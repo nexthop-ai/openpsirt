@@ -24,7 +24,7 @@ ARG ALPINE_VERSION=3.24
 #
 # Building it here also means the image needs nothing of the builder's machine
 # but docker, which is what lets one command stand a working instance up.
-FROM node:24-alpine AS web
+FROM node:26-alpine AS web
 
 WORKDIR /web
 
@@ -38,7 +38,7 @@ COPY web/ ./
 RUN npm run build
 
 # Build. Pinned to the same Go the module asks for.
-FROM golang:1.27.0-alpine AS build
+FROM golang:1.27.1-alpine AS build
 
 WORKDIR /src
 
