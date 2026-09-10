@@ -57,6 +57,20 @@ ENGINE_PREFIX        ?= openpsirt
 # reported "Up" is not one that answers yet, and MySQL takes the longest.
 ENGINE_WAIT          ?= 120
 
+# Every package of ours, which is not what "./..." means here.
+#
+# An npm dependency ships a Go package: web/node_modules/flatted/golang is
+# matched by "./..." and was compiled, vetted and tested as part of this
+# module. Nothing chose that, and a JavaScript dependency putting Go source
+# into this build graph is a surface rather than a curiosity. Every tool
+# written here already skips node_modules by name — readable, unreachable,
+# reserved and the document link test all list it — and the package pattern
+# was the one place that did not.
+#
+# Computed rather than written as "./cmd/... ./internal/...", so a new
+# directory of ours is included without anybody remembering to add it.
+PACKAGES = $(shell $(GO) list ./... | grep -v '/node_modules/')
+
 BIN          := bin/openpsirt
 VERSION      ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT       ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -197,7 +211,7 @@ build:
 # race detector. Seconds, so it is run after every change. The four-engine,
 # race-detected, uncached run is test-all, and the gate uses that.
 test:
-	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test ./...
+	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test $(PACKAGES)
 
 # Every configured engine, the race detector once, nothing cached. Packages run
 # in parallel: each test binary gets a database of its own on every engine
@@ -213,13 +227,13 @@ test-all: test-race test-engines
 
 # The detector, on the engine every checkout has.
 test-race:
-	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1 ./...
+	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1 $(PACKAGES)
 
 # The three server engines, without it. Their time is spent waiting on a
 # socket, which is not where a race is found: 16.9 s against 12.0 s for the API
 # package on MariaDB, where the same package on SQLite is 73.6 s against 10.1 s.
 test-engines:
-	OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1 ./...
+	OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1 $(PACKAGES)
 
 # The checks this change has to pass, chosen from what it touches.
 #
@@ -255,7 +269,7 @@ docs-check:
 	$(GO) test ./internal/docs/
 
 vet:
-	$(GO) vet ./...
+	$(GO) vet $(PACKAGES)
 
 lint:
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) run
@@ -264,7 +278,7 @@ fmt:
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) fmt
 
 govulncheck:
-	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) $(PACKAGES)
 
 # Both halves of what ships, against one allowlist.
 #
@@ -274,7 +288,7 @@ govulncheck:
 # private repository. The allowlist is this variable, passed to both, because
 # a policy written in two files is a policy that differs in one of them.
 licenses:
-	$(GO) run github.com/google/go-licenses@$(GOLICENSES_VERSION) check ./... \
+	$(GO) run github.com/google/go-licenses@$(GOLICENSES_VERSION) check $(PACKAGES) \
 		--allowed_licenses=$(ALLOWED_LICENSES) \
 		$(foreach m,$(LICENSE_EXCEPTIONS),--ignore=$(m))
 	@command -v $(NPM) >/dev/null 2>&1 \
@@ -729,10 +743,19 @@ engines-up: engines-check
 # Stops them. The containers are removed rather than stopped, because a
 # half-migrated database left behind by an interrupted run is a confusing thing
 # to come back to; local.mk is left alone, since it is yours.
+# Leaving local.mk behind is deliberate — "engines-up" reuses it — but a
+# checkout that names three servers and has none is a state worth saying out
+# loud. Between them, "check" and "test-engines" ask for exactly the engines
+# named there, and what they report when nothing answers is a connection
+# error per subtest, which reads like a code regression rather than a stopped
+# container. The quick loop and the race run are narrowed to SQLite and are
+# unaffected.
 engines-down:
 	@$(DOCKER) rm -f $(ENGINE_PREFIX)-pg16 $(ENGINE_PREFIX)-mysql \
 	  $(ENGINE_PREFIX)-mariadb $(ENGINE_PREFIX)-floor >/dev/null 2>&1 || true
-	@echo "removed. local.mk was left alone; 'make engines-up' reuses it."
+	@echo "removed. local.mk was left alone, so 'make engines-up' reuses it —"
+	@echo "and until you run it, 'make check' and 'make test-engines' ask for"
+	@echo "three servers that are no longer there. 'make test' is unaffected."
 
 engines-status:
 	@$(DOCKER) ps -a --filter "name=^$(ENGINE_PREFIX)-" \

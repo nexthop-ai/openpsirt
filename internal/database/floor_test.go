@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 )
 
 // TooOldURLEnv points at a server deliberately older than the floor, so the
@@ -14,6 +15,10 @@ import (
 const TooOldURLEnv = "OPENPSIRT_TEST_TOO_OLD_URL"
 
 func TestOpenRefusesAServerBelowTheFloor(t *testing.T) {
+	// The server below the floor is a PostgreSQL one, so a run narrowed to
+	// SQLite has no business opening it — this test connected regardless, and
+	// the quick loop is documented as needing no server.
+	engines.SkipUnless(t, database.Postgres)
 	url := os.Getenv(TooOldURLEnv)
 	if url == "" {
 		t.Skipf("%s is not set, so the refusal is untested here", TooOldURLEnv)
