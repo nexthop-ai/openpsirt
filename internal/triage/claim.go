@@ -265,6 +265,11 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		if err != nil {
 			return err
 		}
+		// The gate, worked out here for the reason every other write path
+		// works it out here.
+		if err := within.gate(ctx, proposals); err != nil {
+			return err
+		}
 		claim, err := within.newClaim(ctx, ExtensionClaim, subject.ID, &source.ID, "", proposals[0])
 		if err != nil {
 			return err

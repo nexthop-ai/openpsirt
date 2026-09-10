@@ -719,23 +719,12 @@ func registerProposing(api huma.API, in Ingest) {
 			proposal.CommittedTo = &by
 		}
 
-		// Asked before the claim is recorded, so the answer can say whether it
-		// is waiting for anybody. A short deferral is ordinary triage and
-		// takes effect at once.
-		threshold, err := deferralThreshold(ctx, in)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell whether that needs agreement", err)
-		}
-		needs, err := store.NeedsApproval(ctx, proposal, threshold)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell whether that needs agreement", err)
-		}
-		// Recorded on the claim, not merely reported back. A claim that says
-		// it is waiting for somebody and is stored as needing nobody takes
-		// effect the moment it is made, and the answer telling the caller it
-		// was waiting is the only trace of a control that did not run.
-		proposal.NeedsApproval = needs
-
+		// Whether it is waiting for anybody is worked out by the store, inside
+		// the transaction that records it, and read back off what was
+		// written. Asked here and passed in, the answer described the policy
+		// and the postponement in force when the request arrived rather than
+		// when the claim landed — and the answer telling the caller it was
+		// waiting was the only trace of a control that did not run.
 		decision, err := store.Propose(ctx, subject, proposal)
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
@@ -743,7 +732,7 @@ func registerProposing(api huma.API, in Ingest) {
 
 		body := decisionBody(*decision)
 		body.Reasoning = input.Body.Reasoning
-		body.NeedsApproval = needs
+		body.NeedsApproval = decision.NeedsApproval
 		// How much this one judgment covers, so nobody discovers afterwards
 		// that they answered for sixty-two modules or for two versions of the
 		// same package.
@@ -903,10 +892,6 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			lands = &when
 		}
 
-		threshold, err := deferralThreshold(ctx, in)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell whether that needs agreement", err)
-		}
 		limit, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
 			triage.DefaultTogetherCap)
 		if err != nil {
@@ -984,17 +969,6 @@ func registerFindingDecision(api huma.API, in Ingest) {
 					CommittedTo:   lands,
 					Binding:       binding,
 				}
-				// Asked per place rather than once for the set. The threshold
-				// reads the claim, and two places of one finding can differ in
-				// what they carry — one answer for all of them would report a
-				// control that did not run on some.
-				needs, err := store.NeedsApproval(ctx, proposal, threshold)
-				if err != nil {
-					return nil, wentWrong(in.Logger,
-						"cannot tell whether that needs agreement", err)
-				}
-				proposal.NeedsApproval = needs
-				out.Body.NeedsApproval = out.Body.NeedsApproval || needs
 				writes[i]++
 				holds[i] += place.Places
 				proposals = append(proposals, proposal)
@@ -1017,6 +991,8 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		for _, decision := range recorded {
 			out.Body.IDs = append(out.Body.IDs, decision.ID)
 			out.Body.ClaimID = decision.ClaimID
+			// Read off what was written rather than off what was asked for.
+			out.Body.NeedsApproval = out.Body.NeedsApproval || decision.NeedsApproval
 		}
 		if out.Body.IDs == nil {
 			out.Body.IDs = []int64{}
@@ -1424,9 +1400,12 @@ func decisionBody(d triage.Decision) DecisionBody {
 // moment its database was in trouble, with nothing saying so. A setting nobody
 // has changed is a different matter, and answers with the default.
 func deferralThreshold(ctx context.Context, in Ingest) (time.Duration, error) {
-	const shipped = 30 * 24 * time.Hour
 	if in.DB == nil {
-		return shipped, nil
+		return triage.DefaultDeferralThreshold, nil
 	}
-	return setting.NewStore(in.DB.DB).Duration(ctx, setting.DeferralThreshold, shipped)
+	// The same shipped span the store falls back to. Written out here as
+	// well, the two came to disagree about what a deployment that has said
+	// nothing is doing.
+	return setting.NewStore(in.DB.DB).Duration(ctx, setting.DeferralThreshold,
+		triage.DefaultDeferralThreshold)
 }

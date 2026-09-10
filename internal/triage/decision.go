@@ -289,9 +289,14 @@ type Proposal struct {
 	// what the claim rests on, which is the reasoning somebody typed.
 	FromStatement *int64
 	// NeedsApproval says a second person must agree before this takes effect.
-	// Worked out by the caller through NeedsApproval, and recorded, because a
-	// claim that is waiting and one that is in force must be distinguishable
-	// afterwards.
+	//
+	// **Worked out by the store, inside the transaction that writes.** Not
+	// something whoever is proposing states: it turns on the deployment's
+	// threshold and on what this place has already been put off for, and read
+	// before the transaction opened it described a world that a retry — or a
+	// policy somebody changed in between — has left behind. The acts that are
+	// gated by construction rather than by arithmetic set it themselves and
+	// say why.
 	NeedsApproval bool
 }
 
@@ -326,11 +331,18 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 	var recorded *Decision
 	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
-		claim, err := within.newClaim(ctx, FindingClaim, p.By, nil, "", p)
+		// Worked out here rather than taken from the caller, and re-worked on
+		// every attempt: what it turns on is the policy and what this place
+		// has already been put off for, both of which a retry re-reads.
+		gated := []Proposal{p}
+		if err := within.gate(ctx, gated); err != nil {
+			return err
+		}
+		claim, err := within.newClaim(ctx, FindingClaim, p.By, nil, "", gated[0])
 		if err != nil {
 			return err
 		}
-		recorded, err = within.propose(ctx, claim, p)
+		recorded, err = within.propose(ctx, claim, gated[0])
 		return err
 	})
 	if errors.Is(err, ErrAlreadyDecided) {
@@ -382,6 +394,14 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
 		recorded = recorded[:0]
+		// Asked per place rather than once for the set: the threshold reads
+		// the claim, and two places of one finding can differ in what they
+		// carry. Re-worked on every attempt, against the policy and the
+		// postponement in force when the write lands rather than when the
+		// request arrived.
+		if err := within.gate(ctx, proposals); err != nil {
+			return err
+		}
 		// One action, one claim, however many places it covers. The
 		// claim is what the queue lists, what an approver agrees to, and what
 		// the argument is held on; the rows underneath stay one per place and

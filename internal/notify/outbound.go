@@ -19,8 +19,13 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
+
+// signalTimeout bounds one request to one destination, and is what the sweep's
+// lease is sized from.
+const signalTimeout = 15 * time.Second
 
 // One signed request out, one shape for every destination.
 //
@@ -138,7 +143,7 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 	// for the same reason: without it every replica sends the same request and
 	// a channel gets one message per replica.
 	if s.leases != nil {
-		mine, err := s.leases.Take(ctx, SignalLease, s.replica, betweenPosts)
+		mine, err := s.leases.Take(ctx, SignalLease, s.replica, heldFor(signalTimeout))
 		if err != nil || !mine {
 			return 0, 0, err
 		}
@@ -162,7 +167,7 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 		// about outside is.
 		Where("nt.cleared_at IS NULL").
 		OrderExpr("nt.created_at ASC, nt.id ASC").
-		Limit(200).
+		Limit(sweepBatch).
 		Scan(ctx, &rows); err != nil {
 		return 0, 0, fmt.Errorf("read what there is to say: %w", err)
 	}
@@ -208,6 +213,15 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 		OutboundID: to.ID, About: key, Attempts: 1, FirstSeen: now,
 	}
 	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
+		// **The unique index, and nothing else.** Every other insert in this
+		// tree asks which failure this was; here any error at all read as
+		// "somebody has this one", so a lost connection or a lock timeout
+		// answered "already claimed" and a sweep during a brief outage
+		// reported nothing sent and nothing failed — which is what a quiet
+		// queue looks like too.
+		if !database.IsDuplicate(err) {
+			return already, fmt.Errorf("claim a delivery: %w", err)
+		}
 		// Somebody has this one. Either it has gone, or it is being tried
 		// again — and trying again is a decision this pass makes by updating
 		// the row rather than by racing for it.
@@ -215,7 +229,10 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 		if err := s.db.NewSelect().Model(&held).
 			Where("outbound_id = ?", to.ID).Where("about = ?", key).
 			Scan(ctx); err != nil {
-			return already, nil
+			// The row the index just refused, and it cannot be read. That is
+			// a fault rather than an answer: reported as one, not as a
+			// delivery somebody else is handling.
+			return already, fmt.Errorf("read who has this delivery: %w", err)
 		}
 		if held.SentAt != nil || held.Attempts >= tries {
 			return already, nil
@@ -224,7 +241,7 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 			Set("attempts = attempts + 1").
 			Where("id = ?", held.ID).Where("sent_at IS NULL").
 			Exec(ctx); err != nil {
-			return already, nil
+			return already, fmt.Errorf("take another attempt at a delivery: %w", err)
 		}
 		claim.ID = held.ID
 	}
@@ -341,7 +358,7 @@ func trimTo(text string, most int) string {
 // whose chat server is quite reasonably on their own network.
 func outboundClient() *http.Client {
 	dialer := &net.Dialer{
-		Timeout: 15 * time.Second,
+		Timeout: signalTimeout,
 		Control: func(_, _ string, _ syscall.RawConn) error { return nil },
 	}
 	return &http.Client{

@@ -296,11 +296,39 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		})
 	}
 	if len(missing) > 0 {
-		if err := database.InBatches(ctx, c.db, missing); err != nil {
+		// **Two writers describing the same component are agreeing.** The
+		// read above is inside the caller's transaction, which satisfies the
+		// rule about reading outside one — but it says nothing about another
+		// transaction, against another target, finding the same component
+		// absent at the same moment. A unique violation is not a retryable
+		// failure, so the loser did not retry: the whole scan apply failed
+		// and the producer was told its upload could not be read, for a
+		// component that is now present. Two replicas reading two scans at
+		// once is the shipped arrangement, and a portfolio first meeting a
+		// shared dependency is when it happens.
+		//
+		// A component row is content-addressed and never edited, so leaving
+		// somebody else's alone loses nothing.
+		if err := database.InBatchesKeeping(ctx, c.db, missing); err != nil {
 			return nil, fmt.Errorf("record %d new components: %w", len(missing), err)
 		}
+		// Read back rather than taken from the rows. A row another writer
+		// wrote carries their identifier, and a row this statement skipped
+		// carries none at all.
+		written := make([]string, 0, len(missing))
 		for _, added := range missing {
-			known[added.Identity] = added.ID
+			written = append(written, added.Identity)
+		}
+		found, err := c.byIdentities(ctx, written)
+		if err != nil {
+			return nil, err
+		}
+		for identity, id := range found {
+			known[identity] = id
+		}
+		if len(found) != len(written) {
+			return nil, fmt.Errorf("recorded %d new components and %d came back",
+				len(written), len(found))
 		}
 	}
 	return known, nil

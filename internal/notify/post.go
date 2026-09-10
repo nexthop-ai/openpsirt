@@ -20,6 +20,35 @@ import (
 // something rather than a prompt.
 const betweenPosts = time.Minute
 
+// sweepBatch is how many messages one cycle carries.
+//
+// The bound that makes the cycle's cost knowable, which is what the lease is
+// sized from.
+const sweepBatch = 200
+
+// heldFor is how long a sweep holds its lease.
+//
+// **Long enough to cover a cycle of the work rather than an instant of it**,
+// which is what the lease's own contract asks for: it is not renewed while
+// the work runs. Taken for the interval between cycles instead, a batch of
+// two hundred messages to a server answering slowly outlived it by an hour —
+// a second replica took the lease, read the same rows, and sent every one of
+// them again, because what marks a message sent is written after each
+// individual send.
+//
+// Derived from the batch rather than picked: how many messages a cycle
+// carries, times how long one of them may take, and a little either side. A
+// lease is only a promise not to start a second copy, so being generous costs
+// a cycle of nothing happening after a replica dies, and being mean costs
+// everybody a second message.
+func heldFor(perMessage time.Duration) time.Duration {
+	held := time.Duration(sweepBatch) * perMessage
+	if held < betweenPosts {
+		return betweenPosts
+	}
+	return held
+}
+
 // tries is how many times one message is attempted before it is left alone.
 //
 // A mailbox that refuses five times has gone, and a sweep that keeps trying it
@@ -46,6 +75,15 @@ type Post struct {
 	leases  *queue.Leases
 	replica string
 	now     func() time.Time
+}
+
+// channelTimeout is how long one message may take, or the shipped mail bound
+// where no channel is configured.
+func (p *Post) channelTimeout() time.Duration {
+	if p.channel == nil {
+		return defaultMailTimeout
+	}
+	return p.channel.Timeout()
 }
 
 // PostLease names the work of carrying messages out of the application.
@@ -112,7 +150,7 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 	// the work happens either way, and a skipped cycle is the ordinary case
 	// on every replica but one.
 	if p.leases != nil {
-		mine, err := p.leases.Take(ctx, PostLease, p.replica, betweenPosts)
+		mine, err := p.leases.Take(ctx, PostLease, p.replica, heldFor(p.channelTimeout()))
 		if err != nil || !mine {
 			return 0, 0, err
 		}
@@ -132,7 +170,7 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 		// where nobody has an address does no work at all.
 		Where("pe.email IS NOT NULL AND pe.email <> ?", "").
 		OrderExpr("nt.created_at ASC, nt.id ASC").
-		Limit(200).
+		Limit(sweepBatch).
 		Scan(ctx, &rows)
 	if err != nil {
 		return 0, 0, fmt.Errorf("read what is waiting to be sent: %w", err)
@@ -184,10 +222,11 @@ const atMostInADigest = 50
 // worth interrupting somebody for. A person is sent nothing where there is
 // nothing to say.
 func (p *Post) Digests(ctx context.Context) (sent int, err error) {
-	// The same lease as the immediate messages, held for the same reason: two
-	// replicas would each send everybody a digest.
+	// A lease of its own, for the reason the two constants are separate: a
+	// cycle of immediate messages and a day's digests are different work and
+	// one holding the other's lease would stop it.
 	if p.leases != nil {
-		mine, err := p.leases.Take(ctx, DigestLease, p.replica, betweenPosts)
+		mine, err := p.leases.Take(ctx, DigestLease, p.replica, heldFor(p.channelTimeout()))
 		if err != nil || !mine {
 			return 0, err
 		}
@@ -205,7 +244,7 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 		// Bounded like every other read here. A deployment with more people
 		// than this sends the rest on the next cycle rather than holding the
 		// lease for as long as it takes.
-		Limit(200).
+		Limit(sweepBatch).
 		Scan(ctx, &people); err != nil {
 		return 0, fmt.Errorf("read who asked for a digest: %w", err)
 	}

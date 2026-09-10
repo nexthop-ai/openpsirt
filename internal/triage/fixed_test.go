@@ -147,7 +147,7 @@ func TestReAffirmingCarriesEverythingTheClaimRestsOn(t *testing.T) {
 			PreviousID: claimed.ID, Place: moved,
 			Reasoning: "Checked again: the newer package carries it too.",
 			By:        f.proposer,
-		}, 0)
+		})
 		if err != nil {
 			t.Fatalf("re-affirming a claim that the fix is already here: %v", err)
 		}
@@ -184,7 +184,7 @@ func TestReAffirmingCarriesWhatStopsIt(t *testing.T) {
 			PreviousID: claimed.ID, Place: moved,
 			Reasoning: "Still not reachable at the new version.",
 			By:        f.proposer,
-		}, 0); err != nil {
+		}); err != nil {
 			t.Fatalf("re-affirming a dismissal that rests on mitigations: %v", err)
 		}
 	})

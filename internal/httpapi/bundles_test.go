@@ -270,6 +270,15 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			"/v1/products/mine/streams/master/end-of-life", `{"on":""}`); set.Code >= 300 {
 			t.Fatalf("putting the release back answered %d: %s", set.Code, set.Body.String())
 		}
+		// Putting a release back puts what is open in it back on the clock,
+		// and that rewrite happens away from the request. Run here as well so
+		// what follows is asked of a settled state rather than of a race: it
+		// computes the same deadlines, so the pass that is still in flight
+		// writes the same values.
+		if _, err := finding.NewStore(r.db.DB).Recompute(t.Context(),
+			finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
 
 		got := asPerson(t, r, "triager", http.MethodPost, at,
 			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+

@@ -61,6 +61,7 @@ Engine-specific code is confined to these places:
 | Connection setup | Driver-specific settings |
 | Recognizing a retryable failure | Each engine reports a lost race as a different code in a different error type (REQ-71) |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
+| Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only place outside this package, because the queue owns the statement |
 
 This list is the complete set and is checked by grep rather than trusted. It

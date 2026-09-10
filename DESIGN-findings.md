@@ -14,6 +14,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37, REQ-73.
 - [Merging later reports](#merging-later-reports)
 - [Derived addresses](#derived-addresses)
 - [How a match was made](#how-a-match-was-made)
+- [Interning a component](#interning-a-component)
 - [Recorded flaws](#recorded-flaws)
 - [Reporter details](#reporter-details)
 - [Scoring](#scoring)
@@ -194,6 +195,18 @@ against anything, which would need an ordering per ecosystem.
 | Unknown is not unconfirmed | Where a scanner said nothing, nothing is claimed. A working list that quietly holds everything nobody classified is one nobody can work down |
 | Kept on the finding, not the issue | One issue reached through two ecosystems has two answers and the issue can hold only one. An issue first seen in a Debian image and later matched in an Alpine one showed Debian's tracker against the Alpine package |
 | One answer per group | Every place of an issue at a component comes from the same line of a scanner's report |
+
+## Interning a component
+
+A component identified by its content is one row whoever writes it, so two
+scans describing the same library at the same version are agreeing rather than
+colliding.
+
+| Rule | |
+|---|---|
+| The lookup is inside the writing transaction | A retry runs against a database that has moved |
+| **A row another writer got to first is left alone** | The lookup says nothing about another transaction, against another target, finding the same component absent at the same moment — and a unique violation is not a retryable failure, so the loser did not retry: its whole scan apply failed and the producer was told its upload could not be read, for a component that is now present. Two replicas reading two scans at once is the shipped arrangement |
+| The identifiers are read back rather than taken from the rows | A row somebody else wrote carries their identifier, and a row this statement skipped carries none |
 
 ## Recorded flaws
 

@@ -503,6 +503,14 @@ date.
 | One taken back **before it held** counts for nothing | Correcting a mistake is not avoiding the work, and counting it would make the two read alike |
 | A deferral asking for a date **already past** counts for nothing | It asks for nothing, and it is refused at submission besides. Counting it as a negative would let a back-dated request subtract from what a finding has already been put off for |
 
+**Whether a claim needs a second person is worked out where it is written.** It
+was a field on the proposal, answered before the transaction opened and taken
+on trust — so a threshold somebody lowered between the answer and the write
+stored a claim as needing nobody under a policy that says it does, and the
+answer telling the caller it was waiting was the only trace of a control that
+had not run. The threshold itself is read inside that transaction too, for the
+same reason.
+
 The report that shows the pattern counts them the same way, and groups on the
 product and the issue rather than on the words they are displayed under. Only
 the product's own name is unique and it is not the one anybody reads, so two

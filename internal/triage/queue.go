@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // Waiting is one claim somebody has to look at, with what an approver needs in
@@ -757,6 +758,48 @@ func heldFor(deferral Decision) time.Duration {
 		until = *deferral.EndedAt
 	}
 	return until.Sub(deferral.ProposedAt)
+}
+
+// deferralThreshold is how much cumulative postponement a place may carry
+// before a further deferral needs a second person.
+//
+// Read here rather than handed in, and read inside whatever transaction the
+// caller opened. It is an input to the control: read outside, a retry — or a
+// first attempt that merely waited — decided against a policy that has since
+// changed, and recorded a claim as needing nobody under one that says it does.
+func (s *Store) deferralThreshold(ctx context.Context) (time.Duration, error) {
+	return setting.NewStore(s.db).Duration(ctx, setting.DeferralThreshold,
+		DefaultDeferralThreshold)
+}
+
+// DefaultDeferralThreshold is the shipped span, where nobody has said.
+//
+// A starting point rather than a recommendation, like every other shipped
+// number here.
+const DefaultDeferralThreshold = 30 * 24 * time.Hour
+
+// gate works out whether each of these proposals needs a second person, and
+// records the answer on them.
+//
+// **Whether a claim is waiting is not something its author states.** It was a
+// field on the proposal, worked out by the caller before the transaction
+// opened and taken on trust — the same shape the binding deadline had, and
+// with the same consequence: a policy changing between the answer and the
+// write, or a deferral landing on the same place in between, stored a claim
+// as needing nobody under a rule that says it does. Nothing reported it.
+func (s *Store) gate(ctx context.Context, proposals []Proposal) error {
+	threshold, err := s.deferralThreshold(ctx)
+	if err != nil {
+		return err
+	}
+	for i := range proposals {
+		needs, err := s.NeedsApproval(ctx, proposals[i], threshold)
+		if err != nil {
+			return err
+		}
+		proposals[i].NeedsApproval = needs
+	}
+	return nil
 }
 
 // NeedsApproval reports whether a proposal may stand on its own.

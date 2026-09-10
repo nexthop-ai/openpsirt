@@ -305,6 +305,13 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 			// Bounded by the interval: a renewal still waiting when the next
 			// one is due has already failed, and on SQLite it is waiting for
 			// the single connection the work itself is holding.
+			//
+			// **On that engine it cannot succeed while the work runs**, so
+			// the claim timeout is the whole of the protection there rather
+			// than a margin around this: it has to exceed the longest single
+			// unit of work, or the claim goes stale and the job is run again
+			// once the first transaction commits. Kept because it is the
+			// whole of the protection on the other three.
 			bounded, done := context.WithTimeout(working, q.opts.Heartbeat)
 			err := q.Renew(bounded, id, worker)
 			done()
@@ -360,34 +367,41 @@ func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
 // it is allowed to be, in which case it is set aside. Retrying for ever would
 // let one job that can never succeed crowd out work that could.
 func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) error {
-	job := new(Job)
-	if err := q.db.NewSelect().Model(job).Where("id = ?", id).Scan(ctx); err != nil {
-		return fmt.Errorf("load job %d: %w", id, err)
-	}
+	// **The attempt count and the write that acts on it, in one act.** The
+	// count was read with a bare select and compared in Go, so whether this
+	// was the last attempt rested on a value fetched separately from the
+	// statement that buries or re-queues the job. The claimed-by predicate
+	// makes that mostly safe, and "mostly safe" is not what the rule about
+	// reading outside a transaction means.
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		job := new(Job)
+		if err := tx.NewSelect().Model(job).Where("id = ?", id).Scan(ctx); err != nil {
+			return fmt.Errorf("load job %d: %w", id, err)
+		}
 
-	now := q.now().Truncate(time.Microsecond)
-	message := cause.Error()
-	update := q.db.NewUpdate().Model((*Job)(nil)).
-		Set("last_error = ?", message).
-		Set("claimed_by = NULL").
-		Set("updated_at = ?", now).
-		Where("id = ?", id).
-		Where("state = ?", Running).
-		Where("claimed_by = ?", worker)
+		now := q.now().Truncate(time.Microsecond)
+		update := tx.NewUpdate().Model((*Job)(nil)).
+			Set("last_error = ?", cause.Error()).
+			Set("claimed_by = NULL").
+			Set("updated_at = ?", now).
+			Where("id = ?", id).
+			Where("state = ?", Running).
+			Where("claimed_by = ?", worker)
 
-	if job.Attempts >= job.MaxAttempts {
-		update = update.Set("state = ?", Dead)
-	} else {
-		// Longer each time, so a dependency that is briefly unavailable is
-		// not hammered while it recovers.
-		delay := time.Duration(job.Attempts) * q.opts.Backoff
-		update = update.Set("state = ?", Pending).Set("run_after = ?", now.Add(delay))
-	}
-	res, err := update.Exec(ctx)
-	if err != nil {
-		return err
-	}
-	return held(res)
+		if job.Attempts >= job.MaxAttempts {
+			update = update.Set("state = ?", Dead)
+		} else {
+			// Longer each time, so a dependency that is briefly unavailable is
+			// not hammered while it recovers.
+			delay := time.Duration(job.Attempts) * q.opts.Backoff
+			update = update.Set("state = ?", Pending).Set("run_after = ?", now.Add(delay))
+		}
+		res, err := update.Exec(ctx)
+		if err != nil {
+			return err
+		}
+		return held(res)
+	})
 }
 
 // held reads a conditional update's count as whether the job was still this

@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+// defaultMailTimeout bounds the whole conversation with a mail server where
+// nobody has said otherwise.
+const defaultMailTimeout = 30 * time.Second
+
 // Channel carries a message to somebody outside the application.
 //
 // One interface for every channel there will be, so that a third is an adapter
@@ -23,6 +27,10 @@ type Channel interface {
 	// Send carries one message to one address. An error is a reason to try
 	// again later rather than to give up: what is unsent stays unsent.
 	Send(ctx context.Context, to string, m Message) error
+	// Timeout bounds one message. The sweep's lease is sized from it, since
+	// a lease has to cover a cycle of the work rather than an instant of it,
+	// and what a cycle can cost is the batch times this.
+	Timeout() time.Duration
 }
 
 // Mail carries messages over SMTP.
@@ -54,11 +62,14 @@ func NewMail(addr, from, username, password string) *Mail {
 	return &Mail{
 		addr: addr, from: from,
 		username: strings.TrimSpace(username), password: password,
-		timeout: 30 * time.Second,
+		timeout: defaultMailTimeout,
 	}
 }
 
 // Name is what this channel is called in a log line.
+// Timeout bounds the whole conversation with the server.
+func (m *Mail) Timeout() time.Duration { return m.timeout }
+
 func (m *Mail) Name() string { return "mail" }
 
 // Send carries one message to one address.

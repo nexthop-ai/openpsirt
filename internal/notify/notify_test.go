@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -367,6 +368,11 @@ type recorder struct {
 }
 
 func (r *recorder) Name() string { return "recorder" }
+
+// Timeout is what one message may take, which is what the sweep sizes its
+// lease from. A test channel answers at once, so this is the smallest span
+// that says "a message is not free".
+func (r *recorder) Timeout() time.Duration { return time.Second }
 
 func (r *recorder) Send(_ context.Context, to string, m notify.Message) error {
 	r.sent = append(r.sent, struct {

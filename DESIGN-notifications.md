@@ -305,6 +305,8 @@ rest of this table's rules are.
 | Nobody is told they were unassigned | A name being removed is not an action directed at the person who held it, and a queue that gets shorter says so already |
 | A failure to tell somebody is logged, not returned | The assignment happened and the claim was sent back; answering the caller with an error invites a retry that does the first thing twice |
 | More than one process sweeps | The chart ships two replicas, each running its own watch. The unique index makes a duplicate one row, and the pass treats a duplicate as the answer already being there — without that it would abort, and every administrator after the one it failed on would be told nothing that cycle |
+| **A duplicate is recognized as one, and every other failure is reported** | Read as "somebody has this one" whatever went wrong, a lost connection during a sweep answered "already claimed" for every destination and the cycle reported nothing sent and nothing failed — which is what a quiet queue looks like too, so an operator could not tell them apart |
+| **A sweep's lease covers a cycle of the work, not the gap between cycles** | The lease is not renewed while the work runs, which is what its own contract says: taken for the interval instead, a batch of two hundred messages to a server answering slowly outlived it by an hour, a second replica took it, read the same rows and sent every one of them again — because what marks a message sent is written after each individual send. Sized from the batch and what one message may take |
 
 ## Mail
 

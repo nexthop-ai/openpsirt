@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -273,6 +274,44 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 		if !needs {
 			t.Error("deferring again after withdrawing needed nobody, so the " +
 				"threshold resets every time somebody takes a deferral back")
+		}
+	})
+}
+
+// Whether a claim needs a second person is worked out where it is written.
+//
+// It was a field on the proposal, answered before the transaction opened and
+// taken on trust — so a threshold an administrator lowered between the answer
+// and the write stored a claim as needing nobody under a policy that says it
+// does, and nothing reported it. A caller stating the flag at all is the same
+// shape the binding deadline had.
+func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// A deferral of ten days, and a deployment that gates anything past
+		// seven.
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.DeferralThreshold,
+			(7 * 24 * time.Hour).String()); err != nil {
+			t.Fatal(err)
+		}
+		until := time.Now().UTC().Add(10 * 24 * time.Hour)
+
+		// Recorded as needing nobody, which is what a caller who read the
+		// old policy would have said.
+		made, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
+			Reasoning: "Not this sprint.", By: f.proposer,
+			NeedsApproval: false,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !made.NeedsApproval {
+			t.Error("a deferral past the deployment's threshold was stored as " +
+				"needing nobody, on the caller's word")
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
+			t.Error("and it took effect at once")
 		}
 	})
 }

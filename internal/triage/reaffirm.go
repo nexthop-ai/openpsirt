@@ -51,7 +51,7 @@ type Reaffirmation struct {
 //
 // A count of re-affirmations deliberately does not trigger it. That would fire
 // on nothing having changed, which every other rule here refuses to do.
-func (s *Store) Reaffirm(ctx context.Context, subject access.Subject, r Reaffirmation, severityNow int) (*Decision, error) {
+func (s *Store) Reaffirm(ctx context.Context, subject access.Subject, r Reaffirmation) (*Decision, error) {
 	if !mayDecideOn(subject, r.Place.ProductID, r.Place.VulnerabilityID, visibilityOf(r.Place)) {
 		return nil, ErrNotTheirs
 	}
@@ -67,7 +67,7 @@ func (s *Store) Reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 	var made *Decision
 	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		var err error
-		made, err = (&Store{db: tx, now: s.now}).reaffirm(ctx, subject, r, severityNow)
+		made, err = (&Store{db: tx, now: s.now}).reaffirm(ctx, subject, r)
 		return err
 	})
 	if errors.Is(err, ErrAlreadyDecided) {
@@ -95,8 +95,8 @@ func (s *Store) Reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 // Everything it turns on is read in here too: the old claim's visibility, who
 // proposed it, and whether its agreement still stands all decide what this may
 // do, and read outside they are answers about a database that has since moved.
-func (s *Store) reaffirm(ctx context.Context, subject access.Subject, r Reaffirmation,
-	severityNow int) (*Decision, error) {
+func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
+	r Reaffirmation) (*Decision, error) {
 
 	previous := new(Decision)
 	// With its argument, which is the whole of what a re-affirmation carries:
@@ -169,6 +169,16 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 	if err != nil {
 		return nil, err
 	}
+	// How bad it is judged to be **now**, read here with everything else this
+	// turns on. Passed in by the caller it was a number from before the
+	// transaction opened, so an advisory sweep raising the severity in
+	// between — or a retry running against a database that has moved — carried
+	// the old agreement forward on the strength of a figure that is gone. The
+	// docstring above already said everything it turns on is read in here.
+	severityNow, err := s.severityOf(ctx, previous.VulnerabilityID)
+	if err != nil {
+		return nil, err
+	}
 	full := needsFullApproval(*previous, severityNow, carryable != nil)
 
 	proposal := Proposal{
@@ -212,6 +222,21 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 		return nil, err
 	}
 	return made, nil
+}
+
+// severityOf is how bad an issue is judged to be now, in hundredths.
+//
+// The rating in force where somebody has assessed it, and the published one
+// where nobody has — the same value everything else here ranks and clocks on.
+func (s *Store) severityOf(ctx context.Context, vulnerabilityID int64) (int, error) {
+	var centi int
+	if err := s.db.NewSelect().
+		TableExpr("vulnerability AS v").
+		ColumnExpr("COALESCE(v.score_centi, 0)").
+		Where("v.id = ?", vulnerabilityID).Scan(ctx, &centi); err != nil {
+		return 0, fmt.Errorf("read how bad this is now: %w", err)
+	}
+	return centi, nil
 }
 
 // needsFullApproval reports whether a re-affirmation is really a new claim.
@@ -377,8 +402,8 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// versions it currently has — stated the same way the decision was written
 	// against them, from the same expression, so that a decision cannot lapse
 	// on one path and stand on the other.
-	openHere := func() *bun.SelectQuery {
-		return s.db.NewSelect().
+	openHere := func(db bun.IDB) *bun.SelectQuery {
+		return db.NewSelect().
 			ColumnExpr("1").
 			TableExpr("finding AS f").
 			Join("JOIN component AS c ON c.id = f.component_id").
@@ -393,82 +418,133 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 
 	// Any open finding in the decision's product, in any build, still at the
 	// versions it was decided about.
-	stillCovered := s.db.NewSelect().
-		ColumnExpr("1").
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Where("st.product_id = de.product_id").
-		Where("f.closed_at IS NULL").
-		Where("f.vulnerability_id = de.vulnerability_id").
-		Where("f.place_identity = de.place_identity").
-		Where(matching)
+	stillCovered := func(db bun.IDB) *bun.SelectQuery {
+		return db.NewSelect().
+			ColumnExpr("1").
+			TableExpr("finding AS f").
+			Join("JOIN component AS c ON c.id = f.component_id").
+			Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
+			Join("JOIN target AS tg ON tg.id = f.target_id").
+			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			Where("st.product_id = de.product_id").
+			Where("f.closed_at IS NULL").
+			Where("f.vulnerability_id = de.vulnerability_id").
+			Where("f.place_identity = de.place_identity").
+			Where(matching)
+	}
 
 	// Still found here, at versions that are not the ones this was decided
 	// about, and no longer found at those versions anywhere in the product.
 	// Absent and empty are the same answer on the finding's side, so a
 	// decision recorded against no version matches a component stating none.
-	moment := s.now().Truncate(time.Microsecond)
-	result, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("state = ?", LapsedState).
-		Set("ended_at = ?", moment).
-		// Released for the same reason a withdrawal is: the code moved out
-		// from under this, so it covers nothing, and somebody has to be able
-		// to decide about what is there now.
-		Set("live_key = ?", nil).
-		Where("state IN (?, ?)", Proposed, Approved).
-		Where("de.product_id = (?)", s.db.NewSelect().
-			ColumnExpr("st.product_id").
-			TableExpr("target AS tg").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
-			Where("tg.id = ?", targetID)).
-		Where("EXISTS (?)", openHere().Where("NOT ("+matching+")")).
-		Where("NOT EXISTS (?)", stillCovered).
-		Exec(ctx)
-	if err != nil {
-		return Lapsed{}, fmt.Errorf("mark what the code moved out from under: %w", err)
-	}
-	moved, err := result.RowsAffected()
-	if err != nil {
-		// Not every driver reports it. The rows are marked either way, and
-		// what follows reads them back rather than trusting this number.
-		moved = 0
+	lapsable := func(db bun.IDB) *bun.SelectQuery {
+		return db.NewSelect().Model((*Decision)(nil)).
+			ColumnExpr("de.id").
+			Where("de.state IN (?, ?)", Proposed, Approved).
+			Where("de.product_id = (?)", db.NewSelect().
+				ColumnExpr("st.product_id").
+				TableExpr("target AS tg").
+				Join("JOIN stream AS st ON st.id = tg.stream_id").
+				Where("tg.id = ?", targetID)).
+			Where("EXISTS (?)", openHere(db).Where("NOT ("+matching+")")).
+			Where("NOT EXISTS (?)", stillCovered(db)).
+			OrderExpr("de.id").
+			Limit(database.InBulk.Most)
 	}
 
-	// Who to tell, read back by the moment just written rather than by
-	// collecting identifiers first. A sweep over a real image can lapse
-	// thousands of rows at once, and an update naming every one of them in an
-	// IN list is a statement whose size is the estate's.
+	db, ok := s.db.(*bun.DB)
+	if !ok {
+		return Lapsed{}, fmt.Errorf("this store is already inside a transaction")
+	}
+
+	// **Marked and read back as one act, a bounded batch at a time.** It was
+	// three statements on the pool with nothing around them: a crash between
+	// the update and the read left rows lapsed with nobody told, which is the
+	// outcome marking a lapse exists to prevent. And the rows were identified
+	// on the way back by the timestamp the update wrote, under a comment
+	// saying two sweeps could not read each other's rows because the product
+	// is this target's — two targets of one product share a product, so two
+	// scans finishing together read each other's rows and told every proposer
+	// twice.
 	//
-	// The moment is this pass's own, truncated to the microsecond, and the
-	// product is this target's — so two sweeps running at once cannot read
-	// each other's rows even if their clocks agree.
-	var lapsed []int64
-	if err := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr("de.id").
-		Where("de.state = ?", LapsedState).
-		Where("de.ended_at = ?", moment).
-		Where("de.product_id = (?)", s.db.NewSelect().
-			ColumnExpr("st.product_id").
-			TableExpr("target AS tg").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
-			Where("tg.id = ?", targetID)).
-		Scan(ctx, &lapsed); err != nil {
-		return Lapsed{}, fmt.Errorf("read what lapsed: %w", err)
+	// Identified by identifier now, which is what makes each pass's rows its
+	// own. Batched because a sweep over a real image can lapse thousands at
+	// once and a statement naming every one of them is a statement whose size
+	// is the estate's.
+	out := Lapsed{}
+	seen := map[int64]bool{}
+	for {
+		var moved int64
+		var lapsed []int64
+		if err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+			moved, lapsed = 0, nil
+			var ids []int64
+			if err := lapsable(tx).Scan(ctx, &ids); err != nil {
+				return fmt.Errorf("read what the code moved out from under: %w", err)
+			}
+			if len(ids) == 0 {
+				return nil
+			}
+			moment := s.now().Truncate(time.Microsecond)
+			result, err := tx.NewUpdate().Model((*Decision)(nil)).
+				Set("state = ?", LapsedState).
+				Set("ended_at = ?", moment).
+				// Released for the same reason a withdrawal is: the code
+				// moved out from under this, so it covers nothing, and
+				// somebody has to be able to decide about what is there now.
+				Set("live_key = ?", nil).
+				Where("de.id IN (?)", bun.List(ids)).
+				// Re-asserted, so a row another sweep took in between is not
+				// counted here as well.
+				Where("de.state IN (?, ?)", Proposed, Approved).
+				Exec(ctx)
+			if err != nil {
+				return fmt.Errorf("mark what the code moved out from under: %w", err)
+			}
+			n, err := result.RowsAffected()
+			if err != nil {
+				return fmt.Errorf("cannot tell what was marked: %w", err)
+			}
+			moved = n
+			// Who to tell, read back inside the same act. The identifiers
+			// are this pass's own, so nothing another sweep marked is in it.
+			if err := tx.NewSelect().Model((*Decision)(nil)).
+				ColumnExpr("de.id").
+				Where("de.id IN (?)", bun.List(ids)).
+				Where("de.state = ?", LapsedState).
+				Where("de.ended_at = ?", moment).
+				Scan(ctx, &lapsed); err != nil {
+				return fmt.Errorf("read what lapsed: %w", err)
+			}
+			return nil
+		}); err != nil {
+			return Lapsed{}, err
+		}
+		if len(lapsed) == 0 && moved == 0 {
+			break
+		}
+		out.Rows += moved
+		fresh := make([]int64, 0, len(lapsed))
+		for _, id := range lapsed {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			fresh = append(fresh, id)
+		}
+		if len(fresh) == 0 {
+			break
+		}
+		told, err := s.proposersOf(ctx, fresh)
+		if err != nil {
+			return Lapsed{}, err
+		}
+		out.Told = append(out.Told, told...)
 	}
-	if len(lapsed) == 0 {
-		return Lapsed{Rows: moved}, nil
+	if out.Rows == 0 && len(out.Told) > 0 {
+		out.Rows = int64(len(out.Told))
 	}
-	told, err := s.proposersOf(ctx, lapsed)
-	if err != nil {
-		return Lapsed{}, err
-	}
-	if moved == 0 {
-		moved = int64(len(lapsed))
-	}
-	return Lapsed{Rows: moved, Told: told}, nil
+	return out, nil
 }
 
 // Carried is what a new line would inherit from an existing one.

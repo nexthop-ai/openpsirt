@@ -41,7 +41,7 @@ func TestReAffirmingAfterABumpNeedsNoSecondPerson(t *testing.T) {
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Checked again at the new version; still not reached.",
 			By:        f.proposer,
-		}, 700)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,12 +65,20 @@ func TestSeverityRisingSendsItBackForFullApproval(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// The world revises it upward, which is what an advisory sweep does.
+		// Read by the store rather than handed in, so this is where it moves.
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
+			Set("score_centi = ?", 950).
+			Where("id = ?", f.issue).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Still not reached.", By: f.proposer,
-		}, 950)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,7 +99,7 @@ func TestNothingIsCarriedFromAClaimNobodyAgreedTo(t *testing.T) {
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: neverAgreed.ID, Place: moved,
 			Reasoning: "Still true.", By: f.proposer,
-		}, 700)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,7 +132,7 @@ func TestALapsedClaimNobodyAgreedToIsNotPreAgreed(t *testing.T) {
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: neverAgreed.ID, Place: moved,
 			Reasoning: "Still true at the new version.", By: f.proposer,
-		}, 700)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -172,7 +180,7 @@ func TestRepetitionAloneChangesNothing(t *testing.T) {
 			again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 				PreviousID: previous.ID, Place: at,
 				Reasoning: "Checked again; still not reached.", By: f.proposer,
-			}, 700)
+			})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -205,7 +213,7 @@ func TestAWithdrawnAgreementIsNotResurrectedByAVersionBump(t *testing.T) {
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Trying again.", By: f.proposer,
-		}, 700)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +246,7 @@ func TestACarriedAgreementSaysItWasCarried(t *testing.T) {
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Checked again at the new version; still not reached.",
 			By:        f.proposer,
-		}, 700)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}

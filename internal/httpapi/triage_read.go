@@ -751,7 +751,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			},
 			Reasoning: input.Body.Reasoning,
 			By:        subject.ID,
-		}, where.SeverityCenti)
+		})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}
