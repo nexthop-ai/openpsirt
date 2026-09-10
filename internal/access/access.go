@@ -275,11 +275,12 @@ func Everything(what string) Subject {
 
 // Holds reports whether this subject holds a role on a product.
 //
-// **An administrator does not hold every role**. Administration is
-// people, roles, credentials, settings and the catalog; reading and triaging
-// are granted on a product like anybody else's, and an administrator who wants
-// them grants them to themselves — visibly, in the same record everyone else's
-// grants live in.
+// **An administrator does not hold every role**. Administration is people,
+// roles, credentials, settings, the catalog, and the two acts on the record
+// itself — removing an attached file and supplying a third party's evidence
+// about a product; reading and triaging are granted on a product like anybody
+// else's, and an administrator who wants them grants them to themselves —
+// visibly, in the same record everyone else's grants live in.
 //
 // It read the other way, and nothing said so: `privileges.md` says holding
 // every role does not amount to admin and never claimed the reverse. What it

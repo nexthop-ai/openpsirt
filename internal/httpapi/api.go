@@ -289,6 +289,9 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	cfg.DocsPath = ""
 
 	api := humachi.New(router, cfg)
+	// Before anything registers, so no operation can be added without the
+	// scope on its own declaration being enforced.
+	enforceDeclarations(api)
 	registerVersion(api)
 	registerScans(api, in)
 	registerFindings(api, in)

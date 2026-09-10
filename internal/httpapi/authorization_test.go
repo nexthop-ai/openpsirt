@@ -11,6 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -317,8 +318,14 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// A place for attachments, so the operations that carry REQ-70's
+		// control answer rather than saying the deployment holds none.
+		files, err := attach.NewFiles(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
 		handler, api := httpapi.New(quiet, nil, httpapi.Ingest{
-			DB: db, Queue: queue.New(db, queue.DefaultOptions()),
+			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(rights, access.Trust{Header: testHeader, From: sources}),
 			// A deployment that has been told who it publishes as, which is
 			// what an advisory needs. The one that has not is tested where

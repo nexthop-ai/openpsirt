@@ -475,6 +475,12 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject) ([]Holding, 
 		ColumnExpr("f.assigned_to AS person_id").
 		GroupExpr("f.assigned_to, f.vulnerability_id, f.component_id, st.product_id")
 
+	// Bounded like every other list. It is a name-yielding projection —
+	// one row per person holding open work the caller can see — and it was
+	// the only one with no ceiling at all: no limit parameter, no default,
+	// and a response that grows with the deployment. Ordered by who is
+	// holding most, so the bound cuts the tail rather than an arbitrary
+	// slice.
 	var held []Holding
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "work"`, pieces).
@@ -483,6 +489,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject) ([]Holding, 
 		ColumnExpr("0 AS places").
 		ColumnExpr("0 AS overdue").
 		GroupExpr(`"work".person_id`).
+		OrderExpr("open DESC, person_id").
+		Limit(database.InBulk.Most).
 		Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("read who is holding what: %w", err)
 	}

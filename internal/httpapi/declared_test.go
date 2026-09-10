@@ -56,10 +56,11 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 
-		// Counted by reason, because a sweep that quietly stops walking is
-		// worse than no sweep: the number it checks is the only evidence it
-		// is still looking at the API.
-		var checked, notAGate, narrowed, noValue int
+		// Counted by class, because a sweep that quietly stops walking is
+		// worse than no sweep: the numbers it checks are the only evidence
+		// it is still looking at the API, and a class emptying is invisible
+		// in one total.
+		var onProduct, deployment, anywhere, notAGate, narrowed, noValue int
 		for path, item := range r.api.OpenAPI().Paths {
 			for method, op := range operations(item) {
 				want, ok := op.Extensions[requiresExtensionName]
@@ -76,19 +77,39 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 				if err := json.Unmarshal(raw, &needs); err != nil {
 					t.Fatalf("%s %s: %v", method, path, err)
 				}
-				// Only the ones that name roles held on the product in the
-				// path. A scope alone is satisfied by anybody holding
-				// anything, and there is no such thing as somebody who holds
-				// none of an empty list.
-				if needs.Scope != "product" || len(needs.AnyOf) == 0 {
-					notAGate++
-					continue
-				}
 				if needs.Narrowed {
 					narrowed++
 					continue
 				}
-				who := strangerTo(needs.AnyOf)
+				// Who is a stranger to this operation depends on what it
+				// asks for. The scope was read as "a scope alone is
+				// satisfied by anybody holding anything", which is true of
+				// the credential scopes and false of the two that name a
+				// standing nobody holds by default — so every
+				// administrator-only operation and every any-product one
+				// went unswept, which is most of the ones a mistake would
+				// be worst on.
+				var who string
+				switch {
+				case needs.Scope == "product" && len(needs.AnyOf) > 0:
+					onProduct++
+					who = strangerTo(needs.AnyOf)
+				case needs.Scope == "deployment":
+					deployment++
+					// Somebody who holds a role on the product and does not
+					// administer the deployment. A subject who reaches
+					// nothing would be refused before the gate was consulted.
+					who = "reader"
+				case needs.Scope == "any-product":
+					anywhere++
+					// Somebody recognized who holds no role on any product,
+					// which is what this scope asks for.
+					who = "nothing"
+				default:
+					notAGate++
+					continue
+				}
+
 				asking := fill(path)
 				if strings.Contains(asking, "{") {
 					noValue++
@@ -96,22 +117,42 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 						"for, so it is not being checked", method, path)
 					continue
 				}
-				checked++
 				if got := r.as(t, who, method, asking); got >= 200 && got < 300 {
-					t.Errorf("%s %s answered %q with %d, and %q holds none of %s",
-						method, asking, who, got, who, strings.Join(needs.AnyOf, " or "))
+					t.Errorf("%s %s answered %q with %d, and %q satisfies none of "+
+						"what it declares (%s)", method, asking, who, got, who,
+						describe(needs))
 				}
 			}
 		}
-		// A sweep that walks nothing passes. Say so out loud, at a number the
-		// API cannot fall below without somebody having deleted most of it.
-		if checked < 30 {
-			t.Fatalf("only %d operations are gated by a role on a product "+
-				"(%d ask for something else, %d are narrowed rather than gated, "+
-				"%d have no value here): this sweep is not walking the API",
-				checked, notAGate, narrowed, noValue)
+		// A sweep that walks nothing passes. Said out loud per class, at
+		// numbers the API cannot fall below without somebody having deleted
+		// most of it — and per class, because one total hides a class that
+		// has quietly emptied.
+		if onProduct < 30 {
+			t.Errorf("only %d operations are gated by a role on a product: "+
+				"this sweep is not walking them", onProduct)
 		}
+		if deployment < 20 {
+			t.Errorf("only %d operations are gated on administering the deployment: "+
+				"this sweep is not walking them", deployment)
+		}
+		if anywhere < 3 {
+			t.Errorf("only %d operations are gated on a role anywhere: "+
+				"this sweep is not walking them", anywhere)
+		}
+		t.Logf("swept %d on a product, %d deployment-wide, %d on any product "+
+			"(%d ask only for a credential, %d are narrowed rather than gated, "+
+			"%d have no value here)",
+			onProduct, deployment, anywhere, notAGate, narrowed, noValue)
 	})
+}
+
+// describe says what an operation asks for, for a failure message.
+func describe(needs asked) string {
+	if len(needs.AnyOf) > 0 {
+		return strings.Join(needs.AnyOf, " or ") + " (" + needs.Scope + ")"
+	}
+	return needs.Scope
 }
 
 // requiresExtensionName is the key the operation carries. Spelled out here

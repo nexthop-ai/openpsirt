@@ -232,14 +232,21 @@ renderer's to apply. The rules are in `DESIGN-text.md`.
 
 ## Limits
 
-- **The declaration is not the check.** What an operation states is what a caller
-  may rely on being asked; the asking is a line in the handler. Where a narrower
-  check was written than the operation declares, the two disagree and nothing
-  fails. Making the decorator enforce its declaration was refused: a check running
-  before the handler would answer 403 and tell a guesser the thing exists.
+- **Half the declaration is the check, and half is not.** The scope — an
+  administrator, the caller's own credential, any recognized one, none — is a
+  fact about the subject alone, so it is enforced from the declaration before
+  any handler runs. A role on a product needs the product resolved, so that
+  half stays a line in the handler, and where a narrower check was written than
+  the operation declares the two disagree and nothing fails. Enforcing the role
+  half centrally is refused for the reason it always was: a check running before
+  the handler would answer 403 and tell a guesser the thing exists. Enforcing
+  neither is what left every administrator gate resting on one line nobody
+  swept.
 - **The gate sweep is a floor, not a proof.** A refusal for the wrong reason
   passes it, and it says nothing about what a narrowed operation puts in its
-  answer.
+  answer. It walks all three gated scopes and counts them apart, because it
+  walked one of the three for a long time and the two it skipped were the
+  thirty-seven administrator gates and the three any-product ones.
 - **A note states something the scope does not, or is omitted.** Three said the
   opposite of the value beside them, the worst being an operation answered
   without a credential that declared it required one.
