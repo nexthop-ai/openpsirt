@@ -51,9 +51,17 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 		// anything in the meantime — otherwise the queue is decorative and one
 		// person can dismiss a finding on their own, which is the whole thing
 		// the second pair of eyes exists to prevent.
+		//
+		// And not one that was sent back. Only a claim needing nobody can be
+		// both sent back and standing, and it went on suppressing the finding
+		// while the record said it had been returned — with the notice to its
+		// author saying, in those words, that it applied to nothing until it
+		// was revised. Sending back is not a state of its own, but it is a
+		// statement that nobody is relying on this yet.
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("de.state = ?", Approved).
-				WhereOr("de.state = ? AND de.needs_approval = ?", Proposed, false)
+				WhereOr("de.state = ? AND de.needs_approval = ? AND de.sent_back_at IS NULL",
+					Proposed, false)
 		})
 
 	query = matchVersion(query, "de.component_upstream_version", at.ComponentUpstream)

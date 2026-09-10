@@ -141,6 +141,7 @@ A deployment with one person cannot approve anything.
 | Rule | |
 |---|---|
 | An approval names one revision of the reasoning, not the decision | A second pair of eyes read particular words. An approval floating free of them would still stand after somebody rewrote them, and nothing would report it |
+| **The row count is the control, so an engine that cannot report it refuses** | The rows move only while the approved revision is still what the claim rests on, and that condition is checked by counting what moved. Read as optional, the check was skipped on any driver that does not answer — after the approval row was already written |
 | The reasoning is revised, never overwritten; every revision is readable | |
 | Editing the reasoning takes back the approval | The item returns to the queue marked as previously approved rather than as a fresh proposal |
 | Withdrawing, revising and sending back need no approval | Hiding risk needs a second person; putting it back on the table does not |
@@ -461,7 +462,8 @@ author revises. A reason is required and travels as a comment.
 
 | Rule | |
 |---|---|
-| Not a state of its own | The claim is still proposed and still suppresses nothing; what changed is whose turn it is. A fifth state would have to be reasoned about everywhere the other four are, for a distinction about attention rather than about standing |
+| Not a state of its own | The claim is still proposed and what changed is whose turn it is. A fifth state would have to be reasoned about everywhere the other four are, for a distinction about attention rather than about standing |
+| **It suppresses nothing while it is back** | A gated claim already suppressed nothing, so this is about the one that needed nobody: a short deferral went on hiding the finding after an approver returned it, while the notice to its author said in those words that it applied to nothing until it was revised. Revising puts it back, which is what returning it asked for |
 | It needs no approval | Same reason revising and withdrawing do not |
 | Nobody sends back a claim whose current words are their own | That is theirs to revise |
 | Everybody whose words went back is told | A claim revised row by row can rest on several people's words. The notice sends them to the finding — the build, the issue and the component, at the version — because that is where the words are revised. Where no open finding the sender may read still describes the claim, it sends them to the decision itself |

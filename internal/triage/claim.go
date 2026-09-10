@@ -539,7 +539,17 @@ func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, 
 	if err != nil {
 		return fmt.Errorf("record an approval: %w", err)
 	}
-	if n, err := moved.RowsAffected(); err == nil && n != int64(len(ids)) {
+	// The count is the control, so a driver that cannot report it is a
+	// refusal rather than a pass. Read as optional, the whole revision-bound
+	// check was skipped on any driver or proxy that does not answer — after
+	// the approval row was already written, leaving a claim agreed to under
+	// an approval naming reasoning that is no longer what it rests on.
+	n, err := moved.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("cannot tell whether the reasoning changed while this "+
+			"was being agreed to: %w", err)
+	}
+	if n != int64(len(ids)) {
 		return fmt.Errorf("the reasoning changed while this was being agreed to; read it again")
 	}
 	return nil
@@ -792,7 +802,12 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 		if err != nil {
 			return fmt.Errorf("record that this was sent back: %w", err)
 		}
-		if n, err := marked.RowsAffected(); err == nil && n != int64(len(ids)) {
+		n, err := marked.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("cannot tell whether the claim changed while it was "+
+				"being sent back: %w", err)
+		}
+		if n != int64(len(ids)) {
 			return fmt.Errorf("the claim changed while it was being sent back; read it again")
 		}
 		result.Sent = len(ids)

@@ -759,3 +759,46 @@ func TestRecordingAClaimIsABoundedNumberOfStatementsHoweverManyPlacesItCovers(t 
 		}
 	})
 }
+
+// A claim that was sent back applies to nothing until it is revised, which is
+// what the notice to its author says in those words.
+//
+// Only a claim needing nobody can be both sent back and standing — a gated
+// one suppresses nothing while it waits — and that is exactly the one that
+// went on hiding the finding after an approver had returned it.
+func TestAClaimSentBackStopsApplying(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		soon := time.Now().UTC().Add(24 * time.Hour)
+		short, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if short.NeedsApproval {
+			t.Fatal("a short deferral was gated, so this tests nothing")
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing == nil {
+			t.Fatal("a deferral needing nobody did not stand, so this tests nothing")
+		}
+
+		if _, err := f.store.SendBackClaim(ctx, f.reviewer, short.ClaimID,
+			"Say which sprint, and why not this one."); err != nil {
+			t.Fatal(err)
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
+			t.Error("a claim an approver sent back went on suppressing the finding")
+		}
+
+		// And revising it puts it back, which is what returning it asked for.
+		if _, err := f.store.Revise(ctx, f.triager, short.ClaimID,
+			"Waiting on the 6.2 rebase, which lands next sprint."); err != nil {
+			t.Fatal(err)
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing == nil {
+			t.Error("a revised claim did not start applying again")
+		}
+	})
+}
