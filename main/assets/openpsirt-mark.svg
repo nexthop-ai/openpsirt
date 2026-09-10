@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="330 120 550 660">
+<title>OpenPSIRT</title>
+<desc>Product Security Incident Response and Triage</desc>
+<defs>
+  <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#14263c"/><stop offset="1" stop-color="#08182d"/>
+  </linearGradient>
+  <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#2a63b8"/><stop offset="1" stop-color="#0f4b9d"/>
+  </linearGradient>
+</defs>
+<!-- Icon: true vector paths -->
+<g>
+  <!-- outer left shield/frame -->
+  <path fill="url(#navy)" d="M600 140 L360 260 Q350 265 350 282 L350 420
+    Q350 610 600 755 L600 715 Q385 585 385 410 L385 285 L600 180 Z"/>
+  <!-- top cap -->
+  <path fill="url(#navy)" d="M600 140 L710 198 L710 242 L600 185 Z"/>
+  <!-- outer right shield/frame -->
+  <path fill="url(#blue)" d="M745 210 L845 260 Q860 267 860 285 L860 430
+    Q860 610 600 755 L600 715 Q825 585 825 425 L825 285 L745 245 Z"/>
+  <!-- white inner left field -->
+  <path fill="#fff" d="M600 180 L385 285 L385 420 Q385 585 600 715 Z"/>
+  <!-- blue inner panel -->
+  <path fill="url(#blue)" d="M600 225 L790 320 L790 425 Q790 565 600 680 Z"/>
+
+  <!-- circuit bars -->
+  <g fill="#10233a">
+    <path d="M395 300 H500 V322 H395 Z"/>
+    <path d="M395 370 H440 L468 392 H545 V414 H458 L430 392 H395 Z"/>
+    <path d="M395 475 H505 V497 H395 Z"/>
+  </g>
+  <!-- nodes -->
+  <g fill="#10233a">
+    <circle cx="510" cy="311" r="33"/>
+    <circle cx="555" cy="403" r="33"/>
+    <circle cx="515" cy="486" r="33"/>
+  </g>
+  <g fill="#fff">
+    <circle cx="510" cy="311" r="14"/>
+    <circle cx="555" cy="403" r="14"/>
+    <circle cx="515" cy="486" r="14"/>
+  </g>
+  <!-- check -->
+  <path d="M650 405 L685 440 L750 370" fill="none" stroke="#fff"
+        stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+
+</svg>
