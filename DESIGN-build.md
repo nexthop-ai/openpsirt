@@ -62,6 +62,15 @@ Everything is under `internal/`, so nothing is importable by another module.
 Every check CI runs is a `make` target, so a CI failure reproduces locally with
 the same command and the same pinned tool versions (REQ-75).
 
+**The Go package pattern is not `./...`.** An npm dependency ships a Go
+package — `web/node_modules/flatted/golang` — and `./...` matched it, so it
+was compiled, vetted, tested and scanned as part of this module. Nothing
+chose that: a JavaScript dependency putting Go source into the build graph is
+a surface, not a curiosity. Every tool written here already skips
+`node_modules` by name; the package pattern was the one place that did not,
+and it is now the list `go list` gives minus that directory, computed rather
+than written out so a new directory of ours needs no edit.
+
 | Target | Runs |
 |---|---|
 | `make build` | The binary, with version information injected |
@@ -283,6 +292,20 @@ what SQLite spends and almost none of what a server engine does.
 
 The detector is a property of the binary and cannot be turned on for one
 subtest, so `test-all` is two runs: SQLite with it, the three servers without.
+
+**It was not true of four tests.** `OPENPSIRT_TEST_ENGINES` narrows which
+engines a run touches, and `test` and `test-race` both set it to `sqlite` — but
+the pool's idle reaper, the migration lock and the version floor open
+connections themselves rather than through `dbtest`, and each read its URL
+without consulting the variable. So the quick loop and the race run opened
+three servers, and the measurements above understate what the race run costs.
+It surfaced as five failures the day the servers were stopped, which reads as
+a code regression rather than a stopped container.
+
+The rule now lives in `dbtest/engines`, a package below both `dbtest` and
+`migrate`: the migration lock's test is an internal test of `migrate`, which
+`dbtest` depends on, so it could not reach the rule and a second copy of the
+parsing was the alternative.
 
 **Tests within a package run beside each other when SQLite is the whole run.**
 That is the only run where each test already holds a database nothing else can

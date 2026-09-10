@@ -6,11 +6,18 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 )
 
 // This package cannot use dbtest: dbtest builds the schema, the schema is
 // applied through this package, and Go allows no such cycle in a test. So
 // the two helpers it needs are here, in the smallest form that works.
+//
+// What is *not* copied here is which engines a run may touch. That rule lives
+// in dbtest/engines, which imports neither this package nor dbtest, precisely
+// so the copy in this file does not have to exist — it is the rule the quick
+// loop and the race run set, and this test used to ignore it and open three
+// servers regardless.
 const (
 	postgresURLEnv = "OPENPSIRT_TEST_POSTGRES_URL"
 	mysqlURLEnv    = "OPENPSIRT_TEST_MYSQL_URL"
@@ -44,12 +51,16 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 	lockWaitSeconds = 2
 	t.Cleanup(func() { lockWaitSeconds = restore })
 
-	for name, env := range map[string]string{
-		"postgres": postgresURLEnv,
-		"mysql":    mysqlURLEnv,
-		"mariadb":  mariadbURLEnv,
+	for name, env := range map[database.Engine]string{
+		database.Postgres: postgresURLEnv,
+		database.MySQL:    mysqlURLEnv,
+		database.MariaDB:  mariadbURLEnv,
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(string(name), func(t *testing.T) {
+			// This is an internal test of the migrate package and dbtest
+			// depends on migrate, so the narrowing comes from the package
+			// below both rather than from a second copy of the parsing here.
+			engines.SkipUnless(t, name)
 			url := os.Getenv(env)
 			if url == "" {
 				t.Skipf("%s is not set, so the migration lock is untested here", env)

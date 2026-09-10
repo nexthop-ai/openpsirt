@@ -37,6 +37,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/uptrace/bun"
 )
@@ -48,12 +49,10 @@ const (
 	MariaDBURLEnv  = "OPENPSIRT_TEST_MARIADB_URL"
 )
 
-// EnginesEnv narrows which engines run, as a comma-separated list of names.
-// Unset means every engine that is configured. The quick loop sets it to
-// "sqlite" so that iterating does not wait on three servers; the gate leaves
-// it unset. An engine excluded this way is skipped with a message that says
-// so, which is a different message from one that is not configured at all.
-const EnginesEnv = "OPENPSIRT_TEST_ENGINES"
+// EnginesEnv narrows which engines run. The rule and its reasoning live in
+// the engines package, which is where a test that cannot import this one
+// reaches it from.
+const EnginesEnv = engines.Env
 
 type candidate struct {
 	name database.Engine
@@ -200,15 +199,7 @@ func runnable(only, wanted map[database.Engine]bool) []candidate {
 }
 
 func enginesWanted() map[database.Engine]bool {
-	raw := strings.TrimSpace(os.Getenv(EnginesEnv))
-	if raw == "" {
-		return nil
-	}
-	wanted := map[database.Engine]bool{}
-	for _, name := range strings.Split(raw, ",") {
-		wanted[database.Engine(strings.TrimSpace(strings.ToLower(name)))] = true
-	}
-	return wanted
+	return engines.Selected()
 }
 
 // Open connects to url and closes the connection when the test ends.

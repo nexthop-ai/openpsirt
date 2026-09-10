@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 )
 
 func TestIdleConnectionsAreReaped(t *testing.T) {
@@ -17,12 +18,15 @@ func TestIdleConnectionsAreReaped(t *testing.T) {
 	// before anything in the path kills it behind our back. Asserting the
 	// setting was applied would prove nothing, so this checks the pool's own
 	// count of connections it closed for being idle too long.
-	for name, env := range map[string]string{
-		"postgres": dbtest.PostgresURLEnv,
-		"mysql":    dbtest.MySQLURLEnv,
-		"mariadb":  dbtest.MariaDBURLEnv,
+	for name, env := range map[database.Engine]string{
+		database.Postgres: dbtest.PostgresURLEnv,
+		database.MySQL:    dbtest.MySQLURLEnv,
+		database.MariaDB:  dbtest.MariaDBURLEnv,
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(string(name), func(t *testing.T) {
+			// Before the URL is read, not after: a configured engine this run
+			// was told to leave alone is one this test must not connect to.
+			engines.SkipUnless(t, name)
 			url := os.Getenv(env)
 			if url == "" {
 				t.Skipf("%s is not set", env)
