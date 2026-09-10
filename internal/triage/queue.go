@@ -735,9 +735,14 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 			return true, nil
 		}
 		if p.Binding == nil {
-			// Nothing it covers has a deadline, so there is none to go past.
-			// A product below its own triage line is the ordinary case here.
-			return false, nil
+			// Nothing it covers has a deadline, so there is no date the
+			// promise can be inside. The exemption is "this hides nothing the
+			// policy did not already allow", and a place with no deadline
+			// allowed nothing — so there is nothing to measure the promise
+			// against and a second person agrees. Reading it the other way
+			// made a product below its own triage line the one place where a
+			// promise could hide a finding for years on one signature.
+			return true, nil
 		}
 		return p.CommittedTo.After(*p.Binding), nil
 	}
@@ -784,6 +789,12 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 // A decision the code moved out from under is the same shape: somebody made a
 // judgment, it no longer applies, and they are the person who should be told.
 //
+// A promise whose date has gone by is the third of that shape. The work was
+// to be done by then and the finding is still open, so the promise did not
+// hold — and nothing else notices, because a commitment has no expiry: it goes
+// on suppressing the finding, and the deadline the finding had passes behind
+// it in silence.
+//
 // A claim that needed nobody — a short deferral — is not here at all. A work
 // list containing work nobody has to do teaches people to skip rows.
 func waiting(query *bun.SelectQuery, now time.Time) *bun.SelectQuery {
@@ -793,10 +804,15 @@ func waiting(query *bun.SelectQuery, now time.Time) *bun.SelectQuery {
 	// nothing here but would have to be repeated at every caller.
 	ranOut := `EXISTS (SELECT 1 FROM "claim" AS wc WHERE wc.id = de.claim_id
 		AND wc.outcome = ? AND wc.deferred_until IS NOT NULL AND wc.deferred_until <= ?)`
+	// The promise that came due, asked the same way of the same table.
+	cameDue := `EXISTS (SELECT 1 FROM "claim" AS wp WHERE wp.id = de.claim_id
+		AND wp.outcome IN (?) AND wp.committed_to IS NOT NULL AND wp.committed_to <= ?)`
 	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.
 			WhereOr("de.state = ? AND de.needs_approval = ? AND de.sent_back_at IS NULL", Proposed, true).
 			WhereOr("de.state = ?", LapsedState).
-			WhereOr("de.state IN (?, ?) AND "+ranOut, Proposed, Approved, Deferred, now)
+			WhereOr("de.state IN (?, ?) AND "+ranOut, Proposed, Approved, Deferred, now).
+			WhereOr("de.state IN (?, ?) AND "+cameDue, Proposed, Approved,
+				bun.List([]Outcome{UpgradeNeeded, PatchNeeded}), now)
 	})
 }

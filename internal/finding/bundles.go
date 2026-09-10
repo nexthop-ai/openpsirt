@@ -490,50 +490,6 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 	return out, nil
 }
 
-// BindingDeadline is the earliest deadline among what is open against a
-// component in a selection of builds.
-//
-// **What a commitment is gated against** (one judgment across many issues's bulk act, and the gate in
-// the review queue). Promising to upgrade by a date is ordinary triage while
-// the date is inside the deadline the work already has; past it, the promise
-// defers the worst thing it covers, and a second person agrees.
-//
-// Computed over the whole set rather than per finding, because one act
-// covering a critical and a medium is gated by the critical however many
-// mediums are in it — and gating each decision separately would let the same
-// act stand for the mediums and wait for the critical, which is one act with
-// two answers.
-//
-// Nil where nothing it covers has a deadline: a product below its own triage
-// line is the ordinary case, and there is then no date to be past.
-func (s *Store) BindingDeadline(ctx context.Context, subject access.Subject, scope Scope,
-	component string, filter Filter) (*time.Time, error) {
-
-	_, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
-	if err != nil {
-		return nil, err
-	}
-	if len(targets) == 0 || strings.TrimSpace(component) == "" {
-		return nil, nil
-	}
-	var earliest struct {
-		DueAt *time.Time `bun:"due_at"`
-	}
-	query := s.db.NewSelect().
-		TableExpr("finding AS f").
-		ColumnExpr("MIN(f.due_at) AS due_at").
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("f.due_at IS NOT NULL").
-		Where("f.component_id IN (?)",
-			componentsWhere(s.db.NewSelect(), "c.name = ?", strings.TrimSpace(component)))
-	if err := filter.narrow(query).Scan(ctx, &earliest); err != nil {
-		return nil, fmt.Errorf("read the deadline this covers: %w", err)
-	}
-	return earliest.DueAt, nil
-}
-
 // PerBuild is one build's answer about a component: the version it ships and
 // where that could go.
 type PerBuild struct {

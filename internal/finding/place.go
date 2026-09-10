@@ -127,6 +127,12 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
 		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS severity_centi").
+		// The deadline, because a promise to act is gated against the earliest
+		// one among what the act covers. Read from the rows rather than
+		// supplied, like the versions and the visibility: it is a fact about
+		// the place and a caller free to state it would be choosing whether
+		// their own commitment needed a second person.
+		ColumnExpr("f.due_at AS due_at").
 		// Whether the release was built once. A tag cannot change, so what may
 		// be said about a finding on one is narrower, and that is a fact about
 		// the build rather than about who is asking.
@@ -155,10 +161,32 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		ComponentUpstream: rows[0].ComponentUpstream,
 		ConsumerUpstream:  rows[0].ConsumerUpstream,
 		SeverityCenti:     rows[0].Severity,
+		DueAt:             earliestDue(rows),
 		OnTag:             rows[0].OnTag == 1,
 		Places:            len(rows),
 		distinctVersions:  distinctVersions(rows),
 	}, nil
+}
+
+// earliestDue is the deadline a place is gated against: the earliest among the
+// findings sitting there, and nil where none of them has one.
+//
+// The earliest rather than the first row's, for the reason one act covering a
+// critical and a medium is gated by the critical — a place holding the same
+// package under two consumers is one thing to decide about, and the strictest
+// deadline among them is what the decision is measured against.
+func earliestDue(rows []placeRow) *time.Time {
+	var earliest *time.Time
+	for _, row := range rows {
+		if row.DueAt == nil {
+			continue
+		}
+		if earliest == nil || row.DueAt.Before(*earliest) {
+			at := *row.DueAt
+			earliest = &at
+		}
+	}
+	return earliest
 }
 
 // placeRow is one open finding at the place being decided about.
@@ -379,6 +407,8 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS severity_centi").
 		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
+		// The deadline each place carries, for the reason PlaceFor reads it.
+		ColumnExpr("f.due_at AS due_at").
 		ColumnExpr("CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS on_tag", catalog.Tag).
 		Join(`JOIN target AS tg ON tg.id = f.target_id`).
 		Join(`JOIN stream AS st ON st.id = tg.stream_id`).
@@ -422,6 +452,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 			ComponentUpstream: at[0].ComponentUpstream,
 			ConsumerUpstream:  at[0].ConsumerUpstream,
 			SeverityCenti:     at[0].Severity,
+			DueAt:             earliestDue(at),
 			FixedIn:           fixes[identity],
 			Consumer:          consumers[identity],
 			OnTag:             at[0].OnTag == 1,

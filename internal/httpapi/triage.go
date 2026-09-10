@@ -696,6 +696,11 @@ func registerProposing(api huma.API, in Ingest) {
 			Reasoning:     input.Body.Reasoning,
 			By:            subject.ID,
 			SeverityCenti: at.SeverityCenti,
+			// The deadline this place already has, which is what a promise to
+			// act is gated against. Read with the place rather than supplied,
+			// because whether a commitment needs a second person is not a
+			// thing the person making it may state.
+			Binding:       at.DueAt,
 			FromStatement: cited(input.Body.FromStatement),
 		}
 		if input.Body.DeferredUntil != "" {
@@ -915,6 +920,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		writes := make([]int, len(asked))
 		holds := make([]int, len(asked))
 		sits := 0
+		reached := make([][]finding.Deciding, len(asked))
 		for i, build := range asked {
 			// Only the build in the path takes the caller's narrowing. In the
 			// others the places at matching versions are already reached by
@@ -936,7 +942,28 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			if i == 0 {
 				sits = all
 			}
+			reached[i] = places
+		}
 
+		// What a promise made here is gated against: the earliest deadline
+		// among everything the act covers, across every build it reaches. One
+		// act covering a critical and a medium is gated by the critical
+		// however many mediums are in it, so this is resolved over the whole
+		// set before any proposal is built rather than per place.
+		var binding *time.Time
+		for _, places := range reached {
+			for _, place := range places {
+				if place.DueAt == nil {
+					continue
+				}
+				if binding == nil || place.DueAt.Before(*binding) {
+					at := *place.DueAt
+					binding = &at
+				}
+			}
+		}
+
+		for i, places := range reached {
 			for _, place := range places {
 				proposal := triage.Proposal{
 					Place: triage.Place{
@@ -955,6 +982,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 					SeverityCenti: place.SeverityCenti,
 					DeferredUntil: until,
 					CommittedTo:   lands,
+					Binding:       binding,
 				}
 				// Asked per place rather than once for the set. The threshold
 				// reads the claim, and two places of one finding can differ in

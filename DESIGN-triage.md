@@ -447,6 +447,7 @@ not looking is a choice rather than an omission.
 | **A rating of an issue** somebody proposed | It had nowhere to be agreed to at all — the route existed and no screen reached it |
 | **A deferral that has run out** | The finding is back. Left out, it resurfaces as new with what somebody wrote last time attached to nothing anyone is looking at |
 | **A decision the code moved out from under** | The person who made the judgment is the person to tell, which is the entire reason a lapse is marked rather than the decision deleted |
+| **A promise whose date has gone by** | The work was to be done by then and the finding is still open, so the promise did not hold. A commitment has no expiry of its own — it goes on suppressing the finding, and the deadline the finding had passes behind it in silence |
 
 A claim that needed nobody — a deferral under the threshold — is not here at all,
 by the same rule that keeps unreachable work out.
@@ -740,7 +741,24 @@ deferrals is **where the gate sits**.
 | **At or before the earliest deadline among what the act covers** | No approval. Nothing is hidden for longer than the policy already allowed, and gating every planned upgrade would put the most routine act of all through the review queue |
 | **Past it** | A second person agrees. The promise now defers the worst thing the act covers |
 | **Measured over the whole set, not per finding** | One act covering a critical and a medium is gated by the critical. Gating each decision separately would let the same act stand for the mediums and wait for the critical |
-| **Nothing the act covers has a deadline** | There is no date to be past, and it is gated. A commitment with no date is not a commitment |
+| **Nothing the act covers has a deadline** | There is no date to be past, so the exemption has nothing to measure against and a second person agrees. A product below its own triage line is the ordinary case, and it was the one place a promise could hide a finding for years on one signature |
+| **A commitment with no date at all** | Not a commitment |
+
+**The deadline is resolved with the places, never supplied.** It is a fact about
+what the act covers rather than something whoever is promising may state, and a
+caller free to state it would be choosing whether their own promise needed a
+second person. The same rule the visibility and the versions follow.
+
+| Where it is read | |
+|---|---|
+| Recording a judgment on one finding | The earliest deadline among the findings at that place |
+| Recording one across builds | The earliest across every place the act reaches, in every build named |
+| Declaring an upgrade on a component | The earliest among the places the bump reaches |
+
+There is one computation of it and it is the one the gate uses. A second
+spelling, reachable only from its own tests, sat beside it and disagreed about
+how the set was narrowed — two implementations of a separation-of-duties
+threshold, one of which nobody executed.
 
 The response says whether it is waiting, rather than leaving somebody to discover
 it from the queue.
