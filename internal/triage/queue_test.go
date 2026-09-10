@@ -220,3 +220,59 @@ func TestYourOwnWaitingClaimsAreTheirOwnQuestion(t *testing.T) {
 		}
 	})
 }
+
+// The cumulative threshold counts a withdrawn deferral for as long as it
+// actually held.
+//
+// Excluded outright, the threshold was defeated by withdrawing and deferring
+// again: each span alone stayed under the line, the running total reset to
+// zero every time, and a place stayed hidden indefinitely with no second
+// person ever seeing it. Withdrawing needs nobody, so the whole loop is one
+// person's.
+func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		const threshold = 30 * 24 * time.Hour
+
+		// A first deferral, under the line, then taken back after most of it
+		// had run.
+		soon := time.Now().UTC().Add(29 * 24 * time.Hour)
+		first, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if first.NeedsApproval {
+			t.Fatal("a deferral under the threshold was gated, so this tests nothing")
+		}
+		// Four weeks pass, moved here rather than waited for, and then it is
+		// taken back. Withdrawing needs nobody, so the whole loop is one
+		// person's.
+		if _, err := f.db.DB.NewUpdate().Table("decision").
+			Set("proposed_at = ?", time.Now().UTC().Add(-28*24*time.Hour)).
+			Where("claim_id = ?", first.ClaimID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+			t.Fatal(err)
+		}
+
+		// The same place, put off again for another span under the line. The
+		// two together are past it, and the second is what a second person
+		// has to agree to.
+		again := time.Now().UTC().Add(29 * 24 * time.Hour)
+		needs, err := f.store.NeedsApproval(ctx, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &again,
+			Reasoning: "Not this sprint either.", By: f.proposer,
+		}, threshold)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !needs {
+			t.Error("deferring again after withdrawing needed nobody, so the " +
+				"threshold resets every time somebody takes a deferral back")
+		}
+	})
+}

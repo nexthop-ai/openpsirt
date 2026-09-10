@@ -694,13 +694,13 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 
 	var deferrals []Decision
 	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
-		Column("vulnerability_id", "place_identity", "proposed_at").
+		Column("vulnerability_id", "place_identity", "proposed_at", "state", "ended_at").
 		Where("de.product_id = ?", productID).
 		Where("de.vulnerability_id IN (?)", bun.List(issues)).
 		Where("de.place_identity IN (?)", bun.List(identities)).
 		Where("claim.outcome = ?", Deferred).
-		// What was taken back was not time the finding spent put off.
-		Where("de.state <> ?", Withdrawn).
+		// Withdrawn ones for the span they were in force, as the threshold
+		// counts them.
 		Where("claim.deferred_until IS NOT NULL").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how long these have been put off: %w", err)
 	}
@@ -711,7 +711,7 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 		if !wanted[key] || deferral.Claim == nil || deferral.Claim.DeferredUntil == nil {
 			continue
 		}
-		if span := deferral.Claim.DeferredUntil.Sub(deferral.ProposedAt); span > 0 {
+		if span := heldFor(deferral); span > 0 {
 			total[key] += span
 		}
 	}

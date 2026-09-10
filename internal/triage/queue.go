@@ -677,10 +677,12 @@ func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[in
 		Where("de.product_id IN (?)", bun.List(productIDs)).
 		Where("de.vulnerability_id IN (?)", bun.List(issueIDs)).
 		Where("claim.outcome = ?", Deferred).
-		// What was taken back was not time the finding spent put off. Counting
-		// a withdrawn deferral would make the number shown to an approver —
-		// "how long has this been postponed" — include time it was not.
-		Where("de.state <> ?", Withdrawn).
+		// Withdrawn ones included, for the span they were actually in force.
+		// Excluded outright, the threshold was defeated by taking a deferral
+		// back and making another: each one alone stayed under the line, the
+		// running total reset to zero every time, and a place stayed hidden
+		// indefinitely with no second person ever seeing it. A withdrawal
+		// shortens the time something was put off; it does not erase it.
 		Where("claim.deferred_until IS NOT NULL").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how long these have been put off: %w", err)
 	}
@@ -698,7 +700,7 @@ func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[in
 		// run out counts the whole of what it asked for rather than only the
 		// part already spent. The question is how long this has been put off
 		// for, not how long it has been put off so far.
-		if span := deferral.Claim.DeferredUntil.Sub(deferral.ProposedAt); span > 0 {
+		if span := heldFor(deferral); span > 0 {
 			spans[place{deferral.ProductID, deferral.VulnerabilityID, deferral.PlaceIdentity}] += span
 		}
 	}
@@ -733,6 +735,28 @@ func commitmentGated(committedTo, binding *time.Time) bool {
 		return true
 	}
 	return committedTo.After(*binding)
+}
+
+// heldFor is how long a deferral put its place off for.
+//
+// From when it was asked for to the date it returns on, cut short where it was
+// taken back before that date. A withdrawal shortens the time something was
+// hidden and does not erase it: counted as zero, the cumulative threshold was
+// defeated by withdrawing and deferring again, one sub-threshold span at a
+// time, forever. Counted whole, taking a decision back would read as avoiding
+// the work.
+//
+// Zero or less where it was taken back before it took effect, which is the
+// case the old exclusion was right about.
+func heldFor(deferral Decision) time.Duration {
+	if deferral.Claim == nil || deferral.Claim.DeferredUntil == nil {
+		return 0
+	}
+	until := *deferral.Claim.DeferredUntil
+	if deferral.State == Withdrawn && deferral.EndedAt != nil && deferral.EndedAt.Before(until) {
+		until = *deferral.EndedAt
+	}
+	return until.Sub(deferral.ProposedAt)
 }
 
 // NeedsApproval reports whether a proposal may stand on its own.

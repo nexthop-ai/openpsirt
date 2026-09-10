@@ -77,11 +77,21 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 		Join(`JOIN "product" AS p ON p.id = de.product_id`).
 		// The argument, which is where the outcome and the date live.
 		Join(`JOIN "claim" AS cl ON cl.id = de.claim_id`).
-		ColumnExpr("p.display_name AS product").
-		ColumnExpr("v.identifier AS vulnerability").
-		ColumnExpr("COALESCE(v.assessed_severity, v.severity, '') AS severity").
+		// Grouped on the product's identifier and the issue's, with the names
+		// carried along as labels. Grouping on the display name merged two
+		// products a catalog is free to display alike — one ordinary judgment
+		// apiece became a repeated-deferral pattern with a total summed across
+		// both, and a genuine per-product pattern was reported against
+		// whichever name the group collapsed onto. Only the product's name is
+		// unique, and it is not the one anybody reads.
+		ColumnExpr("MIN(p.display_name) AS product").
+		ColumnExpr("MIN(v.identifier) AS vulnerability").
+		ColumnExpr("MIN(COALESCE(v.assessed_severity, v.severity, '')) AS severity").
 		ColumnExpr("de.place_identity AS place_identity").
-		ColumnExpr("COUNT(*) AS times").
+		// Counted over the deferrals that actually held. One taken back
+		// before it took effect put nothing off, and counting it would make
+		// correcting a mistake read as avoiding the work.
+		ColumnExpr("SUM(CASE WHEN "+heldSeconds(s.db)+" > 0 THEN 1 ELSE 0 END) AS times").
 		ColumnExpr("MAX(cl.deferred_until) AS last_until").
 		// Summed in days here rather than as intervals, because the four
 		// engines return an interval as four different things and a caller
@@ -90,11 +100,12 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND cl.deferred_until > ?"+
 			" THEN 1 ELSE 0 END) AS standing", s.now().UTC()).
 		Where("cl.outcome = ?", Deferred).
-		// What was taken back was never time anything spent put off.
-		Where("de.state <> ?", Withdrawn).
+		// Withdrawn ones counted for the span they were in force, the way the
+		// threshold counts them. Left out, the report built to catch
+		// withdraw-and-defer-again was blind to exactly that pattern.
 		Where("cl.deferred_until IS NOT NULL").
-		GroupExpr("p.display_name, v.identifier, v.assessed_severity, v.severity, de.place_identity").
-		Having("COUNT(*) >= ?", atLeast).
+		GroupExpr("de.product_id, de.vulnerability_id, de.place_identity").
+		Having("SUM(CASE WHEN "+heldSeconds(s.db)+" > 0 THEN 1 ELSE 0 END) >= ?", atLeast).
 		// The most put-off first, and then the longest: a list read from the
 		// top should start with the thing somebody has avoided most.
 		OrderExpr("times DESC, total_days DESC, vulnerability").
@@ -113,6 +124,19 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 // deferredDays sums how long each deferral ran for, in whole days, through the
 // one place an engine is asked how to subtract two moments.
 func deferredDays(db bun.IDB) string {
-	return "COALESCE(SUM(" + database.SecondsBetween(db,
-		"de.proposed_at", "cl.deferred_until") + ") / 86400, 0)"
+	return "COALESCE(SUM(" + heldSeconds(db) + ") / 86400, 0)"
+}
+
+// heldSeconds is how long one deferral put its place off for, in seconds.
+//
+// The SQL half of the rule the threshold applies in Go: from when it was
+// asked for to the date it returns on, cut short where it was taken back
+// before that date, and never negative. Written as a CASE rather than with a
+// two-argument minimum, because the four engines spell that three ways.
+func heldSeconds(db bun.IDB) string {
+	ends := `(CASE WHEN de.state = '` + string(Withdrawn) + `'
+			AND de.ended_at IS NOT NULL AND de.ended_at < cl.deferred_until
+		THEN de.ended_at ELSE cl.deferred_until END)`
+	seconds := database.SecondsBetween(db, "de.proposed_at", ends)
+	return "(CASE WHEN " + seconds + " > 0 THEN " + seconds + " ELSE 0 END)"
 }

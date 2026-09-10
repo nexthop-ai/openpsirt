@@ -483,12 +483,22 @@ for**, not against the deferral being asked for. Otherwise four twenty-nine-day
 deferrals are a year nobody approved. **The time counted is what each deferral
 asked for**, not what it has spent.
 
-Two things are excluded from that total:
+Every deferral counts for as long as it actually held: from when it was asked
+for to the date it returns on, cut short where it was taken back before that
+date.
 
-| Excluded | |
+| Rule | |
 |---|---|
-| A deferral that was **taken back** | Not time the finding spent postponed. Counting it would make the number an approver is shown describe time that did not happen |
-| A deferral asking for a date **already past** | It asks for nothing. Counting it as a negative would let a back-dated request subtract from what a finding has already been put off for |
+| A deferral that was **taken back** counts for the part that ran | A withdrawal shortens the time a finding spent hidden and does not erase it. Erased, the threshold was defeated by withdrawing and deferring again — each span under the line, the running total back to zero every time, and a place hidden indefinitely with nobody ever agreeing to it. Withdrawing needs nobody, so the whole loop is one person's |
+| One taken back **before it held** counts for nothing | Correcting a mistake is not avoiding the work, and counting it would make the two read alike |
+| A deferral asking for a date **already past** counts for nothing | It asks for nothing, and it is refused at submission besides. Counting it as a negative would let a back-dated request subtract from what a finding has already been put off for |
+
+The report that shows the pattern counts them the same way, and groups on the
+product and the issue rather than on the words they are displayed under. Only
+the product's own name is unique and it is not the one anybody reads, so two
+products a catalog displays alike merged into one row: an ordinary judgment in
+each read as a repeated-deferral pattern with a total summed across both, and a
+genuine pattern was reported against whichever name the group collapsed onto.
 
 ## One live claim per key
 
