@@ -29,13 +29,12 @@ jobs:
       checks: read
     steps:
       - name: Wait for all checks to pass or be skipped
-        # Pinned to a SHA rather than a tag, like every other tool here: a tag
-        # moves, and an action that moves is code executing with this
-        # repository's token on a day nobody chose. This is v0.6.0 plus the
-        # dedupe fix (poseidon/wait-for-status-checks#627), so a run cancelled
-        # by concurrency with a successful re-run for the same commit does not
-        # read as a failure.
-        uses: poseidon/wait-for-status-checks@990a77d11cde85fd8897cb1747d2701ea9565615  # v0.6.0 + #627
+        # v0.7.0 carries the fix that checks the latest run for a commit
+        # (poseidon/wait-for-status-checks#627), so a run cancelled by
+        # concurrency with a successful re-run for the same commit does not
+        # read as a failure. sonic-nhcli pins a post-v0.6.0 SHA for that fix
+        # because it was unreleased then; it is released now.
+        uses: poseidon/wait-for-status-checks@e7e24423722c5b8e97a6dd5848827d2a412f812d  # v0.7.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # Itself. The job sets a name, so it is not ignored automatically,

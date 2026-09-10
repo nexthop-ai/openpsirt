@@ -17,10 +17,14 @@ tmp:
   sizeLimit: 1Gi
 
 image:
-  # **No image is published yet.** This is where one will live; until there is
-  # a release, build it from the repository and push it somewhere your cluster
-  # can pull from, then point this there. Leaving it as it stands gives you a
-  # pod that cannot pull.
+  # Published by the release workflow, one image per tag. While the repository
+  # is private this needs a pull secret your cluster can use; see
+  # imagePullSecrets below. `linux/amd64` only for now.
+  #
+  # There is no image before the first tag. Until then, build one from the
+  # repository and push it somewhere your cluster can reach, then point this
+  # there — left as it stands with nothing published, you get a pod that
+  # cannot pull.
   repository: ghcr.io/nexthop-ai/openpsirt
   pullPolicy: IfNotPresent
   # Defaults to the chart's appVersion.

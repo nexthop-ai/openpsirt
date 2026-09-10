@@ -1,0 +1,21 @@
+# A pinned SHA is a pin nobody moves unless something moves it.
+#
+# Every action is pinned to the commit of a release rather than to a tag,
+# because a tag moves and an action that moves is code running with this
+# repository's token on a day nobody chose. What that costs is that a pin goes
+# stale silently — the version stops receiving fixes and nothing says so.
+# This is what says so: an update arrives as a pull request, through the same
+# queue and the same gate as any other change, and the commit it pins is
+# visible in the diff.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # One pull request rather than one per action. These move together and
+      # each is a line in a workflow file; separately they are noise nobody
+      # reads by the fourth one.
+      actions:
+        patterns: ["*"]

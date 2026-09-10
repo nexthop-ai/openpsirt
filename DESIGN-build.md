@@ -22,6 +22,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Probes](#probes)
 - [Documentation](#documentation)
 - [The review checklist](#the-review-checklist)
+- [Actions are pinned](#actions-are-pinned)
 - [Repository settings](#repository-settings)
 - [Limits](#limits)
 
@@ -74,7 +75,9 @@ the same command and the same pinned tool versions (REQ-75).
 | `make lint` | Static analysis, pinned version |
 | `make vet` | The compiler's own checks |
 | `make govulncheck` | Known vulnerabilities in dependencies |
-| `make licenses` | Shipped dependency licenses against the allowlist |
+| `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
+| `make web-audit` | Known vulnerabilities in what the interface installs |
+| `make secrets` | Credentials in the working tree, pinned scanner |
 | `make openapi` | Regenerates the API document from the code |
 | `make openapi-current` | The committed API document against what the code generates |
 | `make sbom` | This project's own CycloneDX inventory |
@@ -125,15 +128,30 @@ the file as stale.
 
 ## CI jobs
 
-Four, and each of the three beside the first is separate for a reason of its own
+Three, and each of the two beside the first is separate for a reason of its own
 rather than for tidiness.
 
 | Job | Holds | Why it is not a step of the first |
 |---|---|---|
 | Build, test and check | `engines-check`, `make check`, `check-engines`, and the bill of materials as an artifact | — |
-| Dependency review | The license policy applied to what a pull request adds | Pull requests only, needs no toolchain, and is an action rather than a make target |
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
+
+**Dependency review was a fourth and is not.** The action needs GitHub
+Advanced Security on a private repository — a paid add-on, per active
+committer, that nothing else in this organization buys. What it checked is
+covered by targets instead, and covered better: `licenses` reads the npm tree
+as well as the Go one, `web-audit` scans what the interface installs, and
+`secrets` replaces the platform's secret scanning. Each runs locally with one
+command, which the action never did, and that is the half of REQ-75 the action
+was quietly failing.
+
+Two workflows beside this one report no build of their own. `PR` is the
+aggregator that waits for every check here and is the only one the ruleset
+names; `Release` runs on a tag and is described in `DESIGN-packaging.md`.
+Both declare `merge_group:` as this one does — a workflow that does not
+contributes no check to a queue entry, and the aggregator cannot tell that
+from one that has not started.
 
 **The first job runs one target, not a list of them.** `make check` is the
 definition of what CI checks, so a target added to it is run by CI without
@@ -317,6 +335,23 @@ threshold would accept every other unreadable license silently.
 Build tooling is exempt. The linter is GPL-licensed; running a tool over the code
 affects its license no more than the compiler does.
 
+**Both ecosystems, one allowlist.** The interface is built into the binary, so
+what npm installs ships exactly as a Go module does, and it went unchecked
+until the product that would have caught it turned out to be paid. `make
+licenses` runs both halves against the same `ALLOWED_LICENSES`, passed in
+rather than repeated, and dev dependencies are unrestricted on both sides
+because a build tool binds whoever builds rather than whoever installs.
+
+| Exception | Why |
+|---|---|
+| `@fontsource/*` under OFL-1.1 | The license fonts are published under. What it withholds is selling the fonts on their own, which is not something a shipped application does |
+| `argparse` under PSF-2.0 | A port of Python's argparse carrying the original's license. Permissive, and compatible |
+
+An SPDX expression is evaluated rather than matched: `MIT AND ISC` needs both
+allowed and `(MPL-2.0 OR Apache-2.0)` needs either. Treating the string as a
+name refuses both, and adding the strings to the allowlist accepts every other
+expression spelled that way.
+
 ## The API document
 
 Generated from the operations registered in `internal/httpapi`, never written by
@@ -365,14 +400,44 @@ consulted when somebody remembers (REQ-75).
 It is not enforced by the pipeline. What CI can check, CI checks; the gate is
 long precisely so the checklist holds only what a machine cannot decide.
 
+## Actions are pinned
+
+| Rule | Why |
+|---|---|
+| Every action is pinned to the commit of a release, with the version in a comment beside it | A tag moves. An action that moves is code running with this repository's token on a day nobody chose, and `v4` is a tag |
+| The repository requires it | `sha_pinning_required` refuses a workflow referencing an action by tag, so the rule is enforced rather than remembered by whoever writes the next workflow |
+| Dependabot moves the pins, weekly, as one pull request | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
+| An update arrives through the queue like anything else | The commit being pinned is visible in the diff, and the gate runs against it |
+
 ## Repository settings
+
+Nothing here is in a file, so each is listed with what it is for and what its
+absence looks like — an absent setting fails somewhere far from itself.
 
 | Setting | Needed by | Symptom when off |
 |---|---|---|
-| Dependency graph, via Dependabot alerts | Dependency review | "Dependency review is not supported on this repository" |
+| Every change through a pull request, no direct push to `main` | The gate meaning anything | A commit reaches `main` having passed nothing |
+| Merge queue, squash, `ALLGREEN` | Landing what was tested | A pull request green against a `main` that has since moved |
+| One required check, `Merge Status` | Every other check | A workflow added later gates nothing until somebody edits the ruleset |
+| Dependency graph, via Dependabot alerts | Being told about a vulnerable dependency between changes | A dependency goes bad and nothing says so until somebody looks |
+| Actions pinned to a SHA | The section above | A tag somebody else controls executes here |
 | Pages, serving the `gh-pages` branch | Documentation publishing | The workflow succeeds and nothing is served |
 
-Secret scanning and push protection are on by default for public repositories.
+**Private and public differ, and what differs is paid for.** Secret scanning,
+push protection and dependency review are free on a public repository and are
+Advanced Security products on a private one, billed per active committer
+across the repositories that enable them. None is enabled here: the gate runs
+`make secrets`, `make licenses` and `make web-audit` instead, which cost
+nothing and run locally. Dependabot alerts are free either way and are on.
+
+What is genuinely lost by not buying them is history: a credential committed
+and later removed is still in the objects, and scanning the working tree
+cannot see it. Push protection would also refuse the push that put it there.
+Both are worth reconsidering when the repository goes public, where they are
+free.
+
+A private Pages site is served only to accounts with read access, at a
+generated address rather than at the organization's.
 
 ## Limits
 

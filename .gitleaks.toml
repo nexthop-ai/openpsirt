@@ -1,0 +1,19 @@
+# What the secret scan is allowed to find.
+#
+# Nothing here excuses a file or a directory. An allowlist by path is how a
+# real credential ends up in a file somebody once put a fake one in — the
+# scan goes quiet exactly where a person has already demonstrated they will
+# paste a token. So each entry names the literal it accepts.
+title = "openpsirt"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test constants that are shaped like credentials and are not."
+regexes = [
+  # A 32-character hex string standing in for an attachment token, in the Go
+  # test for what markdown may reference and in the interface's test for the
+  # same rule. The two have to agree, so it is the same literal twice.
+  '''0f9a1b2c3d4e5f60718293a4b5c6d7e8''',
+]
