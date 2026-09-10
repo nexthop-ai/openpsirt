@@ -1,0 +1,50 @@
+site_name: OpenPSIRT
+site_description: Track vulnerabilities in the products you ship.
+repo_url: https://github.com/nexthop-ai/openpsirt
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/openpsirt-mark.svg
+  favicon: assets/openpsirt-mark.svg
+  palette:
+    # Colors are defined in stylesheets/brand.css and taken from the mark.
+    # The theme's default primary is an indigo that clashes with it.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      # White, because the mark is drawn for a light background: its outer
+      # frame is navy and its inner field is white. On any colored header the
+      # frame falls below 2:1 against the background and the mark reads as a
+      # white blob.
+      primary: white
+      accent: custom
+      toggle: {icon: material/weather-night, name: Switch to dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      # The mark's own navy. Its outer frame blends into a header this dark,
+      # leaving the inner field and the blue to carry it — a light variant of
+      # the mark would fix that and there is not one yet.
+      primary: custom
+      accent: custom
+      toggle: {icon: material/weather-sunny, name: Switch to light mode}
+  features:
+    - navigation.sections
+    - content.code.copy
+
+extra_css:
+  - stylesheets/brand.css
+
+plugins:
+  - search
+  - swagger-ui-tag
+
+nav:
+  - Home: index.md
+  - Configuration: configuration.md
+  - API reference: reference/api.md
+  - Privileges: reference/privileges.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: {permalink: true}

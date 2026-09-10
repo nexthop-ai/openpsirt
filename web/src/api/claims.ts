@@ -1,0 +1,153 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, type Body } from "./client";
+import { unwrap } from "./queries";
+
+// The review queue at the grain of a claim: one proposer's action, however
+// many decisions it wrote. The row carries the claim, what it wrote, how far
+// it reaches, and — for a claim over many issues — its outliers.
+export type QueueRow = Body<"WaitingBody">;
+export type Outliers = Body<"OutliersBody">;
+export type FindingRef = Body<"FindingRefBody">;
+// What would argue against agreeing.
+export type Counter = Body<"CounterBody">;
+
+export type Claim = {
+  key: string;
+  id: number;
+  decisionId: number;
+  kind: "finding" | "together" | "extension" | "returned";
+  derivedFrom: number | null;
+  title: string;
+  product: string;
+  outcome: string;
+  justification: string;
+  deferredUntil: string;
+  proposedBy: string;
+  proposedAt: string;
+  selectedBy: string;
+  reasoning: string;
+  previouslyApproved: boolean;
+  deferredDays: number;
+  ageDays: number;
+  records: number;
+  issues: number;
+  places: number;
+  builds: string[];
+  outliers: Outliers | null;
+  // What a careful reader would go and look up before agreeing: what was
+  // decided about the same issue elsewhere, and how much else at the same
+  // place nobody has answered.
+  counter: Counter | null;
+  // What the claim is about, for the approver's card: the issue, the component
+  // and version, how bad, where it sits, and where to open it.
+  finding: FindingRef | null;
+};
+
+export function claimOf(row: QueueRow): Claim {
+  const kind = row.claim.kind;
+  return {
+    key: `claim:${row.claim.id}`,
+    id: row.claim.id,
+    decisionId: row.decision.id ?? 0,
+    kind: kind === "together" || kind === "extension" || kind === "returned" ? kind : "finding",
+    derivedFrom: row.claim.derived_from ?? null,
+    title: row.place.vulnerability ?? "",
+    product: row.place.product ?? "",
+    outcome: row.decision.outcome ?? "",
+    justification: row.decision.justification ?? "",
+    deferredUntil: row.decision.deferred_until ?? "",
+    proposedBy: row.claim.proposed_by || row.proposed_by,
+    proposedAt: row.claim.proposed_at,
+    selectedBy: row.claim.selected_by ?? row.decision.selected_by ?? "",
+    reasoning: row.reasoning,
+    previouslyApproved: row.previously_approved ?? false,
+    deferredDays: row.deferred_days ?? 0,
+    ageDays: row.age_days,
+    records: row.decisions,
+    issues: row.issues,
+    places: row.places,
+    builds: row.builds ?? [],
+    outliers: row.outliers ?? null,
+    counter: row.counter ?? null,
+    finding: row.finding ?? null,
+  };
+}
+
+// Anything that changes a claim invalidates the same set: the queue it may
+// have left, the decisions it wrote, and the findings they hang off.
+function useAfterClaim() {
+  const queries = useQueryClient();
+  return () => {
+    void queries.invalidateQueries({ queryKey: ["queue"] });
+    void queries.invalidateQueries({ queryKey: ["decision"] });
+    void queries.invalidateQueries({ queryKey: ["decided"] });
+    void queries.invalidateQueries({ queryKey: ["finding"] });
+    void queries.invalidateQueries({ queryKey: ["home"] });
+    // And the proposer's own list, which is where a claim they split appears
+    // as two.
+    void queries.invalidateQueries({ queryKey: ["my-claims"] });
+  };
+}
+
+// Approving a claim agrees to every decision it wrote, except any set aside ,
+// which return to the proposer as a claim of their own.
+export function useApproveClaim() {
+  const done = useAfterClaim();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      batch,
+      except,
+      because,
+    }: {
+      id: number;
+      batch?: string;
+      except?: number[];
+      because?: string;
+    }) =>
+      unwrap(
+        await api.POST("/v1/claims/{id}/approval", {
+          params: { path: { id } },
+          body: {
+            ...(batch ? { batch } : {}),
+            ...(except && except.length > 0 ? { except, because } : {}),
+          },
+        }),
+      ),
+    onSuccess: done,
+  });
+}
+
+// Rejecting a claim sends every decision it wrote back to the proposer, with
+// the reason as a comment.
+export function useRejectClaim() {
+  const done = useAfterClaim();
+  return useMutation({
+    mutationFn: async ({ id, because }: { id: number; because: string }) =>
+      unwrap(
+        await api.POST("/v1/claims/{id}/send-back", {
+          params: { path: { id } },
+          body: { because },
+        }),
+      ),
+    onSuccess: done,
+  });
+}
+
+// Holding part of your own claim back: the proposer's side of setting rows
+// aside. The rows move into a claim of their own, with you, carrying the
+// argument they were made under — and it is a revision that gives them one of
+// their own.
+export function useSplitClaim() {
+  const done = useAfterClaim();
+  return useMutation({
+    mutationFn: async ({ id, rows, because }: { id: number; rows: number[]; because: string }) =>
+      unwrap(
+        await api.POST("/v1/claims/{id}/split", {
+          params: { path: { id } },
+          body: { rows, because },
+        }),
+      ),
+    onSuccess: done,
+  });
+}

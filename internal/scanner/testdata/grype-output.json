@@ -1,0 +1,1405 @@
+{
+ "alertsByPackage": [
+  {
+   "package": {
+    "id": "a",
+    "name": "libc6",
+    "version": "2.36-9+deb12u1",
+    "type": "deb",
+    "locations": null,
+    "language": "",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:deb/debian/libc6@2.36-9+deb12u1?arch=amd64&distro=debian-12",
+    "upstreams": []
+   },
+   "alerts": [
+    {
+     "type": "distro-eol",
+     "message": "Package is from end-of-life distro: debian 12",
+     "metadata": {
+      "name": "debian",
+      "version": "12"
+     }
+    }
+   ]
+  },
+  {
+   "package": {
+    "id": "b",
+    "name": "openssl",
+    "version": "3.0.11-1~deb12u2",
+    "type": "deb",
+    "locations": null,
+    "language": "",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12",
+    "upstreams": []
+   },
+   "alerts": [
+    {
+     "type": "distro-eol",
+     "message": "Package is from end-of-life distro: debian 12",
+     "metadata": {
+      "name": "debian",
+      "version": "12"
+     }
+    }
+   ]
+  },
+  {
+   "package": {
+    "id": "c",
+    "name": "golang.org/x/crypto",
+    "version": "v0.16.0",
+    "type": "go-module",
+    "locations": null,
+    "language": "go",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:golang/golang.org/x/crypto@v0.16.0",
+    "upstreams": []
+   },
+   "alerts": [
+    {
+     "type": "distro-eol",
+     "message": "Package is from end-of-life distro: debian 12",
+     "metadata": {
+      "name": "debian",
+      "version": "12"
+     }
+    }
+   ]
+  },
+  {
+   "package": {
+    "id": "d",
+    "name": "tokio",
+    "version": "1.20.0",
+    "type": "rust-crate",
+    "locations": null,
+    "language": "rust",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:cargo/tokio@1.20.0",
+    "upstreams": []
+   },
+   "alerts": [
+    {
+     "type": "distro-eol",
+     "message": "Package is from end-of-life distro: debian 12",
+     "metadata": {
+      "name": "debian",
+      "version": "12"
+     }
+    }
+   ]
+  }
+ ],
+ "source": {
+  "type": "unknown",
+  "target": "unknown"
+ },
+ "distro": {
+  "name": "debian",
+  "version": "12",
+  "idLike": [
+   "debian"
+  ]
+ },
+ "descriptor": {
+  "name": "grype",
+  "version": "0.112.0",
+  "configuration": {
+   "output": [
+    "json"
+   ],
+   "file": "",
+   "pretty": false,
+   "distro": "",
+   "add-cpes-if-none": false,
+   "output-template-file": "",
+   "check-for-app-update": true,
+   "only-fixed": false,
+   "only-notfixed": false,
+   "ignore-wontfix": "",
+   "platform": "",
+   "search": {
+    "scope": "squashed",
+    "unindexed-archives": false,
+    "indexed-archives": true
+   },
+   "ignore": [
+    {
+     "vulnerability": "",
+     "include-aliases": false,
+     "reason": "",
+     "namespace": "",
+     "fix-state": "",
+     "package": {
+      "name": "kernel-headers",
+      "version": "",
+      "language": "",
+      "type": "rpm",
+      "location": "",
+      "upstream-name": "kernel"
+     },
+     "vex-status": "",
+     "vex-justification": "",
+     "match-type": "exact-indirect-match"
+    },
+    {
+     "vulnerability": "",
+     "include-aliases": false,
+     "reason": "",
+     "namespace": "",
+     "fix-state": "",
+     "package": {
+      "name": "linux(-.*)?-headers-.*",
+      "version": "",
+      "language": "",
+      "type": "deb",
+      "location": "",
+      "upstream-name": "linux.*"
+     },
+     "vex-status": "",
+     "vex-justification": "",
+     "match-type": "exact-indirect-match"
+    },
+    {
+     "vulnerability": "",
+     "include-aliases": false,
+     "reason": "",
+     "namespace": "",
+     "fix-state": "",
+     "package": {
+      "name": "linux-libc-dev",
+      "version": "",
+      "language": "",
+      "type": "deb",
+      "location": "",
+      "upstream-name": "linux"
+     },
+     "vex-status": "",
+     "vex-justification": "",
+     "match-type": "exact-indirect-match"
+    }
+   ],
+   "exclude": [],
+   "externalSources": {
+    "enable": false,
+    "maven": {
+     "searchUpstreamBySha1": true,
+     "baseUrl": "https://search.maven.org/solrsearch/select",
+     "rateLimit": 300000000
+    }
+   },
+   "match": {
+    "java": {
+     "using-cpes": false
+    },
+    "jvm": {
+     "using-cpes": true
+    },
+    "dotnet": {
+     "using-cpes": false
+    },
+    "golang": {
+     "using-cpes": false,
+     "always-use-cpe-for-stdlib": true,
+     "allow-main-module-pseudo-version-comparison": false
+    },
+    "javascript": {
+     "using-cpes": false
+    },
+    "python": {
+     "using-cpes": false
+    },
+    "ruby": {
+     "using-cpes": false
+    },
+    "rust": {
+     "using-cpes": false
+    },
+    "hex": {
+     "using-cpes": false
+    },
+    "stock": {
+     "using-cpes": true
+    },
+    "dpkg": {
+     "using-cpes": false,
+     "missing-epoch-strategy": "zero",
+     "use-cpes-for-eol": false
+    },
+    "rpm": {
+     "using-cpes": false,
+     "missing-epoch-strategy": "auto",
+     "use-cpes-for-eol": false
+    }
+   },
+   "fail-on-severity": "",
+   "registry": {
+    "insecure-skip-tls-verify": false,
+    "insecure-use-http": false,
+    "ca-cert": ""
+   },
+   "show-suppressed": false,
+   "by-cve": false,
+   "SortBy": {
+    "sort-by": "risk"
+   },
+   "name": "",
+   "default-image-pull-source": "",
+   "from": null,
+   "vex-documents": [],
+   "vex-add": [],
+   "match-upstream-kernel-headers": false,
+   "fix-channel": {
+    "redhat-eus": {
+     "apply": "auto",
+     "versions": ">= 8.0"
+    }
+   },
+   "timestamp": true,
+   "alerts": {
+    "enable-eol-distro-warnings": true
+   },
+   "db": {
+    "cache-dir": "/home/bhouse/.cache/grype/db",
+    "update-url": "https://grype.anchore.io/databases",
+    "ca-cert": "",
+    "auto-update": true,
+    "validate-by-hash-on-start": true,
+    "validate-age": true,
+    "max-allowed-built-age": 432000000000000,
+    "require-update-check": false,
+    "update-available-timeout": 30000000000,
+    "update-download-timeout": 300000000000,
+    "max-update-check-frequency": 7200000000000
+   },
+   "exp": {},
+   "dev": {
+    "db": {
+     "debug": false
+    }
+   }
+  },
+  "db": {
+   "status": {
+    "schemaVersion": "v6.1.9",
+    "from": "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.9_2026-08-28T02:58:52Z_1787908899.tar.zst?checksum=sha256%3Ae97c0e5e87c834bde464f3039da3a142cc0874c097681d87fe8a2e910a64c5cb",
+    "built": "2026-08-28T09:21:39Z",
+    "path": "/home/bhouse/.cache/grype/db/6/vulnerability.db",
+    "valid": true
+   },
+   "providers": {
+    "debian": {
+     "captured": "2026-08-28T02:59:22Z",
+     "input": "xxh64:02917f57de220d8a"
+    }
+   }
+  },
+  "timestamp": "2026-08-28T20:59:16.381912853Z"
+ },
+ "matches": [
+  {
+   "vulnerability": {
+    "id": "GHSA-45x7-px36-x8w8",
+    "dataSource": "https://github.com/advisories/GHSA-45x7-px36-x8w8",
+    "namespace": "github:language:go",
+    "severity": "Medium",
+    "urls": [
+     "https://github.com/warp-tech/russh/security/advisories/GHSA-45x7-px36-x8w8",
+     "https://nvd.nist.gov/vuln/detail/CVE-2023-48795",
+     "https://github.com/paramiko/paramiko/issues/2337",
+     "https://github.com/TeraTermProject/teraterm/commit/7279fbd6ef4d0c8bdd6a90af4ada2899d786eec0",
+     "https://github.com/golang/crypto/commit/9d2ee975ef9fe627bf0a6f01c1f69e8ef1d4f05d",
+     "https://github.com/warp-tech/russh/commit/1aa340a7df1d5be1c0f4a9e247aade76dfdd2951",
+     "https://github.com/erlang/otp/blob/d1b43dc0f1361d2ad67601169e90a7fc50bb0369/lib/ssh/doc/src/notes.xml#L39-L42",
+     "https://github.com/mkj/dropbear/blob/17657c36cce6df7716d5ff151ec09a665382d5dd/CHANGES#L25",
+     "https://github.com/openssh/openssh-portable/commits/master",
+     "https://github.com/ronf/asyncssh/blob/develop/docs/changes.rst",
+     "https://github.com/ronf/asyncssh/tags",
+     "https://github.com/warp-tech/russh/releases/tag/v0.40.2",
+     "https://gitlab.com/libssh/libssh-mirror/-/tags",
+     "https://groups.google.com/g/golang-announce/c/-n5WqVC18LQ",
+     "https://groups.google.com/g/golang-announce/c/qA3XtxvMUyg",
+     "https://matt.ucc.asn.au/dropbear/CHANGES",
+     "https://news.ycombinator.com/item?id=38684904",
+     "https://news.ycombinator.com/item?id=38685286",
+     "https://twitter.com/TrueSkrillor/status/1736774389725565005",
+     "https://www.bitvise.com/ssh-server-version-history",
+     "https://www.chiark.greenend.org.uk/~sgtatham/putty/changes.html",
+     "https://www.openssh.com/openbsd.html",
+     "https://www.openssh.com/txt/release-9.6",
+     "https://www.openwall.com/lists/oss-security/2023/12/18/2",
+     "https://www.terrapin-attack.com",
+     "http://www.openwall.com/lists/oss-security/2023/12/18/3",
+     "https://github.com/mwiede/jsch/issues/457",
+     "https://github.com/mwiede/jsch/pull/461",
+     "https://access.redhat.com/security/cve/cve-2023-48795",
+     "https://bugs.gentoo.org/920280",
+     "https://bugzilla.redhat.com/show_bug.cgi?id=2254210",
+     "https://bugzilla.suse.com/show_bug.cgi?id=1217950",
+     "https://git.libssh.org/projects/libssh.git/commit/?h=stable-0.10&id=10e09e273f69e149389b3e0e5d44b8c221c2e7f6",
+     "https://github.com/drakkan/sftpgo/releases/tag/v2.5.6",
+     "https://github.com/erlang/otp/releases/tag/OTP-26.2.1",
+     "https://go.dev/cl/550715",
+     "https://go.dev/issue/64784",
+     "https://security-tracker.debian.org/tracker/CVE-2023-48795",
+     "https://security-tracker.debian.org/tracker/source-package/libssh2",
+     "https://security-tracker.debian.org/tracker/source-package/proftpd-dfsg",
+     "https://ubuntu.com/security/CVE-2023-48795",
+     "https://github.com/libssh2/libssh2/pull/1291",
+     "https://github.com/jtesta/ssh-audit/commit/8e972c5e94b460379fe0c7d20209c16df81538a5",
+     "https://forum.netgate.com/topic/184941/terrapin-ssh-attack",
+     "https://github.com/rapier1/hpn-ssh/releases",
+     "https://github.com/proftpd/proftpd/issues/456",
+     "https://github.com/NixOS/nixpkgs/pull/275249",
+     "https://github.com/connectbot/sshlib/commit/5c8b534f6e97db7ac0e0e579331213aa25c173ab",
+     "https://github.com/mscdex/ssh2/commit/97b223f8891b96d6fc054df5ab1d5a1a545da2a3",
+     "https://crates.io/crates/thrussh/versions",
+     "https://github.com/TeraTermProject/teraterm/releases/tag/v5.1",
+     "https://github.com/connectbot/sshlib/compare/2.2.21...2.2.22",
+     "https://github.com/mwiede/jsch/compare/jsch-0.2.14...jsch-0.2.15",
+     "https://github.com/proftpd/proftpd/blob/master/RELEASE_NOTES",
+     "https://nest.pijul.com/pijul/thrussh/changes/D6H7OWTTMHHX6BTB3B6MNBOBX2L66CBL4LGSEUSAI2MCRCJDQFRQC",
+     "https://oryx-embedded.com/download/#changelog",
+     "https://www.crushftp.com/crush10wiki/Wiki.jsp?page=Update",
+     "https://www.paramiko.org/changelog.html",
+     "https://www.freebsd.org/security/advisories/FreeBSD-SA-23:19.openssh.asc",
+     "http://www.openwall.com/lists/oss-security/2023/12/19/5",
+     "http://www.openwall.com/lists/oss-security/2023/12/20/3",
+     "https://github.com/apache/mina-sshd/issues/445",
+     "https://github.com/hierynomus/sshj/issues/916",
+     "https://github.com/janmojzis/tinyssh/issues/81",
+     "https://github.com/net-ssh/net-ssh/blob/2e65064a52d73396bfc3806c9196fc8108f33cd8/CHANGES.txt#L14-L16",
+     "https://github.com/proftpd/proftpd/blob/0a7ea9b0ba9fcdf368374a226370d08f10397d99/RELEASE_NOTES",
+     "https://github.com/proftpd/proftpd/blob/d21e7a2e47e9b38f709bec58e3fa711f759ad0e1/RELEASE_NOTES",
+     "https://security-tracker.debian.org/tracker/source-package/trilead-ssh2",
+     "https://www.openwall.com/lists/oss-security/2023/12/20/3",
+     "http://packetstormsecurity.com/files/176280/Terrapin-SSH-Connection-Weakening.html",
+     "https://github.com/PowerShell/Win32-OpenSSH/issues/2189",
+     "https://github.com/cyd01/KiTTY/issues/520",
+     "https://github.com/ssh-mitm/ssh-mitm/issues/165",
+     "https://filezilla-project.org/versions.php",
+     "https://github.com/PowerShell/Win32-OpenSSH/releases/tag/v9.5.0.0p1-Beta",
+     "https://lists.debian.org/debian-lts-announce/2023/12/msg00017.html",
+     "https://news.ycombinator.com/item?id=38732005",
+     "https://nova.app/releases/#v11.8",
+     "https://roumenpetrov.info/secsh/#news20231220",
+     "https://security.gentoo.org/glsa/202312-16",
+     "https://security.gentoo.org/glsa/202312-17",
+     "https://winscp.net/eng/docs/history#6.2.2",
+     "https://www.bitvise.com/ssh-client-version-history#933",
+     "https://www.debian.org/security/2023/dsa-5586",
+     "https://www.debian.org/security/2023/dsa-5588",
+     "https://www.lancom-systems.de/service-support/allgemeine-sicherheitshinweise#c243508",
+     "https://www.theregister.com/2023/12/20/terrapin_attack_ssh",
+     "https://www.vandyke.com/products/securecrt/history.txt",
+     "https://psirt.global.sonicwall.com/vuln-detail/SNWLID-2024-0002",
+     "https://lists.debian.org/debian-lts-announce/2024/01/msg00013.html",
+     "https://lists.debian.org/debian-lts-announce/2024/01/msg00014.html",
+     "https://github.com/paramiko/paramiko/issues/2337#issuecomment-1887642773",
+     "https://arstechnica.com/security/2023/12/hackers-can-break-ssh-channel-integrity-using-novel-data-corruption-attack",
+     "https://help.panic.com/releasenotes/transmit5",
+     "https://jadaptive.com/important-java-ssh-security-update-new-ssh-vulnerability-discovered-cve-2023-48795",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/33XHJUB6ROFUOH2OQNENFROTVH6MHSHA",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/3CAYYW35MUTNO65RVAELICTNZZFMT2XS",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/3JIMLVBDWOP4FUPXPTB4PGHHIOMGFLQE",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/3YQLUQWLIHDB5QCXQEX7HXHAWMOKPP5O",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/6Y74KVCPEPT4MVU3LHDWCNNOXOE5ZLUR",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/APYIXIQOVDCRWLHTGB4VYMAUIAQLKYJ3",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/BL5KTLOSLH2KHRN4HCXJPK3JUVLDGEL6",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/C3AFMZ6MH2UHHOPIWT5YLSFV3D2VB3AC",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/CHHITS4PUOZAKFIUBQAQZC7JWXMOYE4B",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/F7EYCFQCTSGJXWO3ZZ44MGKFC5HA7G3Y",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/HYEDEXIKFKTUJIN43RG4B7T5ZS6MHUSP",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/I724O3LSRCPO4WNVIXTZCT4VVRMXMMSG",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/KEOTKBUPZXHE3F352JBYNTSNRXYLWD6P",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/KMZCVGUGJZZVDPCVDA7TEB22VUCNEXDD",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/L5Y6MNNVAPIJSXJERQ6PKZVCIUXSNJK7",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/LZQVUHWVWRH73YBXUQJOD6CKHDQBU3DM",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/MKQRBF3DWMWPH36LBCOBUTSIZRTPEZXB",
+     "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/QI3EHAHABFQK7OABNCSF5GMYP6TONTI7",
+     "https://security.netapp.com/advisory/ntap-20240105-0004",
+     "https://support.apple.com/kb/HT214084",
+     "https://thorntech.com/cve-2023-48795-and-sftp-gateway",
+     "https://www.netsarang.com/en/xshell-update-history",
+     "https://www.reddit.com/r/sysadmin/comments/18idv52/cve202348795_why_is_this_cve_still_undisclosed",
+     "https://www.suse.com/c/suse-addresses-the-ssh-v2-protocol-terrapin-attack-aka-cve-2023-48795",
+     "http://seclists.org/fulldisclosure/2024/Mar/21",
+     "https://lists.debian.org/debian-lts-announce/2024/04/msg00016.html",
+     "http://www.openwall.com/lists/oss-security/2024/03/06/3",
+     "http://www.openwall.com/lists/oss-security/2024/04/17/8",
+     "https://www.vicarius.io/vsociety/posts/cve-2023-48795-mitigate-openssh-vulnerability",
+     "https://www.vicarius.io/vsociety/posts/cve-2023-48795-detect-openssh-vulnerabilit",
+     "https://lists.debian.org/debian-lts-announce/2025/04/msg00028.html",
+     "https://lists.debian.org/debian-lts-announce/2024/11/msg00032.html",
+     "https://lists.debian.org/debian-lts-announce/2024/09/msg00042.html",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/3JIMLVBDWOP4FUPXPTB4PGHHIOMGFLQE",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/3YQLUQWLIHDB5QCXQEX7HXHAWMOKPP5O",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/6Y74KVCPEPT4MVU3LHDWCNNOXOE5ZLUR",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/APYIXIQOVDCRWLHTGB4VYMAUIAQLKYJ3",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/C3AFMZ6MH2UHHOPIWT5YLSFV3D2VB3AC",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/I724O3LSRCPO4WNVIXTZCT4VVRMXMMSG",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/L5Y6MNNVAPIJSXJERQ6PKZVCIUXSNJK7",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/LZQVUHWVWRH73YBXUQJOD6CKHDQBU3DM",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/MKQRBF3DWMWPH36LBCOBUTSIZRTPEZXB",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/33XHJUB6ROFUOH2OQNENFROTVH6MHSHA",
+     "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HYEDEXIKFKTUJIN43RG4B7T5ZS6MHUSP",
+     "https://cert-portal.siemens.com/productcert/html/ssa-915275.html",
+     "https://cert-portal.siemens.com/productcert/html/ssa-794697.html",
+     "https://cert-portal.siemens.com/productcert/html/ssa-769027.html",
+     "https://cert-portal.siemens.com/productcert/html/ssa-364175.html",
+     "https://cert-portal.siemens.com/productcert/html/ssa-082556.html"
+    ],
+    "description": "Prefix Truncation Attack against ChaCha20-Poly1305 and Encrypt-then-MAC aka Terrapin",
+    "cvss": [
+     {
+      "type": "Secondary",
+      "version": "3.1",
+      "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+      "metrics": {
+       "baseScore": 5.9,
+       "exploitabilityScore": 2.3,
+       "impactScore": 3.6
+      },
+      "vendorMetadata": {}
+     }
+    ],
+    "epss": [
+     {
+      "cve": "CVE-2023-48795",
+      "epss": 0.93305,
+      "percentile": 0.99829,
+      "date": "2026-08-27"
+     }
+    ],
+    "cwes": [
+     {
+      "cve": "CVE-2023-48795",
+      "cwe": "CWE-354",
+      "source": "nvd@nist.gov",
+      "type": "Primary"
+     },
+     {
+      "cve": "CVE-2023-48795",
+      "cwe": "CWE-354",
+      "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+      "type": "Secondary"
+     }
+    ],
+    "fix": {
+     "versions": [
+      "0.17.0"
+     ],
+     "state": "fixed",
+     "available": [
+      {
+       "version": "0.17.0",
+       "date": "2023-12-19",
+       "kind": "first-observed"
+      }
+     ]
+    },
+    "advisories": [],
+    "risk": 50.851225000000014
+   },
+   "relatedVulnerabilities": [
+    {
+     "id": "CVE-2023-48795",
+     "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2023-48795",
+     "namespace": "nvd:cpe",
+     "severity": "Medium",
+     "urls": [
+      "http://packetstormsecurity.com/files/176280/Terrapin-SSH-Connection-Weakening.html",
+      "http://seclists.org/fulldisclosure/2024/Mar/21",
+      "http://www.openwall.com/lists/oss-security/2023/12/18/3",
+      "http://www.openwall.com/lists/oss-security/2023/12/19/5",
+      "http://www.openwall.com/lists/oss-security/2023/12/20/3",
+      "http://www.openwall.com/lists/oss-security/2024/03/06/3",
+      "http://www.openwall.com/lists/oss-security/2024/04/17/8",
+      "https://access.redhat.com/security/cve/cve-2023-48795",
+      "https://arstechnica.com/security/2023/12/hackers-can-break-ssh-channel-integrity-using-novel-data-corruption-attack/",
+      "https://bugs.gentoo.org/920280",
+      "https://bugzilla.redhat.com/show_bug.cgi?id=2254210",
+      "https://bugzilla.suse.com/show_bug.cgi?id=1217950",
+      "https://crates.io/crates/thrussh/versions",
+      "https://filezilla-project.org/versions.php",
+      "https://forum.netgate.com/topic/184941/terrapin-ssh-attack",
+      "https://git.libssh.org/projects/libssh.git/commit/?h=stable-0.10&id=10e09e273f69e149389b3e0e5d44b8c221c2e7f6",
+      "https://github.com/NixOS/nixpkgs/pull/275249",
+      "https://github.com/PowerShell/Win32-OpenSSH/issues/2189",
+      "https://github.com/PowerShell/Win32-OpenSSH/releases/tag/v9.5.0.0p1-Beta",
+      "https://github.com/TeraTermProject/teraterm/commit/7279fbd6ef4d0c8bdd6a90af4ada2899d786eec0",
+      "https://github.com/TeraTermProject/teraterm/releases/tag/v5.1",
+      "https://github.com/advisories/GHSA-45x7-px36-x8w8",
+      "https://github.com/apache/mina-sshd/issues/445",
+      "https://github.com/connectbot/sshlib/commit/5c8b534f6e97db7ac0e0e579331213aa25c173ab",
+      "https://github.com/connectbot/sshlib/compare/2.2.21...2.2.22",
+      "https://github.com/cyd01/KiTTY/issues/520",
+      "https://github.com/drakkan/sftpgo/releases/tag/v2.5.6",
+      "https://github.com/erlang/otp/blob/d1b43dc0f1361d2ad67601169e90a7fc50bb0369/lib/ssh/doc/src/notes.xml#L39-L42",
+      "https://github.com/erlang/otp/releases/tag/OTP-26.2.1",
+      "https://github.com/golang/crypto/commit/9d2ee975ef9fe627bf0a6f01c1f69e8ef1d4f05d",
+      "https://github.com/hierynomus/sshj/issues/916",
+      "https://github.com/janmojzis/tinyssh/issues/81",
+      "https://github.com/jtesta/ssh-audit/commit/8e972c5e94b460379fe0c7d20209c16df81538a5",
+      "https://github.com/libssh2/libssh2/pull/1291",
+      "https://github.com/mkj/dropbear/blob/17657c36cce6df7716d5ff151ec09a665382d5dd/CHANGES#L25",
+      "https://github.com/mscdex/ssh2/commit/97b223f8891b96d6fc054df5ab1d5a1a545da2a3",
+      "https://github.com/mwiede/jsch/compare/jsch-0.2.14...jsch-0.2.15",
+      "https://github.com/mwiede/jsch/issues/457",
+      "https://github.com/mwiede/jsch/pull/461",
+      "https://github.com/net-ssh/net-ssh/blob/2e65064a52d73396bfc3806c9196fc8108f33cd8/CHANGES.txt#L14-L16",
+      "https://github.com/openssh/openssh-portable/commits/master",
+      "https://github.com/paramiko/paramiko/issues/2337",
+      "https://github.com/proftpd/proftpd/blob/0a7ea9b0ba9fcdf368374a226370d08f10397d99/RELEASE_NOTES",
+      "https://github.com/proftpd/proftpd/blob/d21e7a2e47e9b38f709bec58e3fa711f759ad0e1/RELEASE_NOTES",
+      "https://github.com/proftpd/proftpd/blob/master/RELEASE_NOTES",
+      "https://github.com/proftpd/proftpd/issues/456",
+      "https://github.com/rapier1/hpn-ssh/releases",
+      "https://github.com/ronf/asyncssh/blob/develop/docs/changes.rst",
+      "https://github.com/ronf/asyncssh/tags",
+      "https://github.com/ssh-mitm/ssh-mitm/issues/165",
+      "https://github.com/warp-tech/russh/releases/tag/v0.40.2",
+      "https://gitlab.com/libssh/libssh-mirror/-/tags",
+      "https://groups.google.com/g/golang-announce/c/-n5WqVC18LQ",
+      "https://groups.google.com/g/golang-announce/c/qA3XtxvMUyg",
+      "https://help.panic.com/releasenotes/transmit5/",
+      "https://jadaptive.com/important-java-ssh-security-update-new-ssh-vulnerability-discovered-cve-2023-48795/",
+      "https://lists.debian.org/debian-lts-announce/2023/12/msg00017.html",
+      "https://lists.debian.org/debian-lts-announce/2024/01/msg00013.html",
+      "https://lists.debian.org/debian-lts-announce/2024/01/msg00014.html",
+      "https://lists.debian.org/debian-lts-announce/2024/04/msg00016.html",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/33XHJUB6ROFUOH2OQNENFROTVH6MHSHA/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/3CAYYW35MUTNO65RVAELICTNZZFMT2XS/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/3JIMLVBDWOP4FUPXPTB4PGHHIOMGFLQE/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/3YQLUQWLIHDB5QCXQEX7HXHAWMOKPP5O/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/6Y74KVCPEPT4MVU3LHDWCNNOXOE5ZLUR/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/APYIXIQOVDCRWLHTGB4VYMAUIAQLKYJ3/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/BL5KTLOSLH2KHRN4HCXJPK3JUVLDGEL6/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/C3AFMZ6MH2UHHOPIWT5YLSFV3D2VB3AC/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/CHHITS4PUOZAKFIUBQAQZC7JWXMOYE4B/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/F7EYCFQCTSGJXWO3ZZ44MGKFC5HA7G3Y/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/HYEDEXIKFKTUJIN43RG4B7T5ZS6MHUSP/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/I724O3LSRCPO4WNVIXTZCT4VVRMXMMSG/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/KEOTKBUPZXHE3F352JBYNTSNRXYLWD6P/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/KMZCVGUGJZZVDPCVDA7TEB22VUCNEXDD/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/L5Y6MNNVAPIJSXJERQ6PKZVCIUXSNJK7/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/LZQVUHWVWRH73YBXUQJOD6CKHDQBU3DM/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/MKQRBF3DWMWPH36LBCOBUTSIZRTPEZXB/",
+      "https://lists.fedoraproject.org/archives/list/package-announce%40lists.fedoraproject.org/message/QI3EHAHABFQK7OABNCSF5GMYP6TONTI7/",
+      "https://matt.ucc.asn.au/dropbear/CHANGES",
+      "https://nest.pijul.com/pijul/thrussh/changes/D6H7OWTTMHHX6BTB3B6MNBOBX2L66CBL4LGSEUSAI2MCRCJDQFRQC",
+      "https://news.ycombinator.com/item?id=38684904",
+      "https://news.ycombinator.com/item?id=38685286",
+      "https://news.ycombinator.com/item?id=38732005",
+      "https://nova.app/releases/#v11.8",
+      "https://oryx-embedded.com/download/#changelog",
+      "https://psirt.global.sonicwall.com/vuln-detail/SNWLID-2024-0002",
+      "https://roumenpetrov.info/secsh/#news20231220",
+      "https://security-tracker.debian.org/tracker/CVE-2023-48795",
+      "https://security-tracker.debian.org/tracker/source-package/libssh2",
+      "https://security-tracker.debian.org/tracker/source-package/proftpd-dfsg",
+      "https://security-tracker.debian.org/tracker/source-package/trilead-ssh2",
+      "https://security.gentoo.org/glsa/202312-16",
+      "https://security.gentoo.org/glsa/202312-17",
+      "https://security.netapp.com/advisory/ntap-20240105-0004/",
+      "https://support.apple.com/kb/HT214084",
+      "https://thorntech.com/cve-2023-48795-and-sftp-gateway/",
+      "https://twitter.com/TrueSkrillor/status/1736774389725565005",
+      "https://ubuntu.com/security/CVE-2023-48795",
+      "https://winscp.net/eng/docs/history#6.2.2",
+      "https://www.bitvise.com/ssh-client-version-history#933",
+      "https://www.bitvise.com/ssh-server-version-history",
+      "https://www.chiark.greenend.org.uk/~sgtatham/putty/changes.html",
+      "https://www.crushftp.com/crush10wiki/Wiki.jsp?page=Update",
+      "https://www.debian.org/security/2023/dsa-5586",
+      "https://www.debian.org/security/2023/dsa-5588",
+      "https://www.freebsd.org/security/advisories/FreeBSD-SA-23:19.openssh.asc",
+      "https://www.lancom-systems.de/service-support/allgemeine-sicherheitshinweise#c243508",
+      "https://www.netsarang.com/en/xshell-update-history/",
+      "https://www.openssh.com/openbsd.html",
+      "https://www.openssh.com/txt/release-9.6",
+      "https://www.openwall.com/lists/oss-security/2023/12/18/2",
+      "https://www.openwall.com/lists/oss-security/2023/12/20/3",
+      "https://www.paramiko.org/changelog.html",
+      "https://www.reddit.com/r/sysadmin/comments/18idv52/cve202348795_why_is_this_cve_still_undisclosed/",
+      "https://www.suse.com/c/suse-addresses-the-ssh-v2-protocol-terrapin-attack-aka-cve-2023-48795/",
+      "https://www.terrapin-attack.com",
+      "https://www.theregister.com/2023/12/20/terrapin_attack_ssh",
+      "https://www.vandyke.com/products/securecrt/history.txt",
+      "https://lists.debian.org/debian-lts-announce/2024/09/msg00042.html",
+      "https://lists.debian.org/debian-lts-announce/2024/11/msg00032.html",
+      "https://lists.debian.org/debian-lts-announce/2025/04/msg00028.html",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/33XHJUB6ROFUOH2OQNENFROTVH6MHSHA/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/3JIMLVBDWOP4FUPXPTB4PGHHIOMGFLQE/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/3YQLUQWLIHDB5QCXQEX7HXHAWMOKPP5O/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/6Y74KVCPEPT4MVU3LHDWCNNOXOE5ZLUR/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/APYIXIQOVDCRWLHTGB4VYMAUIAQLKYJ3/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/C3AFMZ6MH2UHHOPIWT5YLSFV3D2VB3AC/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/HYEDEXIKFKTUJIN43RG4B7T5ZS6MHUSP/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/I724O3LSRCPO4WNVIXTZCT4VVRMXMMSG/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/L5Y6MNNVAPIJSXJERQ6PKZVCIUXSNJK7/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/LZQVUHWVWRH73YBXUQJOD6CKHDQBU3DM/",
+      "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/MKQRBF3DWMWPH36LBCOBUTSIZRTPEZXB/",
+      "https://www.vicarius.io/vsociety/posts/cve-2023-48795-detect-openssh-vulnerabilit",
+      "https://www.vicarius.io/vsociety/posts/cve-2023-48795-mitigate-openssh-vulnerability",
+      "https://cert-portal.siemens.com/productcert/html/ssa-082556.html",
+      "https://cert-portal.siemens.com/productcert/html/ssa-364175.html",
+      "https://cert-portal.siemens.com/productcert/html/ssa-769027.html",
+      "https://cert-portal.siemens.com/productcert/html/ssa-794697.html",
+      "https://cert-portal.siemens.com/productcert/html/ssa-915275.html"
+     ],
+     "description": "The SSH transport protocol with certain OpenSSH extensions, found in OpenSSH before 9.6 and other products, allows remote attackers to bypass integrity checks such that some packets are omitted (from the extension negotiation message), and a client and server may consequently end up with a connection for which some security features have been downgraded or disabled, aka a Terrapin attack. This occurs because the SSH Binary Packet Protocol (BPP), implemented by these extensions, mishandles the handshake phase and mishandles use of sequence numbers. For example, there is an effective attack against SSH's use of ChaCha20-Poly1305 (and CBC with Encrypt-then-MAC). The bypass occurs in chacha20-poly1305@openssh.com and (if CBC is used) the -etm@openssh.com MAC algorithms. This also affects Maverick Synergy Java SSH API before 3.1.0-SNAPSHOT, Dropbear through 2022.83, Ssh before 5.1.1 in Erlang/OTP, PuTTY before 0.80, AsyncSSH before 2.14.2, golang.org/x/crypto before 0.17.0, libssh before 0.10.6, libssh2 through 1.11.0, Thorn Tech SFTP Gateway before 3.4.6, Tera Term before 5.1, Paramiko before 3.4.0, jsch before 0.2.15, SFTPGo before 2.5.6, Netgate pfSense Plus through 23.09.1, Netgate pfSense CE through 2.7.2, HPN-SSH through 18.2.0, ProFTPD before 1.3.8b (and before 1.3.9rc2), ORYX CycloneSSH before 2.3.4, NetSarang XShell 7 before Build 0144, CrushFTP before 10.6.0, ConnectBot SSH library before 2.2.22, Apache MINA sshd through 2.11.0, sshj through 0.37.0, TinySSH through 20230101, trilead-ssh2 6401, LANCOM LCOS and LANconfig, FileZilla before 3.66.4, Nova before 11.8, PKIX-SSH before 14.4, SecureCRT before 9.4.3, Transmit5 before 5.10.4, Win32-OpenSSH before 9.5.0.0p1-Beta, WinSCP before 6.2.2, Bitvise SSH Server before 9.32, Bitvise SSH Client before 9.33, KiTTY through 0.76.1.13, the net-ssh gem 7.2.0 for Ruby, the mscdex ssh2 module before 1.15.0 for Node.js, the thrussh library before 0.35.1 for Rust, and the Russh crate before 0.40.2 for Rust.",
+     "cvss": [
+      {
+       "source": "nvd@nist.gov",
+       "type": "Primary",
+       "version": "3.1",
+       "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+       "metrics": {
+        "baseScore": 5.9,
+        "exploitabilityScore": 2.3,
+        "impactScore": 3.6
+       },
+       "vendorMetadata": {}
+      },
+      {
+       "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+       "type": "Secondary",
+       "version": "3.1",
+       "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+       "metrics": {
+        "baseScore": 5.9,
+        "exploitabilityScore": 2.3,
+        "impactScore": 3.6
+       },
+       "vendorMetadata": {}
+      }
+     ],
+     "epss": [
+      {
+       "cve": "CVE-2023-48795",
+       "epss": 0.93305,
+       "percentile": 0.99829,
+       "date": "2026-08-27"
+      }
+     ],
+     "cwes": [
+      {
+       "cve": "CVE-2023-48795",
+       "cwe": "CWE-354",
+       "source": "nvd@nist.gov",
+       "type": "Primary"
+      },
+      {
+       "cve": "CVE-2023-48795",
+       "cwe": "CWE-354",
+       "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+       "type": "Secondary"
+      }
+     ]
+    }
+   ],
+   "matchDetails": [
+    {
+     "type": "exact-direct-match",
+     "matcher": "go-module-matcher",
+     "searchedBy": {
+      "language": "go",
+      "namespace": "github:language:go",
+      "package": {
+       "name": "golang.org/x/crypto",
+       "version": "v0.16.0"
+      }
+     },
+     "found": {
+      "vulnerabilityID": "GHSA-45x7-px36-x8w8",
+      "versionConstraint": ">=0.1.0,<0.17.0 (go)"
+     },
+     "fix": {
+      "suggestedVersion": "0.17.0"
+     }
+    }
+   ],
+   "artifact": {
+    "id": "c",
+    "name": "golang.org/x/crypto",
+    "version": "v0.16.0",
+    "type": "go-module",
+    "locations": null,
+    "language": "go",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:golang/golang.org/x/crypto@v0.16.0",
+    "upstreams": []
+   }
+  },
+  {
+   "vulnerability": {
+    "id": "CVE-2024-6119",
+    "dataSource": "https://security-tracker.debian.org/tracker/CVE-2024-6119",
+    "namespace": "debian:distro:debian:12",
+    "severity": "High",
+    "urls": [],
+    "description": "Issue summary: Applications performing certificate name checks (e.g., TLS clients checking server certificates) may attempt to read an invalid memory address resulting in abnormal termination of the application process.  Impact summary: Abnormal termination of an application can a cause a denial of service.  Applications performing certificate name checks (e.g., TLS clients checking server certificates) may attempt to read an invalid memory address when comparing the expected name with an `otherName` subject alternative name of an X.509 certificate. This may result in an exception that terminates the application program.  Note that basic certificate chain validation (signatures, dates, ...) is not affected, the denial of service can occur only when the application also specifies an expected DNS name, Email address or IP address.  TLS servers rarely solicit client certificates, and even when they do, they generally don't perform a name check against a reference identifier (expected identity), but rather extract the presented identity after checking the certificate chain.  So TLS servers are generally not affected and the severity of the issue is Moderate.  The FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
+    "cvss": [
+     {
+      "source": "nvd@nist.gov",
+      "type": "Primary",
+      "version": "3.1",
+      "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "metrics": {
+       "baseScore": 7.5,
+       "exploitabilityScore": 3.9,
+       "impactScore": 3.6
+      },
+      "vendorMetadata": {}
+     }
+    ],
+    "epss": [
+     {
+      "cve": "CVE-2024-6119",
+      "epss": 0.66582,
+      "percentile": 0.99227,
+      "date": "2026-08-27"
+     }
+    ],
+    "cwes": [
+     {
+      "cve": "CVE-2024-6119",
+      "cwe": "CWE-843",
+      "source": "openssl-security@openssl.org",
+      "type": "Secondary"
+     },
+     {
+      "cve": "CVE-2024-6119",
+      "cwe": "CWE-843",
+      "source": "nvd@nist.gov",
+      "type": "Primary"
+     }
+    ],
+    "fix": {
+     "versions": [
+      "3.0.14-1~deb12u2"
+     ],
+     "state": "fixed",
+     "available": [
+      {
+       "version": "3.0.14-1~deb12u2",
+       "date": "2024-09-03",
+       "kind": "advisory"
+      }
+     ]
+    },
+    "advisories": [
+     {
+      "id": "DSA-5764-1",
+      "link": "https://security-tracker.debian.org/tracker/DSA-5764-1"
+     }
+    ],
+    "risk": 49.936499999999995
+   },
+   "relatedVulnerabilities": [
+    {
+     "id": "CVE-2024-6119",
+     "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2024-6119",
+     "namespace": "nvd:cpe",
+     "severity": "High",
+     "urls": [
+      "https://github.com/openssl/openssl/commit/05f360d9e849a1b277db628f1f13083a7f8dd04f",
+      "https://github.com/openssl/openssl/commit/06d1dc3fa96a2ba5a3e22735a033012aadc9f0d6",
+      "https://github.com/openssl/openssl/commit/621f3729831b05ee828a3203eddb621d014ff2b2",
+      "https://github.com/openssl/openssl/commit/7dfcee2cd2a63b2c64b9b4b0850be64cb695b0a0",
+      "https://openssl-library.org/news/secadv/20240903.txt",
+      "http://www.openwall.com/lists/oss-security/2024/09/03/4",
+      "https://lists.freebsd.org/archives/freebsd-security/2024-September/000303.html",
+      "https://security.netapp.com/advisory/ntap-20240912-0001/",
+      "https://cert-portal.siemens.com/productcert/html/ssa-082556.html",
+      "https://cert-portal.siemens.com/productcert/html/ssa-613116.html",
+      "https://cert-portal.siemens.com/productcert/html/ssa-769027.html"
+     ],
+     "description": "Issue summary: Applications performing certificate name checks (e.g., TLS\nclients checking server certificates) may attempt to read an invalid memory\naddress resulting in abnormal termination of the application process.\n\nImpact summary: Abnormal termination of an application can a cause a denial of\nservice.\n\nApplications performing certificate name checks (e.g., TLS clients checking\nserver certificates) may attempt to read an invalid memory address when\ncomparing the expected name with an `otherName` subject alternative name of an\nX.509 certificate. This may result in an exception that terminates the\napplication program.\n\nNote that basic certificate chain validation (signatures, dates, ...) is not\naffected, the denial of service can occur only when the application also\nspecifies an expected DNS name, Email address or IP address.\n\nTLS servers rarely solicit client certificates, and even when they do, they\ngenerally don't perform a name check against a reference identifier (expected\nidentity), but rather extract the presented identity after checking the\ncertificate chain.  So TLS servers are generally not affected and the severity\nof the issue is Moderate.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
+     "cvss": [
+      {
+       "source": "nvd@nist.gov",
+       "type": "Primary",
+       "version": "3.1",
+       "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+       "metrics": {
+        "baseScore": 7.5,
+        "exploitabilityScore": 3.9,
+        "impactScore": 3.6
+       },
+       "vendorMetadata": {}
+      },
+      {
+       "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+       "type": "Secondary",
+       "version": "3.1",
+       "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+       "metrics": {
+        "baseScore": 7.5,
+        "exploitabilityScore": 3.9,
+        "impactScore": 3.6
+       },
+       "vendorMetadata": {}
+      }
+     ],
+     "epss": [
+      {
+       "cve": "CVE-2024-6119",
+       "epss": 0.66582,
+       "percentile": 0.99227,
+       "date": "2026-08-27"
+      }
+     ],
+     "cwes": [
+      {
+       "cve": "CVE-2024-6119",
+       "cwe": "CWE-843",
+       "source": "openssl-security@openssl.org",
+       "type": "Secondary"
+      },
+      {
+       "cve": "CVE-2024-6119",
+       "cwe": "CWE-843",
+       "source": "nvd@nist.gov",
+       "type": "Primary"
+      }
+     ]
+    }
+   ],
+   "matchDetails": [
+    {
+     "type": "exact-direct-match",
+     "matcher": "dpkg-matcher",
+     "searchedBy": {
+      "distro": {
+       "type": "debian",
+       "version": "12"
+      },
+      "package": {
+       "name": "openssl",
+       "version": "3.0.11-1~deb12u2"
+      },
+      "namespace": "debian:distro:debian:12"
+     },
+     "found": {
+      "vulnerabilityID": "CVE-2024-6119",
+      "versionConstraint": "< 3.0.14-1~deb12u2 (deb)"
+     },
+     "fix": {
+      "suggestedVersion": "3.0.14-1~deb12u2"
+     }
+    }
+   ],
+   "artifact": {
+    "id": "b",
+    "name": "openssl",
+    "version": "3.0.11-1~deb12u2",
+    "type": "deb",
+    "locations": null,
+    "language": "",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12",
+    "upstreams": []
+   }
+  },
+  {
+   "vulnerability": {
+    "id": "CVE-2026-63076",
+    "dataSource": "https://security-tracker.debian.org/tracker/CVE-2026-63076",
+    "namespace": "debian:distro:debian:12",
+    "severity": "High",
+    "urls": [],
+    "description": "Issue summary: OpenSSL CMP password based protection verification only checks whether the protectionAlg parameter was not NULL and not its ASN.1 type, before treating it as a PBMParameter. A crafted message can contain a parameter of a different type, which is then dereferenced as an invalid pointer.  Impact summary: A remote, unauthenticated attacker can crash an application acting as a CMP server that accepts PBM-protected messages, or a CMP client talking to a malicious or intercepted CMP server, resulting in a Denial of Service.  CWE: CWE-476: NULL Pointer Dereference  Description: When verifying the password-based MAC protection of a CMP message, OpenSSL library reads the protectionAlg algorithm parameter with X509_ALGOR_get0(), which returns both the parameter type and its value pointer. The value is then cast to an ASN1_STRING and treated as the expected PBMParameter after only checking that pointer is not NULL. The parameter type returned by X509_ALGOR_get0() was never consulted.  This happens during protection verification, before any MAC is computed, so no knowledge of the PBM shared secret is required; the only precondition is that PBM verification is reachable. On the server side this is reached from OSSL_CMP_SRV_process_request() for any application that stands up a CMP server accepting PBM-protected messages, and on the client side from CMP response validation against a malicious or on-path (MITM) server. The reliable consequence is a denial of service; there is no memory disclosure, no controlled memory write, and no path to code execution. CMP is a specialized feature that an application must explicitly enable.  FIPS impact: no As the CMP code lives outside the FIPS module boundary, no FIPS modules are affected by this CVE.",
+    "cvss": [
+     {
+      "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+      "type": "Secondary",
+      "version": "3.1",
+      "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "metrics": {
+       "baseScore": 7.5,
+       "exploitabilityScore": 3.9,
+       "impactScore": 3.6
+      },
+      "vendorMetadata": {}
+     }
+    ],
+    "epss": [
+     {
+      "cve": "CVE-2026-63076",
+      "epss": 0.0133,
+      "percentile": 0.6898,
+      "date": "2026-08-27"
+     }
+    ],
+    "cwes": [
+     {
+      "cve": "CVE-2026-63076",
+      "cwe": "CWE-476",
+      "source": "openssl-security@openssl.org",
+      "type": "Secondary"
+     }
+    ],
+    "fix": {
+     "versions": [],
+     "state": "not-fixed"
+    },
+    "advisories": [],
+    "risk": 0.9974999999999999
+   },
+   "relatedVulnerabilities": [
+    {
+     "id": "CVE-2026-63076",
+     "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2026-63076",
+     "namespace": "nvd:cpe",
+     "severity": "High",
+     "urls": [
+      "https://github.com/openssl/openssl/commit/37882aa2e0256e1072442a8f62f7db45b995c45b",
+      "https://github.com/openssl/openssl/commit/a17cc8d612ecff6d94a9b7ca8b5283ddf5ff570e",
+      "https://github.com/openssl/openssl/commit/a1f348ccb328c3afbd4ba6883f9b7c813c043259",
+      "https://github.com/openssl/openssl/commit/a7af46a92d0ce19a90e669ef56d2576a07924226",
+      "https://github.com/openssl/openssl/commit/cdacfff557389abfa9e4615abded2ec984517d6c",
+      "https://openssl-library.org/news/secadv/20260825.txt"
+     ],
+     "description": "Issue summary: OpenSSL CMP password based protection verification only\nchecks whether the protectionAlg parameter was not NULL and not its\nASN.1 type, before treating it as a PBMParameter. A crafted message can\ncontain a parameter of a different type, which is then dereferenced as an\ninvalid pointer.\n\nImpact summary: A remote, unauthenticated attacker can crash an application\nacting as a CMP server that accepts PBM-protected messages, or a CMP client\ntalking to a malicious or intercepted CMP server, resulting in a Denial of\nService.\n\nCWE: CWE-476: NULL Pointer Dereference\n\nDescription: When verifying the password-based MAC protection of a CMP\nmessage, OpenSSL library reads the protectionAlg algorithm parameter with\nX509_ALGOR_get0(), which returns both the parameter type and its value\npointer. The value is then cast to an ASN1_STRING and treated as the\nexpected PBMParameter after only checking that pointer is not NULL. The\nparameter type returned by X509_ALGOR_get0() was never consulted.\n\nThis happens during protection verification, before any MAC is computed, so\nno knowledge of the PBM shared secret is required; the only precondition is\nthat PBM verification is reachable. On the server side this is reached from\nOSSL_CMP_SRV_process_request() for any application that stands up a CMP\nserver accepting PBM-protected messages, and on the client side from CMP\nresponse validation against a malicious or on-path (MITM) server. The\nreliable consequence is a denial of service; there is no memory disclosure,\nno controlled memory write, and no path to code execution. CMP is a\nspecialized feature that an application must explicitly enable.\n\nFIPS impact: no\nAs the CMP code lives outside the FIPS module boundary, no FIPS modules\nare affected by this CVE.",
+     "cvss": [
+      {
+       "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+       "type": "Secondary",
+       "version": "3.1",
+       "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+       "metrics": {
+        "baseScore": 7.5,
+        "exploitabilityScore": 3.9,
+        "impactScore": 3.6
+       },
+       "vendorMetadata": {}
+      }
+     ],
+     "epss": [
+      {
+       "cve": "CVE-2026-63076",
+       "epss": 0.0133,
+       "percentile": 0.6898,
+       "date": "2026-08-27"
+      }
+     ],
+     "cwes": [
+      {
+       "cve": "CVE-2026-63076",
+       "cwe": "CWE-476",
+       "source": "openssl-security@openssl.org",
+       "type": "Secondary"
+      }
+     ]
+    }
+   ],
+   "matchDetails": [
+    {
+     "type": "exact-direct-match",
+     "matcher": "dpkg-matcher",
+     "searchedBy": {
+      "distro": {
+       "type": "debian",
+       "version": "12"
+      },
+      "package": {
+       "name": "openssl",
+       "version": "3.0.11-1~deb12u2"
+      },
+      "namespace": "debian:distro:debian:12"
+     },
+     "found": {
+      "vulnerabilityID": "CVE-2026-63076",
+      "versionConstraint": "none (unknown)"
+     }
+    }
+   ],
+   "artifact": {
+    "id": "b",
+    "name": "openssl",
+    "version": "3.0.11-1~deb12u2",
+    "type": "deb",
+    "locations": null,
+    "language": "",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12",
+    "upstreams": []
+   }
+  },
+  {
+   "vulnerability": {
+    "id": "CVE-2026-63072",
+    "dataSource": "https://security-tracker.debian.org/tracker/CVE-2026-63072",
+    "namespace": "debian:distro:debian:12",
+    "severity": "High",
+    "urls": [],
+    "description": "Issue summary: OpenSSL CMS decryption sizes the key-unwrap output buffer based on querying the unwrapped key size, but the AES-WRAP-PAD unwrap primitive can write and cleanse more bytes than that query reports, causing an 8-byte out-of-bounds heap write.  Impact summary: An attacker who supplies a crafted CMS message can trigger a deterministic 8-byte out-of-bounds heap write when the victim decrypts it with CMS_decrypt(), corrupting the heap and typically resulting in a Denial of Service.  CWE: CWE-787: Out-of-bounds Write  Description: The key-wrap OID is potentially attacker-controlled on the wire. CMS unwrapping allows both id-aesNNN-wrap-pad and id-aesNNN-wrap ciphers. An attacker can take a legitimate message and change a single OID byte to select the padded variant while leaving the message otherwise valid. Since the unwrap key is derived from the recipient's private operation (ECDH key agreement or ML-KEM decapsulation), the RFC 5649 integrity check cannot pass, and the decryption fails with integrity failure.  The write is a fixed-size (8-byte), fixed-value (zero) heap overflow immediately past the allocation, requires no special configuration, and is reachable from the public CMS_decrypt() function. The consequence is a heap corruption leading to a Denial of Service. The fix in the CMS code sizes the unwrap output buffer for the worst case so a failed unwrap cannot write past the allocation.  FIPS impact: no  As the CMS code lives outside the FIPS module boundary, no FIPS modules are affected by this CVE.",
+    "cvss": [
+     {
+      "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+      "type": "Secondary",
+      "version": "3.1",
+      "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "metrics": {
+       "baseScore": 7.5,
+       "exploitabilityScore": 3.9,
+       "impactScore": 3.6
+      },
+      "vendorMetadata": {}
+     }
+    ],
+    "epss": [
+     {
+      "cve": "CVE-2026-63072",
+      "epss": 0.00612,
+      "percentile": 0.46766,
+      "date": "2026-08-27"
+     }
+    ],
+    "cwes": [
+     {
+      "cve": "CVE-2026-63072",
+      "cwe": "CWE-787",
+      "source": "openssl-security@openssl.org",
+      "type": "Secondary"
+     }
+    ],
+    "fix": {
+     "versions": [],
+     "state": "not-fixed"
+    },
+    "advisories": [],
+    "risk": 0.45899999999999996
+   },
+   "relatedVulnerabilities": [
+    {
+     "id": "CVE-2026-63072",
+     "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2026-63072",
+     "namespace": "nvd:cpe",
+     "severity": "High",
+     "urls": [
+      "https://github.com/openssl/openssl/commit/2a3dac874c8057c1f0186849bf1ede1ae7b6b756",
+      "https://github.com/openssl/openssl/commit/87784ad619af36b8807c2044b3940006fccc1e42",
+      "https://github.com/openssl/openssl/commit/9530a5fd1aacaeccdced4478ea2340a480613335",
+      "https://github.com/openssl/openssl/commit/9ec2f6d2ae2bcad907cf7ee38584855bafe4979a",
+      "https://github.com/openssl/openssl/commit/a0c8ec557d9cac078f032d76cdf684fe743eb382",
+      "https://openssl-library.org/news/secadv/20260825.txt"
+     ],
+     "description": "Issue summary: OpenSSL CMS decryption sizes the key-unwrap output buffer based\non querying the unwrapped key size, but the AES-WRAP-PAD unwrap primitive\ncan write and cleanse more bytes than that query reports, causing an 8-byte\nout-of-bounds heap write.\n\nImpact summary: An attacker who supplies a crafted CMS message can trigger a\ndeterministic 8-byte out-of-bounds heap write when the victim decrypts it\nwith CMS_decrypt(), corrupting the heap and typically resulting in a Denial\nof Service.\n\nCWE: CWE-787: Out-of-bounds Write\n\nDescription: The key-wrap OID is potentially attacker-controlled on the wire.\nCMS unwrapping allows both id-aesNNN-wrap-pad and id-aesNNN-wrap ciphers.\nAn attacker can take a legitimate message and change a single OID byte to\nselect the padded variant while leaving the message otherwise valid. Since\nthe unwrap key is derived from the recipient's private operation (ECDH key\nagreement or ML-KEM decapsulation), the RFC 5649 integrity check cannot\npass, and the decryption fails with integrity failure.\n\nThe write is a fixed-size (8-byte), fixed-value (zero) heap overflow\nimmediately past the allocation, requires no special configuration, and is\nreachable from the public CMS_decrypt() function. The consequence is\na heap corruption leading to a Denial of Service. The fix in the CMS code\nsizes the unwrap output buffer for the worst case so a failed unwrap cannot\nwrite past the allocation.\n\nFIPS impact: no\n\nAs the CMS code lives outside the FIPS module boundary, no FIPS\nmodules are affected by this CVE.",
+     "cvss": [
+      {
+       "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+       "type": "Secondary",
+       "version": "3.1",
+       "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+       "metrics": {
+        "baseScore": 7.5,
+        "exploitabilityScore": 3.9,
+        "impactScore": 3.6
+       },
+       "vendorMetadata": {}
+      }
+     ],
+     "epss": [
+      {
+       "cve": "CVE-2026-63072",
+       "epss": 0.00612,
+       "percentile": 0.46766,
+       "date": "2026-08-27"
+      }
+     ],
+     "cwes": [
+      {
+       "cve": "CVE-2026-63072",
+       "cwe": "CWE-787",
+       "source": "openssl-security@openssl.org",
+       "type": "Secondary"
+      }
+     ]
+    }
+   ],
+   "matchDetails": [
+    {
+     "type": "exact-direct-match",
+     "matcher": "dpkg-matcher",
+     "searchedBy": {
+      "distro": {
+       "type": "debian",
+       "version": "12"
+      },
+      "package": {
+       "name": "openssl",
+       "version": "3.0.11-1~deb12u2"
+      },
+      "namespace": "debian:distro:debian:12"
+     },
+     "found": {
+      "vulnerabilityID": "CVE-2026-63072",
+      "versionConstraint": "none (unknown)"
+     }
+    }
+   ],
+   "artifact": {
+    "id": "b",
+    "name": "openssl",
+    "version": "3.0.11-1~deb12u2",
+    "type": "deb",
+    "locations": null,
+    "language": "",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12",
+    "upstreams": []
+   }
+  },
+  {
+   "vulnerability": {
+    "id": "CVE-2026-42767",
+    "dataSource": "https://security-tracker.debian.org/tracker/CVE-2026-42767",
+    "namespace": "debian:distro:debian:12",
+    "severity": "Medium",
+    "urls": [],
+    "description": "Issue summary: An attacker-controlled CMP (Certificate Management Protocol) server could trigger a NULL pointer dereference in a CMP client application.  Impact summary: A NULL pointer dereference causes a crash of the application and a Denial of Service.  An attacker controlling a CMP server (or acting as a man-in-the-middle) could craft a CMP response containing a CRMF (Certificate Request Message Format) CertRepMessage with an EncryptedValue structure where the symmAlg field has an algorithm OID but no parameters field. When the OpenSSL CMP client processes this response, the NULL dereference occurs, causing a crash of the CMP client.  Applications that process untrusted CMP/CRMF messages may be affected.  The FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this issue, as the affected code is outside the OpenSSL FIPS module boundary.",
+    "cvss": [
+     {
+      "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+      "type": "Secondary",
+      "version": "3.1",
+      "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "metrics": {
+       "baseScore": 5.9,
+       "exploitabilityScore": 2.3,
+       "impactScore": 3.6
+      },
+      "vendorMetadata": {}
+     }
+    ],
+    "epss": [
+     {
+      "cve": "CVE-2026-42767",
+      "epss": 0.00557,
+      "percentile": 0.44081,
+      "date": "2026-08-27"
+     }
+    ],
+    "cwes": [
+     {
+      "cve": "CVE-2026-42767",
+      "cwe": "CWE-476",
+      "source": "openssl-security@openssl.org",
+      "type": "Secondary"
+     }
+    ],
+    "fix": {
+     "versions": [],
+     "state": "wont-fix"
+    },
+    "advisories": [],
+    "risk": 0.30356500000000003
+   },
+   "relatedVulnerabilities": [
+    {
+     "id": "CVE-2026-42767",
+     "dataSource": "https://nvd.nist.gov/vuln/detail/CVE-2026-42767",
+     "namespace": "nvd:cpe",
+     "severity": "Medium",
+     "urls": [
+      "https://github.com/openssl/openssl/commit/61a86a8cd73546c9fea916f3d304c1293e05c046",
+      "https://github.com/openssl/openssl/commit/665d5254083affde9982efca7c41dd01cacc8774",
+      "https://github.com/openssl/openssl/commit/810b722f772652ad48042bcc7ab07e3414b11d0f",
+      "https://github.com/openssl/openssl/commit/b90ff3b1bd33b1c18e6a09936d097c2eddef8873",
+      "https://github.com/openssl/openssl/commit/e6f912907fc2ec82a0fd07aae55172c5e5e3d90d",
+      "https://openssl-library.org/news/secadv/20260609.txt"
+     ],
+     "description": "Issue summary: An attacker-controlled CMP (Certificate Management Protocol)\nserver could trigger a NULL pointer dereference in a CMP client application.\n\nImpact summary: A NULL pointer dereference causes a crash of the\napplication and a Denial of Service.\n\nAn attacker controlling a CMP server (or acting as a man-in-the-middle) could\ncraft a CMP response containing a CRMF (Certificate Request Message Format)\nCertRepMessage with an EncryptedValue structure where the symmAlg field\nhas an algorithm OID but no parameters field. When the OpenSSL CMP client\nprocesses this response, the NULL dereference occurs, causing a crash of\nthe CMP client.\n\nApplications that process untrusted CMP/CRMF messages may be affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
+     "cvss": [
+      {
+       "source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+       "type": "Secondary",
+       "version": "3.1",
+       "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+       "metrics": {
+        "baseScore": 5.9,
+        "exploitabilityScore": 2.3,
+        "impactScore": 3.6
+       },
+       "vendorMetadata": {}
+      }
+     ],
+     "epss": [
+      {
+       "cve": "CVE-2026-42767",
+       "epss": 0.00557,
+       "percentile": 0.44081,
+       "date": "2026-08-27"
+      }
+     ],
+     "cwes": [
+      {
+       "cve": "CVE-2026-42767",
+       "cwe": "CWE-476",
+       "source": "openssl-security@openssl.org",
+       "type": "Secondary"
+      }
+     ]
+    }
+   ],
+   "matchDetails": [
+    {
+     "type": "exact-direct-match",
+     "matcher": "dpkg-matcher",
+     "searchedBy": {
+      "distro": {
+       "type": "debian",
+       "version": "12"
+      },
+      "package": {
+       "name": "openssl",
+       "version": "3.0.11-1~deb12u2"
+      },
+      "namespace": "debian:distro:debian:12"
+     },
+     "found": {
+      "vulnerabilityID": "CVE-2026-42767",
+      "versionConstraint": "none (unknown)"
+     }
+    }
+   ],
+   "artifact": {
+    "id": "b",
+    "name": "openssl",
+    "version": "3.0.11-1~deb12u2",
+    "type": "deb",
+    "locations": null,
+    "language": "",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:deb/debian/openssl@3.0.11-1~deb12u2?arch=amd64&distro=debian-12",
+    "upstreams": []
+   }
+  },
+  {
+   "vulnerability": {
+    "id": "GO-2026-5932",
+    "dataSource": "https://go.dev/issue/44226",
+    "namespace": "govulndb:language:go",
+    "severity": "Unknown",
+    "urls": [],
+    "description": "The golang.org/x/crypto/openpgp package is unsafe by design, has numerous known security issues, is not maintained, and should not be used.\n\nIf you are required to interoperate with OpenPGP systems and need a maintained package, consider github.com/ProtonMail/go-crypto/openpgp which is a maintained fork that aims to be a drop-in replacement for this package.",
+    "cvss": [],
+    "fix": {
+     "versions": [],
+     "state": ""
+    },
+    "advisories": [],
+    "risk": 0
+   },
+   "relatedVulnerabilities": [],
+   "matchDetails": [
+    {
+     "type": "exact-direct-match",
+     "matcher": "go-module-matcher",
+     "searchedBy": {
+      "language": "go",
+      "namespace": "govulndb:language:go",
+      "package": {
+       "name": "golang.org/x/crypto",
+       "version": "v0.16.0"
+      }
+     },
+     "found": {
+      "vulnerabilityID": "GO-2026-5932",
+      "versionConstraint": "none (unknown)"
+     }
+    }
+   ],
+   "artifact": {
+    "id": "c",
+    "name": "golang.org/x/crypto",
+    "version": "v0.16.0",
+    "type": "go-module",
+    "locations": null,
+    "language": "go",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:golang/golang.org/x/crypto@v0.16.0",
+    "upstreams": []
+   }
+  },
+  {
+   "vulnerability": {
+    "id": "GHSA-4q83-7cq4-p6wg",
+    "dataSource": "https://github.com/advisories/GHSA-4q83-7cq4-p6wg",
+    "namespace": "github:language:rust",
+    "severity": "Low",
+    "urls": [
+     "https://github.com/tokio-rs/tokio/issues/5372",
+     "https://rustsec.org/advisories/RUSTSEC-2023-0005.html"
+    ],
+    "description": "`tokio::io::ReadHalf<T>::unsplit` is Unsound",
+    "cvss": [],
+    "fix": {
+     "versions": [
+      "1.20.4"
+     ],
+     "state": "fixed",
+     "available": [
+      {
+       "version": "1.20.4",
+       "date": "2023-02-05",
+       "kind": "first-observed"
+      }
+     ]
+    },
+    "advisories": [],
+    "risk": 0
+   },
+   "relatedVulnerabilities": [],
+   "matchDetails": [
+    {
+     "type": "exact-direct-match",
+     "matcher": "rust-matcher",
+     "searchedBy": {
+      "language": "rust",
+      "namespace": "github:language:rust",
+      "package": {
+       "name": "tokio",
+       "version": "1.20.0"
+      }
+     },
+     "found": {
+      "vulnerabilityID": "GHSA-4q83-7cq4-p6wg",
+      "versionConstraint": ">=1.19.0,<1.20.4 (unknown)"
+     },
+     "fix": {
+      "suggestedVersion": "1.20.4"
+     }
+    }
+   ],
+   "artifact": {
+    "id": "d",
+    "name": "tokio",
+    "version": "1.20.0",
+    "type": "rust-crate",
+    "locations": null,
+    "language": "rust",
+    "licenses": [],
+    "cpes": [],
+    "purl": "pkg:cargo/tokio@1.20.0",
+    "upstreams": []
+   }
+  }
+ ]
+}

@@ -1,0 +1,373 @@
+//go:build measure
+
+// What a year of nightly scans does to this, measured rather than assumed.
+//
+// `REQUIREMENTS.md` §4 records the gap: scan files are deleted once read and the
+// interval storage was shaped so that a rebuild changing nothing writes
+// nothing, which is asserted by a test — but nobody had checked the shape
+// after a year of real nightly scans, and "the design says it should be fine"
+// is a sentence with a word doing too much work in it.
+//
+// This is behind a build tag because it is a measurement and not a gate: it
+// takes minutes, it asserts almost nothing, and its output is numbers to write
+// down. `make measure` runs it.
+package finding_test
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/schema"
+)
+
+// The shape of a real switch image, from the fixture this project keeps.
+//
+// Scaled down by a factor named here rather than run at full size: the answer
+// wanted is how the cost *grows*, and a night at full size is the same
+// operation with a bigger constant. Every number this prints says which scale
+// it was taken at.
+const (
+	// components is how many packages a build ships. The real image has 6,845.
+	components = 700
+	// consumers is how many containers each package sits in on average. A real
+	// image reached 241,021 places from 7,035 components, so about 34.
+	//
+	// That reach was measured against the previous fixture and has not been
+	// re-measured against the current one, which describes 190 fewer
+	// components. The average is what this model uses and it is not sensitive
+	// to that difference, but the 241,021 is a figure from the older document
+	// rather than from the one in testdata now.
+	consumers = 34
+	// issues is how many distinct vulnerabilities are open. The real image had
+	// about 2,600 across 7,374 issue-at-component rows, on the same older
+	// document as the line above.
+	issues = 260
+	// nights is how many rebuilds to simulate.
+	nights = 365
+	// churn is the fraction of components whose version moves on a given
+	// night. A build that changes nothing writes nothing, so this is the whole
+	// of what a night costs — and it is the number this measurement is most
+	// sensitive to, which is why it is stated rather than buried.
+	churn = 0.01
+	// arriving is how many issues the vulnerability database adds each night
+	// that match something already shipped.
+	arriving = 3
+)
+
+func TestMeasureAYearOfNightlyScans(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if err := schema.Up(ctx, db, quiet); err != nil {
+			t.Fatalf("migrate: %v", err)
+		}
+		dbtest.Reset(t, db)
+
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		store := finding.NewStore(db.DB)
+		graphs := graph.NewStore(db.DB)
+		scans := ingest.NewStore(db.DB)
+		// Somebody granted reading on the one product these builds
+		// belong to. The narrowing is the ordinary one, which is what
+		// the common plan carries — an administrator is no longer a
+		// way to run without it .
+		who := access.NewPerson(1, "a reader", false,
+			map[int64][]access.Role{product.ID: {access.PrivateRead}}, 0)
+
+		// What a night costs in *statements*, not only in seconds.
+		//
+		// The engine gap this measures — MySQL a night several times more
+		// expensive than PostgreSQL's, and barely moving when the churn was
+		// halved — is either work or round trips, and the two are told apart
+		// by dividing. A cost that is flat in rows and proportional to
+		// statements is paid per statement.
+		statements := &counting{}
+		db.DB.AddQueryHook(statements)
+
+		built := time.Now().UTC().Add(-time.Duration(nights) * 24 * time.Hour)
+		seq := 0
+		night := func(versionOf func(int) string, extra int) (finding.Applied, time.Duration, int64) {
+			seq++
+			built = built.Add(24 * time.Hour)
+			scan, _, err := scans.Record(ctx, ingest.Arriving{
+				TargetID: target.ID, ContentHash: fmt.Sprintf("hash-%d", seq),
+				BuiltAt: built, ParserVersion: "measure",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			snap := shape(versionOf)
+			if _, err := graphs.Apply(ctx, target.ID, scan.ID, snap); err != nil {
+				t.Fatal(err)
+			}
+			run, err := store.Begin(ctx, finding.Run{
+				TargetID: target.ID, Scanner: "measure",
+				ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			reported := reports(versionOf, extra)
+			before := statements.n.Load()
+			start := time.Now()
+			applied, err := store.Apply(ctx, target.ID, run.ID, reported)
+			if err != nil {
+				t.Fatal(err)
+			}
+			took := time.Since(start)
+			issued := statements.n.Load() - before
+			if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
+				t.Fatal(err)
+			}
+			return applied, took, issued
+		}
+
+		// The first night is every finding opening at once, which is what an
+		// installation's first scan actually is.
+		first, took, issued := night(func(int) string { return "1.0" }, 0)
+		t.Logf("scale: %d components x %d consumers = %d places, %d issues",
+			components, consumers, components*consumers, issues)
+		t.Logf("night 1 (everything opens): opened %d in %s, %d statements (%s each)",
+			first.Opened, took, issued, per(took, issued))
+
+		count := func(table string) int {
+			var n int
+			if err := db.DB.NewSelect().TableExpr(table).
+				ColumnExpr("COUNT(*)").Scan(ctx, &n); err != nil {
+				t.Fatalf("count %s: %v", table, err)
+			}
+			return n
+		}
+		report := func(label string) {
+			t.Logf("%s: finding=%d scan_run=%d graph_node=%d graph_edge=%d",
+				label, count("finding"), count("scan_run"),
+				count("graph_node"), count("graph_edge"))
+			timed(t, ctx, store, who, finding.Scope{
+				ProductID: &product.ID, StreamID: &branch.ID, VariantID: &variant.ID,
+			})
+			timedHistory(t, ctx, store, scans, who, target.ID, product.ID)
+		}
+		report("after night 1")
+
+		// Then a year of them. A component whose version moves closes every
+		// finding at it and opens the same number again, which is the whole of
+		// what a quiet night costs.
+		// What each component is at, carried forward. A bump is permanent: a
+		// package that moved to 1.5 does not go back to 1.0 tomorrow.
+		//
+		// The first version of this slid a window and left everything outside
+		// it at 1.0, so last night's components reverted — fourteen identities
+		// changing a night where the model says seven, and a version history
+		// no build has. The numbers it produced were real measurements of
+		// twice the churn they claimed.
+		version := make([]string, components)
+		for i := range version {
+			version[i] = "1.0"
+		}
+		moved := 0
+		var slowest time.Duration
+		var total time.Duration
+		var issuedAll int64
+		for n := 2; n <= nights; n++ {
+			bumped := int(float64(components) * churn)
+			from := (n * bumped) % components
+			for i := from; i < from+bumped && i < components; i++ {
+				version[i] = fmt.Sprintf("1.%d", n)
+			}
+			versionOf := func(i int) string { return version[i] }
+			_, took, issued := night(versionOf, (n-1)*arriving)
+			total += took
+			issuedAll += issued
+			if took > slowest {
+				slowest = took
+			}
+			moved += min(bumped, components-from)
+			if n%73 == 0 {
+				report(fmt.Sprintf("after night %d", n))
+			}
+		}
+		measured := int64(nights - 1)
+		t.Logf("a night cost %s on average, %s at worst, over %d nights",
+			total/time.Duration(measured), slowest, measured)
+		t.Logf("a night issued %d statements on average, costing %s each",
+			issuedAll/measured, per(total, issuedAll))
+		t.Logf("%d component versions moved across the year", moved)
+		report("after a year")
+	})
+}
+
+// shape builds the graph for one night: a root, some consumers, and every
+// component under every consumer.
+func shape(versionOf func(int) string) graph.Snapshot {
+	snap := graph.Snapshot{Root: at("sonic", "1.0")}
+	snap.Components = append(snap.Components, snap.Root)
+	holders := make([]graph.Described, 0, consumers)
+	for c := range consumers {
+		holder := at(fmt.Sprintf("container-%d", c), "1.0")
+		holders = append(holders, holder)
+		snap.Components = append(snap.Components, holder)
+		snap.Dependencies = append(snap.Dependencies, graph.Dependency{
+			Parent: snap.Root, Child: holder,
+		})
+	}
+	for i := range components {
+		part := at(fmt.Sprintf("package-%d", i), versionOf(i))
+		snap.Components = append(snap.Components, part)
+		for _, holder := range holders {
+			snap.Dependencies = append(snap.Dependencies, graph.Dependency{
+				Parent: holder, Child: part,
+			})
+		}
+	}
+	return snap
+}
+
+// reports is what the scanner says it found: every issue against the component
+// it belongs to, plus whatever the vulnerability database has added since.
+func reports(versionOf func(int) string, extra int) []finding.Reported {
+	out := make([]finding.Reported, 0, issues+extra)
+	for v := range issues + extra {
+		part := at(fmt.Sprintf("package-%d", v%components), versionOf(v%components))
+		out = append(out, finding.Reported{
+			Issue: finding.Named{
+				Identifier: fmt.Sprintf("CVE-2026-%05d", v),
+				Severity:   [...]string{"low", "medium", "high", "critical"}[v%4],
+			},
+			Component: part,
+		})
+	}
+	return out
+}
+
+// timedHistory runs the two reads that grow with the calendar rather than with
+// the size of a build.
+//
+// Both were named as unbounded rather than measured: the receipts page reads
+// every finished run of a target and every scan filed against it, whatever
+// page is asked for, and then pairs them; the release comparison counts what
+// is open against every build of a product. A year of nights is what tells the
+// difference between a shape that grows and a shape that matters.
+func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
+	scans *ingest.Store, who access.Subject, target, product int64) {
+
+	t.Helper()
+	start := time.Now()
+	first, filed, err := scans.Receipts(ctx, who, target, "", 50, 0)
+	if err != nil {
+		t.Fatalf("receipts: %v", err)
+	}
+	page := time.Since(start)
+
+	// A later page as well as the first. The pairing is done over all of
+	// history rather than over the page, so the last page should cost what the
+	// first does — and if it does not, that is the answer.
+	deep := 0
+	if filed > 50 {
+		deep = filed - 50
+	}
+	start = time.Now()
+	last, _, err := scans.Receipts(ctx, who, target, "", 50, deep)
+	if err != nil {
+		t.Fatalf("receipts at %d: %v", deep, err)
+	}
+	back := time.Since(start)
+
+	start = time.Now()
+	releases, err := store.Releases(ctx, who, product)
+	if err != nil {
+		t.Fatalf("releases: %v", err)
+	}
+	compare := time.Since(start)
+
+	t.Logf("    receipts page 1 %s (%d of %d) · page at %d %s (%d) · releases %s (%d builds)",
+		page.Round(time.Millisecond), len(first), filed,
+		deep, back.Round(time.Millisecond), len(last),
+		compare.Round(time.Millisecond), len(releases))
+}
+
+// timed runs the queries somebody actually waits for.
+func timed(t *testing.T, ctx context.Context, store *finding.Store,
+	who access.Subject, scope finding.Scope) {
+
+	t.Helper()
+	start := time.Now()
+	_, total, err := store.Groups(ctx, who, scope, 50, 0, finding.Filter{})
+	if err != nil {
+		t.Fatalf("findings list: %v", err)
+	}
+	list := time.Since(start)
+
+	start = time.Now()
+	due, err := store.RunningOut(ctx, who, finding.Scope{}, 30*24*time.Hour, 50)
+	if err != nil {
+		t.Fatalf("running out: %v", err)
+	}
+	out := time.Since(start)
+
+	start = time.Now()
+	points, err := store.Trend(ctx, who, finding.Scope{},
+		time.Now().UTC().Add(-12*7*24*time.Hour), 7*24*time.Hour, 12)
+	if err != nil {
+		t.Fatalf("trend: %v", err)
+	}
+	trend := time.Since(start)
+
+	t.Logf("    findings list %s (%d rows) · running out %s (%d) · trend %s (%d points)",
+		list.Round(time.Millisecond), total,
+		out.Round(time.Millisecond), len(due),
+		trend.Round(time.Millisecond), len(points))
+}
+
+// counting counts the statements a store issues, so a night's cost can be
+// divided into work and round trips.
+type counting struct{ n atomic.Int64 }
+
+func (c *counting) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	c.n.Add(1)
+	return ctx
+}
+
+func (c *counting) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// per is how long one statement took, on average.
+//
+// The figure the engine comparison turns on. A cost that is flat in rows and
+// proportional to statements is paid per statement — which points at how the
+// work is batched rather than at how much of it there is.
+func per(took time.Duration, statements int64) time.Duration {
+	if statements <= 0 {
+		return 0
+	}
+	return took / time.Duration(statements)
+}

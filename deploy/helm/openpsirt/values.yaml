@@ -1,0 +1,220 @@
+# Any number of replicas run the same binary with no leader; every one serves,
+# reads scans and runs the scanner, and the database coordinates them. That
+# rules SQLite out for more than one: it is a file inside one pod, so the chart
+# refuses a SQLite URL with replicaCount above 1.
+replicaCount: 2
+
+# How long Kubernetes waits for a pod to stop before killing it. The process
+# drains requests for its shutdown grace (15 seconds unless
+# OPENPSIRT_SHUTDOWN_GRACE says otherwise) and then waits the same again for a
+# scan mid-application, so this is twice that with room to spare. Raise both
+# together if the grace is raised through extraEnv.
+terminationGracePeriodSeconds: 60
+
+# Scratch space for the process, since the root filesystem is read-only. An
+# emptyDir without a limit is node disk that a stray file can fill.
+tmp:
+  sizeLimit: 1Gi
+
+image:
+  # **No image is published yet.** This is where one will live; until there is
+  # a release, build it from the repository and push it somewhere your cluster
+  # can pull from, then point this there. Leaving it as it stands gives you a
+  # pod that cannot pull.
+  repository: ghcr.io/nexthop-ai/openpsirt
+  pullPolicy: IfNotPresent
+  # Defaults to the chart's appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+database:
+  # Where the database is and how to reach it. Supply exactly one of these.
+  #
+  #   url          set it here, and the chart creates a Secret holding it
+  #   existingSecret  name a Secret you manage yourself
+  #
+  # Putting a password in values.yaml means it ends up in your release history
+  # and probably in version control, so existingSecret is the better habit.
+  url: ""
+  existingSecret: ""
+  existingSecretKey: "database-url"
+
+# Who may sign in, and how. **The process refuses to start until somebody can
+# administer it**, because a deployment nobody can administer has one route
+# back in — editing the database by hand — and nobody discovers that at a good
+# moment.
+#
+# The minimum for a working install is bootstrapAdmins plus one provider.
+auth:
+  # Identities granted administration at every startup, not just the first.
+  # That makes this the recovery path as well as the bootstrap: lose access,
+  # add yourself here, and restart.
+  #
+  # An identity is what the provider calls the person — the OIDC subject or
+  # username claim, the GitHub login, or whatever the trusted header carries.
+  # Naming somebody grants them a role; it does not let them in without
+  # signing in.
+  bootstrapAdmins: []
+  # Where this deployment answers, as people reach it. A provider sends
+  # somebody back to an address and compares it against what it was registered
+  # with, so it is stated rather than taken from whatever a request claims its
+  # host is. Required once any provider is configured.
+  baseURL: ""
+
+  # Sign-in through an OpenID Connect provider. Leave issuer empty to skip.
+  oidc:
+    name: oidc
+    issuer: ""
+    clientID: ""
+    # Set clientSecret here and the chart puts it in a Secret, or name one you
+    # manage yourself. A secret in values.yaml ends up in your release history
+    # and probably in version control.
+    clientSecret: ""
+    existingSecret: ""
+    existingSecretKey: "oidc-client-secret"
+    # Which claim carries the username, and which carries group membership.
+    # Empty means the provider's usual one.
+    usernameClaim: ""
+    groupsClaim: ""
+
+  # Sign-in through GitHub. Leave clientID empty to skip.
+  github:
+    clientID: ""
+    clientSecret: ""
+    existingSecret: ""
+    existingSecretKey: "github-client-secret"
+    # Restrict to members of one organization. Empty means anybody with a
+    # GitHub account, which is rarely what you want.
+    org: ""
+
+  # Sign-in asserted by something in front of this — an identity-aware proxy.
+  # **Both parts are required together**: a header named with nothing to trust
+  # it from is either a mistake or the first half of one, and the process stops
+  # rather than accepting a header anybody can set.
+  trustedHeader:
+    name: ""
+    # Addresses or CIDR ranges the header is believed from. Anything else
+    # presenting it is ignored.
+    sources: []
+    # Where group membership arrives, if the proxy asserts it.
+    groupsHeader: ""
+    groupsDelimiter: ","
+
+# Mail is how anything leaves the application. Leave server empty and this
+# deployment tells nobody anything outside it, which is a supported way to run:
+# the notification area in the interface still works. Who gets what is each
+# person's own setting rather than a deployment one.
+mail:
+  # Both together, or neither: one without the other fails at render, since a
+  # server with nobody to send as sends nothing and nothing is what an
+  # operator would never notice.
+  server: ""
+  from: ""
+  # Credentials, where the server wants them. They are sent only over a
+  # connection STARTTLS secured; a server that will not secure one is refused
+  # rather than handed the password anyway.
+  username: ""
+  # Set password here and the chart puts it in a Secret, or name one you
+  # manage yourself. A secret in values.yaml ends up in your release history
+  # and probably in version control.
+  password: ""
+  existingSecret: ""
+  existingSecretKey: "mail-password"
+
+# Schema changes are applied at startup by default, which makes an upgrade
+# just a deployment. Turn this off to run "openpsirt migrate up" yourself,
+# under different credentials, at a time you choose.
+autoMigrate: true
+
+log:
+  level: info
+  format: json
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: openpsirt.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# Nothing here needs root, a writable filesystem, or any capability.
+podSecurityContext:
+  runAsNonRoot: true
+  # Pinned in the image, not chosen by the package manager.
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+# Migrations run before the service starts answering. A schema change over a
+# large table can take a while, and a startup probe that gives up part way
+# through kills the pod and starts the migration again from the beginning.
+# failureThreshold x periodSeconds is how long a migration may take.
+startupProbe:
+  periodSeconds: 5
+  failureThreshold: 120
+
+livenessProbe:
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+extraEnv: []
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+
+# The vulnerability scanner ships in the image. This deployment runs the scan
+# rather than trusting whatever a producer's pipeline installed, so that counts
+# are comparable between products rather than being a property of somebody's
+# build image.
+scanner:
+  # Where it keeps its vulnerability data. The image sets the same path, and
+  # changing it here without changing it there leaves the data on the
+  # read-only root filesystem, where it cannot be written.
+  cacheDir: /var/cache/openpsirt/grype
+  persistence:
+    # Empty means scratch space that lives as long as the pod: correct, and it
+    # re-downloads the database on every start. Name a claim to keep it.
+    existingClaim: ""
+    sizeLimit: 5Gi

@@ -1,0 +1,190 @@
+import { Link, useParams } from "react-router-dom";
+import { Loading } from "../ui/Loading";
+import { on } from "../ui/when";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api/client";
+import { unwrap } from "../api/queries";
+import { Empty } from "../ui/Empty";
+import { Failed } from "../ui/Failed";
+
+// One product's own page.
+//
+// **There was no page for one product.** "How is SONiC doing" was five
+// requests and a spreadsheet — what is open per build, how much is overdue,
+// how much has been decided, when each build was last scanned — every piece of
+// which existed and none of which sat together. The products table is an
+// administration surface: a triage line in a select and an end-of-support date
+// in an input, which is a different job from reading how something is going.
+//
+// **Every number here opens the list that produced it.** A figure somebody
+// cannot follow is one they stop trusting, and then they go and count it
+// themselves.
+export function Product() {
+  const { product = "" } = useParams();
+  const overview = useQuery({
+    queryKey: ["overview", product],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/products/{product}/overview", { params: { path: { product } } })),
+  });
+
+  if (overview.isPending) return <Loading />;
+  if (overview.isError) {
+    return <Failed error={overview.error} what="That product could not be read." />;
+  }
+  const it = overview.data;
+  if (!it) return null;
+  const builds = it.builds ?? [];
+  const at = `/products/${encodeURIComponent(product)}`;
+
+  return (
+    <div>
+      <div className="screen-head">
+        <h2>{it.display_name || it.name}</h2>
+        <p>
+          <span className="id">{it.name}</span>
+          {it.triage_floor ? (
+            <> · triaged at {it.triage_floor} and above</>
+          ) : (
+            <> · triaged at whatever the deployment says</>
+          )}
+          {it.end_of_life && <> · out of support {it.end_of_life}</>}
+        </p>
+      </div>
+
+      {/* The four numbers somebody asks for, each a link to the list that
+          produced it. Overdue and waiting are the two that decide whether
+          anything needs doing today. */}
+      <div className="kpis">
+        <Link className="kpi" to={`${at}/findings`}>
+          <span className="l">Open · {it.name}</span>
+          <span className="n">{(it.open ?? 0).toLocaleString()}</span>
+          <span className="d">issues at components, as the list counts them</span>
+        </Link>
+        <Link
+          className={`kpi${(it.overdue ?? 0) > 0 ? " urgent" : ""}`}
+          to={`${at}/findings?running=overdue`}
+        >
+          <span className="l">Past a deadline</span>
+          <span className="n">{(it.overdue ?? 0).toLocaleString()}</span>
+          <span className="d">already late, across every build</span>
+        </Link>
+        <Link className="kpi" to={`${at}/findings?state=undecided`}>
+          <span className="l">Nobody has argued about</span>
+          <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
+          <span className="d">no place has a decision of any kind</span>
+        </Link>
+        <Link className="kpi" to="/review-queue">
+          <span className="l">Waiting on a second person</span>
+          <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
+          <span className="d">claims here that nobody has agreed to</span>
+        </Link>
+      </div>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <h3>Builds</h3>
+        {builds.length === 0 ? (
+          <Empty
+            title="Nothing is declared here yet."
+            detail="A build is a branch or tag and a variant. Declare them, and an upload can be filed against one."
+          />
+        ) : (
+          <div className="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Build</th>
+                  <th className="num">Open</th>
+                  <th className="num">Overdue</th>
+                  <th className="num">Exploited</th>
+                  <th className="num">Undecided</th>
+                  <th className="num">Decided</th>
+                  <th>Last scanned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {builds.map((row) => {
+                  const build =
+                    `${at}/streams/${encodeURIComponent(row.stream ?? "")}` +
+                    `/variants/${encodeURIComponent(row.variant ?? "")}`;
+                  return (
+                    <tr key={`${row.stream} ${row.variant}`} className="row">
+                      <td>
+                        <Link to={`${build}/findings`} className="id">
+                          {row.stream}
+                        </Link>{" "}
+                        <span className="hint">·</span> <span className="id">{row.variant}</span>
+                        {row.retired && (
+                          <>
+                            {" "}
+                            <span
+                              className="vchip"
+                              title="This release is out of support. Nothing is going to be fixed here, so nothing is late and a quiet build is expected rather than a fault"
+                            >
+                              out of support
+                            </span>
+                          </>
+                        )}
+                      </td>
+                      <td className="num">{(row.open ?? 0).toLocaleString()}</td>
+                      <td className="num">
+                        {row.overdue ? (
+                          <Link to={`${build}/findings?running=overdue`} className="due late">
+                            {row.overdue.toLocaleString()}
+                          </Link>
+                        ) : (
+                          <span className="hint">—</span>
+                        )}
+                      </td>
+                      <td className="num">
+                        {row.exploited ? (
+                          <Link to={`${build}/findings?only=exploited`}>
+                            {row.exploited.toLocaleString()}
+                          </Link>
+                        ) : (
+                          <span className="hint">—</span>
+                        )}
+                      </td>
+                      <td className="num">
+                        {row.undecided ? (
+                          <Link to={`${build}/findings?state=undecided`}>
+                            {row.undecided.toLocaleString()}
+                          </Link>
+                        ) : (
+                          <span className="hint">—</span>
+                        )}
+                      </td>
+                      <td className="num">
+                        {row.agreed ? (
+                          <Link to={`${build}/findings?state=agreed`}>
+                            {row.agreed.toLocaleString()}
+                          </Link>
+                        ) : (
+                          <span className="hint">—</span>
+                        )}
+                      </td>
+                      <td className="hint">
+                        {/* A build nobody has ever scanned is the row this
+                            page exists to show: a product reads as clean when
+                            part of it was never looked at. */}
+                        {row.last_scan_at ? (
+                          <Link to={`${build}/scans`}>{on(row.last_scan_at)}</Link>
+                        ) : (
+                          <span className="alertish">never</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="hint" style={{ marginTop: 8 }}>
+          Counted as issues at components, which is what the findings list counts: a component
+          reached twenty ways carries the same issue twenty times. <b>Undecided</b> means no place
+          has a decision; <b>decided</b> means every place is answered by one that stands.
+        </p>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,28 @@
+/* Colors taken from the mark, replacing a theme default indigo that sits
+   badly against it.
+
+   In light mode the header is white, set in mkdocs.yml rather than here: the
+   mark is drawn for a light background, with a navy outer frame around a white
+   inner field. Measured against a colored header its frame falls to about
+   1.3:1 and the mark reads as a white blob; against white it is 15:1.
+
+   These values cover the dark scheme's header and the accent in both. */
+
+:root {
+  --md-primary-fg-color:        #1d3a5c;
+  --md-primary-fg-color--light: #2c527f;
+  --md-primary-fg-color--dark:  #10233a;
+  --md-primary-bg-color:        #ffffff;
+  --md-primary-bg-color--light: #dbe4f0;
+
+  --md-accent-fg-color:         #2a63b8;
+  --md-accent-fg-color--transparent: rgba(42, 99, 184, 0.1);
+}
+
+/* On a dark page the mark's blue is too close to the background to read as a
+   link, so the accent lifts to the lighter end of the same family. */
+[data-md-color-scheme="slate"] {
+  --md-accent-fg-color:         #6da6e8;
+  --md-accent-fg-color--transparent: rgba(109, 166, 232, 0.1);
+  --md-typeset-a-color:         #6da6e8;
+}

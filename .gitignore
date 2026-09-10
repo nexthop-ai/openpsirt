@@ -1,0 +1,33 @@
+# Go
+/bin/
+*.exe
+*.test
+*.out
+
+# Node
+node_modules/
+dist/
+# …except the directory the binary embeds. //go:embed fails to compile when
+# its target is missing, so this one has to exist in a fresh clone even though
+# everything the frontend build puts in it is ignored. The directory has to be
+# un-ignored before anything inside it can be: git does not descend into an
+# excluded directory, so a negation nested under one never applies.
+!internal/webui/dist/
+!internal/webui/dist/.gitkeep
+!internal/webui/dist/.gitignore
+.vite/
+# Local
+*.local
+.env
+# Machine-local make settings: the database URLs for the engines the suite
+# runs against. Ignored because the ports are whoever's containers these are.
+local.mk
+# Everything "make demo" writes: the database it seeds, the scanner's
+# vulnerability cache, and the proxy configuration it generates. In the tree so
+# that deleting the checkout deletes the state, rather than leaving something
+# behind in somebody's home directory.
+.demo/
+.DS_Store
+# Docs build
+/site/
+# Build output

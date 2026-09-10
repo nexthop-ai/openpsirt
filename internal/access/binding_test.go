@@ -1,0 +1,350 @@
+package access_test
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+)
+
+func TestAGroupBringsTheRolesItIsBoundTo(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Bind(ctx, "security", f.products["sonic"], access.PrivateTriage); err != nil {
+			t.Fatal(err)
+		}
+
+		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform", "security"})
+		if err != nil {
+			t.Fatalf("somebody in two mapped groups was refused: %v", err)
+		}
+		if !subject.Reads(access.Public, f.products["sonic"]) ||
+			!subject.Holds(access.PrivateTriage, f.products["sonic"]) {
+			t.Errorf("reached %+v", subject)
+		}
+		if subject.Reads(access.Public, f.products["onie"]) {
+			t.Error("a binding on one product reached another")
+		}
+	})
+}
+
+func TestLosingAGroupLosesWhatItGranted(t *testing.T) {
+	// A bound role is a statement about current membership. Leaving the group
+	// and keeping the access would make the binding decorative, and it is
+	// exactly the case an access review is meant to catch.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform"}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Signing in again, no longer in the group.
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"unrelated"}); err == nil {
+			t.Error("somebody in no mapped group was still admitted")
+		}
+		if _, err := f.store.Resolve(ctx, "proxy:someone"); err == nil {
+			t.Error("the role survived leaving the group that granted it")
+		}
+	})
+}
+
+func TestSomebodyInNoMappedGroupIsRefusedAndNotRecorded(t *testing.T) {
+	// The mapping is the pre-authorization. Somebody it does not cover was
+	// never authorized, and recording them would leave a person row behind for
+	// everybody who ever tried to sign in.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		for _, groups := range [][]string{nil, {}, {"unmapped"}, {""}} {
+			if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "a-stranger", Username: "a-stranger"}, groups); err == nil {
+				t.Errorf("%v admitted somebody", groups)
+			}
+		}
+		if _, err := f.store.ByIdentity(ctx, "proxy:a-stranger"); err == nil {
+			t.Error("somebody nobody authorized was recorded anyway")
+		}
+	})
+}
+
+func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T) {
+	// Two rules meeting. Membership that is missing or unreadable yields no
+	// roles rather than unrestricted access, and per-person assignment grants
+	// nothing while this mode is on — so an assignment made before the switch
+	// cannot be a way in behind the groups' back.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "someone", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		// The switch is what a deployment actually does before any of this
+		// runs, and it is what sets the assignment aside.
+		if err := f.store.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, groups := range [][]string{nil, {}, {"unmapped"}} {
+			if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, groups); err == nil {
+				t.Errorf("%v admitted somebody on an assignment that was set aside", groups)
+			}
+		}
+
+		// And the group route still works, which is what makes the refusals
+		// above mean something.
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform"}); err != nil {
+			t.Errorf("the mapped group did not admit them: %v", err)
+		}
+	})
+}
+
+func TestAGroupCanCarryAdministration(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.BindAdmin(ctx, "platform-leads"); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "a-lead", Username: "a-lead"}, []string{"platform-leads"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !subject.Admin {
+			t.Error("a group bound to administration granted none")
+		}
+
+		// And loses it on leaving.
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "a-lead", Username: "a-lead"}, []string{"nothing-mapped"}); err == nil {
+			t.Error("somebody who left the administrators' group was still admitted")
+		}
+		person, err := f.store.ByIdentity(ctx, "proxy:a-lead")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if person.IsAdmin {
+			t.Error("administration survived leaving the group that carried it")
+		}
+	})
+}
+
+func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *testing.T) {
+	// The documented way back in when the mapping is wrong or the provider is
+	// unreachable. A re-derivation that stripped it would take the recovery
+	// path away at exactly the moment it is needed.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:the-operator"}); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "the-operator", Username: "the-operator"}, []string{"nothing-mapped"})
+		if err != nil {
+			t.Fatalf("somebody named in configuration was refused: %v", err)
+		}
+		if !subject.Admin {
+			t.Error("somebody named in configuration lost administration to a sign-in")
+		}
+	})
+}
+
+func TestNamingAdministratorsIsWhatConfigurationSaysAndNotMore(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:first", "proxy:second"}); err != nil {
+			t.Fatal(err)
+		}
+		// Removed from configuration and restarted.
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:first"}); err != nil {
+			t.Fatal(err)
+		}
+
+		second, err := f.store.ByIdentity(ctx, "proxy:second")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if second.IsBootstrap {
+			t.Error("somebody removed from configuration is still named by it")
+		}
+		first, err := f.store.ByIdentity(ctx, "proxy:first")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !first.IsBootstrap || !first.IsAdmin {
+			t.Error("somebody still named lost it")
+		}
+	})
+}
+
+func TestSwitchingToGroupBoundSetsAssignmentsAsideRatherThanDeletingThem(t *testing.T) {
+	// People switch back, usually on discovering their groups do not map to
+	// how the team actually divides work.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "someone", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := f.store.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Resolve(ctx, "someone"); err == nil {
+			t.Error("an assignment set aside still granted something")
+		}
+
+		if err := f.store.SwitchTo(ctx, access.Direct); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := f.store.Resolve(ctx, "someone")
+		if err != nil {
+			t.Fatalf("switching back did not restore what was assigned: %v", err)
+		}
+		if !subject.Reads(access.Public, f.products["sonic"]) {
+			t.Error("what was assigned did not come back")
+		}
+	})
+}
+
+func TestSwitchingBackToDirectClearsWhatGroupsDerived(t *testing.T) {
+	// Derived grants are a cache of what a provider said at somebody's last
+	// sign-in. Keeping them once nothing refreshes them would leave roles
+	// nobody assigned and nothing will ever withdraw.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.BindAdmin(ctx, "leads"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform", "leads"}); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := f.store.SwitchTo(ctx, access.Direct); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Resolve(ctx, "proxy:someone"); err == nil {
+			t.Error("a role derived from a group outlived the mode that derived it")
+		}
+		person, err := f.store.ByIdentity(ctx, "proxy:someone")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if person.IsAdmin {
+			t.Error("administration derived from a group outlived the mode that derived it")
+		}
+	})
+}
+
+func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
+	// The only route back is editing the database by hand, and nobody
+	// discovers that at a good moment.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+
+		can, err := f.store.CanAdminister(ctx, access.GroupBound)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if can {
+			t.Error("group-bound mode with no admin group and nobody named looked survivable")
+		}
+
+		if err := f.store.BindAdmin(ctx, "leads"); err != nil {
+			t.Fatal(err)
+		}
+		if can, err = f.store.CanAdminister(ctx, access.GroupBound); err != nil || !can {
+			t.Errorf("a group bound to administration was not enough: %v %v", can, err)
+		}
+
+		// Naming somebody in configuration is enough in either mode.
+		if err := f.store.UnbindAdmin(ctx, "leads"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:the-operator"}); err != nil {
+			t.Fatal(err)
+		}
+		for _, mode := range []access.Mode{access.Direct, access.GroupBound} {
+			if can, err = f.store.CanAdminister(ctx, mode); err != nil || !can {
+				t.Errorf("somebody named in configuration was not enough in %s mode", mode)
+			}
+		}
+	})
+}
+
+func TestAnUnreadableModeReadsAsTheOneThatDerivesNothing(t *testing.T) {
+	// A value nobody can parse must not turn group membership into roles.
+	for _, raw := range []string{"", "groupbound", "Group-Bound", "nonsense", "direct"} {
+		if got := access.AsMode(raw); got != access.Direct {
+			t.Errorf("%q read as %q, want direct", raw, got)
+		}
+	}
+	if got := access.AsMode("group-bound"); got != access.GroupBound {
+		t.Errorf("the group-bound mode read as %q", got)
+	}
+}
+
+func TestAProxyCanReportMembershipToo(t *testing.T) {
+	// This extends no trust that was not already extended: anybody able to
+	// forge the group header could forge the username header and claim to be
+	// an administrator outright. It is what lets a deployment run entirely
+	// behind existing ingress authentication with no provider configured here.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		sources, err := access.ParseSources("192.0.2.1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resolver := access.NewResolver(f.store, access.Trust{
+			Header: "X-Remote-User", From: sources,
+			GroupsHeader: "X-Remote-Groups", GroupsDelimiter: ",",
+		}).WithMode(func(context.Context) access.Mode { return access.GroupBound })
+
+		ask := func(user, groups string) (access.Subject, error) {
+			req := httptest.NewRequest(http.MethodGet, "/v1/products", nil)
+			req.RemoteAddr = "192.0.2.1:5000"
+			req.Header.Set("X-Remote-User", user)
+			if groups != "" {
+				req.Header.Set("X-Remote-Groups", groups)
+			}
+			subject, _, err := resolver.Resolve(ctx, req)
+			return subject, err
+		}
+
+		subject, err := ask("someone", "platform, unrelated")
+		if err != nil {
+			t.Fatalf("somebody the proxy put in a mapped group was refused: %v", err)
+		}
+		if !subject.Reads(access.Public, f.products["sonic"]) {
+			t.Error("the mapped group granted nothing")
+		}
+
+		// And membership that is absent or unmapped grants nothing rather than
+		// everything, which is the failure that would otherwise be silent.
+		for _, groups := range []string{"", "unmapped", "  ,  "} {
+			if _, err := ask("nobody-here", groups); err == nil {
+				t.Errorf("groups %q admitted somebody", groups)
+			}
+		}
+	})
+}

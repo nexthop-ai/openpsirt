@@ -1,0 +1,52 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:oci/docker-base-trixie@master.0-dirty-20260828.134451?arch=amd64",
+      "name": "docker-base-trixie",
+      "properties": [
+        {
+          "name": "sonic:fragment_kind",
+          "value": "recipe-emit"
+        },
+        {
+          "name": "sonic:recipe_type",
+          "value": "DOCKER_IMAGE"
+        },
+        {
+          "name": "sonic:artifact_filename",
+          "value": "docker-base-trixie.gz"
+        }
+      ],
+      "purl": "pkg:oci/docker-base-trixie@master.0-dirty-20260828.134451?arch=amd64",
+      "type": "container",
+      "version": "master.0-dirty-20260828.134451"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "sonic:fragment_kind",
+        "value": "recipe-emit"
+      },
+      {
+        "name": "sonic:recipe_type",
+        "value": "DOCKER_IMAGE"
+      },
+      {
+        "name": "sonic:src_path",
+        "value": ""
+      },
+      {
+        "name": "sonic:platform",
+        "value": "broadcom"
+      },
+      {
+        "name": "sonic:arch",
+        "value": "amd64"
+      }
+    ]
+  },
+  "specVersion": "1.6",
+  "version": 1
+}

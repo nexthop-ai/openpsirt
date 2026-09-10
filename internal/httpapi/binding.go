@@ -1,0 +1,360 @@
+package httpapi
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
+)
+
+// ModeBody is where this deployment's roles come from.
+type ModeBody struct {
+	Mode string `json:"mode" enum:"direct,group-bound" doc:"Whether an administrator assigns roles or provider groups derive them"`
+}
+
+// BindingBody is a provider group bound to a role.
+type BindingBody struct {
+	Group string `json:"group" minLength:"1" maxLength:"191" doc:"The group as the provider names it — a team slug, or a claim value"`
+	// Product is absent where the binding carries administration, which is
+	// global rather than held against a product.
+	Product string `json:"product,omitempty" doc:"The product the role is held against"`
+	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin" doc:"What membership of this group grants"`
+}
+
+func registerBindings(api huma.API, a Administering, settings func() *setting.Store) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "get-role-mode", Method: http.MethodGet, Path: "/v1/roles/mode",
+		Summary: "Get the role assignment mode",
+		Description: "Says where roles come from here: assigned by an administrator, or derived " +
+			"from the groups an identity provider reports.\n\n" +
+			"One mode for the whole deployment, never both. A hybrid would need a precedence " +
+			"rule for somebody holding one role from a team and another directly, which is how a " +
+			"stale assignment outlives somebody's removal from the team it was shadowing.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ModeBody }, error) {
+		if _, _, err := administerable(ctx, a); err != nil {
+			return nil, err
+		}
+		store := settings()
+		if store == nil {
+			return nil, noDatabase(a.Logger)
+		}
+		stored, _, err := store.Get(ctx, setting.RoleMode)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot read where roles come from", err)
+		}
+		return &struct{ Body ModeBody }{Body: ModeBody{Mode: string(access.AsMode(stored))}}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "set-role-mode", Method: http.MethodPut, Path: "/v1/roles/mode",
+		Summary: "Set the role assignment mode",
+		Description: "Turning group binding on sets assignments aside rather than deleting them, " +
+			"and turning it off restores them — so trying it is not a one-way door. Refused if it " +
+			"would leave nobody able to administer this deployment.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, in *struct{ Body ModeBody }) (*struct{ Body ModeBody }, error) {
+		rights, _, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		store := settings()
+		if store == nil {
+			return nil, noDatabase(a.Logger)
+		}
+
+		wanted := access.AsMode(in.Body.Mode)
+		if string(wanted) != in.Body.Mode {
+			return nil, huma.Error422UnprocessableEntity("that is not a way for roles to be assigned")
+		}
+
+		// Asked before the switch rather than after. A deployment that has
+		// locked itself out of its own administration has one route back —
+		// editing the database by hand — and refusing the change is cheaper
+		// than discovering that afterwards.
+		can, err := rights.CanAdminister(ctx, wanted)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot tell who would administer", err)
+		}
+		if !can {
+			return nil, huma.Error409Conflict(
+				"nothing would administer this deployment in that mode: bind a group to admin, " +
+					"or name somebody in configuration, before switching")
+		}
+
+		if err := rights.SwitchTo(ctx, wanted); err != nil {
+			return nil, wentWrong(a.Logger, "cannot change where roles come from", err)
+		}
+		if err := store.Set(ctx, setting.RoleMode, string(wanted)); err != nil {
+			return nil, wentWrong(a.Logger, "cannot record where roles come from", err)
+		}
+		return &struct{ Body ModeBody }{Body: ModeBody{Mode: string(wanted)}}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "list-bindings", Method: http.MethodGet, Path: "/v1/roles/bindings",
+		Summary: "List group-to-role bindings",
+		Description: "Lists every group-to-role mapping, and the groups that administer.\n\n" +
+			"In group-bound mode a mapping is the advance authorization: somebody arriving for " +
+			"the first time in a mapped group is admitted, and somebody in none is refused.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[BindingBody], error) {
+		rights, _, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+
+		bindings, err := rights.Bindings(ctx)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot list the group bindings", err)
+		}
+		named, err := productNames(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+
+		out := &listOutput[BindingBody]{}
+		out.Body.Items = make([]BindingBody, 0, len(bindings))
+		for _, binding := range bindings {
+			out.Body.Items = append(out.Body.Items, BindingBody{
+				Group: binding.GroupName, Product: named[binding.ProductID], Role: string(binding.Role),
+			})
+		}
+
+		administering, err := rights.AdminGroups(ctx)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot list which groups administer", err)
+		}
+		for _, group := range administering {
+			out.Body.Items = append(out.Body.Items, BindingBody{Group: group, Role: adminRole})
+		}
+		return out, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "bind-group", Method: http.MethodPost, Path: "/v1/roles/bindings",
+		Summary: "Bind an identity-provider group to a role",
+		Description: "Maps one identity-provider group to one role, so that everybody in that " +
+			"group holds it from their next sign-in.\n\n" +
+			"Every role but administration names the product it applies to. Administration is " +
+			"bound without one, because it is global rather than held against a product.",
+		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
+	}, deploymentWide, ""), func(ctx context.Context, in *struct{ Body BindingBody }) (*struct{ Body BindingBody }, error) {
+		rights, names, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+
+		if in.Body.Role == adminRole {
+			if in.Body.Product != "" {
+				return nil, huma.Error422UnprocessableEntity(
+					"administration is not held against a product, so a group bound to it names none")
+			}
+			if err := rights.BindAdmin(ctx, in.Body.Group); err != nil {
+				return nil, wentWrong(a.Logger, "cannot bind a group to administration", err)
+			}
+			return &struct{ Body BindingBody }{Body: in.Body}, nil
+		}
+
+		role := access.Role(in.Body.Role)
+		if !role.Valid() {
+			return nil, huma.Error422UnprocessableEntity("that is not a role")
+		}
+		product, err := names.ProductByName(ctx, in.Body.Product)
+		if err != nil {
+			return nil, noSuchProduct()
+		}
+		if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
+			return nil, wentWrong(a.Logger, "cannot bind a group", err)
+		}
+		return &struct{ Body BindingBody }{Body: in.Body}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "unbind-group", Method: http.MethodDelete, Path: "/v1/roles/bindings",
+		Summary: "Remove a group-to-role binding",
+		Description: "Removes one group-to-role mapping.\n\n" +
+			"It takes effect at each member's next sign-in, because group membership is read at " +
+			"sign-in and never again. To cut somebody off now, end their sessions.",
+		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
+	}, deploymentWide, ""), func(ctx context.Context, in *struct {
+		Group   string `query:"group" required:"true"`
+		Product string `query:"product"`
+		Role    string `query:"role" required:"true"`
+	}) (*struct{}, error) {
+		rights, names, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+
+		if in.Role == adminRole {
+			// Refused where it would leave nobody able to administer, for the
+			// same reason the mode change is.
+			if err := rights.UnbindAdmin(ctx, in.Group); err != nil {
+				return nil, wentWrong(a.Logger, "cannot unbind a group from administration", err)
+			}
+			if err := stillAdministrable(ctx, rights, a, settings); err != nil {
+				// Put back, so a refusal does not half-apply.
+				if restored := rights.BindAdmin(ctx, in.Group); restored != nil {
+					return nil, wentWrong(a.Logger, "cannot restore an administration binding", restored)
+				}
+				return nil, err
+			}
+			return &struct{}{}, nil
+		}
+
+		product, err := names.ProductByName(ctx, in.Product)
+		if err != nil {
+			return nil, noSuchProduct()
+		}
+		if err := rights.Unbind(ctx, in.Group, product.ID, access.Role(in.Role)); err != nil {
+			return nil, wentWrong(a.Logger, "cannot unbind a group", err)
+		}
+		return &struct{}{}, nil
+	})
+}
+
+// adminRole is how administration is named in a binding. It is not a role held
+// against a product, so it is not one of the roles.
+const adminRole = "admin"
+
+// stillAdministrable refuses a change that would leave nobody able to
+// administer this deployment.
+//
+// Asked against the mode actually in force. Unbinding the last administrators'
+// group matters while roles are derived from groups and does not while they
+// are assigned, and refusing in both would make a deployment that has never
+// turned group binding on unable to tidy up a mapping it is not using.
+func stillAdministrable(ctx context.Context, rights *access.Store, a Administering, settings func() *setting.Store) error {
+	mode := access.Direct
+	if store := settings(); store != nil {
+		stored, _, err := store.Get(ctx, setting.RoleMode)
+		if err != nil {
+			return wentWrong(a.Logger, "cannot read where roles come from", err)
+		}
+		mode = access.AsMode(stored)
+	}
+
+	can, err := rights.CanAdminister(ctx, mode)
+	if err != nil {
+		return wentWrong(a.Logger, "cannot tell who would administer", err)
+	}
+	if !can {
+		return huma.Error409Conflict(
+			"that was the last thing granting administration: bind another group to admin, " +
+				"or name somebody in configuration, first")
+	}
+	return nil
+}
+
+// productNames maps product rows to the names bindings state them by.
+func productNames(ctx context.Context, a Administering) (map[int64]string, error) {
+	names := a.Catalog()
+	// Every product, because this is naming the ones bindings already refer
+	// to rather than answering anybody about them. The caller is administering
+	// group bindings and was authorized for that before reaching here.
+	products, err := names.Products(ctx, access.Everything("naming products for bindings"))
+	if err != nil {
+		return nil, wentWrong(a.Logger, "cannot read the products roles are held against", err)
+	}
+	named := map[int64]string{}
+	for _, product := range products {
+		named[product.ID] = product.DisplayName
+	}
+	return named, nil
+}
+
+// registerRevocation mounts what an administrator needs to cut access off now
+// rather than at the next sign-in.
+//
+// Group membership is only ever re-read when somebody signs in, so withdrawing
+// a role or a mapping takes effect at their next one. That is the right
+// mechanism for drift and the wrong one for somebody leaving. Ending their
+// sessions is what makes the deliberate case immediate.
+func registerRevocation(api huma.API, a Administering) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "list-all-tokens", Method: http.MethodGet, Path: "/v1/people/tokens",
+		Summary: "List all users' API tokens",
+		Description: "Lists every personal token in the deployment, whose it is, what it may " +
+			"send and when it was last used.\n\n" +
+			"Without it a stale token is found only when somebody leaves and nobody knows what " +
+			"breaks if it is turned off.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[TokenBody], error) {
+		rights, names, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		tokens, err := rights.AllTokens(ctx)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot list the tokens", err)
+		}
+		people, _, err := rights.People(ctx)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot read whose tokens these are", err)
+		}
+		owners := map[int64]string{}
+		for _, person := range people {
+			owners[person.ID] = person.Identity
+		}
+		return tokenList(ctx, names, tokens, owners)
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "revoke-anyones-token", Method: http.MethodDelete,
+		Path:    "/v1/people/{identity}/tokens/{name}",
+		Summary: "Withdraw another user's API token",
+		Description: "Revokes one person's token on their behalf. It stops working immediately; " +
+			"the record of what it sent stays.\n\n" +
+			"An owner withdraws their own through their own token paths. This is for the ones " +
+			"whose owner is no longer here to do it.",
+		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
+	}, deploymentWide, ""), func(ctx context.Context, in *struct {
+		Identity string `path:"identity"`
+		Name     string `path:"name"`
+	}) (*struct{}, error) {
+		rights, _, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		person, err := rights.ByIdentity(ctx, in.Identity)
+		if err != nil {
+			return nil, noSuchPerson()
+		}
+		token, err := rights.TokenByName(ctx, person.ID, in.Name)
+		if err != nil {
+			return nil, huma.Error404NotFound("they hold no token called that")
+		}
+		if err := rights.RevokeToken(ctx, token.ID); err != nil {
+			return nil, wentWrong(a.Logger, "cannot revoke a token", err)
+		}
+		return &struct{}{}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "end-sessions", Method: http.MethodDelete, Path: "/v1/people/{identity}/sessions",
+		Summary: "End all of a user's sessions",
+		Description: "Takes effect at once, whichever copy of the application answers next. Roles " +
+			"and group mappings are re-read at sign-in, so withdrawing one takes effect then; this " +
+			"is what makes somebody leaving immediate instead.",
+		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
+	}, deploymentWide, ""), func(ctx context.Context, in *struct {
+		Identity string `path:"identity"`
+	}) (*struct{}, error) {
+		rights, _, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		person, err := rights.ByIdentity(ctx, in.Identity)
+		if err != nil {
+			return nil, noSuchPerson()
+		}
+		if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
+			return nil, wentWrong(a.Logger, "cannot end the sessions", err)
+		}
+		return &struct{}{}, nil
+	})
+}

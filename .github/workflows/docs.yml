@@ -1,0 +1,38 @@
+name: Publish documentation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r docs/requirements.txt
+      - name: Configure committer
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      # Published sets are versioned so a reader can tell which release they
+      # are looking at. Unreleased work publishes as "main"; a tagged release
+      # publishes under its version and moves the "latest" alias.
+      - run: mike deploy --push --update-aliases main
+      # Without a default the site root serves nothing — every version lives in
+      # its own directory. Until there is a release, unreleased work is what a
+      # visitor should land on; once releases exist this becomes "latest".
+      - run: mike set-default --push main

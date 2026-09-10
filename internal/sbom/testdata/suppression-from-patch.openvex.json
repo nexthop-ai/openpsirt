@@ -1,0 +1,24 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/sonic-net/sonic-buildimage/vex/auto/14a48262e416278c",
+  "_comment": "Auto-extracted from src/thrift_0_14_1/thrift.patch/0002-cve-2017-1000487.patch. DO NOT EDIT \u2014 regenerate via scripts/sbom_extract_vex_from_patches.py",
+  "author": "SONiC auto-VEX",
+  "role": "SONiC build tooling",
+  "statements": [
+    {
+      "impact_statement": "Fixed by SONiC local patch src/thrift_0_14_1/thrift.patch/0002-cve-2017-1000487.patch. Promote to a curated vex/ file with an exact product PURL if grype's PURL matcher doesn't catch this component automatically.",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "products": [
+        {
+          "@id": "pkg:generic/thrift_0_14_1"
+        }
+      ],
+      "status": "not_affected",
+      "vulnerability": {
+        "name": "CVE-2017-1000487"
+      }
+    }
+  ],
+  "timestamp": "2026-08-28T11:48:05Z",
+  "version": 1
+}

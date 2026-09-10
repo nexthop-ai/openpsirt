@@ -1,0 +1,263 @@
+package ingest_test
+
+import (
+	"io"
+	"log/slog"
+	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/schema"
+)
+
+// scanned gives every engine a database holding two builds of one product: one
+// filed against recently, one that has gone silent. A third build belongs to a
+// product the reader cannot see.
+func scanned(t *testing.T, fn func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, ours, theirs int64)) {
+	t.Helper()
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if err := schema.Up(ctx, db, quiet); err != nil {
+			t.Fatalf("migrate: %v", err)
+		}
+		dbtest.Reset(t, db)
+
+		cat := catalog.NewStore(db.DB)
+		store := ingest.NewStore(db.DB)
+
+		// Declaring is refused where the name is taken, and two builds of one
+		// product share a product and a branch by construction — so each level
+		// falls back to the one that exists.
+		build := func(product, stream, variant string) (int64, int64) {
+			p, err := cat.DeclareProduct(ctx, product, product)
+			if err != nil {
+				if p, err = cat.ProductByName(ctx, product); err != nil {
+					t.Fatal(err)
+				}
+			}
+			br, err := cat.DeclareStream(ctx, p.ID, stream, catalog.Branch, nil)
+			if err != nil {
+				if br, err = cat.StreamByName(ctx, p.ID, stream); err != nil {
+					t.Fatal(err)
+				}
+			}
+			v, err := cat.DeclareVariant(ctx, p.ID, variant, true)
+			if err != nil {
+				if v, err = cat.VariantByName(ctx, p.ID, variant); err != nil {
+					t.Fatal(err)
+				}
+			}
+			target, err := cat.TargetFor(ctx, br.ID, v.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return p.ID, target.ID
+		}
+
+		ours, current := build("sonic", "master", "broadcom")
+		_, silent := build("sonic", "master", "mellanox")
+		theirs, hidden := build("edge-router", "main", "generic")
+
+		file := func(target int64, hash string, ago time.Duration) {
+			at := time.Now().UTC().Add(-ago)
+			if _, _, err := store.Record(ctx, ingest.Arriving{
+				TargetID: target, ContentHash: hash, BuiltAt: at,
+				ParserVersion: "test", Credential: "key-1",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		file(current, "recent", time.Hour)
+		file(hidden, "elsewhere", time.Hour)
+		// The silent build has one scan, long enough ago to have gone quiet.
+		// A build with a scan and a build with none are different situations,
+		// and both have to be reported.
+		file(silent, "stale", 30*24*time.Hour)
+		if _, err := db.DB.NewUpdate().Table("scan").
+			Set("received_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
+			Where("content_hash = ?", "stale").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		reader := access.NewPerson(1, "reader", false, map[int64][]access.Role{
+			ours: {access.PublicRead},
+		}, 0)
+		fn(t, db, store, reader, ours, theirs)
+	})
+}
+
+func TestScanningNamesTheBuildThatWentQuiet(t *testing.T) {
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
+		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("wanted the reader's two builds, got %d: %+v", len(rows), rows)
+		}
+		// Quietest first, because the answer somebody needs is which one
+		// stopped rather than which one is alphabetically first.
+		if rows[0].Variant != "mellanox" || !rows[0].Quiet {
+			t.Errorf("the silent build should lead and be quiet, got %+v", rows[0])
+		}
+		if rows[1].Variant != "broadcom" || rows[1].Quiet {
+			t.Errorf("the scanned build should follow and be quiet=false, got %+v", rows[1])
+		}
+		if rows[0].LastReceivedAt == nil {
+			t.Error("a build that was scanned once should still say when")
+		}
+		if rows[0].Since < 20*24*time.Hour {
+			t.Errorf("silence measured as %v, wanted about thirty days", rows[0].Since)
+		}
+	})
+}
+
+func TestScanningCountsFromDeclarationWhereNothingEverArrived(t *testing.T) {
+	// The same failure caught earlier: a build declared and never filed
+	// against. An inner join to the scan table cannot see it at all, which is
+	// the mistake this asserts against.
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		cat := catalog.NewStore(s.DB())
+		br, err := cat.DeclareStream(t.Context(), ours, "never-built", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, err := cat.VariantByName(t.Context(), ours, "broadcom")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cat.TargetFor(t.Context(), br.ID, v.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var found bool
+		for _, row := range rows {
+			if row.Stream == "never-built" {
+				found = true
+				if row.LastReceivedAt != nil {
+					t.Error("nothing was ever filed against it, so it has no last arrival")
+				}
+			}
+		}
+		if !found {
+			t.Error("a build nothing has ever been filed against was left out entirely")
+		}
+	})
+}
+
+func TestScanningShowsOnlyWhatTheReaderMaySee(t *testing.T) {
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, _, theirs int64) {
+		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range rows {
+			if row.ProductID == theirs {
+				t.Errorf("a product the reader holds nothing on was listed: %+v", row)
+			}
+		}
+	})
+}
+
+func TestScanningTellsAPipelineKeyNothing(t *testing.T) {
+	// A key sees the receipts for what it sent and nothing more. When a build
+	// was last scanned by anybody is a fact about the deployment, and a key
+	// that could read it would learn about uploads it did not make.
+	//
+	// This pins the outcome rather than one guard. A subject that is not a
+	// person holds no products at all, so the products check refuses a key
+	// even with the explicit one removed — mutating either alone leaves this
+	// green, and that is a property of the two agreeing rather than a test
+	// that proves nothing.
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, _ access.Subject, ours, _ int64) {
+		pipeline := access.NewPipeline(1, "nightly", access.Scope{ProductID: ours})
+		rows, err := s.Scanning(t.Context(), pipeline, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 0 {
+			t.Errorf("a pipeline key was told about %d builds", len(rows))
+		}
+	})
+}
+
+func TestScanningJudgesNothingWithoutAThreshold(t *testing.T) {
+	// Zero is how a caller asks "when was each of these last seen" without
+	// also asking for a judgment, and a threshold of zero must not make
+	// everything quiet.
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
+		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 0 {
+			t.Fatal("wanted the builds back")
+		}
+		for _, row := range rows {
+			if row.Quiet {
+				t.Errorf("nothing should be quiet with no threshold: %+v", row)
+			}
+		}
+	})
+}
+
+func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
+	// A dead release not being scanned is expected rather than a fault,
+	// and without this the coverage view — the thing that catches a
+	// product silently dropping out — fills with releases that stopped on
+	// purpose and nobody reads it.
+	//
+	// **Reported rather than left out**: "not scanned, and that is
+	// fine" and "not listed" are different answers, and only one is true.
+	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		ctx := t.Context()
+		before, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(before) != 2 || !before[0].Quiet {
+			t.Fatalf("the silent build is not quiet to begin with: %+v", before)
+		}
+		if before[0].Retired {
+			t.Fatal("a build nobody has dated reads as out of support")
+		}
+
+		// Support for the whole product ended yesterday.
+		yesterday := time.Now().UTC().Add(-24 * time.Hour)
+		if err := catalog.NewStore(db.DB).SetProductEndOfLife(ctx, ours, &yesterday); err != nil {
+			t.Fatal(err)
+		}
+
+		after, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(after) != len(before) {
+			t.Fatalf("a release out of support left the list: %d rows, was %d", len(after), len(before))
+		}
+		for _, row := range after {
+			if !row.Retired {
+				t.Errorf("%s %s does not read as out of support", row.Stream, row.Variant)
+			}
+			if row.Quiet {
+				t.Errorf("%s %s is reported as having gone quiet while out of support",
+					row.Stream, row.Variant)
+			}
+			// And the silence is still measured and still shown, so a reader
+			// can see it stopped rather than being told nothing.
+			if row.Since == 0 {
+				t.Errorf("%s %s reports no silence at all", row.Stream, row.Variant)
+			}
+		}
+	})
+}

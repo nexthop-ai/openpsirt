@@ -1,0 +1,401 @@
+package finding
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
+)
+
+// The findings list across every product somebody may see.
+//
+// **The work starts from an issue as often as from a product.** Findings were
+// answerable one product at a time, so "which of our products are carrying
+// this, and what is running out anywhere" was a question assembled by hand
+// once per product. At a dozen products that is the first thing anybody
+// complains about, and the issue page answers only half of it: it answers for
+// one issue, and the other half is the list — with filters, an order and
+// paging.
+//
+// **One row per product, issue and component.** The same library carrying the
+// same issue in two products is two pieces of work, decided separately by
+// different people; in three builds of one product it is one, with a count.
+// That is the grain the per-product list already groups at, one level out.
+//
+// **Every product's own line still applies.** A line is a claim about what is
+// worth an afternoon *here*, and a list that ignored the lines would hand
+// somebody back the thousands of rows their products deliberately set aside.
+// Applied per row from the product's own column rather than from one number
+// chosen for the page.
+//
+// **Nothing about it is a new visibility rule**, and that is exactly where it
+// has to be right: a page spanning products is where narrowing afterwards gets
+// forgotten, and the total leaks even when no row is shown. So the narrowing
+// is in the statement, and an issue that exists only in products somebody
+// holds nothing on answers as an issue that does not exist.
+
+// rankOf turns a severity word into a number, so a line and a rating can be
+// compared in the statement.
+//
+// The words rank; the column holds words. Inside one product the line is read
+// first and turned into a list of words the query admits, which cannot be done
+// across products — each row's line is its own — so the comparison happens in
+// SQL, and this is the same order severityOrder states.
+const rankOf = `CASE %s
+	WHEN 'critical' THEN 4 WHEN 'high' THEN 3
+	WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END`
+
+// Anywhere is what is open across every product this subject may see.
+//
+// Ordered, filtered and paged the way the per-product list is, by the same
+// allowlist and the same expressions, because two lists with two orders is how
+// they come to disagree in front of somebody.
+//
+// The filters that are about one build are refused rather than ignored: a
+// subtree is a walk over one build's edges, and "differs between builds" is a
+// statement about a selection. Answering them from whichever build sorted
+// first is the failure being avoided.
+func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
+	limit, offset int, filter Filter) ([]Group, int, error) {
+
+	products, all := subject.Products()
+	if subject.Kind != access.Person || (!all && len(products) == 0) {
+		return nil, 0, nil
+	}
+	if filter.Beneath != nil {
+		return nil, 0, fmt.Errorf("read findings beneath a component: a subtree is a walk over" +
+			" one build's edges, and this list spans products")
+	}
+	limit = database.AList.Of(limit)
+	filter.Across = true
+	filter.ProductID = 0
+	filter.HeldBy = subject.Mine()
+	// Both are statements about a selection of builds, which this is not.
+	filter.Builds = 0
+	filter.DiffersBetweenBuilds = false
+	// The line is applied per product below rather than from the filter's one
+	// word, so the filter's own is turned off — including its inverse, which
+	// would otherwise ask for what is beneath a line that is not in the query.
+	line := filter.Floor
+	filter.Floor = Floor{}
+	wasBelow := filter.BelowFloor
+	filter.BelowFloor = true
+
+	// The deployment's line, which a product that states none inherits.
+	deployment := NoFloor
+	if !wasBelow {
+		word, set, err := setting.NewStore(s.db).Get(ctx, setting.TriageFloor)
+		if err != nil {
+			return nil, 0, err
+		}
+		if set && word != "" {
+			deployment = word
+		}
+		// A caller may raise the line for the whole page — that is what the
+		// severity control on the list does — but never lower it below what a
+		// product decided, because the line is the product's decision.
+		if line.Hides() && Ranks(line.Word) > Ranks(deployment) {
+			deployment = line.Word
+		}
+	}
+
+	// Which releases are past their date, read once for the page. This list
+	// spans products and resolves no build identifiers, so the two questions
+	// are conditions here rather than a narrowing of a target list — the same
+	// rule, applied where this query can reach it.
+	var pastEOL []int64
+	if filter.Workable.asks() && len(filter.Workable.Support) == 1 {
+		var err error
+		if pastEOL, err = catalog.NewStore(s.db).
+			StreamsPastEndOfLife(ctx, s.now().UTC()); err != nil {
+			return nil, 0, err
+		}
+	}
+
+	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
+		if len(filter.Workable.Kinds) == 1 {
+			q = q.Where("st.kind = ?", filter.Workable.Kinds[0])
+		}
+		if len(filter.Workable.Support) == 1 {
+			switch {
+			case filter.Workable.Support[0] == PastEndOfLife && len(pastEOL) == 0:
+				q = q.Where("1 = 0")
+			case filter.Workable.Support[0] == PastEndOfLife:
+				q = q.Where("st.id IN (?)", bun.List(pastEOL))
+			case len(pastEOL) > 0:
+				q = q.Where("st.id NOT IN (?)", bun.List(pastEOL))
+			}
+		}
+		q = q.TableExpr("finding AS f").
+			Join(`JOIN "target" AS tg ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
+			Join(`JOIN "product" AS p ON p.id = st.product_id`).
+			// The issue is joined for everybody here, unlike the per-product
+			// page: the line this list applies is the row's own product's, so
+			// the rating has to be compared in the statement rather than
+			// turned into a list of admitted words before it.
+			Join(`JOIN "vulnerability" AS v ON v.id = f.vulnerability_id`).
+			// And the component, for the fold: two binaries of one source
+			// package carrying one issue are one row here as they are on the
+			// per-product list, because they are one thing to decide about.
+			Join(`JOIN "component" AS c ON c.id = f.component_id`).
+			Where("f.closed_at IS NULL")
+		q = onlyReadable(q, subject, products, all)
+		if !wasBelow {
+			// Never below the line where somebody is using one,
+			// and being exploited is not a claim about how bad
+			// something is — it is a fact about the world, and the
+			// one thing a line cannot set aside . Read off the
+			// urgency, whose top band is exactly that.
+			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.
+					WhereOr("f.urgency >= ?", int64(exploitedBand)).
+					WhereOr(ratedAt+" >= "+lineAt, deployment)
+			})
+		}
+		return filter.narrow(q)
+	}
+
+	var heads []struct {
+		ProductID       int64  `bun:"product_id"`
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		Fold            string `bun:"fold"`
+		ComponentID     int64  `bun:"component_id"`
+		Places          int    `bun:"places"`
+		Urgency         int64  `bun:"urgency"`
+		Total           int    `bun:"total"`
+	}
+	page := narrow(s.db.NewSelect()).
+		ColumnExpr("st.product_id AS product_id").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
+		ColumnExpr(FoldedOn + " AS fold").
+		ColumnExpr("MIN(f.component_id) AS component_id").
+		ColumnExpr("COUNT(*) AS places").
+		ColumnExpr("MAX(f.urgency) AS urgency").
+		ColumnExpr("COUNT(*) OVER () AS total").
+		GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+	if err := page.OrderExpr(sortedAcross(filter)).
+		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {
+		return nil, 0, fmt.Errorf("read what is open anywhere: %w", err)
+	}
+	total := 0
+	if len(heads) > 0 {
+		total = heads[0].Total
+	} else {
+		counted := narrow(s.db.NewSelect()).
+			ColumnExpr("f.vulnerability_id").
+			GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+		var err error
+		if total, err = s.db.NewSelect().
+			TableExpr("(?) AS grouped", counted).Count(ctx); err != nil {
+			return nil, 0, fmt.Errorf("count what is open anywhere: %w", err)
+		}
+		return nil, total, nil
+	}
+
+	issues := make([]int64, 0, len(heads))
+	components := make([]int64, 0, len(heads))
+	folds := make([]string, 0, len(heads))
+	within := make([]int64, 0, len(heads))
+	for _, head := range heads {
+		issues = append(issues, head.VulnerabilityID)
+		components = append(components, head.ComponentID)
+		folds = append(folds, head.Fold)
+		within = append(within, head.ProductID)
+	}
+
+	// What the page shows about each row, in one statement over the page's
+	// products, issues and folds as three lists. That admits combinations
+	// no row asked for, which are read and dropped on the way into the map;
+	// what it buys is the index, which is the same trade the per-product page
+	// makes.
+	decided := func(alias, condition string) string {
+		return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS de
+			WHERE de.product_id = st.product_id
+			  AND de.vulnerability_id = f.vulnerability_id
+			  AND de.place_identity = f.place_identity
+			  AND ` + coversHere + condition + `) THEN 1 ELSE 0 END) AS ` + alias
+	}
+	var rows []struct {
+		ProductID       int64  `bun:"product_id"`
+		Product         string `bun:"product"`
+		ProductName     string `bun:"product_name"`
+		VulnerabilityID int64  `bun:"vulnerability_id"`
+		Stream          string `bun:"stream"`
+		Variant         string `bun:"variant"`
+		Builds          int    `bun:"builds"`
+		decorated
+	}
+	body := narrow(s.db.NewSelect()).
+		Join(`JOIN "variant" AS va ON va.id = tg.variant_id`).
+		Join(`LEFT JOIN "component" AS uc ON uc.id = f.consumer_id`).
+		ColumnExpr("st.product_id AS product_id").
+		ColumnExpr("MIN(p.name) AS product").
+		ColumnExpr("MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS product_name").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
+		ColumnExpr(FoldedOn+" AS fold").
+		ColumnExpr("MIN(f.component_id) AS component_id").
+		ColumnExpr("COUNT(DISTINCT f.component_id) AS packages").
+		ColumnExpr("MIN(st.name) AS stream").
+		ColumnExpr("MIN(va.name) AS variant").
+		ColumnExpr("COUNT(DISTINCT f.target_id) AS builds").
+		ColumnExpr("COUNT(*) AS places").
+		ColumnExpr("MAX(f.urgency) AS urgency").
+		ColumnExpr("MAX(COALESCE(v.likelihood_ppm, 0)) AS likelihood_ppm").
+		ColumnExpr("MAX(COALESCE(v.score_centi, 0)) AS score_centi").
+		ColumnExpr("SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS answered").
+		ColumnExpr("MIN(f.opened_at) AS opened_at").
+		ColumnExpr("MIN(f.due_at) AS due_at").
+		ColumnExpr("MAX(f.visibility) AS visibility").
+		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
+		ColumnExpr("MIN(f.fix_state) AS fix_state").
+		ColumnExpr("MIN(f.fixed_in) AS fixed_in").
+		ColumnExpr("MIN(COALESCE(f.matched, '')) AS matched").
+		ColumnExpr("MIN(f.target_id) AS target_id").
+		ColumnExpr("MIN(f.consumer_id) AS consumer_id").
+		ColumnExpr("COUNT(DISTINCT f.consumer_id) AS consumers").
+		ColumnExpr("SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS direct").
+		ColumnExpr(decided("any_claim", "")).
+		ColumnExpr(decided("waiting_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
+			"proposed").
+		ColumnExpr(decided("approved_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
+			"approved").
+		ColumnExpr(decided("lapsed_here", " AND de.state = ?"), "lapsed").
+		ColumnExpr(decided("sent_back_here",
+			" AND de.state = ? AND de.live_key IS NOT NULL AND de.sent_back_at IS NOT NULL"),
+			"proposed").
+		ColumnExpr("0 AS total").
+		Where("st.product_id IN (?)", bun.List(within)).
+		Where("f.vulnerability_id IN (?)", bun.List(issues)).
+		Where(FoldedOn+" IN (?)", bun.List(folds)).
+		GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+	if err := body.Scan(ctx, &rows); err != nil {
+		return nil, 0, fmt.Errorf("read about what is open anywhere: %w", err)
+	}
+
+	type anyKey struct {
+		product, vulnerability int64
+		fold                   string
+	}
+	known := make(map[anyKey]int, len(rows))
+	for i, row := range rows {
+		known[anyKey{row.ProductID, row.VulnerabilityID, row.Fold}] = i
+	}
+	named, err := issuesNamed(ctx, s.db, issues)
+	if err != nil {
+		return nil, 0, err
+	}
+	shipped, err := componentsNamed(ctx, s.db, components)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// What people have marked these with, in their own product's words. The
+	// list is where a mark is for — the point of putting one on is finding the
+	// work again — so a mark this list did not draw was one nobody saw, on the
+	// screen somebody reaches before they have picked a product.
+	wanted := make(map[acrossKey]bool, len(heads))
+	for _, head := range heads {
+		wanted[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}] = true
+	}
+	marks, err := s.tagsAcross(ctx, wanted, within, issues, components)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	groups := make([]Group, 0, len(heads))
+	for _, head := range heads {
+		at, held := known[anyKey{head.ProductID, head.VulnerabilityID, head.Fold}]
+		if !held {
+			continue
+		}
+		row := rows[at]
+		group := Group{
+			Product: row.Product, ProductName: row.ProductName,
+			Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
+			Places: row.Places, Answered: row.Answered,
+			Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
+			LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
+			FixState: FixState(row.FixState), FixedIn: row.FixedIn,
+			Matched:  Matched(row.Matched),
+			State:    stateWord(row.Places, row.AnyClaim, row.Waiting, row.Approved, row.Lapsed),
+			SentBack: row.SentBack > 0,
+			OpenedAt: row.OpenedAt, DueAt: row.DueAt,
+			Undisclosed: access.AsVisibility(row.Visibility) == access.Private,
+			DiscloseAt:  row.DiscloseAt,
+			// One build of possibly several, so a row has somewhere to link
+			// to and an action has a build to name. What says there are others
+			// is the count beside it.
+			Builds: row.Builds, Stream: row.Stream, Variant: row.Variant,
+			Tags: marks[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}],
+		}
+		if issue, has := named[head.VulnerabilityID]; has {
+			group.Vulnerability, group.Severity = issue.Identifier, issue.Severity
+			// The one line of the issue's own words the row shows, the same as
+			// the per-product list. Two lists of the same rows, one of which
+			// says what the issue is: fifty rows here read "CVE-2026-74280 ·
+			// linux-image" fifty times, and this is the list somebody arrives
+			// at before they have picked a product.
+			group.Summary = firstLineOf(issue.Description)
+		}
+		if component, has := shipped[head.ComponentID]; has {
+			group.Component, group.Version = component.Name, component.Version
+			group.Ecosystem = graph.EcosystemOf(component.Purl)
+			if component.UpstreamVersion != "" {
+				group.Upstream = component.UpstreamName + " " + component.UpstreamVersion
+			}
+			// Which source package it was built from, where that is not the
+			// name itself. Two rows that are one bump say so on both lists.
+			if component.UpstreamName != "" && component.UpstreamName != component.Name {
+				group.Source = component.UpstreamName
+			}
+		}
+		// Why there is no deadline. The two reasons are exhaustive, and which
+		// one holds is a statement about this product's line — so it is asked
+		// of the line the row's own product states rather than of one word
+		// chosen for a page that spans them.
+		if group.DueAt == nil {
+			group.NoDeadline = OutOfSupport
+			if !(Floor{Word: deployment}).Admits(group.Exploited, group.Severity) {
+				group.NoDeadline = BelowTheLine
+			}
+		}
+		groups = append(groups, group)
+	}
+	return groups, total, nil
+}
+
+// ratedAt is the rating in force, as a number that compares against a line.
+var ratedAt = fmt.Sprintf(rankOf, BandExpr)
+
+// lineAt is the line the row's own product holds, as the same number. A
+// product that states none inherits the deployment's, which is bound.
+var lineAt = fmt.Sprintf(rankOf, "COALESCE(NULLIF(p.triage_floor, ''), ?)")
+
+// sortedAcross is the ORDER BY the cross-product list is paged with.
+//
+// The same allowlist and the same expressions as the per-product list, with
+// the product added to the tie-break: two rows equal on the sorted column must
+// not swap between pages, and across products the pair that was enough is not
+// — one issue in one component can be a row in a dozen products.
+func sortedAcross(filter Filter) string {
+	by, known := order[filter.SortBy]
+	if !known {
+		by = order[ByUrgency]
+	}
+	way := "DESC"
+	if filter.Ascending {
+		way = "ASC"
+	}
+	sorted := by.expr + " " + way
+	if filter.SortBy == ByDeadline {
+		sorted = "CASE WHEN " + by.expr + " IS NULL THEN 1 ELSE 0 END, " + sorted
+	}
+	return sorted + ", st.product_id, f.vulnerability_id, " + FoldedOn
+}

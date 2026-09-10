@@ -1,0 +1,226 @@
+{{- if and (not .Values.database.url) (not .Values.database.existingSecret) }}
+{{- fail "set database.url or database.existingSecret: openpsirt needs a database" }}
+{{- end }}
+{{- if and .Values.database.url .Values.database.existingSecret }}
+{{- fail "set database.url or database.existingSecret, not both" }}
+{{- end }}
+{{- if and .Values.database.url (regexMatch "^(sqlite|sqlite3|file):" (lower .Values.database.url)) (gt (int .Values.replicaCount) 1) }}
+{{- fail (printf "database.url is SQLite and replicaCount is %d: SQLite is one file on one pod, so a second replica would start with an empty database of its own rather than share this one. Use PostgreSQL, MySQL or MariaDB, or set replicaCount to 1 for a single-pod trial" (int .Values.replicaCount)) }}
+{{- end }}
+{{- if not .Values.auth.bootstrapAdmins }}
+{{- fail "set auth.bootstrapAdmins: the process refuses to start until somebody can administer it, and a deployment nobody can administer has one route back in — editing the database by hand" }}
+{{- end }}
+{{- $providers := 0 }}
+{{- if .Values.auth.oidc.issuer }}{{ $providers = add1 $providers }}{{ end }}
+{{- if .Values.auth.github.clientID }}{{ $providers = add1 $providers }}{{ end }}
+{{- if .Values.auth.trustedHeader.name }}{{ $providers = add1 $providers }}{{ end }}
+{{- if eq $providers 0 }}
+{{- fail "configure a way to sign in: auth.oidc.issuer, auth.github.clientID, or auth.trustedHeader.name. Naming a bootstrap admin grants a role; it does not let anybody in without signing in" }}
+{{- end }}
+{{- if and .Values.auth.oidc.issuer (not .Values.auth.baseURL) }}
+{{- fail "set auth.baseURL: a provider sends people back to an address and compares it against what it was registered with" }}
+{{- end }}
+{{- if and .Values.auth.github.clientID (not .Values.auth.baseURL) }}
+{{- fail "set auth.baseURL: a provider sends people back to an address and compares it against what it was registered with" }}
+{{- end }}
+{{- if and .Values.auth.trustedHeader.name (not .Values.auth.trustedHeader.sources) }}
+{{- fail "set auth.trustedHeader.sources: a header named with nothing to trust it from is a header anybody can set" }}
+{{- end }}
+{{- if or (and .Values.mail.server (not .Values.mail.from)) (and .Values.mail.from (not .Values.mail.server)) }}
+{{- fail "set mail.server and mail.from together, or neither: a server with nobody to send as sends nothing, and nothing is what an operator who configured half of it would never find out" }}
+{{- end }}
+{{- if and (or .Values.mail.password .Values.mail.existingSecret) (not .Values.mail.username) }}
+{{- fail "set mail.username: a password with no username is never sent, so the server would refuse every message and the mail would look configured" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openpsirt.fullname" . }}
+  labels: {{- include "openpsirt.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels: {{- include "openpsirt.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "openpsirt.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Rolls the pods when the database credential changes. Without this a
+        # rotation updates the Secret, leaves the pod template byte-identical,
+        # and every running pod keeps using the old credential while the
+        # upgrade reports success.
+        {{- if or (and .Values.database.url (not .Values.database.existingSecret)) (and .Values.auth.oidc.clientSecret (not .Values.auth.oidc.existingSecret)) (and .Values.auth.github.clientSecret (not .Values.auth.github.existingSecret)) }}
+        checksum/secrets: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "openpsirt.serviceAccountName" . }}
+      # Set on the pod, not the service account, so it holds however the
+      # account was created. openpsirt never talks to the Kubernetes API.
+      automountServiceAccountToken: false
+      # The process drains requests for its shutdown grace and then waits
+      # the same grace again for a worker mid-scan, so it can take twice the
+      # grace to stop on its own. Killed before that, a request in flight is
+      # cut off and a scan being applied is left for the queue to retry.
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: openpsirt
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Operator additions first: a later entry with the same name wins,
+            # so putting these last would let extraEnv silently override the
+            # database URL that comes from the Secret.
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: OPENPSIRT_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openpsirt.databaseSecretName" . }}
+                  key: {{ include "openpsirt.databaseSecretKey" . }}
+            - name: OPENPSIRT_BOOTSTRAP_ADMINS
+              value: {{ join "," .Values.auth.bootstrapAdmins | quote }}
+            {{- with .Values.auth.baseURL }}
+            - name: OPENPSIRT_BASE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.auth.oidc.issuer }}
+            - name: OPENPSIRT_OIDC_NAME
+              value: {{ .Values.auth.oidc.name | quote }}
+            - name: OPENPSIRT_OIDC_ISSUER
+              value: {{ .Values.auth.oidc.issuer | quote }}
+            - name: OPENPSIRT_OIDC_CLIENT_ID
+              value: {{ .Values.auth.oidc.clientID | quote }}
+            - name: OPENPSIRT_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.oidc.existingSecret | default (printf "%s-oidc" (include "openpsirt.fullname" .)) }}
+                  key: {{ .Values.auth.oidc.existingSecretKey }}
+            {{- with .Values.auth.oidc.usernameClaim }}
+            - name: OPENPSIRT_OIDC_USERNAME_CLAIM
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.auth.oidc.groupsClaim }}
+            - name: OPENPSIRT_OIDC_GROUPS_CLAIM
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.auth.github.clientID }}
+            - name: OPENPSIRT_GITHUB_CLIENT_ID
+              value: {{ .Values.auth.github.clientID | quote }}
+            - name: OPENPSIRT_GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.github.existingSecret | default (printf "%s-github" (include "openpsirt.fullname" .)) }}
+                  key: {{ .Values.auth.github.existingSecretKey }}
+            {{- with .Values.auth.github.org }}
+            - name: OPENPSIRT_GITHUB_ORG
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.auth.trustedHeader.name }}
+            - name: OPENPSIRT_TRUSTED_HEADER
+              value: {{ .Values.auth.trustedHeader.name | quote }}
+            - name: OPENPSIRT_TRUSTED_SOURCES
+              value: {{ join "," .Values.auth.trustedHeader.sources | quote }}
+            {{- with .Values.auth.trustedHeader.groupsHeader }}
+            - name: OPENPSIRT_TRUSTED_GROUPS_HEADER
+              value: {{ . | quote }}
+            {{- end }}
+            - name: OPENPSIRT_TRUSTED_GROUPS_DELIMITER
+              value: {{ .Values.auth.trustedHeader.groupsDelimiter | quote }}
+            {{- end }}
+            {{- if .Values.mail.server }}
+            - name: OPENPSIRT_MAIL_SERVER
+              value: {{ .Values.mail.server | quote }}
+            - name: OPENPSIRT_MAIL_FROM
+              value: {{ .Values.mail.from | quote }}
+            {{- with .Values.mail.username }}
+            - name: OPENPSIRT_MAIL_USERNAME
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if or .Values.mail.password .Values.mail.existingSecret }}
+            - name: OPENPSIRT_MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mail.existingSecret | default (printf "%s-mail" (include "openpsirt.fullname" .)) }}
+                  key: {{ .Values.mail.existingSecretKey }}
+            {{- end }}
+            {{- end }}
+            - name: OPENPSIRT_AUTO_MIGRATE
+              value: {{ .Values.autoMigrate | quote }}
+            - name: OPENPSIRT_LOG_LEVEL
+              value: {{ .Values.log.level | quote }}
+            - name: OPENPSIRT_LOG_FORMAT
+              value: {{ .Values.log.format | quote }}
+          # Migrations run before the service answers, so the startup probe has
+          # to allow for one taking a long time. Giving up part way through
+          # kills the pod and starts the migration over.
+          startupProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          # Liveness asks whether the process is running. Restarting will not
+          # fix an unreachable database, so it must not depend on one.
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          # Readiness asks whether it can serve, which includes the database.
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # The root filesystem is read-only, so anything wanting a scratch
+            # path needs somewhere to put it.
+            - name: tmp
+              mountPath: /tmp
+            # The scanner's vulnerability data. It is fetched rather than built
+            # into the image, because data baked in is stale the day after it
+            # is published — and the reason the scan runs here at all is that
+            # this data moves under an inventory that does not.
+            #
+            # A volume claim keeps it across restarts. The default is scratch
+            # space, which works and re-downloads on every start; a deployment
+            # that restarts often, or that would rather not fetch hundreds of
+            # megabytes each time, points this at a claim instead.
+            - name: scanner-cache
+              mountPath: {{ .Values.scanner.cacheDir }}
+      volumes:
+        - name: tmp
+          # Bounded, because an emptyDir without a limit is node disk that a
+          # scratch file nobody cleans up can fill.
+          emptyDir:
+            sizeLimit: {{ .Values.tmp.sizeLimit }}
+        - name: scanner-cache
+          {{- if .Values.scanner.persistence.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.scanner.persistence.existingClaim }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.scanner.persistence.sizeLimit }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}

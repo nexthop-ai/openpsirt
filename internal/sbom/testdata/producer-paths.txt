@@ -1,0 +1,92 @@
+# What our producers emit, and what is done with it.
+#
+# One line per key path a recorded document contains, with the type found at
+# it. "read" means the reader acts on it; "skipped" means it has been seen and
+# deliberately left alone.
+#
+# A path in a document and not in this list fails the test. That is the point:
+# a field nobody reads because it was never noticed and one nobody reads
+# because it was considered look the same in the code, and only one of them is
+# a decision.
+#
+# Add newly seen paths with: go test ./internal/sbom -update
+skipped $schema:string
+read @context:string
+skipped @id:string
+skipped _comment:string
+skipped author:string
+read bomFormat:string
+read components[].bom-ref:string
+read components[].components[].name:string
+read components[].components[].purl:string
+skipped components[].components[].type:string
+read components[].components[].version:string
+read components[].cpe:string
+skipped components[].description:string
+skipped components[].externalReferences[].type:string
+skipped components[].externalReferences[].url:string
+skipped components[].hashes[].alg:string
+skipped components[].hashes[].content:string
+skipped components[].licenses[].expression:string
+skipped components[].licenses[].license.id:string
+skipped components[].licenses[].license.name:string
+read components[].name:string
+skipped components[].pedigree.ancestors[].externalReferences[].type:string
+skipped components[].pedigree.ancestors[].externalReferences[].url:string
+read components[].pedigree.ancestors[].name:string
+skipped components[].pedigree.ancestors[].purl:string
+read components[].pedigree.ancestors[].version:string
+skipped components[].pedigree.notes:string
+skipped components[].pedigree.patches[].diff.hashes[].alg:string
+skipped components[].pedigree.patches[].diff.hashes[].content:string
+read components[].pedigree.patches[].diff.url:string
+read components[].pedigree.patches[].resolves[].id:string
+skipped components[].pedigree.patches[].resolves[].references[]:string
+read components[].pedigree.patches[].resolves[].type:string
+skipped components[].pedigree.patches[].type:string
+skipped components[].properties[].name:string
+skipped components[].properties[].value:string
+skipped components[].publisher:string
+read components[].purl:string
+skipped components[].scope:string
+skipped components[].supplier.name:string
+skipped components[].swid.name:string
+skipped components[].swid.tagId:string
+skipped components[].swid.version:string
+skipped components[].type:string
+read components[].version:string
+read dependencies[].dependsOn[]:string
+read dependencies[].ref:string
+read metadata.component.bom-ref:string
+read metadata.component.components[].name:string
+read metadata.component.components[].purl:string
+skipped metadata.component.components[].type:string
+read metadata.component.components[].version:string
+skipped metadata.component.externalReferences[].type:string
+skipped metadata.component.externalReferences[].url:string
+read metadata.component.name:string
+skipped metadata.component.properties[].name:string
+skipped metadata.component.properties[].value:string
+read metadata.component.purl:string
+skipped metadata.component.type:string
+read metadata.component.version:string
+skipped metadata.properties[].name:string
+skipped metadata.properties[].value:string
+read metadata.timestamp:string
+skipped metadata.tools[].externalReferences[].type:string
+skipped metadata.tools[].externalReferences[].url:string
+skipped metadata.tools[].hashes[].alg:string
+skipped metadata.tools[].hashes[].content:string
+skipped metadata.tools[].name:string
+skipped metadata.tools[].vendor:string
+skipped metadata.tools[].version:string
+skipped role:string
+read serialNumber:string
+read specVersion:string
+read statements[].impact_statement:string
+read statements[].justification:string
+read statements[].products[].@id:string
+read statements[].status:string
+read statements[].vulnerability.name:string
+skipped timestamp:string
+skipped version:number

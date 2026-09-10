@@ -1,0 +1,57 @@
+name: PR
+
+# One check to require, rather than a list somebody maintains.
+#
+# This job waits for every other check on the commit to pass or be skipped, so
+# it is the only status check the `main` ruleset names. A workflow added later
+# is gated automatically: it reports a check on the same event, this waits for
+# it, and nothing has to be added to the ruleset for it to count.
+#
+# That delegation is only as strong as the set of workflows firing on the same
+# event. A workflow that does not declare an event contributes no check run
+# there, and this job cannot tell a check that will never run from one that
+# has not started yet — so every workflow meant to gate a merge declares
+# `merge_group:` alongside `pull_request:`.
+
+on:
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  merge-status:
+    name: Merge Status
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    steps:
+      - name: Wait for all checks to pass or be skipped
+        # Pinned to a SHA rather than a tag, like every other tool here: a tag
+        # moves, and an action that moves is code executing with this
+        # repository's token on a day nobody chose. This is v0.6.0 plus the
+        # dedupe fix (poseidon/wait-for-status-checks#627), so a run cancelled
+        # by concurrency with a successful re-run for the same commit does not
+        # read as a failure.
+        uses: poseidon/wait-for-status-checks@990a77d11cde85fd8897cb1747d2701ea9565615  # v0.6.0 + #627
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Itself. The job sets a name, so it is not ignored automatically,
+          # and a job waiting for its own completion never completes.
+          ignore: "Merge Status"
+          # Do not poll until the sibling workflows have registered their
+          # check runs. The action treats "every watched run completed" as
+          # satisfied, and an empty set satisfies it vacuously — so a first
+          # poll landing before any sibling check exists reports success and
+          # gates nothing. A minute of a hosted runner removes the window in
+          # which that is reachable. It narrows the race rather than closing
+          # it: nothing here can prove a check run that has not appeared yet
+          # is still coming.
+          delay: 60
+          # An hour. The longest job is the four-engine suite with the race
+          # detector, plus the image and chart build beside it; a ceiling far
+          # above that costs nothing on a green run and stops a wedged check
+          # from holding a queue entry open all day.
+          timeout: 3600

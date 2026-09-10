@@ -1,0 +1,9 @@
+# Installed by `npm ci` from the lockfile, which is what is committed.
+node_modules/
+
+# Build output. What ships is copied into internal/webui/dist by `make web`
+# and embedded from there; neither copy belongs in the repository.
+dist/
+
+# Incremental build state for the type-checker.
+tsconfig.tsbuildinfo

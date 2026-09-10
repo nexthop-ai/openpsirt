@@ -1,0 +1,5 @@
+The frontend build writes here. Kept in the repository because //go:embed
+names this directory and fails to compile when it does not exist — so a
+checkout that has never run `make web` still builds a working API-only binary.
+
+Everything else in here is build output and is not committed.

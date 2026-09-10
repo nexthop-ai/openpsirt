@@ -1,0 +1,532 @@
+/* The frame somebody always sees: the rail, the top bar, and the stage the
+   screens are drawn into. */
+
+/* ---------- the frame of the app ---------- */
+
+.app {
+  overflow-x: clip;
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 100dvh;
+  position: relative;
+}
+
+code,
+.mono,
+.id {
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+/* Selecting a node in the tree is a button, so that it is reachable without a
+   pointer. It has to keep looking like the name it is rather than like a
+   control, which is the whole of what this undoes. */
+button.id {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------- rail (sidebar) ---------- */
+
+/* The rail stays put and does not scroll. It asks for about 935 pixels of
+   entries, which is taller than the window on most laptops, and the two ways
+   of absorbing that are both worse than folding: a scroll region of its own
+   puts a second scrollbar down the middle of the screen, and scrolling with
+   the page leaves the menu a thousand pixels above somebody reading the foot
+   of a list. So the groups fold, and "Manage" starts folded, which brings it
+   under seven hundred. The max-height is a floor under a very short window
+   rather than the arrangement — with the groups folded it never bites. */
+.rail {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  background: var(--side-bg);
+  color: var(--side-ink);
+  border-right: 1px solid var(--side-line);
+  padding: 14px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+  max-height: 100dvh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+/* The bug itself, and all it ever was. A column flex container shrinks its
+   children before it overflows, so a rail taller than the window squashed its
+   entries down to a third of their height rather than extending past the
+   fold. Nothing in a rail should ever be shorter than it asked to be. */
+.rail > * {
+  flex: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-loose);
+  padding: 4px 8px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--side-line);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 15px;
+  color: var(--side-ink);
+}
+/* The mark carries its own color, so it sits on the rail rather than inside
+   an accent tile: a full-color logo on a solid accent square is two brands
+   arguing. */
+.brand .glyph {
+  width: 30px;
+  height: 30px;
+  display: block;
+  flex: none;
+}
+.brand .glyph svg {
+  display: block;
+}
+/* The wordmark's second line, in full. It wraps rather than being cut: what
+   the tool is called is one word, and what it is for is the rest of the
+   sentence — a strapline truncated at the rail's width says "Product Security
+   Incident Resp…", which is worse than two lines. */
+.brand small {
+  display: block;
+  font-weight: 500;
+  font-size: 9.5px;
+  line-height: 1.35;
+  color: var(--side-muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+/* A heading that folds what is under it. It stays a heading to look at: the
+   caret is the only thing marking it as a control, because a rail of three
+   buttons styled as buttons reads as three more places to go. */
+.rail .group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--side-faint);
+  padding: 14px 10px 6px;
+  font-weight: 600;
+}
+.rail .group .what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail .group .caret {
+  font-size: 8px;
+  line-height: 1;
+  flex: none;
+}
+.rail .group:hover {
+  color: var(--side-ink);
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-loose);
+  text-decoration: none;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  color: var(--side-muted);
+  font-size: var(--step-0);
+  font-weight: 500;
+}
+.nav svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke: currentcolor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+.nav:hover {
+  background: var(--side-hover);
+  color: var(--side-ink);
+}
+.nav .count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--side-count);
+  color: var(--side-ink);
+  font-variant-numeric: tabular-nums;
+}
+.nav .count.quiet {
+  opacity: 0.85;
+}
+.nav[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.rail .foot {
+  margin-top: auto;
+  padding: 12px 10px 0;
+  font-size: 11px;
+  color: var(--side-faint);
+}
+
+/* ---------- top bar ---------- */
+
+.chrome {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-wide);
+  padding: 0 18px;
+  height: 54px;
+  background: var(--top-bg);
+  color: var(--top-ink);
+  border-bottom: 1px solid var(--top-line);
+}
+.chrome .spacer {
+  flex: 1;
+}
+
+.topsearch {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  background: var(--top-field);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 0 10px;
+  height: 34px;
+  width: 280px;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+.topsearch:focus-within {
+  border-color: var(--accent-line);
+  background: var(--surface);
+}
+.topsearch svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentcolor;
+  fill: none;
+  stroke-width: 2;
+  flex: none;
+}
+.topsearch input {
+  border: 0;
+  background: none;
+  outline: 0;
+  flex: 1;
+  font: inherit;
+  color: var(--ink);
+  min-width: 0;
+}
+.topsearch kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 0 5px;
+  color: var(--faint);
+}
+
+.bell {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+}
+.bell:hover {
+  background: var(--top-field);
+  color: var(--ink);
+}
+.bell svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentcolor;
+  fill: none;
+  stroke-width: 1.9;
+}
+.bell .n {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--sev-critical);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+.me {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.me b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.who {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* scope picker in the top bar */
+.scopebar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+.scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 5px 9px;
+  font-size: var(--step--1);
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 600;
+}
+.scope:hover {
+  background: var(--top-field);
+}
+.scope .caret {
+  opacity: 0.5;
+  font-size: 10px;
+}
+.scope .label {
+  font-weight: 500;
+  color: var(--faint);
+}
+.scopebar .sep {
+  color: var(--line-strong);
+  font-size: 12px;
+}
+
+.picker {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  z-index: 40;
+  width: min(600px, 80vw);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  display: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.picker.open {
+  display: grid;
+}
+.picker h5 {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+  font-weight: 600;
+}
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--step--1);
+  color: var(--ink);
+}
+.opt:hover {
+  background: var(--raised);
+}
+.opt[aria-current="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.opt .tag {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.picker .hint {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: var(--step--1);
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Whose tool this is. Quiet enough to be ignored while working and present on
+   every screen, which is the whole requirement. */
+.colophon {
+  display: flex;
+  gap: var(--gap);
+  align-items: center;
+  margin-top: 34px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: var(--step--1);
+}
+.colophon a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.colophon a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- the stage ---------- */
+
+.stage {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  padding: 22px 24px 34px;
+  background: var(--canvas);
+}
+
+.screen {
+  display: none;
+}
+.screen.on {
+  display: block;
+}
+
+.screen-head {
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px 16px;
+}
+.screen-head h2 {
+  margin: 0;
+  font-size: var(--step-2);
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  flex-basis: 100%;
+}
+.screen-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+.screen-head .crumbs {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-bottom: 2px;
+}
+/* A trailing action keeps its width; the caption beside it wraps instead. */
+.screen-head > span:last-child {
+  flex: none;
+}
+.screen-head .crumbs b {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* The way to the next finding without going back to the list (UIX-63). It sits
+   on the head's line because it belongs to the list rather than to the
+   finding: it says where the reader is in what they were reading. An end of
+   the walk is shown rather than removed, so the pair does not move under the
+   pointer at the first and last row. */
+.walking {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  margin-left: auto;
+}
+.walking .btn {
+  padding: 4px 10px;
+  text-decoration: none;
+}
+.walking .btn.off {
+  color: var(--faint);
+  border-color: var(--line);
+  background: var(--surface);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.eyebrow {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+  font-weight: 600;
+}
+.hint {
+  color: var(--faint);
+  font-size: var(--step--1);
+}

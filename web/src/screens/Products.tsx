@@ -1,0 +1,267 @@
+import { THE_LINE } from "../ui/severities";
+import { useState } from "react";
+import { Loading } from "../ui/Loading";
+import { on, since } from "../ui/when";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { api } from "../api/client";
+import { unwrap } from "../api/queries";
+import { AddButton, Declare, Field } from "../ui/Declare";
+import { Empty } from "../ui/Empty";
+import { EndOfLife } from "../ui/EndOfLife";
+import { Failed } from "../ui/Failed";
+import type { Who } from "../app/session";
+
+// You pick a product first, and everything below is bound to it. What each one
+// holds is on the row, so the list answers the question it exists to answer
+// without every row being opened.
+export function Products({ who }: { who: Who }) {
+  const queries = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const products = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
+  });
+  const declare = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.POST("/v1/products", {
+          body: { name: name.trim(), display_name: displayName.trim() || undefined },
+        }),
+      ),
+    onSuccess: () => {
+      setName("");
+      setDisplayName("");
+      setAdding(false);
+      void queries.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+
+  const setEndOfLife = useMutation({
+    mutationFn: async ({ product, on }: { product: string; on: string }) =>
+      unwrap(
+        await api.PUT("/v1/products/{product}/end-of-life", {
+          params: { path: { product } },
+          body: { on },
+        }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
+  });
+
+  const setFloor = useMutation({
+    mutationFn: async ({ product, floor }: { product: string; floor: Line }) =>
+      unwrap(
+        await api.PUT("/v1/products/{product}/triage-floor", {
+          params: { path: { product } },
+          body: { floor },
+        }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
+  });
+
+  if (products.isPending) return <Loading />;
+  if (products.isError) {
+    return <Failed error={products.error} what="The products could not be read." />;
+  }
+
+  const items = products.data?.items ?? [];
+  // One instant for the whole table rather than a reading per row. Two rows
+  // judged against two different "now"s is a difference nobody would ever see
+  // reported, and a week-old threshold does not need better than this.
+  //
+  // Reading the clock is impure whether it happens here or inside a memo,
+  // because a memo's body still runs during render. There is no pure source
+  // for it: the answer this asks for is what the time is, and the alternatives
+  // are state written from an effect, which is the pattern this same ruleset
+  // argues against, or a field the server does not send. So the rule is
+  // switched off for this line and stays on everywhere else.
+  // eslint-disable-next-line react-hooks/purity
+  const asOf = Date.now();
+
+  return (
+    <>
+      <div className="screen-head">
+        <h2>Products</h2>
+        <p>
+          Everything a scan can be filed against has to be declared first — a pipeline with a typo
+          would otherwise invent a product that looks entirely genuine.
+        </p>
+        {who.admin && <AddButton label="Add product" onClick={() => setAdding(true)} />}
+      </div>
+
+      {items.length === 0 ? (
+        <Empty
+          title="You can reach no product yet."
+          detail={
+            who.admin
+              ? "Declare one before a build can file a scan against it."
+              : "Access is granted in advance, so an administrator grants a role before anything appears here."
+          }
+        />
+      ) : (
+        <div className="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th className="num">Branches</th>
+                <th className="num">Tags</th>
+                <th className="num">Variants</th>
+                {/* Findings, not distinct issues: one issue at one component,
+                    counted once per build it is in. The rail's own number is
+                    the same unit and the tree's is not, so the column says
+                    which. */}
+                <th className="num" title="Open findings — an issue at a component, per build">
+                  Open findings
+                </th>
+                <th>Triage from</th>
+                <th>Out of support</th>
+                <th>Last inventory</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((product) => {
+                const stale =
+                  !!product.last_scan_at &&
+                  asOf - Date.parse(product.last_scan_at) > 7 * 86_400_000;
+                return (
+                  <tr key={product.name} className="row">
+                    <td>
+                      {/* The product's own page rather than its branches
+. This table is an administration surface —
+                          a triage line in a select, a date in an input — and
+                          "how is this one doing" is a different question that
+                          had nowhere to go. */}
+                      <Link to={`/products/${encodeURIComponent(product.name)}`} className="id">
+                        {product.display_name || product.name}
+                      </Link>
+                      {product.display_name && product.display_name !== product.name && (
+                        <>
+                          <br />
+                          <span className="id" style={{ color: "var(--faint)" }}>
+                            {product.name}
+                          </span>
+                        </>
+                      )}
+                    </td>
+                    <td className="num">{product.branches ?? 0}</td>
+                    <td className="num">{product.tags ?? 0}</td>
+                    <td className="num">{product.variants ?? 0}</td>
+                    <td>
+                      <Floor
+                        product={product.name ?? ""}
+                        stated={product.triage_floor ?? ""}
+                        admin={who.admin}
+                        onSet={(floor) => setFloor.mutate({ product: product.name ?? "", floor })}
+                      />
+                    </td>
+                    <td>
+                      <EndOfLife
+                        what={`${product.name} goes out of support`}
+                        on={product.end_of_life ?? ""}
+                        admin={who.admin}
+                        onSet={(on) => setEndOfLife.mutate({ product: product.name ?? "", on })}
+                      />
+                    </td>
+                    <td className="num">{(product.open ?? 0).toLocaleString()}</td>
+                    <td
+                      className={stale ? "" : "hint"}
+                      style={stale ? { color: "var(--sev-high)", fontWeight: 600 } : undefined}
+                    >
+                      {product.last_scan_at ? (
+                        <span title={on(product.last_scan_at)}>{since(product.last_scan_at)}</span>
+                      ) : (
+                        "never"
+                      )}
+                    </td>
+                    <td>
+                      <Link
+                        to={`/products/${encodeURIComponent(product.name)}/streams`}
+                        className="linkish"
+                      >
+                        Manage
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Declare
+        title="Add product"
+        open={adding}
+        onClose={() => setAdding(false)}
+        onSubmit={() => declare.mutate()}
+        error={declare.error}
+        busy={declare.isPending || name.trim() === ""}
+        ok="Add product"
+        hint="Declared rather than created on first use. A pipeline with a typo in a product name would otherwise invent a product that looks entirely genuine, with its own findings and its own place in every report, while the real one appears to have stopped being scanned."
+      >
+        <Field
+          label="Name"
+          value={name}
+          onChange={setName}
+          placeholder="sonic"
+          hint="How scans name it. Matched without regard to capitals; the spelling typed here is what is shown back."
+        />
+        <Field
+          label="Display name"
+          value={displayName}
+          onChange={setDisplayName}
+          placeholder="SONiC"
+          hint="Optional. Defaults to the name"
+        />
+      </Declare>
+    </>
+  );
+}
+
+// The words a line may be, plus the one that is not a word at all: following
+// the deployment. Following is not the same as stating the deployment's
+// current line — a product that stated it would stop following the next time
+// the deployment changed its mind, and nobody would see that happen.
+type Line = "" | "everything" | "low" | "medium" | "high" | "critical";
+
+const lines: Line[] = ["", ...THE_LINE];
+
+// What a product considers worth triaging, and a way to say something else.
+//
+// Below the line a finding is still recorded, still counted and still
+// reportable; it is out of the working list, not out of the system. Shown to
+// everybody because it explains a number, and editable by an administrator
+// because hiding findings is what every other part of this gates.
+function Floor({
+  product,
+  stated,
+  admin,
+  onSet,
+}: {
+  product: string;
+  stated: Line;
+  admin: boolean;
+  onSet: (floor: Line) => void;
+}) {
+  if (!admin) {
+    return stated ? <span>{stated}</span> : <span className="hint">deployment&rsquo;s</span>;
+  }
+  return (
+    <select
+      value={stated}
+      aria-label={`What ${product} considers worth triaging`}
+      onChange={(event) => onSet(event.target.value as Line)}
+      title="Below this line a finding is still recorded and counted, and is out of the working list"
+    >
+      {lines.map((word) => (
+        <option key={word || "inherit"} value={word}>
+          {word || "deployment\u2019s"}
+        </option>
+      ))}
+    </select>
+  );
+}

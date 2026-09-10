@@ -1,0 +1,14 @@
+apiVersion: v2
+name: openpsirt
+description: Track vulnerabilities in the products you ship
+type: application
+# Placeholders. Both are stamped from the tag when the chart is packaged for a
+# release (`make dist`), because a version committed here is the one somebody
+# forgets to move. What is packaged from a checkout is not a release and does
+# not claim to be one. See DESIGN-packaging.md.
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/nexthop-ai/openpsirt
+sources:
+  - https://github.com/nexthop-ai/openpsirt
+keywords: [security, psirt, sbom, vulnerability, cyclonedx]

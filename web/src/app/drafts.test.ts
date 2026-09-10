@@ -1,0 +1,87 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { belongTo, forget, forgetAll, keep, restore } from "./drafts";
+
+beforeEach(() => {
+  window.localStorage.clear();
+  belongTo(undefined);
+});
+
+describe("drafts", () => {
+  it("gives back what was left behind", () => {
+    belongTo("oidc:ana");
+    keep("revise:7", "half a justification");
+    expect(restore("revise:7")).toBe("half a justification");
+  });
+
+  it("keeps nothing until somebody is recognized", () => {
+    // Text typed before the session is known has nowhere safe to go: stored
+    // under nobody's name, it would be handed to whoever signs in next.
+    keep("revise:7", "half a justification");
+    expect(window.localStorage.length).toBe(0);
+    belongTo("oidc:ana");
+    expect(restore("revise:7")).toBe("");
+  });
+
+  it("does not hand one person's draft to another", () => {
+    // The control that covers a session which quietly expired rather than
+    // being signed out of. Same browser, same screen, different person.
+    belongTo("oidc:ana");
+    keep("revise:7", "what Ana was writing");
+    belongTo("oidc:ben");
+    expect(restore("revise:7")).toBe("");
+    // And Ana still has hers when she comes back.
+    belongTo("oidc:ana");
+    expect(restore("revise:7")).toBe("what Ana was writing");
+  });
+
+  it("clears one draft when its text has been accepted", () => {
+    belongTo("oidc:ana");
+    keep("revise:7", "sent");
+    keep("comment:7", "not sent");
+    forget("revise:7");
+    expect(restore("revise:7")).toBe("");
+    expect(restore("comment:7")).toBe("not sent");
+  });
+
+  it("removes a draft rather than storing an empty one", () => {
+    belongTo("oidc:ana");
+    keep("revise:7", "typed");
+    keep("revise:7", "");
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it("clears every draft on the browser, whoever wrote them", () => {
+    // What signing out rests on. Drafts hold triage text, private findings
+    // included, so text surviving a sign-out would be exposed in a way the
+    // application itself is not — and a draft left by an earlier session is
+    // exactly the one nobody would think to clear.
+    belongTo("oidc:ana");
+    keep("revise:7", "Ana's");
+    belongTo("oidc:ben");
+    keep("revise:7", "Ben's");
+    keep("comment:9", "Ben's other");
+
+    forgetAll();
+
+    expect(restore("revise:7")).toBe("");
+    expect(restore("comment:9")).toBe("");
+    belongTo("oidc:ana");
+    expect(restore("revise:7")).toBe("");
+  });
+
+  it("leaves what is not a draft alone", () => {
+    // The store holds the chosen theme and the scope somebody picked, under
+    // their own names. Signing out is not a reason to forget which colors
+    // somebody likes, and a prefix that swept them up would do exactly that.
+    window.localStorage.setItem("openpsirt.look", "dusk");
+    window.localStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
+    belongTo("oidc:ana");
+    keep("revise:7", "typed");
+
+    forgetAll();
+
+    expect(restore("revise:7")).toBe("");
+    expect(window.localStorage.getItem("openpsirt.look")).toBe("dusk");
+    expect(window.localStorage.getItem("openpsirt.scope")).toBe('{"product":"sonic"}');
+  });
+});

@@ -1,0 +1,166 @@
+package ingest
+
+import (
+	"context"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+)
+
+// Coverage is when a build was last scanned, and whether that is long enough
+// ago to be worth saying out loud.
+//
+// A build that stops being scanned looks healthier than one that is: no new
+// findings appear against it, every count holds still, and nothing fails. It
+// is the one failure that makes every other number here wrong rather than
+// merely incomplete, so it is reported rather than left to be noticed.
+//
+// A build nothing has ever been filed against is the same failure caught
+// earlier, so it is included and measured from when it was declared. A
+// pipeline that was pointed at a name nobody declared is refused loudly; one
+// declared and never pointed at anything fails silently, and this is what
+// says so.
+type Coverage struct {
+	ProductID  int64
+	Product    string
+	Stream     string
+	StreamKind string
+	Variant    string
+	// LastReceivedAt is when a scan last arrived, or nil where none ever has.
+	LastReceivedAt *time.Time
+	// Since is how long it has been, measured from the last arrival or, where
+	// there has never been one, from when the build was declared.
+	Since time.Duration
+	// Quiet is whether Since has passed the threshold asked for.
+	//
+	// Never true for a build out of support: a release that stopped being
+	// scanned because it stopped being supported is expected rather than a
+	// fault, and coverage that filled with those would stop catching the
+	// product that dropped out silently.
+	Quiet bool
+	// Retired says this build's release has gone out of support. It is
+	// reported rather than left out, because "not scanned, and that is
+	// fine" and "not listed" are different answers and only one of them is
+	// true .
+	Retired bool
+}
+
+// Scanning reports when each build in scope was last scanned, quietest first.
+//
+// Ordering by silence rather than by name is the point: the answer somebody
+// needs is which build has stopped, and a list alphabetical by product buries
+// it among the ones that are fine.
+//
+// quietAfter of zero or less reports every build with Quiet false, which is
+// how a caller asks "when was each of these last seen" without also asking
+// for a judgment about it.
+func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope finding.Scope,
+	quietAfter time.Duration) ([]Coverage, error) {
+
+	// A person's question. A pipeline key sees the receipts for what it sent
+	// and nothing more, and when a build was last scanned by anybody is a fact
+	// about the deployment rather than about that key's uploads.
+	products, all := subject.Products()
+	if subject.Kind != access.Person || (!all && len(products) == 0) {
+		return nil, nil
+	}
+
+	var rows []struct {
+		ProductID  int64      `bun:"product_id"`
+		StreamID   int64      `bun:"stream_id"`
+		Product    string     `bun:"product"`
+		Stream     string     `bun:"stream"`
+		StreamKind string     `bun:"stream_kind"`
+		Variant    string     `bun:"variant"`
+		DeclaredAt time.Time  `bun:"declared_at"`
+		LastSeen   *time.Time `bun:"last_seen"`
+	}
+
+	// One row per declared build, with the newest arrival against it as a
+	// correlated subquery rather than a join: a build with no scans is the
+	// case this exists to report, and joining the scan table would drop
+	// exactly those rows.
+	query := s.db.NewSelect().
+		TableExpr("target AS tg").
+		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		Join("JOIN product AS p ON p.id = st.product_id").
+		Join("JOIN variant AS va ON va.id = tg.variant_id").
+		ColumnExpr("st.product_id AS product_id").
+		ColumnExpr("st.id AS stream_id").
+		ColumnExpr("p.name AS product").
+		ColumnExpr("st.name AS stream").
+		ColumnExpr("st.kind AS stream_kind").
+		ColumnExpr("va.name AS variant").
+		ColumnExpr("tg.created_at AS declared_at").
+		ColumnExpr("(SELECT MAX(sc.received_at) FROM scan AS sc WHERE sc.target_id = tg.id) AS last_seen")
+	if !all {
+		query = query.Where("st.product_id IN (?)", bun.List(products))
+	}
+	query = scope.Narrow(query)
+
+	if err := query.Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read when each build was last scanned: %w", err)
+	}
+
+	now := s.now().UTC()
+	// Which releases have gone out of support, read once for the whole list.
+	// What "past end of life" means is spelled in the catalog and nowhere
+	// else, because the same fact decides whether a finding carries a
+	// deadline and what this list says about a build.
+	past, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, now)
+	if err != nil {
+		return nil, err
+	}
+	retired := make(map[int64]bool, len(past))
+	for _, id := range past {
+		retired[id] = true
+	}
+
+	out := make([]Coverage, 0, len(rows))
+	for _, r := range rows {
+		from := r.DeclaredAt
+		if r.LastSeen != nil {
+			from = *r.LastSeen
+		}
+		since := now.Sub(from.UTC())
+		// A clock that disagrees with a stored timestamp reads as a build
+		// scanned in the future, and a negative age sorts to the top of a list
+		// meant to lead with the worst.
+		if since < 0 {
+			since = 0
+		}
+		out = append(out, Coverage{
+			ProductID:      r.ProductID,
+			Product:        r.Product,
+			Stream:         r.Stream,
+			StreamKind:     r.StreamKind,
+			Variant:        r.Variant,
+			LastReceivedAt: r.LastSeen,
+			Since:          since,
+			Retired:        retired[r.StreamID],
+			Quiet:          quietAfter > 0 && since > quietAfter && !retired[r.StreamID],
+		})
+	}
+
+	// Quietest first, and by name where two have been silent equally long, so
+	// the order does not shuffle between reads.
+	slices.SortFunc(out, func(a, b Coverage) int {
+		if a.Since != b.Since {
+			if a.Since > b.Since {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(
+			a.Product+"\x00"+a.Stream+"\x00"+a.Variant,
+			b.Product+"\x00"+b.Stream+"\x00"+b.Variant)
+	})
+	return out, nil
+}

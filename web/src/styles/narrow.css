@@ -1,0 +1,577 @@
+/* What a narrow screen changes, and the names older code still uses.
+   Last, because these override. */
+
+/* ---------- a narrow screen ---------- */
+/* The mockup's phone shaping: no rail, a tab bar, the findings table as
+   cards, one column everywhere (UIX-15, UIX-16). */
+.menubtn {
+  display: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  place-items: center;
+  flex: none;
+}
+.menubtn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentcolor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.menubtn:hover {
+  background: var(--top-field);
+  color: var(--ink);
+}
+.railscrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgb(8 12 20 / 35%);
+}
+
+@media (width <= 780px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rail {
+    display: none;
+  }
+  /* The whole rail, as a panel over the page, from the menu control. */
+  .menubtn {
+    display: grid;
+  }
+  .railscrim {
+    display: block;
+  }
+  .rail.open {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 46;
+    width: min(280px, 86vw);
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    border-right: 1px solid var(--side-line);
+  }
+  .chrome {
+    grid-column: 1;
+    padding: 0 12px;
+  }
+  .stage {
+    grid-column: 1;
+    padding: 14px;
+  }
+  .topsearch {
+    display: none;
+  }
+  .me > .hint {
+    display: none;
+  }
+  .scope .label {
+    display: none;
+  }
+  .panels {
+    grid-template-columns: 1fr;
+  }
+  .findings .tablewrap {
+    display: none;
+  }
+  .cards {
+    display: flex;
+  }
+  /* A wide table stays wide on a narrow screen and says so, rather than being
+     folded into something that reads badly and works worse. It scrolls
+     sideways, which is discoverable once somebody knows it is a table and not
+     once they think the page is cut off — so the table says which it is. The
+     findings list is exempt: it has cards on this width and its table is
+     hidden above. */
+  .tablewrap::before {
+    content: "Wider than the screen — scroll it sideways.";
+    display: block;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: var(--step--1);
+    position: sticky;
+    left: 0;
+  }
+  .findings .tablewrap::before {
+    content: none;
+  }
+  .tabbar {
+    display: flex;
+  }
+  .fab {
+    right: 16px;
+    bottom: 64px;
+  }
+  .topact span {
+    display: none;
+  }
+  .topact {
+    padding: 0 8px;
+  }
+  .detail {
+    grid-template-columns: 1fr;
+  }
+  /* Five rules stood here restating what the 900px query above already
+     applies — a phone layout fixed by appending a corrected copy rather than
+     editing the rule where it lives. Anything under 780 is under 900, so they
+     changed nothing and read as though they did. What is left in this block is
+     what only a phone needs. */
+}
+
+/* ---------- names older code still uses ---------- */
+/* The first stylesheet exposed tinted backgrounds as tokens; the mockup mixes
+   them from the color. Kept as mixes so nothing has two definitions. */
+:root,
+:root[data-look="dark"] {
+  --sev-exploited-bg: color-mix(in oklab, var(--sev-exploited) 12%, transparent);
+  --sev-high-bg: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  --ok-bg: color-mix(in oklab, var(--ok) 12%, transparent);
+  --wait-bg: color-mix(in oklab, var(--wait) 12%, transparent);
+  --paper: var(--canvas);
+  --navy: var(--side-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  color-scheme: light;
+}
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+}
+/* NavLink marks the active entry with aria-current="page". */
+.nav[aria-current="page"] {
+  background: var(--side-active);
+  color: var(--side-active-ink);
+  font-weight: 600;
+}
+.nav[aria-current="page"] .count {
+  background: rgb(255 255 255 / 22%);
+  color: var(--side-active-ink);
+}
+/* What is waiting on you, hanging under the bell that opened it. */
+.notices {
+  position: relative;
+}
+.noticelist {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: min(420px, 90vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--step--1);
+}
+.noticelist header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap);
+  margin-bottom: 8px;
+}
+.noticelist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.noticelist li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap);
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.noticelist li:first-child {
+  border-top: 0;
+}
+.noticelist li > div {
+  flex: 1;
+  min-width: 0;
+}
+.noticelist li a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.noticelist .when {
+  display: block;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+/* The look menu on the avatar. */
+.lookmenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  min-width: 220px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  font-size: var(--step--1);
+}
+.lookmenu h5 {
+  margin: 4px 8px 6px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+  font-weight: 600;
+}
+.lookmenu .opt .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgb(0 0 0 / 18%);
+  background: linear-gradient(135deg, var(--a) 50%, var(--b) 50%);
+  flex: none;
+}
+.lookmenu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 6px 0;
+}
+
+.advanced .field > span:first-child {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  font-weight: 600;
+}
+.advanced .field.row > span {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--step--1);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Rendered markdown, wherever a person's text is shown. */
+.prose-openpsirt p {
+  margin: 0 0 8px;
+}
+.prose-openpsirt p:last-child {
+  margin-bottom: 0;
+}
+.prose-openpsirt pre {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 8px;
+  font-size: 0.95em;
+}
+.prose-openpsirt code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--raised);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.prose-openpsirt pre code {
+  background: none;
+  padding: 0;
+}
+.prose-openpsirt a {
+  color: var(--accent);
+}
+.prose-openpsirt ul,
+.prose-openpsirt ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.prose-openpsirt blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--muted);
+}
+
+/* Recharts marks its surface focusable; the browser's ring reads as a box
+   drawn on purpose. Ours is shown instead, and only from a keyboard. */
+.recharts-surface {
+  outline: none;
+}
+.recharts-wrapper:focus-visible .recharts-surface {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The sign-in page has no shell around it. */
+
+/* An icon inside a button sits on the text line. */
+.btn svg {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 6px;
+  stroke: currentcolor;
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tabbar a {
+  flex: 1;
+  text-align: center;
+  text-decoration: none;
+  padding: 9px 4px 11px;
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 0;
+  background: none;
+}
+.tabbar a[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+/* A drop zone is a label, and not the small-caps kind. */
+.field > label.dropzone {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--step--1);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* The finding an approver is judging, above the argument about it (TRI-09). */
+.about {
+  font-size: var(--step--1);
+  color: var(--ink);
+  padding: 8px 11px;
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.about .clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Files attached to an issue. A list rather than a grid of thumbnails: what
+   is attached is usually one or two things, and the name is what somebody is
+   looking for. */
+.files {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+}
+.files > li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.files > li:last-child {
+  border-bottom: 0;
+}
+
+/* The report catalog: a name on its own line, what it answers beneath it.
+   Side by side the two wrap into each other on a narrow screen, and a report
+   is found by its name. */
+.catalog > li {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* An image attached to a finding, inside rendered text. Bounded so that a
+   screenshot somebody took on a large display does not push the reasoning it
+   belongs to off the screen. */
+.prose-openpsirt img {
+  max-width: min(100%, 640px);
+  max-height: 480px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: block;
+  margin: 8px 0;
+}
+
+/* Release notes, as the markdown somebody pastes rather than as rendered
+   markup: what is on screen has to be exactly what lands in the document. */
+.notes {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 60vh;
+}
+
+/* A set chosen by ticking. Not a multiple-select box: those are hard to use
+   with a mouse and impossible to read the state of at a glance, and what
+   somebody needs here is to see which builds they are about to file against. */
+.ticks {
+  list-style: none;
+  margin: 4px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.ticks label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* The words people put on a finding (TRI-61). Deliberately quieter than a
+   severity or a state chip: a mark is somebody's own note about the work, not
+   a judgment the tool made, and one styled like a verdict would be read as
+   one. */
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-tight);
+  margin-top: 8px;
+}
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-hair);
+  font-size: var(--step--1);
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  padding: 1px 4px 1px 9px;
+  color: var(--ink);
+  background: var(--paper);
+  white-space: nowrap;
+}
+.mark button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--pill);
+}
+.mark button:hover:not(:disabled) {
+  color: var(--sev-high);
+  background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+}
+.mark.add {
+  border-style: dashed;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 1px 9px;
+}
+.mark.add:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.marking {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+.marking .field {
+  margin: 0;
+  min-width: 220px;
+}
+
+/* The tree seen upward, for somebody narrowed to their own work (ACC-77).
+   Indented rather than expandable: every row is already on the page, because
+   what is drawn is the chains their own findings sit on and there is nothing
+   under them to open. */
+.branchlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.branch {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-tight);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.branch:last-child {
+  border-bottom: 0;
+}
+.branch .counts {
+  margin-left: auto;
+  display: flex;
+  gap: var(--gap-loose);
+  white-space: nowrap;
+}
+.branch .counts .n {
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+/* Each count opens the list it counts, and a link brings its own colour with
+   it. The underline arrives on hover, where it says the number is a way
+   through rather than decorating every row. */
+a.n {
+  color: inherit;
+  text-decoration: none;
+}
+a.n:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Filters somebody kept (UIX-10). Beside the chips rather than above them:
+   opening one is the same act as pressing a chip, and putting it somewhere
+   else would read as a mode. */
+.kept {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+.kept select {
+  width: auto;
+  min-width: 150px;
+}

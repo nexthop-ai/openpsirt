@@ -1,0 +1,45 @@
+# Rule selection and tool behavior live here and nowhere else.
+#
+# The set below is tuned rather than enabled wholesale. Enabling every linter a
+# tool offers buries the findings worth acting on under style noise, and a noisy
+# gate is one someone turns off.
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - revive
+    # Named in CIG-07 as a partial substitute for the semantic analysis we do
+    # not run. It catches the class that missing server timeouts belong to.
+    - gosec
+  settings:
+    errcheck:
+      # Close, Flush and Sync on cleanup paths are conventionally ignored, and
+      # flagging them hides the unchecked errors that do matter.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*os.File).Sync
+        - (*bufio.Writer).Flush
+        - (*net/http.Server).Shutdown
+    revive:
+      rules:
+        # Documentation rules, not defect rules.
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+    gosec:
+      excludes:
+        # Errors not checked — errcheck covers this, and with better tuning.
+        - G104
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

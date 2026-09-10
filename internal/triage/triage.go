@@ -1,0 +1,169 @@
+// Package triage holds what people decide about findings, and the rules for
+// when a decision stops applying.
+//
+// The shape everything here rests on: a decision is a claim about a
+// combination of code, not about a release. It is keyed structurally — which
+// issue, in which component, under which consumer — and it stops applying when
+// the code it was about changes. Those two are kept apart deliberately:
+// identity is structural and expiry is version-based, and letting either reach
+// into the other is how an unrelated bump at the top of a build invalidates a
+// judgment made about a leaf.
+package triage
+
+// Outcome is what somebody decided about a finding.
+//
+// More than two. A vocabulary with only "affects us" and "does not" has
+// nowhere to put the most common real answer, which is "yes, but not now" —
+// and the absence shows up as people recording it as one of the other two,
+// after which no report can tell the difference.
+type Outcome string
+
+const (
+	// Affected means it applies and goes to remediation.
+	Affected Outcome = "affected"
+	// NotApplicable means it does not affect this product here.
+	NotApplicable Outcome = "not-applicable"
+	// Deferred means it affects us and is not being worked on until a date.
+	Deferred Outcome = "deferred"
+	// WontFix means it affects us and will not be addressed.
+	WontFix Outcome = "wont-fix"
+	// AlreadyFixed means the version shipping here carries the fix,
+	// although nothing here can see that it does.
+	//
+	// The case is a distribution's package: a backported patch does not
+	// move the upstream version, so a scanner comparing a published
+	// identifier against an upstream range fires whether or not whoever
+	// packages it has already dealt with it. None of the other four says
+	// this. It is not "does not affect us" — the code is there and it was
+	// affected — and the exchange format keeps the two apart as well, with
+	// a status of its own rather than a reason under "not affected".
+	AlreadyFixed Outcome = "already-fixed"
+	// UpgradeNeeded means the answer here is moving the component to a newer
+	// version, and somebody has committed to doing it by a date.
+	//
+	// It is not a dismissal and not a deferral. A deferral says "not now and
+	// no plan"; this says "the plan is this version, held by this party, by
+	// this date", and the scans decide whether it happened — nobody marks
+	// their own work done. Written in bulk from an upgrade rather than one at
+	// a time, because a bump answers many issues at once.
+	UpgradeNeeded Outcome = "upgrade-needed"
+	// PatchNeeded means the answer here is a backported patch, and the
+	// version does not move.
+	//
+	// The other half of the same intent at the other grain: an upgrade is
+	// about a component and this is about one issue. It closes the way a
+	// backport closes — the build's next inventory declares the patch it
+	// carries and says what it resolves, so the finding goes without the
+	// version moving, which no version comparison could have seen.
+	PatchNeeded Outcome = "patch-needed"
+)
+
+// Outcomes are all of them, in the order a person meets them.
+func Outcomes() []Outcome {
+	return []Outcome{Affected, NotApplicable, Deferred, WontFix, AlreadyFixed,
+		UpgradeNeeded, PatchNeeded}
+}
+
+// Valid reports whether o is one we recognize.
+func (o Outcome) Valid() bool {
+	for _, known := range Outcomes() {
+		if o == known {
+			return true
+		}
+	}
+	return false
+}
+
+// HidesRisk reports whether recording this takes something out of the working
+// queue.
+//
+// The distinction the review queue is built on: hiding risk needs a second
+// person, and putting it back does not. "Affected" is the only one that leaves
+// the issue visible as an issue.
+//
+// **The two commitments hide it as well**, and that is deliberate: work with a
+// plan and a date on it should not come back round to somebody the next
+// morning. What keeps that from being an ungated deferral is where the gate
+// sits rather than whether there is one — a commitment inside the deadline
+// already set for the work is ordinary triage, and one past it is deferring
+// the worst thing it covers. See NeedsApproval.
+func (o Outcome) HidesRisk() bool { return o != Affected }
+
+// Commits reports whether this outcome is a promise to act by a date.
+//
+// The two of them differ from every other outcome in what the date means. A
+// deferral's date is when somebody will look again; these are when the thing
+// will be done, and the scans say whether it was.
+func (o Outcome) Commits() bool { return o == UpgradeNeeded || o == PatchNeeded }
+
+// Dated reports whether this outcome stores a date.
+//
+// Three of them do: a deferral says when somebody will look again, and the two
+// that promise to act say when the work will be done. It is not the same
+// question as Commits — a deferral's date is a review date rather than a
+// commitment — and the difference matters where what is being asked is whether
+// an outcome makes a statement about the future at all.
+func (o Outcome) Dated() bool { return o.Commits() || o == Deferred }
+
+// Justification is why something does not affect us.
+//
+// The vocabulary is the one the exchange format already defines rather than
+// one of ours. It encodes exactly this reasoning, it is what a consumer of our
+// published statements will expect, and using it makes publishing them close
+// to free — whereas a private vocabulary would need a mapping that nobody
+// maintains and that loses meaning at every step.
+type Justification string
+
+const (
+	// ComponentNotPresent means the component is not in what ships, whatever
+	// the inventory says.
+	ComponentNotPresent Justification = "component_not_present"
+	// CodeNotPresent means the component ships without the vulnerable code.
+	CodeNotPresent Justification = "vulnerable_code_not_present"
+	// CodeNotInExecutePath means the vulnerable code ships and never runs.
+	CodeNotInExecutePath Justification = "vulnerable_code_not_in_execute_path"
+	// CodeNotReachableByAdversary means it runs but nothing an attacker
+	// controls reaches it.
+	CodeNotReachableByAdversary Justification = "vulnerable_code_cannot_be_controlled_by_adversary"
+	// MitigationsExist means something already in place stops it.
+	MitigationsExist Justification = "inline_mitigations_already_exist"
+)
+
+// Justifications are the recognized categories.
+func Justifications() []Justification {
+	return []Justification{
+		ComponentNotPresent, CodeNotPresent, CodeNotInExecutePath,
+		CodeNotReachableByAdversary, MitigationsExist,
+	}
+}
+
+// Valid reports whether j is one we recognize.
+func (j Justification) Valid() bool {
+	for _, known := range Justifications() {
+		if j == known {
+			return true
+		}
+	}
+	return false
+}
+
+// State is where a decision has got to.
+//
+// Append-only in spirit: a decision moves forward and what it was before stays
+// readable, so the record reads as proposed, approved, withdrawn rather than
+// as whatever it happens to be now.
+type State string
+
+const (
+	// Proposed means somebody has claimed it and nobody has agreed yet.
+	Proposed State = "proposed"
+	// Approved means a second person agreed, against one specific revision of
+	// the reasoning.
+	Approved State = "approved"
+	// Withdrawn means it no longer applies because somebody took it back.
+	Withdrawn State = "withdrawn"
+	// LapsedState means the code it was a claim about changed. Named for what
+	// it is rather than for the word alone, because "lapsed" reads as a verb
+	// everywhere else in this package.
+	LapsedState State = "lapsed"
+)

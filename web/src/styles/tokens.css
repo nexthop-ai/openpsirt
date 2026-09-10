@@ -1,0 +1,157 @@
+/* The looks, the tokens every rule reads, and the base element rules.
+   First, because everything after it is written in terms of these. */
+
+/* The tokens, the type scale, the shell and every component are the restyled
+   mockup's, taken as they were settled rather than approximated (UIX-50). The
+   mockup drew the interface inside a frame; here the frame is the page, so its
+   tokens sit on the root and its grid on the app container. Three looks, one
+   markup: a look is a token set, chosen per person and kept in the browser.
+   Severity is its own scale, deliberately not the accent — "urgent" and
+   "clickable" must never read as the same thing. */
+
+/* ============================================================
+   The app. Three looks, one markup. Every component below reads only
+   these tokens, so switching a look is a token swap and a few
+   structural overrides marked [look].
+   ============================================================ */
+
+:root {
+  /* ---- Light mode (the default) — dark rail, light work surface ---- */
+  --font: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+
+  --canvas: #f1f3f7;
+  --surface: #fff;
+  --raised: #f5f7fa;
+  --ink: #161b24;
+  --muted: #5d6675;
+  --faint: #8b93a1;
+  --line: #e2e6ec;
+  --line-strong: #cdd3dc;
+
+  --accent: #2b62e3;
+  --accent-ink: #fff;
+  --accent-soft: rgb(43 98 227 / 10%);
+  --accent-line: rgb(43 98 227 / 35%);
+
+  --side-bg: #141a23;
+  --side-ink: #e6eaf0;
+  --side-muted: #8e97a6;
+  --side-faint: #5f6875;
+  --side-line: rgb(255 255 255 / 7%);
+  --side-hover: rgb(255 255 255 / 6%);
+  --side-active: #2b62e3;
+  --side-active-ink: #fff;
+  --side-count: rgb(255 255 255 / 12%);
+
+  --top-bg: #fff;
+  --top-ink: #161b24;
+  --top-field: #f1f3f7;
+  --top-line: #e2e6ec;
+
+  --sev-exploited: #a3123e;
+  --sev-critical: #d12b2b;
+  --sev-high: #d9700a;
+  --sev-medium: #a3760c;
+  --sev-low: #4a6a8c;
+  /* Not a rating. A scanner's own "unknown", a producer's invented word and
+     no rating at all are one state, and it is grey because it is the absence
+     of a judgment rather than a mild one — drawn in the low band's colour it
+     would say somebody had looked and decided it was small. */
+  --sev-unrated: #8a8f98;
+  --ok: #1f7a4d;
+  --wait: #8a5a10;
+
+  --shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 1px 3px rgb(16 24 40 / 6%);
+  --shadow-lg: 0 12px 32px rgb(16 24 40 / 18%);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --pill: 999px;
+
+  --step--1: 12.5px;
+  --step-0: 13.5px;
+  --step-1: 15px;
+  --step-2: 19px;
+  --step-3: 25px;
+
+  /* The spacing scale.
+     
+     There was none. Nine hundred spacing values were written by hand across
+     the stylesheet, running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18 —
+     continuous rather than a scale, which is what "no scale" looks like from
+     the outside: every value is defensible on its own and no two screens agree
+     about what "a small gap" is.
+     
+     These are the six that carry the weight, named at exactly the numbers
+     already in use, so naming them moved nothing. That is the point: a scale
+     invented here would be an aesthetic judgment made without looking at a
+     screen, and this is the other half of the job — making the vocabulary
+     visible, so the next value somebody adds is either one of these or
+     obviously not. */
+  --gap-hair: 4px;
+  --gap-tight: 6px;
+  --gap: 8px;
+  --gap-loose: 10px;
+  --gap-wide: 12px;
+  --gap-room: 18px;
+
+  color-scheme: light;
+}
+
+:root[data-look="dark"] {
+  /* ---- Dark mode — dark throughout, cool blue accent ---- */
+  --font: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+
+  --canvas: #0e1117;
+  --surface: #151a22;
+  --raised: #1c2230;
+  --ink: #e6eaf1;
+  --muted: #9aa5b6;
+  --faint: #6c7789;
+  --line: #232a37;
+  --line-strong: #323b4b;
+
+  --accent: #6ea8ff;
+  --accent-ink: #0b1220;
+  --accent-soft: rgb(110 168 255 / 13%);
+  --accent-line: rgb(110 168 255 / 40%);
+
+  --side-bg: #0e1117;
+  --side-ink: #e6eaf1;
+  --side-muted: #8e99ab;
+  --side-faint: #5c6678;
+  --side-line: #1f2632;
+  --side-hover: #171d27;
+  --side-active: #1c2634;
+  --side-active-ink: #fff;
+  --side-count: #1f2734;
+
+  --top-bg: #0e1117;
+  --top-ink: #e6eaf1;
+  --top-field: #151a22;
+  --top-line: #1f2632;
+
+  --sev-exploited: #ff6b8f;
+  --sev-critical: #ff7a6e;
+  --sev-high: #ffb054;
+  --sev-medium: #e0c65a;
+  --sev-low: #8fb3d6;
+  --sev-unrated: #8b95a3;
+  --ok: #5fd39a;
+  --wait: #e6b566;
+
+  --shadow: 0 1px 0 rgb(255 255 255 / 3%) inset;
+  --shadow-lg: 0 18px 50px rgb(0 0 0 / 55%);
+  --radius: 10px;
+  --radius-lg: 14px;
+  --pill: 999px;
+
+  --step--1: 12.5px;
+  --step-0: 13.5px;
+  --step-1: 15px;
+  --step-2: 19px;
+  --step-3: 25px;
+
+  color-scheme: dark;
+}

@@ -1,0 +1,120 @@
+package httpapi
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+)
+
+// registerTags is the words people put on findings.
+//
+// **People mark work regardless.** With nowhere to put it they do it inside
+// the reasoning text, where nothing can filter on it and an approver reads it
+// as part of the argument.
+func registerTags(api huma.API, in Ingest) {
+	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
+		"/findings/{vulnerability}/components/{component}/tags/{tag}"
+
+	mark := func(add bool) func(ctx context.Context, input *struct {
+		Product       string `path:"product"`
+		Stream        string `path:"stream"`
+		Variant       string `path:"variant"`
+		Vulnerability string `path:"vulnerability"`
+		Component     string `path:"component"`
+		Tag           string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
+	}) (*struct{}, error) {
+		return func(ctx context.Context, input *struct {
+			Product       string `path:"product"`
+			Stream        string `path:"stream"`
+			Variant       string `path:"variant"`
+			Vulnerability string `path:"vulnerability"`
+			Component     string `path:"component"`
+			Tag           string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
+		}) (*struct{}, error) {
+			subject, err := reading(ctx)
+			if err != nil {
+				return nil, err
+			}
+			product, _, issue, component, err := locateFinding(ctx, in, subject,
+				input.Product, input.Stream, input.Variant, input.Vulnerability, input.Component)
+			if err != nil {
+				return nil, err
+			}
+			store := finding.NewStore(in.DB.DB)
+			if add {
+				err = store.TagIt(ctx, subject, product, issue, component, input.Tag)
+			} else {
+				err = store.Untag(ctx, subject, product, issue, component, input.Tag)
+			}
+			if err != nil {
+				return nil, refusedFinding(in, err)
+			}
+			return &struct{}{}, nil
+		}
+	}
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "tag-finding", Method: http.MethodPut, Path: at,
+		Summary: "Mark a finding with a word",
+		Description: "Puts a free-text tag on one issue in one component of this product.\n\n" +
+			"**No fixed vocabulary**, because none has been earned yet. A tag that becomes " +
+			"universal is a signal that it should be promoted to a real concept — \"waiting on " +
+			"vendor\" is a state the tool would want to reason about rather than a string " +
+			"somebody typed.\n\n" +
+			"**One issue in one component of one product**, not one place and not one build: " +
+			"a kernel flaw at sixty places is one thing somebody is marking, and a tag is " +
+			"about the work rather than about a release.\n\n" +
+			"Matched without regard to capitals and shown back as it was typed. Marking what " +
+			"is already marked succeeds and keeps the first spelling.\n\n" +
+			"**Marking is triage**, so it asks for the triage right: a tag changes what a " +
+			"filtered list answers, and somebody who may only read should not move work into " +
+			"or out of a saved filter.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
+	}, perProduct, "", triageRights()...), mark(true))
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "untag-finding", Method: http.MethodDelete, Path: at,
+		Summary: "Take a word off a finding",
+		Description: "Removes a tag. Taking off one that is not there succeeds and changes " +
+			"nothing.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
+	}, perProduct, "", triageRights()...), mark(false))
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "list-tags", Method: http.MethodGet, Path: "/v1/products/{product}/tags",
+		Summary: "List the words in use on a product",
+		Description: "Every tag anybody has used here, most-used first.\n\n" +
+			"What a filter offers rather than a vocabulary: the list is what people have " +
+			"actually written, which is also the evidence for promoting one of them to a " +
+			"real concept.\n\n" +
+			"**Only the words on findings you may read.** A tag row carries no visibility of " +
+			"its own, so the list is narrowed by the findings it was written on — reading it " +
+			"is a read act, and writing one is the act that asks for triage.",
+		Tags: []string{"Findings"},
+	}, perProduct, "Answers only the words on findings you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+	}) (*listOutput[string], error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		if err != nil {
+			return nil, noSuchProduct()
+		}
+		rows, err := finding.NewStore(in.DB.DB).TagsInUse(ctx, subject, named.ID)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "the tags could not be read", err)
+		}
+		out := &listOutput[string]{}
+		out.Body.Items = rows
+		if out.Body.Items == nil {
+			out.Body.Items = []string{}
+		}
+		return out, nil
+	})
+}

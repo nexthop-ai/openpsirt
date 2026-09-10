@@ -1,0 +1,152 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:1c9f4b6a-6a2e-5a0d-9b4a-2f1c7d3e8a55",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-08-14T09:12:33Z",
+    "component": {
+      "bom-ref": "pkg:generic/sonic-broadcom@master.0-dirty-20260814.091233?arch=amd64",
+      "type": "application",
+      "name": "sonic-broadcom.bin",
+      "version": "master.0-dirty-20260814.091233",
+      "purl": "pkg:generic/sonic-broadcom@master.0-dirty-20260814.091233?arch=amd64"
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64",
+      "type": "container",
+      "name": "docker-fpm-frr",
+      "version": "sha256:a1b2c3",
+      "purl": "pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64",
+      "properties": [
+        {
+          "name": "sonic:scope",
+          "value": "dockers/docker-fpm-frr"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64",
+      "type": "container",
+      "name": "docker-swss",
+      "version": "sha256:d4e5f6",
+      "purl": "pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64",
+      "properties": [
+        {
+          "name": "sonic:scope",
+          "value": "dockers/docker-swss"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:deb/sonic/frr@10.5.4-sonic-0?arch=amd64",
+      "type": "library",
+      "name": "frr",
+      "version": "10.5.4-sonic-0",
+      "purl": "pkg:deb/sonic/frr@10.5.4-sonic-0?arch=amd64",
+      "supplier": {
+        "name": "SONiC build (forked upstream)"
+      },
+      "pedigree": {
+        "ancestors": [
+          {
+            "name": "frr",
+            "version": "10.5.4",
+            "purl": "pkg:github/FRRouting/frr@frr-10.5.4",
+            "externalReferences": [
+              {
+                "type": "vcs",
+                "url": "https://github.com/FRRouting/frr"
+              }
+            ]
+          }
+        ],
+        "patches": [
+          {
+            "type": "unofficial",
+            "diff": {
+              "url": "file://src/sonic-frr/patch/0007-cve-2026-31951.patch",
+              "hashes": [
+                {
+                  "alg": "SHA-256",
+                  "content": "9d1f0c2b8a7e6d5c4b3a29180706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4"
+                }
+              ]
+            },
+            "resolves": [
+              {
+                "type": "security",
+                "id": "CVE-2026-31951",
+                "references": [
+                  "https://nvd.nist.gov/vuln/detail/CVE-2026-31951"
+                ]
+              }
+            ]
+          }
+        ],
+        "notes": "patch-set sha1: 6f1b7c0d9e8a5b4c3d2e1f0a9b8c7d6e5f4a3b2c"
+      }
+    },
+    {
+      "bom-ref": "pkg:deb/debian/libc6@2.41-12?arch=amd64",
+      "type": "library",
+      "name": "libc6",
+      "version": "2.41-12",
+      "purl": "pkg:deb/debian/libc6@2.41-12?arch=amd64",
+      "properties": [
+        {
+          "name": "sonic:scope",
+          "value": "host-image dockers/docker-fpm-frr dockers/docker-swss"
+        }
+      ],
+      "cpe": "cpe:2.3:a:gnu:glibc:2.41:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:cargo/tokio@1.47.1",
+      "type": "library",
+      "name": "tokio",
+      "version": "1.47.1",
+      "purl": "pkg:cargo/tokio@1.47.1",
+      "properties": [
+        {
+          "name": "sonic:source_deb",
+          "value": "sonic-swss_1.0.0_amd64.deb"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:pypi/paramiko@3.5.1",
+      "type": "library",
+      "name": "paramiko",
+      "version": "3.5.1",
+      "purl": "pkg:pypi/paramiko@3.5.1"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:generic/sonic-broadcom@master.0-dirty-20260814.091233?arch=amd64",
+      "dependsOn": [
+        "pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64",
+        "pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64",
+        "pkg:deb/debian/libc6@2.41-12?arch=amd64"
+      ]
+    },
+    {
+      "ref": "pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64",
+      "dependsOn": [
+        "pkg:deb/sonic/frr@10.5.4-sonic-0?arch=amd64",
+        "pkg:deb/debian/libc6@2.41-12?arch=amd64"
+      ]
+    },
+    {
+      "ref": "pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64",
+      "dependsOn": [
+        "pkg:cargo/tokio@1.47.1",
+        "pkg:deb/debian/libc6@2.41-12?arch=amd64"
+      ]
+    }
+  ]
+}

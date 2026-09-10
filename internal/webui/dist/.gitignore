@@ -1,0 +1,5 @@
+# Build output. The directory itself is tracked so the embed compiles; what
+# the frontend build puts in it is not.
+*
+!.gitignore
+!.gitkeep

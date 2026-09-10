@@ -1,0 +1,215 @@
+name: CI
+
+# bash with pipefail everywhere. GitHub's default shell is `bash -e`, which
+# takes the *last* command's status in a pipeline — so `go test | tee` reports
+# tee's status, which is always 0. The engine guards below pipe into tee, and
+# without this they announce success over a failing suite. Measured, not
+# assumed: the local gate had the same hole and passed a deliberately broken
+# test.
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # A queue entry is a different event from the pull request it came from, and
+  # a workflow that does not name it reports no check there. The aggregator in
+  # pr.yml waits for the checks that exist and cannot tell one that will never
+  # run from one that has not started — so a queue entry with no checks on it
+  # would satisfy the only required check vacuously.
+  merge_group:
+
+permissions:
+  contents: read
+
+# A superseded run tells you nothing worth waiting for.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Everything that needs the Go toolchain, in one job.
+  #
+  # This was six jobs — build and test, the interface, static analysis,
+  # vulnerabilities and licenses, the OpenAPI document, and the bill of
+  # materials. Five of them declared nothing but a checkout and a Go setup
+  # before running a make target: same runner image, same toolchain, same
+  # module cache, no services and no conditions. So they were six clones and
+  # six toolchain restores to run one machine's worth of work.
+  #
+  # **What it runs is the command a developer runs.** `make check` is defined
+  # as everything CI checks, and `make gate full` is `make check &&
+  # make check-engines`. Naming the targets separately here is how the two
+  # drifted: CI was running neither `reserved`, nor `readable`, nor
+  # `pins-check`, all three of which `make check` has run for as long as it has
+  # existed. A gate nobody notices is missing is the failure `check-engines`
+  # was written to prevent, one level up.
+  checks:
+    name: Build, test and check
+    runs-on: ubuntu-latest
+
+    # All four supported engines run the same suite. SQLite alone would catch
+    # none of the portability traps the design is written around, so a green
+    # run here is the only thing that makes "runs on four engines" a fact.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: openpsirt
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: openpsirt
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -ptest --silent" --health-interval 5s
+          --health-timeout 5s --health-retries 20
+      # Deliberately below the floor, so the refusal is exercised. Without it
+      # that test skips in every run, and the design claims it is proved.
+      postgres-old:
+        image: postgres:13-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: openpsirt
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: test
+          MARIADB_DATABASE: openpsirt
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    env:
+      OPENPSIRT_TEST_POSTGRES_URL: postgres://postgres:test@127.0.0.1:5432/openpsirt?sslmode=disable
+      OPENPSIRT_TEST_MYSQL_URL: mysql://root:test@127.0.0.1:3306/openpsirt
+      OPENPSIRT_TEST_MARIADB_URL: mariadb://root:test@127.0.0.1:3307/openpsirt
+      OPENPSIRT_TEST_TOO_OLD_URL: postgres://postgres:test@127.0.0.1:5433/openpsirt?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          # The version the image builds the interface with. "make check" runs
+          # the interface checks, so the toolchain for them belongs here.
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Confirm a developer's engines are the engines run here
+        # The servers above are declared in this file and started locally by
+        # "make engines-up", which pins the same versions. Two pinned lists
+        # drift, and the drift is invisible exactly when it matters: a suite
+        # green locally against an engine this job no longer runs proves
+        # nothing about the one it does. The target compares the two lists in
+        # both directions, so an engine added here and nowhere else is caught.
+        run: make engines-check
+
+      - name: Everything the local gate checks
+        # Deliberately one target rather than a list of them. "make check" is
+        # the definition of what CI checks, so a target added to it is run
+        # here without anybody remembering to add a step, which is the half
+        # that had already gone wrong three times over.
+        #
+        # It covers: the build, vet, the linter, unreachable exported code,
+        # decisions no design document names, invented names an engine
+        # reserves, source files a text tool cannot read, the pinned versions
+        # agreeing with each other, the four-engine race-detected suite,
+        # known vulnerabilities, dependency licenses, the OpenAPI document
+        # being current, the bill of materials, and the interface.
+        run: make check
+
+      - name: Confirm every engine ran, and that each was the engine it claimed
+        # A skipped engine passes silently, which would make the matrix
+        # decorative. The target greps each engine by name, and — because a
+        # grep for a *label* only proves a subtest with that label ran, while
+        # the connection comes from an environment variable — asks each server
+        # what it is and compares that against the label. With the old server
+        # configured above it also checks the version floor refused it rather
+        # than skipped, and that the migration lock was exercised on each of
+        # the three servers.
+        run: make check-engines
+
+      # Written by "make check" above, by way of the sbom target. Published
+      # because we ingest these for other people's software and publishing one
+      # for our own is the same promise kept.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openpsirt-sbom
+          path: bin/openpsirt.cdx.json
+          if-no-files-found: error
+
+  # The three below are not steps of the job above, and each for a reason of
+  # its own rather than for tidiness.
+
+  dependency-review:
+    name: Dependency review
+    # Pull requests only, needs no toolchain at all, and is a GitHub action
+    # rather than a make target — so there is nothing of the job above to
+    # share with it.
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          # Matches the license policy: permissive only for anything shipped.
+          allow-licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MIT, MPL-2.0
+
+  image:
+    name: Container image and chart
+    # buildx and helm rather than Go, and it carries a build cache of its own.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: azure/setup-helm@v4
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: openpsirt:ci
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+            DATE=${{ github.event.repository.updated_at }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # The same checks the local target runs, against the image just built.
+      # Written twice they drifted: the image's scanner was checked here and
+      # not there, the chart's refusal to render without a database there and
+      # not here, and the messages had come to differ — so whichever a
+      # developer ran, some of the guards went unexercised.
+      - name: Everything check-packaging checks
+        run: make check-packaging CHECK_IMAGE=openpsirt:ci
+
+  docs:
+    name: Documentation builds
+    # Python, and nothing else here needs it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r docs/requirements.txt
+      - run: make docs-site

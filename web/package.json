@@ -1,0 +1,57 @@
+{
+  "name": "openpsirt-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --noEmit",
+    "api": "openapi-typescript ../docs/reference/openapi.yaml -o src/api/schema.d.ts",
+    "test": "vitest run",
+    "classes": "node scripts/class-collisions.mjs",
+    "tokens": "node scripts/tokens.mjs",
+    "ladder": "node scripts/one-ladder.mjs",
+    "lint": "eslint .",
+    "stylelint": "stylelint \"src/**/*.css\"",
+    "format": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.mjs\""
+  },
+  "dependencies": {
+    "@fontsource/hanken-grotesk": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/instrument-sans": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/manrope": "5.3.0",
+    "@tanstack/react-query": "5.102.8",
+    "dompurify": "3.4.14",
+    "markdown-it": "15.0.1",
+    "openapi-fetch": "0.17.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-router-dom": "7.18.3",
+    "recharts": "3.10.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/markdown-it": "14.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "10.10.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
+    "jsdom": "30.0.1",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.6",
+    "stylelint": "17.15.0",
+    "stylelint-config-standard": "40.0.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0",
+    "vite": "8.2.2",
+    "vitest": "4.1.11"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2"
+  }
+}

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/brand/mark.svg" />
+    <title>OpenPSIRT — Product Security Incident Response &amp; Triage</title>
+    <!-- The look, stamped before anything paints. Setting it from the
+         application means one frame drawn light on a machine set to dark,
+         which reads as a flicker on every navigation to a fresh page. -->
+    <script>
+      (function () {
+        try {
+          var kept = window.localStorage.getItem("openpsirt.look");
+          if (kept !== "light" && kept !== "dark") {
+            kept = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.setAttribute("data-look", kept);
+        } catch (e) {
+          document.documentElement.setAttribute("data-look", "light");
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,64 @@
+package migrations
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	"github.com/pressly/goose/v3"
+
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
+)
+
+func init() {
+	goose.AddMigrationContext(upJob, downJob)
+}
+
+// Work waiting to be done.
+//
+// The queue lives in the database rather than in a broker because the
+// alternatives do not fit: the mature Go queues are tied to one engine or need
+// a separate service, and neither is acceptable for something an operator
+// installs against whatever database they already run.
+func upJob(ctx context.Context, tx *sql.Tx) error {
+	e := migrate.EngineFrom(ctx)
+	t := typesFor(e)
+	if t == nil {
+		return fmt.Errorf("no schema for %s", e)
+	}
+
+	statements := []string{
+		`CREATE TABLE "job" (
+			"id"           ` + t.id + `,
+			"kind"         ` + t.name + ` NOT NULL,
+			"reference"    ` + t.name + ` NOT NULL,
+			"state"        ` + t.kind + ` NOT NULL,
+			"attempts"     INTEGER NOT NULL,
+			"max_attempts" INTEGER NOT NULL,
+			"run_after"    ` + t.timestamp + ` NOT NULL,
+			"claimed_by"   ` + t.name + ` NULL,
+			"claimed_at"   ` + t.timestamp + ` NULL,
+			"last_error"   ` + t.text + ` NULL,
+			"created_at"   ` + t.timestamp + ` NOT NULL,
+			"updated_at"   ` + t.timestamp + ` NOT NULL
+		)` + t.suffix,
+
+		// Claiming asks for the oldest runnable job of one kind, which is the
+		// query on the path of every worker poll. Kind leads, because workers
+		// of different sorts share this table and a worker that scanned rows
+		// belonging to another would lock and skip them on every poll.
+		`CREATE INDEX "job_runnable_idx" ON "job" ("kind", "state", "run_after", "id")`,
+	}
+
+	for _, stmt := range statements {
+		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("%s: %w", firstLine(stmt), err)
+		}
+	}
+	return nil
+}
+
+func downJob(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `DROP TABLE "job"`)
+	return err
+}

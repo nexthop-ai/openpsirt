@@ -1,0 +1,852 @@
+package httpapi_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
+)
+
+// scannedTwoIssues is a build whose one component carries two issues that
+// look nothing alike: one exploited, high and fixable, one low with no fix and
+// a driver in its description. The shape a bulk claim's outliers are read from.
+func (r *reach) scannedTwoIssues(t *testing.T) {
+	t.Helper()
+	ctx := t.Context()
+
+	names := catalog.NewStore(r.db.DB)
+	located, err := names.Locate(ctx, "mine", "master", "broadcom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: "two-issues", BuiltAt: time.Now().UTC(),
+		ParserVersion: "test",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+
+	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
+	kernel := graph.Described{
+		Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10",
+	}
+	if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+		Root:         product,
+		Components:   []graph.Described{kernel},
+		Dependencies: []graph.Dependency{{Parent: product, Child: kernel}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	findings := finding.NewStore(r.db.DB)
+	run, err := findings.Begin(ctx, finding.Run{
+		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
+		DatabaseVersion: "2026-08-28", RanHere: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
+		{
+			Issue: finding.Named{
+				Identifier: "CVE-2026-9999", Severity: "high",
+				Description: "A crafted packet writes past the end of a buffer in the netfilter connection tracker.",
+				Exploited:   true, Score: 8.1,
+			},
+			Component: kernel, FixState: finding.FixedUpstream, FixedIn: "5.10.0-27",
+		},
+		{
+			Issue: finding.Named{
+				Identifier: "CVE-2026-1000", Severity: "low",
+				Description: "Race in a joystick driver.",
+				Score:       3.1,
+			},
+			Component: kernel, FixState: finding.NoFix,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// claimed records one judgment about a finding through the API and returns
+// the claim it made.
+func (r *reach) claimed(t *testing.T, who, vulnerability, component, body string) (claim int64, ids []int64) {
+	t.Helper()
+	path := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
+		"/findings/%s/components/%s/decision", vulnerability, component)
+	got := asPerson(t, r, who, http.MethodPost, path, body)
+	if got.Code != http.StatusCreated {
+		t.Fatalf("deciding answered %d: %s", got.Code, got.Body.String())
+	}
+	var out struct {
+		ClaimID int64   `json:"claim_id"`
+		IDs     []int64 `json:"ids"`
+	}
+	if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v (%s)", err, got.Body.String())
+	}
+	if out.ClaimID == 0 {
+		t.Fatalf("a judgment came back without the claim it made: %s", got.Body.String())
+	}
+	return out.ClaimID, out.IDs
+}
+
+const dismissal = `{"outcome":"not-applicable","justification":"vulnerable_code_not_present",` +
+	`"reasoning":"The driver is not built for this image."}`
+
+func TestTheQueueListsOneEntryPerClaimWithItsSize(t *testing.T) {
+	// One judgment, one entry — with how many rows it wrote, how many
+	// issues and places it covers, and the builds it reaches.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		claim, ids := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+
+		got := asPerson(t, r, "reviewer", http.MethodGet, "/v1/review-queue", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading the queue answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Items []struct {
+				Claim struct {
+					ID   int64  `json:"id"`
+					Kind string `json:"kind"`
+				} `json:"claim"`
+				Decision struct {
+					ClaimID int64 `json:"claim_id"`
+				} `json:"decision"`
+				Decisions int      `json:"decisions"`
+				Issues    int      `json:"issues"`
+				Places    int      `json:"places"`
+				Builds    []string `json:"builds"`
+				Reasoning string   `json:"reasoning"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if out.Total != 1 || len(out.Items) != 1 {
+			t.Fatalf("%d entries (total %d), want one claim: %s", len(out.Items), out.Total, got.Body.String())
+		}
+		one := out.Items[0]
+		if one.Claim.ID != claim || one.Decision.ClaimID != claim || one.Claim.Kind != "finding" {
+			t.Errorf("the entry does not name the claim %d: %+v", claim, one)
+		}
+		if one.Decisions != len(ids) || one.Issues != 1 || one.Places != len(ids) {
+			t.Errorf("the entry's size reads as %d/%d/%d, want %d/1/%d", one.Decisions, one.Issues, one.Places, len(ids), len(ids))
+		}
+		if len(one.Builds) != 1 || one.Builds[0] != "master · broadcom" {
+			t.Errorf("the entry names builds %v, want the one it sits in", one.Builds)
+		}
+	})
+}
+
+func TestAClaimIsApprovedAsOneAndByAnotherPerson(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+
+		if got := asPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusConflict {
+			t.Errorf("the proposer approving their own claim answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			"/v1/claims/999999/approval", `{}`); got.Code != http.StatusNotFound {
+			t.Errorf("approving a claim that is not there answered %d", got.Code)
+		}
+		if got := asPerson(t, r, "reader", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusNotFound {
+			t.Errorf("somebody who may not approve answered %d, want the same as not there", got.Code)
+		}
+
+		got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{"batch":"tuesday"}`)
+		if got.Code != http.StatusOK {
+			t.Fatalf("approving the claim answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Approved int `json:"approved"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil || out.Approved != 1 {
+			t.Errorf("approving reported %+v (%v)", out, err)
+		}
+
+		// Under a batch, so undone as one.
+		got = asPerson(t, r, "reviewer", http.MethodDelete, "/v1/approval-batches/tuesday", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("undoing the batch answered %d: %s", got.Code, got.Body.String())
+		}
+		got = asPerson(t, r, "reviewer", http.MethodGet, "/v1/review-queue", "")
+		var queue struct {
+			Total int `json:"total"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &queue); err != nil || queue.Total != 1 {
+			t.Errorf("after undoing the batch the claim is not back in the queue: %+v", queue)
+		}
+	})
+}
+
+func TestABulkClaimCarriesItsOutliersAndTheyCanBeSetAside(t *testing.T) {
+	// Nobody reads three hundred rows. What a careful approver checks is
+	// the handful that contradict the shape of the claim, and those are
+	// handed to them — and may be set aside, so the rest is not held up.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+
+		got := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/components/linux-image/decisions",
+			`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_present",`+
+				`"selected_by":"undecided, description contains \"driver\"",`+
+				`"reasoning":"None of these drivers are built for this image."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("a bulk claim answered %d: %s", got.Code, got.Body.String())
+		}
+		var made struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil || made.ClaimID == 0 {
+			t.Fatalf("a bulk claim did not say which claim it made: %s", got.Body.String())
+		}
+
+		got = asPerson(t, r, "reviewer", http.MethodGet, "/v1/review-queue", "")
+		var out struct {
+			Items []struct {
+				Claim struct {
+					Kind       string `json:"kind"`
+					SelectedBy string `json:"selected_by"`
+				} `json:"claim"`
+				Issues   int `json:"issues"`
+				Outliers *struct {
+					Exploited int `json:"exploited"`
+					Severe    int `json:"severe"`
+					Fixable   int `json:"fixable"`
+					Unmatched int `json:"unmatched"`
+					Rows      []struct {
+						DecisionID    int64    `json:"decision_id"`
+						Vulnerability string   `json:"vulnerability"`
+						Why           []string `json:"why"`
+					} `json:"rows"`
+				} `json:"outliers"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil || len(out.Items) != 1 {
+			t.Fatalf("the queue reads as %s (%v)", got.Body.String(), err)
+		}
+		one := out.Items[0]
+		if one.Claim.Kind != "together" || one.Issues != 2 || one.Outliers == nil {
+			t.Fatalf("a bulk claim reads as %+v", one)
+		}
+		o := one.Outliers
+		if o.Exploited != 1 || o.Severe != 1 || o.Fixable != 1 || o.Unmatched != 1 {
+			t.Errorf("outliers counted %d exploited, %d severe, %d fixable, %d unmatched; want 1 of each", o.Exploited, o.Severe, o.Fixable, o.Unmatched)
+		}
+		if len(o.Rows) != 1 || o.Rows[0].Vulnerability != "CVE-2026-9999" || len(o.Rows[0].Why) != 4 {
+			t.Fatalf("the rows that stood out are %+v, want the one that is exploited, severe, fixable and not about a driver", o.Rows)
+		}
+
+		// Set it aside: the other is approved, this one goes back.
+		got = asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID),
+			fmt.Sprintf(`{"except":[%d],"because":"Netfilter is not a driver, and it is exploited."}`, o.Rows[0].DecisionID))
+		if got.Code != http.StatusOK {
+			t.Fatalf("approving with a row set aside answered %d: %s", got.Code, got.Body.String())
+		}
+		var done struct {
+			Approved      int   `json:"approved"`
+			ReturnedClaim int64 `json:"returned_claim"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &done); err != nil || done.Approved != 1 || done.ReturnedClaim == 0 {
+			t.Fatalf("setting aside reported %+v (%v)", done, err)
+		}
+
+		// The row set aside is the proposer's again, in a claim of its own,
+		// with the reason on it.
+		got = asPerson(t, r, "triager", http.MethodGet,
+			fmt.Sprintf("/v1/claims/%d/comments", done.ReturnedClaim), "")
+		var said struct {
+			Items []struct {
+				Body string `json:"body"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &said); err != nil || len(said.Items) != 1 ||
+			said.Items[0].Body != "Netfilter is not a driver, and it is exploited." {
+			t.Errorf("the reason did not travel with the row: %s", got.Body.String())
+		}
+		// And nothing is waiting: one approved, one sent back.
+		got = asPerson(t, r, "reviewer", http.MethodGet, "/v1/review-queue", "")
+		var queue struct {
+			Total int `json:"total"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &queue); err != nil || queue.Total != 0 {
+			t.Errorf("%d still waiting after approving with a row set aside", queue.Total)
+		}
+	})
+}
+
+func TestAFindingReportsItsDecisionsAndWhatMayCarryToIt(t *testing.T) {
+	// The finding is the working screen after a decision as well as before
+	// it : what stands, what stood, and what argued about a neighbor may
+	// be carried here.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		at := "/v1/products/mine/streams/master/variants/broadcom/findings/%s/components/linux-image"
+
+		read := func(vulnerability string) (body []byte) {
+			t.Helper()
+			got := asPerson(t, r, "triager", http.MethodGet, fmt.Sprintf(at, vulnerability), "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("reading the finding answered %d: %s", got.Code, got.Body.String())
+			}
+			return got.Body.Bytes()
+		}
+		type finding struct {
+			Standing []struct {
+				ClaimID    int64  `json:"claim_id"`
+				State      string `json:"state"`
+				ApprovedBy string `json:"approved_by"`
+				Places     int    `json:"places"`
+				Rows       struct {
+					Proposed int `json:"proposed"`
+					SentBack int `json:"sent_back"`
+					Approved int `json:"approved"`
+				} `json:"rows"`
+				SentBackAt      string `json:"sent_back_at"`
+				SentBackBecause string `json:"sent_back_because"`
+			} `json:"standing"`
+			Previous []struct {
+				DecisionID int64  `json:"decision_id"`
+				Ended      string `json:"ended"`
+				EndedAt    string `json:"ended_at"`
+				Reasoning  string `json:"reasoning"`
+			} `json:"previous"`
+			Similar []struct {
+				ClaimID   int64  `json:"claim_id"`
+				Reasoning string `json:"reasoning"`
+				Issues    int    `json:"issues"`
+			} `json:"similar"`
+		}
+		var f finding
+		if err := json.Unmarshal(read("CVE-2026-1000"), &f); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.Standing) != 0 || len(f.Previous) != 0 || len(f.Similar) != 0 {
+			t.Fatalf("an undecided finding reports %+v", f)
+		}
+
+		// A claim about the neighbor, approved.
+		neighbor, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", neighbor), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		if err := json.Unmarshal(read("CVE-2026-1000"), &f); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.Similar) != 1 || f.Similar[0].ClaimID != neighbor || f.Similar[0].Issues != 1 || f.Similar[0].Reasoning == "" {
+			t.Fatalf("the approved claim about the neighbor is not offered: %+v", f.Similar)
+		}
+
+		// Carried here as an extension.
+		got := asPerson(t, r, "triager", http.MethodPost, fmt.Sprintf(at, "CVE-2026-1000")+"/decision",
+			fmt.Sprintf(`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
+				`"reasoning":"Same kernel config; still not built.","extends":%d}`, neighbor))
+		if got.Code != http.StatusCreated {
+			t.Fatalf("extending answered %d: %s", got.Code, got.Body.String())
+		}
+		var made struct {
+			ClaimID int64   `json:"claim_id"`
+			IDs     []int64 `json:"ids"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		got = asPerson(t, r, "reviewer", http.MethodGet, "/v1/review-queue", "")
+		var queue struct {
+			Items []struct {
+				Claim struct {
+					ID          int64  `json:"id"`
+					Kind        string `json:"kind"`
+					DerivedFrom int64  `json:"derived_from"`
+				} `json:"claim"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &queue); err != nil || len(queue.Items) != 1 {
+			t.Fatalf("the queue reads as %s (%v)", got.Body.String(), err)
+		}
+		if queue.Items[0].Claim.Kind != "extension" || queue.Items[0].Claim.DerivedFrom != neighbor {
+			t.Errorf("the extension does not say what it carries: %+v", queue.Items[0].Claim)
+		}
+
+		// Standing, pending; then withdrawn, and offered back with a date.
+		if err := json.Unmarshal(read("CVE-2026-1000"), &f); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.Standing) != 1 || f.Standing[0].ClaimID != made.ClaimID || f.Standing[0].State != "proposed" {
+			t.Fatalf("the extension does not stand as pending: %+v", f.Standing)
+		}
+		if f.Standing[0].Rows.Proposed != 1 || f.Standing[0].Rows.SentBack != 0 || f.Standing[0].Rows.Approved != 0 {
+			t.Errorf("a pending claim's rows read as %+v", f.Standing[0].Rows)
+		}
+
+		// Sent back, the finding says so and says why.
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/send-back", made.ClaimID),
+			`{"because":"Name the kconfig option."}`); got.Code != http.StatusNoContent {
+			t.Fatalf("sending the claim back answered %d: %s", got.Code, got.Body.String())
+		}
+		if err := json.Unmarshal(read("CVE-2026-1000"), &f); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.Standing) != 1 || f.Standing[0].Rows.SentBack != 1 || f.Standing[0].SentBackAt == "" ||
+			f.Standing[0].SentBackBecause != "Name the kconfig option." {
+			t.Errorf("a claim sent back does not say so on the finding: %+v", f.Standing)
+		}
+		if got := asPerson(t, r, "triager", http.MethodDelete,
+			fmt.Sprintf("/v1/claims/%d", made.ClaimID), ""); got.Code != http.StatusNoContent {
+			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())
+		}
+		if err := json.Unmarshal(read("CVE-2026-1000"), &f); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.Standing) != 0 || len(f.Previous) != 1 {
+			t.Fatalf("after withdrawing, the finding reports %+v", f)
+		}
+		if f.Previous[0].Ended != "withdrawn" || f.Previous[0].EndedAt == "" || f.Previous[0].Reasoning == "" {
+			t.Errorf("what was decided before does not say how it ended, when, or what it argued: %+v", f.Previous[0])
+		}
+
+		// An extension that keeps neither outcome nor justification is refused.
+		got = asPerson(t, r, "triager", http.MethodPost, fmt.Sprintf(at, "CVE-2026-1000")+"/decision",
+			fmt.Sprintf(`{"outcome":"wont-fix","reasoning":"Different claim.","extends":%d}`, neighbor))
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("an extension with a different outcome answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAFindingsRowSaysHowFarItIsDecidedAndWhetherItCameBack(t *testing.T) {
+	// The list carried no decision state, so the interface guessed from what
+	// the build had argued away and showed "Undecided" over forty-four
+	// proposed records. The row now says it, by the state filter's own
+	// definition, and says when a claim is back with its author.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		const list = "/v1/products/mine/findings?stream=master&variant=broadcom"
+		row := func() (state string, sentBack bool) {
+			t.Helper()
+			got := asPerson(t, r, "triager", http.MethodGet, list, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("listing answered %d: %s", got.Code, got.Body.String())
+			}
+			var out struct {
+				Items []struct {
+					State    string `json:"state"`
+					SentBack bool   `json:"sent_back"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil || len(out.Items) != 1 {
+				t.Fatalf("the list reads as %s (%v)", got.Body.String(), err)
+			}
+			return out.Items[0].State, out.Items[0].SentBack
+		}
+
+		if state, back := row(); state != "undecided" || back {
+			t.Errorf("an undecided finding reads as %q, sent back %v", state, back)
+		}
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		if state, back := row(); state != "waiting" || back {
+			t.Errorf("a proposed claim reads as %q, sent back %v", state, back)
+		}
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/send-back", claim), `{"because":"Which encoder?"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("sending back answered %d: %s", got.Code, got.Body.String())
+		}
+		if state, back := row(); state != "waiting" || !back {
+			t.Errorf("a claim sent back reads as %q, sent back %v", state, back)
+		}
+		var ids struct {
+			Standing []struct {
+				DecisionID int64 `json:"decision_id"`
+				ClaimID    int64 `json:"claim_id"`
+			} `json:"standing"`
+		}
+		// The finding itself is still a build's, and says so in its path.
+		got := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/components/libnl-3-200", "")
+		if err := json.Unmarshal(got.Body.Bytes(), &ids); err != nil || len(ids.Standing) != 1 {
+			t.Fatalf("the finding reads as %s (%v)", got.Body.String(), err)
+		}
+		// Revised, it is waiting again; approved, it is agreed.
+		if got := asPerson(t, r, "triager", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/reasoning", ids.Standing[0].ClaimID),
+			`{"reasoning":"The encoder only. Re-checked the call sites."}`); got.Code != http.StatusOK {
+			// 200 rather than 204: it answers which names in the text reached
+			// nobody, so the author is told a mention did not land.
+			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
+		}
+		if state, back := row(); state != "waiting" || back {
+			t.Errorf("a revised claim reads as %q, sent back %v", state, back)
+		}
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		if state, back := row(); state != "agreed" || back {
+			t.Errorf("an approved claim reads as %q, sent back %v", state, back)
+		}
+	})
+}
+
+func TestAQueueEntryAndADecisionSayWhatTheyAreAbout(t *testing.T) {
+	// An approver judges a row from the row: what the issue is, which
+	// component, how bad, where it sits, and which build to open. The
+	// entry carried only an identifier, and the decision screen no more.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		claim, ids := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
+
+		type ref struct {
+			Product       string  `json:"product"`
+			Stream        string  `json:"stream"`
+			Variant       string  `json:"variant"`
+			Vulnerability string  `json:"vulnerability"`
+			Component     string  `json:"component"`
+			Version       string  `json:"version"`
+			Severity      string  `json:"severity"`
+			Score         float64 `json:"score"`
+			Exploited     bool    `json:"exploited"`
+			FixState      string  `json:"fix_state"`
+			FixedIn       string  `json:"fixed_in"`
+			Description   string  `json:"description"`
+			Owner         string  `json:"owner"`
+			Parent        string  `json:"parent"`
+			Places        int     `json:"places"`
+			Decided       int     `json:"decided"`
+		}
+		check := func(what string, f *ref) {
+			t.Helper()
+			if f == nil {
+				t.Fatalf("%s carries no finding", what)
+			}
+			if f.Product != "Mine" || f.Stream != "master" || f.Variant != "broadcom" {
+				t.Errorf("%s names build %s · %s · %s", what, f.Product, f.Stream, f.Variant)
+			}
+			if f.Vulnerability != "CVE-2026-9999" || f.Component != "linux-image" || f.Version != "5.10" {
+				t.Errorf("%s names %s in %s %s", what, f.Vulnerability, f.Component, f.Version)
+			}
+			if f.Severity != "high" || f.Score != 8.1 || !f.Exploited || f.FixState != "fixed" || f.FixedIn != "5.10.0-27" {
+				t.Errorf("%s says %s %.1f exploited=%v %s %s", what, f.Severity, f.Score, f.Exploited, f.FixState, f.FixedIn)
+			}
+			// The build holds the kernel directly, and the findings list names
+			// both ends of a two-step way down as the component itself.
+			if f.Description == "" || f.Owner != "linux-image" || f.Parent != "linux-image" {
+				t.Errorf("%s says %q, owner %q, parent %q", what, f.Description, f.Owner, f.Parent)
+			}
+			if f.Places != 1 || f.Decided != 1 {
+				t.Errorf("%s counts %d places, %d decided; want 1 and 1", what, f.Places, f.Decided)
+			}
+		}
+
+		got := asPerson(t, r, "reviewer", http.MethodGet, "/v1/review-queue", "")
+		var queue struct {
+			Items []struct {
+				Finding *ref `json:"finding"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &queue); err != nil || len(queue.Items) != 1 {
+			t.Fatalf("the queue reads as %s (%v)", got.Body.String(), err)
+		}
+		check("the queue entry", queue.Items[0].Finding)
+
+		got = asPerson(t, r, "triager", http.MethodGet, fmt.Sprintf("/v1/decisions/%d", ids[0]), "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading the decision answered %d: %s", got.Code, got.Body.String())
+		}
+		var detail struct {
+			Finding *ref `json:"finding"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &detail); err != nil {
+			t.Fatal(err)
+		}
+		check("the decision", detail.Finding)
+		_ = claim
+	})
+}
+
+// scannedShared is a build where one library sits under two containers and
+// carries two issues: the shape a tree count has to answer per path.
+func (r *reach) scannedShared(t *testing.T) {
+	t.Helper()
+	ctx := t.Context()
+	names := catalog.NewStore(r.db.DB)
+	located, err := names.Locate(ctx, "mine", "master", "broadcom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: "shared", BuiltAt: time.Now().UTC(), ParserVersion: "test",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
+	a := graph.Described{Purl: "pkg:oci/docker-a@1", Name: "docker-a", Version: "1"}
+	b := graph.Described{Purl: "pkg:oci/docker-b@1", Name: "docker-b", Version: "1"}
+	lib := graph.Described{Purl: "pkg:deb/debian/libyang@2.1", Name: "libyang", Version: "2.1"}
+	if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+		Root:       product,
+		Components: []graph.Described{a, b, lib},
+		Dependencies: []graph.Dependency{
+			{Parent: product, Child: a}, {Parent: product, Child: b},
+			{Parent: a, Child: lib}, {Parent: b, Child: lib},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	findings := finding.NewStore(r.db.DB)
+	run, err := findings.Begin(ctx, finding.Run{
+		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
+		DatabaseVersion: "2026-08-28", RanHere: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
+		{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: lib, FixState: finding.NoFix},
+		{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "low"}, Component: lib, FixState: finding.NoFix},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
+	// A library at two places with two issues used to read four under every
+	// parent, because a finding is one issue at one place. Somebody who
+	// drilled down one path is looking at one place and expects two — and
+	// the list the number opens has to show the same.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedShared(t)
+		const build = "/v1/products/mine/streams/master/variants/broadcom"
+
+		type node struct {
+			Component string `json:"component"`
+			Findings  int    `json:"findings"`
+			Beneath   int    `json:"beneath"`
+		}
+		around := func(name string) (above, below []node) {
+			t.Helper()
+			got := asPerson(t, r, "triager", http.MethodGet, build+"/components/"+name+"/around", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("around %s answered %d: %s", name, got.Code, got.Body.String())
+			}
+			var out struct {
+				Above []node `json:"above"`
+				Below []node `json:"below"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+				t.Fatal(err)
+			}
+			return out.Above, out.Below
+		}
+		for _, parent := range []string{"docker-a", "docker-b"} {
+			_, below := around(parent)
+			if len(below) != 1 || below[0].Component != "libyang" {
+				t.Fatalf("under %s: %+v", parent, below)
+			}
+			if below[0].Findings != 2 || below[0].Beneath != 2 {
+				t.Errorf("libyang under %s reads %d findings, %d beneath; want 2 and 2", parent, below[0].Findings, below[0].Beneath)
+			}
+		}
+		// The root counts distinct issues open in the build.
+		got := asPerson(t, r, "triager", http.MethodGet, build+"/components", "")
+		var roots struct {
+			Root  *node  `json:"root"`
+			Items []node `json:"items"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &roots); err != nil || roots.Root == nil {
+			t.Fatalf("the roots read as %s (%v)", got.Body.String(), err)
+		}
+		if roots.Root.Beneath != 2 {
+			t.Errorf("the root reads %d beneath, want the 2 distinct issues", roots.Root.Beneath)
+		}
+		for _, item := range roots.Items {
+			if item.Beneath != 2 {
+				t.Errorf("%s reads %d beneath, want 2", item.Component, item.Beneath)
+			}
+		}
+
+		// The list the number opens: two rows, one per issue and
+		// component. The list is scoped by query rather than by path:
+		// with the branch and the variant named it is this one build.
+		const listing = "/v1/products/mine/findings?stream=master&variant=broadcom"
+		list := func(query string) (total int, code int) {
+			t.Helper()
+			got := asPerson(t, r, "triager", http.MethodGet, listing+query, "")
+			var out struct {
+				Total int `json:"total"`
+			}
+			_ = json.Unmarshal(got.Body.Bytes(), &out)
+			return out.Total, got.Code
+		}
+		if total, code := list("&beneath=docker-a"); code != http.StatusOK || total != 2 {
+			t.Errorf("beneath docker-a answered %d with %d rows, want 2", code, total)
+		}
+		if total, code := list("&beneath=libyang"); code != http.StatusOK || total != 2 {
+			t.Errorf("beneath libyang answered %d with %d rows, want 2", code, total)
+		}
+		if total, code := list("&beneath=mine"); code != http.StatusOK || total != 2 {
+			t.Errorf("beneath the root answered %d with %d rows, want 2", code, total)
+		}
+		// under is still the direct consumer, and beneath refuses a name the
+		// build does not hold.
+		if total, code := list("&under=docker-a"); code != http.StatusOK || total != 2 {
+			t.Errorf("under docker-a answered %d with %d rows, want 2", code, total)
+		}
+		if _, code := list("&beneath=nothing-here"); code != http.StatusUnprocessableEntity {
+			t.Errorf("beneath a name the build lacks answered %d, want 422", code)
+		}
+		got = asPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/findings/components?stream=master&variant=broadcom&beneath=docker-b", "")
+		var byComponent struct {
+			Total int `json:"total"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &byComponent); err != nil || got.Code != http.StatusOK || byComponent.Total != 1 {
+			t.Errorf("by component beneath docker-b answered %d with %d components, want 1", got.Code, byComponent.Total)
+		}
+	})
+}
+
+func TestTheTreeIsReachedByNameAndVersionWhereANameIsNotEnough(t *testing.T) {
+	// A build ships one name at several versions, and arriving from a finding
+	// at one of them had no way to say which — the reader saw an error
+	// instead of the tree.
+	eachReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		names := catalog.NewStore(r.db.DB)
+		located, err := names.Locate(ctx, "mine", "master", "broadcom")
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scan, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
+			TargetID: target.ID, ContentHash: "versions", BuiltAt: time.Now().UTC(), ParserVersion: "test",
+		})
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("record scan: %v %v", outcome, err)
+		}
+		product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
+		old := graph.Described{Purl: "pkg:golang/stdlib@go1.24.9", Name: "stdlib", Version: "go1.24.9"}
+		newer := graph.Described{Purl: "pkg:golang/stdlib@go1.25.6", Name: "stdlib", Version: "go1.25.6"}
+		if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+			Root:       product,
+			Components: []graph.Described{old, newer},
+			Dependencies: []graph.Dependency{
+				{Parent: product, Child: old}, {Parent: product, Child: newer},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom/components/stdlib/around"
+		got := asPerson(t, r, "triager", http.MethodGet, at, "")
+		if got.Code != http.StatusConflict {
+			t.Errorf("a name the build holds at two versions answered %d, want 409: %s", got.Code, got.Body.String())
+		}
+		got = asPerson(t, r, "triager", http.MethodGet, at+"?version=go1.25.6", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("naming the version answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Above []struct {
+				Component string `json:"component"`
+			} `json:"above"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil || len(out.Above) != 1 || out.Above[0].Component != "mine" {
+			t.Errorf("the tree around stdlib go1.25.6 reads as %s (%v)", got.Body.String(), err)
+		}
+		got = asPerson(t, r, "triager", http.MethodGet, at+"?version=go1.0.0", "")
+		if got.Code != http.StatusNotFound {
+			t.Errorf("a version the build lacks answered %d, want 404", got.Code)
+		}
+	})
+}
+
+func TestAProposerHoldsPartOfTheirOwnClaimBack(t *testing.T) {
+	// Recording in bulk and changing your mind one row at a time was the
+	// split, and it was the wrong middle: an approver could hold rows back and
+	// the author could only withdraw everything and start again.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		got := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/components/linux-image/decisions",
+			`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_present",`+
+				`"selected_by":"undecided, description contains \"driver\"",`+
+				`"reasoning":"None of these drivers are built for this image."}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("deciding answered %d: %s", got.Code, got.Body.String())
+		}
+		var made struct {
+			ClaimID int64   `json:"claim_id"`
+			IDs     []int64 `json:"ids"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil || len(made.IDs) < 2 {
+			t.Fatalf("the claim reads as %s (%v)", got.Body.String(), err)
+		}
+
+		// Somebody who did not make it cannot hold part of it back: that is
+		// setting rows aside, and setting rows aside agrees to the rest.
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/split", made.ClaimID),
+			fmt.Sprintf(`{"rows":[%d],"because":"Not this one."}`, made.IDs[0])); got.Code < 400 {
+			t.Errorf("an approver held part of somebody's claim back: %d", got.Code)
+		}
+
+		got = asPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/split", made.ClaimID),
+			fmt.Sprintf(`{"rows":[%d],"because":"This one is the driver after all."}`, made.IDs[0]))
+		if got.Code != http.StatusCreated {
+			t.Fatalf("holding a row back answered %d: %s", got.Code, got.Body.String())
+		}
+		var held struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &held); err != nil || held.ClaimID == 0 {
+			t.Fatalf("holding back answered %s (%v)", got.Body.String(), err)
+		}
+		if held.ClaimID == made.ClaimID {
+			t.Fatal("the rows held back stayed in the claim they came from")
+		}
+
+		// The reason is on the new claim, which is where its author reads it.
+		var said struct {
+			Items []struct {
+				Body string `json:"body"`
+			} `json:"items"`
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/comments", held.ClaimID), &said)
+		if len(said.Items) != 1 || said.Items[0].Body != "This one is the driver after all." {
+			t.Errorf("the reason did not travel with the rows: %+v", said.Items)
+		}
+	})
+}
