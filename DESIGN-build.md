@@ -22,6 +22,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Probes](#probes)
 - [Documentation](#documentation)
 - [The review checklist](#the-review-checklist)
+- [Actions are pinned](#actions-are-pinned)
 - [Repository settings](#repository-settings)
 - [Limits](#limits)
 
@@ -134,6 +135,13 @@ rather than for tidiness.
 | Dependency review | The license policy applied to what a pull request adds | Pull requests only, needs no toolchain, and is an action rather than a make target |
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
+
+Two workflows beside this one report no build of their own. `PR` is the
+aggregator that waits for every check here and is the only one the ruleset
+names; `Release` runs on a tag and is described in `DESIGN-packaging.md`.
+Both declare `merge_group:` as this one does — a workflow that does not
+contributes no check to a queue entry, and the aggregator cannot tell that
+from one that has not started.
 
 **The first job runs one target, not a list of them.** `make check` is the
 definition of what CI checks, so a target added to it is run by CI without
@@ -365,14 +373,36 @@ consulted when somebody remembers (REQ-75).
 It is not enforced by the pipeline. What CI can check, CI checks; the gate is
 long precisely so the checklist holds only what a machine cannot decide.
 
+## Actions are pinned
+
+| Rule | Why |
+|---|---|
+| Every action is pinned to the commit of a release, with the version in a comment beside it | A tag moves. An action that moves is code running with this repository's token on a day nobody chose, and `v4` is a tag |
+| The repository requires it | `sha_pinning_required` refuses a workflow referencing an action by tag, so the rule is enforced rather than remembered by whoever writes the next workflow |
+| Dependabot moves the pins, weekly, as one pull request | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
+| An update arrives through the queue like anything else | The commit being pinned is visible in the diff, and the gate runs against it |
+
 ## Repository settings
+
+Nothing here is in a file, so each is listed with what it is for and what its
+absence looks like — an absent setting fails somewhere far from itself.
 
 | Setting | Needed by | Symptom when off |
 |---|---|---|
-| Dependency graph, via Dependabot alerts | Dependency review | "Dependency review is not supported on this repository" |
+| Every change through a pull request, no direct push to `main` | The gate meaning anything | A commit reaches `main` having passed nothing |
+| Merge queue, squash, `ALLGREEN` | Landing what was tested | A pull request green against a `main` that has since moved |
+| One required check, `Merge Status` | Every other check | A workflow added later gates nothing until somebody edits the ruleset |
+| GitHub Advanced Security | Dependency review, on a private repository | "Dependency review is not supported on this repository" |
+| Dependency graph, via Dependabot alerts | Dependency review | The same |
+| Secret scanning and push protection | REQ-75 | A credential reaches the history, where deleting it does not remove it |
+| Actions pinned to a SHA | The section above | A tag somebody else controls executes here |
 | Pages, serving the `gh-pages` branch | Documentation publishing | The workflow succeeds and nothing is served |
 
-Secret scanning and push protection are on by default for public repositories.
+**Private and public differ.** Secret scanning and push protection are on by
+default for a public repository and are switched on explicitly here; dependency
+review needs Advanced Security while the repository is private, and needs
+nothing once it is public. A private Pages site is served only to accounts with
+read access, at a generated address rather than at the organization's.
 
 ## Limits
 
