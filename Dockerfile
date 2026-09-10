@@ -38,7 +38,7 @@ COPY web/ ./
 RUN npm run build
 
 # Build. Pinned to the same Go the module asks for.
-FROM golang:1.27-alpine AS build
+FROM golang:1.27.0-alpine AS build
 
 WORKDIR /src
 

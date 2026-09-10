@@ -353,8 +353,12 @@ publication path and undertake nothing about upgrading from one to the next.
 - **Pinning the base means nothing moves it either.** The image carried 3.21 —
   released December 2024, support ending 2026-11-01 — until somebody looked, by
   which point it was three releases behind. Past a base's end-of-life its packages
-  receive no security backports. Nothing watches the base, the scanner or the
-  inventory tool; all three were found two or more releases behind in one week.
+  receive no security backports, and all of the base, the scanner and the
+  inventory tool were found two or more releases behind in one week. Dependabot
+  now watches what a `FROM` line names, which is the base images and the Go
+  toolchain. **The scanner and the inventory tool are still watched by nobody**:
+  each is a version and a checksum in a build argument, which nothing reads as a
+  dependency.
 - **Two builds of one commit can differ**, because the packages inside the base
   are upgraded at build time. Accepted because the image carries an inventory of
   itself, so what shipped is recorded rather than assumed.

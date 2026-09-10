@@ -19,3 +19,27 @@ updates:
       # reads by the fourth one.
       actions:
         patterns: ["*"]
+
+  # The images the container is built from.
+  #
+  # "Nothing watches the base, the scanner or the inventory tool" is written
+  # into DESIGN-packaging.md's limits, next to the measurement that found all
+  # three two or more releases behind in one week. Past a base's end of life
+  # its packages receive no security backports, and pinning without watching
+  # is how that happened.
+  #
+  # The Go toolchain is here for a second reason: it is pinned to the patch
+  # go.mod declares, so the image stops picking up Go releases by itself. A
+  # bump arriving as a pull request is what replaces that.
+  #
+  # **A bump to the node image will fail `pins-check`, and should.** The
+  # version the image builds the interface with is written in the Dockerfile
+  # and in ci.yml, and the check compares them — so the pull request needs
+  # ci.yml moved with it. Red there means half an update, not a broken bot.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      images:
+        patterns: ["*"]
