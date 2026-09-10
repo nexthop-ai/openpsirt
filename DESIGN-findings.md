@@ -88,6 +88,7 @@ names**: every name resolves to one row, and a decision holds across all of them
 | An issue is filed under the most widely recognized of its names | What a person sees is the name they will find in an advisory. The rest are kept, and any of them finds the row |
 | Identifiers are compared in one case | Every scheme treats them as case-insensitive and reports disagree about which case to write |
 | A report that would merge two held issues is refused | That is a merge of findings and decisions already made against both, and reading a scan is the wrong moment to do it quietly |
+| **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
 
 ## What a report supplies
 

@@ -10,9 +10,15 @@ of that as four tables of a hundred and sixty rows, which is the reference
 again at lower resolution — nobody looking up one endpoint reads a table to
 find it, and nobody reading about roles wants a list of paths.
 
-Access is granted in advance or not at all: **no account is created by signing
-in**. Somebody who authenticates and has no record is refused, so a role is
-something an administrator gave a person before they arrived.
+Access is granted in advance or not at all: **no account is created for
+anybody nothing authorized in advance**. Somebody who authenticates and has no
+record is refused, so a role is something an administrator gave a person
+before they arrived.
+
+Where a deployment derives roles from identity-provider groups, the mapping is
+that advance grant, and a record is written on first arrival for somebody it
+covers. Somebody in no mapped group is refused exactly as a stranger is, and
+nothing is recorded for them.
 
 ## The roles
 

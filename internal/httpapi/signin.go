@@ -1,6 +1,10 @@
 package httpapi
 
 import (
+	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,7 +23,8 @@ import (
 // pendingCookie holds what a sign-in has to remember while the browser is away
 // at the provider.
 //
-// Held by the browser rather than here. The alternative is a table of
+// Held by the browser rather than here, and signed with this deployment's own
+// key so that what comes back is what went out. The alternative is a table of
 // half-finished sign-ins, which has to be swept and which anybody can fill by
 // starting sign-ins they never come back from.
 const pendingCookie = "openpsirt_pending"
@@ -82,8 +87,13 @@ func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
 		wentWrongHere(w, in, "a sign-in could not be started", err)
 		return
 	}
-	cookie := browserCookie(pendingCookie,
-		base64.RawURLEncoding.EncodeToString(encoded), false, in.PlainHTTP, int(pendingLife.Seconds()))
+	sealed, err := sealPending(r.Context(), in, encoded)
+	if err != nil {
+		wentWrongHere(w, in, "a sign-in could not be started", err)
+		return
+	}
+	cookie := browserCookie(pendingCookie, sealed, false, in.PlainHTTP,
+		int(pendingLife.Seconds()))
 	http.SetCookie(w, &cookie)
 	// Where this goes is the provider's authorization endpoint, and an adapter
 	// refuses at startup to be built around one that is not on the configured
@@ -101,7 +111,7 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 		return
 	}
 
-	held, err := pendingFrom(r)
+	held, err := pendingFrom(r.Context(), in, r)
 	if err != nil {
 		refuseSignIn(w, in)
 		return
@@ -264,12 +274,20 @@ func fillEmail(r *http.Request, in Ingest, rights *access.Store,
 }
 
 // pendingFrom reads back what the sign-in remembered.
-func pendingFrom(r *http.Request) (inProgress, error) {
+//
+// **Signed, because the cookie is the browser's.** Unsigned, the state the
+// callback compares against was whatever the cookie said — so somebody who
+// can write a cookie on this host, from a neighboring subdomain or anywhere
+// else, could start a sign-in of their own, plant their state and verifier in
+// a victim's browser, and have the callback issue that browser a session for
+// the attacker's account. The state check is only a control while the value
+// it compares against is one this deployment authored.
+func pendingFrom(ctx context.Context, in Ingest, r *http.Request) (inProgress, error) {
 	cookie, err := r.Cookie(pendingCookie)
 	if err != nil || cookie.Value == "" {
 		return inProgress{}, errors.New("no sign-in is in progress")
 	}
-	raw, err := base64.RawURLEncoding.DecodeString(cookie.Value)
+	raw, err := openPending(ctx, in, cookie.Value)
 	if err != nil {
 		return inProgress{}, err
 	}
@@ -287,6 +305,86 @@ func pendingFrom(r *http.Request) (inProgress, error) {
 	// about.
 	held.Return = aLocalPath(held.Return)
 	return held, nil
+}
+
+// sealPending signs what a sign-in leaves in the browser, and openPending
+// refuses anything this deployment did not sign.
+//
+// The value stays in the cookie rather than moving to a row keyed by an
+// opaque one: what it holds is short-lived, meaningless to anybody else, and
+// needed by whichever replica the callback lands on — so the thing that has
+// to be shared is a key rather than a table and a sweep.
+func sealPending(ctx context.Context, in Ingest, payload []byte) (string, error) {
+	key, err := signingKey(ctx, in)
+	if err != nil {
+		return "", err
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write(payload)
+	return base64.RawURLEncoding.EncodeToString(payload) + "." +
+		base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+}
+
+func openPending(ctx context.Context, in Ingest, value string) ([]byte, error) {
+	body, signature, found := strings.Cut(value, ".")
+	if !found {
+		return nil, errors.New("the sign-in in progress is not signed")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(body)
+	if err != nil {
+		return nil, err
+	}
+	given, err := base64.RawURLEncoding.DecodeString(signature)
+	if err != nil {
+		return nil, err
+	}
+	key, err := signingKey(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write(payload)
+	// Constant time, like every other secret comparison here.
+	if !hmac.Equal(mac.Sum(nil), given) {
+		return nil, errors.New("the sign-in in progress was not started here")
+	}
+	return payload, nil
+}
+
+// signingKey is this deployment's own key, minted the first time it is
+// wanted.
+//
+// Stored rather than held in memory because it has to be the same on every
+// replica and across a restart: a sign-in begun on one process is finished by
+// whichever answers the callback, and a key per process would refuse half of
+// them for no reason a person could act on.
+func signingKey(ctx context.Context, in Ingest) ([]byte, error) {
+	if in.DB == nil {
+		return nil, errors.New("no database, so a sign-in cannot be signed")
+	}
+	settings := setting.NewStore(in.DB.DB)
+	held, found, err := settings.Get(ctx, setting.SignInKey)
+	if err != nil {
+		return nil, err
+	}
+	if found && held != "" {
+		return base64.RawURLEncoding.DecodeString(held)
+	}
+	fresh := make([]byte, 32)
+	if _, err := rand.Read(fresh); err != nil {
+		return nil, err
+	}
+	minted := base64.RawURLEncoding.EncodeToString(fresh)
+	if err := settings.Set(ctx, setting.SignInKey, minted); err != nil {
+		return nil, err
+	}
+	// Read back, so two processes minting at once agree on which key won
+	// rather than each signing with its own.
+	stored, found, err := settings.Get(ctx, setting.SignInKey)
+	if err != nil || !found {
+		return fresh, err
+	}
+	return base64.RawURLEncoding.DecodeString(stored)
 }
 
 // inProgress is a sign-in that has been started: what the provider needs to

@@ -53,6 +53,7 @@ var settable = []struct {
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else"},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time"},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it"},
+	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload"},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here"},
 	{setting.WaitingAfter, "How long a claim may wait on a second person before whoever can approve it is told. What is wrong is that nothing has happened, which is the one thing no message driven by an event can report"},
 	{setting.SentBackAfter, "How long a claim an approver asked more of may sit untouched before its proposer is told again. Shorter than the wait above: the question was asked of the person already holding it"},
@@ -85,7 +86,8 @@ func aSeverity(name string) bool { return name == setting.TriageFloor }
 // value checked as the wrong kind is stored and then silently ignored.
 func aCount(name string) bool {
 	switch name {
-	case setting.TogetherCap, setting.AttachmentMaxSize, setting.AttachmentQuota:
+	case setting.TogetherCap, setting.AttachmentMaxSize, setting.AttachmentQuota,
+		setting.AttachmentShare:
 		return true
 	}
 	return false
@@ -354,6 +356,8 @@ func shipped(name string) string {
 		return strconv.Itoa(setting.DefaultAttachmentMaxSize)
 	case setting.AttachmentQuota:
 		return strconv.Itoa(setting.DefaultAttachmentQuota)
+	case setting.AttachmentShare:
+		return strconv.Itoa(setting.DefaultAttachmentShare)
 	case setting.AbsentAfter:
 		return setting.DefaultAbsentAfter.String()
 	case setting.WaitingAfter:

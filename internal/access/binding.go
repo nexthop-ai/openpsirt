@@ -257,14 +257,26 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// what a group granted is taken back by a group, which is what
 	// admin_derived records.
 	effective := admin || person.IsBootstrap || (person.IsAdmin && !person.AdminDerived)
-	if person.IsAdmin != effective || person.AdminDerived != admin {
+	// **A group's grant is derived only where it is what made them an
+	// administrator.** Written as "whatever the groups say this time", the
+	// column destroyed the input the line above depends on next time:
+	// somebody promoted in the application who also happened to be in an
+	// admin-bound group was rewritten as derived, and losing the group then
+	// took away administration the group never gave — irrecoverably, since a
+	// switch back to direct roles clears exactly the rows marked derived.
+	derived := person.AdminDerived || (admin && !person.IsAdmin)
+	if !effective {
+		// Nothing to have come from anywhere.
+		derived = false
+	}
+	if person.IsAdmin != effective || person.AdminDerived != derived {
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("is_admin = ?", effective).Set("admin_derived = ?", admin).
+			Set("is_admin = ?", effective).Set("admin_derived = ?", derived).
 			Where("id = ?", person.ID).Exec(ctx); err != nil {
 			return nil, fmt.Errorf("record what %q administers: %w", person.Identity, err)
 		}
 		person.IsAdmin = effective
-		person.AdminDerived = admin
+		person.AdminDerived = derived
 	}
 
 	if err := s.replaceDerived(ctx, person.ID, roles); err != nil {

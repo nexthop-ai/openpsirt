@@ -329,7 +329,7 @@ gets ticked without being read.
 | **Insecure design** | Does the change contradict a recorded decision? Cite the identifier if so |
 | **Security misconfiguration** | Container non-root with a read-only root filesystem. Trusted-header sign-in off by default and only from configured sources (REQ-41) |
 | **Vulnerable components** | `govulncheck` and dependency review gate. A new dependency needs a permissive license (REQ-01) |
-| **Authentication failures** | No account created automatically on any path; unauthorized users get a generic message that does not say why (REQ-41) |
+| **Authentication failures** | No account created for anybody nothing authorized in advance. In group-bound mode the mapping an administrator made *is* that authorization, so a record is written on first arrival for somebody it covers and nobody else — every other path refuses an unknown arrival outright. Unauthorized users get a generic message that does not say why (REQ-41) |
 | **Data integrity** | A scan file is hostile input. Bounded size, depth and component count; never used as a filesystem path (REQ-66 and REQ-69). Markdown fields are length-bounded and rendering is time-bounded (REQ-69) |
 | **Separation of duties** | An approval points at one revision of a justification. Anything that lets approved text change without withdrawing the approval defeats REQ-24 silently (REQ-28) |
 | **Logging failures** | Secrets never logged. Triage actions land in the append-only history (REQ-68) |

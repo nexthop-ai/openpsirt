@@ -348,3 +348,55 @@ func TestAProxyCanReportMembershipToo(t *testing.T) {
 		}
 	})
 }
+
+// Administration granted in the application survives a group that never gave
+// it.
+//
+// The column recording where administration came from was rewritten on every
+// sign-in as "whatever the groups say this time", which destroyed the input
+// the rule above it depends on: somebody promoted here who also happened to
+// be in an admin-bound group was recorded as derived, and being taken out of
+// that group then removed administration the group never granted. A switch
+// back to direct roles clears exactly the rows marked derived, so it was not
+// recoverable that way either.
+func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// Promoted here, not by a group.
+		person, err := f.store.Ensure(ctx, "proxy:bob", "Bob", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// How they come through the door, recorded like anybody else's.
+		if err := f.store.Claim(ctx, person.ID, access.ProxyProvider, "bob"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.BindAdmin(ctx, "platform-admins"); err != nil {
+			t.Fatal(err)
+		}
+
+		arriving := access.Arrival{
+			Provider: access.ProxyProvider, Subject: "bob", Username: "bob",
+			DisplayName: "Bob",
+		}
+		if _, err := f.store.AdmitByGroups(ctx, arriving,
+			[]string{"platform-admins"}); err != nil {
+			t.Fatal(err)
+		}
+		// Out of the group, and back.
+		back, err := f.store.AdmitByGroups(ctx, arriving, nil)
+		if err != nil {
+			t.Fatalf("somebody promoted here was refused once a group dropped them: %v", err)
+		}
+		if !back.Admin {
+			t.Error("a group that never granted administration took it away")
+		}
+		account, err := f.store.ByIdentity(ctx, "proxy:bob")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if account.AdminDerived {
+			t.Error("administration granted here reads as a group's")
+		}
+	})
+}

@@ -563,3 +563,43 @@ func TestACapabilityAloneNarrowsNoFindings(t *testing.T) {
 		}
 	})
 }
+
+// A grant that grants nothing is not access, including here.
+//
+// Every other question about what somebody holds reads past an inactive
+// grant; this one counted every row. So in group-bound mode — where every
+// assigned grant is inactive by construction — withdrawing somebody's last
+// live role answered "they still hold something here", their assigned
+// findings stayed with somebody who can no longer open them, and the
+// response said nothing had been released. That is the exact outcome the
+// question exists to prevent.
+func TestAnInactiveGrantIsNotSomethingSomebodyHolds(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		sonic := f.products["sonic"]
+		person, err := f.store.Ensure(ctx, "alice", "Alice", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, sonic, access.PrivateTriage); err != nil {
+			t.Fatal(err)
+		}
+		if held, err := f.store.HoldsAnythingIn(ctx, person.ID, sonic); err != nil || !held {
+			t.Fatalf("a live grant reads as nothing: %v %v", held, err)
+		}
+
+		// The deployment switches to group-bound roles, which leaves every
+		// assigned grant inactive rather than deleting it.
+		if err := f.store.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+		held, err := f.store.HoldsAnythingIn(ctx, person.ID, sonic)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held {
+			t.Error("a grant that grants nothing reads as something they hold, " +
+				"so their assigned work is never handed back")
+		}
+	})
+}

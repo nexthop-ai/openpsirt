@@ -2,6 +2,8 @@ package httpapi_test
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -453,6 +455,47 @@ func TestASignInWillNotSendABrowserOffThisDeployment(t *testing.T) {
 	})
 }
 
+// A sign-in this deployment did not start is not a sign-in.
+//
+// The cookie holding the state was unsigned, and the callback compared the
+// state it was given against the state in that cookie — so somebody who can
+// write a cookie on this host could start a sign-in of their own, plant its
+// state and verifier in a victim's browser, and have the callback hand that
+// browser a session for the attacker's account. A comparison against a value
+// the other party authored is not a control.
+func TestASignInNobodyStartedHereIsRefused(t *testing.T) {
+	twoSignIn(t, func(t *testing.T, r *signInReach) {
+		forged, err := json.Marshal(map[string]any{
+			"pending": map[string]string{
+				"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
+			},
+			"return": "/",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodGet,
+			"/v1/sign-in/stub/callback?state=the-state&code=a-code", nil)
+		// Set as a header rather than built as a cookie value: a browser sends
+		// a name and a value and nothing else, so this is what a planted
+		// request actually looks like on the wire.
+		req.Header.Set("Cookie",
+			"openpsirt_pending="+base64.RawURLEncoding.EncodeToString(forged))
+		rec := httptest.NewRecorder()
+		r.handler.ServeHTTP(rec, req)
+
+		if rec.Code == http.StatusFound {
+			t.Fatalf("a sign-in nobody started here completed: %s",
+				rec.Header().Get("Location"))
+		}
+		for _, cookie := range rec.Result().Cookies() {
+			if cookie.Name == "openpsirt_session" && cookie.Value != "" {
+				t.Error("a planted sign-in was issued a session")
+			}
+		}
+	})
+}
+
 func TestATamperedReturnAddressIsStillRefused(t *testing.T) {
 	// The address is checked on the way in and again on the way out. The
 	// cookie holding it is the browser's own, so somebody may edit it — and
@@ -460,7 +503,9 @@ func TestATamperedReturnAddressIsStillRefused(t *testing.T) {
 	// left here is an address this deployment sent, which is what an open
 	// redirect is.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
-		// What begin would have left behind, with the address replaced.
+		// What begin would have left behind, with the address replaced —
+		// signed with this deployment's own key, because an unsigned one is
+		// refused before the address is looked at.
 		forged, err := json.Marshal(map[string]any{
 			"pending": map[string]string{
 				"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
@@ -472,11 +517,7 @@ func TestATamperedReturnAddressIsStillRefused(t *testing.T) {
 		}
 		req := httptest.NewRequest(http.MethodGet,
 			"/v1/sign-in/stub/callback?state=the-state&code=a-code", nil)
-		// Set as a header rather than built as a cookie value: a browser sends
-		// a name and a value and nothing else, so this is what a tampered
-		// request actually looks like on the wire.
-		req.Header.Set("Cookie",
-			"openpsirt_pending="+base64.RawURLEncoding.EncodeToString(forged))
+		req.Header.Set("Cookie", "openpsirt_pending="+r.sealed(t, forged))
 		rec := httptest.NewRecorder()
 		r.handler.ServeHTTP(rec, req)
 
@@ -487,4 +528,26 @@ func TestATamperedReturnAddressIsStillRefused(t *testing.T) {
 			t.Errorf("a tampered address sent the browser to %q, want /", where)
 		}
 	})
+}
+
+// sealed signs a pending payload the way the sign-in path does, so a test can
+// hand the callback something this deployment would accept.
+func (r *signInReach) sealed(t *testing.T, payload []byte) string {
+	t.Helper()
+	// Minted on first use, so a sign-in is started to bring it into being.
+	begin := httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil)
+	r.handler.ServeHTTP(httptest.NewRecorder(), begin)
+
+	held, found, err := setting.NewStore(r.db.DB).Get(t.Context(), setting.SignInKey)
+	if err != nil || !found {
+		t.Fatalf("this deployment has no sign-in key: %v %v", found, err)
+	}
+	key, err := base64.RawURLEncoding.DecodeString(held)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write(payload)
+	return base64.RawURLEncoding.EncodeToString(payload) + "." +
+		base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

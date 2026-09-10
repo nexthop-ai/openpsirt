@@ -1854,9 +1854,11 @@ export interface paths {
          *
          *     **Nothing about the finding, the decisions or the approvals moves**, because they are keyed on the issue rather than on what it is called. What changes is that the name travels with it: a report arriving under the new name resolves here rather than opening a second issue, the finding shows it, and the advisory carries it in the field a reader looks in — which is the one lookup a published advisory exists to serve.
          *
+         *     **A name is identity, and identity is deployment-wide.** From here on a scan of any product reporting that name resolves to this issue and inherits its decisions. So this asks for the right to triage the issue in every product it is currently open in, at the visibility each one carries, and is refused rather than partly done.
+         *
          *     Recording a name it already goes by succeeds and changes nothing.
          *
-         *     **Requires:** public-triage or private-triage on the product
+         *     **Requires:** public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
          */
         put: operations["add-alias"];
         post?: never;
@@ -1889,11 +1891,11 @@ export interface paths {
          *
          *     The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
          *
-         *     Refused when the file is larger than this deployment accepts, or when it has no room left; both limits are settings. A deployment that has configured no store holds no attachments and says so.
+         *     Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings. A deployment that has configured no store holds no attachments and says so.
          *
          *     An upload nothing refers to is removed after a day, so a file attached and then abandoned does not accumulate. Send `evidence=true` where the file hangs off the issue itself — a test case that proves the flaw — rather than off text you are about to write: it is then listed at once and never swept, because the issue is what points at it.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** public-triage or private-triage on the product. A collaborator brought onto this issue may attach to it too.
          */
         post: operations["upload-attachment"];
         delete?: never;

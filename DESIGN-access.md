@@ -13,6 +13,7 @@ REQ-44, REQ-45, REQ-56, REQ-59, REQ-68, REQ-69's server half.
 - [The upward tree](#the-upward-tree)
 - [Refusals disclose nothing](#refusals-disclose-nothing)
 - [Assignment](#assignment)
+- [What a sign-in leaves behind](#what-a-sign-in-leaves-behind)
 - [Departure](#departure)
 - [No statistics role](#no-statistics-role)
 - [Somebody who has left](#somebody-who-has-left)
@@ -208,6 +209,18 @@ yourself is still doing it.
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
+
+## What a sign-in leaves behind
+
+What a sign-in has to remember while the browser is at the provider stays with
+the browser rather than in a table of half-finished sign-ins that has to be
+swept and that anybody can fill.
+
+| Rule | |
+|---|---|
+| **It is signed with this deployment's own key** | The callback compares the state it is given against the state in that cookie, and a comparison against a value the other party wrote is not a control. Unsigned, somebody who can write a cookie on this host could start a sign-in of their own, plant its state and verifier in a victim's browser, and have the callback hand that browser a session for the attacker's account |
+| The key is stored, not held in memory | A sign-in begun on one replica is finished by whichever answers the callback, and it has to survive a restart. Minted the first time it is wanted |
+| The return address is checked on the way in and again on the way out | An address that left here is an address this deployment sent |
 
 ## Departure
 
