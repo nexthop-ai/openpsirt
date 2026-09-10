@@ -189,6 +189,88 @@ func earliestDue(rows []placeRow) *time.Time {
 	return earliest
 }
 
+// At names one place a decision was made about, for asking what is open there
+// now.
+type At struct {
+	VulnerabilityID int64
+	PlaceIdentity   string
+}
+
+// DeadlineAt is the earliest deadline among the open findings at these places,
+// in these builds.
+//
+// What a promise already recorded is measured against, asked again rather than
+// remembered: the deadline moves when the policy or the rating moves, so a
+// promise being edited is gated against the deadline in force now and not the
+// one in force when it was first made.
+//
+// Narrowed by what the subject may see, like every other read here, and taking
+// a handle because the caller opens the transaction: resolved beforehand, a
+// retry recomputes a gate from findings somebody closed in between.
+func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID int64, targets []int64, places []At) (*time.Time, error) {
+
+	if !subject.Sees(productID) {
+		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+	visible := access.Visible(subject, productID)
+	if len(visible) == 0 {
+		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+	if len(targets) == 0 || len(places) == 0 {
+		return nil, nil
+	}
+
+	// The pair of lists matches more combinations than were asked for, so what
+	// was not asked for is dropped after the read. Naming each pair in the
+	// statement would be one OR group per place, and a claim reaches as many
+	// places as the issue sits at.
+	issues := make([]int64, 0, len(places))
+	identities := make([]string, 0, len(places))
+	wanted := make(map[At]bool, len(places))
+	for _, place := range places {
+		if wanted[place] {
+			continue
+		}
+		wanted[place] = true
+		issues = append(issues, place.VulnerabilityID)
+		identities = append(identities, place.PlaceIdentity)
+	}
+
+	var rows []struct {
+		VulnerabilityID int64      `bun:"vulnerability_id"`
+		PlaceIdentity   string     `bun:"place_identity"`
+		DueAt           *time.Time `bun:"due_at"`
+	}
+	if err := db.NewSelect().
+		TableExpr("finding AS f").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
+		ColumnExpr("f.place_identity AS place_identity").
+		ColumnExpr("MIN(f.due_at) AS due_at").
+		Where("f.target_id IN (?)", bun.List(targets)).
+		Where("f.vulnerability_id IN (?)", bun.List(issues)).
+		Where("f.place_identity IN (?)", bun.List(identities)).
+		Where("f.closed_at IS NULL").
+		Where("f.due_at IS NOT NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.vulnerability_id, f.place_identity").
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read the deadline this covers: %w", err)
+	}
+
+	var earliest *time.Time
+	for _, row := range rows {
+		if row.DueAt == nil || !wanted[At{row.VulnerabilityID, row.PlaceIdentity}] {
+			continue
+		}
+		if earliest == nil || row.DueAt.Before(*earliest) {
+			at := *row.DueAt
+			earliest = &at
+		}
+	}
+	return earliest, nil
+}
+
 // placeRow is one open finding at the place being decided about.
 type placeRow struct {
 	Visibility        string     `bun:"visibility"`

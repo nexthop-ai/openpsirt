@@ -39,12 +39,6 @@ import (
 // risk rather than hiding it, and the queue exists to stop risk being hidden
 // unseen.
 func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int64, reasoning string) (*Revision, error) {
-	if strings.TrimSpace(reasoning) == "" {
-		return nil, errors.New("a revision has to say something")
-	}
-	if err := markdown.Check(reasoning); err != nil {
-		return nil, err
-	}
 	db, ok := s.db.(*bun.DB)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
@@ -60,8 +54,22 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int6
 	return written, err
 }
 
+// revise is the whole of a revision, inside a transaction the caller opened.
+//
+// **The policy is checked here rather than by each caller.** Every path that
+// stores typed text runs it before the text is stored, so that what is in the
+// column is known to have passed what was in force when it arrived — and a
+// second entry point that reached the write without it stored raw HTML,
+// remote images and text past the bound a render is kept inside.
 func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int64,
 	reasoning string) (*Revision, error) {
+
+	if strings.TrimSpace(reasoning) == "" {
+		return nil, errors.New("a revision has to say something")
+	}
+	if err := markdown.Check(reasoning); err != nil {
+		return nil, err
+	}
 
 	claim, rows, err := s.claimRows(ctx, subject, claimID, mayDecide)
 	if err != nil {

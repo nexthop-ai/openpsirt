@@ -118,7 +118,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject, up Upgr
 				}
 			}
 		}
-		gated := binding != nil && up.By.After(*binding)
+		gated := commitmentGated(&up.By, binding)
 
 		type standsAt struct {
 			vulnerability                        int64
@@ -246,6 +246,7 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 	if !ok {
 		return fmt.Errorf("this store is already inside a transaction")
 	}
+	findings := finding.NewStore(db)
 	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
 		claim, rows, err := within.claimRows(ctx, subject, claimID, mayDecide)
@@ -263,6 +264,25 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		}
 		moving := strings.TrimSpace(to)
 		when := by.UTC()
+		if !when.After(s.now()) {
+			return fmt.Errorf("a promise lands on a date still to come: %s has passed",
+				when.Format(time.DateOnly))
+		}
+
+		// The gate again, over what the claim covers now. Moving the date is
+		// moving the thing the gate is about, so a promise first made inside
+		// the deadline and then pushed years out would otherwise stay
+		// recorded as needing nobody — in force, suppressing everything it
+		// covers, and out of the review queue, which is a seven-year deferral
+		// on one signature.
+		//
+		// Resolved here rather than remembered: the deadline moves when the
+		// policy or the rating moves, and this is inside the transaction that
+		// writes so a retry cannot gate against a database that has gone.
+		gated, err := within.regate(ctx, tx, findings, subject, claimID, rows, when)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.NewUpdate().Model((*Claim)(nil)).
 			Set("upgrade_to = ?", moving).
 			Set("committed_to = ?", when).
@@ -278,6 +298,14 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 			Where("claim_id = ?", claimID).Exec(ctx); err != nil {
 			return fmt.Errorf("change what the releases are waiting on: %w", err)
 		}
+		// Written with the revision rather than after it, because the two are
+		// one act: a row back in the queue that still says it needs nobody is
+		// a row the queue does not list.
+		if _, err := tx.NewUpdate().Model((*Decision)(nil)).
+			Set("needs_approval = ?", gated).
+			Where("claim_id = ?", claimID).Exec(ctx); err != nil {
+			return fmt.Errorf("record whether the changed promise needs agreement: %w", err)
+		}
 		// Last, because it is what returns the rows to the queue: an approver
 		// meeting it again is reading a promise that has changed.
 		if _, err := within.revise(ctx, subject, claimID, reasoning); err != nil {
@@ -285,4 +313,36 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		}
 		return nil
 	})
+}
+
+// regate works out whether a changed promise needs a second person, from what
+// the claim covers rather than from what it covered when it was made.
+//
+// The builds come from the commitments the claim wrote, which are what says
+// where the promise applies, and the places from the claim's own rows. The
+// deadline is then the earliest among the findings still open at those places
+// in those builds.
+func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
+	subject access.Subject, claimID int64, rows []Decision, by time.Time) (bool, error) {
+
+	if len(rows) == 0 {
+		return true, nil
+	}
+	var targets []int64
+	if err := tx.NewSelect().Table("upgrade").
+		ColumnExpr("DISTINCT target_id").
+		Where("claim_id = ?", claimID).Scan(ctx, &targets); err != nil {
+		return false, fmt.Errorf("read which releases this was promised for: %w", err)
+	}
+	places := make([]finding.At, 0, len(rows))
+	for _, row := range rows {
+		places = append(places, finding.At{
+			VulnerabilityID: row.VulnerabilityID, PlaceIdentity: row.PlaceIdentity,
+		})
+	}
+	binding, err := findings.DeadlineAt(ctx, tx, subject, rows[0].ProductID, targets, places)
+	if err != nil {
+		return false, err
+	}
+	return commitmentGated(&by, binding), nil
 }

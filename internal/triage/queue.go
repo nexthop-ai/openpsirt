@@ -708,6 +708,33 @@ func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[in
 	return totals, nil
 }
 
+// commitmentGated reports whether a promise to act by a date needs a second
+// person, given the deadline the work it covers already has.
+//
+// One spelling, because there are three acts that make a promise — recording
+// one on a finding, declaring an upgrade on a component, and moving either —
+// and a gate written out at each of them is a gate that comes to say three
+// things.
+//
+// Inside the deadline, nothing is hidden for longer than the policy already
+// allowed, which is ordinary triage: gating every planned upgrade would put
+// the most routine act of all through the review queue. Past it, the promise
+// defers the worst thing the act covers, which is exactly what a second
+// person is for.
+//
+// Both absences gate. A commitment with no date is not a commitment. And
+// where nothing it covers has a deadline there is no date the promise can be
+// inside — the exemption is "this hides nothing the policy did not already
+// allow", and a place with no deadline allowed nothing. Reading that the
+// other way made a product below its own triage line the one place a promise
+// could hide a finding for years on one signature.
+func commitmentGated(committedTo, binding *time.Time) bool {
+	if committedTo == nil || binding == nil {
+		return true
+	}
+	return committedTo.After(*binding)
+}
+
 // NeedsApproval reports whether a proposal may stand on its own.
 //
 // Hiding risk needs a second person. The exception is a short deferral: a
@@ -722,29 +749,9 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 		return false, nil
 	}
 	// A promise to act by a date is gated against the deadline the work
-	// already has rather than against a configured span. Inside it, nothing
-	// is being hidden for longer than the policy already allowed, which is
-	// ordinary triage — and gating every planned upgrade would put the most
-	// routine act in the queue, which is how a queue stops being read.
-	//
-	// Past it, the promise defers the worst thing the act covers, and that is
-	// exactly what a second person is for. A commitment with no date at all
-	// is not a commitment, so it is gated.
+	// already has rather than against a configured span.
 	if p.Outcome.Commits() {
-		if p.CommittedTo == nil {
-			return true, nil
-		}
-		if p.Binding == nil {
-			// Nothing it covers has a deadline, so there is no date the
-			// promise can be inside. The exemption is "this hides nothing the
-			// policy did not already allow", and a place with no deadline
-			// allowed nothing — so there is nothing to measure the promise
-			// against and a second person agrees. Reading it the other way
-			// made a product below its own triage line the one place where a
-			// promise could hide a finding for years on one signature.
-			return true, nil
-		}
-		return p.CommittedTo.After(*p.Binding), nil
+		return commitmentGated(p.CommittedTo, p.Binding), nil
 	}
 	if p.Outcome != Deferred {
 		return true, nil
