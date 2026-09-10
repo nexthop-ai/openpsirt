@@ -156,22 +156,17 @@ jobs:
           path: bin/openpsirt.cdx.json
           if-no-files-found: error
 
-  # The three below are not steps of the job above, and each for a reason of
+  # The two below are not steps of the job above, and each for a reason of
   # its own rather than for tidiness.
-
-  dependency-review:
-    name: Dependency review
-    # Pull requests only, needs no toolchain at all, and is a GitHub action
-    # rather than a make target — so there is nothing of the job above to
-    # share with it.
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v5.0.0
-        with:
-          # Matches the license policy: permissive only for anything shipped.
-          allow-licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MIT, MPL-2.0
+  #
+  # A third was here: dependency review, the action applying the license
+  # policy to what a pull request adds. It needs GitHub Advanced Security on
+  # a private repository, which is a paid add-on nothing else in this
+  # organization buys, and it could never be run locally — so what it checked
+  # is now checked by "make licenses" and "make web-audit", which the job
+  # above runs along with everything else. REQ-75 asks for a finding that
+  # reproduces locally with one documented command, and the action was the
+  # one gate that could not.
 
   image:
     name: Container image and chart

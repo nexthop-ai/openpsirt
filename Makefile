@@ -98,6 +98,11 @@ DIST_IMAGE_ARCH ?= $(shell $(GO) env GOARCH)
 GOLANGCI_VERSION    ?= v2.13.1
 GOVULNCHECK_VERSION ?= v1.7.0
 GOLICENSES_VERSION  ?= v1.6.0
+# The module path is not the repository path: the project moved to the
+# gitleaks organization and the module still declares zricethezav, so asking
+# for the other one fails with a version-constraint conflict rather than a
+# not-found.
+GITLEAKS_VERSION    ?= v8.30.1
 CDXGOMOD_VERSION    ?= v1.12.0
 
 # Permissive only, for anything that ships. Build tooling is unrestricted.
@@ -180,7 +185,7 @@ DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 
-.PHONY: dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
 
 all: check build
 
@@ -261,10 +266,20 @@ fmt:
 govulncheck:
 	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
+# Both halves of what ships, against one allowlist.
+#
+# The interface is built into the binary, so its dependencies are shipped
+# exactly as the Go ones are — and they went unchecked until the platform
+# product that would have caught them turned out to be a paid add-on on a
+# private repository. The allowlist is this variable, passed to both, because
+# a policy written in two files is a policy that differs in one of them.
 licenses:
 	$(GO) run github.com/google/go-licenses@$(GOLICENSES_VERSION) check ./... \
 		--allowed_licenses=$(ALLOWED_LICENSES) \
 		$(foreach m,$(LICENSE_EXCEPTIONS),--ignore=$(m))
+	@command -v $(NPM) >/dev/null 2>&1 \
+	  || { echo "npm not found, so the interface's licenses are unchecked here"; exit 1; }
+	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) $(NPM) --prefix web run --silent licenses
 
 # We ingest SBOMs, so we publish one for ourselves. CycloneDX because that is
 # the format this project treats as authoritative on the way in.
@@ -441,7 +456,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved readable pins-check test-all govulncheck licenses openapi-current sbom web-check
+check: build vet lint unreachable unclaimed reserved readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -487,7 +502,37 @@ web-check:
 	$(NPM) --prefix web run classes
 	$(NPM) --prefix web run tokens
 	$(NPM) --prefix web run ladder
+	$(MAKE) web-audit
 	$(MAKE) web-api
+
+# Known vulnerabilities in what the interface installs.
+#
+# The counterpart to govulncheck, and the other half of REQ-75's vulnerability
+# scanning: govulncheck reads Go modules and says nothing at all about npm.
+# The advisory data is the registry's, so this needs a network and says so
+# rather than passing when it cannot reach one.
+#
+# High and above fails. Everything is reported, because "one moderate" and
+# "forty moderates" are different facts and only one of them is worth a look.
+# Credentials in the tree.
+#
+# REQ-75 names secret scanning as a gate. The platform product that provides
+# it is a paid add-on on a private repository and is not enabled, so the gate
+# is this: the same scan, pinned, running against the working tree, locally
+# and in CI with one command.
+#
+# What it does not cover is history — a credential committed and then removed
+# is still in the objects, and finding that is what the platform product is
+# for. Nothing here should ever have been in a commit, which is the point of
+# running this before one.
+secrets:
+	$(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
+		--no-banner --redact
+
+web-audit:
+	@command -v $(NPM) >/dev/null 2>&1 \
+	  || { echo "npm not found, so the interface's dependencies are unscanned here"; exit 1; }
+	$(NPM) --prefix web audit --audit-level=high
 
 # Exported code nothing reaches. The analysis gate only reports unexported
 # symbols, which left ten real defects invisible in one review — a store method

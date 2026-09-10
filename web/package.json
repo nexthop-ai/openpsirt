@@ -11,6 +11,7 @@
     "classes": "node scripts/class-collisions.mjs",
     "tokens": "node scripts/tokens.mjs",
     "ladder": "node scripts/one-ladder.mjs",
+    "licenses": "node scripts/licenses.mjs",
     "lint": "eslint .",
     "stylelint": "stylelint \"src/**/*.css\"",
     "format": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.mjs\""
