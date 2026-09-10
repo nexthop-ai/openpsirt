@@ -186,7 +186,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 	if !mayDecideOn(subject, place.ProductID, place.VulnerabilityID, visibilityOf(place)) {
 		return nil, ErrNotTheirs
 	}
-	if err := proposal.valid(); err != nil {
+	if err := proposal.valid(s.now()); err != nil {
 		return nil, err
 	}
 	// A re-affirmation is an action of its own. It carries the earlier
@@ -554,6 +554,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		ConsumerNow   string `bun:"consumer_now"`
 		Reasoning     string `bun:"reasoning"`
 		StillThere    bool   `bun:"still_there"`
+		RanOut        bool   `bun:"ran_out"`
 		// Carried so a postponement can be told how long it has already run.
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		PlaceIdentity   string `bun:"place_identity"`
@@ -598,6 +599,9 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL)
 			AS still_there`, toTarget).
+		// Whether the date it carries has already gone by, either date.
+		ColumnExpr(`(COALESCE(cl.deferred_until, cl.committed_to) IS NOT NULL
+			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS ran_out`, s.now()).
 		Where("de.live_key IS NOT NULL").
 		Where("de.product_id = ?", productID).
 		Where("de.visibility IN (?)", bun.List(readable)).
@@ -627,6 +631,15 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			DecisionID: row.DecisionID, Vulnerability: row.Vulnerability,
 			Component: row.Component, Outcome: Outcome(row.Outcome),
 			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
+		}
+		// What the write would refuse is not offered. A carried judgment
+		// keeps its date rather than having it quietly moved forward, so a
+		// deferral that has already run out and a promise whose date has
+		// gone by cannot be carried at all — and offering one is offering
+		// something the act behind the button turns down.
+		if row.RanOut {
+			carried.Absent++
+			continue
 		}
 		if Outcome(row.Outcome) == Deferred {
 			postponed = append(postponed, at{row.VulnerabilityID, row.PlaceIdentity})

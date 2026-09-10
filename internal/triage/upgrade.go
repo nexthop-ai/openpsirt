@@ -162,7 +162,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject, up Upgr
 				})
 			}
 		}
-		if err := allowed(subject, proposals, cap); err != nil {
+		if err := allowed(subject, proposals, cap, s.now()); err != nil {
 			return err
 		}
 		out.Issues, out.Components = len(issues), len(components)

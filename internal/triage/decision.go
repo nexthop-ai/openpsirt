@@ -308,7 +308,7 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 	if !mayDecideOn(subject, p.Place.ProductID, p.Place.VulnerabilityID, visibilityOf(p.Place)) {
 		return nil, ErrNotTheirs
 	}
-	if err := p.valid(); err != nil {
+	if err := p.valid(s.now()); err != nil {
 		return nil, err
 	}
 	if p.By != subject.ID {
@@ -366,7 +366,7 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 	if len(proposals) == 0 {
 		return nil, nil
 	}
-	if err := allowed(subject, proposals, cap); err != nil {
+	if err := allowed(subject, proposals, cap, s.now()); err != nil {
 		return nil, err
 	}
 	if err := oneArgument(proposals); err != nil {
@@ -532,7 +532,11 @@ func sameDay(a, b *time.Time) bool {
 }
 
 // valid reports whether a proposal says enough to be recorded.
-func (p Proposal) valid() error {
+//
+// It takes the moment rather than reading a clock, because a store's clock is
+// injectable and a rule about dates that read a different clock from the rest
+// of the package would be a rule no test could pin.
+func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
 		return fmt.Errorf("%q is not an outcome", p.Outcome)
 	}
@@ -632,6 +636,23 @@ func (p Proposal) valid() error {
 	}
 	if !p.Outcome.Commits() && p.CommittedTo != nil {
 		return fmt.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
+	}
+	// **A date already past is not a date.** Nothing here checked, and the two
+	// dates fail in opposite directions: a deferral until last year takes the
+	// place's live key so nobody else may decide there, suppresses nothing,
+	// and lands in the review queue already run out — a work item the tool
+	// made for itself. A promise to act by last year is worse, because the
+	// gate asks whether the date is past the deadline the work has and a date
+	// in the past never is, so the promise stands on one signature.
+	if p.DeferredUntil != nil && !p.DeferredUntil.After(now) {
+		return fmt.Errorf(
+			"a deferral returns on a date still to come: %s has passed",
+			p.DeferredUntil.Format(time.DateOnly))
+	}
+	if p.CommittedTo != nil && !p.CommittedTo.After(now) {
+		return fmt.Errorf(
+			"promised work lands on a date still to come: %s has passed",
+			p.CommittedTo.Format(time.DateOnly))
 	}
 	// A backport moves no version, which is the whole difference between the
 	// two: naming one here would record an upgrade under the outcome
@@ -1062,7 +1083,7 @@ const DefaultTogetherCap = 2000
 // these actions exist to avoid — and the bound is on the rows about to be
 // written rather than on what a caller named, since one name expands into as
 // many places as the issue sits at.
-func allowed(subject access.Subject, proposals []Proposal, cap int) error {
+func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Time) error {
 	if cap <= 0 {
 		cap = DefaultTogetherCap
 	}
@@ -1074,7 +1095,7 @@ func allowed(subject access.Subject, proposals []Proposal, cap int) error {
 		if !mayDecideOn(subject, p.Place.ProductID, p.Place.VulnerabilityID, visibilityOf(p.Place)) {
 			return ErrNotTheirs
 		}
-		if err := p.valid(); err != nil {
+		if err := p.valid(now); err != nil {
 			return err
 		}
 		if p.By != subject.ID {
@@ -1168,7 +1189,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 			one := p
 			one.Place = place.Place
 			one.SeverityCenti = place.SeverityCenti
-			if err := one.valid(); err != nil {
+			if err := one.valid(s.now()); err != nil {
 				return err
 			}
 			each = append(each, one)

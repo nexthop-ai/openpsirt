@@ -41,6 +41,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Re-affirmation](#re-affirmation)
 - [Comments and reasoning](#comments-and-reasoning)
 - [VEX statements as evidence](#vex-statements-as-evidence)
+- [Dates still to come](#dates-still-to-come)
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
 - [Outcomes on a tag](#outcomes-on-a-tag)
 - [Tags](#tags)
@@ -903,6 +904,20 @@ rejected the **absence** of a fix, which describes nearly the whole population.
 This is the **presence** of a published judgment, made by a security team, about
 that issue in that package.
 
+## Dates still to come
+
+A deferral returns on a date, and promised work lands on one. Both are refused
+at or before the moment the claim is being made.
+
+| | |
+|---|---|
+| A deferral until a date already gone | Takes the place's live key so nobody else may decide there, suppresses nothing, and arrives in the review queue already run out — a work item the tool made for itself |
+| Promised work due on a date already gone | Worse, because the gate asks whether the date is past the deadline the work already has and a date in the past never is. The promise stands on one signature and hides the finding for good |
+
+Checked where every write path inherits it rather than at each of them, which
+is how the two acts that build a claim without going through the ordinary
+entry point came to write claims nothing had looked at.
+
 ## Mitigation-based dismissals
 
 Choosing `inline_mitigations_already_exist` requires saying what actually stops
@@ -1001,6 +1016,8 @@ all.
 | Only what was offered may be carried | Naming a judgment the preview classified as already applying, or as covering nothing here, is refused rather than skipped: a caller that got the set wrong should hear so |
 | The place is read from the new line, never copied from the old claim | The versions are what a decision is keyed on and they are the thing that moved |
 | A deferral carries the date it had | Quietly moving it forward would be the tool making the judgment it is asking for. The total it has already run for is shown beside it, because that is what agreeing to it again agrees to |
+| **A judgment whose date has gone by is not offered** | It carries its date rather than having it moved forward, so carrying one that has run out writes a claim finished the moment it lands. Offering it is offering something the act behind the button turns down |
+| **What is carried is checked like anything else written** | It built a claim and went straight to the writer, so nothing asked whether what it carried could be said at all — and the place it built never read whether the new line was a tag, which is the one rule this act can break that no other can |
 | Bounded, and written in one transaction | Carrying six judgments is one act, and half of it landing is a line nobody can tell from one somebody chose that way |
 
 ## Not built

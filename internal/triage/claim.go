@@ -247,7 +247,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 	if len(proposals) == 0 {
 		return nil, nil
 	}
-	if err := allowed(subject, proposals, cap); err != nil {
+	if err := allowed(subject, proposals, cap, s.now()); err != nil {
 		return nil, err
 	}
 
