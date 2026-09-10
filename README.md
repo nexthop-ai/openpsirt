@@ -279,9 +279,8 @@ behind every line of it.
 
 Not built: every adapter that would send an advisory somewhere, the VEX
 profile of the CSAF document, chat, hand-off to an external tracker, findings
-from a static analyzer, reading SPDX, and the workflow that publishes a
-release — the assets and the versioning are designed and `make dist` builds
-them, but nothing is pushed anywhere yet.
+from a static analyzer, reading SPDX, and images for any architecture but
+`amd64`.
 
 ## Trying it
 

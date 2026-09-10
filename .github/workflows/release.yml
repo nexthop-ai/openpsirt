@@ -1,0 +1,216 @@
+name: Release
+
+# Publishing what "make dist" builds.
+#
+# The assets are not assembled here. `make dist` builds every one of them and
+# checks that each names the same version, and this workflow runs that command
+# — so what a developer can build locally and what is published are the same
+# recipe, and a release failure reproduces with one command. What is here is
+# only the part a checkout cannot do: pushing to the registry, signing against
+# a workload identity, and creating the release.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    permissions:
+      # The release, and the documentation branch mike pushes to.
+      contents: write
+      # The image and the chart, both to ghcr.
+      packages: write
+      # Keyless signing and provenance: the identity is the workflow's own,
+      # so there is no key to hold, rotate, or lose to whoever holds it next.
+      id-token: write
+      attestations: write
+
+    steps:
+      # Full history: `git describe` derives the version from the tag, and
+      # mike needs the documentation branch. A shallow checkout has neither.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A tag pointing at a commit that never reached main is a release of
+      # something nothing gated. Everything on main arrived through the merge
+      # queue with CI green; a tag on a side branch did not, and the assets
+      # would be indistinguishable afterwards.
+      - name: Confirm the tag is on main
+        run: |
+          git fetch origin main --quiet
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main \
+            || { echo "::error::${{ github.ref_name }} points at a commit that is not on main"; exit 1; }
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: azure/setup-helm@v4
+      - uses: sigstore/cosign-installer@v3
+      # Deliberately no setup-buildx-action. It makes a container-driver
+      # builder the default, and that driver does not load what it builds
+      # into the daemon's image store — "make dist" builds the image and then
+      # reads the two inventories out of it, so the image has to be there.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Every asset, and the check that each names one version.
+      - name: Build the release
+        run: make dist
+
+      - name: Name this release
+        id: release
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Anything with a hyphen after the patch number is a prerelease:
+          # 0.1.0-rc.1 is, 0.1.0 is not. A prerelease moves no alias and takes
+          # no floating tag — it exists to be tried, not to be landed on by
+          # somebody who asked for the current version.
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
+
+      # The image "make dist" already built and read the inventories out of,
+      # pushed under the tags the design gives it. The exact tag never moves;
+      # the others do, and neither is applied to a prerelease.
+      - name: Push the image
+        id: image
+        run: |
+          image=ghcr.io/${{ github.repository }}
+          version=${{ steps.release.outputs.version }}
+          docker push "$image:$version"
+          if [ "${{ steps.release.outputs.prerelease }}" = "false" ]; then
+            docker tag "$image:$version" "$image:${{ steps.release.outputs.minor }}"
+            docker tag "$image:$version" "$image:latest"
+            docker push "$image:${{ steps.release.outputs.minor }}"
+            docker push "$image:latest"
+          fi
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image:$version" | cut -d@ -f2)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Push the chart
+        run: |
+          helm push "bin/dist/openpsirt-${{ steps.release.outputs.version }}.tgz" \
+            "oci://ghcr.io/${{ github.repository_owner }}/charts"
+
+      - name: Sign the image
+        run: |
+          cosign sign --yes \
+            "ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}"
+
+      # One signature over the checksum file rather than one per asset: the
+      # file already covers every asset, so a verifier checks one signature
+      # and then the hashes.
+      - name: Sign the checksums
+        run: |
+          cosign sign-blob --yes \
+            --bundle bin/dist/SHA256SUMS.cosign.bundle \
+            bin/dist/SHA256SUMS
+
+      # A signature nobody has verified is a signature nobody has tested. This
+      # is the command a third party runs, with the identity they would pin,
+      # so a release that cannot be verified fails here rather than for them.
+      - name: Verify the signature the way somebody else would
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/" \
+            "ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}" > /dev/null
+          echo "the image verifies against this workflow's identity at ${{ github.ref_name }}"
+
+      - name: Attest the image
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest the files
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: "bin/dist/*"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=${{ steps.release.outputs.version }}
+          {
+            echo "## Container image"
+            echo
+            echo '```'
+            echo "docker pull ghcr.io/${{ github.repository }}:$version"
+            echo '```'
+            echo
+            echo "Digest \`${{ steps.image.outputs.digest }}\`, signed with cosign against this workflow's identity."
+            echo
+            echo "## Helm chart"
+            echo
+            echo '```'
+            echo "helm install openpsirt oci://ghcr.io/${{ github.repository_owner }}/charts/openpsirt --version $version"
+            echo '```'
+            echo
+            echo "## Everything else"
+            echo
+            echo "The binaries, both CycloneDX inventories, \`SHA256SUMS\` and its cosign bundle are attached."
+            echo "Inventories are published because this tool ingests them for other people's software."
+          } > /tmp/notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$version" \
+            --notes-file /tmp/notes.md \
+            ${{ steps.release.outputs.prerelease == 'true' && '--prerelease' || '' }} \
+            bin/dist/*
+
+  # A job of its own, in the group docs.yml uses, because both push to the
+  # same branch. Two mike runs racing on gh-pages is how a published set ends
+  # up with a version directory and no entry in the switcher.
+  docs:
+    name: Publish the documentation
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: docs
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r docs/requirements.txt
+      - name: Configure committer
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      # The published set is versioned so a reader can tell which release
+      # they are looking at. A prerelease publishes under its own version and
+      # moves nothing: "latest" has to keep meaning the newest release
+      # somebody is meant to be running.
+      - name: Publish under this version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          case "$version" in
+            *-*) mike deploy --push "$version" ;;
+            *)   mike deploy --push --update-aliases "$version" latest
+                 mike set-default --push latest ;;
+          esac

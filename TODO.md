@@ -23,7 +23,7 @@ Mandatory, and wrong to do earlier.
 |---|---|
 | Collapse the schema into one initial migration | Thirty-seven migrations describe the order things were thought of. They are kept until now because walking the chain catches an ordering mistake between two of them (REQ-72) |
 | Start keeping schema and API compatibility | Until this point a schema change edits the migration that created the thing, and a development database is recreated (REQ-61 and REQ-72) |
-| The workflow that publishes a release | The assets, the versioning, the tags, the signing and the order they happen in are designed, and `make dist` builds and checks every asset. What is missing is the workflow that runs on a tag: push to the registry, sign, upload, move the documentation alias. Held until the two rows above land, because the first tag is the point compatibility is promised from (REQ-02) |
+| Promote a prerelease to a release | The publication path is built and exercised. What a plain `vX.Y.Z` adds is the compatibility promise, which cannot start while the two rows above are open — so tags before then carry a prerelease suffix (REQ-02) |
 
 ## Blocked on something we do not have
 
@@ -52,6 +52,7 @@ gap somebody rediscovers by auditing.
 
 | Gap | |
 |---|---|
+| The published image is `amd64` only | The binaries are cross-compiled for `arm64` as well; the image cannot follow while the stage that catalogs what it ships runs the cataloger at the target architecture, which puts `node`, `go` and `syft` under emulation. `DESIGN-packaging.md` names the fix |
 | No screen gathers what exists per tag | Navigating to a tag lands on a build's findings list, as though it were a branch. Every piece exists — what was fixed since the last release, the advisories, the VEX document, the register — and they sit in four places. What belongs there is settled; the screen is not built |
 | Nine `react-hooks/set-state-in-effect` warnings | Nine components reset local state from an effect when a prop changes or a panel opens. The fix is to remount with a key, which changes how they are mounted rather than what they do, so each needs driving in a browser. The rule reports rather than refuses, deliberately: the count is the honest measure of the work |
 | The server-side markdown renderer has no consumer | Mail carries markdown as its text part, so the HTML part it was kept for was never built. It is kept rather than deleted because it carries the sanitizer and a corpus of cross-site-scripting payloads, and a security control rebuilt from memory comes back weaker |

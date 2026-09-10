@@ -212,7 +212,7 @@ with its leading `v` removed (REQ-01 and REQ-02).
 
 | Asset | Name | |
 |---|---|---|
-| Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. Everything else here supports it |
+| Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. Everything else here supports it. `linux/amd64` today — see below |
 | Helm chart | `openpsirt-<version>.tgz`, pushed to `oci://ghcr.io/nexthop-ai/charts` | The registry that already holds the image, rather than an index somebody has to host and keep |
 | Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
 | Binary inventory | `openpsirt_<version>.cdx.json` | What the binary was linked from |
@@ -298,33 +298,55 @@ the inventories and `openpsirt -version` cannot disagree about one build.
 
 ## Cutting a release
 
-| | |
-|---|---|
-| 1 | Tag the commit `vX.Y.Z`, and push the tag |
-| 2 | The gate runs against the tag: `make gate full` |
-| 3 | `make dist` builds every asset and checks that each names one version |
-| 4 | The image and the chart are pushed to `ghcr.io` |
-| 5 | Every asset is signed and its provenance attested |
-| 6 | The release is created, and the assets uploaded to it |
-| 7 | The documentation publishes under the version, and the `latest` alias moves |
+A release is a tag. Everything after it is the `Release` workflow, and there
+is no step anybody performs by hand:
 
-Steps 1 to 3 are a tag and a make target. Steps 4 to 7 are the workflow's, and
-are not built.
+```
+git switch main && git pull
+make gate full
+git tag -a v0.2.0 -m "0.2.0"
+git push origin v0.2.0
+```
+
+| The workflow then | |
+|---|---|
+| Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
+| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log |
+| Pushes the image and the chart to `ghcr.io` | |
+| Signs the image and the checksum file, and attests provenance for both | Keyless, against the workflow's own identity |
+| Creates the release and uploads every asset | |
+| Publishes the documentation under the version | And moves `latest`, unless this is a prerelease |
+
+| Rule | Why |
+|---|---|
+| A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice |
+| A prerelease moves nothing | No `latest` image tag, no `<major>.<minor>` tag, no documentation alias. It exists to be tried, not to be landed on by somebody who asked for the current version |
+| A release is never rebuilt under the same tag | The tag names one set of bytes. Something wrong in a published release is fixed by the next tag, not by moving this one |
+
+**When a step fails**, the tag stays and the release does not exist yet.
+Fix what failed, delete the tag on the remote and locally, and tag again — the
+only case where a tag is allowed to move, because nothing has been published
+under it. Once assets exist under a tag, that tag is spent.
 
 ## Not built
 
-**The release workflow.** `make dist` builds every asset above and checks each
-one names the same version; what does not exist is the workflow that runs on a
-tag, pushes to the registry, signs, uploads and moves the documentation alias.
-So the image is pushed nowhere and the chart is published nowhere, the chart's
-default image reference points at something that does not exist, and the values
-file states this.
+**Multi-architecture images.** The image is published for `linux/amd64`. The
+binaries are cross-compiled for both, because cgo is off and Go needs no
+machine of its own to do it — the image cannot follow, because the stage that
+catalogs what it ships runs the cataloger at the target architecture, so an
+`arm64` image builds `node`, `go` and `syft` under emulation. What that costs
+is measured in tens of minutes, not seconds.
 
-**Held rather than overlooked.** The first tag is the point compatibility is
-promised from, and that promise does not start until the schema is collapsed
-into one initial migration (REQ-72). A release cut before then would publish a
-version that nothing undertakes to be compatible with, and the assets would be
-the most convincing part of it.
+The fix is named rather than guessed at: build the binary stage at the build
+platform and cross-compile from there (`FROM --platform=$BUILDPLATFORM`, with
+`GOARCH` from `TARGETARCH`), which leaves only the cataloger emulated. It is
+not done, so the manifest holds one architecture and the chart runs on
+`amd64` nodes.
+
+**Compatibility is not promised yet.** A tag is where that promise would start
+and it does not start until the schema is collapsed into one initial migration
+(REQ-72), so releases before then are prereleases: they exercise the whole
+publication path and undertake nothing about upgrading from one to the next.
 
 ## Limits
 

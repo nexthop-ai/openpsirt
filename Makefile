@@ -386,6 +386,10 @@ dist-sums:
 # there and nothing is skipped; run on its own against half a directory, a
 # silent pass would say the assets agree when three of the four checks never
 # ran — which is the shape of green this repository refuses elsewhere.
+#
+# The checksum file and anything beside it carrying the same stem are exempt
+# from the name check: a signature is written after the assets are built and
+# named for what it signs, not for the release.
 dist-verify:
 	@command -v jq >/dev/null 2>&1 \
 	  || { echo "jq is needed to read the version out of an inventory"; exit 1; }
@@ -393,7 +397,7 @@ dist-verify:
 	  for path in $(DIST_DIR)/*; do \
 	    file=$$(basename "$$path"); \
 	    case "$$file" in \
-	      SHA256SUMS) continue ;; \
+	      SHA256SUMS|SHA256SUMS.*) continue ;; \
 	      *$(DIST_VERSION)*) ;; \
 	      *) echo "$$file does not carry $(DIST_VERSION) in its name"; fail=1 ;; \
 	    esac; \
