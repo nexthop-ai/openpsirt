@@ -122,6 +122,16 @@ type Approval struct {
 	// what it covers *now* answers a different question from what somebody
 	// consented to, and only one of those two can be recovered after the fact.
 	Covered *int `bun:"covered"`
+	// CarriedFrom names the agreement this one was carried forward from,
+	// where it was carried rather than given.
+	//
+	// A re-affirmation states fresh reasoning and stands on the agreement its
+	// predecessor had. Recorded as an ordinary approval that read as the
+	// earlier approver agreeing, today, to words they have never seen — which
+	// is what an approval naming one revision of the reasoning exists to make
+	// impossible. What is true is that they agreed to the earlier words, and
+	// this is what says so.
+	CarriedFrom *int64 `bun:"carried_from"`
 }
 
 // Place is what a decision is a claim about, as a finding presents it.

@@ -145,6 +145,7 @@ A deployment with one person cannot approve anything.
 | Withdrawing, revising and sending back need no approval | Hiding risk needs a second person; putting it back on the table does not |
 | Undoing works at the size it was done | A bulk approval records what it covered; undoing takes the whole batch back to *proposed*. The claims still stand — it is the agreement that was taken back |
 | A withdrawn approval stays on the record | It says a second person did once agree, and to which words |
+| **A carried agreement says it was carried** | A re-affirmation stands on the agreement its predecessor had and states its own reasoning, so the approver named read the earlier words. Written as an ordinary approval it said they had agreed, today, to text they have never seen — and the register, the audit list and the claim's own approvals all reported it that way |
 
 ## Rights
 
@@ -824,6 +825,12 @@ Two things send it back for full approval:
 |---|---|
 | **Nobody agreed to the previous claim** | There is nothing to carry. Asked of the *agreements on the row* and never of its state: a claim lapses from proposed as well as from approved, so reading "lapsed" as evidence of agreement let one person propose a dismissal, wait for a version bump, re-affirm it, and have it stand needing nobody and appearing in no queue |
 | **A severity that has risen since** | What was agreed was that this did not matter much; that is not an agreement about what it has become |
+
+The reasoning is the re-affirmer's own and nobody else has read it, so the
+agreement carried onto the new claim names the agreement it came from. What is
+true is that somebody agreed to the earlier words on the earlier day, and that
+is what the record now says — everywhere an approver's name appears against a
+re-affirmed claim, it appears marked as carried.
 
 The same question is asked twice — once to decide whether a second person is
 needed, once to write the carried agreement — through one function, because two

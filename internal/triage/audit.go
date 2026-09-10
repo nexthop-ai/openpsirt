@@ -49,6 +49,12 @@ type Agreed struct {
 	// it : what somebody agreed to and then stopped agreeing to is exactly
 	// what an audit is looking for.
 	WithdrawnAt *time.Time
+	// Carried says the agreement was carried onto this claim from an earlier
+	// one rather than given for it. A re-affirmation states its own
+	// reasoning and stands on the agreement its predecessor had, so the
+	// person named read the earlier claim's words — reporting it as a fresh
+	// agreement said they had read these.
+	Carried bool
 }
 
 // Standing reports whether this judgment applies now.
@@ -195,6 +201,7 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		agreed[approval.ClaimID] = append(agreed[approval.ClaimID], Agreed{
 			By: named[approval.ApprovedBy], At: approval.ApprovedAt,
 			WithdrawnAt: approval.WithdrawnAt,
+			Carried:     approval.CarriedFrom != nil,
 		})
 	}
 

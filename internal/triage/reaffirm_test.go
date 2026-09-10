@@ -214,3 +214,61 @@ func TestAWithdrawnAgreementIsNotResurrectedByAVersionBump(t *testing.T) {
 		}
 	})
 }
+
+// A carried agreement is recorded as carried.
+//
+// A re-affirmation states its own reasoning — that is the point of it — and
+// stands on the agreement its predecessor had. Written as an ordinary
+// approval it said the earlier approver had agreed, today, to words they have
+// never seen: the register, the audit list and the approvals of the claim all
+// reported an agreement that did not happen, and the person whose name was on
+// it could not have contradicted it because nothing said it was theirs to
+// contradict.
+func TestACarriedAgreementSaysItWasCarried(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.judged(t, f.at(), 700)
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+
+		moved := f.at()
+		moved.ComponentUpstream = "1.2.4"
+		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
+			PreviousID: agreed.ID, Place: moved,
+			Reasoning: "Checked again at the new version; still not reached.",
+			By:        f.proposer,
+		}, 700)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.State != triage.Approved {
+			t.Fatalf("a re-affirmation of an agreed claim reads as %q", again.State)
+		}
+
+		carried, err := f.store.Approvals(ctx, f.triager, again.ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(carried) != 1 {
+			t.Fatalf("the re-affirmed claim holds %d agreements", len(carried))
+		}
+		if carried[0].CarriedFrom == nil {
+			t.Fatal("the carried agreement reads as one given for these words")
+		}
+
+		// And the agreement it names is the one somebody actually gave.
+		first, err := f.store.Approvals(ctx, f.triager, agreed.ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(first) != 1 || *carried[0].CarriedFrom != first[0].ID {
+			t.Errorf("it names agreement %v, and the one given was %+v",
+				carried[0].CarriedFrom, first)
+		}
+		// The agreement given for the original names nothing: it was given.
+		if first[0].CarriedFrom != nil {
+			t.Error("an agreement somebody gave reads as carried")
+		}
+	})
+}

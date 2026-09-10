@@ -289,6 +289,27 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			-- between here, already-matching and deliberately-carried is how
 			-- it is presented; what the record needs is how much was agreed to.
 			"covered"      ` + t.ref + ` NULL,
+			-- The agreement this one was carried forward from, where it was
+			-- carried rather than given.
+			--
+			-- A re-affirmation states fresh reasoning and stands on the
+			-- agreement its predecessor had, which is the whole exemption a
+			-- version bump earns. Written as an ordinary approval it said the
+			-- earlier approver had agreed, today, to words they have never
+			-- seen — so the register, the audit list and the approvals of a
+			-- claim all reported an agreement that did not happen. Naming
+			-- what it came from is what makes the record true: somebody did
+			-- agree, to those words, on that day.
+			"carried_from" ` + t.ref + ` NULL,
+			-- Nulled rather than blocking, because this is the one key in the
+			-- schema that points at its own table and no ordering of deletes
+			-- can satisfy it. Nothing deletes an approval — the record is
+			-- append-only, and a withdrawn one is marked rather than removed
+			-- — so the clause is reached only where a whole table is being
+			-- emptied, and there it is the difference between working on two
+			-- engines and four.
+			CONSTRAINT "claim_approval_carried_fk" FOREIGN KEY ("carried_from")
+				REFERENCES "claim_approval"("id") ON DELETE SET NULL,
 			CONSTRAINT "claim_approval_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
 			CONSTRAINT "claim_approval_revision_fk" FOREIGN KEY ("revision_id") REFERENCES "claim_revision"("id"),
 			CONSTRAINT "claim_approval_approver_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id")

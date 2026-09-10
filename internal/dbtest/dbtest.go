@@ -545,6 +545,9 @@ var tables = []string{
 	"claim_comment_revision",
 	"claim_comment",
 	"vulnerability_reference",
+	// Points at itself, which no position in this list can answer: a carried
+	// agreement names the one it came from. The key is declared to null
+	// rather than to block, so emptying the table needs no ordering.
 	"claim_approval",
 	"decision",
 	// After the rows that point at it, and before the claim it hangs off.

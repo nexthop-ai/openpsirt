@@ -44,6 +44,12 @@ type Disposed struct {
 	ProposedAt *time.Time
 	ApprovedBy string
 	ApprovedAt *time.Time
+	// AgreementCarried says the agreement was given for an earlier claim and
+	// carried onto this one, which is what a re-affirmation stands on. The
+	// person named read those words rather than these, and a register that
+	// did not say so reported them as having agreed to reasoning they have
+	// never seen.
+	AgreementCarried bool
 	// OpenedAt is when this was first seen here and ClosedAt when it stopped
 	// being present. DueAt is the deadline it carried, and Met says whether
 	// it was closed by then — answerable only for something that closed.
@@ -209,6 +215,7 @@ type registerRow struct {
 	ProposedAt    *time.Time `bun:"proposed_at"`
 	ApprovedBy    string     `bun:"approved_by"`
 	ApprovedAt    *time.Time `bun:"approved_at"`
+	Carried       bool       `bun:"agreement_carried"`
 	OpenedAt      time.Time  `bun:"opened_at"`
 	ClosedAt      *time.Time `bun:"closed_at"`
 	DueAt         *time.Time `bun:"due_at"`
@@ -259,6 +266,13 @@ func (s *Store) registerQuery(productID int64,
 			ORDER BY da2.approved_at, da2.id LIMIT 1), '') AS approved_by`).
 		ColumnExpr(`(SELECT MIN(da3.approved_at) FROM "claim_approval" AS da3
 			WHERE da3.claim_id = de.claim_id AND da3.withdrawn_at IS NULL) AS approved_at`).
+		// And whether that agreement was carried rather than given. The same
+		// row the identity above comes from, ordered the same way, so the two
+		// cannot describe different approvals.
+		ColumnExpr(`COALESCE((SELECT CASE WHEN da4.carried_from IS NULL THEN 0 ELSE 1 END
+			FROM "claim_approval" AS da4
+			WHERE da4.claim_id = de.claim_id AND da4.withdrawn_at IS NULL
+			ORDER BY da4.approved_at, da4.id LIMIT 1), 0) AS agreement_carried`).
 		ColumnExpr("f.opened_at AS opened_at").
 		ColumnExpr("f.closed_at AS closed_at").
 		ColumnExpr("f.due_at AS due_at").
@@ -274,7 +288,8 @@ func disposedFrom(row registerRow) Disposed {
 		Outcome:  row.Outcome, Justification: row.Justification,
 		ProposedBy: row.ProposedBy, ProposedAt: row.ProposedAt,
 		ApprovedBy: row.ApprovedBy, ApprovedAt: row.ApprovedAt,
-		OpenedAt: row.OpenedAt, ClosedAt: row.ClosedAt, DueAt: row.DueAt,
+		AgreementCarried: row.Carried,
+		OpenedAt:         row.OpenedAt, ClosedAt: row.ClosedAt, DueAt: row.DueAt,
 	}
 	// The same four words the state filter uses, at the grain of one
 	// place: a place has one standing decision or none, so there is no

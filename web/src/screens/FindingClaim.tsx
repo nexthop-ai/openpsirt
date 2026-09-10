@@ -240,6 +240,10 @@ export function Standing({
               <>
                 <span className="state agreed">Approved</span> by <b>{last.approved_by}</b>
                 {last.approved_at && <>, {last.approved_at.replace("T", " ").slice(0, 16)}</>}
+                {/* Carried onto this claim from the one it re-affirms: they
+                    agreed to those words rather than to the reasoning shown
+                    here. */}
+                {last.carried_from && <span className="hint"> · carried forward</span>}
                 {typeof last.covered === "number" && (
                   <> · covered {last.covered} records at the time</>
                 )}
@@ -428,7 +432,9 @@ export function Activity({
     now.push({
       when: a.approved_at ?? "",
       who: a.approved_by ?? "",
-      what: `approved revision ${a.revision_id}${a.batch ? ` (batch ${a.batch})` : ""}`,
+      what: a.carried_from
+        ? `agreement carried forward onto revision ${a.revision_id}`
+        : `approved revision ${a.revision_id}${a.batch ? ` (batch ${a.batch})` : ""}`,
     });
     if (a.withdrawn_at)
       now.push({ when: a.withdrawn_at, who: a.approved_by ?? "", what: "approval withdrawn" });

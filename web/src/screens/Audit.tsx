@@ -444,6 +444,10 @@ function Judgment({ row }: { row: Judged }) {
               <span key={i}>
                 {i > 0 && ", "}
                 <b>{a.by}</b> · {on(a.at)}
+                {/* They read the earlier claim's words, not these. Shown
+                    because a name with no mark beside it says they read
+                    what is on the screen above it. */}
+                {a.carried && <span className="hint"> (carried forward)</span>}
               </span>
             ))
           )}
@@ -469,7 +473,8 @@ function Judgment({ row }: { row: Judged }) {
               {withdrawn.map((a, i) => (
                 <span key={i}>
                   {i > 0 && ", "}
-                  <b>{a.by}</b> agreed {on(a.at)}, withdrawn {on(a.withdrawn_at)}
+                  <b>{a.by}</b> agreed {on(a.at)}
+                  {a.carried && " (carried forward)"}, withdrawn {on(a.withdrawn_at)}
                 </span>
               ))}
             </dd>

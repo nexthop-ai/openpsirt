@@ -367,6 +367,8 @@ export interface paths {
          * List who approved a claim
          * @description Returns every approval recorded against this claim, including ones later withdrawn, each naming the revision of the justification it was given for.
          *
+         *     An approval carrying `carried_from` was not given for this claim. A re-affirmation states its own reasoning and stands on the agreement its predecessor had, so the person named agreed to the earlier claim's words; `carried_from` is the approval where those are.
+         *
          *     A withdrawn approval is kept rather than deleted: who agreed to what, and when it stopped counting, is part of the record.
          *
          *     `covered` is how many findings the claim covered **when it was agreed to**. A claim applies to every build running the same versions, so it covers more as builds appear — with nobody acting, and nobody having agreed to the larger number. Comparing this against what it covers now is the point of keeping it.
@@ -2869,7 +2871,9 @@ export interface paths {
          *
          *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version bump is a prompt to re-check rather than a new claim.
          *
-         *     It does need approval again if the justification differs from the original, or if the vulnerability's severity has risen since — both mean this is not the claim that was agreed to. The response says which happened.
+         *     It does need approval again if the vulnerability's severity has risen since the original was agreed to, or if nothing was ever agreed to. What was agreed was that this did not matter much, which is not an agreement about what it has become. The response says whether a second person is needed.
+         *
+         *     Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
          *
          *     `reasoning` is required. "Still true" with nothing behind it is what a re-affirmation becomes when it is made too easy.
          *
@@ -4110,6 +4114,8 @@ export interface components {
             at: string;
             /** @description Their sign-in identity */
             by: string;
+            /** @description Whether this agreement was carried forward from an earlier claim rather than given for this one */
+            carried?: boolean;
             /** @description When the agreement was taken back, by the approver or by somebody editing the words it was given for */
             withdrawn_at?: string;
         };
@@ -4135,6 +4141,11 @@ export interface components {
             approved_by: string;
             /** @description The batch it was approved under, if it was a bulk approval */
             batch?: string;
+            /**
+             * Format: int64
+             * @description The approval this was carried forward from, where a re-affirmation stood on an earlier agreement rather than a fresh one
+             */
+            carried_from?: number;
             /**
              * Format: int64
              * @description Findings this covered when it was agreed to
@@ -5119,6 +5130,8 @@ export interface components {
             item: components["schemas"]["VariantBody"];
         };
         DisposedBody: {
+            /** @description Whether the agreement was carried forward from an earlier claim rather than given for this one */
+            agreement_carried?: boolean;
             approved_at?: string;
             /** @description Who agreed. Two different people is the whole of the control, so both names are carried rather than a count */
             approved_by?: string;

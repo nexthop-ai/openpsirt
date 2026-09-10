@@ -20,6 +20,10 @@ type AgreedBody struct {
 	// agreement out: what somebody agreed to and then stopped agreeing to is
 	// what an audit is looking for.
 	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"When the agreement was taken back, by the approver or by somebody editing the words it was given for"`
+	// Carried says this agreement was given for an earlier claim and carried
+	// onto this one, which is what a re-affirmation stands on. The person
+	// named read those words rather than these.
+	Carried bool `json:"carried,omitempty" doc:"Whether this agreement was carried forward from an earlier claim rather than given for this one"`
 }
 
 // JudgedBody is one judgment as an auditor reads it.
@@ -217,7 +221,7 @@ func judgedBody(row triage.Judged) JudgedBody {
 				body.EndedAt = stamp(*row.EndedAt)
 			}
 			for _, agreed := range row.Approvals {
-				one := AgreedBody{By: agreed.By, At: stamp(agreed.At)}
+				one := AgreedBody{By: agreed.By, At: stamp(agreed.At), Carried: agreed.Carried}
 				if agreed.WithdrawnAt != nil {
 					one.WithdrawnAt = stamp(*agreed.WithdrawnAt)
 				}

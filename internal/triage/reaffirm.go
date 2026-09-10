@@ -42,9 +42,8 @@ type Reaffirmation struct {
 // Two things put it back through full approval, and both fire on something
 // having actually changed:
 //
-// A different justification is a different claim, which nobody has reviewed.
-// Letting it inherit an approval granted for other reasons is the same failure
-// as an approval surviving a rewrite.
+// Nobody having agreed to the previous claim leaves nothing to carry, and
+// treating a lapse as evidence of agreement would manufacture one.
 //
 // A severity that has risen since means the original judgment was made about a
 // smaller thing. What was agreed to was that this did not matter much; that is
@@ -295,9 +294,14 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 	}
 
 	now := s.now().Truncate(time.Microsecond)
+	// Named as carried, not written as a fresh agreement. The reasoning on
+	// this claim is the re-affirmer's own and the earlier approver has not
+	// read it; what they agreed to is the earlier claim's words, and the
+	// approval they gave is where those are.
 	carried := &Approval{
 		ClaimID: claim.ID, RevisionID: *claim.RevisionID,
 		ApprovedBy: earlier.ApprovedBy, ApprovedAt: now,
+		CarriedFrom: &earlier.ID,
 	}
 	if _, err := s.db.NewInsert().Model(carried).Exec(ctx); err != nil {
 		return fmt.Errorf("carry an approval forward: %w", err)
