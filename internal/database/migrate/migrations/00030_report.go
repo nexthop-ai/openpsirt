@@ -46,6 +46,16 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 		`CREATE TABLE "flaw_report" (
 			"id"               ` + t.id + `,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			-- The product it was reported against.
+			--
+			-- A report is one per issue, not one per finding: a flaw
+			-- recorded against four builds is one report from one person.
+			-- But an issue's identity spans its aliases, so the same issue
+			-- turns up in other products the moment a shared CVE is
+			-- recorded — and without this the reporter's name, address and
+			-- received date were readable by anybody holding triage rights
+			-- in any of them.
+			"product_id"       ` + t.ref + ` NOT NULL,
 			-- Who found it, as they gave their name, and how to reach them.
 			-- Free text: a reporter is somebody outside this deployment and
 			-- has no account here, which is the whole shape of the thing.
@@ -70,6 +80,7 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 			"recorded_at"      ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "flaw_report_issue_unique" UNIQUE ("vulnerability_id"),
 			CONSTRAINT "flaw_report_issue_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "flaw_report_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "flaw_report_by_fk" FOREIGN KEY ("recorded_by") REFERENCES "person"("id")
 		)` + t.suffix,
 

@@ -25,6 +25,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Extensions](#extensions)
 - [Decision lists on a finding](#decision-lists-on-a-finding)
 - [The review queue](#the-review-queue)
+- [What became of a claim](#what-became-of-a-claim)
 - [Sending a claim back](#sending-a-claim-back)
 - [The deferral threshold](#the-deferral-threshold)
 - [One live claim per key](#one-live-claim-per-key)
@@ -454,6 +455,15 @@ not looking is a choice rather than an omission.
 
 A claim that needed nobody — a deferral under the threshold — is not here at all,
 by the same rule that keeps unreachable work out.
+
+## What became of a claim
+
+A person's own page of what they proposed and what happened to it.
+
+| Rule | |
+|---|---|
+| Narrowed to what they may still read | Losing the reading of a product does not leave a list of its issues behind on a personal page |
+| **The rows are narrowed as well as the page** | A claim's rows need not agree about visibility and the page lists a claim if any one row is readable, so an unnarrowed row read counted the undisclosed ones into the row, issue and place totals and could hand one of them back as the claim's representative. A count is the leak even where no row is shown |
 
 ## Sending a claim back
 

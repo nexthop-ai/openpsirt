@@ -141,13 +141,23 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 		byID[claim.ID] = claim
 	}
 
-	// Every row of every claim on the page, in one read, and every agreement
-	// ever recorded against those rows — because "somebody agreed and then
-	// took it back" is a fact about the agreements rather than about the row,
-	// which reads as proposed again either way.
+	// Every row of every claim on the page **that this person may still
+	// read**, in one read, and every agreement ever recorded against those
+	// rows — because "somebody agreed and then took it back" is a fact about
+	// the agreements rather than about the row, which reads as proposed again
+	// either way.
+	//
+	// Narrowed here as well as on the page query. A claim's rows need not
+	// agree about visibility, and the page listed a claim if any one row was
+	// readable — so an unnarrowed read counted the undisclosed ones into the
+	// row, issue and place totals and could hand back one of them as the
+	// claim's representative, carrying its issue and its place. A count is
+	// the leak even where no row is shown, which is exactly what the
+	// docstring above promises does not happen here.
 	var rows []Decision
-	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where("de.claim_id IN (?)", bun.List(ids)).Order("de.id ASC").Scan(ctx); err != nil {
+	rowsOf := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim").
+		Where("de.claim_id IN (?)", bun.List(ids)), subject, "de")
+	if err := rowsOf.Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("read what you proposed: %w", err)
 	}
 	var agreements []Approval

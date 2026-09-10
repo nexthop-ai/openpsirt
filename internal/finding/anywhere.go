@@ -252,7 +252,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr("SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS answered").
 		ColumnExpr("MIN(f.opened_at) AS opened_at").
 		ColumnExpr("MIN(f.due_at) AS due_at").
-		ColumnExpr("MAX(f.visibility) AS visibility").
+		// One undisclosed place makes the group undisclosed, counted rather
+		// than aggregated over the word — a maximum of the word returns
+		// "public" for a mixed group, which is the one case it matters for.
+		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS undisclosed",
+			access.Private).
 		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
 		ColumnExpr("MIN(f.fix_state) AS fix_state").
 		ColumnExpr("MIN(f.fixed_in) AS fixed_in").
@@ -327,7 +331,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			State:    stateWord(row.Places, row.AnyClaim, row.Waiting, row.Approved, row.Lapsed),
 			SentBack: row.SentBack > 0,
 			OpenedAt: row.OpenedAt, DueAt: row.DueAt,
-			Undisclosed: access.AsVisibility(row.Visibility) == access.Private,
+			Undisclosed: row.Undisclosed,
 			DiscloseAt:  row.DiscloseAt,
 			// One build of possibly several, so a row has somewhere to link
 			// to and an action has a build to name. What says there are others

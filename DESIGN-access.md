@@ -118,6 +118,7 @@ no read role, which an assignment gives content to.
 | Assigning asks about the level, not the row | Whether they can already see the row is the wrong question — before the assignment they cannot, by construction. What is checked is that an undisclosed finding goes only to somebody who may read undisclosed work in that product. For a team it asks whether at least one member can |
 | The notification's own check stays beside it | A different check at a different moment. A channel that leaks only when another rule is wrong is a channel nobody notices is leaking |
 | The narrowing is not a switch an administrator turns on | It is what not granting reading already meant. There is no fourth state where somebody holds reading and is narrowed anyway |
+| **Administering the catalog is not reading it, for the set that narrows findings** | Two questions, answered by two rules: which products somebody may know exist, which an administrator may know all of, and which products' findings they read, which is only where they hold a read role. Asked as the first, an administrator holding nothing but a capability on a product read every disclosed finding in it — and a non-administrator holding the same grant was correctly excluded, which is what makes it a widening rather than a policy |
 | The report endpoints need no check added | Every query carries a subject and narrows in the data layer, so narrowing the subject narrows every trend, rate, bar and total with it. A check bolted onto a report is the per-handler enforcement this area exists to avoid |
 
 ## The upward tree
@@ -419,6 +420,12 @@ cannot read the finding is accepted, nobody is told, and whoever wrote it is tol
 that much — refusing the write loses the paragraph to fix a word. Why it did not
 land stays unsaid: a name nobody holds and a name held by somebody who may not
 read this answer alike.
+
+| Rule | |
+|---|---|
+| **The names typed are resolved, not looked for in a page of the picker** | The two ask the same rule and are asked different questions: the picker narrows by what somebody is typing and takes a page, and a mention has names in hand. Answered from the picker's first hundred readers by identity, a mention of anybody sorting past them reached nobody — every time, growing with the deployment — and the author was told the name matched nobody at all |
+| **Nobody is offered for being an administrator** | Administering the catalog is not reading its findings. Offered, an administrator holding nothing on a product was a legitimate mention target on an undisclosed finding there, and the notice told them undisclosed work exists in a product they may not open. One who wants to be mentionable grants themselves a read role |
+| **Somebody who has left is not offered** | They are refused at sign-in, so the mention reaches a person who will never see it |
 
 **What somebody is told asks for reading it.** A notification names the issue,
 the component and the build, and is stored as written, so there is no visibility

@@ -459,7 +459,15 @@ func (s Subject) Products() (ids []int64, all bool) {
 		return nil, true
 	}
 	for id := range s.grants {
-		if s.Sees(id) {
+		// The read roles directly, not Sees. Sees answers "may they know this
+		// product exists", which is true for an administrator everywhere and
+		// true for anybody holding a bare capability here — so an
+		// administrator who granted themselves nothing but the ability to
+		// approve or to assign on a product got that product into the set
+		// that narrows findings, counts, aggregates and exports, and read
+		// every disclosed finding in it. A capability grants no visibility of
+		// its own, and this is where that stopped being true.
+		if s.Reads(Public, id) || s.Reads(Private, id) {
 			ids = append(ids, id)
 		}
 	}

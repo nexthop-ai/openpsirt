@@ -524,3 +524,42 @@ func TestBeingOnACaseIsNotReadingTheProduct(t *testing.T) {
 		t.Error("a collaborator reads an issue they were not brought into")
 	}
 }
+
+// A capability grants no visibility of its own, including to an
+// administrator.
+//
+// The set that narrows findings, counts, aggregates and exports was built by
+// asking whether the subject may know the product exists, which is true for
+// an administrator everywhere and true for anybody holding a bare capability
+// there. So an administrator who granted themselves the ability to assign
+// work on a product — and no read role — read every disclosed finding in it.
+// A non-administrator with the same grant was correctly excluded, which is
+// what makes it a widening rather than a policy.
+func TestACapabilityAloneNarrowsNoFindings(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		sonic, onie := f.products["sonic"], f.products["onie"]
+
+		boss := access.NewPerson(1, "boss", true, map[int64][]access.Role{
+			sonic: {access.Assigner},
+			onie:  {access.PublicRead},
+		}, 0)
+		products, all := boss.Products()
+		if all {
+			t.Fatal("an administrator narrows to every product, which is not what Products is")
+		}
+		for _, id := range products {
+			if id == sonic {
+				t.Error("a product held by nothing but a capability narrows findings")
+			}
+		}
+		if len(products) != 1 || products[0] != onie {
+			t.Errorf("the products whose findings they read are %v, want the one read role", products)
+		}
+
+		// And they still know the product exists, which is what administering
+		// the catalog means.
+		if !boss.Sees(sonic) {
+			t.Error("an administrator cannot see a product they administer")
+		}
+	})
+}

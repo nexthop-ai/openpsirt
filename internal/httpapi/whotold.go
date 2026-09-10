@@ -48,11 +48,11 @@ func registerWhoTold(api huma.API, in Ingest) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*struct{ Body ReportBody }, error) {
-		_, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
+		subject, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
-		told, err := finding.NewStore(in.DB.DB).ReportFor(ctx, issue)
+		told, err := finding.NewStore(in.DB.DB).ReportFor(ctx, subject, issue)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who told us could not be read", err)
 		}
@@ -87,7 +87,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 			return nil, err
 		}
 		store := finding.NewStore(in.DB.DB)
-		told, err := store.ReportFor(ctx, issue)
+		told, err := store.ReportFor(ctx, subject, issue)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who told us could not be read", err)
 		}

@@ -342,12 +342,15 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if told := in.Told; told.Stated() {
 			row := &WhoTold{
 				VulnerabilityID: vulnerabilityID,
-				ReportedBy:      strings.TrimSpace(told.ReportedBy),
-				Contact:         strings.TrimSpace(told.Contact),
-				Credit:          strings.TrimSpace(told.Credit),
-				ReceivedOn:      told.When(),
-				RecordedBy:      subject.ID,
-				RecordedAt:      now,
+				// The product it was reported against, which is what decides
+				// who may read the reporter's name and address later.
+				ProductID:  productID,
+				ReportedBy: strings.TrimSpace(told.ReportedBy),
+				Contact:    strings.TrimSpace(told.Contact),
+				Credit:     strings.TrimSpace(told.Credit),
+				ReceivedOn: told.When(),
+				RecordedBy: subject.ID,
+				RecordedAt: now,
 			}
 			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
 				return fmt.Errorf("record who told us: %w", err)

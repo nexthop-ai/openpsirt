@@ -1463,7 +1463,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 			State:    stateWord(row.Places, row.AnyClaim, row.Waiting, row.Approved, row.Lapsed),
 			SentBack: row.SentBack > 0,
 			OpenedAt: row.OpenedAt, DueAt: row.DueAt,
-			Undisclosed: access.AsVisibility(row.Visibility) == access.Private,
+			Undisclosed: row.Undisclosed,
 			DiscloseAt:  row.DiscloseAt,
 		}
 		if issue, held := named[row.VulnerabilityID]; held {
@@ -1634,7 +1634,7 @@ type decorated struct {
 	Answered      int        `bun:"answered"`
 	OpenedAt      time.Time  `bun:"opened_at"`
 	DueAt         *time.Time `bun:"due_at"`
-	Visibility    string     `bun:"visibility"`
+	Undisclosed   bool       `bun:"undisclosed"`
 	DiscloseAt    *time.Time `bun:"disclose_at"`
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ScoreCenti    int        `bun:"score_centi"`
@@ -1833,11 +1833,19 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr("MIN(f.opened_at) AS opened_at").
 		ColumnExpr("MIN(f.due_at) AS due_at").
 		// Whether anything here is undisclosed, and when the earliest embargo
-		// ends. MAX on the word rather than a flag: "private" sorts after
-		// "public", so a group with one undisclosed place among fifty reads as
-		// undisclosed — which is what it is, for anybody deciding what may be
+		// ends. One undisclosed place among fifty makes the group
+		// undisclosed, which is what it is for anybody deciding what may be
 		// said about it.
-		ColumnExpr("MAX(f.visibility) AS visibility").
+		//
+		// Counted rather than aggregated over the word. A maximum of the word
+		// was written on the belief that "private" sorts after "public", and
+		// it does not — so the expression returned "public" for exactly the
+		// mixed group it was written to catch, and a list showed no embargo
+		// marker on a row holding an undisclosed place. The four engines do
+		// not agree on a boolean aggregate either, and counting is the same
+		// question asked portably.
+		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS undisclosed",
+			access.Private).
 		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
 		ColumnExpr("MIN(f.fix_state) AS fix_state").
 		ColumnExpr("MIN(f.fixed_in) AS fixed_in").

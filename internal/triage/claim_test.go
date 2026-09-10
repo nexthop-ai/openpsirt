@@ -802,3 +802,54 @@ func TestAClaimSentBackStopsApplying(t *testing.T) {
 		}
 	})
 }
+
+// The personal page counts only the rows this person may still read.
+//
+// The page query narrowed and the follow-up row read did not, and a claim's
+// rows need not agree about visibility — so a claim listed through one
+// disclosed row counted its undisclosed ones into the row, issue and place
+// totals, and could hand one of them back as the claim's representative,
+// carrying its issue and its place. A count is the leak even where no row is
+// shown, and the page's own docstring promises the opposite: losing the
+// reading of something does not leave a list of its issues behind here.
+func TestThePersonalPageCountsOnlyWhatIsStillReadable(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// One claim over two places, one of them undisclosed.
+		here, hidden := f.at(), f.at()
+		hidden.PlaceIdentity = "undisclosed-place"
+		hidden.Visibility = access.Private
+		// Proposed while they could still read both, which is the only way a
+		// claim comes to hold a row its proposer may not read.
+		both := access.NewPerson(f.proposer, "proposer", false,
+			map[int64][]access.Role{f.product: {access.PrivateTriage}}, 0)
+		if _, err := f.store.ProposeMany(ctx, both, []triage.Proposal{
+			{
+				Place: here, Outcome: triage.WontFix,
+				Reasoning: "Not worth the churn.", By: f.proposer,
+			},
+			{
+				Place: hidden, Outcome: triage.WontFix,
+				Reasoning: "Not worth the churn.", By: f.proposer,
+			},
+		}, triage.DefaultTogetherCap); err != nil {
+			t.Fatal(err)
+		}
+
+		// Their private reading is withdrawn; the public half stays.
+		page, total, err := f.store.Became(ctx, f.triager, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || len(page) != 1 {
+			t.Fatalf("the page holds %d of %d claims, want the one they proposed", len(page), total)
+		}
+		if page[0].Rows != 1 || page[0].Places != 1 {
+			t.Errorf("it counts %d rows at %d places, want the one they may still read",
+				page[0].Rows, page[0].Places)
+		}
+		if page[0].Decision.PlaceIdentity == hidden.PlaceIdentity {
+			t.Error("an undisclosed place was handed back as the claim's representative")
+		}
+	})
+}

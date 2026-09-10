@@ -102,11 +102,14 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 		names = names[:mentionCap]
 	}
 
-	// Who may read this, at the visibility of the thing the text is about.
-	// Asked of the same rule the editor's list uses rather than spelled again
-	// here, so the two cannot come to disagree about who may be named.
-	readers, err := access.NewStore(in.DB.DB).WhoCanRead(ctx,
-		decision.ProductID, decision.Visibility, "", 100)
+	// Who among the names typed may read this, at the visibility of the thing
+	// the text is about. Asked of the same rule the editor's list uses rather
+	// than spelled again here, so the two cannot come to disagree about who
+	// may be named — and asked about these names rather than by paging that
+	// list, which answered from the alphabetically-first hundred readers and
+	// silently reached nobody for anyone sorting past them.
+	readers, err := access.NewStore(in.DB.DB).ReadersNamed(ctx,
+		decision.ProductID, decision.Visibility, names)
 	if err != nil {
 		return nil, fmt.Errorf("read who may be told: %w", err)
 	}
