@@ -792,10 +792,11 @@ pins-check:
 	[ "$$(block README.md)" = "$$(block docs/index.md)" ] || { \
 	  echo "README.md and docs/index.md describe what this does in different words."; \
 	  echo "They are the same list maintained twice; make them the same words."; fail=1; }; \
-	declared=$$(awk '/^go /{print $$2}' go.mod | cut -d. -f1,2); \
-	image=$$(awk -F'[:-]' '/^FROM golang:/{print $$2}' Dockerfile); \
+	declared=$$(awk '/^go /{print $$2}' go.mod); \
+	image=$$(sed -n 's/^FROM golang:\([0-9.]*\)-.*/\1/p' Dockerfile); \
 	[ "$$declared" = "$$image" ] || { \
-	  echo "go.mod declares Go $$declared and the image builds with $$image."; fail=1; }; \
+	  echo "go.mod declares Go $$declared and the image builds with $$image."; \
+	  echo "The patch counts: the release ships a binary built by each."; fail=1; }; \
 	here=$$(awk -F'= ' '/^CDXGOMOD_VERSION/{print $$2}' Makefile | tr -d ' \t'); \
 	there=$$(awk -F= '/^ARG CDXGOMOD_VERSION/{print $$2}' Dockerfile); \
 	[ "$$here" = "$$there" ] || { \

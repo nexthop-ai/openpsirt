@@ -306,6 +306,18 @@ tests run against, this answers what the release is built from. It found drift o
 its first run — the image carried two defaults for the version passed in, so a
 build with none reported `dev` in the binary and `0.0.0` in its own inventory.
 
+**The Go patch counts, and it did not used to.** The image built from
+`golang:1.27-alpine`, which floats, and the check truncated `go.mod` to the
+minor so the two could be compared at all. The first release shipped a tarball
+built by 1.27.0 and an image built by 1.27.1 — one Go patch apart, and green.
+The image now names the patch `go.mod` declares and the check compares the
+whole version.
+
+| What that costs | What answers it |
+|---|---|
+| The image no longer picks up a Go release by itself | Dependabot watches the images and a bump arrives as a pull request |
+| A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities, and now reports them about the toolchain both artifacts are built with rather than about one of the two |
+
 ## Static analysis
 
 Rule selection lives in `.golangci.yml` and nowhere else. **Two scopes only**: a
