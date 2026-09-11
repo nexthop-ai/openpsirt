@@ -59,6 +59,25 @@ func spdxInventory(builtAt time.Time, component string) string {
 	}`, builtAt.UnixNano(), builtAt.UTC().Format(time.RFC3339), component, component)
 }
 
+// spdx3Inventory is the same inventory again, in the version that states a
+// document as one flat graph of typed elements.
+func spdx3Inventory(builtAt time.Time, component string) string {
+	return fmt.Sprintf(`{
+	  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+	  "@graph": [
+	    {"@id": "_:creationInfo", "type": "CreationInfo", "specVersion": "3.0.1", "created": %q},
+	    {"spdxId": "https://example.invalid/sonic/%x", "type": "SpdxDocument",
+	     "creationInfo": "_:creationInfo", "rootElement": ["urn:root"]},
+	    {"spdxId": "urn:root", "type": "software_Package", "creationInfo": "_:creationInfo",
+	     "name": "sonic-broadcom.bin", "software_packageVersion": "1.0"},
+	    {"spdxId": "urn:a", "type": "software_Package", "creationInfo": "_:creationInfo",
+	     "name": %q, "software_packageVersion": "2.41", "software_packageUrl": "pkg:deb/debian/%s@2.41"},
+	    {"spdxId": "urn:rel", "type": "Relationship", "creationInfo": "_:creationInfo",
+	     "from": "urn:root", "relationshipType": "dependsOn", "to": ["urn:a"]}
+	  ]
+	}`, builtAt.UTC().Format(time.RFC3339), builtAt.UnixNano(), component, component)
+}
+
 const suppression = `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": "urn:x", "version": 1,
  "statements": [{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
  "products": [{"@id": "pkg:deb/debian/libc6"}]}]}`
@@ -325,6 +344,27 @@ func TestNothingIsStoredWhenTheBacklogIsFull(t *testing.T) {
 		}
 		if count != 1 {
 			t.Errorf("%d scans recorded, want only the one that was taken", count)
+		}
+	})
+}
+
+func TestAnUploadInTheThirdSpdxVersionIsTaken(t *testing.T) {
+	// The version that puts the header inside the contents. The arrival
+	// decision turns on the document's identity and its build time, and this
+	// format states both as entries of the same array its packages are in —
+	// so the pass that answers those has more to walk, and answers the same
+	// two questions.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		built := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+		code, result := f.send(t, upload(t, f.path, spdx3Inventory(built, "libc6")))
+		if code != http.StatusAccepted {
+			t.Fatalf("POST returned %d, want 202", code)
+		}
+		if result.BuiltAt != built.Format(time.RFC3339) {
+			t.Errorf("reported build time %q, want %q", result.BuiltAt, built.Format(time.RFC3339))
+		}
+		if depth, _ := f.queue.Depth(t.Context()); depth != 1 {
+			t.Errorf("%d jobs waiting, want 1", depth)
 		}
 	})
 }

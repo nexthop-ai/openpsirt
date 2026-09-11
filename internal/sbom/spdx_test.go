@@ -598,7 +598,7 @@ func TestADocumentStatingTwoFormatsIsRefused(t *testing.T) {
 	both := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
 	  "serialNumber": "urn:uuid:1", "documentNamespace": "https://example.invalid/2",
 	  "components": [{"name": "libc"}]}`
-	if why := refuses(t, both); !strings.Contains(why, "states both CycloneDX and SPDX") {
+	if why := refuses(t, both); !strings.Contains(why, "states both CycloneDX 1.x and SPDX 2.x") {
 		t.Errorf("refused with %q", why)
 	}
 
@@ -607,28 +607,36 @@ func TestADocumentStatingTwoFormatsIsRefused(t *testing.T) {
 	swapped := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
 	  "documentNamespace": "https://example.invalid/2", "serialNumber": "urn:uuid:1",
 	  "components": [{"name": "libc"}]}`
-	if why := refuses(t, swapped); !strings.Contains(why, "states both CycloneDX and SPDX") {
+	if why := refuses(t, swapped); !strings.Contains(why, "states both CycloneDX 1.x and SPDX 2.x") {
 		t.Errorf("refused with %q", why)
 	}
 }
 
-func TestARealThirdVersionDocumentIsRefusedByName(t *testing.T) {
+func TestARealThirdVersionDocumentIsNeverRefusedAsUnrecognized(t *testing.T) {
 	// The third version states a document as a context and one linked graph,
-	// with no `spdxVersion` anywhere — so the by-name refusal cannot hang off
-	// a second-version key, and a document landing in "it is neither" sends
-	// whoever reads it hunting for a corrupt file. It is not corrupt.
+	// with no `spdxVersion` anywhere. Before it was read, the by-name refusal
+	// hung off a second-version key and so could never fire on one, and the
+	// document landed in "it is neither" — which sends whoever reads it
+	// hunting for a corrupt file. It is not corrupt, and now it is read.
+	//
+	// Kept pointing at that message rather than deleted, because the way to
+	// reintroduce the fault is to stop claiming its keys, and then this is the
+	// message that comes back.
 	real3 := `{
 	  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
 	  "@graph": [
 	    {"spdxId": "urn:a", "type": "software_Package", "name": "libc",
 	     "software_packageVersion": "2.41"}
 	  ]}`
-	why := refuses(t, real3)
-	if !strings.Contains(why, "SPDX 3.x is not a version this reads") {
-		t.Errorf("refused with %q", why)
+	doc, err := sbom.Read(strings.NewReader(real3), sbom.Limits{})
+	if err != nil {
+		t.Fatalf("a well-formed document of a format this reads was refused: %v", err)
 	}
-	if strings.Contains(why, "does not say what format it is") {
-		t.Error("a well-formed document of a format we do not read was refused as saying nothing")
+	if len(doc.Components) != 1 {
+		t.Errorf("read %d components, want 1", len(doc.Components))
+	}
+	if doc.Format != sbom.SPDX {
+		t.Errorf("format is %q, want %q", doc.Format, sbom.SPDX)
 	}
 }
 

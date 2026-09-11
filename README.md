@@ -66,10 +66,10 @@ behind every line of it.
 
 ### Ingest
 
-- **Inventories arrive from the build**, in CycloneDX or SPDX 2.x form, one
- adapter per producer. A vulnerability report or a third party's VEX document
- may be uploaded alongside. The document says which format it is and the
- reader is chosen from that, so one upload takes either
+- **Inventories arrive from the build**, in CycloneDX, SPDX 2.x or SPDX 3.x
+ form, one adapter per producer. A vulnerability report or a third party's VEX
+ document may be uploaded alongside. The document says which format it is and
+ the reader is chosen from that, so one upload takes any of them
 - **An upload is accepted, queued and answered later.** A scan applies whole or
  changes nothing, and only a scan newer than the state it replaces is taken
 - **Releases and variants are declared before a scan may name one**, so a
@@ -268,7 +268,7 @@ behind every line of it.
 | Build and validation | The pipeline, and a gate that runs the tier a change lands in |
 | Database | All four engines, with the schema created and migrated at startup |
 | Catalog and graph | Products, streams, variants, and the dependency graph |
-| Ingest | Inventory upload and the readers behind it — CycloneDX and SPDX 2.x, chosen by what the document says it is — with the suppressions a build carries |
+| Ingest | Inventory upload and the readers behind it — CycloneDX, SPDX 2.x and SPDX 3.x, chosen by what the document says it is — with the suppressions a build carries |
 | Scanning | Run here, findings tracked over intervals, everything tracked scanned again on a schedule |
 | Sign-in | OIDC, GitHub or a trusted header, with sessions, API keys and personal tokens |
 | Access | Roles and visibility, enforced in the data layer |
@@ -283,8 +283,7 @@ behind every line of it.
 
 Not built: every adapter that would send an advisory somewhere, the VEX
 profile of the CSAF document, chat, hand-off to an external tracker, findings
-from a static analyzer, reading SPDX 3.0, and images for any architecture but
-`amd64`.
+from a static analyzer, and images for any architecture but `amd64`.
 
 ## Trying it
 

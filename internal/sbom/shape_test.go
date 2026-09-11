@@ -207,12 +207,17 @@ func documentPaths(t *testing.T, name string, from ...io.Reader) (map[string]int
 			t.Fatalf("%s: %v", name, err)
 		}
 		key, _ := tok.(string)
-		// The array each format puts its components in, decoded one element
-		// at a time. Naming only one format's leaves the other's whole array
-		// decoded at once — which loses the property this exists for, since a
-		// full-size document is tens of megabytes, and reports zero shapes,
-		// which is the output the check is read for.
-		if key != "components" && key != "packages" {
+		// The array each format puts its contents in, decoded one element at
+		// a time. Naming only some of them leaves the rest decoded whole —
+		// which loses the property this exists for, since a full-size document
+		// is tens of megabytes, and reports zero shapes, which is the output
+		// the check is read for.
+		//
+		// The third vocabulary's array holds everything rather than components
+		// alone, so what it counts is elements. That is the honest count for a
+		// format that does not separate them, and it is the number the memory
+		// property is about.
+		if key != "components" && key != "packages" && key != "@graph" {
 			var value any
 			if err := dec.Decode(&value); err != nil {
 				t.Fatalf("%s: %v", name, err)
