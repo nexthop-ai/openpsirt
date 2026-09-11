@@ -884,8 +884,8 @@ somewhere to triage what it finds and follow it through to a fix.</p>
  built, and changes as it is.</p>
 <h2 id="what-it-does">What it does<a class="headerlink" href="#what-it-does" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Takes in inventories</strong> pushed by build pipelines, in CycloneDX form, along
- with the suppressions the build carries patches for</li>
+<li><strong>Takes in inventories</strong> pushed by build pipelines, in CycloneDX or SPDX
+ form, along with the suppressions the build carries patches for</li>
 <li><strong>Runs the scan here</strong>, not in the build, so every product is measured
  against the same scanner and the same vulnerability data</li>
 <li><strong>Keeps the dependency graph</strong>, so you can see why a vulnerable component is
