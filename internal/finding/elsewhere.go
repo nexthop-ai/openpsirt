@@ -195,18 +195,98 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		seen[differing][key] = len(*into)
 		*into = append(*into, match)
 	}
+	// One statement over every place, which is what the paragraph above
+	// promised and what a loop calling the single-place read did not do: the
+	// screen deciding about a kernel flaw at sixty places issued sixty
+	// grouped five-join queries and two authorization checks each, so the
+	// cost the removed sampling was there to avoid came straight back.
+	at := places[0]
+	if !subject.Sees(at.ProductID) {
+		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
+	}
+	visible := access.Visible(subject, at.ProductID)
+	if len(visible) == 0 {
+		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
+	}
+	identities := make([]string, 0, len(places))
+	// What each place is keyed on, which is what decides whether a build is
+	// reached by matching or has to be ticked. Two places of one finding can
+	// hold different versions, so the comparison is per place and cannot be
+	// asked of the statement.
+	keyed := make(map[string][2]string, len(places))
 	for _, place := range places {
-		one, err := s.Reaching(ctx, subject, place, hereTargetID)
-		if err != nil {
-			return Reach{}, err
+		merged.Here += place.Places
+		identities = append(identities, place.PlaceIdentity)
+		keyed[place.PlaceIdentity] = [2]string{place.ComponentUpstream, place.ConsumerUpstream}
+	}
+
+	var rows []struct {
+		PlaceIdentity     string `bun:"place_identity"`
+		TargetID          int64  `bun:"target_id"`
+		Stream            string `bun:"stream"`
+		Variant           string `bun:"variant"`
+		Version           string `bun:"version"`
+		ComponentUpstream string `bun:"component_upstream"`
+		ConsumerUpstream  string `bun:"consumer_upstream"`
+		Places            int    `bun:"places"`
+	}
+	err := s.db.NewSelect().
+		TableExpr("finding AS f").
+		Join("JOIN target AS t ON t.id = f.target_id").
+		Join("JOIN stream AS st ON st.id = t.stream_id").
+		Join("JOIN variant AS va ON va.id = t.variant_id").
+		Join("JOIN component AS c ON c.id = f.component_id").
+		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
+		ColumnExpr("f.place_identity AS place_identity").
+		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("st.display_name AS stream").
+		ColumnExpr("va.display_name AS variant").
+		ColumnExpr("c.version AS version").
+		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
+		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
+		ColumnExpr("COUNT(*) AS places").
+		Where("st.product_id = ?", at.ProductID).
+		Where("f.vulnerability_id = ?", at.VulnerabilityID).
+		Where("f.place_identity IN (?)", bun.List(identities)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.place_identity, f.target_id, st.display_name, va.display_name, c.version, "+
+			ComponentUpstreamExpr+", "+ConsumerUpstreamExpr).
+		OrderExpr("st.display_name, va.display_name, c.version").
+		Scan(ctx, &rows)
+	if err != nil {
+		return Reach{}, fmt.Errorf("look for the same issue elsewhere: %w", err)
+	}
+
+	for _, row := range rows {
+		here, known := keyed[row.PlaceIdentity]
+		if !known {
+			continue
 		}
-		merged.Here += one.Here
-		for _, match := range one.Automatic {
+		match := Match{
+			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
+			Version:           row.Version,
+			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
+			Places: row.Places,
+			// Whether it is somewhere else or right here. A screen leads with
+			// the version, because that is what differs, and says where as an
+			// aside — but it still has to be able to say "here".
+			Here: row.TargetID == hereTargetID,
+		}
+		if row.ComponentUpstream == here[0] && row.ConsumerUpstream == here[1] {
+			// In this build at these versions, this *is* what is being
+			// decided: the place count above already holds it, and listing it
+			// as somewhere the judgment travels to would count it twice.
+			if match.Here {
+				continue
+			}
+			// Elsewhere at these versions the decision reaches it by matching,
+			// so there is nothing to agree to — but somebody deciding should
+			// still be told, because it is how far their judgment travels.
 			add(&merged.Automatic, false, match)
+			continue
 		}
-		for _, match := range one.Differing {
-			add(&merged.Differing, true, match)
-		}
+		add(&merged.Differing, true, match)
 	}
 	return merged, nil
 }

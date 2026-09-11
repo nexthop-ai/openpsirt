@@ -294,6 +294,10 @@ as the findings they cover, so the figure agrees with the list behind it.
 It carries the same narrowing every other query does. **A count is as much a
 disclosure as a row.**
 
+It is bounded, worst first, like every other list. It was the one name-yielding
+projection with no ceiling at all — no limit parameter, no default, one row per
+person holding open work as the deployment grows.
+
 ## Inheritance preview
 
 Asked before a line is created, because the answer is what somebody is agreeing

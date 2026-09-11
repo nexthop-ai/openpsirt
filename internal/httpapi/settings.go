@@ -53,6 +53,7 @@ var settable = []struct {
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else"},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time"},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it"},
+	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog"},
 	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload"},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here"},
 	{setting.WaitingAfter, "How long a claim may wait on a second person before whoever can approve it is told. What is wrong is that nothing has happened, which is the one thing no message driven by an event can report"},
@@ -87,7 +88,7 @@ func aSeverity(name string) bool { return name == setting.TriageFloor }
 func aCount(name string) bool {
 	switch name {
 	case setting.TogetherCap, setting.AttachmentMaxSize, setting.AttachmentQuota,
-		setting.AttachmentShare:
+		setting.AttachmentShare, setting.RoutingBatch:
 		return true
 	}
 	return false
@@ -354,6 +355,8 @@ func shipped(name string) string {
 		return strconv.Itoa(triage.DefaultTogetherCap)
 	case setting.AttachmentMaxSize:
 		return strconv.Itoa(setting.DefaultAttachmentMaxSize)
+	case setting.RoutingBatch:
+		return strconv.Itoa(setting.DefaultRoutingBatch)
 	case setting.AttachmentQuota:
 		return strconv.Itoa(setting.DefaultAttachmentQuota)
 	case setting.AttachmentShare:

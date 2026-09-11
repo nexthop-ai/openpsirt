@@ -466,12 +466,21 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 
 		said("undecided")
-		// A proposed row that holds no key is a shape nothing writes — a
-		// proposal is live until it is withdrawn or lapses, and both change
-		// its state — and it is none of the four words, for the row as for
-		// the filter.
+		// A proposed row that holds no key covers nothing: a proposal is live
+		// until it is withdrawn or lapses, and both release the key. So the
+		// place stands undecided — and the row and the filter say the same
+		// thing about it, which is what they exist to do. The row used to
+		// draw no word at all while the filter put the group in the
+		// undecided bucket, so a reader found it in a list whose own state
+		// column was blank.
 		record("proposed", false)
-		said("")
+		said("undecided")
+		if n := count("undecided"); n != 1 {
+			t.Errorf("a claim that holds nothing: undecided kept %d, want 1", n)
+		}
+		if n := count("waiting"); n != 0 {
+			t.Errorf("a claim that holds nothing is not waiting, yet waiting kept %d", n)
+		}
 		record("proposed", true)
 		said("waiting")
 		if n := count("waiting"); n != 1 {
@@ -786,6 +795,59 @@ func TestSeveralStatesAreAskedForTogether(t *testing.T) {
 		// what an unset control submitting a blank member would otherwise do.
 		if none := count(t, ""); none != 2 {
 			t.Errorf("an empty set kept %d, want everything", none)
+		}
+	})
+}
+
+// The list filters on the rating in force, and shows it.
+//
+// The floor and the deadline compare the rating of ours where somebody has
+// made one, and the minimum-severity filter compared the published one — so a
+// finding reassessed from low to critical had its urgency and its deadline
+// moved and then disappeared from the list it was now at the top of, and drew
+// the word that had been overruled.
+func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mild := found("CVE-2026-1", libnl)
+		mild.Issue.Severity = "low"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Rated critical here, which is what the floor and the clock already
+		// read.
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
+			Set("assessed_severity = ?", "critical").
+			Where("identifier = ?", "CVE-2026-1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicRead)
+		groups, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{MinSeverity: "high"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(groups) != 1 {
+			t.Fatalf("asking for high and above found %d groups, want the reassessed one",
+				len(groups))
+		}
+		if groups[0].Severity != "critical" {
+			t.Errorf("the row reads %q, want the rating in force", groups[0].Severity)
+		}
+
+		// And a word typed with capitals narrows rather than doing nothing.
+		shouted, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{MinSeverity: "High"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(shouted) != len(groups) {
+			t.Errorf("asking for \"High\" found %d groups and \"high\" found %d",
+				len(shouted), len(groups))
 		}
 	})
 }

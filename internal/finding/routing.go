@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // Routing is a standing rule that hands work nobody holds to a team.
@@ -144,7 +145,7 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // rest never routed.
 func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, error) {
 	if cap <= 0 {
-		cap = 2000
+		cap = setting.DefaultRoutingBatch
 	}
 	rules, err := s.Rules(ctx, productID)
 	if err != nil {

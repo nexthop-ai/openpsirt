@@ -67,7 +67,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		for _, r := range reported {
 			issues = append(issues, r.Issue)
 		}
-		vulnerabilities, err := NewVulnerabilities(tx).Intern(ctx, issues)
+		interned := NewVulnerabilities(tx)
+		vulnerabilities, err := interned.Intern(ctx, issues)
 		if err != nil {
 			return err
 		}
@@ -403,7 +404,20 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				return fmt.Errorf("close %d findings: %w", len(ids), err)
 			}
 		}
-		return nil
+
+		// Last, and over every build rather than this one. Three of the four
+		// signals the order is worked out from are properties of the issue,
+		// so a report raising one here leaves every open finding of it in
+		// every build nothing rescanned carrying a number worked out from a
+		// world that has moved — a known-exploited issue in a shipped tag
+		// below the triage line, answering no exploited filter, on no
+		// exploited clock, at the bottom of the list, until somebody
+		// rescans a tag, which for a tag is never.
+		//
+		// After this build's own rows are written, so what the scan changed
+		// here is counted as the scan's; the rows this corrects are the ones
+		// no scan was going to touch.
+		return Reranked(ctx, tx, interned.Moved(), startedAt)
 	})
 	return applied, err
 }

@@ -31,6 +31,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37, REQ-73.
 - [Incomplete upgrades](#incomplete-upgrades)
 - [Scanning as separate work](#scanning-as-separate-work)
 - [A year of nightly scans](#a-year-of-nightly-scans)
+- [The total above a list](#the-total-above-a-list)
 - [The severity ladder](#the-severity-ladder)
 - [File organization](#file-organization)
 - [Limits](#limits)
@@ -485,6 +486,14 @@ neither undecided nor any of the other three, disappeared from the count above
 the list as well as from the list, and was never offered as work again. The
 product's own totals counted it the same way and agreed.
 
+**The word on the row and the filter's own buckets are one rule**, not two
+spellings of it. They came apart twice: the filter counted a place as waiting
+without asking whether the claim still held its key, while the row required it,
+so a claim proposed and withdrawn put its group in the waiting list with a
+blank state column; and the row asked "was anything ever said" for undecided
+where the filter asked "does anything stand", so the same group was undecided
+to one and nothing to the other. Both now ask the filter's question.
+
 **A live decision covers a place at the versions it was keyed on and no other.**
 These counts match a live decision by product, issue, place and both versions,
 and match a lapsed or withdrawn one — which holds no key — by place alone. Matched
@@ -527,6 +536,21 @@ being applied.** A report is one source's account of one moment: it may omit tha
 something is being exploited, or carry a score lower than last week's. What the
 issue holds is the worst anybody has claimed, moving only toward worse, plus a
 rating of ours where somebody has made one.
+
+**And it is rewritten wherever the issue is open, not only in the build being
+scanned.** Three of the four signals are properties of the issue, so a nightly
+branch scan raising one of them left every other build carrying a number worked
+out from a world that had moved — a known-exploited issue in a shipped tag
+below the triage line, answering no exploited filter, on no exploited clock,
+at the bottom of the list, until somebody rescanned that tag, which for a tag
+is never.
+
+| Rule | |
+|---|---|
+| The signals that moved are what decides who is re-ranked | The write that raises them reports whether any of them actually rose, so nothing is recomputed for a report that told us nothing new |
+| Only learning something is exploited moves a clock | Neither the score nor the likelihood is in the deadline, and a clock reset by a revised number would never arrive |
+| The clock runs from when it was learned | Counted from when the finding opened, an issue that became exploited after six months lands three days before it was known — a deadline nobody could have met |
+| It is not a cache being refreshed | The stored order describes an issue rather than a moment, so it is rewritten when the signals move. What is stored because it cannot be worked out again is a different thing |
 
 **Four signals, in this order:**
 
@@ -718,6 +742,16 @@ product, so the queries ran with no narrowing by product — the cheapest plan
 available. One build, not the several a deployment tracks. And it assumes a churn
 rate rather than observing one. `make measure` re-runs it, and the constants at
 the top of the harness are the model.
+
+## The total above a list
+
+The figure above a list is what somebody quotes, so it counts the population
+the list itself pages through.
+
+| Rule | |
+|---|---|
+| It rides on the page | Counted after the grouping and before the limit, in the statement that groups, so the number and the rows cannot describe different sets |
+| The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source counted as two where the page draws one, and the figure changed depending on which page was being looked at |
 
 ## The severity ladder
 

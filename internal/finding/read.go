@@ -400,6 +400,11 @@ type Filter struct {
 	// by a caller — for the same reason ProductID is: a caller supplying it
 	// could ask for somebody else's while saying "mine".
 	HeldBy []int64
+	// now is the store's clock, set where the store narrows. What the
+	// deadline filters compare against, so that a frozen clock reaches them
+	// and so that one request answers "is this overdue" and "is anything off
+	// the clock" from the same moment.
+	now func() time.Time
 	// Reassessed keeps groups whose issue we rated differently from the
 	// world. It is how somebody finds what has been re-prioritized here,
 	// which is a question auditors ask and nothing else answers.
@@ -523,8 +528,13 @@ func (f Filter) product() (string, []any) {
 // severities returns the words a floor admits, or nil where it admits all of
 // them and the filter should not be applied at all.
 func (f Filter) severities() []string {
+	// Compared without regard to capitals, like every other name somebody
+	// types. Compared exactly, a caller sending "High" matched no word and
+	// got no narrowing at all rather than a refusal — the filter silently
+	// did nothing.
+	wanted := strings.ToLower(strings.TrimSpace(f.MinSeverity))
 	for i, word := range ranked {
-		if word == f.MinSeverity {
+		if word == wanted {
 			if i == 0 {
 				return nil
 			}
@@ -552,9 +562,15 @@ func (f Filter) severities() []string {
 // smaller than it is.
 func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if words := f.severities(); len(words) > 0 {
+		// The rating in force, not the published one. Being able to say a
+		// published rating is wrong is pointless if the filter then ignores
+		// us: a finding reassessed from low to critical had its urgency and
+		// its deadline moved and then disappeared from the list it was now
+		// at the top of. The same expression the floor and the deadline
+		// compare, so the three cannot come to disagree.
 		q = q.Where("f.vulnerability_id IN (?)",
 			q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
-				Where("v.severity IN (?)", bun.List(words)))
+				Where(EffectiveSeverityExpr+" IN (?)", bun.List(words)))
 	}
 	if f.Exploited {
 		// Read off the urgency rather than the flag beside it. A place known
@@ -564,7 +580,15 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Having("MAX(f.urgency) >= ?", int64(exploitedBand))
 	}
 	if f.HasFix {
-		q = q.Having("MIN(f.fixed_in) IS NOT NULL AND MIN(f.fixed_in) <> ?", "")
+		// Unanimity, like the fix-state filter below, which the documentation
+		// above calls the same question asked as a flag. A minimum skips
+		// nulls, so one place with a fixed version admitted the whole group —
+		// and a fold covering a package with a fix and one without answered
+		// yes to this, no to fix_state=fixed and yes to fix_state=mixed:
+		// three answers to one question.
+		q = q.Having("MIN(f.fixed_in) IS NOT NULL AND MIN(f.fixed_in) <> ?"+
+			" AND COUNT(*) = SUM(CASE WHEN f.fixed_in IS NULL OR f.fixed_in = ? THEN 0 ELSE 1 END)",
+			"", "")
 	}
 	if f.Unconfirmed {
 		// One place answers for the group. A group is an issue at a component,
@@ -889,10 +913,22 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	return q
 }
 
-// at is the moment the deadline filters compare against. A method rather than
-// a field so that a caller cannot forget to set one and get 1 January year one,
-// which as a deadline reads as "everything is late".
-func (f Filter) at() time.Time { return time.Now().UTC() }
+// at is the moment the deadline filters compare against.
+//
+// The store's own clock where it set one, and the wall clock where nothing
+// did — a method rather than a bare field so that a caller who forgets cannot
+// get 1 January year one, which as a deadline reads as "everything is late".
+//
+// **Read through the store so a frozen clock reaches it.** Reading the wall
+// clock directly is what left the overdue filter untestable, and it meant one
+// request compared "is this overdue" against one moment and "is anything off
+// the clock" against another.
+func (f Filter) at() time.Time {
+	if f.now != nil {
+		return f.now()
+	}
+	return time.Now().UTC()
+}
 
 // componentsWhere is the identifiers of the components a condition selects,
 // as a subquery for a membership test on a finding's component or consumer.
@@ -962,9 +998,15 @@ func stateWord(places, anyClaim, waiting, approved, lapsed int) string {
 		return "waiting"
 	case lapsed > 0 && approved == 0:
 		return "lapsed"
-	case anyClaim == 0:
+	case waiting == 0 && approved == 0 && lapsed == 0:
+		// **Nothing stands, rather than nothing was ever said** — the same
+		// predicate the filter's own "undecided" uses. Asked as "no claim
+		// row exists", a place whose only claim was withdrawn fell through
+		// every case and drew a blank word, while the filter put it in the
+		// undecided bucket. The row and the filter now answer from one rule.
 		return "undecided"
 	}
+	_ = anyClaim
 	return ""
 }
 
@@ -1115,7 +1157,12 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// argument, and the rows underneath say where it lands.
 		Join("JOIN claim AS cl ON cl.id = de.claim_id").
 		ColumnExpr("f2.id AS finding_id").
-		ColumnExpr("MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS waiting", proposed).
+		// Waiting, and standing: the row's own count requires the live key
+		// and this did not, so a claim proposed and then withdrawn put its
+		// group in the waiting bucket while the row drew no state word at
+		// all. Both are the same question and have to be the same condition.
+		ColumnExpr("MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS waiting",
+			proposed).
 		ColumnExpr("MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS approved",
 			approved).
 		ColumnExpr("MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS lapsed", lapsed).
@@ -1321,6 +1368,10 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// Who "mine" means, from the subject rather than from the request, and
 	// their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
+	// The store's clock, so the deadline filters compare against the same
+	// moment everything else here does — and so a frozen clock reaches them,
+	// which is what left the overdue filter with no test.
+	filter.now = s.now
 	// How many builds the selection holds, which is what "differs between
 	// builds" is measured against. The filter cannot see it.
 	filter.Builds = len(targets)
@@ -1474,7 +1525,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 			DiscloseAt:  row.DiscloseAt,
 		}
 		if issue, held := named[row.VulnerabilityID]; held {
-			group.Vulnerability, group.Severity = issue.Identifier, issue.Severity
+			group.Vulnerability, group.Severity = issue.Identifier, issue.InForce()
 			group.Summary = firstLineOf(issue.Description)
 		}
 		group.Tags = marks[markKey{row.VulnerabilityID, row.ComponentID}]
@@ -1731,13 +1782,19 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	if len(heads) > 0 {
 		return heads, heads[0].Total, nil
 	}
+	// Grouped the way the page groups, which is by the fold rather than by
+	// the component. Two binaries of one source are one row on a page and
+	// were two here, so the figure above the list changed depending on which
+	// page was being looked at — and this is the one somebody quotes, because
+	// it is what a deep link or the last page shows.
 	counted := s.db.NewSelect().
 		TableExpr("finding AS f").
+		Join("JOIN component AS c ON c.id = f.component_id").
 		ColumnExpr("f.vulnerability_id").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.vulnerability_id, f.component_id")
+		GroupExpr("f.vulnerability_id, " + FoldedOn)
 	total, err := s.db.NewSelect().
 		TableExpr("(?) AS grouped", filter.narrow(counted)).
 		Count(ctx)
@@ -1983,7 +2040,12 @@ func issuesNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]Vulner
 		// The description too, for the one line the row shows of it. One
 		// lookup for the page either way, and the row is already being read
 		// for the identifier beside it.
-		Column("id", "identifier", "severity", "description").
+		// The rating of ours as well as the published one. The word on the
+		// row and the word the floor and the deadline compare have to be the
+		// same word: shown as published, a finding somebody reassessed read
+		// as the rating that was overruled, and the reason given for having
+		// no deadline was worked out from it.
+		Column("id", "identifier", "severity", "assessed_severity", "description").
 		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}

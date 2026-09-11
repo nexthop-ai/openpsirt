@@ -3,7 +3,6 @@ package finding
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/uptrace/bun"
 
@@ -68,7 +67,9 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	if len(visible) == 0 {
 		return nil, whole, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
-	now := time.Now().UTC()
+	// The store's clock, like everything else here, so a frozen clock
+	// reaches it and so one answer is worked out from one moment.
+	now := s.now().UTC()
 
 	// The things somebody decides about: one row per build, issue and
 	// component, with the places counted and the standing decisions counted
