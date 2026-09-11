@@ -26,7 +26,13 @@ import { ROLES, reaches } from "../ui/roles";
 // product row covered by the estate grant is drawn the same way, for the same
 // reason: it is withdrawn where it was granted.
 
-type Held = { product?: string; role?: string; effective?: boolean; source?: string; everywhere?: boolean };
+type Held = {
+  product?: string;
+  role?: string;
+  effective?: boolean;
+  source?: string;
+  everywhere?: boolean;
+};
 
 export function Access({
   holds,
@@ -192,8 +198,8 @@ export function Access({
       )}
       <p className="hint" style={{ marginTop: 6 }}>
         A capability — approver, assigner — is bounded by what its holder may read, so granted on a
-        product where they hold no read or triage role it reaches nothing. Those cells are marked.
-        A role held across every product covers products declared later, and is withdrawn as one.
+        product where they hold no read or triage role it reaches nothing. Those cells are marked. A
+        role held across every product covers products declared later, and is withdrawn as one.
       </p>
     </div>
   );
