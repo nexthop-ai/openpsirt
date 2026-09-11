@@ -386,9 +386,13 @@ dist-inventories:
 	@command -v $(DOCKER) >/dev/null 2>&1 \
 	  || { echo "$(DOCKER) is needed to read the inventories out of the image"; exit 1; }
 	@echo "  building $(DIST_IMAGE):$(DIST_VERSION) for $(DIST_IMAGE_ARCH)"
-	@$(DOCKER) build -q -t $(DIST_IMAGE):$(DIST_VERSION) \
+	@# Not quiet. This builds the binary's inventory inside the image, and a
+	@# release that cannot say why it failed is one somebody re-runs to find
+	@# out — which is what happened: the step exited 1 and the only thing
+	@# recorded was that it had.
+	$(DOCKER) build -t $(DIST_IMAGE):$(DIST_VERSION) \
 	  --build-arg VERSION=$(DIST_VERSION) --build-arg COMMIT=$(COMMIT) \
-	  --build-arg DATE=$(DATE) --build-arg CDXGOMOD_VERSION=$(CDXGOMOD_VERSION) . >/dev/null
+	  --build-arg DATE=$(DATE) --build-arg CDXGOMOD_VERSION=$(CDXGOMOD_VERSION) .
 	@$(DOCKER) run --rm --entrypoint cat $(DIST_IMAGE):$(DIST_VERSION) \
 	  /usr/share/openpsirt/openpsirt.cdx.json > $(DIST_DIR)/openpsirt_$(DIST_VERSION).cdx.json
 	@$(DOCKER) run --rm --entrypoint cat $(DIST_IMAGE):$(DIST_VERSION) \
@@ -898,8 +902,10 @@ endif
 CHECK_IMAGE ?= openpsirt:check
 
 check-packaging:
+	@# Not quiet, for the reason dist-inventories is not: a build that fails
+	@# without saying why is diagnosed by running it again differently.
 	@if [ "$(CHECK_IMAGE)" = "openpsirt:check" ]; then \
-	  docker build -q -t $(CHECK_IMAGE) . >/dev/null; \
+	  docker build -t $(CHECK_IMAGE) .; \
 	fi
 	docker run --rm $(CHECK_IMAGE) -version
 	@test "$$(docker run --rm --entrypoint id $(CHECK_IMAGE) -u)" != "0" \
