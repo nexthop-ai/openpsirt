@@ -512,7 +512,8 @@ it re-resolves the issuer's name each time.
 ## Trusted-header sign-in
 
 A reverse proxy authenticates and passes the username on, which lets a deployment
-run with no provider at all.
+run with no provider at all — or alongside one, where the name it asserts is the
+same person as that name at the provider.
 
 Two guardrails, both deliberate acts: naming the header, and naming the sources
 it is honored from. Trusting it unconditionally would let anybody who can reach
@@ -537,10 +538,32 @@ username and its own identifier. **Only the second is stable.**
 | Failure closed | How |
 |---|---|
 | A username moves | People rename themselves at work, and a forge login can be renamed and the name then registered by somebody else. The newcomer's identifier does not match what was pinned, so they are refused, while the original holder is still recognized under their new name |
-| A username is only unique within its provider | A deployment with two providers would otherwise treat `alice` at each as one person. Every lookup is scoped to the provider, including the one on the identifier — providers do not coordinate, and plenty issue small numbers |
 
 Pinning at first use is what lets authorization stay in advance: an administrator
 cannot know an identifier before somebody has arrived.
+
+### One identity, two arrival paths
+
+An identity is a username, unqualified by the path it arrived on (REQ-41). One
+provider is configured at a time, and a username a trusted proxy asserts is the
+same person as that username at the provider.
+
+| Arrival | Matched by | Binds |
+|---|---|---|
+| The provider | Its identifier where one is bound; otherwise the name, which binds it | The identifier, at that sign-in |
+| A trusted proxy | The name | Nothing |
+
+| Rule | Reason |
+|---|---|
+| A proxy binds nothing, and the provider binds afterwards | A proxy has no identifier to offer. Leaving the authorization unbound is what lets the provider still redeem it at a later sign-in, so the order somebody first arrives in does not decide which path keeps working |
+| A bound identifier does not refuse a proxy arrival | The mismatch refusal protects a name that moved between people at the provider. A deployment trusting the header has already granted whatever sets it the power to claim to be anybody, so believing the name it asserts adds nothing |
+| Which path an arrival took is stated, never inferred from an empty identifier | It decides whether an identifier is bound and whether a mismatch refuses. An authorization boundary that turns on a field somebody could leave empty by accident fails in the quiet direction |
+
+Qualifying an identity by its path is what this replaced. It made one human two
+accounts: administration granted to the name under one path while the other was
+the one being signed in as, and — because separation of duties compares people —
+one person able to be both the proposer and the approver of a dismissal, which
+REQ-24 forbids with no override.
 
 ## Sessions and request forgery
 

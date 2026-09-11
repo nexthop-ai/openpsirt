@@ -23,7 +23,6 @@ export function People() {
   // two of them stacked is a screen nobody can read a row out of.
   const [openFor, setOpenFor] = useState("");
   const [identity, setIdentity] = useState("");
-  const [provider, setProvider] = useState("");
 
   const people = useQuery({
     queryKey: ["people"],
@@ -39,11 +38,10 @@ export function People() {
   });
 
   const record = useMutation({
-    mutationFn: async (body: { identity: string; provider?: string }) =>
+    mutationFn: async (body: { identity: string }) =>
       unwrap(await api.POST("/v1/people", { body })),
     onSuccess: () => {
       setIdentity("");
-      setProvider("");
       setAdding(false);
       void queries.invalidateQueries({ queryKey: ["people"] });
     },
@@ -141,9 +139,8 @@ export function People() {
                         <span style={{ color: "var(--faint)" }}>—</span>
                       ) : (
                         (person.signs_in_by ?? []).map((door) => (
-                          <div key={`${door.provider} ${door.username}`}>
-                            <span className="id">{door.username}</span>{" "}
-                            <span className="hint">{door.provider}</span>
+                          <div key={door.username}>
+                            <span className="id">{door.username}</span>
                           </div>
                         ))
                       )}
@@ -314,9 +311,7 @@ export function People() {
         title="Add user"
         open={adding}
         onClose={() => setAdding(false)}
-        onSubmit={() =>
-          record.mutate({ identity: identity.trim(), provider: provider.trim() || undefined })
-        }
+        onSubmit={() => record.mutate({ identity: identity.trim() })}
         error={record.error}
         busy={identity.trim() === "" || record.isPending}
         ok="Add user"
@@ -327,14 +322,7 @@ export function People() {
           value={identity}
           onChange={setIdentity}
           placeholder="ashwin@example.com"
-          hint="Exactly as your provider gives it. Capitals matter here."
-        />
-        <Field
-          label="Provider"
-          value={provider}
-          onChange={setProvider}
-          placeholder="github"
-          hint="Optional"
+          hint="Exactly as your provider gives it. Capitals matter here. A trusted proxy asserting the same name is the same person."
         />
       </Declare>
     </>

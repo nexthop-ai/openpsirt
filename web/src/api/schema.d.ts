@@ -7230,10 +7230,6 @@ export interface components {
             holds?: components["schemas"]["GrantBody"][] | null;
             /** @description What to call them here */
             identity: string;
-            /** @description Which sign-in path they will arrive by, such as proxy for a trusted header */
-            provider?: string;
-            /** @description What that provider calls them. Defaults to the identity */
-            username?: string;
         };
         "Redact-attachmentRequest": {
             /**
@@ -7772,7 +7768,6 @@ export interface components {
         };
         SignInBody: {
             pinned: boolean;
-            provider: string;
             username: string;
         };
         SimilarBody: {

@@ -57,10 +57,11 @@ auth:
   # That makes this the recovery path as well as the bootstrap: lose access,
   # add yourself here, and restart.
   #
-  # An identity is what the provider calls the person — the OIDC subject or
-  # username claim, the GitHub login, or whatever the trusted header carries.
-  # Naming somebody grants them a role; it does not let them in without
-  # signing in.
+  # An identity is what the provider calls the person — the OIDC username
+  # claim, the GitHub login, or whatever the trusted header carries. Written
+  # plainly, with no prefix: one provider is configured at a time, and the same
+  # name from the trusted header is the same person. Naming somebody grants
+  # them a role; it does not let them in without signing in.
   bootstrapAdmins: []
   # Where this deployment answers, as people reach it. A provider sends
   # somebody back to an address and compares it against what it was registered
@@ -69,6 +70,8 @@ auth:
   baseURL: ""
 
   # Sign-in through an OpenID Connect provider. Leave issuer empty to skip.
+  # One provider is configured at a time: setting this alongside github.clientID
+  # below stops the process.
   oidc:
     name: oidc
     issuer: ""
@@ -84,7 +87,8 @@ auth:
     usernameClaim: ""
     groupsClaim: ""
 
-  # Sign-in through GitHub. Leave clientID empty to skip.
+  # Sign-in through GitHub. Leave clientID empty to skip. Not to be set
+  # alongside oidc.issuer above.
   github:
     clientID: ""
     clientSecret: ""

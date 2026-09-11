@@ -146,7 +146,7 @@ func TestAnAssignmentNamesAPartyRatherThanAPerson(t *testing.T) {
 		// Somebody recorded after the team, so their party and their person
 		// identifier have certainly diverged.
 		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
-			`{"identity":"later","provider":"proxy","username":"later",`+
+			`{"identity":"later",`+
 				`"holds":[{"product":"mine","role":"public-triage"}]}`); made.Code != http.StatusCreated {
 			t.Fatalf("recording a person answered %d: %s", made.Code, made.Body.String())
 		}

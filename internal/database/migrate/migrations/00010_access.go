@@ -154,36 +154,41 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "role_grant_unique" UNIQUE ("person_id", "product_id", "role", "source")
 		)` + t.suffix,
 
-		// The ways one person may sign in.
+		// How one person signs in.
 		//
-		// Two things go wrong when a username is the whole identity. A
-		// username moves — people change their name at work, and a forge login
-		// can be renamed and the old one then claimed by somebody else — so
-		// matching on it eventually hands one person's access to another. And
-		// a username is only unique within the provider that issued it, so a
-		// deployment with two providers configured would treat the same name
-		// from each as one person.
+		// A username moves — people change their name at work, and a forge
+		// login can be renamed and the old one then claimed by somebody
+		// else — so matching on it alone eventually hands one person's access
+		// to another. A sign-in through the provider is therefore matched on
+		// the provider's own stable identifier, and the username is what an
+		// administrator types to authorize somebody before that identifier is
+		// knowable.
 		//
-		// So a sign-in is matched on the provider's own stable identifier, and
-		// the username is what an administrator types to authorize somebody
-		// before that identifier is knowable.
+		// Neither the identifier nor the username is qualified by where it
+		// came from. One provider is configured at a time, and a username a
+		// trusted proxy asserts is the same identity as that username at the
+		// provider (REQ-41). Qualifying them made one human two accounts —
+		// administration granted to one while the other was the one being
+		// signed in as.
 		//
-		// subject is absent until the first successful sign-in binds it. All
-		// four engines treat NULLs in a unique key as distinct from each
-		// other, so many rows may await binding while no two bound rows share
-		// a subject — checked on each engine rather than assumed, because the
-		// opposite behavior is a configurable option on one of them.
+		// A proxy binds nothing, so an identity reached only that way is still
+		// waiting to be bound and the provider binds it at a later sign-in.
+		//
+		// subject is absent until that happens. All four engines treat NULLs
+		// in a unique key as distinct from each other, so many rows may await
+		// binding while no two bound rows share a subject — checked on each
+		// engine rather than assumed, because the opposite behavior is a
+		// configurable option on one of them.
 		`CREATE TABLE "person_identity" (
 			"id"         ` + t.id + `,
 			"person_id"  ` + t.ref + ` NOT NULL,
-			"provider"   ` + t.name + ` NOT NULL,
 			"subject"    ` + t.name + ` NULL,
 			"username"   ` + t.name + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
 			"bound_at"   ` + t.timestamp + ` NULL,
 			CONSTRAINT "person_identity_person_fk" FOREIGN KEY ("person_id") REFERENCES "person"("id"),
-			CONSTRAINT "person_identity_username_unique" UNIQUE ("provider", "username"),
-			CONSTRAINT "person_identity_subject_unique" UNIQUE ("provider", "subject")
+			CONSTRAINT "person_identity_username_unique" UNIQUE ("username"),
+			CONSTRAINT "person_identity_subject_unique" UNIQUE ("subject")
 		)` + t.suffix,
 
 		`CREATE INDEX "person_identity_person_idx" ON "person_identity" ("person_id")`,

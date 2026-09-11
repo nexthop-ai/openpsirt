@@ -411,7 +411,7 @@ func TestTheHeaderIsRefusedFromSomewhereUntrusted(t *testing.T) {
 			t.Fatal(err)
 		}
 		// The proxy asserts a username, and that is what it is matched on.
-		if err := f.store.Claim(ctx, person.ID, access.ProxyProvider, "someone"); err != nil {
+		if err := f.store.Claim(ctx, person.ID, "someone"); err != nil {
 			t.Fatal(err)
 		}
 

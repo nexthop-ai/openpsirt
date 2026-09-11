@@ -132,10 +132,14 @@ for a process and not for an install.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart | unset |
+| `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports, exactly as it reports it — there is no prefix, and the same name down either path is the same person. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart | unset |
 | `OPENPSIRT_SESSION_LIFETIME` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration | 12 hours |
 
 ### An OpenID Connect provider
+
+One sign-in provider is configured at a time. Setting both an issuer here and a
+GitHub client id below stops the process, naming the two: an identity is a
+username, and two providers issuing them independently cannot be told apart.
 
 | Variable | Meaning | Default |
 |---|---|---|
@@ -150,7 +154,7 @@ for a process and not for an install.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_GITHUB_CLIENT_ID` | The OAuth application's client id. Empty means GitHub sign-in is off | unset |
+| `OPENPSIRT_GITHUB_CLIENT_ID` | The OAuth application's client id. Empty means GitHub sign-in is off. Not to be set alongside `OPENPSIRT_OIDC_ISSUER` | unset |
 | `OPENPSIRT_GITHUB_CLIENT_SECRET` | Its secret | unset |
 | `OPENPSIRT_GITHUB_ORG` | Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want | unset |
 

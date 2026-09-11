@@ -215,7 +215,7 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.Claim(ctx, administrator.ID, access.ProxyProvider, "admin"); err != nil {
+		if err := rights.Claim(ctx, administrator.ID, "admin"); err != nil {
 			t.Fatal(err)
 		}
 		// An administrator who granted themselves reading, which is
@@ -227,7 +227,7 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.Claim(ctx, adminReader.ID, access.ProxyProvider, "admin-reader"); err != nil {
+		if err := rights.Claim(ctx, adminReader.ID, "admin-reader"); err != nil {
 			t.Fatal(err)
 		}
 		if err := rights.GrantRole(ctx, adminReader.ID, mine.ID, access.PrivateRead); err != nil {
@@ -268,7 +268,7 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 			// in. The proxy path matches on what the proxy asserts, so that
 			// has to be claimed for them or they are somebody with access and
 			// no door to come through.
-			if err := rights.Claim(ctx, person.ID, access.ProxyProvider, who); err != nil {
+			if err := rights.Claim(ctx, person.ID, who); err != nil {
 				t.Fatal(err)
 			}
 			for _, role := range roles {
@@ -285,7 +285,7 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.Claim(ctx, reviewer.ID, access.ProxyProvider, "reviewer"); err != nil {
+		if err := rights.Claim(ctx, reviewer.ID, "reviewer"); err != nil {
 			t.Fatal(err)
 		}
 		for _, role := range []access.Role{access.PublicRead, access.Approver} {
@@ -299,7 +299,7 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.Claim(ctx, ungranted.ID, access.ProxyProvider, "nothing"); err != nil {
+		if err := rights.Claim(ctx, ungranted.ID, "nothing"); err != nil {
 			t.Fatal(err)
 		}
 		_, secret, err := rights.NewKey(ctx, "nightly", access.Scope{ProductID: mine.ID})

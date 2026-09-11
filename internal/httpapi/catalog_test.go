@@ -115,7 +115,7 @@ func catalogOn(t *testing.T, on engines, fn func(t *testing.T, d *declaring)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.Claim(t.Context(), administrator.ID, access.ProxyProvider, "admin"); err != nil {
+		if err := rights.Claim(t.Context(), administrator.ID, "admin"); err != nil {
 			t.Fatal(err)
 		}
 		// httptest sends from a documentation address; the fixture's proxy is

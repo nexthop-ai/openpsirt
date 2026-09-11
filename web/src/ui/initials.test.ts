@@ -9,10 +9,12 @@ describe("the letters standing for somebody", () => {
     expect(initials("alice@example.com")).toBe("AE");
   });
 
-  it("drops the provider an identity is written with", () => {
-    // `provider:username`. Taking the first letters of "proxy" says nothing
-    // about anybody.
-    expect(initials("proxy:dev")).toBe("DE");
+  it("reads an identity as the username it is", () => {
+    // Identities were written `provider:username` and the prefix had to be
+    // stripped here. One provider is configured at a time now, so an identity
+    // is the username and there is nothing in front of it.
+    expect(initials("dev")).toBe("DE");
+    expect(initials("ashwin@example.com")).toBe("AE");
   });
 
   it("uses two names where there are two", () => {

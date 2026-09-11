@@ -231,29 +231,43 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// through the withdrawal below first, or leaving every group would refuse
 	// this sign-in while quietly leaving the last one's roles in place.
 	//
-	// Matched through the provider rather than by name, so that somebody who
+	// Matched down whichever path they arrived by. Through the provider that
+	// is its stable identifier rather than the name, so that somebody who
 	// renamed themselves is still themselves and somebody who took the name
 	// they left behind is not.
-	person, err := s.MatchProvider(ctx, who.Provider, who.Subject, who.Username)
+	person, err := s.match(ctx, who)
 	known := err == nil
 	if !known && len(roles) == 0 && !admin {
 		return nil, ErrDenied
 	}
 
 	if !known {
-		person = &Account{
-			Identity: who.handle(), DisplayName: who.DisplayName,
-			CreatedAt: s.now().Truncate(time.Microsecond),
-		}
-		if err := s.record(ctx, person); err != nil {
-			return nil, fmt.Errorf("record %q: %w", who.handle(), err)
+		// Somebody an administrator recorded who has not signed in yet is that
+		// person, not a second one. An identity is a username now, so the
+		// record waiting under it is theirs — where it was qualified by the
+		// path they arrived on, the two were different rows and this arrival
+		// quietly became a second account.
+		//
+		// Whether they administer is left alone: it is derived below from the
+		// groups they arrived with, and reading it from here would overwrite
+		// that with what the row happened to say.
+		if waiting, err := s.ByIdentity(ctx, who.handle()); err == nil {
+			person = waiting
+		} else {
+			person = &Account{
+				Identity: who.handle(), DisplayName: who.DisplayName,
+				CreatedAt: s.now().Truncate(time.Microsecond),
+			}
+			if err := s.record(ctx, person); err != nil {
+				return nil, fmt.Errorf("record %q: %w", who.handle(), err)
+			}
 		}
 		// The mapping authorized them, so the way they arrived is recorded and
 		// pinned now rather than waiting for a second sign-in.
-		if err := s.Claim(ctx, person.ID, who.Provider, who.Username); err != nil {
+		if err := s.Claim(ctx, person.ID, who.Username); err != nil {
 			return nil, err
 		}
-		if _, err := s.MatchProvider(ctx, who.Provider, who.Subject, who.Username); err != nil {
+		if _, err := s.match(ctx, who); err != nil {
 			return nil, err
 		}
 	}
@@ -467,6 +481,12 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 // It is a pre-authorization and not a bypass: being named grants the role and
 // admits nobody who has not authenticated.
 //
+// Each is a plain username, the same one the provider or the trusted proxy
+// reports. It used to be written "provider:username" with a bare name falling
+// back to the proxy path, which granted administration to an account nobody
+// signed in as whenever the two disagreed — silently, at the one moment
+// somebody needs this to work.
+//
 // Anybody no longer named stops being one. Configuration says who is named, so
 // a deployment that removes somebody and restarts should not still have them
 // named — though an administrator promoted from inside the application keeps
@@ -477,11 +497,6 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 		if trimmed := strings.TrimSpace(identity); trimmed != "" {
 			named = append(named, trimmed)
 		}
-	}
-
-	handles := make([]string, 0, len(named))
-	for _, identity := range named {
-		handles = append(handles, arrivalFor(identity).handle())
 	}
 
 	// Both halves or neither. Clearing who was named and naming who is
@@ -495,16 +510,15 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 		within := &Store{db: db, now: s.now}
 		clearing := db.NewUpdate().Model((*Account)(nil)).
 			Set("is_bootstrap = ?", false).Where("is_bootstrap = ?", true)
-		if len(handles) > 0 {
-			clearing = clearing.Where("identity NOT IN (?)", bun.List(handles))
+		if len(named) > 0 {
+			clearing = clearing.Where("identity NOT IN (?)", bun.List(named))
 		}
 		if _, err := clearing.Exec(ctx); err != nil {
 			return fmt.Errorf("clear who was named as an administrator: %w", err)
 		}
 
 		for _, identity := range named {
-			who := arrivalFor(identity)
-			person, err := within.Ensure(ctx, who.handle(), "", true)
+			person, err := within.Ensure(ctx, identity, "", true)
 			if err != nil {
 				return err
 			}
@@ -512,7 +526,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 			// way they will sign in is recorded with it. Without this the
 			// named administrator would exist and have no door to come
 			// through.
-			if err := within.Claim(ctx, person.ID, who.Provider, who.Username); err != nil {
+			if err := within.Claim(ctx, person.ID, identity); err != nil {
 				return err
 			}
 			if _, err := db.NewUpdate().Model((*Account)(nil)).
@@ -522,20 +536,4 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 		}
 		return nil
 	})
-}
-
-// arrivalFor reads a named administrator.
-//
-// Written "provider:username", because a username is only unique within the
-// provider that issued it and naming a bare one would be ambiguous the moment
-// a second provider is configured. A bare name is taken as the trusted-header
-// path, which is the arrangement that has no provider at all.
-func arrivalFor(identity string) Arrival {
-	if provider, username, found := strings.Cut(identity, ":"); found {
-		provider, username = strings.TrimSpace(provider), strings.TrimSpace(username)
-		if provider != "" && username != "" {
-			return Arrival{Provider: provider, Subject: "", Username: username}
-		}
-	}
-	return Arrival{Provider: ProxyProvider, Username: strings.TrimSpace(identity)}
 }

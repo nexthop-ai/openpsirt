@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -38,7 +37,7 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	}
 	for _, door := range doors {
 		body.SignsInBy = append(body.SignsInBy, SignInBody{
-			Provider: door.Provider, Username: door.Username, Pinned: door.Subject != nil,
+			Username: door.Username, Pinned: door.Subject != nil,
 		})
 	}
 	for _, grant := range held {
@@ -139,8 +138,6 @@ type RecordBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"What to call them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"What to show instead of the identity"`
 	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
-	Provider    string `json:"provider,omitempty" doc:"Which sign-in path they will arrive by, such as proxy for a trusted header"`
-	Username    string `json:"username,omitempty" doc:"What that provider calls them. Defaults to the identity"`
 	// Email is where to reach them outside the application. Optional:
 	// without one somebody is told nothing outside it and keeps the area
 	// inside it. A provider that verifies an address fills in one nobody
@@ -160,9 +157,8 @@ type GrantBody struct {
 	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
 }
 
-// SignInBody is one way somebody may arrive.
+// SignInBody is how somebody may arrive.
 type SignInBody struct {
-	Provider string `json:"provider"`
 	Username string `json:"username"`
 	// Pinned says the provider's own identifier has been bound, which happens
 	// at the first successful sign-in. Until then the authorization is still
@@ -244,7 +240,7 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			for _, door := range doors {
 				body.SignsInBy = append(body.SignsInBy, SignInBody{
-					Provider: door.Provider, Username: door.Username, Pinned: door.Subject != nil,
+					Username: door.Username, Pinned: door.Subject != nil,
 				})
 			}
 			for _, grant := range held[person.ID] {
@@ -278,20 +274,11 @@ func registerAdministration(api huma.API, a Administering) {
 		_, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
 		created := lookupErr != nil
 
-		// Recording somebody is not the same as recording how they sign in,
-		// and access without a way to arrive is access nobody can use. So the
-		// door is recorded with them, and a first recording that names none is
-		// refused rather than half-done.
-		provider := strings.TrimSpace(in.Body.Provider)
-		username := strings.TrimSpace(in.Body.Username)
-		if username == "" {
-			username = strings.TrimSpace(in.Body.Identity)
-		}
-		if created && provider == "" {
-			return nil, huma.Error422UnprocessableEntity(
-				"say which provider they will sign in by, or they are somebody with access and no way to use it")
-		}
-
+		// Recording somebody records the way they sign in, because access
+		// without a way to arrive is access nobody can use. The identity is
+		// that way: one provider is configured at a time and a username a
+		// trusted proxy asserts is the same person, so there is nothing left
+		// to ask for and nothing left to get wrong.
 		person, err := store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName, in.Body.Admin)
 		if err != nil {
 			return nil, huma.Error400BadRequest(err.Error())
@@ -300,10 +287,8 @@ func registerAdministration(api huma.API, a Administering) {
 			noteAdminChange(ctx, a, trail.Account, in.Body.Identity, nil,
 				trail.Said("recorded", true))
 		}
-		if provider != "" {
-			if err := store.Claim(ctx, person.ID, provider, username); err != nil {
-				return nil, asked(a.Logger, err)
-			}
+		if err := store.Claim(ctx, person.ID, in.Body.Identity); err != nil {
+			return nil, asked(a.Logger, err)
 		}
 		// Recorded here, so it outranks whatever a provider states
 		// later . A request that says nothing about an address leaves

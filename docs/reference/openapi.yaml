@@ -5680,12 +5680,6 @@ components:
           maxLength: 191
           minLength: 1
           type: string
-        provider:
-          description: Which sign-in path they will arrive by, such as proxy for a trusted header
-          type: string
-        username:
-          description: What that provider calls them. Defaults to the identity
-          type: string
       required:
         - identity
       type: object
@@ -6593,12 +6587,9 @@ components:
       properties:
         pinned:
           type: boolean
-        provider:
-          type: string
         username:
           type: string
       required:
-        - provider
         - username
         - pinned
       type: object

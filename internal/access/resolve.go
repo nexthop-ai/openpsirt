@@ -252,18 +252,19 @@ func (r *Resolver) Resolve(ctx context.Context, req *http.Request) (Subject, *Se
 		// The proxy reports membership too, where it is configured to.
 		// This extends no trust that was not already extended: anybody
 		// able to forge the group header could forge the username
-		// header and claim to be an administrator outright. The proxy
-		// has no stable identifier of its own — it asserts a username
-		// on every request and there is nothing else to match on. So
-		// the username is the identifier here, which is sound because
-		// the proxy is the authority in this arrangement and a
-		// deployment trusting it has already accepted that.
-		who := Arrival{Provider: ProxyProvider, Subject: identity, Username: identity}
+		// header and claim to be an administrator outright.
+		//
+		// It has no stable identifier of its own — it asserts a username
+		// on every request and there is nothing else to match on — so
+		// the username decides and nothing is bound. Binding a made-up
+		// identifier here would claim the identity against the provider,
+		// and whichever path arrived first would lock the other out.
+		who := Arrival{ViaProxy: true, Username: identity}
 		if r.mode(ctx) == GroupBound {
 			subject, err := r.store.AdmitByGroups(ctx, who, r.trust.groupsFrom(req))
 			return subject, viaBrowser, err
 		}
-		person, err := r.store.MatchProvider(ctx, who.Provider, who.Subject, who.Username)
+		person, err := r.store.MatchProxy(ctx, who.Username)
 		if err != nil {
 			return Subject{}, nil, ErrDenied
 		}
