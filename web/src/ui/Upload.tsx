@@ -195,7 +195,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         <label className={inventory ? "dropzone has" : "dropzone"}>
           <input
             type="file"
-            accept=".json,.cdx.json,.spdx.json,application/json"
+            accept=".json,.cdx.json,.spdx.json,.spdx3.json,application/json"
             onChange={(event) => setInventory(event.target.files?.[0] ?? null)}
           />
           <Icon name="upload" />
@@ -206,9 +206,9 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
               </>
             ) : (
               <>
-                <b>Drop a CycloneDX 1.x or SPDX 2.x JSON file</b> (CycloneDX 1.4 to 1.7, SPDX 2.2
-                and 2.3; a later major version of either is refused by name), or click to choose.
-                The file says which format it is. The scan runs here against the current
+                <b>Drop a CycloneDX or SPDX JSON file</b> (CycloneDX 1.4 to 1.7, SPDX 2.2 and 2.3,
+                SPDX 3.x; a major version this does not read is refused by name), or click to
+                choose. The file says which format it is. The scan runs here against the current
                 vulnerability database.
               </>
             )}

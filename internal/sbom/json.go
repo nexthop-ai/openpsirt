@@ -206,3 +206,63 @@ func (b *bounded) skip() error {
 	}
 	return b.close()
 }
+
+// each reads a field a format states either as one string or as an array of
+// them, calling fn per value.
+//
+// A format that says "one or more" and serializes the one without its brackets
+// is common enough that reading only the array would refuse documents that are
+// perfectly well formed.
+//
+// An object is walked past rather than refused, for the same reason an edge
+// naming nothing is dropped rather than taken as a malformed file: a linked
+// format lets a field that is a reference be written out as the thing it
+// refers to, and a document doing that in a field whose text is all this reads
+// has nothing here to offer rather than being broken.
+func (b *bounded) each(fn func(string) error) error {
+	tok, err := b.dec.Token()
+	if err != nil {
+		return err
+	}
+	switch v := tok.(type) {
+	case string:
+		return fn(v)
+	case nil:
+		return nil
+	case json.Delim:
+		if v == '{' {
+			if err := b.enter(); err != nil {
+				return err
+			}
+			defer b.leave()
+			for b.dec.More() {
+				if _, err := b.dec.Token(); err != nil { // the key
+					return err
+				}
+				if err := b.skip(); err != nil {
+					return err
+				}
+			}
+			return b.close()
+		}
+		if v != '[' {
+			return fmt.Errorf("want a string or an array, got %v", v)
+		}
+	default:
+		return fmt.Errorf("want a string or an array, got %v", v)
+	}
+	if err := b.enter(); err != nil {
+		return err
+	}
+	defer b.leave()
+	for b.dec.More() {
+		value, err := b.str()
+		if err != nil {
+			return err
+		}
+		if err := fn(value); err != nil {
+			return err
+		}
+	}
+	return b.close()
+}

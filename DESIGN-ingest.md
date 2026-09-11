@@ -4,7 +4,7 @@ What happens to a scan between arrival and application.
 
 Satisfies REQ-03, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11,
 REQ-12, REQ-13, REQ-14, REQ-16, REQ-17, REQ-18, REQ-31, REQ-44, REQ-66,
-REQ-69, REQ-76, REQ-77.
+REQ-69, REQ-76, REQ-77, REQ-78.
 
 ## Contents
 
@@ -41,9 +41,9 @@ A build sends two things, in one request:
 | Inventory | Every component that ships, with its dependency edges |
 | Suppressions | Findings the build has already argued are not applicable, usually because it carries a patch |
 
-CycloneDX and SPDX 2.x are the formats read (REQ-05). A document says which it
-is and the reader is chosen from that, so an upload takes either and nothing
-about the endpoint names one.
+CycloneDX, SPDX 2.x and SPDX 3.x are the formats read (REQ-05). A document says
+which it is and the reader is chosen from that, so an upload takes any of them
+and nothing about the endpoint names one.
 
 The vulnerability data is produced here rather than sent. The inventory is
 reproducible and a vulnerability report is not, since new issues are disclosed
@@ -259,17 +259,29 @@ other's business (REQ-05).
 adds nothing this reads, so one reader covers both and a document stating
 either is read.
 
-**SPDX 3.x is refused by name** (REQ-76), and the refusal is hung off its own
-keys rather than off 2.x's. It is a different document rather than a revision
-of this one: a context and one flat graph of typed elements, sharing no key
-path with 2.x — which is exactly why a by-name refusal reading `spdxVersion`
-never reaches one, since a real 3.x document does not carry that key at all. A
-document refused for saying nothing sends whoever reads the message hunting for
-a corrupt file, and it is not corrupt.
+**SPDX 3.x is a third vocabulary rather than a branch in the second.** It
+shares no key path with 2.x: a document is a context and one flat graph of
+typed elements — packages, files, relationships, people, tools, licenses and
+the document's own record in one array, in no stated order. Three vocabularies
+and one reader is what the seam was for.
 
-Nothing this deployment ingests emits it: the scanner it ships emits 2.3 and
-tag-value, and so does the reference producer. Reading it is a third vocabulary
-rather than a branch in this one.
+| Difference | What it costs |
+|---|---|
+| **An element announces what it is in a field that may arrive after the fields it governs** | An element is read into one neutral shape and interpreted when it closes. That is what a component read from either other format already does, and it holds one element rather than a document, so the walk stays bounded |
+| **The header is inside the contents** | A document's creation record is one entry of the same array its packages are in. The header read therefore walks the whole graph and builds nothing from it, which is as cheap as this format allows rather than as cheap as the others are |
+| **A document carries several creation records** | Anything it imported brought its own. The one the document points at is the document's; where it points at nothing the first read stands in, because reporting no build time at all has every later scan of that target refused as not newer |
+| **One relationship states a list of ends** | The edge bound is charged per end rather than per relationship, as each is read |
+| **An element does not say what it is until it has been read** | Every entry is charged against the component bound on the way in, because what a bound stops is the walk; the ones that turn out to be paths hand that charge back and take the file bound instead. So the walk is bounded throughout and the two are still sized the way they differ |
+| **Identifiers are absolute** | Nothing here depends on their shape. They resolve a document to itself and are discarded, which is what the other formats' identifiers are for too |
+
+**A path and a package may not share an identifier**, and this format states
+both in one array — so the check runs where a package is bound and where a path
+is recorded, since which of the two a producer writes first is its business.
+
+**The version is stated in two places and either will do.** The context carries
+it, and so does every creation record; a producer need not emit the first. Read
+from one place only, a document stating it in the other would be refused as
+saying nothing.
 
 ## What each format states
 
@@ -277,18 +289,18 @@ The internal shape is the same from either, because it is the shape the graph
 is stored in rather than either format's. What differs is where a producer put
 each fact.
 
-| Fact | CycloneDX | SPDX |
-|---|---|---|
-| The document's own identity | `serialNumber` | `documentNamespace` |
-| When the producer made it | `metadata.timestamp` | `creationInfo.created` |
-| What the document is about | the component under `metadata`, stated inline | an identifier pointing at one of the packages |
-| What ships | `components` | `packages` |
-| A component's identity within the file | `bom-ref` | `SPDXID` |
-| The version | `version` | `versionInfo` |
-| The package identifier and the database key | fields of the component | external references, by type |
-| Structure | `dependencies`, and one component nested in another | relationships, stated either way round |
-| What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package |
-| What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** (REQ-77) |
+| Fact | CycloneDX | SPDX 2.x | SPDX 3.x |
+|---|---|---|---|
+| The document's own identity | `serialNumber` | `documentNamespace` | the document element's own identifier |
+| When the producer made it | `metadata.timestamp` | `creationInfo.created` | the creation record the document points at |
+| What the document is about | the component under `metadata`, stated inline | an identifier pointing at one of the packages | identifiers on the document or inventory element, and `describes` |
+| What ships | `components` | `packages` | graph entries typed as a package |
+| A component's identity within the file | `bom-ref` | `SPDXID` | `spdxId` |
+| The version | `version` | `versionInfo` | `software_packageVersion` |
+| The package identifier and the database key | fields of the component | external references, by type | a field of the package, or external identifiers by type |
+| Structure | `dependencies`, and one component nested in another | relationships, stated either way round | relationships, stated one way round |
+| What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` |
+| What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** (REQ-77) | **cannot be stated** (REQ-77) |
 
 **The root is resolved at the end rather than where it is named.** One format
 states it inline with everything it says about it; the other points at a
@@ -348,6 +360,37 @@ document also describes. It fills in an upstream nothing else stated and never
 replaces one, and it is charged against the claim bound rather than the edge
 bound, because an unbounded array of them is the same hazard under a different
 name.
+
+**The third version drops the reversed spellings**, so a type is an edge or it
+is not and there is no direction to get wrong: `contains`, `dependsOn`,
+`hasDynamicLink`, `hasStaticLink`, `hasPrerequisite`, `hasOptionalComponent`,
+`hasOptionalDependency` and `hasProvidedDependency`, with `ancestorOf` and
+`descendantOf` for a derivation and `describes` for the root.
+
+### Lifecycle scopes
+
+The third version annotates a relationship with the phase it matters in —
+build, design, development, runtime, test or other. **The specification does not
+say that any of them means the target does not ship**, and inferring it is the
+one judgment in this area the format leaves to a reader (REQ-78).
+
+| Scope | Read as |
+|---|---|
+| `test` | Not in the product. A test artifact is in the document and not in what ships, which is the same statement `TEST_DEPENDENCY_OF` makes in the second version |
+| Everything else | In the product |
+
+**Reading `build` as "does not ship" is the inference that looks obvious and is
+wrong for every compiled language.** A crate or a module linked into a binary is
+stated as a build-phase dependency and is inside what the product ships, so
+dropping it hides a finding that is somebody's problem. Getting it wrong the
+other way adds something to triage, which is a cost somebody can see and act
+on; getting it wrong this way removes a finding nobody ever learns about.
+
+The format's own example settles that it is a real risk rather than a
+hypothetical one: one application's three dependencies are `DEPENDS_ON` in the
+second version and `dependsOn` scoped `build` in the third, which is the same
+application described twice. Read as not shipping, that document loses every
+component it has.
 
 ### Files are not components
 

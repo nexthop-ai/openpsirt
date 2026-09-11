@@ -172,10 +172,10 @@ func registerScans(api huma.API, in Ingest) {
 		Method:      http.MethodPost,
 		Path:        "/v1/products/{product}/streams/{stream}/variants/{variant}/scans",
 		Summary:     "Upload an SBOM and its VEX documents",
-		Description: "Accepts a CycloneDX 1.x or SPDX 2.x SBOM and any number of OpenVEX " +
-			"documents as multipart form fields named `inventory` and `suppressions`. The " +
-			"format is taken from the document itself; a later major version of either is " +
-			"rejected by name.\n\n" +
+		Description: "Accepts a CycloneDX 1.x, SPDX 2.x or SPDX 3.x SBOM and any number of " +
+			"OpenVEX documents as multipart form fields named `inventory` and " +
+			"`suppressions`. The format is taken from the document itself; a major version " +
+			"this does not read is rejected by name.\n\n" +
 			"The product, branch and variant must already exist; an upload naming something " +
 			"undeclared is rejected and the error says which part is missing.\n\n" +
 			"**Returns 202 before the documents are parsed.** A success here means they were " +

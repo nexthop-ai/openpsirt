@@ -17,10 +17,13 @@ type vocabulary struct {
 }
 
 // vocabularies are the formats read, in the order a document is tried against.
+//
+// The third major version of SPDX has a table of its own rather than a branch
+// in the second's, because it shares no key with it.
 var vocabularies = []vocabulary{
 	{format: CycloneDX, top: cyclonedxTop},
 	{format: SPDX, top: spdxTop},
-	{format: SPDX, top: spdxLaterTop},
+	{format: SPDX, top: spdx3Top},
 }
 
 // ReadHeader reads what a document says about itself and stops.
@@ -86,7 +89,13 @@ func (c *reader) read() error {
 	if err != nil {
 		return fmt.Errorf("reading scan file: %w", err)
 	}
-	return c.checkFormat()
+	if err := c.checkFormat(); err != nil {
+		return err
+	}
+	// One format states its build time inside the contents, pointing at it
+	// rather than carrying it, so it cannot be settled where it is read.
+	c.spdx3Settle()
+	return nil
 }
 
 // checkFormat refuses a document that did not say what it is, said it was two

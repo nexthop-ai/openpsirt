@@ -80,6 +80,14 @@ type reader struct {
 	// upstreamOrder is the order the document stated them in, so resolving
 	// them does not depend on what a map felt like doing.
 	upstreamOrder []string
+	// spdx3Creations is when each creation-information element says a document
+	// was made, and spdx3Order is the order they were read in. A format that
+	// puts the header inside the contents states several, because anything the
+	// document imported brought its own.
+	spdx3Creations map[string]string
+	spdx3Order     []string
+	// spdx3DocumentCreation is the one the document itself points at.
+	spdx3DocumentCreation string
 }
 
 func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
@@ -176,6 +184,19 @@ func (c *reader) file() error {
 		return fmt.Errorf("scan file catalogs more than the %d file limit", c.lim.MaxFiles)
 	}
 	return nil
+}
+
+// refile moves a charge from the component bound to the file bound, once an
+// element has turned out to be a path rather than a package.
+//
+// The charge has to happen on the way in — what a bound stops is the walk, and
+// a format that states everything in one array does not say what an element is
+// until the element has been read. So every entry is charged as a component
+// and the ones that turn out to be paths are moved, which leaves the walk
+// bounded throughout and still sizes the two the way they actually differ.
+func (c *reader) refile() error {
+	c.stated--
+	return c.file()
 }
 
 // claim counts one more patch claim against the limit.

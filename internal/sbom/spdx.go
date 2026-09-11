@@ -397,27 +397,3 @@ func (c *reader) spdxRelate(from, kind, to string) error {
 	}
 	return nil
 }
-
-// The keys the third major version states a document with. It shares no key
-// path with the second, which is why the by-name refusal cannot hang off one
-// of the second's: a real 3.0 document carries no `spdxVersion` at all, so the
-// version check above can never see one.
-var spdxLaterTop = map[string]func(*reader) error{
-	"@context": (*reader).spdxLaterMajor,
-	"@graph":   (*reader).spdxLaterMajor,
-}
-
-// spdxLaterMajor refuses a major version this reader was not written against,
-// naming it rather than letting the document fall through as unrecognized.
-//
-// A document refused for saying nothing sends whoever reads the message hunting
-// for a corrupt file. This one is not corrupt: it is a format we have not
-// written support for, which is a different sentence and a different thing for
-// them to do next.
-func (c *reader) spdxLaterMajor() error {
-	if err := c.b.skip(); err != nil {
-		return err
-	}
-	return fmt.Errorf("%s 3.x is not a version this reads: it states a document as one linked "+
-		"graph, which shares no field with the %s 2.x this reads", SPDX, SPDX)
-}
