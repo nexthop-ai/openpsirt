@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useClickAway } from "../ui/away";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -39,21 +40,7 @@ export function Scope() {
     setStream(at.stream ?? "");
   }, [at.product, at.stream]);
 
-  useEffect(() => {
-    if (!open) return;
-    function away(event: MouseEvent) {
-      if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
-    }
-    function key(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", key);
-    };
-  }, [open]);
+  useClickAway(box, open, () => setOpen(false));
 
   const products = useQuery({
     queryKey: ["products"],

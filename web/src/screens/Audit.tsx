@@ -3,6 +3,7 @@ import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { usePaging } from "./list";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -77,7 +78,6 @@ export function Audit() {
   // as an answer: an auditor reading a year cannot narrow to something they
   // have not read yet, and the rows past the cap were unreachable from this
   // screen entirely.
-  const offset = Number(params.get("offset") ?? 0);
 
   function set(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -99,11 +99,12 @@ export function Audit() {
     setParams(next);
   }
 
+  // The shared handler, with the record's own addition: this list is long
+  // and paging it from the foot leaves the reader at the foot of the next
+  // page, looking at rows they have to scroll up to reach.
+  const { offset, go: paged } = usePaging();
   function go(to: number) {
-    const next = new URLSearchParams(params);
-    if (to <= 0) next.delete("offset");
-    else next.set("offset", String(to));
-    setParams(next);
+    paged(to);
     window.scrollTo({ top: 0 });
   }
 

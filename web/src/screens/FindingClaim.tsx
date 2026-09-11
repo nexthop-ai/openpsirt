@@ -16,8 +16,9 @@ import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { linkable } from "../ui/addressable";
-import { useComment, useEditComment, useRevise, useWithdraw } from "../api/mutations";
+import { useComment, useEditComment } from "../api/mutations";
 import { Failed } from "../ui/Failed";
+import { ReasonEditor } from "../ui/ReasonEditor";
 import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
 import { Because, labeled } from "../ui/Outcome";
@@ -101,10 +102,6 @@ export function Standing({
     !!rows &&
     [rows.proposed ?? 0, rows.sent_back ?? 0, rows.approved ?? 0].filter((n) => n > 0).length > 1;
   const sentBackAt = summary?.sent_back_at ?? claim.decision?.sent_back_at;
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(claim.reasoning ?? "");
-  const revise = useRevise();
-  const withdraw = useWithdraw();
   const queries = useQueryClient();
   // Where this claim's work is happening. Stored and never fetched.
   const point = useMutation({
@@ -124,7 +121,6 @@ export function Standing({
   });
   const live = (approvals.data?.items ?? []).filter((a) => !a.withdrawn_at);
   const last = live[live.length - 1];
-  const draftKey = `revise:${id}`;
   const stripe =
     state === "proposed"
       ? "pending"
@@ -262,88 +258,15 @@ export function Standing({
         </div>
       </div>
 
-      {editing ? (
-        <div style={{ marginTop: 12, maxWidth: "78ch" }}>
-          <div className="alert" style={{ marginBottom: 10 }}>
-            <strong>Revising the reasoning withdraws the approval</strong>
-            <span>
-              The earlier words stay readable in the revision history, and the decision returns to
-              the review queue marked as previously approved.
-            </span>
-          </div>
-          <Editor
-            value={text}
-            onChange={setText}
-            draftKey={draftKey}
-            label="Reasoning"
-            attachTo={about}
-          />
-          {revise.error != null && <Failed error={revise.error} what="That could not be stored." />}
-          <div className="actions" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn"
-              disabled={!text.trim() || revise.isPending}
-              onClick={() =>
-                revise.mutate(
-                  { id, reasoning: text },
-                  {
-                    onSuccess: () => {
-                      forget(draftKey);
-                      setEditing(false);
-                      onRevised();
-                    },
-                  },
-                )
-              }
-            >
-              Save revision
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="why rendered" style={{ marginTop: 12 }}>
-          {claim.reasoning ? (
-            <Markdown source={claim.reasoning} />
-          ) : (
-            <p className="hint">Nothing written.</p>
-          )}
-        </div>
-      )}
-
-      {withdraw.error != null && (
-        <Failed error={withdraw.error} what="That could not be withdrawn." />
-      )}
-      {!editing && (state === "proposed" || state === "approved") && (
-        <div className="actions" style={{ marginTop: 12 }}>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={() => {
-              setText(claim.reasoning ?? "");
-              setEditing(true);
-            }}
-          >
-            Revise reasoning
-          </button>
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={withdraw.isPending}
-            onClick={() => withdraw.mutate({ id }, { onSuccess: onRevised })}
-          >
-            Withdraw
-          </button>
-          <span className="consequence">
-            {state === "approved"
-              ? "Revising withdraws the approval; withdrawing needs nobody"
-              : "Withdrawing needs nobody"}
-          </span>
-        </div>
-      )}
+      <ReasonEditor
+        claimId={id}
+        reasoning={claim.reasoning ?? ""}
+        offered={state === "proposed" || state === "approved"}
+        approved={state === "approved"}
+        about={about}
+        onDone={onRevised}
+        spaced
+      />
       {/* Where this is being worked on or argued about outside here.
           Anybody who may argue about the claim may set it: a link is a note
           about where the conversation is rather than a judgment, and needing a

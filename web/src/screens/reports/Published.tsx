@@ -8,6 +8,7 @@ import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { WindowPicker, coveringWords } from "./Window";
 
 // How far back to look. A year by default, because publishing is rare enough
 // that a month of it is usually nothing and reads as a tool that is not working.
@@ -25,7 +26,7 @@ const WINDOWS = [90, 365, 3650] as const;
 // the catalog offers as a file.
 export function Published() {
   const at = useScope();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const days = Number(params.get("days") ?? 365);
   const product = at.product ?? "";
 
@@ -46,26 +47,9 @@ export function Published() {
     <Sheet
       name="Advisories issued"
       answers="what has been published about our own flaws, and what was published twice."
-      asked={windowWords(days)}
+      asked={coveringWords(days)}
     >
-      <div className="controls">
-        <div className="seg" role="group" aria-label="Window">
-          {WINDOWS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={days === n}
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                next.set("days", String(n));
-                setParams(next);
-              }}
-            >
-              {n === 3650 ? "everything" : n === 365 ? "a year" : "90 days"}
-            </button>
-          ))}
-        </div>
-      </div>
+      <WindowPicker offered={WINDOWS} days={days} />
 
       {gone.isPending ? (
         <Loading />
@@ -133,11 +117,4 @@ export function Published() {
       )}
     </Sheet>
   );
-}
-
-// What the window is, in the words the buttons use.
-function windowWords(days: number): string {
-  if (days >= 3650) return "everything";
-  if (days === 365) return "the last year";
-  return `the last ${days} days`;
 }

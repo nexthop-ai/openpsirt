@@ -98,6 +98,11 @@ export function useAfterClaim() {
     // change under a revision and neither list held them.
     void queries.invalidateQueries({ queryKey: ["claim"] });
     void queries.invalidateQueries({ queryKey: ["comments"] });
+    // And the list the work came from. A claim answers findings, so agreeing
+    // to one moves what the list says about every place it covers — nine
+    // other screens invalidate this key after a write and this one did not,
+    // which is the shape of a list that silently shows the old answer.
+    void queries.invalidateQueries({ queryKey: ["findings"] });
   };
 }
 

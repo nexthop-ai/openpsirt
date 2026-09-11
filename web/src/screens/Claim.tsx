@@ -11,14 +11,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { linkable } from "../ui/addressable";
-import { useRevise, useWithdraw } from "../api/mutations";
 import { useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
 import { Comments, Revisions } from "./FindingClaim";
-import { Happened } from "./Queue";
-import { Editor, forget } from "../ui/Editor";
+import { Happened } from "./QueueMine";
+import { Editor } from "../ui/Editor";
+import { ReasonEditor } from "../ui/ReasonEditor";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
-import { Markdown } from "../ui/Markdown";
 import { Because, labeled } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
@@ -323,11 +322,6 @@ function Reasoning({
   onChanged: () => void;
 }) {
   const id = claim.claim.id;
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(claim.argument.reasoning);
-  const revise = useRevise();
-  const withdraw = useWithdraw();
-  const draftKey = `revise:${id}`;
   const standing = live(claim.happened) || claim.happened === "approved";
 
   // The card names the screen so the reasoning block is styled as something
@@ -335,87 +329,14 @@ function Reasoning({
   return (
     <div className="card claim">
       <h3>Reasoning</h3>
-      {editing ? (
-        <div style={{ maxWidth: "78ch" }}>
-          <div className="alert" style={{ marginBottom: 10 }}>
-            <strong>Revising the reasoning withdraws the approval</strong>
-            <span>
-              The earlier words stay readable in the revision history, and the claim returns to the
-              review queue marked as previously approved.
-            </span>
-          </div>
-          <Editor
-            value={text}
-            onChange={setText}
-            draftKey={draftKey}
-            label="Reasoning"
-            attachTo={about}
-          />
-          {revise.error != null && <Failed error={revise.error} what="That could not be stored." />}
-          <div className="actions" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn"
-              disabled={!text.trim() || revise.isPending}
-              onClick={() =>
-                revise.mutate(
-                  { id, reasoning: text },
-                  {
-                    onSuccess: () => {
-                      forget(draftKey);
-                      setEditing(false);
-                      onChanged();
-                    },
-                  },
-                )
-              }
-            >
-              Save revision
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="why rendered">
-          {claim.argument.reasoning ? (
-            <Markdown source={claim.argument.reasoning} />
-          ) : (
-            <p className="hint">Nothing written.</p>
-          )}
-        </div>
-      )}
-      {withdraw.error != null && (
-        <Failed error={withdraw.error} what="That could not be withdrawn." />
-      )}
-      {standing && !editing && (
-        <div className="actions" style={{ marginTop: 12 }}>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={() => {
-              setText(claim.argument.reasoning);
-              setEditing(true);
-            }}
-          >
-            Revise reasoning
-          </button>
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={withdraw.isPending}
-            onClick={() => withdraw.mutate({ id }, { onSuccess: onChanged })}
-          >
-            Withdraw
-          </button>
-          <span className="consequence">
-            {claim.happened === "approved"
-              ? "Revising withdraws the approval; withdrawing needs nobody"
-              : "Withdrawing needs nobody"}
-          </span>
-        </div>
-      )}
+      <ReasonEditor
+        claimId={id}
+        reasoning={claim.argument.reasoning}
+        offered={standing}
+        approved={claim.happened === "approved"}
+        about={about}
+        onDone={onChanged}
+      />
     </div>
   );
 }

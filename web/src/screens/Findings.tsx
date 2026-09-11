@@ -25,17 +25,18 @@ import { useWho } from "../app/session";
 // is 153 pages of one product's findings, which is not a list anybody
 // assembles a day's work out of.
 import {
-  acrossProducts,
-  asAsked,
-  identityOf,
-  listQuery,
   PAGE,
   PAGES,
+  SORTS,
+  acrossProducts,
+  asAsked,
+  hiddenIn,
+  identityOf,
+  listQuery,
   pageSize,
   pathTo,
-  hiddenIn,
-  SORTS,
   type Row,
+  usePaging,
 } from "./list";
 
 // The filters the by-bump view can apply, by the key their chip carries.
@@ -127,7 +128,7 @@ export function Findings() {
     [stream, variant],
   );
   const navigate = useNavigate();
-  const offset = Number(params.get("offset") ?? 0);
+  const { offset, go } = usePaging();
   const page = pageSize(params);
   const sort = params.get("sort") ?? "";
   const ascending = params.get("asc") === "yes";
@@ -1260,17 +1261,7 @@ export function Findings() {
             </select>
           </label>
         )}
-        <Pager
-          offset={offset}
-          total={total}
-          size={page}
-          onGo={(next) => {
-            const now = new URLSearchParams(params);
-            if (next === 0) now.delete("offset");
-            else now.set("offset", String(next));
-            setParams(now);
-          }}
-        />
+        <Pager offset={offset} total={total} size={page} onGo={go} />
       </div>
     </>
   );

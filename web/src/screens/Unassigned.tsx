@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
+import { usePaging } from "./list";
 import { scopeQuery, useScope } from "../app/scope";
 import { useWho } from "../app/session";
 import { unwrap } from "../api/queries";
@@ -22,8 +23,7 @@ const PAGE = 50;
 // when every screen shows one product.
 export function Unassigned() {
   const scope = scopeQuery(useScope());
-  const [params, setParams] = useSearchParams();
-  const offset = Number(params.get("offset") ?? 0);
+  const { offset, go } = usePaging();
   const queries = useQueryClient();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [person, setPerson] = useState("");
@@ -243,12 +243,7 @@ export function Unassigned() {
             total={rows.data?.total}
             offset={offset}
             limit={PAGE}
-            onGo={(next) => {
-              const now = new URLSearchParams(params);
-              if (next === 0) now.delete("offset");
-              else now.set("offset", String(next));
-              setParams(now);
-            }}
+            onGo={go}
           />
         </>
       )}

@@ -4,6 +4,7 @@ import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import { usePaging } from "./list";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -30,7 +31,7 @@ export function Together() {
   const { product = "", stream = "", variant = "", component = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const contains = params.get("contains") ?? "";
-  const offset = Number(params.get("offset") ?? 0);
+  const { offset, go } = usePaging();
   const [typed, setTyped] = useState(contains);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const queries = useQueryClient();
@@ -256,12 +257,7 @@ export function Together() {
             total={issues.data?.total}
             offset={offset}
             limit={PAGE}
-            onGo={(next) => {
-              const now = new URLSearchParams(params);
-              if (next === 0) now.delete("offset");
-              else now.set("offset", String(next));
-              setParams(now);
-            }}
+            onGo={go}
           />
 
           <Claim

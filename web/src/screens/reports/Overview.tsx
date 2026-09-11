@@ -9,6 +9,7 @@ import { Empty } from "../../ui/Empty";
 import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
 import { Sheet } from "./Sheet";
+import { WindowPicker, coveringWords } from "./Window";
 
 // How long the figures cover. Thirty days is the window the remediation
 // metrics names and the one people quote; the others are here because a month
@@ -62,7 +63,7 @@ function openFor(at: Parameters<typeof findingsPath>[0], days: number): string {
 export function Overview() {
   const at = useScope();
   const scope = scopeQuery(at);
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const days = Number(params.get("days") ?? 30);
 
   const pace = useQuery({
@@ -121,26 +122,9 @@ export function Overview() {
     <Sheet
       name="Program overview"
       answers="how the work is going, rather than what it is."
-      asked={`the last ${days} days`}
+      asked={coveringWords(days)}
     >
-      <div className="controls">
-        <div className="seg" role="group" aria-label="Window">
-          {WINDOWS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={days === n}
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                next.set("days", String(n));
-                setParams(next);
-              }}
-            >
-              {n} days
-            </button>
-          ))}
-        </div>
-      </div>
+      <WindowPicker offered={WINDOWS} days={days} />
 
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Keeping pace</h3>
