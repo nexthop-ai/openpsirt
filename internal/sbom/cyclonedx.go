@@ -2,172 +2,87 @@ package sbom
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// The format we read. A document that does not say it is this is refused
-// rather than attempted, because a reader that guesses will eventually guess
-// wrong on a file that looks close enough.
-const formatName = "CycloneDX"
+// The first format read. A document that says it is something no vocabulary
+// here knows is refused rather than attempted, because a reader that guesses
+// will eventually guess wrong on a file that looks close enough.
+const cyclonedxName = "CycloneDX"
 
 // Only the first major version exists, and every field read here has been in
 // it throughout. A second major version would move things, so it is refused
 // rather than read on the assumption that it did not.
-const supportedMajor = "1"
+const cyclonedxMajor = "1"
 
-// ReadHeader reads what a document says about itself and stops.
+// cyclonedxTop routes this format's top-level keys.
 //
-// The contents are skipped rather than parsed, so this stays cheap on a file
-// that is about to be refused. It is not free — the interesting fields are not
-// guaranteed to come first, and some producers sort their keys — but skipping
-// values costs a walk rather than a structure per component.
-func ReadHeader(r io.Reader, lim Limits) (Header, error) {
-	c := newReader(r, lim, true)
-	if err := c.read(); err != nil {
-		return Header{}, err
+// The table is the vocabulary: a key in it belongs to CycloneDX and a key in
+// no vocabulary's table is skipped. It is a table rather than a switch so that
+// a test can assert the vocabularies claim no key in common — which is what
+// makes reading a key without knowing the format yet safe, and a producer that
+// sorts its keys makes that ordinary rather than exotic.
+var cyclonedxTop = map[string]func(*reader) error{
+	"bomFormat":    (*reader).cyclonedxFormatName,
+	"specVersion":  (*reader).cyclonedxFormatVersion,
+	"serialNumber": (*reader).cyclonedxSerial,
+	"metadata":     (*reader).metadata,
+	"components":   (*reader).cyclonedxComponents,
+	"dependencies": (*reader).cyclonedxDependencies,
+}
+
+// cyclonedxSerial reads the identity the document carries for itself.
+func (c *reader) cyclonedxSerial() error { return c.into(&c.doc.Serial) }
+
+// cyclonedxComponents reads what the document ships, unless only the header
+// was asked for.
+func (c *reader) cyclonedxComponents() error {
+	if c.headerOnly {
+		return c.b.skip()
 	}
-	return c.doc.Header, nil
+	_, err := c.componentArray()
+	return err
 }
 
-// Read reads a whole document.
-//
-// Nothing partial is returned. A half-read inventory is indistinguishable from
-// a product that shrank, and acting on one would close findings that are still
-// somebody's problem.
-func Read(r io.Reader, lim Limits) (*Document, error) {
-	c := newReader(r, lim, false)
-	if err := c.read(); err != nil {
-		return nil, err
+// cyclonedxDependencies reads the declared edges, unless only the header was
+// asked for.
+func (c *reader) cyclonedxDependencies() error {
+	if c.headerOnly {
+		return c.b.skip()
 	}
-	return c.finish()
+	return c.dependencies()
 }
 
-// refEdge is one declared dependency, still named by the identifiers the file
-// used. Those identifiers never leave this package: nothing guarantees a
-// producer keeps them stable between builds, so they are good for joining a
-// document to itself and for nothing else.
-type refEdge struct{ parent, child string }
-
-type reader struct {
-	b          *bounded
-	lim        Limits
-	headerOnly bool
-
-	format string
-	spec   string
-
-	doc Document
-	// byRef resolves a document's own identifiers to the components they
-	// named, for the length of the read.
-	byRef map[string]graph.Described
-	// described is every component in document order, one entry per identity.
-	described []graph.Described
-	// stated counts what the document says, deduplicated or not, and charged
-	// counts every edge however it was stated. Both are the bounds; the slices
-	// above are only what survived.
-	stated  int
-	charged int
-	// claimed counts the patch claims a document makes, against the same bound
-	// the two VEX readers charge their statements against. It is not covered
-	// by the component bound: the claims hang off one component's pedigree, so
-	// a document of one component can carry millions of them, and this is read
-	// in full inside the upload request.
-	claimed int
-	seen    map[string]int
-	edges   []refEdge
-	// contained is the structure a producer declared by nesting one component
-	// inside another. It resolves without the document's identifiers, since a
-	// nested component often carries none.
-	contained []graph.Dependency
-}
-
-func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
-	lim = lim.OrDefault()
-	return &reader{
-		b:          newBounded(&capped{r: r, left: lim.MaxBytes}, lim.MaxDepth),
-		lim:        lim,
-		headerOnly: headerOnly,
-		byRef:      map[string]graph.Described{},
-		seen:       map[string]int{},
-	}
-}
-
-// read walks the document once.
-func (c *reader) read() error {
-	err := c.b.object(func(key string) error {
-		switch key {
-		case "bomFormat":
-			if err := c.into(&c.format); err != nil {
-				return err
-			}
-			return c.checkFormatName()
-		case "specVersion":
-			if err := c.into(&c.spec); err != nil {
-				return err
-			}
-			return c.checkFormatVersion()
-		case "serialNumber":
-			return c.into(&c.doc.Serial)
-		case "metadata":
-			return c.metadata()
-		case "components":
-			if c.headerOnly {
-				return c.b.skip()
-			}
-			_, err := c.componentArray()
-			return err
-		case "dependencies":
-			if c.headerOnly {
-				return c.b.skip()
-			}
-			return c.dependencies()
-		default:
-			return c.b.skip()
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("reading scan file: %w", err)
-	}
-	return c.checkFormat()
-}
-
-// checkFormatName refuses a document that says it is something else.
+// cyclonedxFormatName refuses a document that says it is something else.
 //
 // Checked where it is read rather than at the end, so a file that was never
 // going to be read is dropped before the rest of it is walked.
-func (c *reader) checkFormatName() error {
-	if !strings.EqualFold(c.format, formatName) {
-		return fmt.Errorf("scan file is not %s: it says %q", formatName, trim(c.format))
+func (c *reader) cyclonedxFormatName() error {
+	var name string
+	if err := c.into(&name); err != nil {
+		return err
 	}
+	if !strings.EqualFold(name, cyclonedxName) {
+		return fmt.Errorf("scan file is not %s: it says %q", cyclonedxName, trim(name))
+	}
+	c.declared = cyclonedxName
 	return nil
 }
 
-// checkFormatVersion refuses a version this reader was not written against.
-func (c *reader) checkFormatVersion() error {
-	if major, _, _ := strings.Cut(c.spec, "."); major != supportedMajor {
-		return fmt.Errorf("%s version %q is not one this reads", formatName, trim(c.spec))
-	}
-	return nil
-}
-
-// checkFormat refuses anything this reader was not written against, including
-// a document that never said what it was.
-//
-// What it does not check is that the document named a component of its own.
-// The format does not require one, and the scan was filed against something
-// that says what it is about.
-func (c *reader) checkFormat() error {
-	if err := c.checkFormatName(); err != nil {
+// cyclonedxFormatVersion refuses a version this reader was not written
+// against.
+func (c *reader) cyclonedxFormatVersion() error {
+	var spec string
+	if err := c.into(&spec); err != nil {
 		return err
 	}
-	if err := c.checkFormatVersion(); err != nil {
-		return err
+	if major, _, _ := strings.Cut(spec, "."); major != cyclonedxMajor {
+		return fmt.Errorf("%s version %q is not one this reads", cyclonedxName, trim(spec))
 	}
+	c.declared = cyclonedxName
 	return nil
 }
 
@@ -223,18 +138,6 @@ func (c *reader) rootComponent() error {
 	return nil
 }
 
-// bind records what one of the document's own identifiers refers to.
-func (c *reader) bind(ref string, described graph.Described) error {
-	if ref == "" {
-		return nil
-	}
-	if _, clash := c.byRef[ref]; clash {
-		return fmt.Errorf("two components share the identifier %q, so every edge naming it is ambiguous", trim(ref))
-	}
-	c.byRef[ref] = described
-	return nil
-}
-
 // componentArray reads an array of components and returns the ones directly in
 // it. Anything nested deeper has already been recorded by the time it returns.
 func (c *reader) componentArray() ([]graph.Described, error) {
@@ -273,20 +176,10 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		nested    []graph.Described
 		carried   []Suppression
 	)
-	// **Charged on the way in, before anything is held.** The bound was
-	// charged where components are recorded, which returns at once on the
-	// header-only read — so a document putting its components inside the
-	// root component's own array was walked in full during a read that
-	// happens synchronously inside the upload request, binding every one of
-	// them, with nothing but the byte limit saying how many there could be.
-	// Ten million of them at twenty-six bytes each is a quarter of a
-	// gigabyte of file and several gigabytes of process, which is the
-	// failure this bound exists to prevent, arriving in the request rather
-	// than in a background reader.
-	c.stated++
-	if c.stated > c.lim.MaxComponents {
-		return graph.Described{}, "", nil, fmt.Errorf(
-			"scan file describes more than the %d component limit", c.lim.MaxComponents)
+	// Charged on the way in, before anything is held, for the reason the
+	// count itself records.
+	if err := c.count(); err != nil {
+		return graph.Described{}, "", nil, err
 	}
 	err := c.b.object(func(key string) error {
 		switch key {
@@ -499,155 +392,4 @@ func (c *reader) dependencies() error {
 		}
 		return nil
 	})
-}
-
-// add records a component, once per identity.
-//
-// The bound is charged where a component is read rather than here, so that it
-// counts what the document states on every path rather than what this one
-// keeps. Counting the survivors would mean a file of one component repeated
-// is unbounded — every copy is read, held and discarded, and the count that
-// was supposed to stop it never moves.
-func (c *reader) add(described graph.Described) error {
-	if c.headerOnly {
-		return nil
-	}
-	// One package described twice is one package, and the two descriptions are
-	// not always the same description. A build that merges two sources emits
-	// one with a vulnerability-database identifier and what it was built from,
-	// and one with neither — so keeping whichever arrived first throws away
-	// whatever only the other one knew, which is the identifier a scanner
-	// matches on about half the time.
-	//
-	// So they are combined rather than deduplicated: the first statement of
-	// something stands, and anything it did not state is taken from the next
-	// description that does. Nothing is overwritten, because two producers
-	// disagreeing is not something this can settle, and the first answer is at
-	// least the one everything downstream already saw.
-	identity := described.Identity()
-	if at, seen := c.seen[identity]; seen {
-		c.described[at].FillFrom(described)
-		return nil
-	}
-	c.seen[identity] = len(c.described)
-	c.described = append(c.described, described)
-	return nil
-}
-
-// claim counts one more patch claim against the limit.
-//
-// Charged as each one is read rather than after the array, for the reason the
-// edge count is: what a bound has to stop is the walk, and a count taken after
-// the walk has already done the work.
-func (c *reader) claim() error {
-	c.claimed++
-	if c.claimed > c.lim.MaxStatements {
-		return fmt.Errorf("scan file carries more than the %d claim limit", c.lim.MaxStatements)
-	}
-	return nil
-}
-
-// charge counts one more edge against the limit.
-func (c *reader) charge() error {
-	c.charged++
-	if c.charged > c.lim.MaxEdges {
-		return fmt.Errorf("scan file declares more than the %d dependency limit", c.lim.MaxEdges)
-	}
-	return nil
-}
-
-// contain records one component holding another, which a producer declares by
-// nesting rather than by naming an edge.
-func (c *reader) contain(parent, child graph.Described) error {
-	if err := c.charge(); err != nil {
-		return err
-	}
-	c.contained = append(c.contained, graph.Dependency{Parent: parent, Child: child})
-	return nil
-}
-
-// finish resolves the document's own identifiers into components.
-func (c *reader) finish() (*Document, error) {
-	rootIdentity := c.doc.Root.Identity()
-
-	c.doc.Components = make([]graph.Described, 0, len(c.described))
-	for _, described := range c.described {
-		if described.Identity() == rootIdentity {
-			continue
-		}
-		c.doc.Components = append(c.doc.Components, described)
-	}
-
-	declared := make([]graph.Dependency, 0, len(c.edges)+len(c.contained))
-	for _, e := range c.edges {
-		// An edge naming something the document never describes is dropped
-		// rather than taken as a malformed file. Producers differ in how
-		// completely they state a graph, and one unresolvable edge is not a
-		// reason to reject every component in a document of tens of
-		// thousands. Inventing the missing component is still not done: the
-		// edge simply goes nowhere and is counted.
-		parent, ok := c.byRef[e.parent]
-		if !ok {
-			c.doc.DanglingEdges++
-			continue
-		}
-		child, ok := c.byRef[e.child]
-		if !ok {
-			c.doc.DanglingEdges++
-			continue
-		}
-		declared = append(declared, graph.Dependency{Parent: parent, Child: child})
-	}
-	declared = append(declared, c.contained...)
-
-	reached := map[string]bool{}
-	pairs := map[[2]string]bool{}
-	for _, dep := range declared {
-		parent, child := dep.Parent.Identity(), dep.Child.Identity()
-		if parent == child {
-			// Two of a document's own identifiers turned out to describe the
-			// same component. The producer could not have known — its
-			// identifiers differ — and an edge from a component to itself
-			// says nothing.
-			c.doc.SelfReferences++
-			continue
-		}
-		pair := [2]string{parent, child}
-		if pairs[pair] {
-			continue
-		}
-		pairs[pair] = true
-		reached[child] = true
-		c.doc.Dependencies = append(c.doc.Dependencies, dep)
-	}
-
-	for _, described := range c.doc.Components {
-		if !reached[described.Identity()] {
-			c.doc.Unrooted++
-		}
-	}
-	return &c.doc, nil
-}
-
-// into reads one string into dst.
-func (c *reader) into(dst *string) error {
-	value, err := c.b.str()
-	if err != nil {
-		return err
-	}
-	*dst = value
-	return nil
-}
-
-// trim bounds what a message quotes back.
-//
-// Everything in a scan file was written by somebody else, and an error is one
-// of the few places it reaches a person. A name the length of the file would
-// make a log unreadable and a response unbounded.
-func trim(s string) string {
-	const most = 120
-	if utf8.RuneCountInString(s) <= most {
-		return s
-	}
-	return string([]rune(s)[:most]) + "…"
 }

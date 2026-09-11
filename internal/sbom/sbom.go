@@ -144,6 +144,15 @@ type Document struct {
 	// DanglingEdges counts edges dropped for naming something the document
 	// never describes.
 	DanglingEdges int
+	// FileReferences counts edges dropped for naming a file the document
+	// describes rather than a package. A format that catalogs files states
+	// most of its structure between a package and the files it installed,
+	// which is below the level anything here tracks: nothing matches a
+	// vulnerability against a path. Counted apart from the edges that name
+	// nothing at all, so that a number meant to say the producer's derivation
+	// changed does not move with how much file detail it was configured to
+	// emit.
+	FileReferences int
 	// SelfReferences counts edges dropped for having the same component at
 	// both ends. Producers do not emit those deliberately; they appear when
 	// two of a document's own identifiers turn out to describe the same

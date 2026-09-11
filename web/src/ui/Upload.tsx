@@ -10,7 +10,7 @@ import { Icon } from "./Icons";
 
 // Uploading an inventory by hand: the same endpoint a pipeline uses, for a
 // build with no automation yet, or for trying the tool on any SBOM to hand.
-// Exactly the two parts the endpoint takes — one CycloneDX inventory and any
+// Exactly the two parts the endpoint takes — one inventory and any
 // number of OpenVEX suppression documents — and nothing it does not.
 export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const at = useScope();
@@ -195,7 +195,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         <label className={inventory ? "dropzone has" : "dropzone"}>
           <input
             type="file"
-            accept=".json,.cdx.json,application/json"
+            accept=".json,.cdx.json,.spdx.json,application/json"
             onChange={(event) => setInventory(event.target.files?.[0] ?? null)}
           />
           <Icon name="upload" />
@@ -206,9 +206,10 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
               </>
             ) : (
               <>
-                <b>Drop a CycloneDX 1.x JSON file</b> (1.4 to 1.7; a 2.x is refused by name), or
-                click to choose. SPDX 2.3 <span className="todo">not built</span>. The scan runs
-                here against the current vulnerability database.
+                <b>Drop a CycloneDX 1.x or SPDX 2.x JSON file</b> (CycloneDX 1.4 to 1.7, SPDX
+                2.2 and 2.3; a later major version of either is refused by name), or click to
+                choose. The file says which format it is. The scan runs here against the current
+                vulnerability database.
               </>
             )}
           </span>

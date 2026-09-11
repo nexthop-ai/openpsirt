@@ -12,8 +12,8 @@ somewhere to triage what it finds and follow it through to a fix.
 
 ## What it does
 
-- **Takes in inventories** pushed by build pipelines, in CycloneDX form, along
- with the suppressions the build carries patches for
+- **Takes in inventories** pushed by build pipelines, in CycloneDX or SPDX
+ form, along with the suppressions the build carries patches for
 - **Runs the scan here**, not in the build, so every product is measured
  against the same scanner and the same vulnerability data
 - **Keeps the dependency graph**, so you can see why a vulnerable component is
