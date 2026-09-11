@@ -69,14 +69,24 @@ export function Finding() {
   const who = useWho();
   const at = { product, stream, variant, vulnerability, component };
   const [recorded, setRecorded] = useState<Recorded | null>(null);
+  // What the decision form starts from, and how many times it has been given
+  // one. Starting from something is a fresh form rather than an edit to the one
+  // on screen, so the count is what the form is mounted against — two prefills
+  // carrying the same words are still two, and the second has to take.
   const [prefill, setPrefill] = useState<{
-    outcome?: string;
-    justification?: string;
-    reasoning?: string;
-    // Cited, never applied: what a VEX document said is not this claim, and
-    // this is what lets a later revision to it be noticed.
-    fromStatement?: number;
-  } | null>(null);
+    n: number;
+    from: {
+      outcome?: string;
+      justification?: string;
+      reasoning?: string;
+      // Cited, never applied: what a VEX document said is not this claim, and
+      // this is what lets a later revision to it be noticed.
+      fromStatement?: number;
+    } | null;
+  }>({ n: 0, from: null });
+  function startFrom(from: (typeof prefill)["from"]) {
+    setPrefill((was) => ({ n: was.n + 1, from }));
+  }
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
 
   const list = useMemo(() => new URLSearchParams(from), [from]);
@@ -697,7 +707,7 @@ export function Finding() {
                           type="button"
                           className="btn ghost"
                           onClick={() =>
-                            setPrefill({
+                            startFrom({
                               fromStatement: one.id,
                               outcome: one.offers as string,
                               justification:
@@ -749,7 +759,7 @@ export function Finding() {
                         className="btn ghost"
                         onClick={() => {
                           setExtending({ claimId: s.claim_id, decisionId: s.decision_id });
-                          setPrefill({
+                          startFrom({
                             outcome: "not-applicable",
                             justification: s.justification,
                             reasoning: s.reasoning,
@@ -768,11 +778,12 @@ export function Finding() {
               places={places}
               onDone={(r) => {
                 setRecorded(r);
-                setPrefill(null);
+                startFrom(null);
                 setExtending(null);
               }}
               extending={extending}
-              prefill={prefill}
+              prefill={prefill.from}
+              key={prefill.n}
             />
           </>
         )}
@@ -855,7 +866,7 @@ export function Finding() {
             at={at}
             undecided={places.some((p) => p.decision == null)}
             onReuse={(reasoning, outcome, justification) => {
-              setPrefill({ reasoning, outcome, justification });
+              startFrom({ reasoning, outcome, justification });
               document
                 .querySelector(".acting .card")
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });

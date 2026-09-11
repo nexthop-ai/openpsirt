@@ -1,6 +1,6 @@
 import { notACredential } from "../ui/noautofill";
 import { RECORDABLE } from "../ui/severities";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -10,6 +10,7 @@ import { mayOf, useWho } from "../app/session";
 import { Editor } from "../ui/Editor";
 import { Suggest } from "../ui/Suggest";
 import { Failed } from "../ui/Failed";
+import { useReseed } from "../ui/reseed";
 import { Scoring } from "../ui/Scoring";
 import { Weaknesses } from "../ui/Weaknesses";
 
@@ -53,7 +54,10 @@ export function Record() {
   // for a handful of names in a build.
   const [version, setVersion] = useState("");
   const [ecosystem, setEcosystem] = useState("");
-  const [disclosed, setDisclosed] = useState(false);
+  // Which of the two somebody pressed, and nothing until they press one. The
+  // value that is read is worked out below, because what is on offer depends
+  // on a right that is not known until the session is.
+  const [chose, setChose] = useState<boolean | null>(null);
   const [vector, setVector] = useState("");
   // Files that prove it — a test case, a capture, a screenshot. Held until the
   // finding exists, because an attachment hangs off an issue and there is no
@@ -80,7 +84,17 @@ export function Record() {
   // Defaulting to undisclosed unless the person cannot record one, which is
   // the case this exists for. Defaulting the other way makes the dangerous
   // mistake the quiet one.
-  useEffect(() => setDisclosed(!mayHide), [mayHide]);
+  //
+  // Worked out rather than stored, so there is no frame in which the form is
+  // drawn one way and corrected to the other once the session has loaded: for
+  // somebody who may not hide a flaw, disclosed is the only answer there is,
+  // and the control that would say otherwise is disabled.
+  const disclosed = mayHide ? (chose ?? false) : true;
+  // The choice is about a flaw in this product, so changing the product unmakes
+  // it and the default falls back to whatever the new one's rights allow. A
+  // choice that carried across would carry "public" onto a product where
+  // undisclosed is the default, which is the quiet dangerous mistake again.
+  useReseed(product, () => setChose(null));
 
   const products = useQuery({
     queryKey: ["products"],
@@ -468,11 +482,11 @@ export function Record() {
               type="button"
               aria-pressed={!disclosed}
               disabled={!mayHide}
-              onClick={() => setDisclosed(false)}
+              onClick={() => setChose(false)}
             >
               Undisclosed
             </button>
-            <button type="button" aria-pressed={disclosed} onClick={() => setDisclosed(true)}>
+            <button type="button" aria-pressed={disclosed} onClick={() => setChose(true)}>
               Public
             </button>
           </div>

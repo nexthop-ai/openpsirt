@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useClickAway } from "../ui/away";
+import { useReseed } from "../ui/reseed";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -35,10 +36,14 @@ export function Scope() {
   // A build is required here, so "all" is not on offer at any level.
   const whole = needsBuild(pathname);
 
-  useEffect(() => {
+  // Applying a partial pick remembers it and comes back through the address,
+  // so the pending pick follows what was applied. The panel stays open across
+  // it — which is why this re-seeds the two fields rather than remounting the
+  // panel, since a remount would close it on the first of the three choices.
+  useReseed(`${at.product ?? ""}\u001f${at.stream ?? ""}`, () => {
     setProduct(at.product ?? "");
     setStream(at.stream ?? "");
-  }, [at.product, at.stream]);
+  });
 
   useClickAway(box, open, () => setOpen(false));
 

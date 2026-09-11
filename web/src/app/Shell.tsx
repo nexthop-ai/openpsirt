@@ -12,14 +12,15 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Notices } from "../ui/Notices";
 import { Icon } from "../ui/Icons";
+import { useReseed } from "../ui/reseed";
 import { UploadDrawer } from "../ui/Upload";
 import {
   LOOKS,
   applyLook,
   chosenLook,
   clearLook,
-  currentLook,
   followSystem,
+  systemLook,
   type Look,
 } from "./look";
 import type { Who } from "./session";
@@ -58,8 +59,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
     });
   }
   const { pathname } = useLocation();
+  // The panel is about the screen somebody is leaving, so arriving on another
+  // one shuts it.
+  useReseed(pathname, () => setMenu(false));
   useEffect(() => {
-    setMenu(false);
     // A new screen starts at its own top. Picking an entry from the foot of
     // the rail used to leave the document where it was, so the screen that
     // arrived was already scrolled past its heading and its controls — which
@@ -513,23 +516,28 @@ function Group({
 // Who you are, with the look menu and the way out underneath.
 function Me({ who }: { who: Who }) {
   const [open, setOpen] = useState(false);
-  // What is drawn, and what was asked for. They differ for somebody who has
-  // chosen nothing: the operating system is answering, and the menu has to
-  // show which of the two that came out as while still marking the choice
-  // as unmade.
-  const [look, setLook] = useState<Look>(() => currentLook());
+  // What was asked for, and what the machine says. They differ for somebody who
+  // has chosen nothing: the operating system is answering, and the menu has to
+  // show which of the two that came out as while still marking the choice as
+  // unmade. What is drawn is the one worked out from the two.
   const [pinned, setPinned] = useState<Look | null>(() => chosenLook());
+  const [system, setSystem] = useState<Look>(() => systemLook());
+  const look = pinned ?? system;
   const box = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (pinned) applyLook(pinned);
-    else clearLook();
-    setLook(currentLook());
-  }, [pinned]);
 
   // While nothing is pinned, a machine that turns dark at sunset turns this
   // dark at sunset.
-  useEffect(() => followSystem(setLook), []);
+  useEffect(() => followSystem(setSystem), []);
+
+  // Choosing is the only thing that moves the look, so the document is written
+  // where the choice is made. The attribute is already on the element before
+  // anything paints — the page stamps it — so there is nothing to apply on
+  // arrival, and an effect that re-applied it was writing what was there.
+  function choose(next: Look | null) {
+    setPinned(next);
+    if (next) applyLook(next);
+    else clearLook();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -568,7 +576,7 @@ function Me({ who }: { who: Who }) {
             role="menuitemradio"
             aria-checked={pinned === null}
             aria-current={pinned === null ? "true" : undefined}
-            onClick={() => setPinned(null)}
+            onClick={() => choose(null)}
           >
             <span
               className="swatch"
@@ -587,7 +595,7 @@ function Me({ who }: { who: Who }) {
               role="menuitemradio"
               aria-checked={pinned === each.name}
               aria-current={pinned === each.name ? "true" : undefined}
-              onClick={() => setPinned(each.name)}
+              onClick={() => choose(each.name)}
             >
               <span
                 className="swatch"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Failed } from "./Failed";
+import { useReseed } from "./reseed";
 
 // Where a decision applies beyond this build, as a guided review.
 //
@@ -64,16 +65,20 @@ export function Review({
   const [applied, setApplied] = useState<Set<string>>(() => new Set());
   const n = plan.offered.length;
 
+  // Opened again is the first step again, with nothing ticked.
+  useReseed(String(open), () => {
+    if (!open) return;
+    setStep(0);
+    setApplied(new Set());
+  });
+
+  // What the sheet does to the page underneath it, which is the document's
+  // rather than the sheet's and so belongs in an effect.
   useEffect(() => {
-    if (open) {
-      setStep(0);
-      setApplied(new Set());
-      document.body.dataset.sheet = "open";
-      // The keys are the sheet's now, not the field's that opened it.
-      (document.activeElement as HTMLElement | null)?.blur?.();
-    } else {
-      delete document.body.dataset.sheet;
-    }
+    if (!open) return;
+    document.body.dataset.sheet = "open";
+    // The keys are the sheet's now, not the field's that opened it.
+    (document.activeElement as HTMLElement | null)?.blur?.();
     return () => {
       delete document.body.dataset.sheet;
     };

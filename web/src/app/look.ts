@@ -27,7 +27,7 @@ export type Look = (typeof LOOKS)[number]["name"];
 const KEPT = "openpsirt.look";
 
 // What the operating system says, for somebody who has not chosen.
-function preferred(): Look {
+export function systemLook(): Look {
   try {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   } catch {
@@ -47,10 +47,6 @@ export function chosenLook(): Look | null {
   return null;
 }
 
-export function currentLook(): Look {
-  return chosenLook() ?? preferred();
-}
-
 export function applyLook(look: Look) {
   document.documentElement.setAttribute("data-look", look);
   try {
@@ -67,7 +63,7 @@ export function clearLook() {
   } catch {
     // Nothing was kept, so nothing has to be removed.
   }
-  document.documentElement.setAttribute("data-look", preferred());
+  document.documentElement.setAttribute("data-look", systemLook());
 }
 
 // Follow the operating system while nobody has chosen. Returns the unsubscribe.
@@ -76,7 +72,7 @@ export function followSystem(onChange: (look: Look) => void): () => void {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const moved = () => {
       if (chosenLook() === null) {
-        const look = preferred();
+        const look = systemLook();
         document.documentElement.setAttribute("data-look", look);
         onChange(look);
       }

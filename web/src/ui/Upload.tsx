@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -7,6 +7,7 @@ import { useScope } from "../app/scope";
 import { Drawer } from "./Drawer";
 import { Failed } from "./Failed";
 import { Icon } from "./Icons";
+import { useReseed } from "./reseed";
 
 // Uploading an inventory by hand: the same endpoint a pipeline uses, for a
 // build with no automation yet, or for trying the tool on any SBOM to hand.
@@ -27,8 +28,9 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const [held, setHeld] = useState<number | null>(null);
 
   // Prefilled from the scope each time it opens, so the common case is
-  // choosing a file and nothing else.
-  useEffect(() => {
+  // choosing a file and nothing else. The drawer stays mounted while it is
+  // shut, because closing it is an animation on the element that is there.
+  useReseed(String(open), () => {
     if (!open) return;
     setProduct(at.product ?? "");
     setStream(at.stream ?? "");
@@ -36,7 +38,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
     setInventory(null);
     setSuppressions([]);
     setHeld(null);
-  }, [open, at.product, at.stream, at.variant]);
+  });
 
   const products = useQuery({
     queryKey: ["products"],
