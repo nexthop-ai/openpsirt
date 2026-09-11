@@ -67,8 +67,13 @@ type FindingBody struct {
 	// Summary is the one line of the issue's own words the row shows. Without
 	// it a list of fifty reads "CVE-2026-74280 · linux-image" fifty times, and
 	// telling two rows apart costs a click each.
-	Summary   string `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding"`
-	Severity  string `json:"severity,omitempty" doc:"As the scanner rated it. A word, not a score"`
+	Summary string `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding"`
+	// The rating in force rather than the published one, which is what the
+	// row is ranked, filtered and clocked by — so a word that said "as the
+	// scanner rated it" meant the published rating on the evidence and the
+	// in-force one here, which is the disagreement this list exists not to
+	// have.
+	Severity  string `json:"severity,omitempty" doc:"The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"`
 	Component string `json:"component" doc:"What carries it"`
 	Version   string `json:"version" doc:"The version that ships"`
 	Upstream  string `json:"upstream,omitempty" doc:"What a fork was made from, where it is one"`
@@ -168,14 +173,14 @@ type FindingsOutput struct {
 	}
 }
 
-// ComponentFindingBody is one component at one version, with what is open
-// against it counted.
 // UpgradeBody is a version a component could move to, and what that would fix.
 type UpgradeBody struct {
 	To     string `json:"to" doc:"The version, as whoever packages the component wrote it"`
 	Issues int    `json:"issues" doc:"How many distinct vulnerabilities open here it would close"`
 }
 
+// ComponentFindingBody is one component at one version, with what is open
+// against it counted.
 type ComponentFindingBody struct {
 	Component string `json:"component"`
 	Version   string `json:"version"`
@@ -204,11 +209,6 @@ type ComponentFindingsOutput struct {
 	}
 }
 
-// filter turns what was asked for into what the store narrows by.
-//
-// One mapping for both lists, for the same reason the parameters are one
-// struct: two of these would drift, and the drift would be a filter that
-// answers on one list and is quietly ignored on the other.
 // planned is what a promised upgrade should do to the list. "either" is a word
 // in the request and the absence of a filter in the store, because a screen
 // that narrows by default needs a way to say "stop" that is distinguishable
@@ -231,6 +231,11 @@ func fixStates(words []string) []finding.FixState {
 	return out
 }
 
+// filter turns what was asked for into what the store narrows by.
+//
+// One mapping for both lists, for the same reason the parameters are one
+// struct: two of these would drift, and the drift would be a filter that
+// answers on one list and is quietly ignored on the other.
 func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 	narrowed := finding.Filter{
 		MinSeverity:   n.Severity,
@@ -309,7 +314,7 @@ type Narrowing struct {
 	Fixable    bool     `query:"fixable" doc:"Keep only issues where an upstream fixed version is known"`
 	BelowFloor bool     `query:"below_floor" doc:"Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list"`
 	Component  []string `query:"component,explode" maxItems:"200" maxLength:"191" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
-	Tag        []string `query:"tag,explode" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags"`
+	Tag        []string `query:"tag,explode" maxItems:"200" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags"`
 	Search     string   `query:"q" maxLength:"200" doc:"Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name"`
 	Ecosystem  []string `query:"ecosystem,explode" maxItems:"200" maxLength:"64" doc:"Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"`
 	// The two questions about the release itself, kept apart because a tag
@@ -329,9 +334,9 @@ type Narrowing struct {
 	DueWithin    int       `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
 	Overdue      bool      `query:"overdue" doc:"Keep only what is already past its deadline"`
 	FixState     []string  `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in"`
-	Weakness     []string  `query:"weakness,explode" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
+	Weakness     []string  `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
 	SentBack     bool      `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
-	Publisher    []string  `query:"vex_publisher,explode" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
+	Publisher    []string  `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
 	OpenedAfter  string    `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
 	ClosedAfter  string    `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
 	DecidedAfter string    `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`

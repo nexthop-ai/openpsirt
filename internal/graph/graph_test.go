@@ -160,11 +160,6 @@ func TestFirstSnapshotIsStored(t *testing.T) {
 	})
 }
 
-// TestAnUnchangedRebuildWritesNothing is the claim the whole interval design
-// exists for. A nightly build that changed nothing must cost nothing: not a
-// row, not a re-stamped timestamp. Without it, storage grows with the calendar
-// rather than with change, and a product tracked for a year costs the same
-// whether or not anything happened to it.
 func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 	// The product's version changes on every build — a real one carries a
 	// build stamp — so if that reached identity, the node standing for the
@@ -186,6 +181,10 @@ func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 	})
 }
 
+// The claim the whole interval design exists for. A nightly build that changed
+// nothing must cost nothing: not a row, not a re-stamped timestamp. Without it,
+// storage grows with the calendar rather than with change, and a product
+// tracked for a year costs the same whether or not anything happened to it.
 func TestAnUnchangedRebuildWritesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree()); err != nil {

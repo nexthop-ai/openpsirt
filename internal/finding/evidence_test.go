@@ -37,7 +37,7 @@ func TestDisclosureIsAskedOfEveryPlaceAndTheMatchOfAny(t *testing.T) {
 		},
 	}
 	issue := Vulnerability{Identifier: "CVE-2026-1", Severity: "high"}
-	evidence := evidenceFrom(rows, issue, graph.Component{Name: "curl"}, nil, nil)
+	evidence := evidenceFrom(rows, issue, graph.Component{Name: "curl"}, nil, nil, nil)
 
 	if !evidence.Undisclosed {
 		t.Error("a fold with one undisclosed place among three reads as disclosed")
@@ -61,7 +61,7 @@ func TestAFoldWithNothingUndisclosedSaysSo(t *testing.T) {
 		{Component: "libcurl4t64", Visibility: string(access.Public), OpenedAt: time.Now().UTC()},
 	}
 	evidence := evidenceFrom(rows, Vulnerability{Identifier: "CVE-2026-2"},
-		graph.Component{Name: "curl"}, nil, nil)
+		graph.Component{Name: "curl"}, nil, nil, nil)
 	if evidence.Undisclosed {
 		t.Error("a fold whose every place is public reads as undisclosed")
 	}

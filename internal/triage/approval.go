@@ -390,25 +390,3 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	}
 	return covered, nil
 }
-
-// readableVisibilities is what this person may read across the products a set
-// of rows sits in: private where they may read private on every one of those
-// products, public only otherwise.
-//
-// A claim is one action on one build, so its rows share a product and this is
-// the per-row rule asked once. Where a set does span products the answer is
-// the narrower one, which discloses less rather than more.
-func readableVisibilities(subject access.Subject, ids []int64, s *Store, ctx context.Context) []access.Visibility {
-	var products []int64
-	if err := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr("DISTINCT de.product_id").
-		Where("de.id IN (?)", bun.List(ids)).Scan(ctx, &products); err != nil {
-		return []access.Visibility{access.Public}
-	}
-	for _, product := range products {
-		if !subject.Reads(access.Private, product) {
-			return []access.Visibility{access.Public}
-		}
-	}
-	return []access.Visibility{access.Public, access.Private}
-}

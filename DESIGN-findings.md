@@ -779,6 +779,23 @@ three questions:
 The split turned up a doc comment describing the component grouping sitting two
 hundred lines away, above an unrelated type.
 
+The narrowing, the page and the component view each have their own test file
+already, which is what says the seam is real rather than a line count. What is
+left beside them is the naming layer they share.
+
+### What stays as it is
+
+Recorded because the conclusion is the deliverable: a review that asks the same
+question next year should find the answer rather than the question.
+
+| Left alone | Why |
+|---|---|
+| `Store.Apply` | Applying a scan is one act with four phases that share too much state to separate without passing a ten-field struct between them. It is also the model the rest of the package is held to: every value the closure uses it fetches inside the closure, the target is locked first, the difference is computed in memory and written as bounded batches |
+| `Store.Enter` | Fifty lines of refusals, each with its own reason, and one transaction. Both belong to the act; what it needed was the transaction discipline, which it has |
+| `fix.go` | Two responsibilities with a clean read-and-write seam, and one subject — upgrade commitments. Splitting it now would be splitting to hit a number. The cut is there when the write half grows |
+| The schema migrations | Each is one list of `CREATE TABLE` statements. The length is the schema, the comment beside each column is what makes it legible, and splitting a table group across two functions would break the ordering the chain exists to check |
+| `sortedBy` and `sortedAcross` | Twenty near-identical lines whose tie-breaks genuinely differ. Both already read from the one allowlist, which is the half that matters; a shared function taking the tie-break as an argument saves a line and costs a call site that has to be read to know which list it is |
+
 ## Limits
 
 - **Incomplete upgrades are stated as inequality, not ordering.** Nothing here

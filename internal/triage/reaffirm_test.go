@@ -3,6 +3,7 @@ package triage_test
 import (
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -30,7 +31,7 @@ func TestReAffirmingAfterABumpNeedsNoSecondPerson(t *testing.T) {
 	// everywhere, not only here.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		agreed := f.judged(t, f.at(), 700)
+		agreed := f.judged(t, f.at(), finding.SeverityScore("high"))
 		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
 			t.Fatal(err)
 		}
@@ -84,6 +85,41 @@ func TestSeverityRisingSendsItBackForFullApproval(t *testing.T) {
 		}
 		if again.State == triage.Approved {
 			t.Error("a claim about a much worse issue inherited the old agreement")
+		}
+	})
+}
+
+func TestARatingMadeHereAlsoSendsItBackForFullApproval(t *testing.T) {
+	// The same rule, asked of the half that is ours. An assessment writes the
+	// word and never the published score, so a comparison reading that score
+	// alone saw nothing move: an issue published `high` with no vector scored
+	// zero before somebody rated it critical and zero afterwards, and a
+	// dismissal agreed to once was re-affirmed with nobody else.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.judged(t, f.at(), finding.SeverityScore("high"))
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		// Rated here rather than by the world, which is the case the
+		// published score cannot see.
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
+			Set("assessed_severity = ?", "critical").
+			Where("id = ?", f.issue).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		moved := f.at()
+		moved.ComponentUpstream = "1.2.4"
+		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
+			PreviousID: agreed.ID, Place: moved,
+			Reasoning: "Still not reached.", By: f.proposer,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.State == triage.Approved {
+			t.Error("a claim about an issue rated worse here inherited the old agreement")
 		}
 	})
 }
@@ -169,7 +205,11 @@ func TestRepetitionAloneChangesNothing(t *testing.T) {
 	// having changed, which every other rule here refuses to do.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		previous := f.judged(t, f.at(), 700)
+		// Agreed to at what the issue scores, which is what the handler
+		// records: the comparison is "has it risen since", so a claim stored
+		// at some other number would be testing the arithmetic rather than
+		// the rule.
+		previous := f.judged(t, f.at(), finding.SeverityScore("high"))
 		if err := agreeTo(ctx, f.store, f.reviewer, previous.ClaimID, ""); err != nil {
 			t.Fatal(err)
 		}
@@ -199,7 +239,7 @@ func TestAWithdrawnAgreementIsNotResurrectedByAVersionBump(t *testing.T) {
 	// what state it is in would undo a withdrawal with a version bump.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		agreed := f.judged(t, f.at(), 700)
+		agreed := f.judged(t, f.at(), finding.SeverityScore("high"))
 		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
 			t.Fatal(err)
 		}
@@ -235,7 +275,7 @@ func TestAWithdrawnAgreementIsNotResurrectedByAVersionBump(t *testing.T) {
 func TestACarriedAgreementSaysItWasCarried(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		agreed := f.judged(t, f.at(), 700)
+		agreed := f.judged(t, f.at(), finding.SeverityScore("high"))
 		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
 			t.Fatal(err)
 		}

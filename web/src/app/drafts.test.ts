@@ -94,6 +94,37 @@ describe("drafts", () => {
     expect(restore("revise:7")).toBe("");
   });
 
+  it("takes away a draft of your own that has lapsed, on the next sign-in", () => {
+    // The sweep's other branch. Restoring a draft checks its age too, so a
+    // lapsed one is never handed back either way — but only the sweep takes
+    // it out of storage, and how long private triage text sits in a browser
+    // for somebody who never reopens the form is what the window is for.
+    belongTo("oidc:ana");
+    keep("revise:9", "written before a meeting");
+    const key = "openpsirt.draft.oidc:ana:revise:9";
+    const held = JSON.parse(window.localStorage.getItem(key)!) as { text: string; at: number };
+    expect(held.text).toBe("written before a meeting");
+    // Older than the window, which nothing else in these tests reaches.
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ text: held.text, at: held.at - 48 * 3600 * 1000 }),
+    );
+
+    // Being recognized again is what runs the sweep.
+    belongTo("oidc:ana");
+
+    expect(window.localStorage.getItem(key)).toBeNull();
+  });
+
+  it("keeps a draft of your own that is inside the window", () => {
+    // The other direction, so the test above cannot pass by sweeping
+    // everything.
+    belongTo("oidc:ana");
+    keep("revise:10", "still being written");
+    belongTo("oidc:ana");
+    expect(restore("revise:10")).toBe("still being written");
+  });
+
   it("leaves what is not a draft alone", () => {
     // The store holds the chosen theme and the scope somebody picked, under
     // their own names. Signing out is not a reason to forget which colors

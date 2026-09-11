@@ -19,6 +19,7 @@ Satisfies REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67.
 - [Path version](#path-version)
 - [Declared privileges](#declared-privileges)
 - [Representation](#representation)
+- [File organization](#file-organization)
 - [Limits](#limits)
 
 ## No private half
@@ -229,6 +230,29 @@ A caller receives the source and renders it themselves. The server has already
 refused what its policy forbids at submission (REQ-67), so the text is known-good
 under the rules in force when it was written; rules written since are the
 renderer's to apply. The rules are in `DESIGN-text.md`.
+
+## File organization
+
+One file per subject, where a subject is a noun somebody acts on rather than a
+count of lines. The catalog is three — declaring what exists, stating policy on
+it, and reading it — because stating policy is the group that silently rewrites
+what the tool reports and was the hardest of the three to find inside a
+five-hundred-line registration. Keys left the people endpoints for the same
+reason: a different noun, a different lifetime, and the one act here that hands
+out a new way in.
+
+The package's authorization primitives sit beside the declarations they
+enforce. A declaration in one file and the primitive enforcing it in another
+with nothing to do with it is what makes the privilege ladder hard to audit.
+
+### What stays as it is
+
+Recorded because the conclusion is the deliverable.
+
+| Left alone | Why |
+|---|---|
+| `findings.go` | The findings list, its filter mapping, and the narrowing, paging and single-build types every other list embeds. Cutting it would separate the filter struct from the one function that reads it |
+| The two-build `locate` closures in the report handlers | The shared part is four lines over different response shapes. A helper whose body is an argument list is harder to read than the repetition |
 
 ## Limits
 

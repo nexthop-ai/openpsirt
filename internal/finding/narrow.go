@@ -90,16 +90,6 @@ func SortKeys() []SortKey {
 	return []SortKey{ByUrgency, ByAge, ByDeadline, ByPlaces, ByLikelihood, BySeverity}
 }
 
-// SortsBy reports whether this key is one the list actually orders by.
-//
-// A key offered and not honored is the silent half: it is accepted, the list
-// comes back in urgency order, and nothing says the order asked for was not
-// the order given.
-func SortsBy(key SortKey) bool {
-	_, known := order[key]
-	return known
-}
-
 // Filter narrows what is open before it is paged.
 //
 // Narrowing belongs here rather than in whatever is displaying the result. A
@@ -559,34 +549,20 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	q = f.whatUpstreamDid(q)
 	if cwes := trimmed(f.Weaknesses); len(cwes) > 0 {
-		// The weaknesses are one comma-joined column, so this is a membership
-		// test spelled as four exact shapes rather than as one padded LIKE.
-		// Padding would want string concatenation, and `||` is logical OR on
-		// two of the four engines — the operands coerce to numbers and the
-		// whole condition collapses. Four patterns are portable and exact,
-		// where a bare LIKE would match CWE-79 for CWE-7.
-		q = q.Where("f.vulnerability_id IN (?)",
-			q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
-				WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-					for _, cwe := range cwes {
-						name := strings.ToUpper(cwe)
-						// The equality takes the name as typed; the three
-						// patterns take it escaped, because the name is
-						// request text and a percent in it would match past
-						// the comma these shapes exist to respect — which is
-						// the CWE-7-matching-CWE-79 case, arriving through
-						// the term rather than through the shape.
-						pattern := strings.ToUpper(containsTerm(cwe))
-						q = q.WhereGroup(" OR ", func(q *bun.SelectQuery) *bun.SelectQuery {
-							return q.
-								WhereOr("UPPER(v.weaknesses) = ?", name).
-								WhereOr(`UPPER(v.weaknesses) LIKE ? ESCAPE '#'`, pattern+",%").
-								WhereOr(`UPPER(v.weaknesses) LIKE ? ESCAPE '#'`, "%,"+pattern).
-								WhereOr(`UPPER(v.weaknesses) LIKE ? ESCAPE '#'`, "%,"+pattern+",%")
-						})
-					}
-					return q
-				}))
+		// One indexed lookup against the table that holds them.
+		//
+		// The classification was a comma-joined column, which made a
+		// membership test a substring match — and a bare LIKE answers CWE-79
+		// for a search for CWE-7, so it took four escaped patterns per name
+		// asked, none of which an index can be used for, over every issue.
+		// Every other multi-valued attribute here is a table; this one is too.
+		upper := make([]string, 0, len(cwes))
+		for _, cwe := range cwes {
+			upper = append(upper, strings.ToUpper(strings.TrimSpace(cwe)))
+		}
+		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability_weakness" AS vw
+			WHERE vw.vulnerability_id = f.vulnerability_id
+			  AND vw.cwe IN (?))`, bun.List(upper))
 	}
 	if words := foldedTags(f.Tags); len(words) > 0 {
 		// One issue in one component of one product, which is the grain a tag
@@ -618,12 +594,11 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("f.kind = ?", Entered)
 	}
 	if f.SentBack {
-		q = q.Where(`EXISTS (SELECT 1 FROM "decision" AS de
-			WHERE de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND de.state = ?
-			  AND de.live_key IS NOT NULL
-			  AND de.sent_back_at IS NOT NULL)`, "proposed")
+		// The same condition the row's own count is computed from, so the
+		// filter and the row cannot disagree about what is with its author.
+		where, args := f.product()
+		q = q.Where(standsAs(where, claimSentBack),
+			append(append([]any{}, args...), claimSentBack.args...)...)
 	}
 	// Open in some builds of the selection and not others, which is what a
 	// comparison is about. Counted over the builds the selection holds rather
@@ -1092,14 +1067,16 @@ func stateHaving(state string) string {
 // reason that run exists.
 //
 // **Case is folded here and again by the engine**, which is a compromise worth
-// naming. matching a typed name without capitals says to normalize the stored value rather than ask an engine
-// to compare loosely, and there is no folded column on a component to compare
-// against — adding one is a migration and a backfill. Folding the term in Go
-// is Unicode-aware; `LOWER()` on the column is ASCII-only on SQLite. So a
-// component named with a non-ASCII capital is found on three engines and
-// missed on the fourth. Component names are ASCII in every producer seen so
-// far, which is why this is written down rather than fixed: the day that stops
-// being true, the fix is a folded column.
+// naming. Folding the term in Go is Unicode-aware; `LOWER()` on the column is
+// ASCII-only on SQLite — so a name carrying a non-ASCII capital is found on
+// three engines and missed on the fourth, wherever the comparison is against a
+// column with no folded copy.
+//
+// The component half has one — `component.name_folded`, which the search
+// clause above compares against — so this applies to the issue half, where
+// `vulnerability.identifier_folded` exists and `LOWER(v.identifier)` is what
+// is still asked. Issue identifiers are ASCII in every scheme anybody
+// publishes, which is why this is written down rather than fixed.
 func containsTerm(term string) string {
 	replacer := strings.NewReplacer("#", "##", "%", "#%", "_", "#_")
 	return replacer.Replace(strings.ToLower(term))

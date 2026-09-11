@@ -1259,3 +1259,52 @@ func TestBeingToldAboutWorkKeepsItOutOfTheDigest(t *testing.T) {
 		}
 	})
 }
+
+// The bound is on what would be written, charged as each build resolves.
+//
+// It was consulted after every named build had been resolved and every place
+// accumulated, so the work one request did was bounded by the request array
+// rather than by the limit: REQ-27's "a limit checked against the request lets
+// a small request do a large amount of work", which is why the entry's own
+// note about each build costing a resolution was answered with a maxItems.
+func TestTheBulkBoundIsChargedAsEachBuildResolves(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		// A second place of the same finding in the build the path names, so
+		// that build alone is already past a cap of one.
+		var rows []finding.Finding
+		if err := r.db.DB.NewSelect().Model(&rows).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("the fixture has %d findings, want 1", len(rows))
+		}
+		second := rows[0]
+		second.ID = 0
+		second.PlaceIdentity = second.PlaceIdentity[:len(second.PlaceIdentity)-4] + "beef"
+		if _, err := r.db.DB.NewInsert().Model(&second).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+			`{"value":"1"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// And a second build named that was never declared. Charged as each
+		// build resolves, the act is refused on the bound before anything
+		// tries to resolve that one; charged afterwards, every named build is
+		// resolved first and the answer is about the build instead.
+		at := "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
+		got := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
+				`"reasoning":"The parser is never reached.",`+
+				`"also":[{"stream":"never-declared","variant":"broadcom"}]}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("an act past the cap answered %d: %s", got.Code, got.Body.String())
+		}
+		if !strings.Contains(got.Body.String(), "one action may write") {
+			t.Errorf("the refusal does not name the bound: %s", got.Body.String())
+		}
+	})
+}

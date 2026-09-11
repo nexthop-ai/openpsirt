@@ -7,10 +7,23 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
+// asking is somebody who reads sonic at this visibility, which is what the
+// picker and the mention resolver are answered for: what they hand back is a
+// fact about work at that visibility, so the query carries the asker.
+func asking(f *fixture, visibility access.Visibility) access.Subject {
+	role := access.PublicRead
+	if visibility == access.Private {
+		role = access.PrivateRead
+	}
+	return access.NewPerson(0, "asking", false,
+		map[int64][]access.Role{f.products["sonic"]: {role}}, 0)
+}
+
 // mentionable is who the picker offers for this visibility on sonic.
 func mentionable(t *testing.T, f *fixture, visibility access.Visibility) []string {
 	t.Helper()
-	found, err := f.store.WhoCanRead(t.Context(), f.products["sonic"], visibility, "", 100)
+	found, err := f.store.WhoCanRead(t.Context(), asking(f, visibility),
+		f.products["sonic"], visibility, "", 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +139,8 @@ func TestAMentionResolvesANamePastTheFirstPage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		found, err := f.store.ReadersNamed(ctx, sonic, access.Public, []string{"Zoe"})
+		found, err := f.store.ReadersNamed(ctx, asking(f, access.Public), sonic,
+			access.Public, []string{"Zoe"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -136,12 +150,67 @@ func TestAMentionResolvesANamePastTheFirstPage(t *testing.T) {
 
 		// A name nobody holds, and a name held by somebody who may not read
 		// this, both come back absent and are not told apart.
-		none, err := f.store.ReadersNamed(ctx, sonic, access.Private, []string{"Zoe", "nobody"})
+		none, err := f.store.ReadersNamed(ctx, asking(f, access.Private), sonic,
+			access.Private, []string{"Zoe", "nobody"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(none) != 0 {
 			t.Errorf("somebody who may not read undisclosed work resolved: %+v", none)
+		}
+	})
+}
+
+// The gate is on the query, not on the two handlers that happen to call it.
+//
+// Both of them do authorize before a name is resolved, and the ordering is
+// right — but the gate was written out at each of them, so a third endpoint
+// over this query would have answered for everybody. What this asks is the
+// store directly, with a subject that may not read what is being asked about.
+func TestAskingWhoReadsSomethingIsAskedWithASubject(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		sonic := f.products["sonic"]
+		who, err := f.store.Ensure(ctx, "hidden-reader", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, who.ID, sonic, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		// Somebody who reads what is disclosed here and nothing more, asking
+		// who reads what is not.
+		public := access.NewPerson(0, "asking", false,
+			map[int64][]access.Role{sonic: {access.PublicRead}}, 0)
+
+		offered, err := f.store.WhoCanRead(ctx, public, sonic, access.Private, "", 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offered) != 0 {
+			t.Errorf("the picker answered who reads undisclosed work to somebody who "+
+				"may not: %+v", offered)
+		}
+		named, err := f.store.ReadersNamed(ctx, public, sonic, access.Private,
+			[]string{"hidden-reader"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(named) != 0 {
+			t.Errorf("resolving a name against undisclosed work answered somebody who "+
+				"may not read it: %+v", named)
+		}
+		// And it still answers the person who may, so this is a gate rather
+		// than a query that returns nothing.
+		private := access.NewPerson(0, "asking", false,
+			map[int64][]access.Role{sonic: {access.PrivateRead}}, 0)
+		stands, err := f.store.ReadersNamed(ctx, private, sonic, access.Private,
+			[]string{"hidden-reader"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(stands) != 1 {
+			t.Errorf("somebody who may read undisclosed work resolved %+v", stands)
 		}
 	})
 }

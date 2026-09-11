@@ -119,6 +119,10 @@ func TestAnAddressOnAnotherHostIsNotARelativeLink(t *testing.T) {
 		"See [the note](//evil.example/log?p=).",
 		`See [the note](/\evil.example/log).`,
 		"See [the note](//evil.example).",
+		// All four spellings of two separators, because a browser reads them
+		// alike and a list of the two somebody thought of is not a rule.
+		`See [the note](\\evil.example/log).`,
+		`See [the note](\/evil.example/log).`,
 	} {
 		if err := markdown.Check(written); err == nil {
 			t.Errorf("an address on another host was accepted: %q", written)

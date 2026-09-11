@@ -112,15 +112,24 @@ func TestTheFiltersATriagerReachesFor(t *testing.T) {
 }
 
 func TestAWeaknessIsMatchedWholeAndNotAsAPrefix(t *testing.T) {
-	// The weaknesses are one comma-joined column, so a bare LIKE would answer
+	// Asked as a membership test against the table that holds them, which is
+	// what makes "whole and not as a prefix" true by construction rather than
+	// by four escaped patterns: packed into one column, a bare LIKE answers
 	// CWE-79 for a search for CWE-7.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
-		if _, err := r.db.DB.NewUpdate().Table("vulnerability").
-			Set("weaknesses = ?", "CWE-125,CWE-787").
+		var issueID int64
+		if err := r.db.DB.NewSelect().TableExpr("vulnerability").Column("id").
 			Where(`identifier = ?`, "CVE-2026-9999").
-			Exec(t.Context()); err != nil {
+			Scan(t.Context(), &issueID); err != nil {
 			t.Fatal(err)
+		}
+		for _, cwe := range []string{"CWE-125", "CWE-787"} {
+			row := map[string]any{"vulnerability_id": issueID, "cwe": cwe}
+			if _, err := r.db.DB.NewInsert().Model(&row).
+				TableExpr("vulnerability_weakness").Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
 		}
 		for _, each := range []struct {
 			cwe  string

@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Applying returns the decision standing against a place, if one is.
@@ -40,29 +41,22 @@ import (
 // without the finding itself having been authorized.
 func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	decision := new(Decision)
+	standing, held := finding.InForce()
 	// With its argument: what suppresses a finding is the outcome, and a
 	// deferral stops standing on a date that is held there too.
 	query := s.db.NewSelect().Model(decision).Relation("Claim").
 		Where("de.product_id = ?", at.ProductID).
 		Where("de.vulnerability_id = ?", at.VulnerabilityID).
 		Where("de.place_identity = ?", at.PlaceIdentity).
-		// Approved, or proposed and never needing agreement. A claim that
-		// hides risk and is waiting for a second person does not suppress
-		// anything in the meantime — otherwise the queue is decorative and one
-		// person can dismiss a finding on their own, which is the whole thing
-		// the second pair of eyes exists to prevent.
-		//
-		// And not one that was sent back. Only a claim needing nobody can be
-		// both sent back and standing, and it went on suppressing the finding
-		// while the record said it had been returned — with the notice to its
-		// author saying, in those words, that it applied to nothing until it
-		// was revised. Sending back is not a state of its own, but it is a
-		// statement that nobody is relying on this yet.
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("de.state = ?", Approved).
-				WhereOr("de.state = ? AND de.needs_approval = ? AND de.sent_back_at IS NULL",
-					Proposed, false)
-		})
+		// Approved, or proposed and never needing agreement, and not one
+		// that was sent back — asked of the one spelling rather than written
+		// out here. It was written out here, and the sent-back half was added
+		// to this copy alone, so a claim an approver returned went on
+		// suppressing its finding everywhere else that asks the same
+		// question: the overdue figure, the list, the backlog, the compliance
+		// rate, the notice saying a deferral is ending, and the count of what
+		// stands on one signature.
+		Where(standing, held...)
 
 	query = matchVersion(query, "de.component_upstream_version", at.ComponentUpstream)
 	query = matchVersion(query, "de.consumer_upstream_version", at.ConsumerUpstream)

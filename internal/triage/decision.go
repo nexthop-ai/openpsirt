@@ -211,9 +211,22 @@ type Proposal struct {
 	// covers, and a second person agrees. Computed over the whole set by the
 	// caller, because one act covering a critical and a medium is gated by
 	// the critical however many mediums are in it.
-	Binding   *time.Time
-	Reasoning string
-	By        int64
+	Binding *time.Time
+	// BindingAcross is the builds the act covers, for a caller that cannot
+	// resolve the binding itself inside the transaction.
+	//
+	// The deadline it is gated against is a stored value that a re-rating or
+	// an arriving scan moves, so reading it before the transaction opens gates
+	// the promise against a deadline that may be gone by the time it is
+	// written — and a retry of the closure re-reads everything else and would
+	// keep this one stale value. Handed over as what it is resolved *from*,
+	// and resolved in `gate`, where the threshold is already read.
+	//
+	// The upgrade paths resolve theirs in their own transaction and pass
+	// Binding instead.
+	BindingAcross []int64
+	Reasoning     string
+	By            int64
 	// SeverityCenti is how bad this is judged to be right now, in hundredths.
 	// Recorded with the claim so that a later re-affirmation can ask whether
 	// it has risen since.
@@ -273,7 +286,7 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 		// every attempt: what it turns on is the policy and what this place
 		// has already been put off for, both of which a retry re-reads.
 		gated := []Proposal{p}
-		if err := within.gate(ctx, gated); err != nil {
+		if err := within.gate(ctx, subject, gated); err != nil {
 			return err
 		}
 		claim, err := within.newClaim(ctx, FindingClaim, p.By, nil, "", gated[0])
@@ -330,7 +343,7 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 		// carry. Re-worked on every attempt, against the policy and the
 		// postponement in force when the write lands rather than when the
 		// request arrived.
-		if err := within.gate(ctx, proposals); err != nil {
+		if err := within.gate(ctx, subject, proposals); err != nil {
 			return err
 		}
 		// One action, one claim, however many places it covers. The
@@ -694,6 +707,16 @@ func liveKeyFor(at Place) string {
 // belongs in one place where both sides are readable.
 var ErrAlreadyDecided = errors.New("a decision already stands here")
 
+// placesOf is the places a set of proposals is about, for a refusal that has
+// to name one of them.
+func placesOf(proposals []Proposal) []Place {
+	places := make([]Place, 0, len(proposals))
+	for _, p := range proposals {
+		places = append(places, p.Place)
+	}
+	return places
+}
+
 // alreadyDecided turns the constraint's refusal into a sentence naming which
 // claim to go and read.
 //
@@ -706,16 +729,6 @@ var ErrAlreadyDecided = errors.New("a decision already stands here")
 // Written four times, in three files, with the wording drifting by a word at
 // each: the same refusal read "here" from one path and "at one of these
 // places" from another for the same act on one place.
-// placesOf is the places a set of proposals is about, for a refusal that has
-// to name one of them.
-func placesOf(proposals []Proposal) []Place {
-	places := make([]Place, 0, len(proposals))
-	for _, p := range proposals {
-		places = append(places, p.Place)
-	}
-	return places
-}
-
 func (s *Store) alreadyDecided(ctx context.Context, err error, places []Place) error {
 	if !errors.Is(err, ErrAlreadyDecided) {
 		return err

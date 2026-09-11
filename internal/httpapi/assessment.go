@@ -33,6 +33,11 @@ type AssessmentBody struct {
 	// with it.
 	OffTheList          int `json:"off_the_list,omitempty" doc:"How many of them this rating would put below their product's triage line, where they stop being work and carry no deadline"`
 	OffTheListInProduct int `json:"off_the_list_in_products,omitempty" doc:"How many products that happens in"`
+	// Mine says you made this one, so you may not be the second person. The
+	// server refuses it either way; carried so a screen can say why rather
+	// than offering a button that answers 422 — which is what the embargo
+	// extensions beside these in the queue already do.
+	Mine bool `json:"mine,omitempty" doc:"You made this rating, so you may not be the one who agrees"`
 }
 
 func registerAssessment(api huma.API, in Ingest) {
@@ -91,7 +96,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			}
 			return nil, asked(in.Logger, err)
 		}
-		return &struct{ Body AssessmentBody }{Body: assessmentBody(*claim, input.Vulnerability)}, nil
+		return &struct{ Body AssessmentBody }{Body: assessmentBody(*claim, input.Vulnerability, subject.ID)}, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -119,7 +124,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			}
 			return nil, asked(in.Logger, err)
 		}
-		return &struct{ Body AssessmentBody }{Body: assessmentBody(*claim, "")}, nil
+		return &struct{ Body AssessmentBody }{Body: assessmentBody(*claim, "", subject.ID)}, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -178,7 +183,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		out := &listOutput[AssessmentBody]{}
 		out.Body.Items = make([]AssessmentBody, 0, len(claims))
 		for _, claim := range claims {
-			body := assessmentBody(claim, named[claim.VulnerabilityID])
+			body := assessmentBody(claim, named[claim.VulnerabilityID], subject.ID)
 			// Only for the ones somebody is being asked to agree to. It is a
 			// question about a decision not yet taken, and a query each for
 			// every historical claim would buy nothing.
@@ -202,10 +207,11 @@ func registerAssessment(api huma.API, in Ingest) {
 	})
 }
 
-func assessmentBody(a finding.Assessment, identifier string) AssessmentBody {
+func assessmentBody(a finding.Assessment, identifier string, asking int64) AssessmentBody {
 	return AssessmentBody{
 		ID: a.ID, Vulnerability: identifier, Severity: a.Severity,
 		Published: a.Published, Reasoning: a.Reasoning,
 		State: a.State, NeedsApproval: a.NeedsApproval,
+		Mine: a.ProposedBy == asking,
 	}
 }

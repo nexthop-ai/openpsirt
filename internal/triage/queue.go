@@ -85,24 +85,6 @@ type Outlier struct {
 // the counts say how many there are.
 const outlierRows = 20
 
-// Queue returns what is waiting for somebody, newest first, one entry per
-// claim.
-//
-// Narrowed to what the asker may act on, in the query. A reviewer who cannot
-// triage a product should not be shown its claims at all — a queue is a work
-// list, and one containing work somebody cannot do teaches them to skip rows.
-//
-// A claim is shown only where the reader may act on every row in it. Acting on
-// a claim is acting on the argument, which does not come in halves: shown the
-// part they may approve, a reader would agree to words whose other half stays
-// waiting on somebody else, and the count beside the card would be wrong.
-//
-// **And not their own.** Approving your own claim is refused, because a control
-// one person completes alone is not one — so a queue containing them
-// is a work list of things the reader cannot do, which teaches them to skip
-// rows. `mine` asks for exactly those instead: somebody wants to find what they
-// proposed and nobody has agreed to yet, and that is a different question from
-// what is waiting on them.
 // WaitingIn counts the claims about one product waiting for a second person.
 //
 // The same population the queue lists, narrowed to one product: a number
@@ -131,6 +113,24 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	return total, nil
 }
 
+// Queue returns what is waiting for somebody, newest first, one entry per
+// claim.
+//
+// Narrowed to what the asker may act on, in the query. A reviewer who cannot
+// triage a product should not be shown its claims at all — a queue is a work
+// list, and one containing work somebody cannot do teaches them to skip rows.
+//
+// A claim is shown only where the reader may act on every row in it. Acting on
+// a claim is acting on the argument, which does not come in halves: shown the
+// part they may approve, a reader would agree to words whose other half stays
+// waiting on somebody else, and the count beside the card would be wrong.
+//
+// **And not their own.** Approving your own claim is refused, because a control
+// one person completes alone is not one — so a queue containing them
+// is a work list of things the reader cannot do, which teaches them to skip
+// rows. `mine` asks for exactly those instead: somebody wants to find what they
+// proposed and nobody has agreed to yet, and that is a different question from
+// what is waiting on them.
 func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, limit, offset int) ([]Waiting, int, error) {
 	limit = database.AList.Of(limit)
 
@@ -484,43 +484,6 @@ func clip(text string, n int) string {
 		return string(runes)
 	}
 	return string(runes[:n]) + "\u2026"
-}
-
-// notApprovableBy narrows a query to the decisions a subject may not agree
-// to — the complement of approvableBy, used to ask whether a claim has any
-// row outside what the reader may act on.
-func notApprovableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
-	if subject.Kind != access.Person {
-		return query
-	}
-	products, all := subject.Products()
-	if all {
-		return query.Where("1 = 0")
-	}
-	var private, public []int64
-	for _, id := range products {
-		switch {
-		case mayApprove(subject, id, access.Private):
-			private = append(private, id)
-		case mayApprove(subject, id, access.Public):
-			public = append(public, id)
-		}
-	}
-	if len(private) == 0 && len(public) == 0 {
-		return query
-	}
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		if len(private) > 0 {
-			q = q.Where(column+".product_id NOT IN (?)", bun.List(private))
-		}
-		if len(public) > 0 {
-			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.WhereOr(column+".product_id NOT IN (?)", bun.List(public)).
-					WhereOr(column+".visibility <> ?", access.Public)
-			})
-		}
-		return q
-	})
 }
 
 // ReasoningFor returns the reasoning each decision currently rests on, keyed

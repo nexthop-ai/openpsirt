@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -26,6 +27,7 @@ export function Unassigned() {
   const { offset, go } = usePaging();
   const queries = useQueryClient();
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const { cap, over } = useBulkCap(picked.size);
   const [person, setPerson] = useState("");
   const rows = useQuery({
     queryKey: ["unassigned", scope, offset],
@@ -114,6 +116,14 @@ export function Unassigned() {
             <span>
               <b>{picked.size === 0 ? "Nothing selected" : `${picked.size} selected`}</b>
             </span>
+            {/* Bounded by what this deployment allows in one act, and said
+                rather than met one refusal at a time: both buttons here send
+                a request per selected row. */}
+            {over && (
+              <span className="alert" role="status">
+                {overCapNotice(cap)}
+              </span>
+            )}
             <span className="spacer" />
             {/* Taking unowned work is a triager's own and needs nobody's
                 picker, so it is a button of its own rather than a step
@@ -121,7 +131,7 @@ export function Unassigned() {
             <button
               type="button"
               className="btn"
-              disabled={picked.size === 0 || me.data?.identity == null || assign.isPending}
+              disabled={picked.size === 0 || me.data?.identity == null || assign.isPending || over}
               onClick={() => void assignTo(me.data!.identity)}
             >
               {picked.size === 0 ? "Take" : `Take ${picked.size}`}
@@ -146,7 +156,7 @@ export function Unassigned() {
             <button
               type="button"
               className="btn"
-              disabled={picked.size === 0 || !person || assign.isPending}
+              disabled={picked.size === 0 || !person || assign.isPending || over}
               onClick={() =>
                 void assignTo(person.slice(person.indexOf(":") + 1), person.startsWith("team:"))
               }

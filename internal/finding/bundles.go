@@ -378,17 +378,6 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	return groups, total, nil
 }
 
-// upgradesFor is where each component on a page could go, and how much each
-// move would close.
-//
-// One read for the page rather than one per row: a page of fifty components on
-// a real image is fifty round trips otherwise, for a column.
-//
-// **Ordered by how much it closes, never by version.** Comparing two versions
-// needs an ordering per ecosystem this does not have, so the question
-// "which of these is nearest" is one this cannot answer and does not pretend
-// to. What it answers is which one closes the most, which is the question
-// somebody choosing between them is actually asking.
 // componentOrder is how the by-component view is ordered.
 //
 // Weight by default and urgency on request, both with the same tie-breaks so
@@ -453,6 +442,17 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 	return out, nil
 }
 
+// upgradesFor is where each component on a page could go, and how much each
+// move would close.
+//
+// One read for the page rather than one per row: a page of fifty components on
+// a real image is fifty round trips otherwise, for a column.
+//
+// **Ordered by how much it closes, never by version.** Comparing two versions
+// needs an ordering per ecosystem this does not have, so the question
+// "which of these is nearest" is one this cannot answer and does not pretend
+// to. What it answers is which one closes the most, which is the question
+// somebody choosing between them is actually asking.
 func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 	visible []access.Visibility, filter Filter) (map[int64][]Candidate, error) {
 

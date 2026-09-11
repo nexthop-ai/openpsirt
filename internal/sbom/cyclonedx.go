@@ -72,6 +72,12 @@ type reader struct {
 	// above are only what survived.
 	stated  int
 	charged int
+	// claimed counts the patch claims a document makes, against the same bound
+	// the two VEX readers charge their statements against. It is not covered
+	// by the component bound: the claims hang off one component's pedigree, so
+	// a document of one component can carry millions of them, and this is read
+	// in full inside the upload request.
+	claimed int
 	seen    map[string]int
 	edges   []refEdge
 	// contained is the structure a producer declared by nesting one component
@@ -399,6 +405,9 @@ func (c *reader) patches(carried *[]Suppression) error {
 				})
 			case "resolves":
 				return c.b.array(func() error {
+					if err := c.claim(); err != nil {
+						return err
+					}
 					claim, err := c.resolved()
 					if err != nil {
 						return err
@@ -522,6 +531,19 @@ func (c *reader) add(described graph.Described) error {
 	}
 	c.seen[identity] = len(c.described)
 	c.described = append(c.described, described)
+	return nil
+}
+
+// claim counts one more patch claim against the limit.
+//
+// Charged as each one is read rather than after the array, for the reason the
+// edge count is: what a bound has to stop is the walk, and a count taken after
+// the walk has already done the work.
+func (c *reader) claim() error {
+	c.claimed++
+	if c.claimed > c.lim.MaxStatements {
+		return fmt.Errorf("scan file carries more than the %d claim limit", c.lim.MaxStatements)
+	}
 	return nil
 }
 

@@ -166,7 +166,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		Access: access.NewResolver(rights, access.Trust{
 			Header: cfg.TrustedHeader, From: cfg.TrustedSources,
 			GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
-		}).WithLogger(logger).WithMode(roleMode(settings)),
+		}).WithLogger(logger).WithMode(roleMode(settings)).OverPlainHTTP(cfg.PlainHTTP),
 		Providers:       providers,
 		BaseURL:         cfg.BaseURL,
 		PlainHTTP:       cfg.PlainHTTP,

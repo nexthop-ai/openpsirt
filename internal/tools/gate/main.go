@@ -61,7 +61,7 @@ const (
 var runs = map[tier][]string{
 	documents:  {"docs-check", "unclaimed"},
 	web:        {"web-check"},
-	code:       {"build", "vet", "lint", "unreachable", "readable", "confined", "test"},
+	code:       {"build", "vet", "lint", "unreachable", "readable", "confined", "attached", "test"},
 	api:        {"openapi-current", "web-api"},
 	engines:    {"reserved", "test-all", "check-engines"},
 	everything: {"check", "check-engines"},
@@ -69,7 +69,7 @@ var runs = map[tier][]string{
 
 // The order targets are printed in, which is the order make runs them.
 var order = []string{
-	"build", "vet", "lint", "unreachable", "readable", "reserved", "confined",
+	"build", "vet", "lint", "unreachable", "readable", "reserved", "confined", "attached",
 	"docs-check", "unclaimed", "openapi-current",
 	"test", "test-all", "check-engines", "web-check", "web-api", "check",
 }

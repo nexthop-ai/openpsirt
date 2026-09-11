@@ -2,6 +2,8 @@ package httpapi_test
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -9,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -383,6 +386,48 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 				names = append(names, each.Name())
 			}
 			t.Errorf("a refused upload left %d files behind: %v", len(after)-len(before), names)
+		}
+	})
+}
+
+// The document is read as a stream, and the digest still covers all of it.
+//
+// It used to be held whole and then copied to parse from — about two and a
+// half times the byte limit, against a container that ships with less than
+// that, so importing a large vendor document killed the process instead of
+// answering. Streaming it puts the digest on the way past, and a digest over
+// part of a document is worse than none: it is what says whether a publisher
+// has revised what they said, so two different documents hashing alike would
+// leave a decision citing evidence that has since changed.
+func TestTheDigestCoversTheWholeDocumentItStreamed(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		// Long enough that the parser answers well before the end of it: the
+		// statements it reads are at the front and the padding is a field it
+		// skips, which is exactly the shape that leaves a digest short.
+		padding := strings.Repeat("x", 64*1024)
+		document := `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
+			"author":"Example Distribution","timestamp":"2026-09-01T00:00:00Z","version":1,
+			"statements":[{"vulnerability":{"name":"CVE-2026-9999"},"status":"not_affected",
+			  "justification":"vulnerable_code_not_present",
+			  "impact_statement":"The affected routine is not built here.",
+			  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}],
+			"_padding":"` + padding + `"}`
+
+		got := r.vexed(t, "admin", "debian", document)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		var taken struct {
+			Digest string `json:"digest"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &taken); err != nil {
+			t.Fatal(err)
+		}
+		whole := sha256.Sum256([]byte(document))
+		if taken.Digest != hex.EncodeToString(whole[:]) {
+			t.Errorf("the digest recorded is %q, want the hash of the whole document %q",
+				taken.Digest, hex.EncodeToString(whole[:]))
 		}
 	})
 }

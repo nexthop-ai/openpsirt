@@ -1,4 +1,5 @@
 import { notACredential } from "../ui/noautofill";
+import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { Became } from "./QueueMine";
@@ -40,6 +41,7 @@ export function Queue() {
   // everything ticked on an earlier page was counted in the button and
   // silently never approved.
   const [picked, setPicked] = useState<Map<string, Claim>>(new Map());
+  const { cap, over } = useBulkCap(picked.size);
   const [batch, setBatch] = useState("");
   // The batch just agreed to, which is the only one there is a safe control
   // for: undoing one named at some point in the past is a control nobody can
@@ -300,10 +302,19 @@ export function Queue() {
             aria-label="Batch name"
             style={{ width: 150 }}
           />
+          {/* Bounded by what this deployment allows in one act, and said
+              rather than met one refusal at a time: approving is a request
+              per claim, and this selection deliberately survives paging, so
+              it can be arbitrarily large. */}
+          {over && (
+            <span className="alert" role="status">
+              {overCapNotice(cap)}
+            </span>
+          )}
           <button
             type="button"
             className="btn"
-            disabled={picked.size === 0 || approveClaim.isPending}
+            disabled={picked.size === 0 || approveClaim.isPending || over}
             onClick={() => void approvePicked()}
           >
             {picked.size === 0 ? "Approve selected" : `Approve ${picked.size} selected`}

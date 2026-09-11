@@ -200,7 +200,7 @@ inputs.
 | REQ-66 | Untrusted input never becomes SQL, markup or a filesystem path. Values are parameterized, identifiers come from an allowlist, and text a scan file supplied is never rendered | A placeholder cannot bind a column name, so a sort column from a query parameter is the live hole. A scan file is a third party's data rendered to staff who hold the most access |
 | REQ-67 | Markdown a person writes is policed on the server at submission, before storage: no raw HTML, restricted link schemes, and nothing fetched from anywhere when it renders | A rendered document that fetches a remote image leaks who read it and when |
 | REQ-68 | Credentials are stored hashed, shown once, and never logged at any level | A credential this deployment can read back is one an operator, a backup, a support session and anybody who reaches a log already holds. Shown once is what makes the hash honest: a value that can be recovered was never really hashed, it was merely stored twice |
-| REQ-69 | Ingest is bounded — file size, nesting depth, component count — every written field is length- and time-bounded to render, and outbound requests reach only their configured host | A scan file is hostile input, and the deployment sits inside somebody's network |
+| REQ-69 | Ingest is bounded — file size, nesting depth, component count — every written field is length-bounded, and outbound requests reach only their configured host | A scan file is hostile input, and the deployment sits inside somebody's network |
 | REQ-70 | Attachments are stored outside the database, in no public bucket, and every fetch is authorized against the finding it hangs off before any URL is issued | A signed URL issued before the check is the check not happening |
 
 ### 3.16 Data and operations

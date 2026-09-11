@@ -111,7 +111,11 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 		provider := &stubProvider{says: &signin.Identity{Subject: "1", Username: "granted"}}
 		handler, _ := httpapi.New(quiet, nil, httpapi.Ingest{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()),
-			Access:    access.NewResolver(rights, access.Trust{}),
+			// Plain HTTP, so the cookies keep their bare names: a browser
+			// will not set a `__Host-` cookie without TLS, and a harness
+			// that prefixed them here would be testing a shape no
+			// deployment of this configuration has.
+			Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
 			Providers: map[string]signin.Provider{"stub": provider},
 			PlainHTTP: true,
 			// Stated, because a provider compares the callback against what
@@ -550,4 +554,92 @@ func (r *signInReach) sealed(t *testing.T, payload []byte) string {
 	mac.Write(payload)
 	return base64.RawURLEncoding.EncodeToString(payload) + "." +
 		base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// A validly-signed pending cookie from somebody else's sign-in is still
+// somebody else's sign-in.
+//
+// The signature says this deployment authored the value. It does not say this
+// deployment authored it for *this* browser — so an attacker who can write a
+// cookie on the host starts a sign-in of their own, takes the signed pending
+// value handed back, plants it in a victim's browser, and the callback issues
+// that browser a session for the attacker's account. Every earlier test here
+// presented an unsigned forgery, which the signature alone already refused.
+//
+// What denies a sibling host the write is the `__Host-` cookie prefix, which
+// this harness runs without because it serves plain HTTP. So what is asserted
+// here is the half a name cannot carry: the session that comes back is the one
+// the pending value was minted for, and never the victim's.
+func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
+	twoSignIn(t, func(t *testing.T, r *signInReach) {
+		// The attacker's own sign-in, which hands back a properly signed
+		// pending cookie.
+		begun := httptest.NewRecorder()
+		r.handler.ServeHTTP(begun, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
+		if begun.Code != http.StatusFound {
+			t.Fatalf("beginning a sign-in answered %d: %s", begun.Code, begun.Body.String())
+		}
+		var planted *http.Cookie
+		for _, cookie := range begun.Result().Cookies() {
+			if cookie.Name == "openpsirt_pending" && cookie.Value != "" {
+				planted = cookie
+			}
+		}
+		if planted == nil {
+			t.Fatal("beginning a sign-in left no pending cookie, so this tests nothing")
+		}
+		// The state the provider will echo, which the attacker knows because
+		// they started this sign-in. The stub answers with a fixed one.
+		const state = "the-state"
+
+		// Planted in the victim's browser, which then completes it.
+		req := httptest.NewRequest(http.MethodGet,
+			"/v1/sign-in/stub/callback?state="+state+"&code=a-code", nil)
+		req.AddCookie(planted)
+		rec := httptest.NewRecorder()
+		r.handler.ServeHTTP(rec, req)
+
+		// It completes — the signature is genuine and the state matches,
+		// because both are the attacker's own. What the browser is handed is
+		// a session for whoever the provider says signed in, which is the
+		// attacker: the victim's own account is never reached, and the
+		// prefix is what stops the cookie being planted at all where this
+		// deployment is served over TLS.
+		if rec.Code != http.StatusFound {
+			t.Fatalf("completing the planted sign-in answered %d: %s", rec.Code, rec.Body.String())
+		}
+		for _, cookie := range rec.Result().Cookies() {
+			if cookie.Name != access.CookieName(access.SessionCookie, true) || cookie.Value == "" {
+				continue
+			}
+			who, _, err := r.rights.ResolveSession(t.Context(), cookie.Value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if who.Identity != "granted" {
+				t.Errorf("the session handed to the browser is %q", who.Identity)
+			}
+		}
+	})
+}
+
+// The name a browser is asked to hold carries the prefix wherever this
+// deployment is served over TLS, which is the control that denies a sibling
+// host the write in the first place.
+func TestTheCookiesABrowserHoldsAreBoundToThisHost(t *testing.T) {
+	for _, each := range []struct {
+		name  string
+		plain bool
+		want  string
+	}{
+		{access.SessionCookie, false, "__Host-openpsirt_session"},
+		{access.SessionCookie, true, "openpsirt_session"},
+		{"openpsirt_pending", false, "__Host-openpsirt_pending"},
+		{"openpsirt_csrf", false, "__Host-openpsirt_csrf"},
+	} {
+		if got := access.CookieName(each.name, each.plain); got != each.want {
+			t.Errorf("over plain=%v, %q is held as %q, want %q",
+				each.plain, each.name, got, each.want)
+		}
+	}
 }

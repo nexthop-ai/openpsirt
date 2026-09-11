@@ -665,8 +665,8 @@ func registerProposing(api huma.API, in Ingest) {
 					"component, where it covers everything open on it in the releases you name")
 		}
 
-		at, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
-			input.Vulnerability, input.Place)
+		at, target, err := decidingAbout(ctx, in, subject, input.Product, input.Stream,
+			input.Variant, input.Vulnerability, input.Place)
 		if err != nil {
 			return nil, err
 		}
@@ -690,11 +690,13 @@ func registerProposing(api huma.API, in Ingest) {
 			Reasoning:     input.Body.Reasoning,
 			By:            subject.ID,
 			SeverityCenti: at.SeverityCenti,
-			// The deadline this place already has, which is what a promise to
-			// act is gated against. Read with the place rather than supplied,
-			// because whether a commitment needs a second person is not a
-			// thing the person making it may state.
-			Binding:       at.DueAt,
+			// The build whose deadline a promise made here is gated against.
+			// The deadline itself is read inside the transaction that writes
+			// the claim, because it is a stored value a re-rating or an
+			// arriving scan moves — and never supplied by the caller, since
+			// whether a commitment needs a second person is not a thing the
+			// person making it may state.
+			BindingAcross: []int64{target},
 			FromStatement: cited(input.Body.FromStatement),
 		}
 		if input.Body.DeferredUntil != "" {

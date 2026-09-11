@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
-
-	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
@@ -84,13 +82,9 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
 	// The enum is built from finding.SortKeys, so asking whether the two
 	// lists match is asking whether a list equals itself. What is worth
-	// checking is the other half: that every order the document offers is a
-	// word the store has an expression for, and answers with.
-	//
-	// A key named in that list with no entry in the store's own map is the
-	// failure this catches — it is accepted at the edge and then silently
-	// sorted by urgency instead, which looks like a list that simply did not
-	// reorder.
+	// checking here is that every order the document offers answers over
+	// HTTP at all — whether the store has an expression for each is asked in
+	// the package that holds the expressions.
 	twoReach(t, func(t *testing.T, r *reach) {
 		var declared []string
 		for path, item := range r.api.OpenAPI().Paths {
@@ -117,9 +111,6 @@ func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
 		}
 
 		for _, word := range declared {
-			if !finding.SortsBy(finding.SortKey(word)) {
-				t.Errorf("the document offers %q and the store sorts by nothing of that name", word)
-			}
 			got := asPerson(t, r, "triager", http.MethodGet,
 				"/v1/products/mine/findings?sort="+word, "")
 			if got.Code != http.StatusOK {

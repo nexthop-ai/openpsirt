@@ -32,8 +32,21 @@ import (
 var asking = regexp.MustCompile(
 	`(database\.Postgres|database\.MySQL|database\.MariaDB|database\.SQLite|` +
 		`mysql\.MySQLError|pgconn\.PgError|` +
+		// Asking the handle which engine it is, which is how a branch is
+		// written without naming a constant. It was not looked for at all, so
+		// the one live branch in the tree that spells it this way —
+		// InBatchesKeeping — was invisible, and those three lines pasted into
+		// a store package would have passed.
+		`Dialect\(\)\.Name|` +
+		// And bun's own spellings of the two upsert idioms, which are the same
+		// branch written through the query builder rather than as SQL.
+		`\.Ignore\(\)|` +
 		`ON CONFLICT|ON DUPLICATE KEY|INSERT IGNORE|ILIKE|julianday|` +
 		`TIMESTAMPDIFF|EXTRACT\(EPOCH|FOR UPDATE|pg_advisory|GET_LOCK)`)
+
+// selecting is an engine named to choose which engine a test runs against,
+// which the harness exists to do. Anything else naming one is a branch.
+var selecting = regexp.MustCompile(`dbtest\.\w+\([^)]*database\.\w+`)
 
 // allowed is where an engine may be named, and why.
 //
@@ -69,7 +82,7 @@ func main() {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
 		path = strings.TrimPrefix(path, "./")
@@ -88,6 +101,14 @@ func main() {
 			if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
 				continue
 			}
+			// Choosing which engine a test runs on is not branching a query on
+			// one. `dbtest.Only(t, database.SQLite, …)` says this question has
+			// the same answer everywhere and is asked once — which is the
+			// distinction the whole rule is about, and the reason the harness
+			// itself is allowed to name all four.
+			if selecting.MatchString(line) {
+				continue
+			}
 			if match := asking.FindString(line); match != "" {
 				bad = append(bad, fmt.Sprintf("%s:%d: %s", path, i+1, match))
 			}
@@ -99,8 +120,8 @@ func main() {
 		os.Exit(2)
 	}
 	if len(bad) == 0 {
-		fmt.Printf("engine-specific code is confined to the %d places the design "+
-			"document lists\n", len(allowed))
+		fmt.Printf("engine-specific code is confined to the %d paths this holds, "+
+			"which the design document lists as its own rows\n", len(allowed))
 		return
 	}
 	sort.Strings(bad)

@@ -82,12 +82,6 @@ func nothingScannedThere() error {
 	return huma.Error404NotFound("nothing has been scanned there")
 }
 
-// ambiguousOrMissing answers a component lookup that could not settle on one.
-//
-// A name matching several is a different answer from a name matching none: the
-// first is something the caller can fix by saying which version, and the
-// second is not. Telling them apart discloses nothing — whoever is asking has
-// already been authorized to read this build.
 // ambiguousAmong offers the ways a name could be meant, having narrowed them
 // to the ones that answer the question being asked.
 func ambiguousAmong(name string, choices []graph.Choice) error {
@@ -107,6 +101,12 @@ func ambiguousAmong(name string, choices []graph.Choice) error {
 			"them — say which one with ?version=", name, len(choices)), detail...)
 }
 
+// ambiguousOrMissing answers a component lookup that could not settle on one.
+//
+// A name matching several is a different answer from a name matching none: the
+// first is something the caller can fix by saying which version, and the
+// second is not. Telling them apart discloses nothing — whoever is asking has
+// already been authorized to read this build.
 // ambiguousOrMissing answers a component lookup that could not settle on one.
 //
 // A name matching several is a different answer from a name matching none: the

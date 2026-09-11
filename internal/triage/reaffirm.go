@@ -216,16 +216,32 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 // severityOf is how bad an issue is judged to be now, in hundredths.
 //
 // The rating in force where somebody has assessed it, and the published one
-// where nobody has — the same value everything else here ranks and clocks on.
+// where nobody has, worked out by the project's one rule for the number rather
+// than read off a column.
+//
+// It read `score_centi` alone, which is the published score and nothing else:
+// an assessment writes the word and never that column, so an issue published
+// `high` with no vector scored zero before the assessment and zero after it.
+// Zero against zero is "no worse than when it was agreed to", so a dismissal
+// agreed once was re-affirmed with nobody else after somebody had rated the
+// issue critical — which is the one thing this comparison exists to catch.
 func (s *Store) severityOf(ctx context.Context, vulnerabilityID int64) (int, error) {
-	var centi int
+	var issue struct {
+		Published  string `bun:"published"`
+		Assessed   string `bun:"assessed"`
+		ScoreCenti int    `bun:"score_centi"`
+	}
 	if err := s.db.NewSelect().
 		TableExpr("vulnerability AS v").
-		ColumnExpr("COALESCE(v.score_centi, 0)").
-		Where("v.id = ?", vulnerabilityID).Scan(ctx, &centi); err != nil {
+		ColumnExpr("COALESCE(v.severity, '') AS published").
+		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed").
+		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
+		Where("v.id = ?", vulnerabilityID).Scan(ctx, &issue); err != nil {
 		return 0, fmt.Errorf("read how bad this is now: %w", err)
 	}
-	return centi, nil
+	return finding.Rating{
+		Published: issue.Published, Assessed: issue.Assessed, ScoreCenti: issue.ScoreCenti,
+	}.Score(), nil
 }
 
 // needsFullApproval reports whether a re-affirmation is really a new claim.
@@ -344,6 +360,13 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 	return nil
 }
 
+type Lapsed struct {
+	// Rows is how many decisions stopped applying.
+	Rows int64
+	// Told is who to tell, once each.
+	Told []ForPerson
+}
+
 // Lapse marks the decisions this target's contents have moved out from under.
 //
 // A decision is stored against the upstream versions it was made about. When
@@ -379,13 +402,6 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 // A lapse is the other outcome a proposer is told about: it hands the work
 // back to them, having taken a judgment they made out of force, and nothing
 // they did caused it.
-type Lapsed struct {
-	// Rows is how many decisions stopped applying.
-	Rows int64
-	// Told is who to tell, once each.
-	Told []ForPerson
-}
-
 func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// Every open finding of this target at the decision's place, with the
 	// versions it currently has — stated the same way the decision was written

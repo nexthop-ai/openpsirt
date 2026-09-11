@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -194,7 +195,17 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		writes := make([]int, len(asked))
 		holds := make([]int, len(asked))
 		sits := 0
+		// How many places the act has reached so far, charged as each build
+		// resolves.
+		seen := 0
 		reached := make([][]finding.Deciding, len(asked))
+		// The builds a promise made here is gated across. What it is gated
+		// against — the earliest deadline among them — is a stored value that
+		// a re-rating or an arriving scan moves, so it is resolved inside the
+		// transaction rather than here: read now, a promise would be gated
+		// against a deadline that may be gone by the time it is written, and a
+		// retry of the closure re-reads everything else.
+		covering := make([]int64, 0, len(asked))
 		for i, build := range asked {
 			// Only the build in the path takes the caller's narrowing. In the
 			// others the places at matching versions are already reached by
@@ -204,7 +215,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			if i > 0 {
 				wanted, remaining = nil, true
 			}
-			places, all, err := placesToDecide(ctx, in, subject, store, input.Product,
+			places, all, target, err := placesToDecide(ctx, in, subject, store, input.Product,
 				build.Stream, build.Variant, input.Vulnerability, input.Component,
 				build.Version, wanted, remaining)
 			if err != nil {
@@ -217,23 +228,20 @@ func registerFindingDecision(api huma.API, in Ingest) {
 				sits = all
 			}
 			reached[i] = places
-		}
+			covering = append(covering, target)
 
-		// What a promise made here is gated against: the earliest deadline
-		// among everything the act covers, across every build it reaches. One
-		// act covering a critical and a medium is gated by the critical
-		// however many mediums are in it, so this is resolved over the whole
-		// set before any proposal is built rather than per place.
-		var binding *time.Time
-		for _, places := range reached {
-			for _, place := range places {
-				if place.DueAt == nil {
-					continue
-				}
-				if binding == nil || place.DueAt.Before(*binding) {
-					at := *place.DueAt
-					binding = &at
-				}
+			// Charged as each build is resolved rather than after all of
+			// them. REQ-27 bounds what is written, not what was asked for —
+			// and a request naming two thousand builds of a kernel-shaped
+			// component accumulates seven figures of places before the cap is
+			// consulted, which is a small request doing a large amount of
+			// work. The refusal names the same limit the store's own check
+			// names, because it is the same limit.
+			seen += len(places)
+			if seen > limit {
+				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+					"that reaches more than the %d findings one action may write: "+
+						"name fewer builds, or raise the limit deliberately", limit))
 			}
 		}
 
@@ -256,7 +264,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 					SeverityCenti: place.SeverityCenti,
 					DeferredUntil: until,
 					CommittedTo:   lands,
-					Binding:       binding,
+					BindingAcross: covering,
 				}
 				writes[i]++
 				holds[i] += place.Places
@@ -309,16 +317,16 @@ func registerFindingDecision(api huma.API, in Ingest) {
 // says how much of the finding is still open.
 func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, store *triage.Store,
 	product, stream, variant, vulnerability, component, version string,
-	wanted []string, remaining bool) ([]finding.Deciding, int, error) {
+	wanted []string, remaining bool) ([]finding.Deciding, int, int64, error) {
 
 	target, issue, at, err := findingAbout(ctx, in, subject,
 		product, stream, variant, vulnerability, component, version)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	all, err := finding.NewStore(in.DB.DB).PlacesFor(ctx, subject, target, issue, at)
 	if err != nil || len(all) == 0 {
-		return nil, 0, noSuchFinding()
+		return nil, 0, 0, noSuchFinding()
 	}
 
 	// Narrowed to what was named, and a name nothing matches is refused
@@ -338,13 +346,13 @@ func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, stor
 			}
 		}
 		if len(asked) > 0 {
-			return nil, 0, huma.Error422UnprocessableEntity(
+			return nil, 0, 0, huma.Error422UnprocessableEntity(
 				"this finding does not sit at every place you named")
 		}
 	}
 
 	if !remaining {
-		return places, len(all), nil
+		return places, len(all), target, nil
 	}
 	ask := make([]triage.Place, 0, len(places))
 	for _, place := range places {
@@ -357,7 +365,7 @@ func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, stor
 	}
 	left, err := store.Undecided(ctx, ask)
 	if err != nil {
-		return nil, 0, wentWrong(in.Logger, "cannot tell what already stands here", err)
+		return nil, 0, 0, wentWrong(in.Logger, "cannot tell what already stands here", err)
 	}
 	standing := make(map[string]bool, len(left))
 	for _, one := range left {
@@ -371,7 +379,7 @@ func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, stor
 			open = append(open, place)
 		}
 	}
-	return open, len(all), nil
+	return open, len(all), target, nil
 }
 
 // aboutBuild says which of the builds a refusal is about.
@@ -419,25 +427,25 @@ func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 // decidingAbout resolves the names in a path to the place a decision is made
 // about, authorized on the way.
 func decidingAbout(ctx context.Context, in Ingest, subject access.Subject,
-	product, stream, variant, vulnerability, place string) (*finding.Deciding, error) {
+	product, stream, variant, vulnerability, place string) (*finding.Deciding, int64, error) {
 	names := catalog.NewStore(in.DB.DB)
 	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
 	if err != nil {
-		return nil, huma.Error404NotFound(err.Error())
+		return nil, 0, huma.Error404NotFound(err.Error())
 	}
 	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
 	if err != nil {
-		return nil, nothingScannedThere()
+		return nil, 0, nothingScannedThere()
 	}
 
 	issue, err := issueHere(ctx, in, subject, named.ProductID, vulnerability)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	at, err := finding.NewStore(in.DB.DB).PlaceFor(ctx, subject, target.ID, issue, place)
 	if err != nil {
-		return nil, noSuchFinding()
+		return nil, 0, noSuchFinding()
 	}
-	return at, nil
+	return at, target.ID, nil
 }

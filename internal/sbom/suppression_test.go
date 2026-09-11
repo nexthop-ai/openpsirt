@@ -1,6 +1,7 @@
 package sbom_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -231,5 +232,47 @@ func TestMoreClaimsThanAllowedAreRefused(t *testing.T) {
 	_, err := sbom.ReadSuppressions(strings.NewReader(statement(b.String())), sbom.Limits{MaxStatements: 10})
 	if err == nil || !strings.Contains(err.Error(), "limit") {
 		t.Errorf("a document past the claim limit was accepted: %v", err)
+	}
+}
+
+func TestPatchClaimsAreChargedAgainstTheClaimBound(t *testing.T) {
+	// Every other way of making a claim is charged: both VEX readers refuse a
+	// document past the statement limit. These were charged against nothing.
+	//
+	// The component bound does not stand in for it, because the claims hang
+	// off one component's pedigree — so a document declaring a single
+	// component can carry millions of them, and this is read in full inside
+	// the upload request rather than by the worker afterwards.
+	var resolves strings.Builder
+	for i := 0; i < 60; i++ {
+		if i > 0 {
+			resolves.WriteString(",")
+		}
+		fmt.Fprintf(&resolves, `{"type": "security", "id": "CVE-2026-%d"}`, i)
+	}
+	body := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
+	 "metadata": {"component": {"name": "p", "version": "1"}},
+	 "components": [{"name": "frr", "version": "1", "purl": "pkg:deb/sonic/frr@1",
+	   "pedigree": {"patches": [{"type": "unofficial", "diff": {"url": "file://p.patch"},
+	     "resolves": [` + resolves.String() + `]}]}}]}`
+
+	// Read against a bound the document is past.
+	if _, err := sbom.Read(strings.NewReader(body), sbom.Limits{
+		MaxStatements: 50,
+	}.OrDefault()); err == nil {
+		t.Error("a document past the claim limit was read")
+	} else if !strings.Contains(err.Error(), "claim limit") {
+		t.Errorf("the refusal does not say which bound was passed: %v", err)
+	}
+
+	// And under it, the same document reads.
+	doc, err := sbom.Read(strings.NewReader(body), sbom.Limits{
+		MaxStatements: 100,
+	}.OrDefault())
+	if err != nil {
+		t.Fatalf("a document inside the claim limit was refused: %v", err)
+	}
+	if len(doc.Suppressions) != 60 {
+		t.Errorf("read %d claims, want 60", len(doc.Suppressions))
 	}
 }

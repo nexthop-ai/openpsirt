@@ -863,3 +863,92 @@ func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
 		}
 	})
 }
+
+// The filter that finds what is with its author, and the count the row draws
+// it from, are one question.
+//
+// The filter had written its own condition without the product and without
+// the version match, so it kept a group whose own sent-back count was zero:
+// matched by a claim returned in a different product, or by one keyed on a
+// version the place stopped holding. A reader asking for what is waiting on
+// them got rows whose state column said nothing was.
+func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issueID := f.issueID(t, "CVE-2026-1")
+		place := finding.PlaceIdentity(swss.Name, "")
+
+		sentBack := func(productID int64, version string) {
+			t.Helper()
+			if _, err := f.db.DB.NewDelete().Table("decision").
+				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			row := map[string]any{
+				"claim_id":   claimBy(t, f.db, somebody.ID),
+				"product_id": productID, "vulnerability_id": issueID,
+				"place_identity": place, "visibility": "public",
+				"state":          "proposed",
+				"needs_approval": true, "proposed_by": somebody.ID,
+				"proposed_at":                time.Now().UTC(),
+				"component_upstream_version": version,
+				"live_key":                   "the-live-key",
+				"sent_back_at":               time.Now().UTC(),
+			}
+			if _, err := f.db.DB.NewInsert().Model(&row).
+				TableExpr("decision").Exec(ctx); err != nil {
+				t.Fatalf("record a claim sent back: %v", err)
+			}
+		}
+		// Both halves of the answer, which have to agree.
+		asked := func(because string, want int) {
+			t.Helper()
+			groups, kept, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+				finding.Filter{SentBack: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kept != want {
+				t.Errorf("%s: the filter kept %d, want %d", because, kept, want)
+			}
+			all, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			drawn := 0
+			for _, group := range all {
+				if group.SentBack {
+					drawn++
+				}
+			}
+			if drawn != want {
+				t.Errorf("%s: %d rows draw as with their author, want %d", because, drawn, want)
+			}
+			if len(groups) != want {
+				t.Errorf("%s: %d rows came back, want %d", because, len(groups), want)
+			}
+		}
+
+		sentBack(f.productID, swss.Version)
+		asked("a claim sent back here, at the version shipping here", 1)
+		sentBack(f.productID, "0.9.0")
+		asked("a claim sent back about a version this place stopped holding", 0)
+		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sentBack(elsewhere.ID, swss.Version)
+		asked("a claim sent back in another product", 0)
+	})
+}

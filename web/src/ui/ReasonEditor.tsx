@@ -16,10 +16,29 @@ import { Markdown } from "./Markdown";
 //
 // Revising keeps the old words readable, takes back the approval given for
 // them, and returns the claim to the queue. Withdrawing needs nobody.
+// What is finished, and therefore has nothing left to revise or withdraw.
+//
+// Said as what is over rather than as what is open, because the two screens
+// that draw this control reach the claim by different routes and had each
+// written their own list of the open words: one allowed waiting, sent back,
+// undone and approved, and the other only proposed and approved — so a claim
+// an approver agreed to in part and set aside in part offered Revise and
+// Withdraw on one screen and neither on the other, to the same person about
+// the same claim. A word neither list had thought of belongs with the open
+// ones, which is the direction a missing case should fall.
+const FINISHED = new Set(["withdrawn", "lapsed"]);
+
+// revisable reports whether a claim in this state may still be revised or
+// withdrawn. The words are the ones the record uses for what became of a
+// claim, and the ones the API reports as a decision's state.
+export function revisable(state: string): boolean {
+  return state !== "" && !FINISHED.has(state);
+}
+
 export function ReasonEditor({
   claimId,
   reasoning,
-  offered,
+  state,
   approved,
   about,
   onDone,
@@ -27,9 +46,10 @@ export function ReasonEditor({
 }: {
   claimId: number;
   reasoning: string;
-  // Whether revising and withdrawing are offered at all. The rule is the
-  // caller's, because the two screens reach this claim by different routes.
-  offered: boolean;
+  // What became of the claim, as the record words it. Whether revising and
+  // withdrawing are offered is decided here from that, rather than by each
+  // screen deciding for itself.
+  state: string;
   // What the consequence line says, which differs for a claim somebody has
   // already agreed to.
   approved: boolean;
@@ -97,7 +117,7 @@ export function ReasonEditor({
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That could not be withdrawn." />
       )}
-      {offered && !editing && (
+      {revisable(state) && !editing && (
         <div className="actions" style={{ marginTop: 12 }}>
           <button
             type="button"

@@ -10,7 +10,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
-import { linkable } from "../ui/addressable";
+import { Outward } from "../ui/Outward";
 import { useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
 import { Comments, Revisions } from "./FindingClaim";
 import { Happened } from "./QueueMine";
@@ -263,19 +263,8 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
           Being worked on at{" "}
           {/* Typed here rather than supplied by a scanner, and still a string
               that becomes somewhere to click — so it is judged the same way a
-              scanner's reference is. What fails is shown and not linked. */}
-          {linkable(where) ? (
-            <a
-              href={linkable(where)!}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="linkish"
-            >
-              {where}
-            </a>
-          ) : (
-            <span className="id">{where}</span>
-          )}
+              scanner's reference is, by the one component that judges. */}
+          <Outward href={where} />
           {". "}
         </>
       ) : (
@@ -322,8 +311,6 @@ function Reasoning({
   onChanged: () => void;
 }) {
   const id = claim.claim.id;
-  const standing = live(claim.happened) || claim.happened === "approved";
-
   // The card names the screen so the reasoning block is styled as something
   // read rather than as the editor it toggles into on the finding.
   return (
@@ -332,7 +319,7 @@ function Reasoning({
       <ReasonEditor
         claimId={id}
         reasoning={claim.argument.reasoning}
-        offered={standing}
+        state={claim.happened ?? ""}
         approved={claim.happened === "approved"}
         about={about}
         onDone={onChanged}

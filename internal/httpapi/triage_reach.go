@@ -85,7 +85,7 @@ func registerElsewhere(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		at, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		at, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
 			input.Vulnerability, input.Place)
 		if err != nil {
 			return nil, err

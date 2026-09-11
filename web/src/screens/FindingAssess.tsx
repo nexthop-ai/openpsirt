@@ -11,12 +11,8 @@ import { RATINGS } from "./FindingClaim";
 //
 // The finding screen is four readings of the record, split by the question
 // each answers. This is the one form among them: a claim about the issue
-// wherever it appears rather than about the place it was made from, and a
-// milder rating waits for a second person.
-
-// What we think of the issue itself, as against what was published. About the
-// issue rather than where it sits, so it holds wherever the issue appears ;
-// rating it milder waits for a second person.
+// rather than about the place it was made from, so it holds wherever the issue
+// appears — and rating it milder waits for a second person.
 export function Assess({
   vulnerability,
   published,

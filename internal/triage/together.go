@@ -131,7 +131,14 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		if len(places) == 0 {
 			return fmt.Errorf("%w against that component", ErrNothingOpen)
 		}
-		if cap > 0 && len(places) > cap {
+		// There is always a cap (REQ-27), so an unset one is the shipped
+		// number rather than none: the two siblings that take this argument
+		// fill it in the same way, and this one read "zero means unbounded" —
+		// which is the one reading the rule does not have.
+		if cap <= 0 {
+			cap = DefaultTogetherCap
+		}
+		if len(places) > cap {
 			return fmt.Errorf("that is %d findings and the limit here is %d: narrow the "+
 				"selection, or raise the limit deliberately", len(places), cap)
 		}

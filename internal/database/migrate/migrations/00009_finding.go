@@ -86,14 +86,6 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- where that shows.
 			"score_centi"     ` + t.ref + ` NULL,
 			"vector"          ` + t.free + ` NULL,
-			-- What kind of flaw this is, by the classification the data
-			-- carries. Comma-separated rather than a table of its own,
-			-- because nothing joins on it: it is read with the issue and shown
-			-- with it, and a table would buy a join for a value never queried
-			-- on its own. A report usually names the same weakness from
-			-- several sources, so what is stored is deduplicated and ordered
-			-- — otherwise a re-scan would rewrite the row for no change.
-			"weaknesses"      ` + t.free + ` NULL,
 			"first_seen_at" ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "vulnerability_identity_unique" UNIQUE ("identity")
 		)` + t.suffix,
@@ -116,6 +108,34 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vulnerability_reference_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "vulnerability_reference_unique" UNIQUE ("vulnerability_id", "url_identity")
 		)` + t.suffix,
+
+		// What kind of flaw this is, by the classification the data carries.
+		//
+		// A row per weakness rather than one comma-joined column, which is the
+		// shape every other multi-valued attribute here has. Packed into one
+		// column it was queried on anyway — the class-of-flaw filter — and the
+		// only way to ask "is CWE-79 in this list" without a table is a
+		// substring match, which answers CWE-79 for a search for CWE-7 unless
+		// it is written as four separate patterns to respect the commas. Four
+		// unindexable patterns per name asked, against every issue, where a
+		// table answers with one indexed lookup.
+		//
+		// A report usually names the same weakness from several sources, so
+		// the pair is unique: a re-scan of the same data writes nothing.
+		`CREATE TABLE "vulnerability_weakness" (
+			"id"               ` + t.id + `,
+			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			-- Upper-cased on the way in, like every other identifier compared
+			-- exactly: CWE names are written CWE-79 everywhere they are
+			-- published, and a feed that shouts or whispers one should not
+			-- make two rows of it.
+			"cwe"              ` + t.name + ` NOT NULL,
+			CONSTRAINT "vulnerability_weakness_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "vulnerability_weakness_unique" UNIQUE ("vulnerability_id", "cwe")
+		)` + t.suffix,
+
+		// What the class-of-flaw filter reads: every issue of one kind.
+		`CREATE INDEX "vulnerability_weakness_cwe_idx" ON "vulnerability_weakness" ("cwe")`,
 
 		`CREATE TABLE "vulnerability_alias" (
 			"id"               ` + t.id + `,
@@ -422,6 +442,7 @@ func downFinding(ctx context.Context, tx *sql.Tx) error {
 		`DROP TABLE "scan_run"`,
 		`DROP TABLE "vulnerability_reference"`,
 		`DROP TABLE "vulnerability_alias"`,
+		`DROP TABLE "vulnerability_weakness"`,
 		`DROP TABLE "vulnerability"`,
 	} {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {

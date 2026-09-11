@@ -433,13 +433,8 @@ func registerAdministration(api huma.API, a Administering) {
 // timeFormat is how a moment is reported.
 const timeFormat = "2006-01-02T15:04:05Z"
 
-// administerable refuses anybody who is not an administrator, and hands back
-// what the endpoint needs.
-//
-// Managing who may do what is the one thing that must never be reachable by a
-// role granted on a product: somebody who may triage a product must not be
-// able to grant themselves more of it. mintable is administerable for the two
-// acts that create a credential: a credential cannot create another.
+// mintable is administerable for the two acts that create a credential: a
+// credential cannot create another.
 func mintable(ctx context.Context, a Administering) (*access.Store, *catalog.Store, error) {
 	if err := mintingCredentials(ctx); err != nil {
 		return nil, nil, err
@@ -447,6 +442,12 @@ func mintable(ctx context.Context, a Administering) (*access.Store, *catalog.Sto
 	return administerable(ctx, a)
 }
 
+// administerable refuses anybody who is not an administrator, and hands back
+// what the endpoint needs.
+//
+// Managing who may do what is the one thing that must never be reachable by a
+// role granted on a product: somebody who may triage a product must not be
+// able to grant themselves more of it.
 func administerable(ctx context.Context, a Administering) (*access.Store, *catalog.Store, error) {
 	if err := administrating(ctx); err != nil {
 		return nil, nil, err

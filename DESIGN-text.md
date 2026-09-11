@@ -55,8 +55,11 @@ Raw markup is refused at the parser rather than stripped afterwards. The parser
 drops a raw block and escapes an inline one. The assertion is that nothing
 arrives as live markup, not which of the two mechanisms ran.
 
-The sanitizer runs over the parser output regardless, and that is asserted
-separately.
+There is no second pass. A sanitizer ran over the parser's output once, and it
+was the only reader of the rendering this server no longer does — so what
+stands between a payload and a reader is the check at submission, which is the
+half the server owns. What renders is somebody else's, and each renderer has
+its own tests over the same corpus.
 
 ## Link schemes
 
@@ -163,13 +166,15 @@ The language tag after three backticks is input and lands in a class attribute.
 It is allowlisted. An unrecognized language keeps the block and loses the label
 rather than failing.
 
-The allowlist is applied in one place, by the sanitizer, on the way out. What is
-asserted is the rendered output, because asking the allowlist directly proves
-only that it agrees with itself.
+The allowlist is whoever renders. This server emits no markup, so the list it
+held went with the renderer — and each reader keeps its own, over which what is
+asserted is the rendered output: asking an allowlist directly proves only that
+it agrees with itself.
 
 ## Bounds
 
-Every field is capped at 64 KB. Rendering is time-bounded.
+Every field is capped at 64 KB. Nothing here renders, so the cap is the whole
+of the bound: what was time-bounded was a rendering this server stopped doing.
 
 The column holds what the cap admits, on every engine. Two of the four spell
 plain text as a type topping out at 65,535 bytes, one byte short of the cap — so
@@ -178,10 +183,12 @@ those two, or was truncated without a word outside strict mode, which leaves an
 approver agreeing to text that is not the text somebody wrote. The quick loop
 never saw it, because the engine it runs on stores it happily.
 
-The time bound bounds the wait, not the work: a parse cannot be interrupted, so
-the work runs to completion with nobody reading the result. What the bound buys
-is that the request answers and releases its resources. The cap on the work is
-the length limit, applied before any parsing starts.
+The parse that remains is the one the submission check makes, over text already
+inside that cap — so the cap is applied before any parsing starts and is what
+bounds the work. The time bound that sat beside it bounded the *wait* rather
+than the work, which is a distinction worth keeping in mind if rendering ever
+comes back: a parse cannot be interrupted, so what such a bound buys is that
+the request answers and releases its resources while the work runs on.
 
 ## Limits
 

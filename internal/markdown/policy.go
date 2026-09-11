@@ -207,11 +207,14 @@ func schemeOf(destination string) (string, bool) {
 	// tab to a third party, handing over this deployment's own address — which
 	// names the product, the build and the finding — as the referrer. A
 	// relative link inside this deployment never starts with two separators.
-	if len(destination) > 1 {
-		switch destination[:2] {
-		case "//", "/\\":
-			return "", false
-		}
+	//
+	// Asked as "two separators" rather than as a list of the two spellings
+	// somebody thought of: a browser reads all four the same way, and the list
+	// held `//` and `/\` while `\\` and `\/` went past it as relative.
+	if len(destination) > 1 &&
+		strings.ContainsAny(destination[:1], `/\`) &&
+		strings.ContainsAny(destination[1:2], `/\`) {
+		return "", false
 	}
 	// Anything before a path separator, a query or a fragment is not a scheme.
 	head := destination

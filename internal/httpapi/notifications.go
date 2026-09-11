@@ -141,10 +141,6 @@ func registerNotifications(api huma.API, in Ingest) {
 	})
 }
 
-// findingPath is where a notification about one finding points.
-//
-// Spelled once here rather than at each producer: it is the address the
-// interface routes on, and three copies of it drift the moment a route moves.
 // registerDigest is the two switches a person sets for themselves.
 func registerDigest(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
@@ -182,6 +178,10 @@ func registerDigest(api huma.API, in Ingest) {
 	})
 }
 
+// findingPath is where a notification about one finding points.
+//
+// Spelled once here rather than at each producer: it is the address the
+// interface routes on, and three copies of it drift the moment a route moves.
 func findingPath(product, stream, variant, vulnerability, component string) string {
 	return "/products/" + url.PathEscape(product) +
 		"/streams/" + url.PathEscape(stream) +

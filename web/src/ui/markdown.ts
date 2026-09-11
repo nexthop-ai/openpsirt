@@ -11,9 +11,10 @@ import DOMPurify from "dompurify";
 // the allowlist whether it allows something proves only that it agrees with
 // itself.
 
-// The fenced-block tags that may reach a class attribute. The same list the
-// server's sanitizer holds: a language tag is somebody's input, and three
-// backticks followed by chosen text landing in markup is small and real.
+// The fenced-block tags that may reach a class attribute. This list is this
+// renderer's own — the server emits no markup and holds no such list — because
+// a language tag is somebody's input, and three backticks followed by chosen
+// text landing in markup is small and real.
 //
 // An unknown language keeps its block and loses the label rather than failing.
 // Refusing to render over a language nobody listed would make the tool argue
@@ -55,8 +56,8 @@ const md = new MarkdownIt({
   html: false,
   linkify: true,
   breaks: false,
-  // The server emits the language as a class and stops there; so does this.
-  // Coloring is applied afterwards, over already-sanitized markup.
+  // The language becomes a class and nothing else. Coloring is applied
+  // afterwards, over already-sanitized markup.
   highlight: () => "",
 });
 

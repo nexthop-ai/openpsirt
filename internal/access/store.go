@@ -641,9 +641,18 @@ type Mentionable struct {
 // about what somebody holds reads past them, and so is somebody who has left:
 // they are refused at sign-in, so offering their name mentions somebody who
 // will never see it.
-func (s *Store) WhoCanRead(ctx context.Context, productID int64, visibility Visibility,
-	term string, limit int) ([]Mentionable, error) {
+func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64,
+	visibility Visibility, term string, limit int) ([]Mentionable, error) {
 
+	// Asking who may read something undisclosed is itself a question about
+	// undisclosed work, and the answer is the one every other read gives:
+	// nothing. Asked here rather than only at the two handlers that call it,
+	// because a third endpoint over this query would answer for everybody —
+	// which is the rule this project does not bend, and the gate was written
+	// out at each caller instead of being carried on the query.
+	if !subject.Reads(visibility, productID) {
+		return nil, nil
+	}
 	limit = database.APicker.Of(limit)
 
 	query := s.readersIn(productID, visibility)
@@ -687,9 +696,14 @@ func (s *Store) WhoCanRead(ctx context.Context, productID int64, visibility Visi
 //
 // A name nobody holds and a name held by somebody who may not read this both
 // come back absent, and are not told apart.
-func (s *Store) ReadersNamed(ctx context.Context, productID int64, visibility Visibility,
-	names []string) ([]Mentionable, error) {
+func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int64,
+	visibility Visibility, names []string) ([]Mentionable, error) {
 
+	// The same gate the picker carries, for the same reason: what this answers
+	// is who may read something, which is a fact about the thing being read.
+	if !subject.Reads(visibility, productID) {
+		return nil, nil
+	}
 	query := s.readersIn(productID, visibility)
 	if query == nil || len(names) == 0 {
 		return nil, nil

@@ -59,6 +59,31 @@ func decisionCounts(q *bun.SelectQuery, product string, args []any, states ...de
 	return q
 }
 
+// standsAs is the same question asked of one place rather than counted over a
+// group: does a decision in this state cover this finding.
+//
+// The row's count and the filter that selects on it have to be the same
+// question, and the sent-back filter had written its own — without the
+// product and without the version match — so it matched a claim sent back in
+// another product, or one keyed on a version the place no longer holds, and
+// returned groups whose own sent-back count was zero.
+func standsAs(product string, state decisionState) string {
+	// The finding is joined again inside rather than read from the outer
+	// query, because the versions the match is keyed on hang off the
+	// component and the consumer, and the statements this narrows have joined
+	// neither. Every join here is the subquery's own and the only thing read
+	// from outside it is the row's identifier, which is the shape the state
+	// filter's derived table already uses on all four engines.
+	return `EXISTS (SELECT 1 FROM "finding" AS f2
+			JOIN "component" AS c ON c.id = f2.component_id
+			LEFT JOIN "component" AS uc ON uc.id = f2.consumer_id
+			JOIN "decision" AS de ON de.vulnerability_id = f2.vulnerability_id
+			  AND de.place_identity = f2.place_identity
+			WHERE f2.id = f.id
+			  AND de.product_id = ` + product + `
+			  AND ` + coversHere + state.condition + `)`
+}
+
 // decidedAs is the one spelling of the count, for the states above and for
 // the one question HowItStands asks that none of them covers.
 func decidedAs(product string, state decisionState) string {

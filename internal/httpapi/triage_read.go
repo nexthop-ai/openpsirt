@@ -535,7 +535,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		where, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
 			input.Vulnerability, input.Place)
 		if err != nil {
 			return nil, err
@@ -611,7 +611,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		where, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
 			input.Vulnerability, input.Place)
 		if err != nil {
 			return nil, err

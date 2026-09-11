@@ -572,7 +572,7 @@ var tables = []string{
 	"routing_rule",
 	// Before person, product and vulnerability, all of which it points at.
 	"case_collaborator",
-	// Before person and vulnerability, both of which it points at.
+	// Before person, vulnerability and product, all of which it points at.
 	"flaw_report",
 	// Before person, product and vulnerability, all of which it points at.
 	"advisory_issuance",
@@ -589,6 +589,7 @@ var tables = []string{
 	"suppression",
 	"scan_run",
 	"vulnerability_alias",
+	"vulnerability_weakness",
 	"vulnerability",
 	"scan_document_chunk",
 	"scan_document",

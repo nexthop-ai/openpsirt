@@ -4189,6 +4189,8 @@ export interface components {
              * @description How many products those sit in
              */
             in_products?: number;
+            /** @description You made this rating, so you may not be the one who agrees */
+            mine?: boolean;
             /** @description Whether a second person has to agree before it takes effect */
             needs_approval?: boolean;
             /**
@@ -5533,7 +5535,7 @@ export interface components {
             score?: number;
             /** @description A live claim at one of these places is currently with its author, sent back for more */
             sent_back?: boolean;
-            /** @description As the scanner rated it. A word, not a score */
+            /** @description The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score */
             severity?: string;
             /** @description The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule */
             source?: string;

@@ -125,7 +125,10 @@ func clearedCookie(plainHTTP bool) http.Cookie {
 //nolint:gosec // G124 cannot see that Secure is cleared only for a deployment that asked for it, nor that HttpOnly is off only for the value a page must read.
 func browserCookie(name, value string, readable, plainHTTP bool, maxAge int) http.Cookie {
 	return http.Cookie{
-		Name: name, Value: value, Path: "/",
+		// Prefixed where this is served over TLS, which is what actually
+		// stops a sibling host writing one of these for us to read. See
+		// access.CookieName.
+		Name: access.CookieName(name, plainHTTP), Value: value, Path: "/",
 		HttpOnly: !readable, Secure: !plainHTTP, SameSite: http.SameSiteLaxMode,
 		MaxAge: maxAge,
 	}

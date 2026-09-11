@@ -13,7 +13,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -23,12 +22,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// Evidence is everything held about one issue in one component here.
-//
-// Assembled for somebody who has to decide about it and has a thousand more
-// waiting. The measure it is built against: nothing here should send them to a
-// search engine. If we hold the write-up, the score, the patch, or the version
-// that fixes it, it is in this answer.
 // Measured is what produced a finding: the run, and what it was measured with.
 //
 // A build reporting nothing wrong and a build last measured against a
@@ -46,6 +39,12 @@ type Measured struct {
 	RanAt *time.Time
 }
 
+// Evidence is everything held about one issue in one component here.
+//
+// Assembled for somebody who has to decide about it and has a thousand more
+// waiting. The measure it is built against: nothing here should send them to a
+// search engine. If we hold the write-up, the score, the patch, or the version
+// that fixes it, it is in this answer.
 type Evidence struct {
 	Vulnerability string
 	Aliases       []string
@@ -172,7 +171,7 @@ type Evidence struct {
 // whole of it undisclosed for anybody deciding what may be said — are
 // checkable without a database.
 func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Component,
-	aliases []Alias, references []Reference) *Evidence {
+	aliases []Alias, references []Reference, weaknesses []Weakness) *Evidence {
 
 	evidence := &Evidence{
 		Vulnerability: issue.Identifier, Severity: issue.Severity,
@@ -222,9 +221,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	if issue.LikelihoodPPM != nil {
 		evidence.LikelihoodPPM = *issue.LikelihoodPPM
 	}
-	if issue.Weaknesses != "" {
-		evidence.Weaknesses = strings.Split(issue.Weaknesses, ",")
-	}
+
 	if component.UpstreamVersion != "" {
 		evidence.Upstream = component.UpstreamName + " " + component.UpstreamVersion
 	}
@@ -233,6 +230,9 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 			evidence.Aliases = append(evidence.Aliases, alias.Identifier)
 		}
 	}
+	for _, weakness := range weaknesses {
+		evidence.Weaknesses = append(evidence.Weaknesses, weakness.CWE)
+	}
 	// Worked out here rather than stored: an address derived from two names
 	// cannot go stale while the names are right, and storing it would be a
 	// second copy of the templates to keep in step.
@@ -240,7 +240,6 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	return evidence
 }
 
-// Sitting is one place a component occupies, as a finding presents it.
 // versionsOf reads the version each of these components ships at, in one
 // statement.
 func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]string, error) {
@@ -265,6 +264,7 @@ func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]string, 
 	return out, nil
 }
 
+// Sitting is one place a component occupies, as a finding presents it.
 type Sitting struct {
 	// PlaceIdentity is what a decision is made against, and what a request
 	// names when making one.
@@ -308,7 +308,6 @@ type Sitting struct {
 	Chain []graph.Step
 }
 
-// Detail reads everything held about one issue in one component of a build.
 // evidenceRow is one open place of the fold a finding screen is about.
 //
 // Named rather than written inline because the assembly that reads it is a
@@ -342,6 +341,7 @@ type evidenceRow struct {
 	DueAt         *time.Time `bun:"due_at"`
 }
 
+// Detail reads everything held about one issue in one component of a build.
 func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
 	componentID int64) (*Evidence, error) {
 
@@ -465,7 +465,14 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, fmt.Errorf("read where this is written up: %w", err)
 	}
 
-	evidence := evidenceFrom(rows, issue, component, aliases, references)
+	var weaknesses []Weakness
+	if err := s.db.NewSelect().Model(&weaknesses).
+		Where("vulnerability_id = ?", vulnerabilityID).
+		Order("cwe").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
+	}
+
+	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
 
 	// When this first appeared here and what produced it. The earliest
 	// place, because that is the age the deadline relates to, and the run

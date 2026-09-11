@@ -275,15 +275,20 @@ func fillEmail(r *http.Request, in Ingest, rights *access.Store,
 
 // pendingFrom reads back what the sign-in remembered.
 //
-// **Signed, because the cookie is the browser's.** Unsigned, the state the
-// callback compares against was whatever the cookie said — so somebody who
-// can write a cookie on this host, from a neighboring subdomain or anywhere
-// else, could start a sign-in of their own, plant their state and verifier in
-// a victim's browser, and have the callback issue that browser a session for
-// the attacker's account. The state check is only a control while the value
-// it compares against is one this deployment authored.
+// **Named so a sibling host cannot write it.** Over TLS the cookie carries the
+// `__Host-` prefix, which a browser refuses to set unless the cookie is
+// Secure, path-wide and bound to exactly the host that set it — so
+// `evil.internal.example` cannot plant one for `psirt.internal.example`, which
+// is the premise the attack rests on.
+//
+// **Signed as well, because the two answer different questions.** The
+// signature says this deployment authored the value; the prefix says it
+// authored it for *this* browser. Signing alone is not the control: an
+// attacker who can write a cookie starts a sign-in of their own, takes the
+// validly-signed pending value it hands back, plants that, and the callback
+// issues the victim's browser a session for the attacker's account.
 func pendingFrom(ctx context.Context, in Ingest, r *http.Request) (inProgress, error) {
-	cookie, err := r.Cookie(pendingCookie)
+	cookie, err := r.Cookie(access.CookieName(pendingCookie, in.PlainHTTP))
 	if err != nil || cookie.Value == "" {
 		return inProgress{}, errors.New("no sign-in is in progress")
 	}

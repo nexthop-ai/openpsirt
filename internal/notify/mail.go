@@ -66,10 +66,10 @@ func NewMail(addr, from, username, password string) *Mail {
 	}
 }
 
-// Name is what this channel is called in a log line.
 // Timeout bounds the whole conversation with the server.
 func (m *Mail) Timeout() time.Duration { return m.timeout }
 
+// Name is what this channel is called in a log line.
 func (m *Mail) Name() string { return "mail" }
 
 // Send carries one message to one address.

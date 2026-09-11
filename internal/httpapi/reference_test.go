@@ -16,10 +16,31 @@ import (
 // matching the shape cannot go stale the way a list of names does.
 var namesADecision = regexp.MustCompile(`\b[A-Z]{3,4}-[0-9]+\b`)
 
+// domainIdentifiers are the names of things this software is *about*, which
+// share that shape and are exactly what a description should be free to use.
+// A caller reading "CVE-2026-74280" is reading the domain's own vocabulary;
+// the rule is about identifiers nobody outside this repository has.
+//
+// Filtered rather than excluded in the pattern, because Go's regexp has no
+// lookahead — and the shape rule is the part worth keeping.
+var domainIdentifiers = regexp.MustCompile(`^(CVE|GHSA|CWE|RHSA|DSA|DLA|USN|ALAS|ELSA|CAPEC)-`)
+
 // paraphrases is the shapes AGENTS.md names as the wrong way to write a
 // summary, quoted from it: a verb that avoids naming the act, and a summary
 // that is a question rather than an instruction.
 var paraphrases = []string{"Agree to", "Send what", "What is", "Getting ", "Returns "}
+
+// decisionIn is the first decision identifier in a piece of text, or empty
+// where the only things of that shape are the domain's own names.
+func decisionIn(text string) string {
+	for _, found := range namesADecision.FindAllString(text, -1) {
+		if domainIdentifiers.MatchString(found) {
+			continue
+		}
+		return found
+	}
+	return ""
+}
 
 func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 	// AGENTS.md: a summary is an imperative verb and the thing it acts on, in
@@ -57,7 +78,7 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 							"way not to write one — say the act: %q", where, shape, op.Summary)
 					}
 				}
-				if found := namesADecision.FindString(op.Summary + " " + op.Description); found != "" {
+				if found := decisionIn(op.Summary + " " + op.Description); found != "" {
 					t.Errorf("%s cites %s, which names a file nobody outside this "+
 						"repository has", where, found)
 				}

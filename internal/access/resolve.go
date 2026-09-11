@@ -114,6 +114,11 @@ type Resolver struct {
 	// held, because an administrator can change it without a restart and a
 	// held copy would keep deriving roles after they turned it off.
 	mode func(context.Context) Mode
+	// plainHTTP says this deployment is served without TLS, which is the one
+	// case the cookie prefix has to be dropped for — a browser will not set a
+	// `__Host-` cookie over plain HTTP, so keeping the prefix there makes
+	// every sign-in silently fail.
+	plainHTTP bool
 }
 
 // NewResolver returns a resolver over a store.
@@ -131,6 +136,13 @@ func (r *Resolver) WithMode(mode func(context.Context) Mode) *Resolver {
 	if mode != nil {
 		r.mode = mode
 	}
+	return r
+}
+
+// OverPlainHTTP says this deployment is served without TLS, which changes the
+// name the session cookie is read under.
+func (r *Resolver) OverPlainHTTP(plain bool) *Resolver {
+	r.plainHTTP = plain
 	return r
 }
 
@@ -163,6 +175,29 @@ func FromBrowserWithoutSession(session *Session) bool { return session == viaBro
 // session token and nothing else — no identity, no roles, nothing a page could
 // read and act on — and it is marked so that scripts cannot read it at all.
 const SessionCookie = "openpsirt_session"
+
+// CookieName is the name a browser actually holds, which carries a prefix
+// wherever this deployment is served over TLS.
+//
+// `__Host-` is the only control that stops a sibling host writing a cookie
+// this deployment then reads: a browser refuses to set a name with that prefix
+// unless the cookie is Secure, path-wide and bound to exactly the host that
+// set it — so `evil.internal.example` cannot plant one for
+// `psirt.internal.example`, which is the premise every cookie-planting attack
+// here rests on. Signing the value proves this deployment wrote it and not
+// that it wrote it for *this* browser, so an attacker who can write cookies
+// plants a validly-signed one of their own and the callback issues the
+// victim's browser a session for the attacker's account.
+//
+// Cleared for a deployment running without TLS, where the prefix would make
+// the browser drop the cookie and every request afterwards look like a
+// stranger's — the same reason Secure is a parameter there.
+func CookieName(name string, plainHTTP bool) string {
+	if plainHTTP {
+		return name
+	}
+	return "__Host-" + name
+}
 
 // CSRFHeader is where a page echoes the value bound to its session.
 const CSRFHeader = "X-CSRF-Token"
@@ -252,7 +287,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *http.Request) (Subject, *Se
 // forgery possible and what the value bound to the session guards against .
 // Nothing else needs to know which door a request came through.
 func (r *Resolver) fromCookie(ctx context.Context, req *http.Request) (Subject, *Session, error) {
-	cookie, err := req.Cookie(SessionCookie)
+	cookie, err := req.Cookie(CookieName(SessionCookie, r.plainHTTP))
 	if err != nil || cookie.Value == "" {
 		return Subject{}, nil, ErrDenied
 	}

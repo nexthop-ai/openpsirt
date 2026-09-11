@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { linkable } from "../ui/addressable";
+import { Outward } from "../ui/Outward";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 
@@ -284,11 +285,11 @@ export function Elsewhere({
     return (
       <>
         {" · "}
-        {where ? (
-          <a href={where} target="_blank" rel="noreferrer noopener" className="linkish">
-            where the work is →
-          </a>
-        ) : null}{" "}
+        {/* Typed here rather than supplied by a scanner, and still a string
+            that becomes somewhere to click, so it is judged the same way a
+            scanner's reference is — by the component that does the judging,
+            rather than by each screen remembering to. */}
+        <Outward href={where}>where the work is →</Outward>{" "}
         <button
           type="button"
           className="linkish"

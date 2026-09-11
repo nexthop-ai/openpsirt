@@ -184,6 +184,13 @@ a comment or a decision would read as a tightening and would defeat it
 silently, which is why it is written here rather than left to be inferred from
 the read rule above.
 
+**The step itself is not built.** What is enforced today is the rule above,
+which is a statement about what a disclosure would carry rather than an act
+somebody can perform: reaching a disclosure date escalates and publishes
+nothing (REQ-37), and no path anywhere makes a finding public. So the record is
+written to be disclosable as a whole, and the act that would disclose it is the
+half that is missing.
+
 ## Readback
 
 Each way of adding to a decision has a matching way of reading the result: the

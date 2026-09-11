@@ -135,13 +135,13 @@ const (
 	// ordinary ones filling a disk somebody else pays for. Storage that
 	// another person fills on our behalf needs a ceiling, and how high it
 	// should be is a judgment about a deployment rather than a constant.
+	AttachmentMaxSize = "attachment.max-size"
+	AttachmentQuota   = "attachment.quota"
 	// RoutingBatch is how many findings one pass of the routing sweep may
 	// place. A bulk write is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
-	RoutingBatch      = "routing.batch"
-	AttachmentMaxSize = "attachment.max-size"
-	AttachmentQuota   = "attachment.quota"
+	RoutingBatch = "routing.batch"
 	// AttachmentShare is how much of that one person may hold, in bytes.
 	//
 	// The deployment-wide quota bounds the store and nothing bounded any
@@ -216,12 +216,6 @@ const (
 	DefaultQueuedAfter    = 3 * 24 * time.Hour
 )
 
-// DefaultAttachmentMaxSize is what one file may be where nobody has said.
-//
-// Screenshots and logs are what people attach, and both fit comfortably. It is
-// deliberately not generous: an operator who wants to accept a core dump can
-// say so, and the direction that needs a deliberate act is the one that fills
-// a disk.
 // DefaultRoutingBatch is how many findings one routing pass places where
 // nobody has said.
 //
@@ -231,6 +225,12 @@ const (
 // is a suspicious number.
 const DefaultRoutingBatch = 2000
 
+// DefaultAttachmentMaxSize is what one file may be where nobody has said.
+//
+// Screenshots and logs are what people attach, and both fit comfortably. It is
+// deliberately not generous: an operator who wants to accept a core dump can
+// say so, and the direction that needs a deliberate act is the one that fills
+// a disk.
 const DefaultAttachmentMaxSize = 25 << 20
 
 // DefaultAttachmentQuota is what a deployment holds in total where nobody has

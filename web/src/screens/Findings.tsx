@@ -1,4 +1,5 @@
 import { decidedAs } from "../ui/decided";
+import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager, Peek, Sits } from "./FindingsViews";
 import { FLOORS } from "../ui/severities";
@@ -18,7 +19,6 @@ import { Icon } from "../ui/Icons";
 import { Holder } from "../ui/Holder";
 import { Saved, type Prepared } from "../ui/Saved";
 import { said } from "../ui/Decide";
-import { useWho } from "../app/session";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
 // question of the server to offer the row before and the row after. Fifty rows
@@ -175,6 +175,9 @@ export function Findings() {
   // rows still on screen, so picking thirty on one page and twenty on the next
   // and pressing "Assign 50" wrote twenty and dropped thirty, silently.
   const [picked, setPicked] = useState<Map<string, Row>>(new Map());
+  // Beside the hooks it belongs with: this reads the session, so it cannot sit
+  // after an early return.
+  const { cap: bulkCap, over: overCap } = useBulkCap(picked.size);
   const [handing, setHanding] = useState("");
   // How many of a hand-over did not land. Said rather than swallowed: the loop
   // writes one row at a time, so a failure partway through leaves part of a
@@ -250,7 +253,7 @@ export function Findings() {
   // handed over a row at a time, so this is the bound on how many round trips
   // one click makes. Read up here with the other hooks, because the screen
   // returns early for two of its views.
-  const bulkCap = useWho().data?.bulk_cap ?? 0;
+
   // What people have marked findings with here, for the filter to offer. Read
   // only while the panel that uses it is open: it is a per-product list nobody
   // needs unless they are narrowing by one.
@@ -658,8 +661,6 @@ export function Findings() {
     (row) => `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`,
   );
 
-  const overCap = bulkCap > 0 && picked.size > bulkCap;
-
   // Handing a selection to somebody, which is the one thing a selection can do
   // until the bulk workflows that start from one are built.
   async function handOver() {
@@ -757,8 +758,7 @@ export function Findings() {
               round trips as the filter matched. */}
           {overCap && (
             <span className="alert" role="status">
-              {bulkCap.toLocaleString()} at a time is what this deployment allows. Narrow the
-              selection.
+              {overCapNotice(bulkCap)}
             </span>
           )}
           <span className="spacer" />

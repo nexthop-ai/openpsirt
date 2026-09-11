@@ -158,14 +158,24 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
               </p>
             )}
             <div className="cardfoot">
+              {/* The same rule the extensions above hold to, and the same
+                  reason: the server refuses your own either way, so offering
+                  the button means a click that answers 422 and says nothing
+                  about why. */}
               <button
                 type="button"
                 className="btn"
-                disabled={agree.isPending}
+                disabled={agree.isPending || row.mine}
+                title={
+                  row.mine
+                    ? "You made this rating. The person who proposes may not be the one who agrees"
+                    : "Agree, and put the rating in force"
+                }
                 onClick={() => agree.mutate(row.id ?? 0)}
               >
                 Agree
               </button>
+              {row.mine && <span className="hint">Yours, so somebody else agrees to it.</span>}
             </div>
           </div>
         ))}

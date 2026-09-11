@@ -241,7 +241,14 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 	if err != nil {
 		return 0, 0, fmt.Errorf("place what that rule matched: %w", err)
 	}
-	n, _ := res.RowsAffected()
+	// What the write matched, which is what the receipt reports and what the
+	// caller counts a pass by. A count that cannot be read is a fault: read
+	// as zero it reports a pass that placed nothing, which is indistinguishable
+	// from a rule that matched nothing.
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, 0, fmt.Errorf("cannot tell how much that rule placed: %w", err)
+	}
 	return len(ids), int(n), nil
 }
 

@@ -15,7 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
-import { linkable } from "../ui/addressable";
+import { Outward } from "../ui/Outward";
 import { useComment, useEditComment } from "../api/mutations";
 import { Failed } from "../ui/Failed";
 import { ReasonEditor } from "../ui/ReasonEditor";
@@ -261,7 +261,7 @@ export function Standing({
       <ReasonEditor
         claimId={id}
         reasoning={claim.reasoning ?? ""}
-        offered={state === "proposed" || state === "approved"}
+        state={state}
         approved={state === "approved"}
         about={about}
         onDone={onRevised}
@@ -277,18 +277,7 @@ export function Standing({
             Being worked on at{" "}
             {/* Judged before it is somewhere to click, like every other
                 address that was somebody's text. */}
-            {linkable(summary.elsewhere) ? (
-              <a
-                href={linkable(summary.elsewhere)!}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="linkish"
-              >
-                {summary.elsewhere}
-              </a>
-            ) : (
-              <span className="id">{summary.elsewhere}</span>
-            )}
+            <Outward href={summary.elsewhere} />
             {". "}
           </>
         ) : (

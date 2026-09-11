@@ -64,10 +64,19 @@ Engine-specific code is confined to these places:
 | Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
+| A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 
 This list is the complete set and is checked by grep rather than trusted —
-`make confined`, which refuses a dialect named anywhere but the paths above and
-holds the same list, so widening one without the other is what fails. The
+`make confined`, which refuses a dialect named anywhere but the places above
+and holds the same list, so widening one without the other is what fails. It
+reads the tests too: a branch in a test is a branch, and the one thing it lets
+past there is an engine named to choose which engine runs.
+
+What it looks for is the branch rather than the SQL: the two upsert idioms as
+bun spells them, and asking a handle which engine it is. Those were absent
+from it at first, which made the one live branch in the tree written that way
+invisible to it — a gate that cannot see the idiom the code actually uses is a
+sentence rather than a check. The
 sentence asserted that check before anything performed it, which is the shape
 this list was written about: it stated three while there were five, because
 each new one arrived under a comment calling itself one of the few places an

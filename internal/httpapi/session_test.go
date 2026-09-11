@@ -22,7 +22,11 @@ func asBrowser(t *testing.T, r *reach, issued *access.Issued, method, path, csrf
 	// A cookie on the way *to* a server carries a name and a value and
 	// nothing else: Secure, HttpOnly and SameSite are instructions a server
 	// gives a browser, and mean nothing on a request.
-	req.AddCookie(&http.Cookie{Name: access.SessionCookie, Value: issued.Token}) //nolint:gosec // a request cookie carries no attributes
+	// Under the name a browser actually holds, which carries the prefix
+	// that stops a sibling host writing one.
+	req.AddCookie(&http.Cookie{ //nolint:gosec // a request cookie carries no attributes
+		Name: access.CookieName(access.SessionCookie, false), Value: issued.Token,
+	})
 	if csrf != "" {
 		req.Header.Set(access.CSRFHeader, csrf)
 	}
@@ -181,7 +185,7 @@ func TestSigningOutStopsTheCookieWorking(t *testing.T) {
 			t.Fatalf("signing out answered %d: %s", out.Code, out.Body.String())
 		}
 		// The browser is told to drop it as well as the row being deleted.
-		if cleared := out.Header().Get("Set-Cookie"); !strings.Contains(cleared, access.SessionCookie+"=") ||
+		if cleared := out.Header().Get("Set-Cookie"); !strings.Contains(cleared, access.CookieName(access.SessionCookie, false)+"=") ||
 			!strings.Contains(cleared, "Max-Age=0") {
 			t.Errorf("signing out did not clear the cookie: %q", cleared)
 		}

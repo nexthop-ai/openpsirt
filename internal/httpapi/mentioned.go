@@ -108,7 +108,7 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	// may be named — and asked about these names rather than by paging that
 	// list, which answered from the alphabetically-first hundred readers and
 	// silently reached nobody for anyone sorting past them.
-	readers, err := access.NewStore(in.DB.DB).ReadersNamed(ctx,
+	readers, err := access.NewStore(in.DB.DB).ReadersNamed(ctx, subject,
 		decision.ProductID, decision.Visibility, names)
 	if err != nil {
 		return nil, fmt.Errorf("read who may be told: %w", err)

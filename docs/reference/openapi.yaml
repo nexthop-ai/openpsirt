@@ -294,6 +294,9 @@ components:
           description: How many products those sit in
           format: int64
           type: integer
+        mine:
+          description: You made this rating, so you may not be the one who agrees
+          type: boolean
         needs_approval:
           description: Whether a second person has to agree before it takes effect
           type: boolean
@@ -2557,7 +2560,7 @@ components:
           description: A live claim at one of these places is currently with its author, sent back for more
           type: boolean
         severity:
-          description: As the scanner rated it. A word, not a score
+          description: "The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"
           type: string
         source:
           description: "The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"
@@ -9338,6 +9341,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9516,6 +9520,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9535,6 +9540,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9757,6 +9763,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9935,6 +9942,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9954,6 +9962,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11523,6 +11532,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11701,6 +11711,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11720,6 +11731,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12019,6 +12031,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12197,6 +12210,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12216,6 +12230,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12439,6 +12454,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12617,6 +12633,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12636,6 +12653,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12885,6 +12903,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -13063,6 +13082,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -13082,6 +13102,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"

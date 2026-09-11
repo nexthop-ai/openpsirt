@@ -64,7 +64,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject, up Upgr
 	if up.By.IsZero() {
 		return Declared{}, fmt.Errorf("say when this will be done")
 	}
-	if !subject.Triages(access.Public, up.ProductID) {
+	// Asked of the one predicate rather than written out: the same question
+	// every other write here asks, and a second spelling of it is a second
+	// rule to keep in step.
+	if !mayDecide(subject, up.ProductID, access.Public) {
 		return Declared{}, access.Denied(
 			fmt.Sprintf("decide what is fixed in product %d", up.ProductID))
 	}

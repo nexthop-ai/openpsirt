@@ -7,6 +7,8 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -167,6 +169,52 @@ func (s *Store) deferralThreshold(ctx context.Context) (time.Duration, error) {
 // number here.
 const DefaultDeferralThreshold = 30 * 24 * time.Hour
 
+// bind resolves what a promise made here is gated against: the earliest
+// deadline among everything the act covers.
+//
+// Read here rather than handed in, because it is a stored value that a
+// re-rating or an arriving scan moves — so a value read before the
+// transaction opened gates the promise against a deadline that may be gone by
+// the time it is written, and a retry re-reads everything else and would keep
+// this one stale. REQ-71: nothing a transaction depends on is read outside it.
+//
+// One binding over the whole set rather than one per place: an act covering a
+// critical and a medium is gated by the critical, however many mediums are in
+// it.
+func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Proposal) error {
+	var targets []int64
+	places := make([]finding.At, 0, len(proposals))
+	var productID int64
+	for _, p := range proposals {
+		if len(p.BindingAcross) == 0 {
+			continue
+		}
+		if len(targets) == 0 {
+			targets, productID = p.BindingAcross, p.Place.ProductID
+		}
+		places = append(places, finding.At{
+			VulnerabilityID: p.Place.VulnerabilityID,
+			PlaceIdentity:   p.Place.PlaceIdentity,
+		})
+	}
+	if len(places) == 0 {
+		return nil
+	}
+	// The store here is only a receiver: what the read runs on is this
+	// transaction, which DeadlineAt takes as its own argument for exactly this
+	// reason.
+	binding, err := (&finding.Store{}).DeadlineAt(ctx, s.db, subject, productID, targets, places)
+	if err != nil {
+		return err
+	}
+	for i := range proposals {
+		if len(proposals[i].BindingAcross) > 0 {
+			proposals[i].Binding = binding
+		}
+	}
+	return nil
+}
+
 // gate works out whether each of these proposals needs a second person, and
 // records the answer on them.
 //
@@ -176,9 +224,12 @@ const DefaultDeferralThreshold = 30 * 24 * time.Hour
 // with the same consequence: a policy changing between the answer and the
 // write, or a deferral landing on the same place in between, stored a claim
 // as needing nobody under a rule that says it does. Nothing reported it.
-func (s *Store) gate(ctx context.Context, proposals []Proposal) error {
+func (s *Store) gate(ctx context.Context, subject access.Subject, proposals []Proposal) error {
 	threshold, err := s.deferralThreshold(ctx)
 	if err != nil {
+		return err
+	}
+	if err := s.bind(ctx, subject, proposals); err != nil {
 		return err
 	}
 	for i := range proposals {

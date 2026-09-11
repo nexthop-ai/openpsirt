@@ -1,6 +1,7 @@
 package triage
 
 import (
+	"context"
 	"errors"
 	"sort"
 
@@ -241,6 +242,11 @@ func readableOn(subject access.Subject, productID, vulnerabilityID int64,
 	return false
 }
 
+const (
+	onCases      = true
+	withoutCases = false
+)
+
 // narrowedBy applies one of those rules as a condition on the query.
 //
 // Written as a condition rather than as filtering afterwards, because a count,
@@ -260,11 +266,6 @@ func readableOn(subject access.Subject, productID, vulnerabilityID int64,
 // was brought into . Named rather than a bare boolean at two call sites,
 // because which of the two a narrowing is decides whether a collaborator can
 // approve.
-const (
-	onCases      = true
-	withoutCases = false
-)
-
 func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
 	allowed func(access.Subject, int64, access.Visibility) bool, cases bool) *bun.SelectQuery {
 
@@ -317,4 +318,63 @@ func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
 		}
 		return q
 	})
+}
+
+// notApprovableBy narrows a query to the decisions a subject may not agree
+// to — the complement of approvableBy, used to ask whether a claim has any
+// row outside what the reader may act on.
+func notApprovableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
+	if subject.Kind != access.Person {
+		return query
+	}
+	products, all := subject.Products()
+	if all {
+		return query.Where("1 = 0")
+	}
+	var private, public []int64
+	for _, id := range products {
+		switch {
+		case mayApprove(subject, id, access.Private):
+			private = append(private, id)
+		case mayApprove(subject, id, access.Public):
+			public = append(public, id)
+		}
+	}
+	if len(private) == 0 && len(public) == 0 {
+		return query
+	}
+	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+		if len(private) > 0 {
+			q = q.Where(column+".product_id NOT IN (?)", bun.List(private))
+		}
+		if len(public) > 0 {
+			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.WhereOr(column+".product_id NOT IN (?)", bun.List(public)).
+					WhereOr(column+".visibility <> ?", access.Public)
+			})
+		}
+		return q
+	})
+}
+
+// readableVisibilities is what this person may read across the products a set
+// of rows sits in: private where they may read private on every one of those
+// products, public only otherwise.
+//
+// A claim is one action on one build, so its rows share a product and this is
+// the per-row rule asked once. Where a set does span products the answer is
+// the narrower one, which discloses less rather than more.
+func readableVisibilities(subject access.Subject, ids []int64, s *Store, ctx context.Context) []access.Visibility {
+	var products []int64
+	if err := s.db.NewSelect().Model((*Decision)(nil)).
+		ColumnExpr("DISTINCT de.product_id").
+		Where("de.id IN (?)", bun.List(ids)).Scan(ctx, &products); err != nil {
+		return []access.Visibility{access.Public}
+	}
+	for _, product := range products {
+		if !subject.Reads(access.Private, product) {
+			return []access.Visibility{access.Public}
+		}
+	}
+	return []access.Visibility{access.Public, access.Private}
 }

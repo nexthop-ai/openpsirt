@@ -234,16 +234,8 @@ func (s *Store) placesOf(ctx context.Context, targetID, componentID int64, issue
 	return everywhere, nil
 }
 
-// ComponentGroup is one component at one version, with what is open against it
-// counted rather than listed.
-//
-// The level above a findings list. A list of issues answers "what is wrong";
-// this answers "where is the weight", which is the question somebody asks
-// before deciding what to read and what to put aside. It is also how a person
-// finds the one package worth hiding: on a real image the kernel carried 4,943
-// of 6,822 rows, and no list of issues makes that visible — it just looks like
-// a long list. Candidate is a version that would close some of what is open
-// against a component, and how much of it.
+// Candidate is a version that would close some of what is open against a
+// component, and how much of it.
 //
 // This is the fix-bundle grouping read per component rather than as a list of
 // its own: a package at a version, and where it could go. It sat on a view of
@@ -254,6 +246,15 @@ type Candidate struct {
 	Issues int
 }
 
+// ComponentGroup is one component at one version, with what is open against it
+// counted rather than listed.
+//
+// The level above a findings list. A list of issues answers "what is wrong";
+// this answers "where is the weight", which is the question somebody asks
+// before deciding what to read and what to put aside. It is also how a person
+// finds the one package worth hiding: on a real image the kernel carried 4,943
+// of 6,822 rows, and no list of issues makes that visible — it just looks like
+// a long list.
 type ComponentGroup struct {
 	Component string
 	Version   string
