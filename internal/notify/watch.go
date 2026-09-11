@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // betweenSweeps is how often the conditions are re-derived.
@@ -301,31 +302,14 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		return nil, fmt.Errorf("read what is critical on a release: %w", err)
 	}
 
-	// Who may read each product, at each visibility, and who may act there.
-	// Read once rather than per row: a release with a thousand criticals would
-	// otherwise ask the same question a thousand times.
-	people, held, err := access.NewStore(w.db).People(ctx)
+	// Who may act on each product, at each visibility. Read once rather than
+	// per row: a release with a thousand criticals would otherwise ask the
+	// same question a thousand times. This one goes to whoever may triage,
+	// because reading alone is not enough — interrupting somebody who cannot
+	// act is noise.
+	acts, err := w.whoActs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("read who may hear about this: %w", err)
-	}
-	type reach struct{ public, private bool }
-	acts := map[int64]map[int64]reach{}
-	for _, person := range people {
-		per := map[int64]reach{}
-		for _, grant := range held[person.ID] {
-			if !grant.Active {
-				continue
-			}
-			at := per[grant.ProductID]
-			switch grant.Role {
-			case access.PublicTriage:
-				at.public = true
-			case access.PrivateTriage:
-				at.public, at.private = true, true
-			}
-			per[grant.ProductID] = at
-		}
-		acts[person.ID] = per
+		return nil, err
 	}
 
 	// Everybody currently being told one of these is handed a list, empty
@@ -365,11 +349,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 			VulnerabilityID: &row.VulnerabilityID,
 		}
 		for personID, per := range acts {
-			at := per[row.ProductID]
-			if private && !at.private {
-				continue
-			}
-			if !private && !at.public {
+			if !per[row.ProductID].triages(private) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
@@ -840,7 +820,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		// Standing, because a decision nobody is relying on any more is not
 		// one whose evidence moving matters.
 		Where("de.live_key IS NOT NULL").
-		Where("de.state = ?", "approved").
+		Where("de.state = ?", triage.Approved).
 		// And the statement it cited is no longer what that publisher says.
 		Where("ss.superseded_at IS NOT NULL").
 		GroupExpr("de.product_id, de.vulnerability_id, de.from_statement_id").
@@ -849,30 +829,11 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		return nil, fmt.Errorf("read where a publisher changed their mind: %w", err)
 	}
 
-	people, held, err := access.NewStore(w.db).People(ctx)
+	// Whoever may read it and act on it, which for a claim somebody approved
+	// is whoever may triage that product.
+	acts, err := w.whoActs(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("read who may hear about this: %w", err)
-	}
-	// Whoever may read it and act on it, which for a claim somebody
-	// approved is whoever may triage that product.
-	type reach struct{ public, private bool }
-	acts := map[int64]map[int64]reach{}
-	for _, person := range people {
-		per := map[int64]reach{}
-		for _, grant := range held[person.ID] {
-			if !grant.Active {
-				continue
-			}
-			at := per[grant.ProductID]
-			switch grant.Role {
-			case access.PublicTriage:
-				at.public = true
-			case access.PrivateTriage:
-				at.public, at.private = true, true
-			}
-			per[grant.ProductID] = at
-		}
-		acts[person.ID] = per
+		return nil, err
 	}
 
 	out := map[int64][]Holds{}
@@ -904,8 +865,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 			VulnerabilityID: &row.VulnerabilityID,
 		}
 		for personID, per := range acts {
-			at := per[row.ProductID]
-			if !at.public || (private && !at.private) {
+			if !per[row.ProductID].triages(private) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)

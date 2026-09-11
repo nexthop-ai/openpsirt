@@ -156,45 +156,17 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 				Where(`"other".claim_id = de.claim_id`), subject, `"other"`))
 	}
 
-	total, err := s.db.NewSelect().
-		TableExpr("(?) AS \"waiting_claims\"", waitingClaims()).Count(ctx)
+	page, err := s.pageClaims(ctx, subject, waitingClaims, limit, offset, "what is waiting")
 	if err != nil {
-		return nil, 0, fmt.Errorf("count what is waiting: %w", err)
+		return nil, 0, err
 	}
+	if len(page.Order) == 0 {
+		return nil, page.Total, nil
+	}
+	total, ids, byID, rows := page.Total, page.Order, page.Claims, page.Rows
 
-	var page []struct {
-		ClaimID int64 `bun:"claim_id"`
-		Newest  int64 `bun:"newest"`
-	}
-	if err := waitingClaims().OrderExpr("newest DESC").
-		Limit(limit).Offset(offset).Scan(ctx, &page); err != nil {
-		return nil, 0, fmt.Errorf("read what is waiting: %w", err)
-	}
-	if len(page) == 0 {
-		return nil, total, nil
-	}
-	ids := make([]int64, 0, len(page))
-	for _, row := range page {
-		ids = append(ids, row.ClaimID)
-	}
-
-	var claims []Claim
-	if err := s.db.NewSelect().Model(&claims).
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read what is waiting: %w", err)
-	}
-	byID := make(map[int64]Claim, len(claims))
-	for _, claim := range claims {
-		byID[claim.ID] = claim
-	}
-
-	// Every row of every claim on the page, in one read. The representative
-	// is the earliest row; the sizes are counted over all of them.
-	var rows []Decision
-	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where("de.claim_id IN (?)", bun.List(ids)).Order("de.id ASC").Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read what is waiting: %w", err)
-	}
+	// The representative is the earliest row; the sizes are counted over all
+	// of them.
 	first := map[int64]Decision{}
 	issues := map[int64]map[int64]bool{}
 	places := map[int64]map[string]bool{}
@@ -210,9 +182,9 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 		count[row.ClaimID]++
 	}
 
-	representatives := make([]Decision, 0, len(page))
-	for _, row := range page {
-		representatives = append(representatives, first[row.ClaimID])
+	representatives := make([]Decision, 0, len(ids))
+	for _, id := range ids {
+		representatives = append(representatives, first[id])
 	}
 	reasoning, err := s.currentReasoning(ctx, representatives)
 	if err != nil {
@@ -232,8 +204,8 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 		return nil, 0, err
 	}
 	var bulk []Claim
-	for _, row := range page {
-		if claim := byID[row.ClaimID]; claim.Kind == TogetherClaim {
+	for _, id := range ids {
+		if claim := byID[id]; claim.Kind == TogetherClaim {
 			bulk = append(bulk, claim)
 		}
 	}
@@ -249,23 +221,23 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 		return nil, 0, err
 	}
 
-	out := make([]Waiting, 0, len(page))
-	for _, row := range page {
-		claim := byID[row.ClaimID]
-		representative := first[row.ClaimID]
+	out := make([]Waiting, 0, len(ids))
+	for _, id := range ids {
+		claim := byID[id]
+		representative := first[id]
 		// Agreed to before and back in the queue: an approver meeting it again
 		// should know they are re-reading something. Asked of the claim, which
 		// is what an agreement is given for.
-		before := seenBefore[row.ClaimID]
+		before := seenBefore[id]
 		one := Waiting{
 			Claim: claim, Decision: representative,
 			Reasoning:          reasoning[representative.ID],
 			PreviouslyApproved: before,
 			DeferredSoFar:      deferred[representative.ID],
-			Decisions:          count[row.ClaimID],
-			Issues:             len(issues[row.ClaimID]),
-			Places:             len(places[row.ClaimID]),
-			Builds:             builds[row.ClaimID],
+			Decisions:          count[id],
+			Issues:             len(issues[id]),
+			Places:             len(places[id]),
+			Builds:             builds[id],
 			Counter:            against[representative.ID],
 		}
 		if claim.Kind == TogetherClaim {

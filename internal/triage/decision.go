@@ -345,17 +345,10 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 		recorded, err = within.propose(ctx, claim, gated[0])
 		return err
 	})
-	if errors.Is(err, ErrAlreadyDecided) {
-		// Read now the transaction has unwound, so the refusal can say which
-		// claim to go and read rather than which constraint was violated.
-		if standing, found := s.liveAt(ctx, liveKeyFor(p.Place)); found {
-			return nil, fmt.Errorf(
-				"%w: decision %d is already %s here — revise that one rather than recording a "+
-					"second claim about the same code",
-				ErrAlreadyDecided, standing.ID, standing.State)
-		}
+	if err != nil {
+		return recorded, s.alreadyDecided(ctx, err, []Place{p.Place})
 	}
-	return recorded, err
+	return recorded, nil
 }
 
 // ProposeMany records the same claim at several places as one action.
@@ -414,19 +407,7 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 		return err
 	})
 	if err != nil {
-		// Named the same way one at a time names it: which claim to go and
-		// read, rather than which constraint was violated.
-		if errors.Is(err, ErrAlreadyDecided) {
-			for _, p := range proposals {
-				if standing, found := s.liveAt(ctx, liveKeyFor(p.Place)); found {
-					return nil, fmt.Errorf(
-						"%w: decision %d is already %s at one of these places — revise that one "+
-							"rather than recording a second claim about the same code",
-						ErrAlreadyDecided, standing.ID, standing.State)
-				}
-			}
-		}
-		return nil, err
+		return nil, s.alreadyDecided(ctx, err, placesOf(proposals))
 	}
 	return recorded, nil
 }
@@ -774,6 +755,49 @@ func liveKeyFor(at Place) string {
 // it: two claims about one finding are a disagreement, and a disagreement
 // belongs in one place where both sides are readable.
 var ErrAlreadyDecided = errors.New("a decision already stands here")
+
+// alreadyDecided turns the constraint's refusal into a sentence naming which
+// claim to go and read.
+//
+// Read after the transaction has unwound, which is why it is not part of the
+// write: inside it the row that collided is the row this attempt could not
+// see. Where the claim has since gone — withdrawn between the collision and
+// the read — the original refusal stands, because a message naming a decision
+// that is no longer there is worse than one naming none.
+//
+// Written four times, in three files, with the wording drifting by a word at
+// each: the same refusal read "here" from one path and "at one of these
+// places" from another for the same act on one place.
+// placesOf is the places a set of proposals is about, for a refusal that has
+// to name one of them.
+func placesOf(proposals []Proposal) []Place {
+	places := make([]Place, 0, len(proposals))
+	for _, p := range proposals {
+		places = append(places, p.Place)
+	}
+	return places
+}
+
+func (s *Store) alreadyDecided(ctx context.Context, err error, places []Place) error {
+	if !errors.Is(err, ErrAlreadyDecided) {
+		return err
+	}
+	where := "here"
+	if len(places) > 1 {
+		where = "at one of these places"
+	}
+	for _, place := range places {
+		standing, found := s.liveAt(ctx, liveKeyFor(place))
+		if !found {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: decision %d is already %s %s — revise that one rather than recording a "+
+				"second claim about the same code",
+			ErrAlreadyDecided, standing.ID, standing.State, where)
+	}
+	return err
+}
 
 // ErrNothingOpen says a selection named nothing that is actually open where it
 // was claimed to be.

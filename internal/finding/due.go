@@ -434,28 +434,7 @@ func (s *Store) clearOnTags(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if len(tags) == 0 {
-		return 0, nil
-	}
-	cleared := 0
-	err = database.IDsInBatches(ctx, tags, func(ctx context.Context, batch []int64) error {
-		result, err := s.db.NewUpdate().
-			Model((*Finding)(nil)).
-			Set("due_at = NULL").
-			Where("closed_at IS NULL").
-			Where("due_at IS NOT NULL").
-			Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-				WHERE tg.stream_id IN (?))`, bun.List(batch)).
-			Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("take the deadline off what cannot change: %w", err)
-		}
-		if n, err := result.RowsAffected(); err == nil {
-			cleared += int(n)
-		}
-		return nil
-	})
-	return cleared, err
+	return s.clearClockOn(ctx, tags, "what cannot change")
 }
 
 // clearPastEndOfLife removes the deadline from open findings on releases that
@@ -472,12 +451,26 @@ func (s *Store) clearPastEndOfLife(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if len(past) == 0 {
+	return s.clearClockOn(ctx, past, "what is out of support")
+}
+
+// clearClockOn takes the deadline off every open finding in these releases.
+//
+// The two passes above differ in which releases they are about and in what a
+// failure says; the write is one statement, and it was written twice. They
+// stay two passes, because Recompute argues for that explicitly: a release can
+// be both a tag and out of support, and one pass merging the lists would
+// report one number where the receipt says which rule ended the clock.
+//
+// The count is what the database says it matched, and a failure to read it is
+// a failure: a number quietly short is a receipt saying less work was done
+// than was done, which is the shape somebody investigates for an afternoon.
+func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (int, error) {
+	if len(streams) == 0 {
 		return 0, nil
 	}
-
 	cleared := 0
-	err = database.IDsInBatches(ctx, past, func(ctx context.Context, batch []int64) error {
+	err := database.IDsInBatches(ctx, streams, func(ctx context.Context, batch []int64) error {
 		result, err := s.db.NewUpdate().
 			Model((*Finding)(nil)).
 			Set("due_at = NULL").
@@ -487,11 +480,13 @@ func (s *Store) clearPastEndOfLife(ctx context.Context) (int, error) {
 				WHERE tg.stream_id IN (?))`, bun.List(batch)).
 			Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("take the deadline off what is out of support: %w", err)
+			return fmt.Errorf("take the deadline off %s: %w", why, err)
 		}
-		if n, err := result.RowsAffected(); err == nil {
-			cleared += int(n)
+		n, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("count what lost its deadline on %s: %w", why, err)
 		}
+		cleared += int(n)
 		return nil
 	})
 	return cleared, err

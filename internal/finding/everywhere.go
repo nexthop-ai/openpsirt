@@ -92,28 +92,14 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		Component   string     `bun:"component"`
 		Version     string     `bun:"version"`
 		Places      int        `bun:"places"`
-		AnyClaim    int        `bun:"any_claim"`
-		Waiting     int        `bun:"waiting"`
-		Approved    int        `bun:"approved"`
-		Lapsed      int        `bun:"lapsed"`
+		Waiting     int        `bun:"waiting_here"`
+		Approved    int        `bun:"approved_here"`
+		Lapsed      int        `bun:"lapsed_here"`
 		Private     int        `bun:"private"`
 		DueAt       *time.Time `bun:"due_at"`
 		FixedIn     string     `bun:"fixed_in"`
 	}
-	// How far each place has been decided, asked as a correlated count per
-	// place rather than by joining the decisions in. A join multiplies the
-	// rows — a place with two decisions counts twice — and the number of
-	// places is exactly what the state word compares against. This is the
-	// same expression the findings list uses, so the two agree about what
-	// "agreed" means.
-	decided := func(alias, condition string) string {
-		return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS de
-			WHERE de.product_id = st.product_id
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND ` + coversHere + condition + `) THEN 1 ELSE 0 END) AS ` + alias
-	}
-	err = narrow(s.db.NewSelect()).
+	sightings := narrow(s.db.NewSelect()).
 		ColumnExpr("p.name AS product").
 		ColumnExpr("COALESCE(NULLIF(p.display_name, ''), p.name) AS product_name").
 		ColumnExpr("st.name AS stream").
@@ -121,13 +107,15 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr("c.name AS component").
 		ColumnExpr("MIN(c.version) AS version").
 		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr(decided("any_claim", "")).
-		ColumnExpr(decided("waiting", " AND de.state = ? AND de.live_key IS NOT NULL"), "proposed").
-		ColumnExpr(decided("approved", " AND de.state = ? AND de.live_key IS NOT NULL"), "approved").
-		ColumnExpr(decided("lapsed", " AND de.state = ?"), "lapsed").
 		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS private", access.Private).
 		ColumnExpr("MIN(f.due_at) AS due_at").
-		ColumnExpr("MIN(COALESCE(f.fixed_in, '')) AS fixed_in").
+		ColumnExpr("MIN(COALESCE(f.fixed_in, '')) AS fixed_in")
+	// How far each place has been decided, the same counts the findings list
+	// carries and by the same conditions, so the two agree about what
+	// "agreed" means. Nothing here asks whether a claim is with its author,
+	// so that column is not read and not computed.
+	err = decisionCounts(sightings, "st.product_id", nil,
+		claimWaiting, claimApproved, claimLapsed).
 		GroupExpr("p.name, p.display_name, st.name, va.name, c.name").
 		OrderExpr("p.name, st.name, va.name, c.name").
 		Limit(limit).
@@ -143,7 +131,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			Stream: row.Stream, Variant: row.Variant,
 			Component: row.Component, Version: row.Version,
 			Places:      row.Places,
-			State:       stateWord(row.Places, row.AnyClaim, row.Waiting, row.Approved, row.Lapsed),
+			State:       stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
 			Undisclosed: row.Private > 0,
 			DueAt:       row.DueAt,
 			FixedIn:     row.FixedIn,

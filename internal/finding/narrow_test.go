@@ -511,6 +511,18 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 			t.Errorf("a lapsed claim is not agreed, yet agreed kept %d", n)
 		}
 
+		// An approval that has stopped standing is not an agreement. The
+		// claim was agreed to and then withdrawn, which releases the key, and
+		// the row keeps its word: without the live key on the count a
+		// judgment taken back eighteen months ago goes on answering for its
+		// place, and the row and the filter answer it the same way because
+		// they are counting through one condition.
+		record("approved", false)
+		said("undecided")
+		if n := count("agreed"); n != 0 {
+			t.Errorf("an approval that no longer stands read as agreed: %d", n)
+		}
+
 		// And a claim that was withdrawn long ago answers for nothing: it is
 		// not live, so the place is undecided again.
 		record("withdrawn", false)

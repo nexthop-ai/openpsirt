@@ -2,7 +2,6 @@ package triage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -70,18 +69,8 @@ func (s *Store) Reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 		made, err = (&Store{db: tx, now: s.now}).reaffirm(ctx, subject, r)
 		return err
 	})
-	if errors.Is(err, ErrAlreadyDecided) {
-		// Read now the transaction has unwound, so the refusal can say which
-		// claim to go and read rather than which constraint was violated.
-		if standing, found := s.liveAt(ctx, liveKeyFor(r.Place)); found {
-			return nil, fmt.Errorf(
-				"%w: decision %d is already %s here — revise that one rather than recording a "+
-					"second claim about the same code",
-				ErrAlreadyDecided, standing.ID, standing.State)
-		}
-	}
 	if err != nil {
-		return nil, err
+		return nil, s.alreadyDecided(ctx, err, []Place{r.Place})
 	}
 	return made, nil
 }

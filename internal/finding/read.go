@@ -246,16 +246,29 @@ var order = map[SortKey]struct {
 	BySeverity:   {expr: "MAX(COALESCE(v.score_centi, 0))", issue: true},
 }
 
-// SortKeys are the orders somebody may ask for.
+// SortKeys are the orders somebody may ask for, in the order they are offered.
 //
-// The list a caller sees is the enum on the query parameter, which a struct
-// tag has to spell as a literal, and the interface's own union is generated
-// from that — so this cannot be the single source by construction. It is the
-// single source by test: one asserts the parameter offers exactly these, in
-// this order, and that each is accepted. Written here as "one list, so the two
-// cannot disagree" while nothing called it, it was neither.
+// One list. The query parameter's enum is built from this at registration and
+// the interface's own union is generated from the document that enum produces,
+// so an order added here is offered and an order removed here is refused —
+// rather than the three agreeing because a test says they do. It said it was
+// the one list while nothing but a test called it, which is the shape this
+// exists to stop.
+//
+// The map above is keyed rather than ordered, which is why the ordering is
+// written once here instead of being read back out of it.
 func SortKeys() []SortKey {
 	return []SortKey{ByUrgency, ByAge, ByDeadline, ByPlaces, ByLikelihood, BySeverity}
+}
+
+// SortsBy reports whether this key is one the list actually orders by.
+//
+// A key offered and not honored is the silent half: it is accepted, the list
+// comes back in urgency order, and nothing says the order asked for was not
+// the order given.
+func SortsBy(key SortKey) bool {
+	_, known := order[key]
+	return known
 }
 
 // Filter narrows what is open before it is paged.
@@ -990,7 +1003,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 // lapsed; one nobody ever decided about is undecided. Some places approved
 // and the rest never decided, with nothing waiting or lapsed, is none of the
 // four, and says so by saying nothing.
-func stateWord(places, anyClaim, waiting, approved, lapsed int) string {
+func stateWord(places, waiting, approved, lapsed int) string {
 	switch {
 	case places > 0 && approved == places:
 		return "agreed"
@@ -999,14 +1012,15 @@ func stateWord(places, anyClaim, waiting, approved, lapsed int) string {
 	case lapsed > 0 && approved == 0:
 		return "lapsed"
 	case waiting == 0 && approved == 0 && lapsed == 0:
-		// **Nothing stands, rather than nothing was ever said** — the same
+		// Nothing stands, rather than nothing was ever said — the same
 		// predicate the filter's own "undecided" uses. Asked as "no claim
 		// row exists", a place whose only claim was withdrawn fell through
 		// every case and drew a blank word, while the filter put it in the
-		// undecided bucket. The row and the filter now answer from one rule.
+		// undecided bucket. The row and the filter now answer from one rule,
+		// which is why no count of claims-of-any-kind is read here or taken
+		// from the statement.
 		return "undecided"
 	}
-	_ = anyClaim
 	return ""
 }
 
@@ -1518,7 +1532,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 			LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
 			FixState: FixState(row.FixState), FixedIn: row.FixedIn,
 			Matched:  Matched(row.Matched),
-			State:    stateWord(row.Places, row.AnyClaim, row.Waiting, row.Approved, row.Lapsed),
+			State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
 			SentBack: row.SentBack > 0,
 			OpenedAt: row.OpenedAt, DueAt: row.DueAt,
 			Undisclosed: row.Undisclosed,
@@ -1708,7 +1722,6 @@ type decorated struct {
 	ConsumerPlaces int   `bun:"consumer_places"`
 	Builds         int   `bun:"builds"`
 	TargetID       int64 `bun:"target_id"`
-	AnyClaim       int   `bun:"any_claim"`
 	Waiting        int   `bun:"waiting_here"`
 	Approved       int   `bun:"approved_here"`
 	Lapsed         int   `bun:"lapsed_here"`
@@ -1865,13 +1878,6 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	// counts over our decisions in this product at each place and at the
 	// versions the place holds, plus whether any live claim is with its
 	// author.
-	decided := func(alias, condition string) string {
-		return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS de
-			WHERE de.product_id = ?
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND ` + coversHere + condition + `) THEN 1 ELSE 0 END) AS ` + alias
-	}
 	var rows []decorated
 	q := s.db.NewSelect().
 		TableExpr("finding AS f").
@@ -1934,16 +1940,12 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// name. Both are one where the selection is a single build, which is
 		// why the row says nothing about either there.
 		ColumnExpr("COUNT(DISTINCT f.target_id) AS builds").
-		ColumnExpr("MIN(f.target_id) AS target_id").
-		ColumnExpr(decided("any_claim", ""), productID).
-		ColumnExpr(decided("waiting_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
-			productID, "proposed").
-		ColumnExpr(decided("approved_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
-			productID, "approved").
-		ColumnExpr(decided("lapsed_here", " AND de.state = ?"), productID, "lapsed").
-		ColumnExpr(decided("sent_back_here",
-			" AND de.state = ? AND de.live_key IS NOT NULL AND de.sent_back_at IS NOT NULL"),
-			productID, "proposed").
+		ColumnExpr("MIN(f.target_id) AS target_id")
+	// How far each group has been decided, counted the way the state filter
+	// counts it, so the row and the filter cannot disagree. One spelling of
+	// each state, in decided.go.
+	q = decisionCounts(q, "?", []any{productID},
+		claimWaiting, claimApproved, claimLapsed, claimSentBack).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).

@@ -81,13 +81,16 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 	})
 }
 
-func TestTheSortOrdersOfferedAreTheOnesTheStoreKnows(t *testing.T) {
-	// finding.SortKeys says it is "one list, so the two cannot disagree" —
-	// the orders an interface offers and the ones the API document declares.
-	// Nothing called it. The list a caller actually sees is the enum on the
-	// query parameter, which a struct tag has to spell as a literal, and the
-	// interface's union comes from the generated schema — so the tag is where
-	// the two meet and this is what keeps it honest.
+func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
+	// The enum is built from finding.SortKeys, so asking whether the two
+	// lists match is asking whether a list equals itself. What is worth
+	// checking is the other half: that every order the document offers is a
+	// word the store has an expression for, and answers with.
+	//
+	// A key named in that list with no entry in the store's own map is the
+	// failure this catches — it is accepted at the edge and then silently
+	// sorted by urgency instead, which looks like a list that simply did not
+	// reorder.
 	twoReach(t, func(t *testing.T, r *reach) {
 		var declared []string
 		for path, item := range r.api.OpenAPI().Paths {
@@ -113,22 +116,10 @@ func TestTheSortOrdersOfferedAreTheOnesTheStoreKnows(t *testing.T) {
 			t.Fatal("no endpoint declares a sort order, so this proves nothing")
 		}
 
-		known := make([]string, 0, len(finding.SortKeys()))
-		for _, key := range finding.SortKeys() {
-			known = append(known, string(key))
-		}
-		if len(declared) != len(known) {
-			t.Fatalf("the API offers %v and the store knows %v", declared, known)
-		}
-		for i := range known {
-			if declared[i] != known[i] {
-				t.Errorf("the API offers %v and the store knows %v", declared, known)
-				break
-			}
-		}
-
-		// And each one is accepted, so the list is not merely equal to itself.
 		for _, word := range declared {
+			if !finding.SortsBy(finding.SortKey(word)) {
+				t.Errorf("the document offers %q and the store sorts by nothing of that name", word)
+			}
 			got := asPerson(t, r, "triager", http.MethodGet,
 				"/v1/products/mine/findings?sort="+word, "")
 			if got.Code != http.StatusOK {

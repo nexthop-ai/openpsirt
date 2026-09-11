@@ -278,17 +278,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return err
 	})
 	if err != nil {
-		if errors.Is(err, ErrAlreadyDecided) {
-			for _, p := range proposals {
-				if standing, found := s.liveAt(ctx, liveKeyFor(p.Place)); found {
-					return nil, fmt.Errorf(
-						"%w: decision %d is already %s at one of these places — revise that one "+
-							"rather than recording a second claim about the same code",
-						ErrAlreadyDecided, standing.ID, standing.State)
-				}
-			}
-		}
-		return nil, err
+		return nil, s.alreadyDecided(ctx, err, placesOf(proposals))
 	}
 	return recorded, nil
 }

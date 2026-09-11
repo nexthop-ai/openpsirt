@@ -215,13 +215,6 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// no row asked for, which are read and dropped on the way into the map;
 	// what it buys is the index, which is the same trade the per-product page
 	// makes.
-	decided := func(alias, condition string) string {
-		return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS de
-			WHERE de.product_id = st.product_id
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND ` + coversHere + condition + `) THEN 1 ELSE 0 END) AS ` + alias
-	}
 	var rows []struct {
 		ProductID       int64  `bun:"product_id"`
 		Product         string `bun:"product"`
@@ -265,16 +258,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr("MIN(f.consumer_id) AS consumer_id").
 		ColumnExpr("COUNT(DISTINCT f.consumer_id) AS consumers").
 		ColumnExpr("SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS direct").
-		ColumnExpr(decided("any_claim", "")).
-		ColumnExpr(decided("waiting_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
-			"proposed").
-		ColumnExpr(decided("approved_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
-			"approved").
-		ColumnExpr(decided("lapsed_here", " AND de.state = ?"), "lapsed").
-		ColumnExpr(decided("sent_back_here",
-			" AND de.state = ? AND de.live_key IS NOT NULL AND de.sent_back_at IS NOT NULL"),
-			"proposed").
-		ColumnExpr("0 AS total").
+		ColumnExpr("0 AS total")
+	// How far each of them has been decided, spelled once for every list
+	// that asks (see decided.go). Across products the row names its own.
+	body = decisionCounts(body, "st.product_id", nil,
+		claimWaiting, claimApproved, claimLapsed, claimSentBack).
 		Where("st.product_id IN (?)", bun.List(within)).
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
@@ -328,7 +316,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
 			FixState: FixState(row.FixState), FixedIn: row.FixedIn,
 			Matched:  Matched(row.Matched),
-			State:    stateWord(row.Places, row.AnyClaim, row.Waiting, row.Approved, row.Lapsed),
+			State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
 			SentBack: row.SentBack > 0,
 			OpenedAt: row.OpenedAt, DueAt: row.DueAt,
 			Undisclosed: row.Undisclosed,

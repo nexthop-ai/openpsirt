@@ -715,16 +715,11 @@ func (s *Store) ReadersNamed(ctx context.Context, productID int64, visibility Vi
 // Nil where no role reaches that visibility at all, which is an answer rather
 // than an empty condition to be filled in.
 func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQuery {
-	// Which roles are enough to read at this visibility. Asked of the same
-	// rule every query uses rather than spelled again here: triage implies
-	// reading at the same visibility, and reading what is undisclosed implies
-	// reading what is not.
-	var enough []Role
-	for _, role := range Roles() {
-		if NewPerson(0, "", false, map[int64][]Role{productID: {role}}, 0).Reads(visibility, productID) {
-			enough = append(enough, role)
-		}
-	}
+	// Which roles are enough to read at this visibility, asked of the rule
+	// rather than of a list. It was the same four lines as rolesReading, in
+	// the same package, one of them named and one not — which is how "may
+	// read" comes to mean two things.
+	enough := rolesReading(productID, visibility)
 	if len(enough) == 0 {
 		return nil
 	}
