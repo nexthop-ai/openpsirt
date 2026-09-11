@@ -48,7 +48,7 @@ func WriteInventory(w io.Writer, components []graph.Described) error {
 		SpecVersion string    `json:"specVersion"`
 		Version     int       `json:"version"`
 		Components  []written `json:"components"`
-	}{BomFormat: formatName, SpecVersion: "1.6", Version: 1}
+	}{BomFormat: string(CycloneDX), SpecVersion: "1.6", Version: 1}
 
 	for _, c := range sorted {
 		out.Components = append(out.Components, written{

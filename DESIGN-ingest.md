@@ -4,7 +4,7 @@ What happens to a scan between arrival and application.
 
 Satisfies REQ-03, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11,
 REQ-12, REQ-13, REQ-14, REQ-16, REQ-17, REQ-18, REQ-31, REQ-44, REQ-66,
-REQ-69.
+REQ-69, REQ-76, REQ-77.
 
 ## Contents
 
@@ -17,6 +17,8 @@ REQ-69.
 - [Reading a scan](#reading-a-scan)
 - [Concurrent scans of one target](#concurrent-scans-of-one-target)
 - [Parsing](#parsing)
+- [The formats read](#the-formats-read)
+- [What each format states](#what-each-format-states)
 - [Tolerated and refused](#tolerated-and-refused)
 - [Unread fields](#unread-fields)
 - [Build-declared suppressions](#build-declared-suppressions)
@@ -39,11 +41,9 @@ A build sends two things, in one request:
 | Inventory | Every component that ships, with its dependency edges |
 | Suppressions | Findings the build has already argued are not applicable, usually because it carries a patch |
 
-CycloneDX is the format read. SPDX is intended and not built (REQ-05); what is
-missing is a fixture carrying enough metadata to write the reader against. The
-reader refuses an SPDX document by name rather than failing at a field, and the
-upload screen says so, because a format nobody wrote support for should say that
-rather than look broken.
+CycloneDX and SPDX 2.x are the formats read (REQ-05). A document says which it
+is and the reader is chosen from that, so an upload takes either and nothing
+about the endpoint names one.
 
 The vulnerability data is produced here rather than sent. The inventory is
 reproducible and a vulnerability report is not, since new issues are disclosed
@@ -238,6 +238,140 @@ because a thousand components can declare a million edges between them.
 | Nesting becomes an edge | A component containing components is the producer stating what is assembled from what. For some producers it is the only structure stated |
 | An edge whose ends resolve to one component is dropped and counted | Content-derived identity can discover that two of a document's identifiers describe the same component. The producer could not have known, so it is not a producer error, and storing it would be a component depending on itself |
 
+## The formats read
+
+Two, sharing one reader. What a vocabulary knows is which keys its format uses
+and what they mean; how a component is deduplicated, how an edge is resolved
+and where a bound is charged are the reader's, and neither half knows the
+other's business (REQ-05).
+
+| Rule | Reason |
+|---|---|
+| **The document chooses the reader, never the request** | An endpoint taking a format parameter is a parameter a build sets wrong, and the answer is then a refusal about the parameter rather than about the file (REQ-76) |
+| **A top-level key is read by the format that owns it**, before the document has necessarily said which format it is | The declaration arrives in no guaranteed position: a producer sorting its keys puts SPDX's packages ahead of its own `spdxVersion`. Requiring the declaration first would refuse documents that are well formed |
+| **The formats claim no key in common**, which a test asserts rather than a reader assuming | A key claimed twice would make the routing a coin toss, and it is a property of the tables rather than of anything checkable while reading |
+| **Which vocabulary read each key is recorded**, and a document that used two is refused | The keys being disjoint is not on its own enough. A handler writes to the document before anything has checked what the document is, and both formats state an identity — so a file carrying both keys is stored under whichever came last, which is a different identity for the same bytes depending only on how its producer sorted them |
+| **A document declaring no format is refused** | A fragment, a hand-edited file, or something else entirely whose keys happen to look familiar. Guessing from the contents is what the declaration exists to make unnecessary |
+| **Half a declaration is not a declaration** | CycloneDX states its format and its version in two keys, and either alone leaves the other unstated. An unstated version is a version this was not written against, which is what the by-name refusal is for |
+| **A major version is read only where it has been written against** | Refused by name where it is read, so a file that was never going to be read is dropped before the rest of it is walked |
+
+**SPDX 2.2 and 2.3 are one vocabulary.** The later revision adds fields and
+adds nothing this reads, so one reader covers both and a document stating
+either is read.
+
+**SPDX 3.x is refused by name** (REQ-76), and the refusal is hung off its own
+keys rather than off 2.x's. It is a different document rather than a revision
+of this one: a context and one flat graph of typed elements, sharing no key
+path with 2.x — which is exactly why a by-name refusal reading `spdxVersion`
+never reaches one, since a real 3.x document does not carry that key at all. A
+document refused for saying nothing sends whoever reads the message hunting for
+a corrupt file, and it is not corrupt.
+
+Nothing this deployment ingests emits it: the scanner it ships emits 2.3 and
+tag-value, and so does the reference producer. Reading it is a third vocabulary
+rather than a branch in this one.
+
+## What each format states
+
+The internal shape is the same from either, because it is the shape the graph
+is stored in rather than either format's. What differs is where a producer put
+each fact.
+
+| Fact | CycloneDX | SPDX |
+|---|---|---|
+| The document's own identity | `serialNumber` | `documentNamespace` |
+| When the producer made it | `metadata.timestamp` | `creationInfo.created` |
+| What the document is about | the component under `metadata`, stated inline | an identifier pointing at one of the packages |
+| What ships | `components` | `packages` |
+| A component's identity within the file | `bom-ref` | `SPDXID` |
+| The version | `version` | `versionInfo` |
+| The package identifier and the database key | fields of the component | external references, by type |
+| Structure | `dependencies`, and one component nested in another | relationships, stated either way round |
+| What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package |
+| What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** (REQ-77) |
+
+**The root is resolved at the end rather than where it is named.** One format
+states it inline with everything it says about it; the other points at a
+package that may not have been read yet. A document pointing at several things
+has no single root — the tracked unit stands in, as it does for a document
+naming none — because picking one of them states a hierarchy the producer did
+not.
+
+**What is counted is what the pointers resolve to, not how many there are.** A
+format offers more than one place to state the root — a list beside the
+contents, and a relationship saying the same thing — and a producer that fills
+in both has named one component twice rather than two components. Counting the
+statements reads that as several roots and leaves the document with none, so a
+document that said the same thing twice would be read as though it had said
+nothing.
+
+**The first of each identifier stands.** A real producer emits eight spellings
+of one database key, differing in where it put a hyphen, and nothing here can
+say which spelling an advisory used. Taking the first is the same answer
+everything downstream has already been given, rather than a preference invented
+here.
+
+**The words for nothing are nothing.** SPDX requires several fields to be
+present and offers `NOASSERTION` and `NONE` for a producer with no value for
+one. Taken literally a package carries the version `NOASSERTION`, which a
+person reads as a version and a scanner tries to match.
+
+### Which relationships are structure
+
+SPDX states a hundred and forty kinds of relationship and most of them are not
+a dependency graph: what generated a file, what a document amends, what a
+package was evidenced by. The test applied is whether the relationship says one
+component is part of another in the sense the graph is walked in — the same
+question a CycloneDX `dependsOn` answers.
+
+| Read as | Types |
+|---|---|
+| An edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF` |
+| What the document is about | `DESCRIBES` and `DESCRIBED_BY`, between the document and a package |
+| What a component was derived from | `ANCESTOR_OF` and `DESCENDANT_OF` |
+| Nothing | Everything else |
+
+**A type stated either way round is the same edge.** A producer may say a
+program contains a library or that the library is contained by the program, and
+the graph does not have two shapes.
+
+**What built something is not what shipped.** A build tool, a test dependency
+and a development dependency are statements about the build rather than about
+what is in the product, so none of them places a component under another. The
+component is still held and still counted as sitting under nothing, which is
+the same treatment CycloneDX build tooling gets by arriving under `formulation`
+rather than beside the contents.
+
+**A derivation is a pointer rather than a description**, which is what makes it
+weaker than the other format's pedigree: it can only name something the
+document also describes. It fills in an upstream nothing else stated and never
+replaces one, and it is charged against the claim bound rather than the edge
+bound, because an unbounded array of them is the same hazard under a different
+name.
+
+### Files are not components
+
+A file is a path rather than a package: nothing matches a vulnerability against
+one, and a scan of a real image catalogs five files for every package it found.
+Holding them would grow the graph with nodes no finding can ever hang off.
+
+The identifiers are kept even so. The structure a producer states is mostly
+between a package and the files it installed — 91 of the 125 relationships in
+the fixture — and an edge naming one has to be dropped knowingly. Dropped
+without knowing, it reads as a graph with a hole in it, and a count meant to say
+the producer's derivation changed moves instead with how much file detail the
+producer was configured to emit. So the two are counted apart.
+
+**They are bounded apart from components**, and the ceiling was set by
+measurement rather than by analogy. A real scan catalogs 4,964 files against 89
+packages on one image and 21,643 against 480 on another — forty-five to
+fifty-six files per package — so a switch operating system's 6,866 packages
+would arrive with something above 300,000 files. Charged against the component
+ceiling of 100,000 that is a real inventory refused; raised until it fits, the
+component bound has stopped bounding components. They also cost very different
+amounts to hold: 133 bytes for a path against 766 for a component, because a
+path is only the identifier and a component is a described thing.
+
 ## Tolerated and refused
 
 The specification requires very little, and producers differ enormously in what
@@ -248,6 +382,8 @@ they fill in. A document that is valid and sparse is not a broken one.
 | The document names no component of its own | What the scan was filed against stands in. The root is excluded from identity and expiry anyway |
 | A component states no version | Kept and counted. What it costs is matching, and it ships either way |
 | An edge names something the document never describes | Dropped and counted. The missing component is not invented |
+| An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
+| An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |
 | Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
 
 The counts matter as much as the tolerance. Each is a number that should be
@@ -255,7 +391,10 @@ stable build to build, so a change says the producer changed.
 
 | Refused | Reason |
 |---|---|
-| Not the format read, or a major version not written against | A reader that guesses eventually guesses wrong on a file that looks close enough |
+| Neither format, or a major version not written against | A reader that guesses eventually guesses wrong on a file that looks close enough |
+| Keys from two formats | Whichever handler ran last has already written over the other's answer, and nothing here can say which half the producer meant |
+| Half of one format's declaration | An unstated version is a version this was not written against |
+| A file and a component sharing one identifier | The same coin toss two components sharing one is refused for, and worse: the edge resolves to the component and invents a dependency nobody stated |
 | A component with no name | It cannot be identified, so it cannot be tracked |
 | Two components sharing one identifier | Every edge naming it is ambiguous |
 | A build time nothing can read | The build time orders scans against each other |
@@ -304,6 +443,27 @@ A build's claims arrive two ways, and they are not equally precise.
 |---|---|
 | On the component | A patch in a component's pedigree recording which vulnerability it fixes. It arrives attached to the thing it is about |
 | In a document of its own | Statements naming what they apply to by package identifier: one version, every version of a package, or a whole source tree |
+
+**Only one of the two formats can carry the first** (REQ-77). SPDX has a
+relationship saying a file is a patch for a package and no way to say which
+vulnerability that patch resolves, so an inventory in that format carries no
+claims and a build with carried patches states them in a document of its own.
+Deriving the link from the patch's filename would report a suppression nobody
+made.
+
+**So the format a scan arrived in is carried out of the reader**, because what
+a claim is closed by is difference: a claim the build no longer argues is a
+claim the build withdrew. That reading only holds where the build had somewhere
+to argue it. A scan whose format cannot attach a claim to a component says
+nothing about carried patches whether or not they are still carried, so
+closing on its silence would have a product's first scan in the other format
+close every claim it held at once and reopen every finding they suppressed,
+with nothing saying why.
+
+A claim of an origin the scan could not have stated is left open and counted,
+so the receipt says how many were carried forward rather than restated. A claim
+the scan *could* have stated and did not is still closed, or the difference
+stops meaning anything at all.
 
 Both are read into one shape with the origin recorded, because the second can
 point at something that cannot be resolved and the first cannot.

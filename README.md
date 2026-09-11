@@ -38,8 +38,8 @@ place to triage what it finds and track it through to a fix.
 
 ## What it does
 
-- **Takes in inventories** pushed by build pipelines, in CycloneDX form, along
- with the suppressions the build carries patches for
+- **Takes in inventories** pushed by build pipelines, in CycloneDX or SPDX
+ form, along with the suppressions the build carries patches for
 - **Runs the scan here**, not in the build, so every product is measured
  against the same scanner and the same vulnerability data
 - **Keeps the dependency graph**, so you can see why a vulnerable component is
@@ -66,9 +66,10 @@ behind every line of it.
 
 ### Ingest
 
-- **Inventories arrive from the build**, in CycloneDX form, one adapter per
- producer. A vulnerability report or a third party's VEX document may be
- uploaded alongside. SPDX is intended and not built
+- **Inventories arrive from the build**, in CycloneDX or SPDX 2.x form, one
+ adapter per producer. A vulnerability report or a third party's VEX document
+ may be uploaded alongside. The document says which format it is and the
+ reader is chosen from that, so one upload takes either
 - **An upload is accepted, queued and answered later.** A scan applies whole or
  changes nothing, and only a scan newer than the state it replaces is taken
 - **Releases and variants are declared before a scan may name one**, so a
@@ -267,7 +268,7 @@ behind every line of it.
 | Build and validation | The pipeline, and a gate that runs the tier a change lands in |
 | Database | All four engines, with the schema created and migrated at startup |
 | Catalog and graph | Products, streams, variants, and the dependency graph |
-| Ingest | Inventory upload and the reader behind it, with the suppressions a build carries |
+| Ingest | Inventory upload and the readers behind it — CycloneDX and SPDX 2.x, chosen by what the document says it is — with the suppressions a build carries |
 | Scanning | Run here, findings tracked over intervals, everything tracked scanned again on a schedule |
 | Sign-in | OIDC, GitHub or a trusted header, with sessions, API keys and personal tokens |
 | Access | Roles and visibility, enforced in the data layer |
@@ -282,7 +283,7 @@ behind every line of it.
 
 Not built: every adapter that would send an advisory somewhere, the VEX
 profile of the CSAF document, chat, hand-off to an external tracker, findings
-from a static analyzer, reading SPDX, and images for any architecture but
+from a static analyzer, reading SPDX 3.0, and images for any architecture but
 `amd64`.
 
 ## Trying it

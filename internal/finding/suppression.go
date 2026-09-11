@@ -71,6 +71,9 @@ func claimIdentity(c Claim) string {
 type ClaimsApplied struct {
 	Opened int
 	Closed int
+	// Unstated counts claims left open because the scan's format could not
+	// express them, rather than because the build repeated them.
+	Unstated int
 }
 
 // Unchanged reports whether a build argued exactly what it argued last time.
@@ -83,7 +86,17 @@ func (a ClaimsApplied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 
 // runs again on a schedule. A claim that lived only in the file would be gone
 // by the time anything needed it, and every carried patch would come back as
 // an outstanding vulnerability on the next re-scan.
-func (s *Store) RecordClaims(ctx context.Context, targetID, scanID int64, claims []sbom.Suppression) (ClaimsApplied, error) {
+//
+// **stated is where the scan could have made a claim**, and a claim of any
+// other origin is left alone rather than closed. Closing works by difference —
+// a claim the build no longer argues is a claim the build withdrew — and that
+// reading only holds where the build had somewhere to argue it. An inventory
+// in a format that cannot attach a claim to a component says nothing about
+// carried patches whether or not the patches are still carried (REQ-77), so
+// a product moving from one format to the other would otherwise close every
+// claim it had at once and reopen every finding they suppressed, with nothing
+// saying why.
+func (s *Store) RecordClaims(ctx context.Context, targetID, scanID int64, claims []sbom.Suppression, stated map[sbom.Origin]bool) (ClaimsApplied, error) {
 	var applied ClaimsApplied
 
 	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
@@ -128,10 +141,18 @@ func (s *Store) RecordClaims(ctx context.Context, targetID, scanID int64, claims
 		}
 
 		var closing []int64
-		for identity, id := range held {
-			if _, still := wanted[identity]; !still {
-				closing = append(closing, id)
+		for _, row := range open {
+			if _, still := wanted[row.Identity]; still {
+				continue
 			}
+			if !stated[sbom.Origin(row.Origin)] {
+				// The scan had nowhere to say this. Left open, and counted so
+				// a receipt can say how many claims this scan carried forward
+				// without restating.
+				applied.Unstated++
+				continue
+			}
+			closing = append(closing, held[row.Identity])
 		}
 		if len(closing) > 0 {
 			err := database.IDsInBatches(ctx, closing, func(ctx context.Context, batch []int64) error {

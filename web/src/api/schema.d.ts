@@ -3149,7 +3149,7 @@ export interface paths {
         put?: never;
         /**
          * Upload an SBOM and its VEX documents
-         * @description Accepts a CycloneDX SBOM and any number of OpenVEX documents as multipart form fields named `inventory` and `suppressions`.
+         * @description Accepts a CycloneDX 1.x or SPDX 2.x SBOM and any number of OpenVEX documents as multipart form fields named `inventory` and `suppressions`. The format is taken from the document itself; a later major version of either is rejected by name.
          *
          *     The product, branch and variant must already exist; an upload naming something undeclared is rejected and the error says which part is missing.
          *

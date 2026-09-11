@@ -11,6 +11,32 @@ nobody can tell a producer quirk from a typo in.
 | `image.cdx.json` | Written by hand, in the shape of the aggregate inventory a switch operating-system build emits: an image at the root, containers under it, packages under those, a shared library reached from several of them, and a forked component whose pedigree carries the version it was forked from. Not a producer's output, and not a substitute for one |
 | `openpsirt-image.cdx.json` | Real output, and the only fixture at **CycloneDX 1.7**. The inventory this deployment's own image carries of itself: the scanner's description of the container, composed from its parts by the tool that builds it. It is what the image ships and what the demo ingests, so the revision every shipped inventory now states is read here by evidence rather than by construction |
 | `switch-image.cdx.json.xz` | Real output, and the full-size one. The public SONiC network operating-system image, 6,866 components and 18,948 edges over 18 MB, from a build of sonic-buildimage at `5acba0313`. Compressed because the shape is the point and 18 MB of it is not. See below |
+| `alpine-image.spdx.json` | Real output, and the rich **SPDX** one. syft 1.51.1 — the same producer the 1.7 CycloneDX fixture came from — scanning `alpine:3.20`. It states the root as a relationship from the document, up to twelve spellings of one database key on a single package, and 77 files against 15 packages, which is what makes "a file is not a component" a rule rather than an opinion |
+| `rust-app.spdx.json` | The specification's own example 11, a Rust application and its cargo dependencies. It states the root the other way — a list beside the packages, naming a package and a file built from it — and its dependency edges as `DEPENDS_ON` |
+| `maven-app.spdx.json` | The specification's own example 14, a Maven application enriched by a second tool. Eleven relationships of which six are structural types, four of them surviving as edges because two `CONTAINS` name files rather than packages — which is a better demonstration than the count alone. The remaining five are a test dependency, a test case, what generated what, what the document amends, and the root. It also carries packages with no identifier at all and no version, which is what identity falling back to a name is for |
+
+## The SPDX fixtures
+
+Three, because no one of them is enough. The scanner's output is real and rich
+and states only what that scanner states; the specification's own examples state
+the shapes a single producer never emits — the other way of naming a root, a
+package with no identifier, and a document whose relationships are mostly not
+structure. A reader written against one of the three looks correct against one
+of the three.
+
+`rust-app.spdx.json` and `maven-app.spdx.json` come from the
+[spdx-examples](https://github.com/spdx/spdx-examples) repository, under
+`software/example11/spdx2.3` and `software/example14/spdx2.3`. **The SPDX
+documents there are CC0-1.0**, which the repository states and each document
+repeats in its own `dataLicense`. The sample source code beside them is
+GPL-3.0-or-later and is not taken.
+
+What is deliberately not here is a document converted from the other format.
+One was made to see what conversion costs, and the answer is why it is not kept:
+the full-size switch image's 18,948 edges become 6,830 `CONTAINS` relationships
+all hanging off a single root, plus 2,767 `DEPENDENCY_OF`. The hierarchy is the
+thing the fixture exists to hold, so a fixture that has lost it proves the
+reader against a shape no producer emits.
 
 The 1.7 document is deliberately uncompressed, unlike the full-size one. That
 fixture skips where `xz` is missing, which is the right trade for something

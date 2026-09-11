@@ -8,7 +8,6 @@ Nothing else may reference this file. Anything durable belongs in
 ## Contents
 
 - [Before the first release](#before-the-first-release)
-- [Blocked on something we do not have](#blocked-on-something-we-do-not-have)
 - [Deferred by the owner](#deferred-by-the-owner)
 - [Decided, not built](#decided-not-built)
 - [Known gaps](#known-gaps)
@@ -24,12 +23,6 @@ Mandatory, and wrong to do earlier.
 | Collapse the schema into one initial migration | Thirty-seven migrations describe the order things were thought of. They are kept until now because walking the chain catches an ordering mistake between two of them (REQ-72) |
 | Start keeping schema and API compatibility | Until this point a schema change edits the migration that created the thing, and a development database is recreated (REQ-61 and REQ-72) |
 | Promote a prerelease to a release | The publication path is built and exercised. What a plain `vX.Y.Z` adds is the compatibility promise, which cannot start while the two rows above are open — so tags before then carry a prerelease suffix (REQ-02) |
-
-## Blocked on something we do not have
-
-| | |
-|---|---|
-| **Reading SPDX inventories** | Intended scope (REQ-05). What is missing is a fixture: no SPDX document to hand carries enough metadata to write the reader against — the dependency relationships, the package identifiers and the version detail the graph and the scanner both key on. A reader written against a thin document would be accepted by construction rather than by evidence, which is the failure the CycloneDX 1.7 fixture was added to close |
 
 ## Deferred by the owner
 
@@ -47,6 +40,7 @@ gap somebody rediscovers by auditing.
 | Decision | Waits for |
 |---|---|
 | REQ-14 | Ingesting static analysis and fuzzing findings. The finding model already carries a kind, so a second kind needs no rewrite |
+| REQ-76 | Reading SPDX 3.0, which is refused by name. It is a second vocabulary rather than a branch in the 2.x one — a flat graph of typed elements sharing no key path with it — and what it waits for is a fixture from a producer this ingests. Nothing that does emits it: the scanner shipped here emits 2.3 and tag-value, and so does the reference producer. Yocto and one vendor tool emit it, so the fixture is gettable rather than hypothetical |
 
 ## Known gaps
 

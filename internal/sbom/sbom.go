@@ -35,6 +35,11 @@ type Limits struct {
 	// alone does not bound this — a document with a thousand components can
 	// declare a million edges between them.
 	MaxEdges int
+	// MaxFiles is how many files a document may catalog. Not covered by the
+	// component count: a file is not a component, and a real inventory holds
+	// forty-five to fifty-six of them per package, so one bound cannot size
+	// both.
+	MaxFiles int
 	// MaxStatements is how many claims a suppression document may make.
 	MaxStatements int
 	// MaxDepth is how deeply it may nest.
@@ -60,6 +65,23 @@ type Limits struct {
 // of components — and every one of them is configurable, for a deployment with
 // a bigger box and a bigger inventory.
 //
+// Measured at these ceilings: 124 MB of edges, 73 MB of components and 63 MB
+// of cataloged paths, which is 260 MB if one document reached every ceiling
+// at once. No real document does — the format that catalogs paths is not the
+// one with the deepest graph — and the figure that matters is that it stays
+// well inside the 512 MiB the chart ships rather than several times past it,
+// which is where it was.
+//
+// **A file is bounded separately from a component**, and measured rather than
+// assumed: a real scan catalogs 4,964 files against 89 packages on one image
+// and 21,643 against 480 on another, which is forty-five to fifty-six files per
+// package. A format that catalogs files would therefore put a switch operating
+// system — 6,866 packages — somewhere above 300,000 entries, so charging both
+// against one ceiling refuses a real inventory at 100,000 or stops bounding
+// components at whatever it is raised to. They cost very different amounts to
+// hold, too: a component is a described thing and a file is an identifier kept
+// only so that an edge naming it can be dropped knowingly.
+//
 // The per-unit costs are measured by a test, with a wide bound, so a change
 // that makes an edge an order of magnitude dearer fails rather than quietly
 // putting the ceiling back where it was.
@@ -68,6 +90,7 @@ func DefaultLimits() Limits {
 		MaxBytes:      256 << 20,
 		MaxComponents: 100_000,
 		MaxEdges:      250_000,
+		MaxFiles:      500_000,
 		MaxStatements: 100_000,
 		MaxDepth:      64,
 	}
@@ -86,6 +109,9 @@ func (l Limits) OrDefault() Limits {
 	if l.MaxEdges <= 0 {
 		l.MaxEdges = d.MaxEdges
 	}
+	if l.MaxFiles <= 0 {
+		l.MaxFiles = d.MaxFiles
+	}
 	if l.MaxStatements <= 0 {
 		l.MaxStatements = d.MaxStatements
 	}
@@ -95,6 +121,30 @@ func (l Limits) OrDefault() Limits {
 	return l
 }
 
+// Format is the document format a scan arrived in.
+//
+// Carried out of the reader because one thing downstream has to know it. The
+// formats do not state the same facts, so a scan that says nothing about
+// something has either withdrawn it or been unable to repeat it, and those are
+// not the same event.
+type Format string
+
+const (
+	// CycloneDX is the first format read.
+	CycloneDX Format = "CycloneDX"
+	// SPDX is the second.
+	SPDX Format = "SPDX"
+)
+
+// StatesCarriedPatches reports whether an inventory in this format can say
+// which vulnerability a patch the build carries resolves (REQ-77).
+//
+// CycloneDX attaches the claim to the component it is about. SPDX can say a
+// file is a patch for a package and cannot say what the patch fixes, so an
+// inventory in that format carries no claims at all — which is not the same
+// statement as a build that has stopped carrying the patch.
+func (f Format) StatesCarriedPatches() bool { return f == CycloneDX }
+
 // Header is what a document says about itself, separately from its contents.
 //
 // It is read on its own because the questions asked of an arriving scan —
@@ -102,6 +152,8 @@ func (l Limits) OrDefault() Limits {
 // whether its build time is believable — are all answered from here. Reading
 // the contents to answer them would mean parsing files we are about to refuse.
 type Header struct {
+	// Format is which format the document declared itself to be.
+	Format Format
 	// Serial is the identity the document carries for itself. It is what
 	// joins a vulnerability report to the inventory it was produced from,
 	// since filenames and upload order say nothing once documents have been
@@ -144,6 +196,15 @@ type Document struct {
 	// DanglingEdges counts edges dropped for naming something the document
 	// never describes.
 	DanglingEdges int
+	// FileReferences counts edges dropped for naming a file the document
+	// describes rather than a package. A format that catalogs files states
+	// most of its structure between a package and the files it installed,
+	// which is below the level anything here tracks: nothing matches a
+	// vulnerability against a path. Counted apart from the edges that name
+	// nothing at all, so that a number meant to say the producer's derivation
+	// changed does not move with how much file detail it was configured to
+	// emit.
+	FileReferences int
 	// SelfReferences counts edges dropped for having the same component at
 	// both ends. Producers do not emit those deliberately; they appear when
 	// two of a document's own identifiers turn out to describe the same

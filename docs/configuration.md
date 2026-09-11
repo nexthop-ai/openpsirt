@@ -215,5 +215,6 @@ the container's memory limit with them.
 | `OPENPSIRT_INGEST_MAX_BYTES` | How large a single document may be | 256 MB |
 | `OPENPSIRT_INGEST_MAX_COMPONENTS` | How many components it may describe. About 1.3 KB of heap each while reading | 100,000 |
 | `OPENPSIRT_INGEST_MAX_EDGES` | How many dependency edges it may declare. The component count does not bound this: a thousand components can declare a million edges between them. About 0.5 KB of heap each while reading | 250,000 |
+| `OPENPSIRT_INGEST_MAX_FILES` | How many files a document may catalog. Not covered by the component count: a real scan catalogs forty-five to fifty-six files per package, so one bound cannot size both | 500,000 |
 | `OPENPSIRT_INGEST_MAX_STATEMENTS` | How many claims a suppression document may make | 100,000 |
 | `OPENPSIRT_INGEST_MAX_DEPTH` | How deeply it may nest | 64 |

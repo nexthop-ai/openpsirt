@@ -38,6 +38,27 @@ func inventory(builtAt time.Time, component string) string {
 	}`, builtAt.UnixNano(), builtAt.UTC().Format(time.RFC3339), component, component)
 }
 
+// spdxInventory is the same inventory in the other format, so the upload path
+// can be shown to take either rather than only the one it was written against.
+func spdxInventory(builtAt time.Time, component string) string {
+	return fmt.Sprintf(`{
+	  "spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
+	  "name": "sonic-broadcom.bin",
+	  "documentNamespace": "https://example.invalid/sonic/%x",
+	  "creationInfo": {"created": %q, "creators": ["Tool: something-1.0"]},
+	  "packages": [
+	    {"SPDXID": "SPDXRef-root", "name": "sonic-broadcom.bin", "versionInfo": "1.0", "downloadLocation": "NOASSERTION"},
+	    {"SPDXID": "SPDXRef-a", "name": %q, "versionInfo": "2.41", "downloadLocation": "NOASSERTION",
+	     "externalRefs": [{"referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl",
+	                       "referenceLocator": "pkg:deb/debian/%s@2.41"}]}
+	  ],
+	  "relationships": [
+	    {"spdxElementId": "SPDXRef-DOCUMENT", "relatedSpdxElement": "SPDXRef-root", "relationshipType": "DESCRIBES"},
+	    {"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-a", "relationshipType": "DEPENDS_ON"}
+	  ]
+	}`, builtAt.UnixNano(), builtAt.UTC().Format(time.RFC3339), component, component)
+}
+
 const suppression = `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": "urn:x", "version": 1,
  "statements": [{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
  "products": [{"@id": "pkg:deb/debian/libc6"}]}]}`
@@ -309,11 +330,38 @@ func TestNothingIsStoredWhenTheBacklogIsFull(t *testing.T) {
 }
 
 func TestSomethingThatIsNotAnInventoryIsRefused(t *testing.T) {
+	// A document naming no format at all. Both formats are read, so what is
+	// left to refuse is a file that says it is neither — a fragment, or
+	// something else entirely whose keys happen to look familiar.
 	twoIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
 		rec := httptest.NewRecorder()
-		f.handler.ServeHTTP(rec, f.sending(upload(t, f.path, `{"bomFormat": "SPDX", "specVersion": "2.3"}`)))
+		f.handler.ServeHTTP(rec, f.sending(upload(t, f.path, `{"components": [{"name": "libc6"}]}`)))
 		if rec.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a document we cannot read returned %d, want 422", rec.Code)
+		}
+	})
+}
+
+func TestAnUploadInEitherFormatIsTaken(t *testing.T) {
+	// One upload, one authorization, one arrival decision, whichever format
+	// the build emits. The reader is chosen by the document rather than by the
+	// request, so nothing about the endpoint says which of the two this is.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		built := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+		code, result := f.send(t, upload(t, f.path, spdxInventory(built, "libc6")))
+		if code != http.StatusAccepted {
+			t.Fatalf("POST returned %d, want 202", code)
+		}
+		if result.Outcome != "queued" {
+			t.Errorf("result is %+v", result)
+		}
+		// The document's own identity and its build time are what the arrival
+		// decision turns on, and this format states both somewhere else.
+		if result.BuiltAt != built.Format(time.RFC3339) {
+			t.Errorf("reported build time %q, want %q", result.BuiltAt, built.Format(time.RFC3339))
+		}
+		if depth, _ := f.queue.Depth(t.Context()); depth != 1 {
+			t.Errorf("%d jobs waiting, want 1", depth)
 		}
 	})
 }

@@ -93,6 +93,7 @@ type Config struct {
 	IngestMaxBytes      int
 	IngestMaxComponents int
 	IngestMaxEdges      int
+	IngestMaxFiles      int
 	IngestMaxStatements int
 	IngestMaxDepth      int
 	// BootstrapAdmins are granted administrator at every startup, not only the
@@ -183,6 +184,7 @@ func Load() (Config, error) {
 		IngestMaxBytes:      r.number("INGEST_MAX_BYTES", 0),
 		IngestMaxComponents: r.number("INGEST_MAX_COMPONENTS", 0),
 		IngestMaxEdges:      r.number("INGEST_MAX_EDGES", 0),
+		IngestMaxFiles:      r.number("INGEST_MAX_FILES", 0),
 		IngestMaxStatements: r.number("INGEST_MAX_STATEMENTS", 0),
 		IngestMaxDepth:      r.number("INGEST_MAX_DEPTH", 0),
 
