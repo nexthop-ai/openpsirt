@@ -171,7 +171,9 @@ export function Access({
                         disabled={busy || derived || covered}
                         title={
                           covered
-                            ? "Comes from the grant across every product. Withdraw it there"
+                            ? has
+                              ? "Granted here and also across every product. Withdraw the estate grant first, then this one"
+                              : "Comes from the grant across every product. Withdraw it there"
                             : derived
                               ? "Comes from a group in the identity provider. Withdraw it by changing the group"
                               : empty

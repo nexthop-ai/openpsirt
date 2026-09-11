@@ -197,7 +197,7 @@ export function People() {
                           )}
                           {(person.holds ?? []).map((held) => (
                             <span
-                              key={`${held.product} ${held.role}`}
+                              key={`${held.everywhere ? "*" : held.product} ${held.role}`}
                               className="vchip"
                               style={{ opacity: held.effective ? 1 : 0.55 }}
                               title={
@@ -207,7 +207,8 @@ export function People() {
                                 (ROLES.find((each) => each.role === held.role)?.means ?? held.role)
                               }
                             >
-                              {held.product} · {called(held.role)}
+                              {held.everywhere ? "every product" : held.product} ·{" "}
+                              {called(held.role)}
                               {held.source === "assigned" && (
                                 <>
                                   {" "}
@@ -217,11 +218,16 @@ export function People() {
                                     style={{ fontSize: "inherit" }}
                                     title="Withdraw this role"
                                     onClick={() =>
-                                      withdraw.mutate({
-                                        identity: person.identity ?? "",
-                                        product: held.product ?? "",
-                                        role: held.role ?? "",
-                                      })
+                                      held.everywhere
+                                        ? withdrawEverywhere.mutate({
+                                            identity: person.identity ?? "",
+                                            role: held.role ?? "",
+                                          })
+                                        : withdraw.mutate({
+                                            identity: person.identity ?? "",
+                                            product: held.product ?? "",
+                                            role: held.role ?? "",
+                                          })
                                     }
                                   >
                                     ×
@@ -447,6 +453,7 @@ function Credentials() {
     onSuccess: (made) => {
       setIssued({ name: made.item.name ?? "", secret: made.item.secret ?? "" });
       setKeyName("");
+      setKeyProduct("");
       setKeyStream("");
       setKeyVariant("");
       setIssuing(false);

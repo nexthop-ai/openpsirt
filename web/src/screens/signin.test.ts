@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { forgetForward, forwardable, rememberForward, returningHere } from "./SignIn";
+import {
+  forgetForward,
+  forwardable,
+  rememberForward,
+  returningHere,
+  signedOutHere,
+} from "./SignIn";
 
 function at(path: string, search = "") {
   window.history.replaceState({}, "", path + search);
@@ -62,10 +68,21 @@ describe("sending somebody straight on to the only provider", () => {
     expect(forwardable(1, true)).toBe(false);
   });
 
-  it("does not forward straight after a sign-out", () => {
+  it("does not forward at the address a sign-out actually lands on", () => {
     // The provider still holds its own session, so forwarding here signs them
-    // back in and makes signing out impossible.
-    at("/", "?signed-out");
+    // back in and makes signing out impossible. Asserted against the value the
+    // sign-out button navigates to rather than one retyped here, so that
+    // changing one side without the other fails.
+    const [path, query] = signedOutHere.split("?");
+    at(path ?? "/", query ? "?" + query : "");
+    expect(forwardable(1, false)).toBe(false);
+  });
+
+  it("does not forward after a sign-out once the address is gone", () => {
+    // Pressing Back leaves the marker behind but not the address. The tab is
+    // marked as well, because the session at the provider outlives both.
+    rememberForward();
+    at("/findings");
     expect(forwardable(1, false)).toBe(false);
   });
 

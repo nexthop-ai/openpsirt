@@ -559,12 +559,8 @@ same person as that username at the provider.
 | A proxy binds nothing, and the provider binds afterwards | A proxy has no identifier to offer. Leaving the authorization unbound is what lets the provider still redeem it at a later sign-in, so the order somebody first arrives in does not decide which path keeps working |
 | A bound identifier does not refuse a proxy arrival | The mismatch refusal protects a name that moved between people at the provider. A deployment trusting the header has already granted whatever sets it the power to claim to be anybody, so believing the name it asserts adds nothing |
 | Which path an arrival took is stated, never inferred from an empty identifier | It decides whether an identifier is bound and whether a mismatch refuses. An authorization boundary that turns on a field somebody could leave empty by accident fails in the quiet direction |
-
-Qualifying an identity by its path is what this replaced. It made one human two
-accounts: administration granted to the name under one path while the other was
-the one being signed in as, and — because separation of duties compares people —
-one person able to be both the proposer and the approver of a dismissal, which
-REQ-24 forbids with no override.
+| A username is folded, an identifier is not | The name is both halves of the rule at once now: an administrator types it to authorize somebody, and a provider reports it at every sign-in. The typed rule wins because the failure runs that way — "Alice" recorded against "alice" reported leaves an authorization nobody can redeem, and under group-bound admission a second account beside the first. Normalized as it is stored, so no engine's collation decides it (REQ-08) |
+| An identifier is unbound by an administrator, never by a sign-in | An identifier belongs to the provider that issued it, so changing provider leaves every account pinned to one that refuses its holder — the name matches and the identifier does not. Clearing it is an administrative act with the authorization left in place; doing it automatically would undo, at the moment it was working, the protection that stops a released name being redeemed by whoever took it |
 
 ## Sessions and request forgery
 
@@ -665,6 +661,8 @@ re-granted anything (REQ-42).
 | What it covers is worked out when somebody asks | The catalog is read as the subject is resolved, which is what makes "declared afterwards" true without anything being rewritten |
 | It narrows by visibility exactly as a per-product grant does | A role held across the estate is still a role of one visibility. This is the trap: the queries carry a flag for "every product" that means no narrowing at all, visibility included, and it belongs to the deployment's own background passes. An estate grant setting it would hand somebody granted disclosed reading every undisclosed finding there is (REQ-43) |
 | Withdrawn whole, leaving nothing behind | Expanding into per-product grants at withdrawal records the catalog of that day, which is the same defect by the back door. Anything still wanted on one product is granted there deliberately |
+| Withdrawing it hands back the work it was holding | It is the last role in every product at once, and a finding assigned to somebody who can no longer open it is in no list at all: out of the shared queue because it is assigned, and out of theirs because they cannot reach it. Asked per product, exactly as withdrawing a per-product role is |
+| Every question about what somebody holds asks this table too | A grant that only a resolved subject can see is invisible to the predicates that read the grant tables directly — whether somebody may be handed a finding, who may be mentioned, whether their last role in a product has gone, and whether an approver still holds the right they used. Each of those is asked of both tables |
 | Withdrawing one product from it is not offered | "All except one" is a third kind of fact, with its own storage, its own narrowing and its own meaning in an access review |
 | Set aside and restored by a change of role-assignment mode | It is an assignment, so the act that makes switching reversible covers it. Nothing derives one: a group binding names a product |
 | Stored in its own table rather than as a grant with no product | All four engines treat NULLs in a unique key as distinct from each other, so a nullable product would let duplicate estate rows accumulate with the database enforcing nothing — and the partial index that fixes it is engine-specific (REQ-71) |

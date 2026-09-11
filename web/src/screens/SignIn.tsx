@@ -37,6 +37,14 @@ export function returningHere(): string {
 // screen with a button works, and a forward that cannot be remembered loops.
 const triedKey = "signin-forwarded";
 
+// Where signing out lands, and the marker the sign-in screen reads there.
+//
+// One value, exported, so that the screen and the sign-out button cannot drift
+// apart: a test asserting the address sign-out actually goes to is what catches
+// one of them changing.
+export const signedOut = "signed-out";
+export const signedOutHere = "/?" + signedOut;
+
 function alreadyTried(): boolean {
   try {
     return window.sessionStorage.getItem(triedKey) !== null;
@@ -75,7 +83,7 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
   // Signing out lands here, and the provider still holds its own session — so
   // forwarding would sign them straight back in and make signing out
   // impossible.
-  if (new URLSearchParams(window.location.search).has("signed-out")) return false;
+  if (new URLSearchParams(window.location.search).has(signedOut)) return false;
   return !alreadyTried();
 }
 

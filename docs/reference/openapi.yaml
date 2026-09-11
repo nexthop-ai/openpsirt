@@ -5663,7 +5663,7 @@ components:
           readOnly: true
           type: string
         admin:
-          description: Whether they administer this deployment
+          description: Whether they administer this deployment. Omit it to leave it as it is
           type: boolean
         display_name:
           description: What to show instead of the identity
@@ -7563,6 +7563,23 @@ components:
         - admin
         - kind
         - reach
+      type: object
+    Withdraw-estate-roleResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Withdraw-estate-roleResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        released:
+          description: Findings handed back because that was their last role there
+          format: int64
+          type: integer
+      required:
+        - released
       type: object
     Withdraw-roleResponse:
       additionalProperties: false
@@ -10870,6 +10887,37 @@ paths:
         - Administration
       x-openpsirt-requires:
         scope: deployment
+  /v1/people/{identity}/identifier:
+    delete:
+      description: |-
+        Clears the identifier a sign-in provider pinned to somebody, so that the next person to arrive under their username binds it again. Their authorization and their roles are untouched.
+
+        **Use it after changing sign-in provider.** An identifier belongs to the provider that issued it, so every account pinned to the old one is refused once a new one is configured: the name matches and the identifier does not.
+
+        It re-opens the window a pinned identifier closes, in which whoever arrives under that username is taken to be its holder. Do it when you expect them to sign in.
+
+        **Requires:** administrator
+      operationId: unbind-identifier
+      parameters:
+        - in: path
+          name: identity
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Unbind a user's provider identifier
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
   /v1/people/{identity}/roles/{product}/{role}:
     delete:
       description: |-
@@ -10920,9 +10968,9 @@ paths:
       description: |-
         Withdraws a role held across the estate. Takes effect at their next request; end their sessions to cut them off now.
 
-        It leaves no per-product grants in its place. Expanding one at withdrawal would record the products of that moment, so a product declared afterwards would silently not be covered — which is what holding a role across the estate exists to avoid. Anything still wanted on one product is granted there deliberately.
+        It leaves no per-product grants in its place: anything still wanted on one product is granted there deliberately. Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
 
-        Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
+        Where this was their last role in a product, what they were dealing with there goes back to the unassigned list. `released` says how much moved in total.
 
         **Requires:** administrator
       operationId: withdraw-estate-role
@@ -10938,8 +10986,12 @@ paths:
           schema:
             type: string
       responses:
-        "204":
-          description: No Content
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdraw-estate-roleResponse"
+          description: OK
         default:
           content:
             application/problem+json:

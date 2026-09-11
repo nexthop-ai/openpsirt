@@ -12,9 +12,9 @@ import (
 //
 // A standing fact rather than a copy per product: a product declared after it
 // was made is covered, because what somebody holds is worked out when they
-// ask rather than frozen when the grant was written. Expanding it into per
-// -product rows is the defect it replaces — those record the products of the
-// moment, and a new product is then a permissions sweep across everybody.
+// ask rather than frozen when the grant was written. Expanding it into
+// per-product rows is the defect it replaces — those record the products of
+// the moment, and a new product is then a permissions sweep across everybody.
 type EstateGrant struct {
 	bun.BaseModel `bun:"table:role_grant_all,alias:rga"`
 
@@ -45,7 +45,12 @@ func (s *Store) GrantEstateRole(ctx context.Context, personID int64, role Role) 
 		// engine-specific SQL belongs in the database package rather than
 		// here (REQ-71).
 		n, counted := s.db.NewSelect().Model((*EstateGrant)(nil)).
-			Where("person_id = ?", personID).Where("role = ?", role).Count(ctx)
+			Where("person_id = ?", personID).Where("role = ?", role).
+			// In force, like every other question about what somebody holds. A
+			// row set aside by a change of mode grants nothing, so reporting
+			// success on one would tell an administrator they had granted
+			// something that does not exist.
+			Where("active = ?", true).Count(ctx)
 		if counted == nil && n > 0 {
 			return nil
 		}
@@ -80,6 +85,24 @@ func (s *Store) EstateGrants(ctx context.Context, personID int64) ([]EstateGrant
 		return nil, fmt.Errorf("read what they hold everywhere: %w", err)
 	}
 	return grants, nil
+}
+
+// EveryEstateGrant is what everybody holds across every product, by person.
+//
+// Batched because the alternative is a query per row, and the list this feeds
+// is exactly the one that is long. The per-product grants beside it are read
+// the same way.
+func (s *Store) EveryEstateGrant(ctx context.Context) (map[int64][]EstateGrant, error) {
+	var grants []EstateGrant
+	if err := s.db.NewSelect().Model(&grants).
+		Order("person_id", "role").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("list what people hold everywhere: %w", err)
+	}
+	held := map[int64][]EstateGrant{}
+	for _, grant := range grants {
+		held[grant.PersonID] = append(held[grant.PersonID], grant)
+	}
+	return held, nil
 }
 
 // everyProduct is the catalog, for resolving an estate grant.
@@ -128,4 +151,14 @@ func holds(roles []Role, role Role) bool {
 		}
 	}
 	return false
+}
+
+// ProductsCovered is every product an estate grant reaches, which is the
+// catalog.
+//
+// Named rather than reusing everyProduct at the call site: what the withdrawal
+// path needs is "what did that grant cover", and spelling it as "every
+// product" there would read as an assumption rather than as the rule.
+func (s *Store) ProductsCovered(ctx context.Context) ([]int64, error) {
+	return s.everyProduct(ctx)
 }

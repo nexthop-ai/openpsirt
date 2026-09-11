@@ -132,7 +132,7 @@ for a process and not for an install.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports, exactly as it reports it — there is no prefix, and the same name down either path is the same person. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart | unset |
+| `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart | unset |
 | `OPENPSIRT_SESSION_LIFETIME` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration | 12 hours |
 
 ### An OpenID Connect provider

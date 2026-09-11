@@ -242,6 +242,12 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(`NOT EXISTS (SELECT 1 FROM "role_grant" AS rg`+
 			` WHERE rg.person_id = ap.approved_by AND rg.product_id = de.product_id`+
 			` AND rg.active = ? AND rg.role = ?)`, true, access.Approver).
+		// Nor one held across every product, which is the same right reached
+		// by the other grant. Without this an approver holding it that way
+		// had every approval they ever gave reported as lapsed.
+		Where(`NOT EXISTS (SELECT 1 FROM "role_grant_all" AS rga`+
+			` WHERE rga.person_id = ap.approved_by`+
+			` AND rga.active = ? AND rga.role = ?)`, true, access.Approver).
 		// An administrator reaches every product, so one is never in this list
 		// however their grants read.
 		Where(`NOT EXISTS (SELECT 1 FROM "person" AS ad`+

@@ -159,8 +159,16 @@ func NewStore(db bun.IDB) *Store {
 //
 // This is the only path that creates a person, and nothing on a sign-in path
 // calls it. Access is granted in advance or not at all.
+// admin is stated rather than optional here: this writes what it is given. A
+// caller that must leave administration alone reads what is stored and passes
+// it back, which is what the endpoint does — the same shape as an address,
+// where the three states are distinguished in the request body rather than in
+// the store.
 func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin bool) (*Account, error) {
-	identity = strings.TrimSpace(identity)
+	// Folded, so that what is recorded here and what a sign-in matches are the
+	// same string. An identity is a username, and a username is a name people
+	// type.
+	identity = folded(identity)
 	if identity == "" {
 		return nil, fmt.Errorf("a person needs an identity to be granted anything")
 	}
@@ -297,7 +305,10 @@ func (s *Store) SetDigest(ctx context.Context, personID int64, wanted, unowned b
 // ByIdentity finds somebody by what a sign-in path calls them.
 func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, error) {
 	person := new(Account)
-	err := s.db.NewSelect().Model(person).Where("identity = ?", identity).Scan(ctx)
+	// Folded to match how it was stored. An identity typed with different
+	// capitals is the same person, and looking it up exactly would answer
+	// "nobody" for somebody who is plainly there.
+	err := s.db.NewSelect().Model(person).Where("identity = ?", folded(identity)).Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("look up %q: %w", identity, err)
 	}
@@ -588,7 +599,18 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
 	}
-	return n > 0, nil
+	if n > 0 {
+		return true, nil
+	}
+	// A role held across every product is a role held here, so withdrawing
+	// their last per-product grant does not leave their work unreachable.
+	everywhere, err := s.db.NewSelect().Model((*EstateGrant)(nil)).
+		Where("person_id = ?", personID).
+		Where("active = ?", true).Count(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read what they still hold everywhere: %w", err)
+	}
+	return everywhere > 0, nil
 }
 
 // Keys lists the pipeline credentials, without their secrets.
@@ -767,8 +789,11 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 		Where("p.deactivated_at IS NULL").
 		Where(`EXISTS (SELECT 1 FROM "role_grant" AS g
 			WHERE g.person_id = p.id AND g.active = ?
-			  AND g.product_id = ? AND g.role IN (?))`,
-			true, productID, bun.List(enough))
+			  AND g.product_id = ? AND g.role IN (?))
+			OR EXISTS (SELECT 1 FROM "role_grant_all" AS ga
+			WHERE ga.person_id = p.id AND ga.active = ?
+			  AND ga.role IN (?))`,
+			true, productID, bun.List(enough), true, bun.List(enough))
 }
 
 // Deactivate records that somebody has left, and Reactivate that they are

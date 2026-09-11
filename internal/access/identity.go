@@ -29,6 +29,22 @@ type Identity struct {
 	BoundAt   *time.Time `bun:"bound_at"`
 }
 
+// folded is how a username is stored and how it is matched.
+//
+// An identity is a username now, and a username is both halves of the rule at
+// once: an administrator types it to authorize somebody in advance, and a
+// provider hands it over at every sign-in. The rule for a name people type
+// wins, because the failure runs that way — an administrator writing "Alice"
+// where the provider reports "alice" leaves an authorization nobody can redeem
+// and, under group-bound admission, a second account beside the first.
+//
+// Normalized on the way in rather than compared loosely. The stored value
+// compares the same under any engine, which is what keeps this from depending
+// on a collation (REQ-08).
+func folded(username string) string {
+	return strings.ToLower(strings.TrimSpace(username))
+}
+
 // Claim authorizes somebody to sign in, before any provider has been asked
 // about them.
 //
@@ -37,7 +53,7 @@ type Identity struct {
 // advance has to be expressed in the moving name and then pinned to the fixed
 // one at first use.
 func (s *Store) Claim(ctx context.Context, personID int64, username string) error {
-	username = strings.TrimSpace(username)
+	username = folded(username)
 	if username == "" {
 		return fmt.Errorf("a way to sign in needs a username")
 	}
@@ -72,7 +88,9 @@ func (s *Store) Claim(ctx context.Context, personID int64, username string) erro
 // Nothing here creates a person. It returns who was already authorized, or
 // nothing at all.
 func (s *Store) MatchProvider(ctx context.Context, subject, username string) (*Account, error) {
-	subject, username = strings.TrimSpace(subject), strings.TrimSpace(username)
+	// The identifier is the provider's own and is compared exactly. Only the
+	// name is folded.
+	subject, username = strings.TrimSpace(subject), folded(username)
 	if subject == "" || username == "" {
 		// A provider that names somebody without a stable identifier leaves
 		// the authorization redeemable by name forever, which is the matching
@@ -141,7 +159,7 @@ func (s *Store) MatchProvider(ctx context.Context, subject, username string) (*A
 // saying who is there, and a deployment trusting the header has already
 // granted whatever sets it the power to claim to be anybody.
 func (s *Store) MatchProxy(ctx context.Context, username string) (*Account, error) {
-	username = strings.TrimSpace(username)
+	username = folded(username)
 	if username == "" {
 		return nil, ErrDenied
 	}
@@ -169,6 +187,7 @@ func (s *Store) claimedBy(ctx context.Context, username string) (*Identity, erro
 // happen while both are real. Keeping the old name is the safe answer: it is
 // only a label, and the identifier still resolves them.
 func (s *Store) rename(ctx context.Context, identity *Identity, username string) error {
+	username = folded(username)
 	taken, err := s.db.NewSelect().Model((*Identity)(nil)).
 		Where("username = ?", username).Where("id <> ?", identity.ID).Count(ctx)
 	if err != nil {
@@ -182,6 +201,29 @@ func (s *Store) rename(ctx context.Context, identity *Identity, username string)
 		return fmt.Errorf("follow a username that moved: %w", err)
 	}
 	identity.Username = username
+	return nil
+}
+
+// UnbindIdentifier clears the provider identifier pinned to somebody.
+//
+// The authorization stays: the username row remains, waiting to be redeemed
+// again by whoever next arrives under that name. Only the pin goes.
+//
+// It exists because a deployment may change provider, and an identifier is the
+// old provider's. After a swap every pinned row refuses its holder — the name
+// matches, the identifier does not, and nothing on a sign-in path can clear it
+// — so without this the way back in is editing the database by hand.
+//
+// An administrative act rather than something a sign-in does for itself. A
+// mismatched identifier is exactly what protects a name that moved between
+// people, so clearing it automatically would undo the protection at the moment
+// it was working.
+func (s *Store) UnbindIdentifier(ctx context.Context, personID int64) error {
+	if _, err := s.db.NewUpdate().Model((*Identity)(nil)).
+		Set("subject = NULL").Set("bound_at = NULL").
+		Where("person_id = ?", personID).Exec(ctx); err != nil {
+		return fmt.Errorf("unbind how they sign in: %w", err)
+	}
 	return nil
 }
 
@@ -234,5 +276,5 @@ func (s *Store) match(ctx context.Context, who Arrival) (*Account, error) {
 // provider, so there is nothing to qualify it with — and qualifying it made
 // one human two accounts, which is the defect that settled this (REQ-41).
 func (a Arrival) handle() string {
-	return strings.TrimSpace(a.Username)
+	return folded(a.Username)
 }

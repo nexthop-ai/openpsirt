@@ -1316,6 +1316,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/people/{identity}/identifier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unbind a user's provider identifier
+         * @description Clears the identifier a sign-in provider pinned to somebody, so that the next person to arrive under their username binds it again. Their authorization and their roles are untouched.
+         *
+         *     **Use it after changing sign-in provider.** An identifier belongs to the provider that issued it, so every account pinned to the old one is refused once a new one is configured: the name matches and the identifier does not.
+         *
+         *     It re-opens the window a pinned identifier closes, in which whoever arrives under that username is taken to be its holder. Do it when you expect them to sign in.
+         *
+         *     **Requires:** administrator
+         */
+        delete: operations["unbind-identifier"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/people/{identity}/roles/{product}/{role}": {
         parameters: {
             query?: never;
@@ -1356,9 +1382,9 @@ export interface paths {
          * Withdraw a user's role on every product
          * @description Withdraws a role held across the estate. Takes effect at their next request; end their sessions to cut them off now.
          *
-         *     It leaves no per-product grants in its place. Expanding one at withdrawal would record the products of that moment, so a product declared afterwards would silently not be covered — which is what holding a role across the estate exists to avoid. Anything still wanted on one product is granted there deliberately.
+         *     It leaves no per-product grants in its place: anything still wanted on one product is granted there deliberately. Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
          *
-         *     Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
+         *     Where this was their last role in a product, what they were dealing with there goes back to the unassigned list. `released` says how much moved in total.
          *
          *     **Requires:** administrator
          */
@@ -7251,7 +7277,7 @@ export interface components {
              * @example https://example.com/schemas/RecordBody.json
              */
             readonly $schema?: string;
-            /** @description Whether they administer this deployment */
+            /** @description Whether they administer this deployment. Omit it to leave it as it is */
             admin?: boolean;
             /** @description What to show instead of the identity */
             display_name?: string;
@@ -8355,6 +8381,19 @@ export interface components {
             reach: components["schemas"]["CanBody"][] | null;
             /** @description An address is recorded for them, so anything can be sent at all */
             reachable?: boolean;
+        };
+        "Withdraw-estate-roleResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Withdraw-estate-roleResponse.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Findings handed back because that was their last role there
+             */
+            released: number;
         };
         "Withdraw-roleResponse": {
             /**
@@ -10385,6 +10424,35 @@ export interface operations {
             };
         };
     };
+    "unbind-identifier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "withdraw-role": {
         parameters: {
             query?: never;
@@ -10430,12 +10498,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No Content */
-            204: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Withdraw-estate-roleResponse"];
+                };
             };
             /** @description Error */
             default: {

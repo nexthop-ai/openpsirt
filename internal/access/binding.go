@@ -511,9 +511,24 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) error {
 	named := make([]string, 0, len(identities))
 	for _, identity := range identities {
-		if trimmed := strings.TrimSpace(identity); trimmed != "" {
-			named = append(named, trimmed)
+		trimmed := strings.TrimSpace(identity)
+		if trimmed == "" {
+			continue
 		}
+		// The old form was "provider:username". Accepted silently it makes an
+		// administrator account literally called "okta:alice" that nobody can
+		// sign in as, while the real alice is refused — and the startup check
+		// that exists to catch a deployment nobody can administer is satisfied
+		// by the phantom. This is the way back in, so it fails loudly at the
+		// one moment somebody needs it.
+		if before, _, found := strings.Cut(trimmed, ":"); found && before != "" {
+			return fmt.Errorf(
+				"%q names an administrator as \"provider:username\". A name here is the "+
+					"plain username the provider or the trusted proxy reports, with no "+
+					"prefix. Write %q and start again",
+				trimmed, strings.TrimPrefix(trimmed, before+":"))
+		}
+		named = append(named, trimmed)
 	}
 
 	// Both halves or neither. Clearing who was named and naming who is
