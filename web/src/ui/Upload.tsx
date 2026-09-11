@@ -206,9 +206,9 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
               </>
             ) : (
               <>
-                <b>Drop a CycloneDX 1.x or SPDX 2.x JSON file</b> (CycloneDX 1.4 to 1.7, SPDX
-                2.2 and 2.3; a later major version of either is refused by name), or click to
-                choose. The file says which format it is. The scan runs here against the current
+                <b>Drop a CycloneDX 1.x or SPDX 2.x JSON file</b> (CycloneDX 1.4 to 1.7, SPDX 2.2
+                and 2.3; a later major version of either is refused by name), or click to choose.
+                The file says which format it is. The scan runs here against the current
                 vulnerability database.
               </>
             )}
