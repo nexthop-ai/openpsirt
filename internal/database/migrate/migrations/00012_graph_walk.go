@@ -34,9 +34,9 @@ func init() {
 // and the column is 0.35 s.
 //
 // The column order is the one the query binds: the target is always known, the
-// component is the correlation, and `closed_run_id IS NULL` is what "open"
-// means. It also serves the plain "what is open against this component here"
-// lookup, which is the same prefix without the last column.
+// component is the correlation, and `closed_at IS NULL` is what "open" means.
+// It also serves the plain "what is open against this component here" lookup,
+// which is the same prefix without the last column.
 func upGraphWalk(ctx context.Context, tx *sql.Tx) error {
 	statements := []string{
 		`CREATE INDEX "finding_component_idx" ON "finding" ("target_id", "component_id", "closed_at")`,

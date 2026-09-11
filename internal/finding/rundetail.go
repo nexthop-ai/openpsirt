@@ -117,7 +117,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			Where("f."+column+" = ?", runID).
 			Where("f.visibility IN (?)", bun.List(visible))
 		err := s.db.NewSelect().
-			TableExpr("(?) AS changed", inner).
+			TableExpr(`(?) AS "changed"`, inner).
 			ColumnExpr("changed.band AS band").
 			ColumnExpr("COUNT(*) AS count").
 			ColumnExpr("SUM(changed.exploited) AS exploited").

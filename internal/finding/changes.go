@@ -69,7 +69,7 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 			Where("f."+column+" IN (?)", bun.List(runIDs)).
 			Where("f.visibility IN (?)", bun.List(visible))
 		err := s.db.NewSelect().
-			TableExpr("(?) AS changed", inner).
+			TableExpr(`(?) AS "changed"`, inner).
 			ColumnExpr("changed.run_id AS run_id").
 			ColumnExpr("COUNT(*) AS count").
 			GroupExpr("changed.run_id").

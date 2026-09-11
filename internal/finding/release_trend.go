@@ -85,7 +85,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	inner = scope.Narrow(onlyReadable(inner, subject, products, all))
 
 	if err := s.db.NewSelect().
-		TableExpr("(?) AS per_release", inner).
+		TableExpr(`(?) AS "per_release"`, inner).
 		ColumnExpr("per_release.stream AS stream").
 		ColumnExpr("per_release.created_at AS created_at").
 		ColumnExpr("per_release.band AS band").

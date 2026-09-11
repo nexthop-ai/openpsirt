@@ -66,7 +66,11 @@ func visibilityOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 		Join("JOIN target AS tg ON tg.id = f.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		ColumnExpr("COUNT(*) AS here").
-		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS undisclosed",
+		// Counted rather than summed over a CASE. That shape comes back as a
+		// decimal on two of the four engines and the cast that fixes it is
+		// spelled per engine, which is why the rule says to write two counts
+		// — and this was the second copy of a shape recorded as removed.
+		ColumnExpr("COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS undisclosed",
 			access.Private).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).

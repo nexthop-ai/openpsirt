@@ -139,7 +139,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Agreed    int    `bun:"agreed"`
 	}
 	err := counted(s.db.NewSelect().
-		TableExpr("(?) AS grouped", groups).
+		TableExpr(`(?) AS "grouped"`, groups).
 		Join(`JOIN "target" AS tg ON tg.id = grouped.target_id`).
 		Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS va ON va.id = tg.variant_id`).
@@ -160,7 +160,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Agreed    int `bun:"agreed"`
 	}
 	if err := counted(s.db.NewSelect().
-		TableExpr("(?) AS grouped", grouped(false))).
+		TableExpr(`(?) AS "grouped"`, grouped(false))).
 		Scan(ctx, &totals); err != nil {
 		return nil, whole, fmt.Errorf("read how this product stands: %w", err)
 	}

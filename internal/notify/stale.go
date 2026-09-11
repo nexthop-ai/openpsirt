@@ -371,7 +371,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			Where(finding.KeyMatches))
 
 	err = w.db.NewSelect().
-		TableExpr("(?) AS q", work).
+		TableExpr(`(?) AS "q"`, work).
 		ColumnExpr("q.team_id AS team_id").
 		ColumnExpr("MIN(COALESCE(NULLIF(q.team_display, ''), q.team_name)) AS team").
 		// The matched name for the link and the typed one for the sentence:

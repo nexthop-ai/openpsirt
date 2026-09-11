@@ -43,6 +43,13 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 			"received_at"    ` + t.timestamp + ` NOT NULL,
 			"parser_version" ` + t.name + ` NOT NULL,
 			"credential"     ` + t.name + ` NULL,
+			-- Why a scan that was taken could not be read.
+			--
+			-- The status alone says that something went wrong and nothing about what. A
+			-- producer whose files cannot be read has to be able to see the reason where
+			-- they see the scan, rather than in a log only an operator of this deployment
+			-- can reach.
+			"failure"        ` + t.text + ` NULL,
 			"status"         ` + t.kind + ` NOT NULL,
 			-- What the inventory was made of, recorded when it is read.
 			--

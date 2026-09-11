@@ -53,6 +53,16 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- statement filter scan this whole table once per statement.
 			"identifier_folded" ` + t.name + ` NOT NULL,
 			"severity"      ` + t.kind + ` NULL,
+			-- What we say instead, where somebody here has assessed it.
+			--
+			-- The published rating is never overwritten: a rating of ours
+			-- shown where the world's goes reads as the world's, and the
+			-- first person to check against the public record finds a
+			-- discrepancy nobody declared. Everything that ranks, filters or
+			-- clocks reads this with the published one as its fallback,
+			-- through one expression — every identity and expiry bug here
+			-- came from letting one fact into two rules.
+			"assessed_severity" ` + t.kind + ` NULL,
 			-- What somebody triaging needs in front of them. There may be
 			-- thousands of these and very few people, so a finding that
 			-- carries its own evidence is the difference between a queue that
@@ -320,6 +330,11 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- recorded, and a finding whose closure could only be read
 			-- through a run was one a person could never close at all.
 			"closed_at"        ` + t.timestamp + ` NULL,
+			-- When this runs out, worked out from how urgent it is and
+			-- counted from when it was first seen. Null where it is on no
+			-- clock at all: below the product's triage line, on a release
+			-- past end of life, or already answered.
+			"due_at"           ` + t.timestamp + ` NULL,
 			-- The run that closed it, where a run did. Null with a closed_at
 			-- set is a finding a person closed.
 			"closed_run_id"    ` + t.refNull + ` NULL,
@@ -353,6 +368,12 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			ON "vulnerability_alias" ("identifier_folded", "vulnerability_id")`,
 
 		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at")`,
+
+		// What is running out, off an index rather than a scan. It leads with
+		// the two columns always compared — a finding that is closed or
+		// already answered is not running out of anything — so the deadline
+		// itself is the range at the end of a narrow prefix.
+		`CREATE INDEX "finding_due_idx" ON "finding" ("closed_at", "suppressed_by", "due_at")`,
 		// Finding one issue everywhere it is present, which is what triaging
 		// one vulnerability across a portfolio asks for.
 		`CREATE INDEX "finding_vulnerability_idx" ON "finding" ("vulnerability_id", "closed_at")`,

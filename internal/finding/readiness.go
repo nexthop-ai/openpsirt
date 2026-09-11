@@ -156,7 +156,7 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 		Open int    `bun:"open"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("(?) AS counted", inner).
+		TableExpr(`(?) AS "counted"`, inner).
 		ColumnExpr("counted.band AS band").
 		ColumnExpr("COUNT(*) AS open").
 		GroupExpr("counted.band").

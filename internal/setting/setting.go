@@ -21,7 +21,13 @@ import (
 
 // Setting is one named value.
 type Setting struct {
-	bun.BaseModel `bun:"table:application_setting,alias:as"`
+	// Aliased "st", not "as": all four engines reserve the second, and it
+	// worked only because the library quotes what a tag declares — a property
+	// of the library rather than of this code. The first raw expression
+	// naming the alias would have been a syntax error on every one of them,
+	// and the gate that checks invented names read call arguments rather than
+	// struct tags, so nothing could have said so.
+	bun.BaseModel `bun:"table:application_setting,alias:st"`
 
 	Name      string    `bun:"name,pk"`
 	Value     string    `bun:"value,notnull"`

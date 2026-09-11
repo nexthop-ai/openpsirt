@@ -410,7 +410,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return Catches{}, err
 	}
-	work, err := s.db.NewSelect().TableExpr("(?) AS matched", counted).Count(ctx)
+	work, err := s.db.NewSelect().TableExpr(`(?) AS "matched"`, counted).Count(ctx)
 	if err != nil {
 		return Catches{}, fmt.Errorf("count what that would match: %w", err)
 	}
@@ -423,7 +423,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return Catches{}, err
 	}
-	free, err := s.db.NewSelect().TableExpr("(?) AS unheld", unheld).Count(ctx)
+	free, err := s.db.NewSelect().TableExpr(`(?) AS "unheld"`, unheld).Count(ctx)
 	if err != nil {
 		return Catches{}, fmt.Errorf("count what nobody holds: %w", err)
 	}

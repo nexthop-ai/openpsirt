@@ -109,7 +109,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	// over some of a group leaves the rest running; overdue when anything
 	// open is past its date and not covered.
 	err = s.db.NewSelect().
-		TableExpr("(?) AS grouped", group).
+		TableExpr(`(?) AS "grouped"`, group).
 		ColumnExpr("grouped.band AS band").
 		ColumnExpr("SUM(CASE WHEN grouped.still_open = 0 AND grouped.judged > 0 "+
 			"THEN 1 ELSE 0 END) AS closed").

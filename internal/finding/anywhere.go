@@ -193,7 +193,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			GroupExpr(GroupedAcross)
 		var err error
 		if total, err = s.db.NewSelect().
-			TableExpr("(?) AS grouped", counted).Count(ctx); err != nil {
+			TableExpr(`(?) AS "grouped"`, counted).Count(ctx); err != nil {
 			return nil, 0, fmt.Errorf("count what is open anywhere: %w", err)
 		}
 		return nil, total, nil

@@ -77,7 +77,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	}
 
 	total, err := s.db.NewSelect().
-		TableExpr("(?) AS sightings", narrow(s.db.NewSelect()).
+		TableExpr(`(?) AS "sightings"`, narrow(s.db.NewSelect()).
 			ColumnExpr("DISTINCT st.product_id, tg.id, f.component_id")).
 		Count(ctx)
 	if err != nil {

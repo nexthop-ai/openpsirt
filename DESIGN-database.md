@@ -112,6 +112,12 @@ only because walking the chain up and down catches an ordering mistake between
 two of them, and they collapse into a single initial migration before the first
 release.
 
+Ten of them did the opposite and have been folded back into the migrations
+that created their tables. What that cost while they stood: a four-statement
+engine-specific rollback that existed only because a column was added later,
+four files to read to know what one table holds, and ten more migrations for
+the collapse to unpick. Every migration now creates something.
+
 ## Migration locks
 
 | Lock | Excludes | Mechanism |
@@ -152,6 +158,17 @@ replaces the mode, and what it replaces includes the strictness that makes an
 oversized value an error rather than a quiet truncation. The first version
 assigned, and a nine-character string stored in a four-character column came back
 four characters long, with no error, on those two engines.
+
+**The gate reads three places, because it read one.** `AS <word>` is the
+syntax for inventing a name and was the whole of what it matched — so a table
+renamed in a migration, which names no alias, and a table alias declared in a
+model's own struct tag were both invisible to it. The settings table was
+aliased `as`, which all four engines reserve, and worked only because the
+library quotes what a tag declares; the first raw expression naming that alias
+would have been a syntax error on every one of them. Inside the migrations it
+reads the data-definition keywords as well, with the comments beside them
+stripped first — the prose that makes a schema legible is full of the words an
+engine reserves.
 
 **A name a query invents needs the same care.** A grouped count wrapped its
 subquery in `AS groups`, and `GROUPS` is a reserved word in MySQL 8, where it

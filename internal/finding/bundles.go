@@ -154,7 +154,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		// reserved on MySQL 8.
 		counted := bundled(s.db.NewSelect()).ColumnExpr("COUNT(*) AS n")
 		if total, err = s.db.NewSelect().
-			TableExpr("(?) AS bundled", counted).Count(ctx); err != nil {
+			TableExpr(`(?) AS "bundled"`, counted).Count(ctx); err != nil {
 			return nil, 0, fmt.Errorf("count what the bumps are: %w", err)
 		}
 	}
@@ -333,7 +333,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 			Where("f.visibility IN (?)", bun.List(visible)).
 			GroupExpr("f.component_id")
 		if total, err = s.db.NewSelect().
-			TableExpr("(?) AS grouped", filter.narrow(counted)).
+			TableExpr(`(?) AS "grouped"`, filter.narrow(counted)).
 			Count(ctx); err != nil {
 			return nil, 0, fmt.Errorf("count what is open by component: %w", err)
 		}

@@ -80,6 +80,39 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			-- claim is that something does not affect us, and which of the
 			-- recognized reasons it is *is* the claim.
 			"justification" ` + t.free + ` NULL,
+			-- What actually stops a vulnerability, where a dismissal rests on something
+			-- stopping it.
+			--
+			-- Every other recognized reason for something not applying is a claim about
+			-- code, and code is what makes a decision lapse: the version moves, the key
+			-- changes, and somebody is asked again. The mitigations-exist reason is
+			-- a claim about configuration — a rule, a setting, a service that is not
+			-- exposed — which can be removed with no version moving at all. Nothing here
+			-- watches configuration, so that claim can go quietly false while the tool
+			-- still believes it.
+			--
+			-- Naming the control does not close that gap, and it is not pretended to. It
+			-- is the difference between a claim somebody can go and check and one nobody
+			-- can, and it is the justification an auditor asks about first, because the
+			-- protection lives outside the software.
+			--
+			-- Nullable because it belongs to one justification out of five, and because
+			-- every claim recorded before this existed has no answer — a column that
+			-- demanded one would be asserting something about claims nobody asked.
+			"mitigation"    ` + t.text + ` NULL,
+			-- Where the work is happening.
+			--
+			-- **A stored link, and nothing is sent to it.** A hand-off to a tracker was
+			-- recorded as one thing and it is two: a link has no egress at all, needs no
+			-- configuration and connects a fix target declared here to the work being done
+			-- there, while the half that *sends* is an outbound request a deployment has
+			-- to decide to allow. Splitting them is what makes the cheap half
+			-- available without that decision.
+			--
+			-- **On the fix target and on the claim**, because both are things somebody
+			-- does elsewhere: a target is a promise to change code and a claim is a
+			-- judgment somebody may be arguing about in a ticket.
+			"elsewhere"     ` + t.text + ` NULL,
 			-- Set only for a deferral, which is the one outcome that expires
 			-- on a date rather than on the code changing.
 			"deferred_until" ` + t.date + ` NULL,

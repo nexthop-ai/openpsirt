@@ -975,7 +975,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 					Where(BandExpr+" NOT IN (?)", bun.List(words)))
 	}
 	n, err := s.db.NewSelect().
-		TableExpr("(?) AS grouped", below.narrow(counted)).
+		TableExpr(`(?) AS "grouped"`, below.narrow(counted)).
 		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what the line keeps out: %w", err)
@@ -1796,7 +1796,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr(GroupedOn)
 	total, err := s.db.NewSelect().
-		TableExpr("(?) AS grouped", filter.narrow(counted)).
+		TableExpr(`(?) AS "grouped"`, filter.narrow(counted)).
 		Count(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count what is open: %w", err)
