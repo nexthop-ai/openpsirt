@@ -3,7 +3,7 @@
 Files hanging off a finding: storage, references, authorization, limits,
 redaction and the reaper.
 
-Satisfies REQ-70.
+Satisfies REQ-70 and REQ-79.
 
 ## Contents
 
@@ -82,6 +82,28 @@ An object store reached through the S3-compatible API. Never the database.
 | A filesystem backend for development | Mirrors what SQLite does for the database |
 | The store is optional | With none configured, attachments are off and everything else works |
 | The official AWS SDK for Go, v2 | Measured against a signer written here. The credential chain is what a cloud deployment needs and is the part that cannot be tested anywhere else |
+
+### Reaching the store in the clear
+
+An endpoint that is not `https` is refused, and two things lift that (REQ-79).
+
+| Lifts it | |
+|---|---|
+| The endpoint reaches no further than this machine | Nothing crosses a network, so there is no path to be on. This is the development backend's neighbor and needs no saying |
+| An operator states that the network is one they accept it on | The store somebody already runs is the constraint. An installation with no TLS in front of its object store should be able to run this, rather than be told it configured the tool wrongly |
+
+Refused at startup rather than at somebody's first upload, with everything else
+a misconfigured store is refused for.
+
+**What it costs is said at every start, not once where it was set.** An
+attachment is delivered as a redirect, so the signed address is a bearer token
+that travels to a browser, and anybody on the path between the two may spend it
+for the file it names. That is invisible from the setting that allows it, and
+the person who set it is rarely the person reading the logs a year later.
+
+**It is a separate decision from serving this application without TLS.** That one
+is about cookies on the way in; this one is about a file on the way out, and a
+deployment can want either without the other.
 
 The transport lives beside the store. The store decides what may be reached and
 by whom; the object-store and filesystem backends implement one interface behind

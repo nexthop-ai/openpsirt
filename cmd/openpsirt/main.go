@@ -571,9 +571,16 @@ func mailChannel(cfg config.Config) notify.Channel {
 // backend — one process and one disk — and a deployment that named a bucket
 // meant the bucket.
 func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger) (attach.Storage, error) {
-	bucket, err := attach.NewBucket(ctx, cfg.AttachmentEndpoint, cfg.AttachmentBucket,
-		cfg.AttachmentRegion, cfg.AttachmentKey, cfg.AttachmentSecret, cfg.AttachmentToken,
-		cfg.AttachmentPathStyle)
+	bucket, err := attach.NewBucket(ctx, attach.BucketConfig{
+		Endpoint:  cfg.AttachmentEndpoint,
+		Bucket:    cfg.AttachmentBucket,
+		Region:    cfg.AttachmentRegion,
+		Key:       cfg.AttachmentKey,
+		Secret:    cfg.AttachmentSecret,
+		Token:     cfg.AttachmentToken,
+		PathStyle: cfg.AttachmentPathStyle,
+		AllowHTTP: cfg.AttachmentAllowHTTP,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -583,6 +590,14 @@ func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger
 		// is while whoever made it is still watching the logs.
 		if err := bucket.Reachable(ctx); err != nil {
 			return nil, err
+		}
+		if bucket.InTheClear() {
+			// Said every start, not once at the moment it was configured. The
+			// address a browser is redirected to carries its own authorization,
+			// so anybody on the path between them and the store may fetch the
+			// file it names.
+			logger.Warn("attachment links cross the network in the clear",
+				"endpoint", cfg.AttachmentEndpoint)
 		}
 		logger.Info("attachments are held in an object store", "bucket", cfg.AttachmentBucket)
 		return bucket, nil
