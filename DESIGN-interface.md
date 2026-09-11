@@ -471,6 +471,11 @@ it prepares is kept as a number of days and turned into a date when somebody
 opens the form. Kept as a date and never read, the prefill opened the form with
 the outcome chosen and no date, which cannot be submitted.
 
+**Nothing hands one over yet.** The filter stores what it prepares, the API
+carries it, and the decision form takes a prefill and works the date out from a
+length. No screen passes one between them, so a prepared claim is stored and
+never offered, and the length reaches nothing that reads it.
+
 Saved filters were argued for as the cheap half of ownership by subtree; the
 expensive half is now team routing, so what they are for is being the thing a
 prefill rule is built on.
