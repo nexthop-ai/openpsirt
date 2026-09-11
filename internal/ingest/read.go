@@ -290,9 +290,9 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// Where this scan could have made a claim is passed with it. A claim in a
 	// document of its own can always be restated, so not restating one is a
 	// withdrawal; a claim attached to a component can only be restated by a
-	// format that can attach one, and one of the two cannot (REQ-77). Without
-	// that, a product's first scan in the other format closes every carried
-	// patch it had and reopens every finding they suppressed.
+	// format that can attach one, and one of the two cannot. Without that, a
+	// product's first scan in the other format closes every carried patch it
+	// had and reopens every finding they suppressed.
 	stated := map[sbom.Origin]bool{
 		sbom.FromStatement: true,
 		sbom.FromPedigree:  doc.Format.StatesCarriedPatches(),

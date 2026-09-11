@@ -4,7 +4,7 @@ What happens to a scan between arrival and application.
 
 Satisfies REQ-03, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11,
 REQ-12, REQ-13, REQ-14, REQ-16, REQ-17, REQ-18, REQ-31, REQ-44, REQ-66,
-REQ-69, REQ-76, REQ-77, REQ-78.
+REQ-69.
 
 ## Contents
 
@@ -247,7 +247,7 @@ other's business (REQ-05).
 
 | Rule | Reason |
 |---|---|
-| **The document chooses the reader, never the request** | An endpoint taking a format parameter is a parameter a build sets wrong, and the answer is then a refusal about the parameter rather than about the file (REQ-76) |
+| **The document chooses the reader, never the request** | An endpoint taking a format parameter is a parameter a build sets wrong, and the answer is then a refusal about the parameter rather than about the file |
 | **A top-level key is read by the format that owns it**, before the document has necessarily said which format it is | The declaration arrives in no guaranteed position: a producer sorting its keys puts SPDX's packages ahead of its own `spdxVersion`. Requiring the declaration first would refuse documents that are well formed |
 | **The formats claim no key in common**, which a test asserts rather than a reader assuming | A key claimed twice would make the routing a coin toss, and it is a property of the tables rather than of anything checkable while reading |
 | **Which vocabulary read each key is recorded**, and a document that used two is refused | The keys being disjoint is not on its own enough. A handler writes to the document before anything has checked what the document is, and both formats state an identity — so a file carrying both keys is stored under whichever came last, which is a different identity for the same bytes depending only on how its producer sorted them |
@@ -300,7 +300,7 @@ each fact.
 | The package identifier and the database key | fields of the component | external references, by type | a field of the package, or external identifiers by type |
 | Structure | `dependencies`, and one component nested in another | relationships, stated either way round | relationships, stated one way round |
 | What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` or `descendantOf` |
-| What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** (REQ-77) | **cannot be stated** (REQ-77) |
+| What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** | **cannot be stated** |
 
 **The root is resolved at the end rather than where it is named.** One format
 states it inline with everything it says about it; the other points at a
@@ -376,7 +376,7 @@ is not and there is no direction to get wrong.
 The third version annotates a relationship with the phase it matters in —
 build, design, development, runtime, test or other. **The specification does not
 say that any of them means the target does not ship**, and inferring it is the
-one judgment in this area the format leaves to a reader (REQ-78).
+one judgment in this area the format leaves to a reader.
 
 | Scope | Read as |
 |---|---|
@@ -483,7 +483,7 @@ A build's claims arrive two ways, and they are not equally precise.
 | On the component | A patch in a component's pedigree recording which vulnerability it fixes. It arrives attached to the thing it is about |
 | In a document of its own | Statements naming what they apply to by package identifier: one version, every version of a package, or a whole source tree |
 
-**Only one of the two formats can carry the first** (REQ-77). SPDX has a
+**Only one of the two formats can carry the first**. SPDX has a
 relationship saying a file is a patch for a package and no way to say which
 vulnerability that patch resolves, so an inventory in that format carries no
 claims and a build with carried patches states them in a document of its own.
@@ -738,7 +738,7 @@ to retrofit were settled early.
 - **A component with no distribution context in its identifier is one nothing will
   match**, and that is invisible rather than an error.
 
-**A lifecycle scope is read the way that keeps a component** (REQ-78), and the
+**A lifecycle scope is read the way that keeps a component**, and the
 two errors it sits between are not equal. Keeping too much adds something to
 triage, which somebody sees and acts on; dropping too much removes a finding
 nobody ever learns about. Measured against the format's own example 11: its
