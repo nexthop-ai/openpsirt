@@ -983,7 +983,7 @@ for a process and not for an install.</p>
 <tbody>
 <tr>
 <td><code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
-<td>Identities granted administration at every startup, comma-separated. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart</td>
+<td>Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. <strong>A name written <code>provider:username</code> is refused and the process stops</strong>, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -994,6 +994,9 @@ for a process and not for an install.</p>
 </tbody>
 </table>
 <h3 id="an-openid-connect-provider">An OpenID Connect provider<a class="headerlink" href="#an-openid-connect-provider" title="Permanent link">&para;</a></h3>
+<p>One sign-in provider is configured at a time. Setting both an issuer here and a
+GitHub client id below stops the process, naming the two: an identity is a
+username, and two providers issuing them independently cannot be told apart.</p>
 <table>
 <thead>
 <tr>
@@ -1047,7 +1050,7 @@ for a process and not for an install.</p>
 <tbody>
 <tr>
 <td><code>OPENPSIRT_GITHUB_CLIENT_ID</code></td>
-<td>The OAuth application's client id. Empty means GitHub sign-in is off</td>
+<td>The OAuth application's client id. Empty means GitHub sign-in is off. Not to be set alongside <code>OPENPSIRT_OIDC_ISSUER</code></td>
 <td>unset</td>
 </tr>
 <tr>
