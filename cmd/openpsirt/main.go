@@ -564,6 +564,23 @@ func mailChannel(cfg config.Config) notify.Channel {
 	return mail
 }
 
+// noteStoreInTheClear says what a plaintext object store costs, at every start
+// rather than once at the moment somebody configured it. The address a browser
+// is redirected to carries its own authorization, so anybody on the path
+// between them and the store may fetch the file it names.
+//
+// Its own function so that a test can watch it happen. Reached through the
+// store's own report rather than through the setting, because what matters is
+// the endpoint that was accepted rather than the intent that admitted it, and
+// the endpoint it names has had any password taken out of it.
+func noteStoreInTheClear(bucket *attach.Bucket, logger *slog.Logger) {
+	if !bucket.InTheClear() {
+		return
+	}
+	logger.Warn("attachment links cross the network in the clear",
+		"endpoint", bucket.Endpoint())
+}
+
 // attachmentStore is where attachments go, or nothing where an operator
 // configured nowhere.
 //
@@ -591,14 +608,7 @@ func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger
 		if err := bucket.Reachable(ctx); err != nil {
 			return nil, err
 		}
-		if bucket.InTheClear() {
-			// Said every start, not once at the moment it was configured. The
-			// address a browser is redirected to carries its own authorization,
-			// so anybody on the path between them and the store may fetch the
-			// file it names.
-			logger.Warn("attachment links cross the network in the clear",
-				"endpoint", cfg.AttachmentEndpoint)
-		}
+		noteStoreInTheClear(bucket, logger)
 		logger.Info("attachments are held in an object store", "bucket", cfg.AttachmentBucket)
 		return bucket, nil
 	}

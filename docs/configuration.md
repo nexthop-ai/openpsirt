@@ -202,7 +202,9 @@ Loopback is exempt, since nothing crosses a network.
 you are content to carry those addresses across. A deployment that sets it is
 told so at every start rather than only where it was configured:
 
-    WARN attachment links cross the network in the clear endpoint=http://minio.internal:9000
+```
+WARN attachment links cross the network in the clear endpoint=http://minio.internal:9000
+```
 
 This is not `OPENPSIRT_PLAIN_HTTP`, which is about serving this application
 without TLS and loosens cookies. One is a file on the way out and the other a

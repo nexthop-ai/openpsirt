@@ -16,12 +16,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+// envPrefix is how these settings are spelled in the environment, so a refusal
+// can name the way through it. Repeated rather than imported, for the reason
+// the same constant is repeated elsewhere: a dependency on the configuration
+// package for a five-character string is the worse trade.
+const envPrefix = "OPENPSIRT_"
+
 // Bucket keeps bytes in an object store reached over the S3 API, which is what
 // MinIO, Ceph and every cloud provider speak.
 type Bucket struct {
 	client  *s3.Client
 	presign *s3.PresignClient
 	bucket  string
+	// The endpoint with any password taken out, which is the only form of it
+	// that is written down. Kept because it is parsed here anyway, so nothing
+	// downstream has to parse it again to say where the store is.
+	endpoint string
 	// Whether what reaches this store, and the signed addresses handed out
 	// for it, cross the network in the clear. Worked out where the endpoint
 	// is checked, so that nothing has to decide it a second time.
@@ -77,8 +87,9 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	if err != nil {
 		return nil, fmt.Errorf("object store credentials: %w", err)
 	}
-	clear := false
+	inTheClear := false
 	endpoint := strings.TrimSpace(settings.Endpoint)
+	shown := endpoint
 	if endpoint != "" {
 		parsed, err := url.Parse(endpoint)
 		if err != nil {
@@ -89,10 +100,19 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		// redirect is the part that leaves us. So plain HTTP is refused unless
 		// it reaches no further than this machine, or an operator has said
 		// that this network is one they accept it on (REQ-70).
-		clear = parsed.Scheme != "https" && !loopback(parsed.Hostname())
-		if clear && !settings.AllowHTTP {
+		// Said without the password. What an operator writes here may carry
+		// one, and a refusal is logged like anything else that stops a start.
+		shown = parsed.Redacted()
+		inTheClear = parsed.Scheme != "https" && !loopback(parsed.Hostname())
+		if inTheClear && !settings.AllowHTTP {
+			// Naming the way through. The operator meeting this is the one a
+			// plaintext store was allowed for, and a refusal that states only
+			// what is forbidden leaves them to find the setting by reading the
+			// source.
 			return nil, fmt.Errorf(
-				"object store endpoint must be https, or loopback for development: %s", endpoint)
+				"object store endpoint must be https, or loopback for development: %s"+
+					" — set %sATTACHMENT_ALLOW_HTTP to accept it on this network",
+				shown, envPrefix)
 		}
 	}
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -102,10 +122,11 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		o.UsePathStyle = settings.PathStyle
 	})
 	return &Bucket{
-		client:  client,
-		presign: s3.NewPresignClient(client),
-		bucket:  bucket,
-		clear:   clear,
+		client:   client,
+		presign:  s3.NewPresignClient(client),
+		bucket:   bucket,
+		endpoint: shown,
+		clear:    inTheClear,
 	}, nil
 }
 
@@ -115,6 +136,10 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 // browser carries its own authorization, and the person who set the variable is
 // rarely the person reading the logs a year later.
 func (b *Bucket) InTheClear() bool { return b.clear }
+
+// Endpoint is where this store is, with any password taken out. Empty for a
+// cloud provider, which is addressed by region rather than by name.
+func (b *Bucket) Endpoint() string { return b.endpoint }
 
 func loopback(host string) bool {
 	return host == "127.0.0.1" || host == "localhost" || host == "::1"
