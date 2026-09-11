@@ -307,7 +307,7 @@ func registerAdministration(api huma.API, a Administering) {
 			return nil, err
 		}
 
-		_, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
+		before, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
 		created := lookupErr != nil
 
 		// Recording somebody records the way they sign in, because access
@@ -322,6 +322,15 @@ func registerAdministration(api huma.API, a Administering) {
 		if created {
 			noteAdminChange(ctx, a, trail.Account, in.Body.Identity, nil,
 				trail.Said("recorded", true))
+		} else if before != nil && before.IsAdmin != in.Body.Admin {
+			// Administration is global and is the widest thing anybody here
+			// holds, so a change to it is recorded with what it changed from
+			// (REQ-22). Only where it actually moved: recording somebody again
+			// to add a role would otherwise write a line saying nothing
+			// changed.
+			noteAdminChange(ctx, a, trail.Account, in.Body.Identity,
+				trail.Said("administrator", before.IsAdmin),
+				trail.Said("administrator", in.Body.Admin))
 		}
 		if err := store.Claim(ctx, person.ID, in.Body.Identity); err != nil {
 			return nil, asked(a.Logger, err)

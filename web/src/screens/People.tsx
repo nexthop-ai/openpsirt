@@ -90,6 +90,17 @@ export function People() {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
   });
 
+  // Administration is global rather than granted against a product, so it sits
+  // beside the grid rather than in it (REQ-42). It had no control at all: the
+  // API took it, the screens only ever displayed it, and the only ways to
+  // grant it were the configuration file, a group binding, or calling the API
+  // by hand.
+  const administer = useMutation({
+    mutationFn: async (who: { identity: string; admin: boolean }) =>
+      unwrap(await api.POST("/v1/people", { body: { identity: who.identity, admin: who.admin } })),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+  });
+
   const endSessions = useMutation({
     mutationFn: async (who: { identity: string }) =>
       unwrap(await api.DELETE("/v1/people/{identity}/sessions", { params: { path: who } })),
@@ -255,6 +266,33 @@ export function People() {
                   {openFor === person.identity && (
                     <tr>
                       <td colSpan={5}>
+                        <label
+                          className="hint"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            margin: "2px 0 8px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(person.admin)}
+                            disabled={administer.isPending}
+                            onChange={(event) =>
+                              administer.mutate({
+                                identity: person.identity ?? "",
+                                admin: event.target.checked,
+                              })
+                            }
+                          />
+                          Administers this deployment — people, roles, credentials, settings and the
+                          catalog. Reading and triaging a product are granted below like anybody
+                          else&apos;s.
+                        </label>
+                        {administer.error != null && (
+                          <Failed error={administer.error} what="That could not be changed." />
+                        )}
                         <Access
                           holds={person.holds ?? []}
                           busy={
@@ -367,13 +405,53 @@ export function People() {
 // never carry more than the person does.
 function Credentials() {
   const queries = useQueryClient();
+  const [issuing, setIssuing] = useState(false);
+  const [keyName, setKeyName] = useState("");
+  const [keyProduct, setKeyProduct] = useState("");
+  const [keyStream, setKeyStream] = useState("");
+  const [keyVariant, setKeyVariant] = useState("");
+  const [issued, setIssued] = useState<{ name: string; secret: string } | null>(null);
+
   const keys = useQuery({
     queryKey: ["keys"],
     queryFn: async () => unwrap(await api.GET("/v1/keys", {})),
   });
+  const products = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
+  });
   const tokens = useQuery({
     queryKey: ["tokens"],
     queryFn: async () => unwrap(await api.GET("/v1/people/tokens", {})),
+  });
+
+  // A pipeline's credential. Its own noun and its own lifetime: it belongs to
+  // no person, so nothing about it is withdrawn when somebody leaves.
+  //
+  // The product is required and the release and variant are independent, so
+  // either, both or neither may pin it. A key covering a whole product cannot
+  // imply which release an upload is for, which is why an upload always states
+  // its full target and this only authorizes it.
+  const issueKey = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.POST("/v1/keys", {
+          body: {
+            name: keyName.trim(),
+            product: keyProduct,
+            ...(keyStream.trim() ? { stream: keyStream.trim() } : {}),
+            ...(keyVariant.trim() ? { variant: keyVariant.trim() } : {}),
+          },
+        }),
+      ),
+    onSuccess: (made) => {
+      setIssued({ name: made.item.name ?? "", secret: made.item.secret ?? "" });
+      setKeyName("");
+      setKeyStream("");
+      setKeyVariant("");
+      setIssuing(false);
+      void queries.invalidateQueries({ queryKey: ["keys"] });
+    },
   });
 
   const withdrawKey = useMutation({
@@ -501,9 +579,76 @@ function Credentials() {
         </div>
       )}
 
+      {issued && (
+        <div className="alert info" style={{ marginTop: 10 }}>
+          <strong>Copy it now.</strong>
+          <span>
+            <span className="id">{issued.secret}</span> — this is the only time it is shown. What is
+            stored is a digest, so a secret nobody copied is a key nobody can use.
+          </span>
+          <button
+            type="button"
+            className="linkish"
+            style={{ marginLeft: "auto" }}
+            onClick={() => setIssued(null)}
+          >
+            Done
+          </button>
+        </div>
+      )}
+
       <p className="reading" style={{ marginTop: 10 }}>
         A secret is shown once when it is made and never again. What is stored is a hash.
       </p>
+
+      <button type="button" className="btn" onClick={() => setIssuing(true)}>
+        Create an API key
+      </button>
+
+      <Declare
+        title="Create an API key"
+        open={issuing}
+        onClose={() => setIssuing(false)}
+        onSubmit={() => issueKey.mutate()}
+        error={issueKey.error}
+        busy={keyName.trim() === "" || keyProduct === "" || issueKey.isPending}
+        ok="Create key"
+        hint="For a build pipeline to upload with. It belongs to no person, may only send scans, and can read back only what it sent."
+      >
+        <Field
+          label="Called"
+          value={keyName}
+          onChange={setKeyName}
+          placeholder="nightly-sonic"
+          hint="What an upload records as its sender, and what you withdraw by. It has to be unique."
+        />
+        <label className="field">
+          <span>Product</span>
+          <select value={keyProduct} onChange={(event) => setKeyProduct(event.target.value)}>
+            <option value="">Choose a product</option>
+            {(products.data?.items ?? []).map((each) => (
+              <option key={each.name} value={each.name ?? ""}>
+                {each.display_name || each.name}
+              </option>
+            ))}
+          </select>
+          <span className="hint">Always required. A key is scoped to one product.</span>
+        </label>
+        <Field
+          label="Branch or tag"
+          value={keyStream}
+          onChange={setKeyStream}
+          placeholder="master"
+          hint="Optional. Leave it empty and the key may send for any branch or tag."
+        />
+        <Field
+          label="Variant"
+          value={keyVariant}
+          onChange={setKeyVariant}
+          placeholder="broadcom"
+          hint="Optional. Leave it empty and the key may send for any variant."
+        />
+      </Declare>
     </div>
   );
 }

@@ -193,6 +193,7 @@ function Tokens() {
   const queries = useQueryClient();
   const [name, setName] = useState("");
   const [count, setCount] = useState(30);
+  const [product, setProduct] = useState("");
   const [unit, setUnit] = useState<Unit>("days");
   const [minted, setMinted] = useState<{ name: string; secret: string } | null>(null);
 
@@ -200,16 +201,31 @@ function Tokens() {
     queryKey: ["tokens"],
     queryFn: async () => unwrap(await api.GET("/v1/tokens", {})),
   });
+  // What this person may narrow a token to. Only what they can already read is
+  // listed, because narrowing intersects: a token pinned to something its
+  // owner cannot reach is a token that reaches nothing.
+  const products = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
+  });
   const mint = useMutation({
     mutationFn: async () =>
       unwrap(
         await api.POST("/v1/tokens", {
-          body: { name: name.trim(), lifetime: write(count, unit) },
+          body: {
+            name: name.trim(),
+            lifetime: write(count, unit),
+            // Empty means it reaches whatever its owner reaches. Narrowing
+            // intersects rather than adds, so naming a product its owner
+            // cannot read reaches nothing.
+            ...(product ? { product } : {}),
+          },
         }),
       ),
     onSuccess: (made) => {
       setMinted({ name: made.name ?? "", secret: made.secret ?? "" });
       setName("");
+      setProduct("");
       void queries.invalidateQueries({ queryKey: ["tokens"] });
     },
   });
@@ -226,7 +242,8 @@ function Tokens() {
       <p className="reading" style={{ marginBottom: 8 }}>
         For scripts of your own. A token is a live reference to you rather than a copy of what you
         could do when it was made, so what it reaches shrinks the moment your roles do — and it
-        never carries more than you do.
+        never carries more than you do. Narrow one to a single product where a script only needs
+        that much.
       </p>
 
       {minted && (
@@ -259,6 +276,7 @@ function Tokens() {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Reaches</th>
                 <th>Expires</th>
                 <th>Last used</th>
                 <th />
@@ -266,20 +284,37 @@ function Tokens() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.name} className="row">
+                // A withdrawn token is kept and dimmed rather than removed, so
+                // what used it stays answerable — and so that withdrawing is
+                // visibly something rather than a button that appears to do
+                // nothing.
+                <tr key={row.name} className="row" style={{ opacity: row.withdrawn ? 0.55 : 1 }}>
                   <td className="id">{row.name}</td>
+                  <td>
+                    {row.product ? (
+                      <>
+                        <span className="id">{row.product}</span> <span className="hint">only</span>
+                      </>
+                    ) : (
+                      <span className="hint">whatever you can reach</span>
+                    )}
+                  </td>
                   <td className="hint">{on(row.expires_at) ?? "—"}</td>
                   <td className="hint">{on(row.last_used_at) ?? "never"}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="linkish"
-                      style={{ color: "var(--muted)" }}
-                      disabled={withdraw.isPending}
-                      onClick={() => withdraw.mutate(row.name ?? "")}
-                    >
-                      Withdraw
-                    </button>
+                    {row.withdrawn ? (
+                      <span style={{ color: "var(--faint)" }}>withdrawn</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="linkish"
+                        style={{ color: "var(--muted)" }}
+                        disabled={withdraw.isPending}
+                        onClick={() => withdraw.mutate(row.name ?? "")}
+                      >
+                        Withdraw
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -324,6 +359,23 @@ function Tokens() {
               ))}
             </select>
           </div>
+        </label>
+        <label className="field" style={{ margin: 0 }}>
+          <span>Reaches</span>
+          <select
+            aria-label="What the token may reach"
+            {...notACredential}
+            style={{ width: "auto" }}
+            value={product}
+            onChange={(event) => setProduct(event.target.value)}
+          >
+            <option value="">Whatever you can reach</option>
+            {(products.data?.items ?? []).map((each) => (
+              <option key={each.name} value={each.name ?? ""}>
+                {each.display_name || each.name} only
+              </option>
+            ))}
+          </select>
         </label>
         <button
           type="button"
