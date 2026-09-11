@@ -92,10 +92,9 @@ func (a ClaimsApplied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 
 // a claim the build no longer argues is a claim the build withdrew — and that
 // reading only holds where the build had somewhere to argue it. An inventory
 // in a format that cannot attach a claim to a component says nothing about
-// carried patches whether or not the patches are still carried (REQ-77), so
-// a product moving from one format to the other would otherwise close every
-// claim it had at once and reopen every finding they suppressed, with nothing
-// saying why.
+// carried patches whether or not the patches are still carried, so a product
+// moving from one format to the other would otherwise close every claim it had
+// at once and reopen every finding they suppressed, with nothing saying why.
 func (s *Store) RecordClaims(ctx context.Context, targetID, scanID int64, claims []sbom.Suppression, stated map[sbom.Origin]bool) (ClaimsApplied, error) {
 	var applied ClaimsApplied
 

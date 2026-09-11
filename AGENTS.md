@@ -208,6 +208,39 @@ Documentation is not governed by this. A design document is as long as its
 subject, and splits when it covers two subjects rather than when it reaches a
 length.
 
+## What is a decision, and what is only true
+
+`REQUIREMENTS.md` records choices somebody made and could have made differently.
+Most of what gets learned while building is not that: it is what a format, an
+engine or a protocol turned out to require, and nobody chose it. That is real
+and it has to be written down — **in a design document, which is where how
+something works is recorded**. Putting it in the decisions table makes a table
+of judgments into a table of facts, and the judgments stop being findable.
+
+**The test is whether somebody could disagree.** A person can disagree that
+attachments belong outside the database, or that four database engines are worth
+supporting. Nobody can disagree that one format has no way to say which
+vulnerability a patch resolves — that is the format, and the only decision
+nearby is what to do about it.
+
+| A decision | What is only true, or only detail |
+|---|---|
+| Attachments are kept outside the database, in no public bucket, and every fetch is authorized before any address is issued | Which scheme an endpoint may use, and the name of the setting that changes it |
+| Inventories are read from build pipelines, one adapter per producer, in these formats | How a reader is picked, which key a version is declared in, what a lifecycle scope of `test` places |
+| Identity is derived from content rather than what a file supplies | Which columns the hash is taken over |
+
+**Say it in one plain sentence.** A row that needs a paragraph is usually two
+things, or a mechanism wearing a decision's clothes. It is prose a person reads
+years later to find out whether a choice still holds, so it is written the way
+the rest of these documents are — plainly, no contractions, and without naming a
+variable, a key path, a function or a version of somebody else's specification.
+Reach for any of those and the row belongs in a design document instead.
+
+**Adding one is the owner's call.** A decision is a commitment the project is
+held to, and one that arrives as a side effect of building something is a
+commitment nobody made. Propose it; do not append it. Removing one is the same
+conversation in reverse.
+
 ## Decision identifiers
 
 **Keep rows sorted by identifier within each table.** Adding a decision next to

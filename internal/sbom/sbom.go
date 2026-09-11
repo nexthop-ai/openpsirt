@@ -137,7 +137,7 @@ const (
 )
 
 // StatesCarriedPatches reports whether an inventory in this format can say
-// which vulnerability a patch the build carries resolves (REQ-77).
+// which vulnerability a patch the build carries resolves.
 //
 // CycloneDX attaches the claim to the component it is about. SPDX can say a
 // file is a patch for a package and cannot say what the patch fixes, so an
