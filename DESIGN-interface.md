@@ -436,6 +436,10 @@ its own order rather than refusing.
 | The tie-break is always the same pair of identifiers | Two rows equal on the sorted column do not swap between pages and drop one while repeating another |
 | A page size of fifty, a hundred or two hundred, kept in the address | Fifty is 153 pages of one product's findings |
 | A row is selected by what it is, not by where it sits | The list is read again after every decision and on every page, so an index would select a different row each time. That also makes a selection survive paging, which is what "a filtered set" means when the filter matches more than a page |
+| **The row is carried with its key** | Acting on a selection then acts on what was selected rather than on the part of it the current page happens to hold. Holding keys alone, the queue counted every ticked claim in its button and approved only the ones on screen, dropping the rest with no message |
+| **Changing the question clears the selection** | A selection is made out of a population, so replacing the population replaces what was selected. Kept across a filter change, the bar went on counting rows chosen under one question while none of them was listed — and acting wrote against all of them |
+| **Select-all and deselect-all are inverses** | Ticking the header box took this page and unticking it took every page, so the two did different amounts of work in opposite directions |
+| **A loop over a selection survives a refusal** | Each row is its own act, so one refusal leaves the rest to be tried and the failures stay selected with a count saying how many. Unguarded, the first refusal abandoned everything after it, left the selection reading its original size, and skipped the control that undoes what did land |
 | Searching is submitted rather than sent per keystroke | Each is a query over every open finding in the build, and a half-typed word is not a question worth asking. It matches anywhere in a component's name, ignoring capitals |
 | A component's name opens the component (reversed) | It narrowed the list, and the component itself sat behind a small "Open →" in the last column next to "Hide" — an act parked away from the thing it acts on, which is the shape the By fix view was deleted for. The name is the way to the thing; narrowing and hiding are the two small acts beside it, and they sit together. The same name on the finding screen opens the same screen, so one word means one thing everywhere it appears |
 
@@ -723,11 +727,24 @@ agree, send it back, hold rows back, and say where the work is happening.
 | **A decision's address resolves here** | Notifications, the record, the reports and the evidence list all name a decision by identifier. Each of those is somebody being sent to read what was decided, and what was decided belongs to the claim. The address is replaced rather than pushed, so going back does not land on it again |
 | **Reaffirming is not here** | It is a claim about one place in one build, and this screen is about an argument that may cover many. It happens on the finding, where the places are |
 
-**Revising and withdrawing are the author's, agreeing and sending back are
-somebody else's**, and neither set is drawn to the person who cannot use it —
-offering a button that would refuse somebody is worse than offering nothing.
-Holding rows back is drawn only on a bulk claim that still has outliers,
-because it is the author's side of the choice an approver already has.
+**Which acts are offered follows the act-and-needs table in
+`DESIGN-triage.md`**, rather than being restated here: offering a button that
+would refuse somebody is worse than offering nothing, and a second copy of the
+rule is a copy that disagrees. It said revising and withdrawing were the
+author's, where the rule and the code both ask for triage on the product at
+the finding's visibility — so a triager reading a colleague's stale claim had
+no way to revise it on this screen and every way to do it from the finding.
+
+The one thing drawn narrower than the rule is holding rows back, which is
+offered only on a bulk claim that still has outliers, because it is the
+author's side of the choice an approver already has.
+
+**A screen asks what it may do rather than working it out from roles.** That
+is what the capability answer is for, and it is only usable as a gate while it
+means what the operation accepts: agreeing was reported from the approver
+capability alone while the operation accepts a triager too, so a two-person
+team where neither holds the capability — the ordinary shape of a small team —
+was shown a claim, its reasoning and its history with no way to answer it.
 
 ## Assignments and routing rules
 

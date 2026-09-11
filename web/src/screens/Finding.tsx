@@ -807,10 +807,18 @@ export function Finding() {
         )}
         <Attachments about={{ product, vulnerability }} admin={!!who.data?.admin} />
 
+        {/* Whether it has been announced, which decides which people the
+            picker is allowed to offer. It was handed `recorded` — whether a
+            person entered it rather than a scanner — so an embargoed finding
+            a scanner reported offered readers of disclosed work, whom the
+            server then refuses, and a disclosed flaw somebody recorded asked
+            for undisclosed readers and came back empty to anybody holding
+            only public triage. Two fields on one object, one letter apart in
+            meaning. */}
         <Assignee
           at={at}
           assigned={it.assigned_to ?? ""}
-          undisclosed={!!it.recorded}
+          undisclosed={!!it.undisclosed}
           routedBy={it.routed_by ?? ""}
         />
 

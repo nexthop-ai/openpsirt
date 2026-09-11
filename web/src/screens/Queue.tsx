@@ -34,12 +34,20 @@ export function Queue() {
   // and shown, or said to be missing — a link that lands on the queue with
   // nothing marked leaves somebody hunting through cards for the one meant.
   const wanted = Number(params.get("claim") ?? 0);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  // The claim beside its key, not the key alone. A selection deliberately
+  // survives paging — a row is selected by what it is rather than by where it
+  // sits — and the loop that acted on it filtered the current page, so
+  // everything ticked on an earlier page was counted in the button and
+  // silently never approved.
+  const [picked, setPicked] = useState<Map<string, Claim>>(new Map());
   const [batch, setBatch] = useState("");
   // The batch just agreed to, which is the only one there is a safe control
   // for: undoing one named at some point in the past is a control nobody can
   // use without knowing what is in it.
   const [justDone, setJustDone] = useState("");
+  // How many of a batch were refused, so a partial result says so rather than
+  // leaving somebody to compare counts.
+  const [refused, setRefused] = useState(0);
   const approveClaim = useApproveClaim();
   const queries = useQueryClient();
   const undo = useMutation({
@@ -145,17 +153,45 @@ export function Queue() {
 
   async function approvePicked() {
     // Sequential rather than parallel: each is a separate claim and a refusal
-    // on one should not decide the fate of the rest.
+    // on one should not decide the fate of the rest — which is what the loop
+    // said and did not do. An unguarded await abandoned every claim after the
+    // first refusal, left the selection reading its original size, and never
+    // set the batch name, so the undo control for the approvals that did land
+    // never appeared.
     const named = batch.trim();
-    for (const claim of claims.filter((c) => picked.has(c.key))) {
-      await approveClaim.mutateAsync({ id: claim.id, batch: named || undefined });
+    const failed: string[] = [];
+    let landed = 0;
+    for (const [key, claim] of picked) {
+      try {
+        await approveClaim.mutateAsync({ id: claim.id, batch: named || undefined });
+        landed++;
+      } catch {
+        failed.push(key);
+      }
     }
-    setPicked(new Set());
+    // Kept from the current selection rather than from the snapshot this loop
+    // started with, so anything ticked while it ran survives.
+    setPicked((prev) => {
+      const left = new Map<string, Claim>();
+      for (const [key, claim] of prev) {
+        if (failed.includes(key) || !claims.some((c) => c.key === key)) {
+          left.set(key, claim);
+        }
+      }
+      for (const key of failed) {
+        const held = picked.get(key);
+        if (held) left.set(key, held);
+      }
+      return left;
+    });
+    setRefused(failed.length);
     // What was just agreed to under one name, so it can be taken back
     // without remembering the name. The control the queue already promised:
     // "approvals under one batch name can be undone together" said so and
     // there was nowhere to do it.
-    if (named) setJustDone(named);
+    // Whenever at least one landed, which is the moment somebody notices —
+    // not only when every one of them did.
+    if (named && landed > 0) setJustDone(named);
   }
 
   return (
@@ -237,10 +273,18 @@ export function Queue() {
           <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
             <input
               type="checkbox"
-              checked={picked.size > 0 && picked.size === claims.length}
-              onChange={(event) =>
-                setPicked(event.target.checked ? new Set(claims.map((c) => c.key)) : new Set())
-              }
+              checked={claims.length > 0 && claims.every((c) => picked.has(c.key))}
+              onChange={(event) => {
+                // This page either way, so ticking and unticking are
+                // inverses. Unticking cleared every page's selection where
+                // ticking added only this one's.
+                const next = new Map(picked);
+                for (const claim of claims) {
+                  if (event.target.checked) next.set(claim.key, claim);
+                  else next.delete(claim.key);
+                }
+                setPicked(next);
+              }}
               aria-label="Select every claim shown"
             />
             <b>{picked.size === 0 ? "Nothing selected" : `${picked.size} selected`}</b>
@@ -267,6 +311,13 @@ export function Queue() {
         </div>
       )}
 
+      {refused > 0 && (
+        <p className="alert" role="status">
+          {refused === 1
+            ? "One claim could not be agreed to and is still selected."
+            : `${refused.toLocaleString()} claims could not be agreed to and are still selected.`}
+        </p>
+      )}
       {approveClaim.error != null && (
         <Failed error={approveClaim.error} what="That could not be approved." />
       )}
@@ -316,8 +367,8 @@ export function Queue() {
               marked={claim.id === wanted}
               picked={picked.has(claim.key)}
               onPick={(on) => {
-                const next = new Set(picked);
-                if (on) next.add(claim.key);
+                const next = new Map(picked);
+                if (on) next.set(claim.key, claim);
                 else next.delete(claim.key);
                 setPicked(next);
               }}

@@ -32,7 +32,7 @@ type CanBody struct {
 	MayTriage bool   `json:"may_triage" doc:"Argue about a finding"`
 	MayAssign bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
 	MayHide   bool   `json:"may_hide" doc:"Argue about a finding nobody has disclosed"`
-	MayAgree  bool   `json:"may_agree" doc:"Agree to somebody else's claim"`
+	MayAgree  bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
 }
 
 // WhoBody is the caller, as the caller.
@@ -146,7 +146,13 @@ func registerWhoAmI(api huma.API, in Ingest) {
 				MayAssign: triages && subject.Holds(access.Assigner, product.ID),
 				MayTriage: triages,
 				MayHide:   subject.Holds(access.PrivateTriage, product.ID),
-				MayAgree:  subject.Holds(access.Approver, product.ID),
+				// The capability, or a triage role — which is what the
+				// operation accepts, and what makes a two-person team where
+				// neither holds the capability able to review at all. Asked
+				// of the capability alone, a screen drawing its controls
+				// from this hid approve and reject from somebody the server
+				// would have accepted, with nothing saying why.
+				MayAgree: subject.Holds(access.Approver, product.ID) || triages,
 			})
 		}
 		sort.Slice(body.Reach, func(i, j int) bool {

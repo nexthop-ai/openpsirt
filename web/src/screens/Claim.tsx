@@ -105,7 +105,7 @@ export function Claim({ who }: { who: Who }) {
       </div>
 
       <Argument claim={it} id={id} onChanged={again} />
-      <Reasoning claim={it} mine={mine} about={about} onChanged={again} />
+      <Reasoning claim={it} about={about} onChanged={again} />
       <Answer claim={it} mine={mine} onAnswered={again} />
       <HoldBack claim={it} mine={mine} onHeld={again} />
       <Revisions claimId={id} />
@@ -300,18 +300,25 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
   );
 }
 
-// The reasoning as it stands, and the two acts its author has.
+// The reasoning as it stands, and the two acts anybody who may argue about it
+// has.
+//
+// **Not the author's alone.** The server asks whether the subject may decide
+// about each row of the claim and nothing about who wrote it, which is what
+// the act-and-needs table says: propose, revise and withdraw all ask for
+// triage on the product at the finding's visibility. Gated on authorship
+// here, a triager reading a colleague's stale claim had no way to revise or
+// withdraw it on this screen and every way to do it from the finding — the
+// same person, the same claim, two answers.
 //
 // Revising keeps the old words readable, takes back the approval given for
 // them, and returns the claim to the queue. Withdrawing needs nobody.
 function Reasoning({
   claim,
-  mine,
   about,
   onChanged,
 }: {
   claim: Claimed;
-  mine: boolean;
   about: { product: string; vulnerability: string };
   onChanged: () => void;
 }) {
@@ -382,7 +389,7 @@ function Reasoning({
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That could not be withdrawn." />
       )}
-      {mine && standing && !editing && (
+      {standing && !editing && (
         <div className="actions" style={{ marginTop: 12 }}>
           <button
             type="button"

@@ -4461,7 +4461,7 @@ export interface components {
             upstream: string;
         };
         CanBody: {
-            /** @description Agree to somebody else's claim */
+            /** @description Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
             may_agree: boolean;
             /** @description Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage */
             may_assign: boolean;

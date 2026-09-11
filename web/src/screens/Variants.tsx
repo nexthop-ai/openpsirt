@@ -150,10 +150,13 @@ export function Variants() {
         ok="Add variant"
         hint="Declared once per product rather than per release. Somebody made to retype it will eventually retype it differently, and win, windows and win32 across three releases are three sets of findings with nothing saying they belong together."
       >
-        <div className="field">
-          <label>Product</label>
+        {/* The label wraps the input, as every other field here does. Beside
+            it with no htmlFor and no id, a screen reader announced a text
+            field with no name at all. */}
+        <label className="field">
+          <span>Product</span>
           <input {...notACredential} type="text" value={product} disabled />
-        </div>
+        </label>
         <Field
           label="Name"
           value={name}

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useSyncExternalStore } from "react";
+import { Suspense, lazy, useEffect, useSyncExternalStore } from "react";
 import { Loading } from "../ui/Loading";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useWho } from "./session";
@@ -64,7 +64,12 @@ export function App() {
   // one place that knows who is signed in and every screen below it takes the
   // answer for granted. Nobody recognized means no drafts are kept at all
   // rather than drafts kept under nobody's name.
-  belongTo(who.data?.identity);
+  //
+  // In an effect rather than in the render body: a render that is thrown away
+  // still leaves a write behind, which is harmless while the value is the
+  // session's own identity and is the shape that stops being harmless the
+  // moment it depends on anything a discarded render computed.
+  useEffect(() => belongTo(who.data?.identity), [who.data?.identity]);
 
   if (who.isPending) return <Waiting />;
 

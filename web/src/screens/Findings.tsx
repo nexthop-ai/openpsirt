@@ -117,7 +117,15 @@ export function Findings() {
   const variant = builtAs || params.get("variant") || "";
   const oneBuild = Boolean(stream && variant);
   // What the server needs to know about the selection, beside the filters.
-  const selection = { ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) };
+  //
+  // Held rather than rebuilt each render, so the memo below it does not
+  // recompute every time — and so the interface's own lint count stays the
+  // honest measure the config says it is: nine warnings of one pattern, and
+  // not a tenth of another nobody had accounted for.
+  const selection = useMemo(
+    () => ({ ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) }),
+    [stream, variant],
+  );
   const navigate = useNavigate();
   const offset = Number(params.get("offset") ?? 0);
   const page = pageSize(params);
@@ -189,13 +197,12 @@ export function Findings() {
         title={`Order by ${label.toLowerCase()}`}
         onClick={() => {
           const next = new URLSearchParams(params);
-          next.delete("offset");
           if (on && !ascending) next.set("asc", "yes");
           else {
             next.set("sort", key);
             next.delete("asc");
           }
-          setParams(next);
+          asking(next);
         }}
       >
         {label}
@@ -311,12 +318,27 @@ export function Findings() {
     };
   }
 
+  // Every change to the question the list is asking goes through here, which
+  // is what makes clearing the selection one line rather than four.
+  //
+  // **A selection is made out of a population**, so replacing the population
+  // replaces what was selected: a triager filtering to low, ticking thirty
+  // rows and then clicking critical had a bar still saying thirty while four
+  // rows were listed — and handing them over wrote assignments for
+  // twenty-six rows nobody could see. The saved-filter path already said this
+  // and cleared; nothing else did.
+  function asking(next: URLSearchParams) {
+    next.delete("offset");
+    setPicked(new Map());
+    setHandFailed(0);
+    setParams(next);
+  }
+
   function set(key: string, value: string) {
     const next = new URLSearchParams(asked);
     if (value) next.set(key, value);
     else next.delete(key);
-    next.delete("offset");
-    setParams(next);
+    asking(next);
   }
 
   // Several values of one filter, which the address carries as the parameter
@@ -326,8 +348,7 @@ export function Findings() {
     const next = new URLSearchParams(asked);
     next.delete(key);
     for (const value of values) next.append(key, value);
-    next.delete("offset");
-    setParams(next);
+    asking(next);
   }
 
   function hide(component: string) {
@@ -648,7 +669,9 @@ export function Findings() {
     // of a selection handed over and the rest not, and saying nothing about
     // that is worse than either outcome.
     const failed: string[] = [];
+    const handled: string[] = [];
     for (const [key, row] of picked) {
+      handled.push(key);
       try {
         await hand.mutateAsync({ row, who, team });
       } catch {
@@ -659,7 +682,18 @@ export function Findings() {
     // each of them, so a long selection spent its time refetching.
     void queries.invalidateQueries({ queryKey: ["findings"] });
     void queries.invalidateQueries({ queryKey: ["holdings"] });
-    setPicked(new Map(failed.map((key) => [key, picked.get(key)!])));
+    // What is selected *now*, minus what went through. Written from the
+    // snapshot the loop began with, anything ticked while it ran — eight
+    // seconds for fifty rows, with the checkboxes live throughout — was
+    // discarded and the count dropped with nothing explaining it.
+    const sent = new Set(failed);
+    setPicked((prev) => {
+      const left = new Map(prev);
+      for (const key of handled) {
+        if (!sent.has(key)) left.delete(key);
+      }
+      return left;
+    });
     setHanding("");
     setHandFailed(failed.length);
   }
