@@ -199,7 +199,7 @@ DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
 
 all: check build
 
@@ -470,7 +470,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved confined attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
+check: build vet lint unreachable unclaimed reserved confined granted attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -575,6 +575,13 @@ reserved:
 # and widening one without the other is what fails.
 confined:
 	$(GO) run ./internal/tools/confined
+
+# That no query outside the access package asks one grant table and not the
+# other. A role is held against one product or across every product, and a
+# predicate seeing only the first answers no for somebody who holds the second —
+# which compiles, passes, and refuses them.
+granted:
+	$(GO) run ./internal/tools/granted
 
 # A doc comment describing something other than what it sits on, which is what
 # a file split leaves behind and what nothing else here can see: the code is
