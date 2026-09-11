@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
+import { linkable } from "../ui/addressable";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 
@@ -19,6 +20,25 @@ import { UNPLACED, type Sitting } from "../ui/Covering";
 // component and what directly pulled it in, which is what a decision is
 // recorded against.
 const CHAINS = 6;
+
+// Away is an address somebody else supplied, shown as a link only where it is
+// one this deployment is willing to send a reader to.
+//
+// A scanner's references and a feed's records are strings from outside, and a
+// string in an href is a scheme the browser acts on rather than encoded
+// output. What fails the check is still shown — losing the address would lose
+// the evidence — it is simply not clickable.
+function Away({ url }: { url?: string }) {
+  const href = linkable(url);
+  if (!href) {
+    return <span className="id">{url}</span>;
+  }
+  return (
+    <a href={href} target="_blank" rel="noreferrer noopener">
+      {href.replace(/^https?:\/\//, "")}
+    </a>
+  );
+}
 
 export function Places({ places, build }: { places: Sitting[]; build: string }) {
   const [all, setAll] = useState(false);
@@ -119,9 +139,7 @@ export function References({
         {sorted.slice(0, 12).map((ref) => (
           <li key={ref.url}>
             <span className={ref.kind === "patch" ? "kind patch" : "kind"}>{ref.kind}</span>{" "}
-            <a href={ref.url} target="_blank" rel="noreferrer noopener">
-              {(ref.url ?? "").replace(/^https?:\/\//, "")}
-            </a>
+            <Away url={ref.url} />
           </li>
         ))}
       </ul>
@@ -190,12 +208,9 @@ export function HowMatched({
       )}
       {from && (
         <p className="hint">
-          The data behind it came from{" "}
-          <a href={from} target="_blank" rel="noreferrer noopener">
-            {from.replace(/^https?:\/\//, "")}
-          </a>
-          , which is not always where the issue is written up: one issue reached through two
-          ecosystems has two answers and the issue itself can hold one.
+          The data behind it came from <Away url={from} />, which is not always where the issue is
+          written up: one issue reached through two ecosystems has two answers and the issue itself
+          can hold one.
         </p>
       )}
     </div>
@@ -217,10 +232,7 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
       <ul className="refs">
         {links.map((link) => (
           <li key={link.url}>
-            <span className="kind">{link.name}</span>{" "}
-            <a href={link.url} target="_blank" rel="noreferrer noopener">
-              {(link.url ?? "").replace(/^https?:\/\//, "")}
-            </a>
+            <span className="kind">{link.name}</span> <Away url={link.url} />
           </li>
         ))}
       </ul>

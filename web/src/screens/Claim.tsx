@@ -10,6 +10,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
+import { linkable } from "../ui/addressable";
 import { useRevise, useWithdraw } from "../api/mutations";
 import { useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
 import { Comments, Revisions } from "./FindingClaim";
@@ -261,9 +262,21 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
       {where ? (
         <>
           Being worked on at{" "}
-          <a href={where} target="_blank" rel="noreferrer noopener" className="linkish">
-            {where}
-          </a>
+          {/* Typed here rather than supplied by a scanner, and still a string
+              that becomes somewhere to click — so it is judged the same way a
+              scanner's reference is. What fails is shown and not linked. */}
+          {linkable(where) ? (
+            <a
+              href={linkable(where)!}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="linkish"
+            >
+              {where}
+            </a>
+          ) : (
+            <span className="id">{where}</span>
+          )}
           {". "}
         </>
       ) : (

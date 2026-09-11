@@ -22,16 +22,41 @@ describe("drafts", () => {
     expect(restore("revise:7")).toBe("");
   });
 
-  it("does not hand one person's draft to another", () => {
+  it("takes away what belongs to somebody else", () => {
     // The control that covers a session which quietly expired rather than
     // being signed out of. Same browser, same screen, different person.
+    //
+    // The identity in the key stopped Ana's text being read back into Ben's
+    // form; it did not stop the text being in the storage, which outlives
+    // every session and needs no credential to read. So somebody signing in
+    // takes away what is not theirs, and Ana's draft does not come back when
+    // she does.
     belongTo("oidc:ana");
     keep("revise:7", "what Ana was writing");
     belongTo("oidc:ben");
     expect(restore("revise:7")).toBe("");
-    // And Ana still has hers when she comes back.
     belongTo("oidc:ana");
-    expect(restore("revise:7")).toBe("what Ana was writing");
+    expect(restore("revise:7")).toBe("");
+  });
+
+  it("forgets a draft nobody came back to", () => {
+    // Browser storage outlives every session, so text about an undisclosed
+    // finding written on a shared machine sat there for whoever opened the
+    // tools next. A draft has an age now.
+    belongTo("oidc:ana");
+    keep("revise:7", "started before the meeting");
+    const key = "openpsirt.draft.oidc:ana:revise:7";
+    const held = JSON.parse(window.localStorage.getItem(key)!) as {
+      text: string;
+      at: number;
+    };
+    // Two days ago, which is past the window.
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ text: held.text, at: held.at - 48 * 60 * 60 * 1000 }),
+    );
+    expect(restore("revise:7")).toBe("");
+    expect(window.localStorage.getItem(key)).toBeNull();
   });
 
   it("clears one draft when its text has been accepted", () => {

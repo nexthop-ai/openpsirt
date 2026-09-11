@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
+import { linkable } from "../ui/addressable";
 import { useComment, useEditComment, useRevise, useWithdraw } from "../api/mutations";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
@@ -351,14 +352,20 @@ export function Standing({
         {summary?.elsewhere ? (
           <>
             Being worked on at{" "}
-            <a
-              href={summary.elsewhere}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="linkish"
-            >
-              {summary.elsewhere}
-            </a>
+            {/* Judged before it is somewhere to click, like every other
+                address that was somebody's text. */}
+            {linkable(summary.elsewhere) ? (
+              <a
+                href={linkable(summary.elsewhere)!}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="linkish"
+              >
+                {summary.elsewhere}
+              </a>
+            ) : (
+              <span className="id">{summary.elsewhere}</span>
+            )}
             {". "}
           </>
         ) : (

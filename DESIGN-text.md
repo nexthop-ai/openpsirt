@@ -21,19 +21,33 @@ Satisfies REQ-65, REQ-66, REQ-67, REQ-69.
 
 ## Policy and sanitizing
 
-Two controls, kept apart.
+Two controls, kept apart, and they run in two different places.
 
 | | Runs | Covers |
 |---|---|---|
 | Policy | Once, on the server, at submission, before storage | What is permitted, which links survive, what each reference resolves to |
-| Sanitizing | Every time the text is rendered | Text stored before a rule existed |
+| Sanitizing | Wherever the text is rendered, which is not here | Text stored before a rule existed |
 
-Both run. Policy needs data and authorization checks no client holds. Sanitizing
-covers stored text, because a sanitizer improved next year does nothing for
-markup already in the database.
+Policy needs data and authorization checks no client holds, so it is the
+server's. Sanitizing travels with rendering, and **nothing on the server
+renders**: the API returns the source as its only representation, and mail is
+sent as plain text. The interface sanitizes what it renders, and an integrator
+rendering this markdown sanitizes what they render.
 
-The source is stored; rendered markup never is. The same text reaches a browser,
-an email and an export.
+**A sanitizer was written here and never called.** Its policy, its language
+allowlist and its time bound sat behind an entry point no running code
+reached, so a rule improved in it next year would change nothing for anybody —
+while this document said it ran on every render, which is the shape a reviewer
+ticks. It is gone, and what is written here is what happens.
+
+**What that costs, stated rather than glossed:** text stored under an older
+submission policy is served as source, so a rule written after it was stored
+is applied by whoever renders it and by nobody else. For the interface that is
+the interface's own sanitizer, which is current. For an integrator it is
+theirs, which is why the API says so.
+
+The source is stored; rendered markup never is. The same text reaches a
+browser, an email and an export.
 
 ## Raw markup
 
@@ -116,24 +130,27 @@ Markdown is what an integrating application can most easily lay out, and it read
 as plain text as it stands. HTML assumes a browser, which most callers of an
 API-first tool are not.
 
-The server renders for an email's HTML part, which has no client to render for
-it. It does not render for a reader on the way out of the API.
+Mail is plain text, so nothing renders there either. An HTML part is the case
+that would need a renderer on the server, and it is not built.
 
-Sanitizing travels with rendering: for the interface that is the browser, for an
-email it is here. An integrator rendering this markdown sanitizes what they
-render. A rendering that fails is the renderer's problem, since the source is
-authoritative.
+Sanitizing travels with rendering, and every renderer is somebody else's: the
+interface for a browser, an integrator for their own application. A rendering
+that fails is the renderer's problem, since the source is authoritative.
 
 ## Rendered and escaped text
 
 | Origin | Treatment |
 |---|---|
 | Typed into this tool | Passes the submission policy and is rendered as markdown |
-| Supplied by a scan file | Escaped and displayed as written, never rendered (REQ-66) |
+| Supplied by a scan file | Shown as written, never rendered (REQ-66) |
 
 Both live in the same column, so the origin decides. Rendering the column would
 hand whoever wrote the scan file a formatting language aimed at the browsers of
 the people holding the most access in this deployment.
+
+Escaping, like sanitizing, happens where the text is put into a document —
+which is the interface, not here. What the server guarantees is that the two
+origins stay distinguishable, so a renderer can tell which it is holding.
 
 ## Refusals
 
