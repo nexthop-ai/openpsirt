@@ -14,6 +14,7 @@ func (c Config) Limits() sbom.Limits {
 		MaxBytes:      int64(c.IngestMaxBytes),
 		MaxComponents: c.IngestMaxComponents,
 		MaxEdges:      c.IngestMaxEdges,
+		MaxFiles:      c.IngestMaxFiles,
 		MaxStatements: c.IngestMaxStatements,
 		MaxDepth:      c.IngestMaxDepth,
 	}

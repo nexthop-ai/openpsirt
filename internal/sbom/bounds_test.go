@@ -17,7 +17,7 @@ func held(t *testing.T, body string, units int) float64 {
 	runtime.GC()
 	runtime.ReadMemStats(&before)
 	doc, err := sbom.Read(strings.NewReader(body), sbom.Limits{
-		MaxEdges: units * 2, MaxComponents: units * 2,
+		MaxEdges: units * 2, MaxComponents: units * 2, MaxFiles: units * 2,
 	}.OrDefault())
 	if err != nil {
 		t.Fatal(err)
@@ -41,6 +41,7 @@ func TestTheCeilingsAreSetFromWhatReadingActuallyCosts(t *testing.T) {
 	// which is what would quietly put the ceiling back where it was.
 	const perEdge = 2048
 	const perComponent = 4096
+	const perFile = 1024
 
 	t.Run("an edge", func(t *testing.T) {
 		const edges = 200_000
@@ -70,6 +71,34 @@ func TestTheCeilingsAreSetFromWhatReadingActuallyCosts(t *testing.T) {
 			t.Errorf("an edge costs %.0f bytes of heap, over the %d this ceiling was set "+
 				"against — the ceiling now permits %.0f MB", cost, perEdge,
 				cost*float64(sbom.DefaultLimits().MaxEdges)/(1<<20))
+		}
+	})
+
+	t.Run("a cataloged path", func(t *testing.T) {
+		// Bounded apart from components because a real document holds forty-
+		// five to fifty-six of them per package, and because a file is only
+		// the identifier — kept so an edge naming it is dropped knowingly —
+		// where a component is a described thing. The higher ceiling is only
+		// affordable while that stays true.
+		const files = 50_000
+		var b strings.Builder
+		b.WriteString(`{"spdxVersion":"SPDX-2.3","documentNamespace":"https://example.invalid/f","files":[`)
+		for i := 0; i < files; i++ {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			fmt.Fprintf(&b, `{"SPDXID":"SPDXRef-File-path-%d","fileName":"usr/share/doc/package/file-%d"}`, i, i)
+		}
+		b.WriteString(`]}`)
+
+		cost := held(t, b.String(), files)
+		t.Logf("%.0f bytes of heap per cataloged path; the ceiling of %d permits %.0f MB",
+			cost, sbom.DefaultLimits().MaxFiles,
+			cost*float64(sbom.DefaultLimits().MaxFiles)/(1<<20))
+		if cost > perFile {
+			t.Errorf("a cataloged path costs %.0f bytes of heap, over the %d this ceiling was "+
+				"set against — the ceiling now permits %.0f MB", cost, perFile,
+				cost*float64(sbom.DefaultLimits().MaxFiles)/(1<<20))
 		}
 	})
 

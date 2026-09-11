@@ -3,14 +3,25 @@ package sbom
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
-// vocabularies are the formats read, in the order a document is tried against.
+// vocabulary is one format's reading of a document's top-level keys.
 //
-// Each one owns a set of top-level keys and nothing else knows them. Adding a
-// format is a table and the handlers it names.
-var vocabularies = []map[string]func(*reader) error{cyclonedxTop, spdxTop}
+// Each owns a set of keys and nothing else knows them. Adding a format is a
+// table and the handlers it names.
+type vocabulary struct {
+	format Format
+	top    map[string]func(*reader) error
+}
+
+// vocabularies are the formats read, in the order a document is tried against.
+var vocabularies = []vocabulary{
+	{format: CycloneDX, top: cyclonedxTop},
+	{format: SPDX, top: spdxTop},
+	{format: SPDX, top: spdxLaterTop},
+}
 
 // ReadHeader reads what a document says about itself and stops.
 //
@@ -54,16 +65,21 @@ func Read(r io.Reader, lim Limits) (*Document, error) {
 // all. Requiring the declaration first would refuse documents that are
 // perfectly well formed.
 //
-// What makes that safe is that the vocabularies claim no key in common, which
-// a test asserts rather than a reader assuming. A document is still refused
-// for declaring no format, and for declaring one this was not written
-// against — the first at the end of the walk, the second where it is read.
+// **Which vocabulary each key was routed to is recorded**, and that rather than
+// the keys being disjoint is what makes the arrangement safe. A handler writes
+// to the document before anything has checked what the document is, and both
+// formats state an identity — so a file carrying both keys would be stored
+// under whichever came last, which is a different identity for the same bytes
+// depending only on how its producer sorted them.
 func (c *reader) read() error {
 	err := c.b.object(func(key string) error {
-		for _, vocabulary := range vocabularies {
-			if handler, ours := vocabulary[key]; ours {
-				return handler(c)
+		for _, v := range vocabularies {
+			handler, ours := v.top[key]
+			if !ours {
+				continue
 			}
+			c.fired[v.format] = true
+			return handler(c)
 		}
 		return c.b.skip()
 	})
@@ -73,22 +89,46 @@ func (c *reader) read() error {
 	return c.checkFormat()
 }
 
-// checkFormat refuses a document that never said what it was.
+// checkFormat refuses a document that did not say what it is, said it was two
+// things, or said only half of what one of them is.
 //
-// A file carrying components and naming no format is the case this catches: a
-// fragment, a hand-edited document, or something of another format entirely
-// whose keys happen to look familiar. Guessing from the contents is what the
-// declaration exists to make unnecessary.
-//
-// What it does not check is that the document named a component of its own.
-// Neither format requires one, and the scan was filed against something that
-// says what it is about.
+// What it does not check is that the document named a component of its own. No
+// format requires one, and the scan was filed against something that says what
+// it is about.
 func (c *reader) checkFormat() error {
-	if c.declared != "" {
-		return nil
+	if len(c.fired) > 1 {
+		// Keys from two formats were read, so this is not either of them, and
+		// whichever handler ran last has already written over the other's
+		// answer. Refused rather than preferred: nothing here can say which
+		// half the producer meant.
+		var named []string
+		for _, v := range vocabularies {
+			if c.fired[v.format] && !slices.Contains(named, string(v.format)) {
+				named = append(named, string(v.format))
+			}
+		}
+		return fmt.Errorf("scan file states both %s, so which format it is cannot be settled",
+			strings.Join(named, " and "))
 	}
-	return fmt.Errorf("scan file does not say what format it is: it is neither %s nor %s",
-		cyclonedxName, spdxName)
+	if c.declared == "" {
+		return fmt.Errorf("scan file does not say what format it is: it is neither %s nor %s",
+			CycloneDX, SPDX)
+	}
+	// **Half a declaration is not a declaration.** Either key alone leaves the
+	// other unstated, and an unstated version is a version this was not written
+	// against — which is what the by-name refusal exists to catch. Stating one
+	// of the two is the shape a fragment has, or of something else entirely
+	// whose keys happen to look familiar.
+	if c.declared == CycloneDX && (!c.named || !c.versioned) {
+		missing := "specVersion"
+		if !c.named {
+			missing = "bomFormat"
+		}
+		return fmt.Errorf("scan file states only half of what %s is: %s is missing",
+			CycloneDX, missing)
+	}
+	c.doc.Format = c.declared
+	return nil
 }
 
 // sentinel reports the value of a field, reading a format's own words for

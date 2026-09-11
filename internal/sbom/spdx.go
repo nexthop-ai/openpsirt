@@ -8,9 +8,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// The second format read.
-const spdxName = "SPDX"
-
 // The major version read. 2.2 and 2.3 share one vocabulary — 2.3 adds fields
 // and adds nothing this reads — so one reader covers both, and a document
 // stating either is read. The third major version is a different document
@@ -95,12 +92,12 @@ func (c *reader) spdxFormatVersion() error {
 	}
 	version, ok := strings.CutPrefix(strings.TrimSpace(stated), "SPDX-")
 	if !ok {
-		return fmt.Errorf("scan file is not %s: it says %q", spdxName, trim(stated))
+		return fmt.Errorf("scan file is not %s: it says %q", SPDX, trim(stated))
 	}
 	if major, _, _ := strings.Cut(version, "."); major != spdxMajor {
-		return fmt.Errorf("%s version %q is not one this reads", spdxName, trim(stated))
+		return fmt.Errorf("%s version %q is not one this reads", SPDX, trim(stated))
 	}
-	c.declared = spdxName
+	c.declared = SPDX
 	return nil
 }
 
@@ -141,7 +138,17 @@ func (c *reader) spdxCreationInfo() error {
 // packages may not have been read yet — and a document may point at several
 // things, which is settled once everything is in hand.
 func (c *reader) spdxDocumentDescribes() error {
+	if c.headerOnly {
+		return c.b.skip()
+	}
 	return c.b.array(func() error {
+		// Charged as each is read. This is a top-level array, so on the header
+		// pass — which runs inside the upload request — it was the one array
+		// with neither a skip above nor a bound here, which is exactly what
+		// count's own comment says the component bound was moved to prevent.
+		if err := c.count(); err != nil {
+			return err
+		}
 		ref, err := c.b.str()
 		if err != nil {
 			return err
@@ -222,10 +229,11 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 // producer filing a package identifier under one category or another does not
 // change what it is.
 //
-// The first of each stands. A real producer emits eight spellings of one
-// database key, differing in where it put a hyphen, and nothing here can say
-// which spelling an advisory used — so this takes the same answer everything
-// downstream has already been given rather than inventing a preference.
+// The first of each stands. A real producer emits up to twelve spellings of
+// one database key on a single package, differing in where it put a hyphen,
+// and nothing here can say which spelling an advisory used — so this takes the
+// same answer everything downstream has already been given rather than
+// inventing a preference.
 func (c *reader) spdxExternalRefs(described *graph.Described) error {
 	return c.b.array(func() error {
 		var kind, locator string
@@ -280,7 +288,7 @@ func (c *reader) spdxFiles() error {
 		return c.b.skip()
 	}
 	return c.b.array(func() error {
-		if err := c.count(); err != nil {
+		if err := c.file(); err != nil {
 			return err
 		}
 		var ref string
@@ -292,9 +300,17 @@ func (c *reader) spdxFiles() error {
 		}); err != nil {
 			return err
 		}
-		if ref != "" {
-			c.files[ref] = true
+		if ref == "" {
+			return nil
 		}
+		// The same rule bind applies, across the two arrays rather than within
+		// one: an edge naming an identifier two things share is a coin toss,
+		// and here it would resolve to the package and invent a dependency the
+		// producer never stated.
+		if _, clash := c.byRef[ref]; clash {
+			return fmt.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
+		}
+		c.files[ref] = true
 		return nil
 	})
 }
@@ -325,6 +341,17 @@ func (c *reader) spdxRelationships() error {
 	})
 }
 
+// describes records one more thing the document says it is about, charged
+// against the edge bound: this is read from the relationships array, and an
+// unbounded array of them is the same hazard as an unbounded array of edges.
+func (c *reader) describes(ref string) error {
+	if err := c.charge(); err != nil {
+		return err
+	}
+	c.rootRefs = append(c.rootRefs, ref)
+	return nil
+}
+
 // spdxRelate records what one relationship states, where it states something
 // this reads.
 //
@@ -333,16 +360,19 @@ func (c *reader) spdxRelationships() error {
 // what a package was evidenced by, alongside the structure — so the ones that
 // are not structure are as ordinary here as a CycloneDX composition is there.
 func (c *reader) spdxRelate(from, kind, to string) error {
+	// The format's words for nothing are allowed at either end — "contains
+	// nothing" is a statement a producer makes. Read literally they are an
+	// identifier nothing describes, so the edge is charged and then lands in
+	// the count that says the producer's derivation changed.
+	from, to = sentinel(from), sentinel(to)
 	if from == "" || to == "" {
 		return nil
 	}
 	switch {
 	case kind == "DESCRIBES" && from == spdxDocumentRef:
-		c.rootRefs = append(c.rootRefs, to)
-		return nil
+		return c.describes(to)
 	case kind == "DESCRIBED_BY" && to == spdxDocumentRef:
-		c.rootRefs = append(c.rootRefs, from)
-		return nil
+		return c.describes(from)
 	}
 	if direction, structural := spdxEdges[kind]; structural {
 		if direction == held {
@@ -362,7 +392,32 @@ func (c *reader) spdxRelate(from, kind, to string) error {
 		}
 		if _, stated := c.upstream[from]; !stated {
 			c.upstream[from] = to
+			c.upstreamOrder = append(c.upstreamOrder, from)
 		}
 	}
 	return nil
+}
+
+// The keys the third major version states a document with. It shares no key
+// path with the second, which is why the by-name refusal cannot hang off one
+// of the second's: a real 3.0 document carries no `spdxVersion` at all, so the
+// version check above can never see one.
+var spdxLaterTop = map[string]func(*reader) error{
+	"@context": (*reader).spdxLaterMajor,
+	"@graph":   (*reader).spdxLaterMajor,
+}
+
+// spdxLaterMajor refuses a major version this reader was not written against,
+// naming it rather than letting the document fall through as unrecognized.
+//
+// A document refused for saying nothing sends whoever reads the message hunting
+// for a corrupt file. This one is not corrupt: it is a format we have not
+// written support for, which is a different sentence and a different thing for
+// them to do next.
+func (c *reader) spdxLaterMajor() error {
+	if err := c.b.skip(); err != nil {
+		return err
+	}
+	return fmt.Errorf("%s 3.x is not a version this reads: it states a document as one linked "+
+		"graph, which shares no field with the %s 2.x this reads", SPDX, SPDX)
 }

@@ -249,21 +249,27 @@ other's business (REQ-05).
 |---|---|
 | **The document chooses the reader, never the request** | An endpoint taking a format parameter is a parameter a build sets wrong, and the answer is then a refusal about the parameter rather than about the file (REQ-76) |
 | **A top-level key is read by the format that owns it**, before the document has necessarily said which format it is | The declaration arrives in no guaranteed position: a producer sorting its keys puts SPDX's packages ahead of its own `spdxVersion`. Requiring the declaration first would refuse documents that are well formed |
-| **The formats claim no key in common**, which a test asserts rather than a reader assuming | That property is what makes the rule above safe, and it is a property of the tables rather than of anything checkable while reading |
+| **The formats claim no key in common**, which a test asserts rather than a reader assuming | A key claimed twice would make the routing a coin toss, and it is a property of the tables rather than of anything checkable while reading |
+| **Which vocabulary read each key is recorded**, and a document that used two is refused | The keys being disjoint is not on its own enough. A handler writes to the document before anything has checked what the document is, and both formats state an identity — so a file carrying both keys is stored under whichever came last, which is a different identity for the same bytes depending only on how its producer sorted them |
 | **A document declaring no format is refused** | A fragment, a hand-edited file, or something else entirely whose keys happen to look familiar. Guessing from the contents is what the declaration exists to make unnecessary |
+| **Half a declaration is not a declaration** | CycloneDX states its format and its version in two keys, and either alone leaves the other unstated. An unstated version is a version this was not written against, which is what the by-name refusal is for |
 | **A major version is read only where it has been written against** | Refused by name where it is read, so a file that was never going to be read is dropped before the rest of it is walked |
 
 **SPDX 2.2 and 2.3 are one vocabulary.** The later revision adds fields and
 adds nothing this reads, so one reader covers both and a document stating
 either is read.
 
-**SPDX 3.0 is refused by name** (REQ-76). It is a different document rather
-than a revision of this one: one flat graph of typed elements, sharing no key
-path with 2.x, where an element announces what it is in a field that may arrive
-after the fields it governs — which the bounded single-pass walk cannot act on
-without holding the element. Nothing this deployment ingests emits it: the
-scanner it ships emits 2.3 and tag-value, and so does the reference producer.
-Reading it is a second vocabulary rather than a branch in this one.
+**SPDX 3.x is refused by name** (REQ-76), and the refusal is hung off its own
+keys rather than off 2.x's. It is a different document rather than a revision
+of this one: a context and one flat graph of typed elements, sharing no key
+path with 2.x — which is exactly why a by-name refusal reading `spdxVersion`
+never reaches one, since a real 3.x document does not carry that key at all. A
+document refused for saying nothing sends whoever reads the message hunting for
+a corrupt file, and it is not corrupt.
+
+Nothing this deployment ingests emits it: the scanner it ships emits 2.3 and
+tag-value, and so does the reference producer. Reading it is a third vocabulary
+rather than a branch in this one.
 
 ## What each format states
 
@@ -356,10 +362,15 @@ without knowing, it reads as a graph with a hole in it, and a count meant to say
 the producer's derivation changed moves instead with how much file detail the
 producer was configured to emit. So the two are counted apart.
 
-They are charged against the component bound, because what a bound has to stop
-is the walk, and an unbounded array is an unbounded walk whatever it holds. A
-deployment ingesting file-level inventories raises that bound rather than
-finding a second one.
+**They are bounded apart from components**, and the ceiling was set by
+measurement rather than by analogy. A real scan catalogs 4,964 files against 89
+packages on one image and 21,643 against 480 on another — forty-five to
+fifty-six files per package — so a switch operating system's 6,866 packages
+would arrive with something above 300,000 files. Charged against the component
+ceiling of 100,000 that is a real inventory refused; raised until it fits, the
+component bound has stopped bounding components. They also cost very different
+amounts to hold: 133 bytes for a path against 766 for a component, because a
+path is only the identifier and a component is a described thing.
 
 ## Tolerated and refused
 
@@ -372,6 +383,7 @@ they fill in. A document that is valid and sparse is not a broken one.
 | A component states no version | Kept and counted. What it costs is matching, and it ships either way |
 | An edge names something the document never describes | Dropped and counted. The missing component is not invented |
 | An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
+| An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |
 | Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
 
 The counts matter as much as the tolerance. Each is a number that should be
@@ -380,6 +392,9 @@ stable build to build, so a change says the producer changed.
 | Refused | Reason |
 |---|---|
 | Neither format, or a major version not written against | A reader that guesses eventually guesses wrong on a file that looks close enough |
+| Keys from two formats | Whichever handler ran last has already written over the other's answer, and nothing here can say which half the producer meant |
+| Half of one format's declaration | An unstated version is a version this was not written against |
+| A file and a component sharing one identifier | The same coin toss two components sharing one is refused for, and worse: the edge resolves to the component and invents a dependency nobody stated |
 | A component with no name | It cannot be identified, so it cannot be tracked |
 | Two components sharing one identifier | Every edge naming it is ambiguous |
 | A build time nothing can read | The build time orders scans against each other |
@@ -435,6 +450,20 @@ vulnerability that patch resolves, so an inventory in that format carries no
 claims and a build with carried patches states them in a document of its own.
 Deriving the link from the patch's filename would report a suppression nobody
 made.
+
+**So the format a scan arrived in is carried out of the reader**, because what
+a claim is closed by is difference: a claim the build no longer argues is a
+claim the build withdrew. That reading only holds where the build had somewhere
+to argue it. A scan whose format cannot attach a claim to a component says
+nothing about carried patches whether or not they are still carried, so
+closing on its silence would have a product's first scan in the other format
+close every claim it held at once and reopen every finding they suppressed,
+with nothing saying why.
+
+A claim of an origin the scan could not have stated is left open and counted,
+so the receipt says how many were carried forward rather than restated. A claim
+the scan *could* have stated and did not is still closed, or the difference
+stops meaning anything at all.
 
 Both are read into one shape with the origin recorded, because the second can
 point at something that cannot be resolved and the first cannot.

@@ -23,7 +23,7 @@ func TestAFindingTheBuildHasAnsweredIsMarkedNotDropped(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		scanID := f.lastScan
 		if _, err := f.store.RecordClaims(t.Context(), f.target, scanID,
-			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)}); err != nil {
+			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 
@@ -55,7 +55,7 @@ func TestAClaimAboutSomethingElseLeavesAFindingAlone(t *testing.T) {
 				aClaim("CVE-2026-9", sbom.NotAffected, libnl, sbom.FromStatement),
 				// Right issue, different component.
 				aClaim("CVE-2026-1", sbom.NotAffected, swss, sbom.FromStatement),
-			}); err != nil {
+			}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -75,7 +75,7 @@ func TestSayingItIsAffectedSuppressesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
-			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.Affected, libnl, sbom.FromStatement)}); err != nil {
+			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.Affected, libnl, sbom.FromStatement)}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -95,11 +95,11 @@ func TestArguingTheSameThingAgainWritesNothing(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		claims := []sbom.Suppression{aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)}
 
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims); err != nil {
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims)
+		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +109,7 @@ func TestArguingTheSameThingAgainWritesNothing(t *testing.T) {
 
 		// Withdrawing one closes it rather than deleting it: what a release
 		// argued is a question asked years later.
-		applied, err = f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil)
+		applied, err = f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -135,12 +135,12 @@ func TestAClaimAttachedToItsComponentWinsOverOneThatNamedIt(t *testing.T) {
 		vague := aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)
 		precise := aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)
 		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
-			[]sbom.Suppression{vague}); err != nil {
+			[]sbom.Suppression{vague}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
-			[]sbom.Suppression{vague, precise}); err != nil {
+			[]sbom.Suppression{vague, precise}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -177,7 +177,7 @@ func TestEveryStatusTheFormatDefinesCanBeStored(t *testing.T) {
 			claim.Justification = "vulnerable_code_cannot_be_controlled_by_adversary"
 			claims = append(claims, claim)
 		}
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims)
+		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims, everyOrigin)
 		if err != nil {
 			t.Fatalf("recording every status the format defines: %v", err)
 		}
@@ -200,7 +200,7 @@ func TestAClaimThatReachedNothingIsCounted(t *testing.T) {
 			graph.Described{Purl: "pkg:generic/libnl3", Name: "libnl3"}, sbom.FromStatement)
 
 		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
-			[]sbom.Suppression{reaches, misses}); err != nil {
+			[]sbom.Suppression{reaches, misses}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -213,6 +213,65 @@ func TestAClaimThatReachedNothingIsCounted(t *testing.T) {
 		}
 		if applied.ClaimsReachingNothing != 1 {
 			t.Errorf("%d claims reached nothing, want 1", applied.ClaimsReachingNothing)
+		}
+	})
+}
+
+// everyOrigin is what a scan in a format that can state every kind of claim
+// passes. Where a format cannot state one, a claim of that origin is carried
+// forward rather than read as withdrawn.
+var everyOrigin = map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}
+
+func TestAFormatThatCannotStateAClaimDoesNotWithdrawOne(t *testing.T) {
+	// Closing works by difference: a claim the build no longer argues is a
+	// claim the build withdrew. That reading only holds where the build had
+	// somewhere to argue it.
+	//
+	// An inventory in a format that cannot attach a claim to a component says
+	// nothing about carried patches whether or not they are still carried, so
+	// a product's first scan in that format would otherwise close every claim
+	// it had at once — and every finding they suppressed comes back, with
+	// nothing saying why.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		carried := []sbom.Suppression{
+			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
+		}
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, carried, everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+
+		// The next scan arrives in a format with nowhere to say it.
+		stated := map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: false}
+		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, stated)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied.Closed != 0 {
+			t.Errorf("%d claims closed, want 0 — the build did not withdraw them", applied.Closed)
+		}
+		if applied.Unstated != 1 {
+			t.Errorf("%d claims carried forward unstated, want 1", applied.Unstated)
+		}
+
+		// And a claim the scan *could* have stated is still closed by not
+		// stating it, or the difference stops meaning anything at all.
+		spoken := []sbom.Suppression{
+			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
+			aClaim("CVE-2026-2", sbom.NotAffected, libnl, sbom.FromStatement),
+		}
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, spoken, everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+		applied, err = f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, stated)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied.Closed != 1 {
+			t.Errorf("%d claims closed, want 1 — that one the scan could have restated", applied.Closed)
+		}
+		if applied.Unstated != 1 {
+			t.Errorf("%d claims carried forward unstated, want 1", applied.Unstated)
 		}
 	})
 }

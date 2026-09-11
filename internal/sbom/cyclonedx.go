@@ -8,11 +8,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// The first format read. A document that says it is something no vocabulary
-// here knows is refused rather than attempted, because a reader that guesses
-// will eventually guess wrong on a file that looks close enough.
-const cyclonedxName = "CycloneDX"
-
 // Only the first major version exists, and every field read here has been in
 // it throughout. A second major version would move things, so it is refused
 // rather than read on the assumption that it did not.
@@ -65,10 +60,10 @@ func (c *reader) cyclonedxFormatName() error {
 	if err := c.into(&name); err != nil {
 		return err
 	}
-	if !strings.EqualFold(name, cyclonedxName) {
-		return fmt.Errorf("scan file is not %s: it says %q", cyclonedxName, trim(name))
+	if !strings.EqualFold(name, string(CycloneDX)) {
+		return fmt.Errorf("scan file is not %s: it says %q", CycloneDX, trim(name))
 	}
-	c.declared = cyclonedxName
+	c.declared, c.named = CycloneDX, true
 	return nil
 }
 
@@ -80,9 +75,9 @@ func (c *reader) cyclonedxFormatVersion() error {
 		return err
 	}
 	if major, _, _ := strings.Cut(spec, "."); major != cyclonedxMajor {
-		return fmt.Errorf("%s version %q is not one this reads", cyclonedxName, trim(spec))
+		return fmt.Errorf("%s version %q is not one this reads", CycloneDX, trim(spec))
 	}
-	c.declared = cyclonedxName
+	c.declared, c.versioned = CycloneDX, true
 	return nil
 }
 

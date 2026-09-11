@@ -207,7 +207,12 @@ func documentPaths(t *testing.T, name string, from ...io.Reader) (map[string]int
 			t.Fatalf("%s: %v", name, err)
 		}
 		key, _ := tok.(string)
-		if key != "components" {
+		// The array each format puts its components in, decoded one element
+		// at a time. Naming only one format's leaves the other's whole array
+		// decoded at once — which loses the property this exists for, since a
+		// full-size document is tens of megabytes, and reports zero shapes,
+		// which is the output the check is read for.
+		if key != "components" && key != "packages" {
 			var value any
 			if err := dec.Decode(&value); err != nil {
 				t.Fatalf("%s: %v", name, err)
@@ -225,7 +230,7 @@ func documentPaths(t *testing.T, name string, from ...io.Reader) (map[string]int
 			}
 			components++
 			var own []string
-			for path := range walkPaths(component, "components[]") {
+			for path := range walkPaths(component, key+"[]") {
 				paths[path]++
 				own = append(own, path)
 			}

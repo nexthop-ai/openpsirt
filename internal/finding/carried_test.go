@@ -24,7 +24,7 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 			[]sbom.Suppression{
 				aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
 				aClaim("CVE-2026-2", sbom.Affected, libnl, sbom.FromStatement),
-			}); err != nil {
+			}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 
@@ -84,7 +84,7 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
 			[]sbom.Suppression{
 				aClaim("CVE-2026-2", sbom.Affected, libnl, sbom.FromStatement),
-			}); err != nil {
+			}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		after, _, err := f.store.CarriedPatches(t.Context(), who, f.target, "", 50, 0)

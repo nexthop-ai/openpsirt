@@ -39,7 +39,9 @@ func TestWhatABuildCarriesIsReachableAndNarrowedLikeEverythingElse(t *testing.T)
 				Vulnerability: "CVE-2026-9999", Status: sbom.AlreadyFixed,
 				Origin: sbom.FromPedigree, Statement: "Backported as a distro patch.",
 				Targets: []sbom.Target{{Name: "libnl-3-200"}},
-			}}); err != nil {
+			}},
+			// A CycloneDX scan, which can state a claim of either origin.
+			map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
 			t.Fatal(err)
 		}
 

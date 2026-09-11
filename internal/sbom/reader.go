@@ -28,8 +28,16 @@ type reader struct {
 	headerOnly bool
 
 	// declared is the format the document stated for itself, and stating one
-	// is what makes a document readable at all.
-	declared string
+	// is what makes a document readable at all. fired records which
+	// vocabularies actually read a key, which is not the same question: a
+	// handler runs before anything has checked what the document is.
+	declared Format
+	fired    map[Format]bool
+	// named and versioned are the two halves of a CycloneDX declaration.
+	// Either alone leaves the other unstated, and an unstated version is one
+	// this was not written against.
+	named     bool
+	versioned bool
 
 	doc Document
 	// byRef resolves a document's own identifiers to the components they
@@ -46,6 +54,9 @@ type reader struct {
 	// above are only what survived.
 	stated  int
 	charged int
+	// filed counts the paths a document catalogs, against a bound of their
+	// own.
+	filed int
 	// claimed counts the patch claims a document makes, against the same bound
 	// the two VEX readers charge their statements against. It is not covered
 	// by the component bound: the claims hang off one component's pedigree, so
@@ -66,6 +77,9 @@ type reader struct {
 	// upstream is what one component was said to be derived from, by the
 	// document's own identifiers. Resolved at the end for the same reason.
 	upstream map[string]string
+	// upstreamOrder is the order the document stated them in, so resolving
+	// them does not depend on what a map felt like doing.
+	upstreamOrder []string
 }
 
 func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
@@ -74,6 +88,7 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 		b:          newBounded(&capped{r: r, left: lim.MaxBytes}, lim.MaxDepth),
 		lim:        lim,
 		headerOnly: headerOnly,
+		fired:      map[Format]bool{},
 		byRef:      map[string]graph.Described{},
 		files:      map[string]bool{},
 		seen:       map[string]int{},
@@ -88,6 +103,11 @@ func (c *reader) bind(ref string, described graph.Described) error {
 	}
 	if _, clash := c.byRef[ref]; clash {
 		return fmt.Errorf("two components share the identifier %q, so every edge naming it is ambiguous", trim(ref))
+	}
+	// Checked against the other array too, and checked here as well as there
+	// because which of the two a format puts first is the producer's business.
+	if c.files[ref] {
+		return fmt.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
 	}
 	c.byRef[ref] = described
 	return nil
@@ -142,6 +162,18 @@ func (c *reader) count() error {
 	c.stated++
 	if c.stated > c.lim.MaxComponents {
 		return fmt.Errorf("scan file describes more than the %d component limit", c.lim.MaxComponents)
+	}
+	return nil
+}
+
+// file counts one more cataloged path against its own limit.
+//
+// Its own rather than the component one, because the two differ by a factor of
+// fifty in a real document and by more than that in what they cost to hold.
+func (c *reader) file() error {
+	c.filed++
+	if c.filed > c.lim.MaxFiles {
+		return fmt.Errorf("scan file catalogs more than the %d file limit", c.lim.MaxFiles)
 	}
 	return nil
 }
@@ -314,7 +346,12 @@ func (c *reader) resolveUpstream() {
 	if len(c.upstream) == 0 || c.headerOnly {
 		return
 	}
-	for ref, ancestorRef := range c.upstream {
+	// Walked in the order the document stated them rather than over the map.
+	// Two identifiers can resolve to one component — the merging case add
+	// describes — and ranging a map would let a Go runtime decide which of
+	// their ancestors is stored, so the same bytes would read two ways.
+	for _, ref := range c.upstreamOrder {
+		ancestorRef := c.upstream[ref]
 		described, ok := c.byRef[ref]
 		if !ok {
 			continue
@@ -327,7 +364,18 @@ func (c *reader) resolveUpstream() {
 		if !seen {
 			continue
 		}
+		// **What is already there may be a qualifier rather than a
+		// description.** Where no pedigree is stated the upstream name is
+		// taken from the package identifier, which carries a name and no
+		// version in 459 of 535 cases — and the version is what expiry
+		// compares. A pointer naming a package the document fully describes
+		// knows the version, so it fills that in rather than losing to a
+		// half-answer. This is the refinement FillFrom already makes for the
+		// same reason.
 		if c.described[at].UpstreamName != "" {
+			if c.described[at].UpstreamVersion == "" && c.described[at].UpstreamName == ancestor.Name {
+				c.described[at].UpstreamVersion = ancestor.Version
+			}
 			continue
 		}
 		c.described[at].UpstreamName = ancestor.Name

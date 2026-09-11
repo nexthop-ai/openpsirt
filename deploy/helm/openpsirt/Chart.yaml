@@ -11,4 +11,4 @@ appVersion: "0.1.0"
 home: https://github.com/nexthop-ai/openpsirt
 sources:
   - https://github.com/nexthop-ai/openpsirt
-keywords: [security, psirt, sbom, vulnerability, cyclonedx]
+keywords: [security, psirt, sbom, vulnerability, cyclonedx, spdx]

@@ -369,11 +369,14 @@ func TestTheSecondFormatChargesTheSameBounds(t *testing.T) {
 	}
 }
 
-func TestFilesAreChargedAgainstWhatADocumentMayDescribe(t *testing.T) {
+func TestFilesAreBoundedApartFromComponents(t *testing.T) {
 	// What a bound has to stop is the walk, and an unbounded array is an
-	// unbounded walk whatever it holds. A format whose files were uncounted
-	// would take a document of ten million of them under a component bound
-	// that never moved.
+	// unbounded walk whatever it holds. The bound is its own rather than the
+	// component one because the two differ by a factor of fifty in a real
+	// document: 4,964 files against 89 packages on one image, 21,643 against
+	// 480 on another. Charged together, a switch operating system's inventory
+	// in a format that catalogs files is refused at a ceiling that is right
+	// for components.
 	var b strings.Builder
 	b.WriteString(`{"spdxVersion": "SPDX-2.3", "documentNamespace": "https://example.invalid/f", "files": [`)
 	for i := range 50 {
@@ -386,18 +389,24 @@ func TestFilesAreChargedAgainstWhatADocumentMayDescribe(t *testing.T) {
 	}
 	b.WriteString(`]}`)
 
-	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10}); err == nil {
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxFiles: 10}); err == nil {
 		t.Fatal("fifty files passed a bound of ten")
-	} else if !strings.Contains(err.Error(), "component limit") {
+	} else if !strings.Contains(err.Error(), "file limit") {
 		t.Errorf("refused with %q", err)
+	}
+
+	// And they do not spend the component bound. A document of fifty files and
+	// no packages is not a document of fifty components.
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10}); err != nil {
+		t.Errorf("fifty files spent a component bound of ten: %v", err)
 	}
 }
 
 func TestReadsARealImageScan(t *testing.T) {
 	// The scanner this deployment ships, emitting the second format for a
 	// real image. What a hand-written document cannot stand in for: the root
-	// stated as a relationship, packages carrying eight spellings of the
-	// database key, and five files catalogued for every package found.
+	// stated as a relationship, one package carrying twelve spellings of the
+	// database key, and five files cataloged for every package found.
 	doc, err := sbom.Read(fixture(t, "alpine-image.spdx.json"), sbom.Limits{})
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -554,5 +563,233 @@ func TestARootNamedTwiceIsStillOneRoot(t *testing.T) {
 	}
 	if len(doc.Components) != 1 {
 		t.Errorf("read %d components, want 1 — the root is not among them", len(doc.Components))
+	}
+}
+
+func TestHalfADeclarationIsNotADeclaration(t *testing.T) {
+	// Either key alone leaves the other unstated, and an unstated version is a
+	// version this was not written against. Both of these were refused before
+	// a second format existed, and the refusal has to survive the dispatch
+	// that made the two halves independent.
+	for _, tc := range []struct{ name, body, want string }{{
+		name: "a format with no version",
+		body: `{"bomFormat": "CycloneDX", "components": [{"name": "libc"}]}`,
+		want: "only half of what CycloneDX is: specVersion is missing",
+	}, {
+		name: "a version with no format",
+		body: `{"specVersion": "1.6", "components": [{"name": "libc"}]}`,
+		want: "only half of what CycloneDX is: bomFormat is missing",
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			if why := refuses(t, tc.body); !strings.Contains(why, tc.want) {
+				t.Errorf("refused with %q, want it to mention %q", why, tc.want)
+			}
+		})
+	}
+}
+
+func TestADocumentStatingTwoFormatsIsRefused(t *testing.T) {
+	// A handler writes to the document before anything has checked what the
+	// document is, and both formats state an identity — so a file carrying
+	// both keys is stored under whichever came last, which is a different
+	// identity for the same bytes depending only on how its producer sorted
+	// them. Refused rather than preferred: nothing here can say which half the
+	// producer meant.
+	both := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "serialNumber": "urn:uuid:1", "documentNamespace": "https://example.invalid/2",
+	  "components": [{"name": "libc"}]}`
+	if why := refuses(t, both); !strings.Contains(why, "states both CycloneDX and SPDX") {
+		t.Errorf("refused with %q", why)
+	}
+
+	// And the same file with the two identity keys the other way round is
+	// refused identically, which is the property that matters.
+	swapped := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "documentNamespace": "https://example.invalid/2", "serialNumber": "urn:uuid:1",
+	  "components": [{"name": "libc"}]}`
+	if why := refuses(t, swapped); !strings.Contains(why, "states both CycloneDX and SPDX") {
+		t.Errorf("refused with %q", why)
+	}
+}
+
+func TestARealThirdVersionDocumentIsRefusedByName(t *testing.T) {
+	// The third version states a document as a context and one linked graph,
+	// with no `spdxVersion` anywhere — so the by-name refusal cannot hang off
+	// a second-version key, and a document landing in "it is neither" sends
+	// whoever reads it hunting for a corrupt file. It is not corrupt.
+	real3 := `{
+	  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+	  "@graph": [
+	    {"spdxId": "urn:a", "type": "software_Package", "name": "libc",
+	     "software_packageVersion": "2.41"}
+	  ]}`
+	why := refuses(t, real3)
+	if !strings.Contains(why, "SPDX 3.x is not a version this reads") {
+		t.Errorf("refused with %q", why)
+	}
+	if strings.Contains(why, "does not say what format it is") {
+		t.Error("a well-formed document of a format we do not read was refused as saying nothing")
+	}
+}
+
+func TestTheWordForNothingIsNothingAtAnEdgesEnds(t *testing.T) {
+	// "Contains nothing" is a statement the format lets a producer make. Read
+	// literally it is an identifier nothing describes, so the edge is charged
+	// and then lands in the count that says the producer's derivation changed.
+	body := strings.Replace(minimalSPDX,
+		`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-a", "relationshipType": "DEPENDS_ON"}`,
+		`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "NONE", "relationshipType": "CONTAINS"},`+
+			`{"spdxElementId": "NOASSERTION", "relatedSpdxElement": "SPDXRef-a", "relationshipType": "CONTAINS"}`, 1)
+	doc := read(t, body)
+
+	if doc.DanglingEdges != 0 {
+		t.Errorf("%d edges named nothing, want 0 — saying so is not a hole in the graph", doc.DanglingEdges)
+	}
+	if len(doc.Dependencies) != 0 {
+		t.Errorf("read %d edges from two statements about nothing", len(doc.Dependencies))
+	}
+}
+
+func TestAFileAndAComponentMayNotShareAnIdentifier(t *testing.T) {
+	// Two components sharing one is refused because every edge naming it is a
+	// coin toss. Across the two arrays the toss is worse, not better: the edge
+	// resolves to the package and invents a dependency the producer never
+	// stated. Refused whichever array the format puts first.
+	afterwards := strings.Replace(minimalSPDX, `"packages": [`,
+		`"files": [{"SPDXID": "SPDXRef-a", "fileName": "usr/lib/libc.so.6"}], "packages": [`, 1)
+	if why := refuses(t, afterwards); !strings.Contains(why, "file and a component share the identifier") {
+		t.Errorf("refused with %q", why)
+	}
+
+	before := strings.Replace(minimalSPDX, `"relationships": [`,
+		`"files": [{"SPDXID": "SPDXRef-a", "fileName": "usr/lib/libc.so.6"}], "relationships": [`, 1)
+	if why := refuses(t, before); !strings.Contains(why, "file and a component share the identifier") {
+		t.Errorf("refused with %q", why)
+	}
+}
+
+func TestAStatedAncestorRefinesOneTakenFromAnIdentifier(t *testing.T) {
+	// Where no pedigree is stated the upstream name comes from the package
+	// identifier, which carries a name and no version in most cases — and the
+	// version is what expiry compares. A pointer naming a package the document
+	// fully describes knows the version, so it fills that in rather than
+	// losing to a half-answer.
+	body := strings.Replace(minimalSPDX,
+		`"referenceLocator": "pkg:deb/debian/libc6@2.41"`,
+		`"referenceLocator": "pkg:deb/debian/libc6@2.41?upstream=glibc"`, 1)
+	body = strings.Replace(body, `"packages": [`,
+		`"packages": [{"SPDXID": "SPDXRef-up", "name": "glibc", "versionInfo": "2.41-9", "downloadLocation": "NONE"},`, 1)
+	body = strings.Replace(body, `"relationships": [`, `"relationships": [`+
+		`{"spdxElementId": "SPDXRef-a", "relatedSpdxElement": "SPDXRef-up", "relationshipType": "DESCENDANT_OF"},`, 1)
+
+	doc := read(t, body)
+	var found bool
+	for _, c := range doc.Components {
+		if c.Name != "libc" {
+			continue
+		}
+		found = true
+		if c.UpstreamName != "glibc" {
+			t.Errorf("derived from %q, want glibc", c.UpstreamName)
+		}
+		if c.UpstreamVersion != "2.41-9" {
+			t.Errorf("derived from version %q, want 2.41-9 — the identifier states no version", c.UpstreamVersion)
+		}
+	}
+	if !found {
+		t.Error("the component the relationship was about is not in the document")
+	}
+}
+
+func TestADerivationIsChargedAgainstTheClaimBound(t *testing.T) {
+	// The only thing bounding what a document may say one component was
+	// derived from. Nothing else in the reader charges this, so without it a
+	// relationships array of derivations fills a map under the byte cap alone.
+	var b strings.Builder
+	b.WriteString(`{"spdxVersion": "SPDX-2.3", "documentNamespace": "https://example.invalid/d",
+	  "packages": [{"SPDXID": "SPDXRef-a", "name": "libc", "downloadLocation": "NONE"},
+	               {"SPDXID": "SPDXRef-b", "name": "zlib", "downloadLocation": "NONE"}],
+	  "relationships": [`)
+	for i, ref := range []string{"SPDXRef-a", "SPDXRef-b"} {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`{"spdxElementId": "` + ref + `", "relatedSpdxElement": "SPDXRef-a",` +
+			` "relationshipType": "DESCENDANT_OF"}`)
+	}
+	b.WriteString(`]}`)
+
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxStatements: 1}); err == nil {
+		t.Fatal("two derivations passed a bound of one")
+	} else if !strings.Contains(err.Error(), "claim limit") {
+		t.Errorf("refused with %q", err)
+	}
+}
+
+func TestWhatTheDocumentSaysItIsAboutIsBounded(t *testing.T) {
+	// A top-level array of references, read on the header pass that runs
+	// inside the upload request. It was the one array with neither a skip
+	// above it nor a bound in it.
+	var b strings.Builder
+	b.WriteString(`{"spdxVersion": "SPDX-2.3", "documentDescribes": [`)
+	for i := range 50 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`"SPDXRef-a"`)
+	}
+	b.WriteString(`]}`)
+
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10}); err == nil {
+		t.Fatal("fifty references passed a bound of ten")
+	} else if !strings.Contains(err.Error(), "component limit") {
+		t.Errorf("refused with %q", err)
+	}
+
+	// And the header pass walks past them rather than holding them, since it
+	// resolves no root.
+	header, err := sbom.ReadHeader(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10})
+	if err != nil {
+		t.Fatalf("a header read charged a bound for something it does not keep: %v", err)
+	}
+	if header.RootDeclared {
+		t.Error("a header-only read resolved a root")
+	}
+}
+
+func TestARootStatedByRelationshipIsBoundedToo(t *testing.T) {
+	var b strings.Builder
+	b.WriteString(`{"spdxVersion": "SPDX-2.3", "relationships": [`)
+	for i := range 50 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`{"spdxElementId": "SPDXRef-DOCUMENT", "relatedSpdxElement": "SPDXRef-a",` +
+			` "relationshipType": "DESCRIBES"}`)
+	}
+	b.WriteString(`]}`)
+
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxEdges: 10}); err == nil {
+		t.Fatal("fifty statements passed a bound of ten")
+	} else if !strings.Contains(err.Error(), "dependency limit") {
+		t.Errorf("refused with %q", err)
+	}
+}
+
+func TestTheFormatADocumentDeclaredIsCarriedOut(t *testing.T) {
+	// One thing downstream needs it: the formats do not state the same facts,
+	// so a scan saying nothing about carried patches has either withdrawn them
+	// or been unable to repeat them, and those are not the same event.
+	if got := read(t, minimal).Format; got != sbom.CycloneDX {
+		t.Errorf("format is %q, want %q", got, sbom.CycloneDX)
+	}
+	if got := read(t, minimalSPDX).Format; got != sbom.SPDX {
+		t.Errorf("format is %q, want %q", got, sbom.SPDX)
+	}
+	if !sbom.CycloneDX.StatesCarriedPatches() {
+		t.Error("CycloneDX attaches a claim to the component it is about")
+	}
+	if sbom.SPDX.StatesCarriedPatches() {
+		t.Error("SPDX cannot say which vulnerability a patch resolves")
 	}
 }

@@ -52,12 +52,16 @@ type Result struct {
 	Unrooted       int
 	Unversioned    int
 	DanglingEdges  int
+	FileReferences int
 	SelfReferences int
 	// ClaimsOpened and ClaimsClosed are what changed in the build's arguments
 	// since its last scan. A build argues the same things night after night,
 	// so both being zero is the ordinary case.
 	ClaimsOpened int
 	ClaimsClosed int
+	// ClaimsUnstated counts what this scan's format could not have restated,
+	// so it was carried forward rather than read as withdrawn.
+	ClaimsUnstated int
 	// Superseded says a newer scan for this target was applied first, so this
 	// one was read no further. It is not a failure: the newer picture is the
 	// current one, and applying an older one over it would reopen everything
@@ -185,10 +189,12 @@ func (r *Reader) Run(ctx context.Context, interval time.Duration) {
 				"edges_opened", result.Applied.EdgesOpened, "edges_closed", result.Applied.EdgesClosed,
 				"suppressions", result.Suppressions,
 				"claims_opened", result.ClaimsOpened, "claims_closed", result.ClaimsClosed,
+				"claims_unstated", result.ClaimsUnstated,
 				// Tolerated rather than refused. A change in any of these says
 				// the producer changed.
 				"unrooted", result.Unrooted, "unversioned", result.Unversioned,
-				"dangling_edges", result.DanglingEdges, "self_references", result.SelfReferences,
+				"dangling_edges", result.DanglingEdges, "file_references", result.FileReferences,
+				"self_references", result.SelfReferences,
 				"documents_retained", result.Retained)
 		}
 		timer.Reset(interval)
@@ -280,7 +286,18 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 
 	// What the build argued is stored against the target, not against the
 	// scan, because it is what the next scan run has to apply.
-	claimed, err := finding.NewStore(r.db.DB).RecordClaims(ctx, scan.TargetID, scanID, claims)
+	//
+	// Where this scan could have made a claim is passed with it. A claim in a
+	// document of its own can always be restated, so not restating one is a
+	// withdrawal; a claim attached to a component can only be restated by a
+	// format that can attach one, and one of the two cannot (REQ-77). Without
+	// that, a product's first scan in the other format closes every carried
+	// patch it had and reopens every finding they suppressed.
+	stated := map[sbom.Origin]bool{
+		sbom.FromStatement: true,
+		sbom.FromPedigree:  doc.Format.StatesCarriedPatches(),
+	}
+	claimed, err := finding.NewStore(r.db.DB).RecordClaims(ctx, scan.TargetID, scanID, claims, stated)
 	if err != nil {
 		return nil, fmt.Errorf("scan %d: %w", scanID, err)
 	}
@@ -291,9 +308,11 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		Unrooted:       doc.Unrooted,
 		Unversioned:    doc.Unversioned,
 		DanglingEdges:  doc.DanglingEdges,
+		FileReferences: doc.FileReferences,
 		SelfReferences: doc.SelfReferences,
 		ClaimsOpened:   claimed.Opened, ClaimsClosed: claimed.Closed,
-		Retained: !target.Moves,
+		ClaimsUnstated: claimed.Unstated,
+		Retained:       !target.Moves,
 	}
 
 	// What the inventory was made of, kept on the scan so a receipt can say
