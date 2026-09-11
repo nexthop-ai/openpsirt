@@ -92,7 +92,7 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.Claim(ctx, granted.ID, "stub", "granted"); err != nil {
+		if err := rights.Claim(ctx, granted.ID, "granted"); err != nil {
 			t.Fatal(err)
 		}
 		if err := rights.GrantRole(ctx, granted.ID, product.ID, access.PublicRead); err != nil {
@@ -104,7 +104,7 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.Claim(ctx, ungranted.ID, "stub", "ungranted"); err != nil {
+		if err := rights.Claim(ctx, ungranted.ID, "ungranted"); err != nil {
 			t.Fatal(err)
 		}
 

@@ -6,6 +6,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import { folded, fold } from "./rail";
 import { forgetAll } from "./drafts";
+import { rememberForward, signedOutHere } from "../screens/SignIn";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -621,7 +622,18 @@ function Me({ who }: { who: Who }) {
                 // A full load rather than a route change: signing out has to
                 // drop every cached answer, and starting again is the way to
                 // be sure.
-                window.location.assign("/");
+                //
+                // Said in the address, because the sign-in screen forwards
+                // straight to the provider where there is only one — and the
+                // provider still holds its own session, so an unmarked arrival
+                // here would sign them back in and make signing out
+                // impossible.
+                // Marked in this tab as well as in the address. The address
+                // alone is lost the moment somebody presses Back, and the
+                // provider still holds its own session — so Back to any other
+                // screen would forward and sign them straight back in.
+                rememberForward();
+                window.location.assign(signedOutHere);
               }
             }}
           >

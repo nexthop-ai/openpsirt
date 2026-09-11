@@ -19,7 +19,10 @@ import (
 // fixture is a migrated database with two products, so that holding something
 // on one says nothing about the other.
 type fixture struct {
-	store    *access.Store
+	store *access.Store
+	// catalog declares products, for the tests that need one to appear after
+	// somebody was already granted something.
+	catalog  *catalog.Store
 	products map[string]int64
 	streams  map[string]int64
 	variants map[string]int64
@@ -38,6 +41,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		cat := catalog.NewStore(db.DB)
 		f := &fixture{
 			store:    access.NewStore(db.DB),
+			catalog:  cat,
 			products: map[string]int64{}, streams: map[string]int64{}, variants: map[string]int64{},
 		}
 		for _, name := range []string{"sonic", "onie"} {
@@ -411,7 +415,7 @@ func TestTheHeaderIsRefusedFromSomewhereUntrusted(t *testing.T) {
 			t.Fatal(err)
 		}
 		// The proxy asserts a username, and that is what it is matched on.
-		if err := f.store.Claim(ctx, person.ID, access.ProxyProvider, "someone"); err != nil {
+		if err := f.store.Claim(ctx, person.ID, "someone"); err != nil {
 			t.Fatal(err)
 		}
 

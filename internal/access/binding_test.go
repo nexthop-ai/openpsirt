@@ -19,7 +19,7 @@ func TestAGroupBringsTheRolesItIsBoundTo(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform", "security"})
+		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform", "security"})
 		if err != nil {
 			t.Fatalf("somebody in two mapped groups was refused: %v", err)
 		}
@@ -42,15 +42,15 @@ func TestLosingAGroupLosesWhatItGranted(t *testing.T) {
 		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform"}); err != nil {
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform"}); err != nil {
 			t.Fatal(err)
 		}
 
 		// Signing in again, no longer in the group.
-		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"unrelated"}); err == nil {
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"unrelated"}); err == nil {
 			t.Error("somebody in no mapped group was still admitted")
 		}
-		if _, err := f.store.Resolve(ctx, "proxy:someone"); err == nil {
+		if _, err := f.store.Resolve(ctx, "someone"); err == nil {
 			t.Error("the role survived leaving the group that granted it")
 		}
 	})
@@ -66,11 +66,11 @@ func TestSomebodyInNoMappedGroupIsRefusedAndNotRecorded(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, groups := range [][]string{nil, {}, {"unmapped"}, {""}} {
-			if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "a-stranger", Username: "a-stranger"}, groups); err == nil {
+			if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "a-stranger"}, groups); err == nil {
 				t.Errorf("%v admitted somebody", groups)
 			}
 		}
-		if _, err := f.store.ByIdentity(ctx, "proxy:a-stranger"); err == nil {
+		if _, err := f.store.ByIdentity(ctx, "a-stranger"); err == nil {
 			t.Error("somebody nobody authorized was recorded anyway")
 		}
 	})
@@ -100,14 +100,14 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 		}
 
 		for _, groups := range [][]string{nil, {}, {"unmapped"}} {
-			if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, groups); err == nil {
+			if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, groups); err == nil {
 				t.Errorf("%v admitted somebody on an assignment that was set aside", groups)
 			}
 		}
 
 		// And the group route still works, which is what makes the refusals
 		// above mean something.
-		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform"}); err != nil {
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform"}); err != nil {
 			t.Errorf("the mapped group did not admit them: %v", err)
 		}
 	})
@@ -119,7 +119,7 @@ func TestAGroupCanCarryAdministration(t *testing.T) {
 		if err := f.store.BindAdmin(ctx, "platform-leads"); err != nil {
 			t.Fatal(err)
 		}
-		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "a-lead", Username: "a-lead"}, []string{"platform-leads"})
+		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "a-lead"}, []string{"platform-leads"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,10 +128,10 @@ func TestAGroupCanCarryAdministration(t *testing.T) {
 		}
 
 		// And loses it on leaving.
-		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "a-lead", Username: "a-lead"}, []string{"nothing-mapped"}); err == nil {
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "a-lead"}, []string{"nothing-mapped"}); err == nil {
 			t.Error("somebody who left the administrators' group was still admitted")
 		}
-		person, err := f.store.ByIdentity(ctx, "proxy:a-lead")
+		person, err := f.store.ByIdentity(ctx, "a-lead")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -147,10 +147,10 @@ func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *
 	// path away at exactly the moment it is needed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:the-operator"}); err != nil {
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
-		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "the-operator", Username: "the-operator"}, []string{"nothing-mapped"})
+		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "the-operator"}, []string{"nothing-mapped"})
 		if err != nil {
 			t.Fatalf("somebody named in configuration was refused: %v", err)
 		}
@@ -163,22 +163,22 @@ func TestSomebodyNamedInConfigurationKeepsAdministrationWhateverTheGroupsSay(t *
 func TestNamingAdministratorsIsWhatConfigurationSaysAndNotMore(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:first", "proxy:second"}); err != nil {
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"first", "second"}); err != nil {
 			t.Fatal(err)
 		}
 		// Removed from configuration and restarted.
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:first"}); err != nil {
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"first"}); err != nil {
 			t.Fatal(err)
 		}
 
-		second, err := f.store.ByIdentity(ctx, "proxy:second")
+		second, err := f.store.ByIdentity(ctx, "second")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if second.IsBootstrap {
 			t.Error("somebody removed from configuration is still named by it")
 		}
-		first, err := f.store.ByIdentity(ctx, "proxy:first")
+		first, err := f.store.ByIdentity(ctx, "first")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,17 +233,17 @@ func TestSwitchingBackToDirectClearsWhatGroupsDerived(t *testing.T) {
 		if err := f.store.BindAdmin(ctx, "leads"); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{Provider: access.ProxyProvider, Subject: "someone", Username: "someone"}, []string{"platform", "leads"}); err != nil {
+		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform", "leads"}); err != nil {
 			t.Fatal(err)
 		}
 
 		if err := f.store.SwitchTo(ctx, access.Direct); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Resolve(ctx, "proxy:someone"); err == nil {
+		if _, err := f.store.Resolve(ctx, "someone"); err == nil {
 			t.Error("a role derived from a group outlived the mode that derived it")
 		}
-		person, err := f.store.ByIdentity(ctx, "proxy:someone")
+		person, err := f.store.ByIdentity(ctx, "someone")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -278,7 +278,7 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 		if err := f.store.UnbindAdmin(ctx, "leads"); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.NameBootstrapAdmins(ctx, []string{"proxy:the-operator"}); err != nil {
+		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
 		for _, mode := range []access.Mode{access.Direct, access.GroupBound} {
@@ -363,12 +363,12 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// Promoted here, not by a group.
-		person, err := f.store.Ensure(ctx, "proxy:bob", "Bob", true)
+		person, err := f.store.Ensure(ctx, "bob", "Bob", true)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// How they come through the door, recorded like anybody else's.
-		if err := f.store.Claim(ctx, person.ID, access.ProxyProvider, "bob"); err != nil {
+		if err := f.store.Claim(ctx, person.ID, "bob"); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.BindAdmin(ctx, "platform-admins"); err != nil {
@@ -376,8 +376,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 		}
 
 		arriving := access.Arrival{
-			Provider: access.ProxyProvider, Subject: "bob", Username: "bob",
-			DisplayName: "Bob",
+			ViaProxy: true, Username: "bob", DisplayName: "Bob",
 		}
 		if _, err := f.store.AdmitByGroups(ctx, arriving,
 			[]string{"platform-admins"}); err != nil {
@@ -391,7 +390,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 		if !back.Admin {
 			t.Error("a group that never granted administration took it away")
 		}
-		account, err := f.store.ByIdentity(ctx, "proxy:bob")
+		account, err := f.store.ByIdentity(ctx, "bob")
 		if err != nil {
 			t.Fatal(err)
 		}

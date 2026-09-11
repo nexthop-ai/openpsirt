@@ -166,7 +166,7 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 	// authorization, so somebody arriving for the first time in a mapped group
 	// is admitted and recorded then — and somebody in no mapped group is
 	// refused exactly as a stranger is.
-	person, err := admit(r, in, rights, provider.Name(), identity)
+	person, err := admit(r, in, rights, identity)
 	if err != nil {
 		if in.Logger != nil {
 			in.Logger.Info("refused somebody who authenticated but reaches nothing",
@@ -217,14 +217,14 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 
 // admit decides whether somebody who authenticated may be here, in whichever
 // way this deployment assigns roles.
-func admit(r *http.Request, in Ingest, rights *access.Store, provider string, identity *signin.Identity) (*access.Account, error) {
+func admit(r *http.Request, in Ingest, rights *access.Store, identity *signin.Identity) (*access.Account, error) {
 	// Matched on the provider's own stable identifier, with the username only
 	// redeeming an authorization nobody has pinned yet. A username moves —
 	// people rename themselves, and a forge login left behind can be taken by
 	// somebody else — so matching on it would eventually hand one person's
 	// access to another.
 	who := access.Arrival{
-		Provider: provider, Subject: identity.Subject,
+		Subject:  identity.Subject,
 		Username: identity.Username, DisplayName: identity.DisplayName,
 	}
 
@@ -232,10 +232,10 @@ func admit(r *http.Request, in Ingest, rights *access.Store, provider string, id
 		if _, err := rights.AdmitByGroups(r.Context(), who, identity.Groups); err != nil {
 			return nil, err
 		}
-		return rights.MatchProvider(r.Context(), who.Provider, who.Subject, who.Username)
+		return rights.MatchProvider(r.Context(), who.Subject, who.Username)
 	}
 
-	person, err := rights.MatchProvider(r.Context(), who.Provider, who.Subject, who.Username)
+	person, err := rights.MatchProvider(r.Context(), who.Subject, who.Username)
 	if err != nil {
 		return nil, err
 	}

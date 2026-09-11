@@ -5,15 +5,11 @@
 // finding and in the work list and "AC" in the rail — the same person with two
 // avatars on one screen, which reads as two people.
 //
-// The provider prefix goes first: an identity is written `provider:username`,
-// and taking the first letters of "proxy" says nothing about anybody. What is
-// left is split on the separators a username actually uses, the `@` among
-// them, so a mail address gives the local part rather than the domain.
+// An identity is a username, so it is split on the separators a username
+// actually uses — the `@` among them, so a mail address gives the local part
+// rather than the domain.
 export function initials(name: string): string {
-  const parts = name
-    .replace(/^[a-z]+:/, "")
-    .split(/[\s._@-]+/)
-    .filter(Boolean);
+  const parts = name.split(/[\s._@-]+/).filter(Boolean);
   if (parts.length === 0) {
     return "?";
   }

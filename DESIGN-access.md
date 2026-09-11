@@ -30,6 +30,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [How a group name is matched](#how-a-group-name-is-matched)
 - [Role assignment modes](#role-assignment-modes)
 - [The grant grid](#the-grant-grid)
+- [A role across every product](#a-role-across-every-product)
 - [Personal tokens](#personal-tokens)
 - [Where each check is made](#where-each-check-is-made)
 - [Browser headers](#browser-headers)
@@ -455,9 +456,16 @@ being applied correctly to it.
 
 ## Provider sign-in
 
-Two adapters behind one interface. One speaks OpenID Connect, for an identity
-provider. The other speaks plain OAuth 2.0, for a forge that issues no identity
-token and publishes no discovery document, so the account has to be asked about.
+Two adapters behind one interface, **one of them configured at a time**. One
+speaks OpenID Connect, for an identity provider. The other speaks plain OAuth
+2.0, for a forge that issues no identity token and publishes no discovery
+document, so the account has to be asked about.
+
+| Rule | Reason |
+|---|---|
+| Configuring both stops the process, naming the two settings | An identity here is a username (REQ-41). Two providers issuing usernames independently make the same name either one person or two, and nothing in the record says which — so the ambiguity is refused rather than resolved by whichever arrived first |
+| Configuring none is not a fault | It is the arrangement where a reverse proxy authenticates instead |
+| Refused at startup, not at a sign-in | A deployment whose sign-in is broken should be visible to whoever started it, rather than to the first person who tries to use it |
 
 The exchange happens here and the browser gets a session of this deployment's. A
 provider's token is never handed to a page: one of them is opaque and this API
@@ -505,7 +513,8 @@ it re-resolves the issuer's name each time.
 ## Trusted-header sign-in
 
 A reverse proxy authenticates and passes the username on, which lets a deployment
-run with no provider at all.
+run with no provider at all — or alongside one, where the name it asserts is the
+same person as that name at the provider.
 
 Two guardrails, both deliberate acts: naming the header, and naming the sources
 it is honored from. Trusting it unconditionally would let anybody who can reach
@@ -530,10 +539,28 @@ username and its own identifier. **Only the second is stable.**
 | Failure closed | How |
 |---|---|
 | A username moves | People rename themselves at work, and a forge login can be renamed and the name then registered by somebody else. The newcomer's identifier does not match what was pinned, so they are refused, while the original holder is still recognized under their new name |
-| A username is only unique within its provider | A deployment with two providers would otherwise treat `alice` at each as one person. Every lookup is scoped to the provider, including the one on the identifier — providers do not coordinate, and plenty issue small numbers |
 
 Pinning at first use is what lets authorization stay in advance: an administrator
 cannot know an identifier before somebody has arrived.
+
+### One identity, two arrival paths
+
+An identity is a username, unqualified by the path it arrived on (REQ-41). One
+provider is configured at a time, and a username a trusted proxy asserts is the
+same person as that username at the provider.
+
+| Arrival | Matched by | Binds |
+|---|---|---|
+| The provider | Its identifier where one is bound; otherwise the name, which binds it | The identifier, at that sign-in |
+| A trusted proxy | The name | Nothing |
+
+| Rule | Reason |
+|---|---|
+| A proxy binds nothing, and the provider binds afterwards | A proxy has no identifier to offer. Leaving the authorization unbound is what lets the provider still redeem it at a later sign-in, so the order somebody first arrives in does not decide which path keeps working |
+| A bound identifier does not refuse a proxy arrival | The mismatch refusal protects a name that moved between people at the provider. A deployment trusting the header has already granted whatever sets it the power to claim to be anybody, so believing the name it asserts adds nothing |
+| Which path an arrival took is stated, never inferred from an empty identifier | It decides whether an identifier is bound and whether a mismatch refuses. An authorization boundary that turns on a field somebody could leave empty by accident fails in the quiet direction |
+| A username is folded, an identifier is not | The name is both halves of the rule at once now: an administrator types it to authorize somebody, and a provider reports it at every sign-in. The typed rule wins because the failure runs that way — "Alice" recorded against "alice" reported leaves an authorization nobody can redeem, and under group-bound admission a second account beside the first. Normalized as it is stored, so no engine's collation decides it (REQ-08) |
+| An identifier is unbound by an administrator, never by a sign-in | An identifier belongs to the provider that issued it, so changing provider leaves every account pinned to one that refuses its holder — the name matches and the identifier does not. Clearing it is an administrative act with the authorization left in place; doing it automatically would undo, at the moment it was working, the protection that stops a released name being redeemed by whoever took it |
 
 ## Sessions and request forgery
 
@@ -617,9 +644,34 @@ order.
 
 | Feature | Reason |
 |---|---|
-| The row across the top is every product at once | Checked where they hold that capability everywhere, partial where they hold it somewhere, and pressing it grants or withdraws only the difference. Granting a reviewer the same capability on eight products was twenty-four gestures, and the chips gave no way to tell "on all eight" from "on six of eight" |
+| The row across the top is the estate grant | Checked where one is held, indeterminate where they hold the role on some products and not across the estate. The two are different facts, and drawing them alike is what made "on all eight" indistinguishable from "on six of eight" |
+| A product row covered by the estate grant is drawn and cannot be changed there | It is withdrawn where it was granted. Accepting a click that would have to expand the estate grant into per-product rows is the freezing this replaced |
 | A role derived from a group is drawn and cannot be changed here | It is withdrawn by changing the group, so the box is disabled and says so rather than accepting a click the next sign-in would undo. Where the deployment takes its roles from groups, the grid is not offered |
 | A capability granted where nothing is readable is marked as it is granted | Approver and assigner are bounded by what their holder may read. That was already said after the fact, on the row; the cell says it where somebody is about to do it |
+| The grid is offered before any product is declared | The estate row is meaningful with an empty catalog, because what it covers is worked out when somebody asks. A screen that said "nothing to grant on" left a fresh deployment with no way to arrange access before the catalog |
+
+## A role across every product
+
+One standing grant, covering products declared afterwards without anybody being
+re-granted anything (REQ-42).
+
+| Rule | Reason |
+|---|---|
+| One grant, never a copy per product | A grant that expands records the products of the moment it was made. The interface offered exactly that, as a button issuing one ordinary grant per product then in the catalog, so a product declared afterwards was silently uncovered and the box fell back to partial |
+| What it covers is worked out when somebody asks | The catalog is read as the subject is resolved, which is what makes "declared afterwards" true without anything being rewritten |
+| It narrows by visibility exactly as a per-product grant does | A role held across the estate is still a role of one visibility. This is the trap: the queries carry a flag for "every product" that means no narrowing at all, visibility included, and it belongs to the deployment's own background passes. An estate grant setting it would hand somebody granted disclosed reading every undisclosed finding there is (REQ-43) |
+| Withdrawn whole, leaving nothing behind | Expanding into per-product grants at withdrawal records the catalog of that day, which is the same defect by the back door. Anything still wanted on one product is granted there deliberately |
+| Withdrawing it hands back the work it was holding | It is the last role in every product at once, and a finding assigned to somebody who can no longer open it is in no list at all: out of the shared queue because it is assigned, and out of theirs because they cannot reach it. Asked per product, exactly as withdrawing a per-product role is |
+| Every question about what somebody holds asks this table too | A grant that only a resolved subject can see is invisible to the predicates that read the grant tables directly — whether somebody may be handed a finding, who may be mentioned, whether their last role in a product has gone, and whether an approver still holds the right they used. Each of those is asked of both tables |
+| A query outside the access package naming one table and not the other is refused | Checked rather than remembered. Five predicates missed the second kind of grant the day it was added, each answering no for somebody who held the role — which compiles and passes. The duplicate-insert check for a per-product grant is the one reader that must stay narrow, and it is inside the package where the two are resolved |
+| Withdrawing one product from it is not offered | "All except one" is a third kind of fact, with its own storage, its own narrowing and its own meaning in an access review |
+| Set aside and restored by a change of role-assignment mode | It is an assignment, so the act that makes switching reversible covers it. Nothing derives one: a group binding names a product |
+| Stored in its own table rather than as a grant with no product | All four engines treat NULLs in a unique key as distinct from each other, so a nullable product would let duplicate estate rows accumulate with the database enforcing nothing — and the partial index that fixes it is engine-specific (REQ-71) |
+
+A personal token narrowed to one product intersects with it the same way it
+intersects with anything else: the estate role is already among what its owner
+holds on that product, so the narrowed credential reaches that product and no
+more.
 
 ## Personal tokens
 

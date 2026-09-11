@@ -23,7 +23,7 @@ import (
 func TestGrantingARoleDoesNotAskWhetherItWorks(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		recorded := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
-			`{"identity":"ana","display_name":"Ana","provider":"proxy","username":"ana",`+
+			`{"identity":"ana","display_name":"Ana",`+
 				`"holds":[{"product":"mine","role":"public-read"}]}`)
 		if recorded.Code != http.StatusCreated {
 			t.Fatalf("recording somebody with a role answered %d: %s",
@@ -40,7 +40,7 @@ func TestGrantingARoleDoesNotAskWhetherItWorks(t *testing.T) {
 					Source    string `json:"source"`
 				} `json:"holds"`
 				SignsInBy []struct {
-					Provider string `json:"provider"`
+					Username string `json:"username"`
 				} `json:"signs_in_by"`
 			} `json:"item"`
 		}
@@ -55,7 +55,9 @@ func TestGrantingARoleDoesNotAskWhetherItWorks(t *testing.T) {
 			t.Errorf("the reply describes the grant as %+v, which is not what was recorded",
 				made.Item.Holds[0])
 		}
-		if len(made.Item.SignsInBy) != 1 || made.Item.SignsInBy[0].Provider != "proxy" {
+		// Recording somebody records the way they arrive, without being asked
+		// for it: an identity is the username, whichever path it comes down.
+		if len(made.Item.SignsInBy) != 1 || made.Item.SignsInBy[0].Username != "ana" {
 			t.Errorf("the reply does not say how she can arrive: %s", recorded.Body.String())
 		}
 
@@ -135,8 +137,7 @@ func TestATokenCannotMintACredentialThatOutlivesIt(t *testing.T) {
 			body string
 		}{
 			{"record a person", "/v1/people",
-				`{"identity":"made-by-token","display_name":"Made","provider":"proxy",` +
-					`"username":"made-by-token","admin":true}`},
+				`{"identity":"made-by-token","display_name":"Made","admin":true}`},
 			{"create a key", "/v1/keys",
 				`{"name":"made-by-token","product":"mine"}`},
 		} {
@@ -153,8 +154,7 @@ func TestATokenCannotMintACredentialThatOutlivesIt(t *testing.T) {
 		// The same acts still work for the same person when they have signed
 		// in, so what is refused is the credential rather than the right.
 		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
-			`{"identity":"made-by-session","display_name":"Made","provider":"proxy",`+
-				`"username":"made-by-session"}`); got.Code != http.StatusCreated {
+			`{"identity":"made-by-session","display_name":"Made"}`); got.Code != http.StatusCreated {
 			t.Errorf("an administrator signing in could not record a person: %d %s",
 				got.Code, got.Body.String())
 		}

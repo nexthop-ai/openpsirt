@@ -46,12 +46,12 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 			},
 			{
 				what: "an account", method: http.MethodPost, path: "/v1/people",
-				body: `{"identity":"newcomer","provider":"proxy","username":"newcomer"}`,
+				body: `{"identity":"newcomer"}`,
 				kind: "account", about: "newcomer",
 			},
 			{
 				what: "a role granted", method: http.MethodPost, path: "/v1/people",
-				body: `{"identity":"newcomer","provider":"proxy","username":"newcomer",` +
+				body: `{"identity":"newcomer",` +
 					`"holds":[{"product":"mine","role":"public-read"}]}`,
 				kind: "role", about: "newcomer on mine",
 			},

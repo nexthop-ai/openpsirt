@@ -563,6 +563,7 @@ var tables = []string{
 	"group_role",
 	"session",
 	"api_key",
+	"role_grant_all",
 	"role_grant",
 	// Before person and product, which they point at.
 	"vex_statement",

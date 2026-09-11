@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -32,13 +31,26 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	if err != nil {
 		return nil, err
 	}
+	estate, err := store.EstateGrants(ctx, person.ID)
+	if err != nil {
+		return nil, err
+	}
 	body := &PersonBody{
 		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
 		Email: person.Email, EmailSource: string(person.EmailSource),
 	}
 	for _, door := range doors {
 		body.SignsInBy = append(body.SignsInBy, SignInBody{
-			Provider: door.Provider, Username: door.Username, Pinned: door.Subject != nil,
+			Username: door.Username, Pinned: door.Subject != nil,
+		})
+	}
+	// The estate grants first, because they are the wider statement and a
+	// reader scanning the list should meet "everywhere" before the exceptions
+	// to it.
+	for _, grant := range estate {
+		body.Holds = append(body.Holds, HeldBody{
+			Everywhere: true, Role: string(grant.Role),
+			Effective: grant.Active, Source: string(grant.Source),
 		})
 	}
 	for _, grant := range held {
@@ -138,9 +150,11 @@ func seesNothing(held []HeldBody) bool {
 type RecordBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"What to call them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"What to show instead of the identity"`
-	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
-	Provider    string `json:"provider,omitempty" doc:"Which sign-in path they will arrive by, such as proxy for a trusted header"`
-	Username    string `json:"username,omitempty" doc:"What that provider calls them. Defaults to the identity"`
+	// Admin is a pointer so that three things stay distinguishable: making
+	// somebody an administrator, taking it away, and saying nothing about it.
+	// A plain bool decodes an absent field as false, so granting a role — a
+	// request that says nothing about administration — withdrew it.
+	Admin *bool `json:"admin,omitempty" doc:"Whether they administer this deployment. Omit it to leave it as it is"`
 	// Email is where to reach them outside the application. Optional:
 	// without one somebody is told nothing outside it and keeps the area
 	// inside it. A provider that verifies an address fills in one nobody
@@ -154,15 +168,20 @@ type RecordBody struct {
 	Holds []GrantBody `json:"holds,omitempty"`
 }
 
-// GrantBody is one role against one product, as a request states it.
+// GrantBody is one role, as a request states it.
 type GrantBody struct {
-	Product string `json:"product" minLength:"1" doc:"The product the role is held against"`
+	// Product is the one it is held against, or empty with Everywhere set.
+	Product string `json:"product,omitempty" doc:"The product the role is held against. Omit it and set everywhere instead to hold it across the estate"`
 	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
+	// Everywhere holds the role across every product, including products
+	// declared afterwards. Stated rather than implied by an absent product,
+	// so that a caller that forgot the product is refused instead of quietly
+	// granting the widest thing there is.
+	Everywhere bool `json:"everywhere,omitempty" doc:"Hold it across every product, including products declared later. The product is then omitted"`
 }
 
-// SignInBody is one way somebody may arrive.
+// SignInBody is how somebody may arrive.
 type SignInBody struct {
-	Provider string `json:"provider"`
 	Username string `json:"username"`
 	// Pinned says the provider's own identifier has been bound, which happens
 	// at the first successful sign-in. Until then the authorization is still
@@ -172,8 +191,15 @@ type SignInBody struct {
 
 // HeldBody is one role against one product.
 type HeldBody struct {
-	Product string `json:"product" minLength:"1" doc:"The product the role is held against"`
-	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
+	// Product is the one it is held against, absent where it is held across
+	// every product.
+	Product string `json:"product,omitempty" doc:"The product the role is held against. Absent where it is held across every product"`
+	// Everywhere says it is held across the estate, covering products
+	// declared afterwards. Reported rather than left to be inferred from an
+	// absent product: an access review asks what somebody holds, and "on
+	// nothing" and "on everything" must not read alike.
+	Everywhere bool   `json:"everywhere,omitempty" doc:"Held across every product, including products declared later"`
+	Role       string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
 	// Effective says whether this grants anything right now. An assignment set
 	// aside by a change of role-assignment mode is kept so the change can be
 	// undone, and it grants nothing while it sits there — so it is shown, and
@@ -231,6 +257,12 @@ func registerAdministration(api huma.API, a Administering) {
 		if err != nil {
 			return nil, err
 		}
+		// Read once for everybody, like the per-product grants beside it. A
+		// query per person is what makes a long list slow.
+		everywhere, err := store.EveryEstateGrant(ctx)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot list what people hold everywhere", err)
+		}
 
 		out := &listOutput[PersonBody]{}
 		out.Body.Items = make([]PersonBody, 0, len(people))
@@ -244,7 +276,13 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			for _, door := range doors {
 				body.SignsInBy = append(body.SignsInBy, SignInBody{
-					Provider: door.Provider, Username: door.Username, Pinned: door.Subject != nil,
+					Username: door.Username, Pinned: door.Subject != nil,
+				})
+			}
+			for _, grant := range everywhere[person.ID] {
+				body.Holds = append(body.Holds, HeldBody{
+					Everywhere: true, Role: string(grant.Role),
+					Effective: grant.Active, Source: string(grant.Source),
 				})
 			}
 			for _, grant := range held[person.ID] {
@@ -275,35 +313,41 @@ func registerAdministration(api huma.API, a Administering) {
 			return nil, err
 		}
 
-		_, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
+		before, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
 		created := lookupErr != nil
 
-		// Recording somebody is not the same as recording how they sign in,
-		// and access without a way to arrive is access nobody can use. So the
-		// door is recorded with them, and a first recording that names none is
-		// refused rather than half-done.
-		provider := strings.TrimSpace(in.Body.Provider)
-		username := strings.TrimSpace(in.Body.Username)
-		if username == "" {
-			username = strings.TrimSpace(in.Body.Identity)
+		// Recording somebody records the way they sign in, because access
+		// without a way to arrive is access nobody can use. The identity is
+		// that way: one provider is configured at a time and a username a
+		// trusted proxy asserts is the same person, so there is nothing left
+		// to ask for and nothing left to get wrong.
+		// Omitting administration leaves it as it is, the same way omitting an
+		// address does. A request that says nothing about it — granting a role
+		// on a product, say — decided it when this was a plain bool, so
+		// ticking a role withdrew administration from whoever had it.
+		administers := before != nil && before.IsAdmin
+		if in.Body.Admin != nil {
+			administers = *in.Body.Admin
 		}
-		if created && provider == "" {
-			return nil, huma.Error422UnprocessableEntity(
-				"say which provider they will sign in by, or they are somebody with access and no way to use it")
-		}
-
-		person, err := store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName, in.Body.Admin)
+		person, err := store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName, administers)
 		if err != nil {
 			return nil, huma.Error400BadRequest(err.Error())
 		}
 		if created {
 			noteAdminChange(ctx, a, trail.Account, in.Body.Identity, nil,
 				trail.Said("recorded", true))
+		} else if before != nil && in.Body.Admin != nil && before.IsAdmin != *in.Body.Admin {
+			// Administration is global and is the widest thing anybody here
+			// holds, so a change to it is recorded with what it changed from
+			// (REQ-22). Only where it actually moved: recording somebody again
+			// to add a role would otherwise write a line saying nothing
+			// changed.
+			noteAdminChange(ctx, a, trail.Account, in.Body.Identity,
+				trail.Said("administrator", before.IsAdmin),
+				trail.Said("administrator", *in.Body.Admin))
 		}
-		if provider != "" {
-			if err := store.Claim(ctx, person.ID, provider, username); err != nil {
-				return nil, asked(a.Logger, err)
-			}
+		if err := store.Claim(ctx, person.ID, in.Body.Identity); err != nil {
+			return nil, asked(a.Logger, err)
 		}
 		// Recorded here, so it outranks whatever a provider states
 		// later . A request that says nothing about an address leaves
@@ -334,6 +378,22 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 		}
 		for _, hold := range in.Body.Holds {
+			if hold.Everywhere {
+				if hold.Product != "" {
+					return nil, huma.Error422UnprocessableEntity(
+						"a role is held against one product or across every product, not both")
+				}
+				if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
+					return nil, huma.Error400BadRequest(err.Error())
+				}
+				noteAdminChange(ctx, a, trail.Role, in.Body.Identity+" on every product",
+					nil, trail.Said(hold.Role, true))
+				continue
+			}
+			if hold.Product == "" {
+				return nil, huma.Error422UnprocessableEntity(
+					"say which product the role is held against, or set everywhere")
+			}
 			product, err := names.ProductByName(ctx, hold.Product)
 			if err != nil {
 				return nil, huma.Error404NotFound(err.Error())
@@ -426,6 +486,112 @@ func registerAdministration(api huma.API, a Administering) {
 			return nil, wentWrong(a.Logger, "cannot hand back what they were dealing with", err)
 		}
 		out.Body.Released = released
+		return out, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "unbind-identifier", Method: http.MethodDelete,
+		Path:    "/v1/people/{identity}/identifier",
+		Summary: "Unbind a user's provider identifier",
+		Description: "Clears the identifier a sign-in provider pinned to somebody, so that the " +
+			"next person to arrive under their username binds it again. Their authorization and " +
+			"their roles are untouched.\n\n" +
+			"**Use it after changing sign-in provider.** An identifier belongs to the provider " +
+			"that issued it, so every account pinned to the old one is refused once a new one is " +
+			"configured: the name matches and the identifier does not.\n\n" +
+			"It re-opens the window a pinned identifier closes, in which whoever arrives under " +
+			"that username is taken to be its holder. Do it when you expect them to sign in.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, in *struct {
+		Identity string `path:"identity"`
+	}) (*struct{}, error) {
+		store, _, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		person, err := store.ByIdentity(ctx, in.Identity)
+		if err != nil {
+			return nil, noSuchPerson()
+		}
+		if err := store.UnbindIdentifier(ctx, person.ID); err != nil {
+			return nil, wentWrong(a.Logger, "cannot unbind how they sign in", err)
+		}
+		noteAdminChange(ctx, a, trail.Account, in.Identity,
+			trail.Said("identifier bound", true), trail.Said("identifier bound", false))
+		return &struct{}{}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "withdraw-estate-role", Method: http.MethodDelete,
+		Path:    "/v1/people/{identity}/roles/{role}",
+		Summary: "Withdraw a user's role on every product",
+		Description: "Withdraws a role held across the estate. Takes effect at their next " +
+			"request; end their sessions to cut them off now.\n\n" +
+			"It leaves no per-product grants in its place: anything still wanted on one " +
+			"product is granted there deliberately. Roles held against a named product are " +
+			"untouched, and are withdrawn one at a time through the path that names the " +
+			"product.\n\n" +
+			"Where this was their last role in a product, what they were dealing with there " +
+			"goes back to the unassigned list. `released` says how much moved in total.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, in *struct {
+		Identity string `path:"identity"`
+		Role     string `path:"role"`
+	}) (*struct {
+		Body struct {
+			Released int64 `json:"released" doc:"Findings handed back because that was their last role there"`
+		}
+	}, error) {
+		subject, err := requester(ctx)
+		if err != nil {
+			return nil, err
+		}
+		store, _, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		person, err := store.ByIdentity(ctx, in.Identity)
+		if err != nil {
+			return nil, noSuchPerson()
+		}
+		if err := store.WithdrawEstateRole(ctx, person.ID, access.Role(in.Role)); err != nil {
+			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)
+		}
+		noteAdminChange(ctx, a, trail.Role, in.Identity+" on every product",
+			trail.Said(in.Role, true), nil)
+
+		out := &struct {
+			Body struct {
+				Released int64 `json:"released" doc:"Findings handed back because that was their last role there"`
+			}
+		}{}
+		// The same reason the per-product withdrawal releases work: their last
+		// role in a product going is what turns their assigned findings into
+		// work nobody can reach — assigned, so out of the shared queue, and
+		// assigned to somebody who can no longer open it. An estate role is
+		// the last role in every product at once, so this asks for each.
+		covered, err := store.ProductsCovered(ctx)
+		if err != nil {
+			return nil, wentWrong(a.Logger, "cannot read what the grant covered", err)
+		}
+		for _, productID := range covered {
+			remaining, err := store.HoldsAnythingIn(ctx, person.ID, productID)
+			if err != nil {
+				return nil, wentWrong(a.Logger, "cannot read what they still hold", err)
+			}
+			if remaining || a.Findings == nil {
+				continue
+			}
+			findings := a.Findings()
+			if findings == nil {
+				continue
+			}
+			released, err := findings.ReleaseIn(ctx, subject, person.PartyID, productID)
+			if err != nil {
+				return nil, wentWrong(a.Logger, "cannot hand back what they were dealing with", err)
+			}
+			out.Body.Released += released
+		}
 		return out, nil
 	})
 }

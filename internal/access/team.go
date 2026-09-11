@@ -341,7 +341,23 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 	if err != nil {
 		return false, fmt.Errorf("read whether they may see this: %w", err)
 	}
-	return reads, nil
+	if reads {
+		return true, nil
+	}
+	// A role held across every product is held here too. Asked as a second
+	// statement rather than folded into the one above, because this table
+	// names no product and a join would have to invent one.
+	everywhere, err := s.db.NewSelect().
+		TableExpr("role_grant_all AS rga").
+		Column("rga.id").
+		Where("rga.person_id = ?", personID).
+		Where("rga.active = ?", true).
+		Where("rga.role IN (?)", bun.List(enough)).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether they may see this anywhere: %w", err)
+	}
+	return everywhere, nil
 }
 
 // rolesReading is which roles are enough to read at a visibility, asked of the
@@ -392,5 +408,19 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	if err != nil {
 		return false, fmt.Errorf("read whether anybody on that team may see this: %w", err)
 	}
-	return reads, nil
+	if reads {
+		return true, nil
+	}
+	everywhere, err := s.db.NewSelect().
+		TableExpr("team_member AS tmm").
+		Join(`JOIN "role_grant_all" AS rga ON rga.person_id = tmm.person_id`).
+		Column("tmm.person_id").
+		Where("tmm.team_id = ?", teamID).
+		Where("rga.active = ?", true).
+		Where("rga.role IN (?)", bun.List(enough)).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether anybody on that team may see this anywhere: %w", err)
+	}
+	return everywhere, nil
 }

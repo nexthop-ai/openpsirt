@@ -1316,6 +1316,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/people/{identity}/identifier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unbind a user's provider identifier
+         * @description Clears the identifier a sign-in provider pinned to somebody, so that the next person to arrive under their username binds it again. Their authorization and their roles are untouched.
+         *
+         *     **Use it after changing sign-in provider.** An identifier belongs to the provider that issued it, so every account pinned to the old one is refused once a new one is configured: the name matches and the identifier does not.
+         *
+         *     It re-opens the window a pinned identifier closes, in which whoever arrives under that username is taken to be its holder. Do it when you expect them to sign in.
+         *
+         *     **Requires:** administrator
+         */
+        delete: operations["unbind-identifier"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/people/{identity}/roles/{product}/{role}": {
         parameters: {
             query?: never;
@@ -1337,6 +1363,32 @@ export interface paths {
          *     **Requires:** administrator
          */
         delete: operations["withdraw-role"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/people/{identity}/roles/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a user's role on every product
+         * @description Withdraws a role held across the estate. Takes effect at their next request; end their sessions to cut them off now.
+         *
+         *     It leaves no per-product grants in its place: anything still wanted on one product is granted there deliberately. Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
+         *
+         *     Where this was their last role in a product, what they were dealing with there goes back to the unassigned list. `released` says how much moved in total.
+         *
+         *     **Requires:** administrator
+         */
+        delete: operations["withdraw-estate-role"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5733,8 +5785,10 @@ export interface components {
             items: components["schemas"]["ReleasePointBody"][] | null;
         };
         GrantBody: {
-            /** @description The product the role is held against */
-            product: string;
+            /** @description Hold it across every product, including products declared later. The product is then omitted */
+            everywhere?: boolean;
+            /** @description The product the role is held against. Omit it and set everywhere instead to hold it across the estate */
+            product?: string;
             /**
              * @description What they may do with it
              * @enum {string}
@@ -5781,8 +5835,10 @@ export interface components {
         HeldBody: {
             /** @description Whether this grants anything right now */
             effective: boolean;
-            /** @description The product the role is held against */
-            product: string;
+            /** @description Held across every product, including products declared later */
+            everywhere?: boolean;
+            /** @description The product the role is held against. Absent where it is held across every product */
+            product?: string;
             /**
              * @description What they may do with it
              * @enum {string}
@@ -7221,7 +7277,7 @@ export interface components {
              * @example https://example.com/schemas/RecordBody.json
              */
             readonly $schema?: string;
-            /** @description Whether they administer this deployment */
+            /** @description Whether they administer this deployment. Omit it to leave it as it is */
             admin?: boolean;
             /** @description What to show instead of the identity */
             display_name?: string;
@@ -7230,10 +7286,6 @@ export interface components {
             holds?: components["schemas"]["GrantBody"][] | null;
             /** @description What to call them here */
             identity: string;
-            /** @description Which sign-in path they will arrive by, such as proxy for a trusted header */
-            provider?: string;
-            /** @description What that provider calls them. Defaults to the identity */
-            username?: string;
         };
         "Redact-attachmentRequest": {
             /**
@@ -7772,7 +7824,6 @@ export interface components {
         };
         SignInBody: {
             pinned: boolean;
-            provider: string;
             username: string;
         };
         SimilarBody: {
@@ -8330,6 +8381,19 @@ export interface components {
             reach: components["schemas"]["CanBody"][] | null;
             /** @description An address is recorded for them, so anything can be sent at all */
             reachable?: boolean;
+        };
+        "Withdraw-estate-roleResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Withdraw-estate-roleResponse.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Findings handed back because that was their last role there
+             */
+            released: number;
         };
         "Withdraw-roleResponse": {
             /**
@@ -10360,6 +10424,35 @@ export interface operations {
             };
         };
     };
+    "unbind-identifier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "withdraw-role": {
         parameters: {
             query?: never;
@@ -10380,6 +10473,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Withdraw-roleResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-estate-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Withdraw-estate-roleResponse"];
                 };
             };
             /** @description Error */
