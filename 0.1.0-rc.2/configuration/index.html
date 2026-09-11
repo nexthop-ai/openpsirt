@@ -1,0 +1,1267 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Track vulnerabilities in the products you ship.">
+      
+      
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../reference/api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/openpsirt-mark.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Configuration - OpenPSIRT</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/brand.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="OpenPSIRT" class="md-header__button md-logo" aria-label="OpenPSIRT" data-md-component="logo">
+      
+  <img src="../assets/openpsirt-mark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenPSIRT
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/nexthop-ai/openpsirt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="OpenPSIRT" class="md-nav__button md-logo" aria-label="OpenPSIRT" data-md-component="logo">
+      
+  <img src="../assets/openpsirt-mark.svg" alt="logo">
+
+    </a>
+    OpenPSIRT
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/nexthop-ai/openpsirt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#serving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serving
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scanning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scanning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-install-that-cannot-reach-the-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An install that cannot reach the network
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telling-people" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telling people
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publishing-advisories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing advisories
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#who-may-sign-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who may sign in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Who may sign in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-openid-connect-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An OpenID Connect provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-proxy-that-says-who-somebody-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A proxy that says who somebody is
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-files-hanging-off-a-finding-are-kept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where files hanging off a finding are kept
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-scan-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a scan file
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/privileges/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#serving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serving
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scanning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scanning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-install-that-cannot-reach-the-network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An install that cannot reach the network
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telling-people" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telling people
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publishing-advisories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing advisories
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#who-may-sign-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who may sign in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Who may sign in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-openid-connect-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An OpenID Connect provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-proxy-that-says-who-somebody-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A proxy that says who somebody is
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-files-hanging-off-a-finding-are-kept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where files hanging off a finding are kept
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-scan-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a scan file
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
+<p>Every setting comes from the environment, and every name starts with
+<code>OPENPSIRT_</code>. Each one has a working default, so the process starts with
+nothing set but a database — and a value that is set and cannot be read stops
+the process with the variable named, rather than falling back to the default.
+A switch spelled wrongly that silently reads as its opposite is worse than a
+refusal to start.</p>
+<p>A switch takes <code>true</code> or <code>false</code> (also <code>1</code>, <code>0</code>, <code>t</code>, <code>f</code>, in any case). A
+duration is written as Go reads it: <code>30s</code>, <code>5m</code>, <code>12h</code>. A number is a positive
+whole number; zero reads as unset everywhere, so it is refused rather than
+taken.</p>
+<h2 id="serving">Serving<a class="headerlink" href="#serving" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_ADDR</code></td>
+<td>The <code>host:port</code> the HTTP server listens on</td>
+<td><code>:8080</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_BASE_URL</code></td>
+<td>The address people arrive on. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PLAIN_HTTP</code></td>
+<td>Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SHUTDOWN_GRACE</code></td>
+<td>How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that</td>
+<td><code>15s</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_LOG_LEVEL</code></td>
+<td><code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code></td>
+<td><code>info</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_LOG_FORMAT</code></td>
+<td><code>text</code> or <code>json</code></td>
+<td><code>text</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_DATABASE_URL</code></td>
+<td>Which database and how to reach it: <code>postgres://user:password@host:5432/name</code>, <code>mysql://…</code>, <code>mariadb://…</code>, or <code>sqlite:///absolute/path.db</code>. SQLite is for development and a single-pod trial, never production. <strong>Required</strong></td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_AUTO_MIGRATE</code></td>
+<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_MAX_OPEN</code></td>
+<td>Most connections open at once</td>
+<td><code>25</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_MAX_IDLE</code></td>
+<td>Most connections kept open idle</td>
+<td><code>25</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_IDLE_TIMEOUT</code></td>
+<td>How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back</td>
+<td><code>1m</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_CONN_LIFETIME</code></td>
+<td>How long a connection is used before it is replaced</td>
+<td><code>30m</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="scanning">Scanning<a class="headerlink" href="#scanning" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_SCANNER_PATH</code></td>
+<td>Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>GRYPE_DB_CACHE_DIR</code></td>
+<td>Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written</td>
+<td><code>/var/cache/openpsirt/grype</code></td>
+</tr>
+<tr>
+<td><code>GRYPE_DB_AUTO_UPDATE</code></td>
+<td>Whether the scanner fetches its own vulnerability data. Set it to <code>false</code> where the deployment cannot reach the network, and put the data there yourself — see below</td>
+<td><code>true</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="an-install-that-cannot-reach-the-network">An install that cannot reach the network<a class="headerlink" href="#an-install-that-cannot-reach-the-network" title="Permanent link">&para;</a></h3>
+<p>The scanner's vulnerability data is not shipped in the image: it changes daily
+and the image does not. A deployment that can reach the network downloads it
+itself and nothing here needs doing.</p>
+<p>One that cannot needs the data carried across, and carrying it is a build
+target rather than a list of steps:</p>
+<pre><code>make scanner-db
+</code></pre>
+<p>It produces <code>dist/openpsirt-scanner-db-&lt;date&gt;.tar.gz</code> and its checksum, using
+<strong>the scanner the image carries</strong> — the format is the scanner's, and a bundle
+built by a different version is one that may not load. Before it says it
+succeeded it runs that same scanner against the bundle <strong>with the network off
+and auto-update refused</strong>, which is the configuration on the far side of the
+gap: a bundle that merely exists is what the target refuses to produce.</p>
+<p>On the far side, check the bundle before trusting it, unpack it into
+<code>GRYPE_DB_CACHE_DIR</code>, and set <code>GRYPE_DB_AUTO_UPDATE=false</code>:</p>
+<pre><code>make scanner-db-verify BUNDLE=openpsirt-scanner-db-&lt;date&gt;.tar.gz
+</code></pre>
+<p>The verification is available there as well as here on purpose. "It built" and
+"it loads where it has to" are different claims, and the second is the one an
+air-gapped install depends on — in the one situation where trying it out first
+is not available.</p>
+<h2 id="telling-people">Telling people<a class="headerlink" href="#telling-people" title="Permanent link">&para;</a></h2>
+<p>Mail is how anything leaves the application. A deployment that sets none of
+this tells nobody anything outside it, which is an ordinary way to run: the
+notification area in the interface still works.</p>
+<p><code>MAIL_FROM</code> and <code>MAIL_SERVER</code> are both needed for mail to happen at all — a
+server with nobody to send as is half a configuration, and either alone sends
+nothing rather than failing at startup. Credentials are optional, and are
+refused over a connection the server would not secure with STARTTLS.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_MAIL_FROM</code></td>
+<td>The address messages are sent as. Set it and the server together, or neither</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_MAIL_SERVER</code></td>
+<td>The SMTP server as <code>host:port</code>, e.g. <code>smtp.example.com:587</code></td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_MAIL_USERNAME</code></td>
+<td>Username, where the server wants one. Sent only after STARTTLS</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_MAIL_PASSWORD</code></td>
+<td>Password for that username. Sent only after STARTTLS</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<p>Who gets what is not configuration: each person chooses in their own settings,
+and the daily digest is off until somebody asks for it. A message about a
+finding nobody has announced carries no detail — only that there is something,
+and a link.</p>
+<p>On the Helm chart these are the <code>mail</code> values, and the password goes in a
+Secret the chart makes or one you name.</p>
+<h2 id="publishing-advisories">Publishing advisories<a class="headerlink" href="#publishing-advisories" title="Permanent link">&para;</a></h2>
+<p>An advisory is a document about a flaw in your own product. It is generated
+from what this deployment already holds and handed to you; nothing is sent
+anywhere, and nothing records that you published it.</p>
+<p>Both a name and a namespace are needed for either to do anything. A CSAF
+document requires a publisher, so with one missing no advisory is generated and
+the refusal says which — rather than handing you a document that fails
+validation after you have sent it.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_NAME</code></td>
+<td>The organization advisories say issued them. Set it and the namespace together, or neither</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_NAMESPACE</code></td>
+<td>A URL identifying that organization, which is what a reader of a CSAF document matches on</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_CATEGORY</code></td>
+<td>What the standard calls the kind of publisher. A deployment publishing about its own product is a vendor</td>
+<td><code>vendor</code></td>
+</tr>
+</tbody>
+</table>
+<p>On the Helm chart these go through <code>extraEnv</code>, since a deployment that does not
+publish needs none of them.</p>
+<h2 id="who-may-sign-in">Who may sign in<a class="headerlink" href="#who-may-sign-in" title="Permanent link">&para;</a></h2>
+<p>The process refuses to start until somebody can administer it, and naming
+somebody grants a role — it does not let anybody in without signing in.</p>
+<p>Configure at least one of the sign-in methods below, or nobody can reach it.
+<strong>The Helm chart refuses to render an install with none; the binary does not
+check</strong>, because a deployment being brought up in pieces is an ordinary state
+for a process and not for an install.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
+<td>Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. <strong>A name written <code>provider:username</code> is refused and the process stops</strong>, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SESSION_LIFETIME</code></td>
+<td>How long a sign-in lasts, where nothing has been set in the application. <strong>An administrator's setting wins over this</strong>, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration</td>
+<td>12 hours</td>
+</tr>
+</tbody>
+</table>
+<h3 id="an-openid-connect-provider">An OpenID Connect provider<a class="headerlink" href="#an-openid-connect-provider" title="Permanent link">&para;</a></h3>
+<p>One sign-in provider is configured at a time. Setting both an issuer here and a
+GitHub client id below stops the process, naming the two: an identity is a
+username, and two providers issuing them independently cannot be told apart.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_OIDC_ISSUER</code></td>
+<td>The provider's issuer address. Empty means no provider</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_NAME</code></td>
+<td>What the sign-in button calls it</td>
+<td><code>oidc</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_CLIENT_ID</code></td>
+<td>The client registered with the provider</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_CLIENT_SECRET</code></td>
+<td>Its secret</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_USERNAME_CLAIM</code></td>
+<td>The claim to take a person's identity from, when it is not the subject</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_GROUPS_CLAIM</code></td>
+<td>The claim carrying group membership, if the provider asserts it</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="github">GitHub<a class="headerlink" href="#github" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_GITHUB_CLIENT_ID</code></td>
+<td>The OAuth application's client id. Empty means GitHub sign-in is off. Not to be set alongside <code>OPENPSIRT_OIDC_ISSUER</code></td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_GITHUB_CLIENT_SECRET</code></td>
+<td>Its secret</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_GITHUB_ORG</code></td>
+<td>Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a-proxy-that-says-who-somebody-is">A proxy that says who somebody is<a class="headerlink" href="#a-proxy-that-says-who-somebody-is" title="Permanent link">&para;</a></h3>
+<p>Both the header and the sources it is believed from are required together: a
+header named with nothing to trust it from is either a mistake or the first
+half of one, and the process stops rather than accept a header anybody can set.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_HEADER</code></td>
+<td>The header an identity-aware proxy sets to say who somebody is</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_SOURCES</code></td>
+<td>Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_GROUPS_HEADER</code></td>
+<td>Where that proxy reports group membership, if it does</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_GROUPS_DELIMITER</code></td>
+<td>What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed</td>
+<td><code>,</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="where-files-hanging-off-a-finding-are-kept">Where files hanging off a finding are kept<a class="headerlink" href="#where-files-hanging-off-a-finding-are-kept" title="Permanent link">&para;</a></h2>
+<p>Absent is ordinary: with none of this set, attachments are off and everything
+else works. An operator who wants none should not have to run a bucket.</p>
+<p><code>OPENPSIRT_ATTACHMENT_BUCKET</code> is what turns the object store on. The endpoint
+is what a self-hosted store needs and a cloud one does not, and credentials are
+optional — a deployment on a cloud provider gets a rotating role from its
+environment rather than a key somebody stored.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_BUCKET</code></td>
+<td>The bucket files are kept in. Empty means attachments are off</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_ENDPOINT</code></td>
+<td>The address of a self-hosted store. A cloud provider needs none</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_REGION</code></td>
+<td>The region, where the store wants one</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_KEY</code></td>
+<td>Access key, where the environment supplies no role</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_SECRET</code></td>
+<td>Its secret</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_SESSION_TOKEN</code></td>
+<td>A session token, where the credentials are temporary ones</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_PATH_STYLE</code></td>
+<td>Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own</td>
+<td>set when an endpoint is</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_DIR</code></td>
+<td>A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<h2 id="reading-a-scan-file">Reading a scan file<a class="headerlink" href="#reading-a-scan-file" title="Permanent link">&para;</a></h2>
+<p>A scan file is somebody else's output arriving over a link this deployment does
+not control, so it is read within bounds. These are the ceilings; each is
+refused with a sentence naming what was exceeded rather than by failing
+partway.</p>
+<p>Leave one unset and it keeps the built-in value, so a deployment changing one
+does not have to restate the rest.</p>
+<p>The built-in values are set from what reading a document costs in memory, not
+from how large a document looks. An edge holds about half a kilobyte of heap
+while it is being read and a component about one and a third, so the defaults
+below allow roughly 250 MB for one document — about half the memory limit the
+chart ships with. They are still several times the largest producer we have.
+Raise them on a deployment with a bigger box and a bigger inventory, and raise
+the container's memory limit with them.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_BYTES</code></td>
+<td>How large a single document may be</td>
+<td>256 MB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_COMPONENTS</code></td>
+<td>How many components it may describe. About 1.3 KB of heap each while reading</td>
+<td>100,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_EDGES</code></td>
+<td>How many dependency edges it may declare. The component count does not bound this: a thousand components can declare a million edges between them. About 0.5 KB of heap each while reading</td>
+<td>250,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_STATEMENTS</code></td>
+<td>How many claims a suppression document may make</td>
+<td>100,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_DEPTH</code></td>
+<td>How deeply it may nest</td>
+<td>64</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
