@@ -282,16 +282,21 @@ func (c *reader) resolveRoot() {
 		return
 	}
 	var found graph.Described
-	seen := 0
+	seen := map[string]bool{}
 	for _, ref := range c.rootRefs {
 		described, ok := c.byRef[ref]
 		if !ok {
 			continue
 		}
-		seen++
+		// Counted by what they resolve to rather than by how many times the
+		// document said it. A format states the root in more than one place —
+		// a list beside the contents and a relationship saying the same
+		// thing — and a producer that fills in both has named one component
+		// twice, not two components.
+		seen[described.Identity()] = true
 		found = described
 	}
-	if seen != 1 {
+	if len(seen) != 1 {
 		return
 	}
 	c.doc.Root = found

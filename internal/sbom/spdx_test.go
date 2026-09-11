@@ -538,3 +538,21 @@ func TestWhatTheSecondFormatCannotSay(t *testing.T) {
 		t.Errorf("a patch relationship became structure: %v", edges(doc))
 	}
 }
+
+func TestARootNamedTwiceIsStillOneRoot(t *testing.T) {
+	// A format states the root in more than one place, and a producer that
+	// fills in both has named one component twice. Counting the statements
+	// rather than what they resolve to reads that as two roots and leaves the
+	// document with none — so a document that says the same thing twice would
+	// be read as though it had said nothing.
+	body := strings.Replace(minimalSPDX, `"packages": [`,
+		`"documentDescribes": ["SPDXRef-root"], "packages": [`, 1)
+	doc := read(t, body)
+
+	if !doc.RootDeclared || doc.Root.Name != "product" {
+		t.Errorf("root is %q, declared %v", doc.Root.Name, doc.RootDeclared)
+	}
+	if len(doc.Components) != 1 {
+		t.Errorf("read %d components, want 1 — the root is not among them", len(doc.Components))
+	}
+}

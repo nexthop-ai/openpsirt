@@ -291,6 +291,14 @@ has no single root — the tracked unit stands in, as it does for a document
 naming none — because picking one of them states a hierarchy the producer did
 not.
 
+**What is counted is what the pointers resolve to, not how many there are.** A
+format offers more than one place to state the root — a list beside the
+contents, and a relationship saying the same thing — and a producer that fills
+in both has named one component twice rather than two components. Counting the
+statements reads that as several roots and leaves the document with none, so a
+document that said the same thing twice would be read as though it had said
+nothing.
+
 **The first of each identifier stands.** A real producer emits eight spellings
 of one database key, differing in where it put a hyphen, and nothing here can
 say which spelling an advisory used. Taking the first is the same answer
