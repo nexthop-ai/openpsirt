@@ -40,6 +40,8 @@ plugins:
 
 nav:
   - Home: index.md
+  - What is built: built.md
+  - Trying it: trying.md
   - Configuration: configuration.md
   - API reference: reference/api.md
   - Privileges: reference/privileges.md
