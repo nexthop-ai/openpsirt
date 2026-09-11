@@ -112,7 +112,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			// where an undisclosed finding may be named, and a
 			// message that said "you were given access to
 			// something" and not to what would be unactionable.
-			if err := notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
+			tell(ctx, in, "could not say that somebody was brought into a case", notify.Telling{
 				PersonID: person.ID, Kind: notify.BroughtIn,
 				Body: "You have been brought into " + input.Vulnerability + " in " +
 					input.Product + ". You can read and argue about that issue there, " +
@@ -125,10 +125,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				// and the grant is what reaches this issue.
 				ProductID:       &product,
 				VulnerabilityID: &issue,
-			}); err != nil && in.Logger != nil {
-				in.Logger.Error("could not say that somebody was brought into a case",
-					"error", err, "person", person.Identity)
-			}
+			}, "person", person.Identity)
 			return &struct{}{}, nil
 		})
 

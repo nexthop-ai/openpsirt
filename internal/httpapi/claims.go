@@ -75,7 +75,7 @@ func registerClaims(api huma.API, in Ingest) {
 			// The rows went back to whoever proposed them, and
 			// they should hear rather than find out. Logged on
 			// failure: the rows are returned either way.
-			if err := notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
+			tell(ctx, in, "could not say that rows were set aside", notify.Telling{
 				PersonID: done.Returned.ProposedBy, Kind: notify.SentBack,
 				Body: "Part of a claim of yours was set aside: " + input.Body.Because,
 				Link: "/review-queue",
@@ -91,10 +91,7 @@ func registerClaims(api huma.API, in Ingest) {
 				// The product the returned rows are in, which
 				// is what a later read narrows by.
 				ProductID: &done.ReturnedIn,
-			}); err != nil && in.Logger != nil {
-				in.Logger.Error("could not say that rows were set aside",
-					"error", err, "claim", input.ID)
-			}
+			}, "claim", input.ID)
 		}
 		return out, nil
 	})
@@ -141,7 +138,7 @@ func registerClaims(api huma.API, in Ingest) {
 				"error", err, "claim", input.ID)
 		}
 		for _, author := range back.Authors {
-			if err := notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
+			tell(ctx, in, "could not say that a claim was sent back", notify.Telling{
 				PersonID: author, Kind: notify.SentBack,
 				Body: "A claim of yours was sent back: " + input.Body.Because,
 				Link: link,
@@ -157,10 +154,7 @@ func registerClaims(api huma.API, in Ingest) {
 				// issue.
 				ProductID:       &back.Decision.ProductID,
 				VulnerabilityID: &back.Decision.VulnerabilityID,
-			}); err != nil && in.Logger != nil {
-				in.Logger.Error("could not say that a claim was sent back",
-					"error", err, "claim", input.ID, "person", author)
-			}
+			}, "claim", input.ID, "person", author)
 		}
 		return &struct{}{}, nil
 	})

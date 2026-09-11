@@ -396,38 +396,13 @@ func registerFindings(api huma.API, in Ingest) {
 		Narrowing
 		Paging
 	}) (*FindingsOutput, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-
-		// Resolved and authorized together, so a product somebody may not see
-		// reads as one that was never declared. A selection matching no build
-		// — declared and never scanned — comes back empty from the store
-		// rather than as a refusal: nothing is open because nothing has run.
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		at, err := narrowing(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
 		}
-
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell what is worth triaging here", err)
-		}
-		narrowed, err := input.filter(floor)
-		if err != nil {
-			return nil, err
-		}
-		narrowed.DiffersBetweenBuilds = input.Differs
-		store := finding.NewStore(in.DB.DB)
-		if narrowed.Beneath, err = beneathIn(ctx, in, scope, input.Beneath); err != nil {
-			return nil, err
-		}
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
 		groups, total, err := store.Groups(ctx, subject, scope,
 			input.Limit, input.Offset, narrowed)
 		if err != nil {
@@ -537,33 +512,13 @@ func registerComponentFindings(api huma.API, in Ingest) {
 		Narrowing
 		Paging
 	}) (*ComponentFindingsOutput, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		at, err := narrowing(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
 		}
-
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell what is worth triaging here", err)
-		}
-		narrowed, err := input.filter(floor)
-		if err != nil {
-			return nil, err
-		}
-		narrowed.DiffersBetweenBuilds = input.Differs
-		if narrowed.Beneath, err = beneathIn(ctx, in, scope, input.Beneath); err != nil {
-			return nil, err
-		}
+		subject, scope, narrowed := at.Subject, at.Scope, at.Filter
 		groups, total, err := finding.NewStore(in.DB.DB).ComponentGroups(ctx, subject, scope,
 			input.Limit, input.Offset, narrowed)
 		if err != nil {

@@ -44,7 +44,24 @@ type HoldingBody struct {
 	Overdue int `json:"overdue" doc:"How many of those pieces are past their deadline"`
 }
 
+// registerAssignment registers the two halves of deciding who deals with
+// something.
+//
+// Writing an assignment and reading who holds what share this file's helpers
+// and nothing else: one is the act the assigner right names, guarded at every
+// step, and the three lists are the ordinary question "what is mine" asked
+// three ways.
 func registerAssignment(api huma.API, in Ingest) {
+	registerAssigning(api, in)
+	registerAssignmentReading(api, in)
+}
+
+// Giving work out and handing it back.
+//
+// The two writes. Taking work nobody owns and handing back your own is
+// triage; giving it to somebody else, or taking what they are holding, is the
+// assigner right — and doing either to yourself is still doing it.
+func registerAssigning(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "assign-finding", Method: http.MethodPut,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
@@ -120,7 +137,7 @@ func registerAssignment(api huma.API, in Ingest) {
 		// they are assignable as, and a notification goes to somebody.
 		// A team tells nobody: a queue filling up is digest content
 		// rather than an interruption.
-		var tell int64
+		var whoToTell int64
 		rights := access.NewStore(in.DB.DB)
 		switch {
 		case input.Body.Person != "":
@@ -153,7 +170,7 @@ func registerAssignment(api huma.API, in Ingest) {
 				}
 			}
 			party := person.PartyID
-			to, tell = &party, person.ID
+			to, whoToTell = &party, person.ID
 		case input.Body.Team != "":
 			team, err := rights.TeamByName(ctx, input.Body.Team)
 			if err != nil {
@@ -218,8 +235,8 @@ func registerAssignment(api huma.API, in Ingest) {
 		// the two.
 		if to != nil && *to != subject.Party() &&
 			seenBy(ctx, in, input.Body.Person, product, undisclosed) {
-			if err := notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
-				PersonID: tell, Kind: notify.Assigned,
+			tell(ctx, in, "could not say that work was assigned", notify.Telling{
+				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: input.Vulnerability + " in " + input.Component +
 					", in " + input.Product + " " + input.Stream + " " + input.Variant,
 				Link: findingPath(input.Product, input.Stream, input.Variant,
@@ -240,14 +257,83 @@ func registerAssignment(api huma.API, in Ingest) {
 				// read narrows by.
 				ProductID:       &product,
 				VulnerabilityID: &issue,
-			}); err != nil && in.Logger != nil {
-				in.Logger.Error("could not say that work was assigned",
-					"error", err, "person", tell)
-			}
+			}, "person", whoToTell)
 		}
 		return &struct{}{}, nil
 	})
 
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "hand-back-assignments", Method: http.MethodPost,
+		Path:    "/v1/people/{identity}/assignments/hand-back",
+		Summary: "Hand back everything one person is dealing with",
+		Description: "Returns all their open findings to the unassigned list. For when somebody " +
+			"has left, or their last role is removed.\n\n" +
+			"Nothing tells this software that somebody has gone — membership is read at sign-in, " +
+			"and a person who has left never signs in again. So this is an action an " +
+			"administrator takes rather than something that happens on its own, and until it is " +
+			"taken their work is in no list at all: not in the shared one because it is assigned, " +
+			"and not in anybody's own because they are not here.\n\n" +
+			"Send `to` instead to hand it to a named person rather than to nobody.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, input *struct {
+		Identity string `path:"identity"`
+		Body     struct {
+			To string `json:"to,omitempty" doc:"Who takes it on. Omit to return it to nobody"`
+		}
+	}) (*struct {
+		Body struct {
+			Moved int64 `json:"moved"`
+		}
+	}, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Authorized before the name is looked up. Resolving first and
+		// refusing after answers "does this person have an account here" for
+		// anybody signed in: a name nobody holds and a name somebody holds
+		// come back differently, which is a directory of the organization
+		// readable by every account.
+		if !subject.Admin {
+			return nil, huma.Error403Forbidden("not authorized")
+		}
+		rights := access.NewStore(in.DB.DB)
+		from, err := rights.ByIdentity(ctx, input.Identity)
+		if err != nil {
+			return nil, noSuchPerson()
+		}
+
+		findings := finding.NewStore(in.DB.DB)
+		var moved int64
+		if input.Body.To == "" {
+			moved, err = findings.Release(ctx, subject, from.PartyID)
+		} else {
+			var to *access.Account
+			if to, err = rights.ByIdentity(ctx, input.Body.To); err != nil {
+				return nil, noSuchPerson()
+			} else {
+				moved, err = findings.HandOver(ctx, subject, from.PartyID, to.PartyID)
+			}
+		}
+		if err != nil {
+			return nil, refusedFinding(in, err)
+		}
+		out := &struct {
+			Body struct {
+				Moved int64 `json:"moved"`
+			}
+		}{}
+		out.Body.Moved = moved
+		return out, nil
+	})
+}
+
+// Reading who holds what.
+//
+// Three lists, each narrowed by what the reader may see: work nobody owns
+// across every product they can see, one person's or team's holdings, and the
+// per-holder totals the assignments screen is built on.
+func registerAssignmentReading(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-unassigned", Method: http.MethodGet, Path: "/v1/unassigned",
 		Summary: "List findings nobody is dealing with",
@@ -448,71 +534,6 @@ func registerAssignment(api huma.API, in Ingest) {
 				Open: h.Open, Places: h.Places, Overdue: h.Overdue,
 			})
 		}
-		return out, nil
-	})
-
-	huma.Register(api, requiring(huma.Operation{
-		OperationID: "hand-back-assignments", Method: http.MethodPost,
-		Path:    "/v1/people/{identity}/assignments/hand-back",
-		Summary: "Hand back everything one person is dealing with",
-		Description: "Returns all their open findings to the unassigned list. For when somebody " +
-			"has left, or their last role is removed.\n\n" +
-			"Nothing tells this software that somebody has gone — membership is read at sign-in, " +
-			"and a person who has left never signs in again. So this is an action an " +
-			"administrator takes rather than something that happens on its own, and until it is " +
-			"taken their work is in no list at all: not in the shared one because it is assigned, " +
-			"and not in anybody's own because they are not here.\n\n" +
-			"Send `to` instead to hand it to a named person rather than to nobody.",
-		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, input *struct {
-		Identity string `path:"identity"`
-		Body     struct {
-			To string `json:"to,omitempty" doc:"Who takes it on. Omit to return it to nobody"`
-		}
-	}) (*struct {
-		Body struct {
-			Moved int64 `json:"moved"`
-		}
-	}, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		// Authorized before the name is looked up. Resolving first and
-		// refusing after answers "does this person have an account here" for
-		// anybody signed in: a name nobody holds and a name somebody holds
-		// come back differently, which is a directory of the organization
-		// readable by every account.
-		if !subject.Admin {
-			return nil, huma.Error403Forbidden("not authorized")
-		}
-		rights := access.NewStore(in.DB.DB)
-		from, err := rights.ByIdentity(ctx, input.Identity)
-		if err != nil {
-			return nil, noSuchPerson()
-		}
-
-		findings := finding.NewStore(in.DB.DB)
-		var moved int64
-		if input.Body.To == "" {
-			moved, err = findings.Release(ctx, subject, from.PartyID)
-		} else {
-			var to *access.Account
-			if to, err = rights.ByIdentity(ctx, input.Body.To); err != nil {
-				return nil, noSuchPerson()
-			} else {
-				moved, err = findings.HandOver(ctx, subject, from.PartyID, to.PartyID)
-			}
-		}
-		if err != nil {
-			return nil, refusedFinding(in, err)
-		}
-		out := &struct {
-			Body struct {
-				Moved int64 `json:"moved"`
-			}
-		}{}
-		out.Body.Moved = moved
 		return out, nil
 	})
 }

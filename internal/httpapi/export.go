@@ -141,35 +141,120 @@ func downloadName(name string) string {
 }
 
 // writeExport streams a list as CSV or JSON.
+//
+// The two formats differ in five places — the content type, the extension,
+// what goes before the rows, how a row is written, and what is said where the
+// file stops early — and in nothing else. Written as two functions they were
+// the same page loop twice, so the incomplete marker had two homes and the
+// stall deadline two ways of being renewed.
 func writeExport(ctx huma.Context, format, name string, out Exporting) {
+	kind := asCSV
 	if format == "json" {
-		writeExportJSON(ctx, name, out)
-		return
+		kind = asJSON
 	}
-	ctx.SetHeader("Content-Type", "text/csv; charset=utf-8")
-	ctx.SetHeader("Content-Disposition", `attachment; filename="`+downloadName(name)+`.csv"`)
+	ctx.SetHeader("Content-Type", kind.contentType)
+	ctx.SetHeader("Content-Disposition",
+		`attachment; filename="`+downloadName(name)+"."+kind.extension+`"`)
 	going := writing(ctx)
-	w := csv.NewWriter(ctx.BodyWriter())
-	// What the file says about itself, above the column names, because a
-	// spreadsheet has nowhere else to carry it.
-	if out.About[0] != "" {
-		_ = w.Write([]string{"# " + out.About[0], out.About[1]})
-	}
-	_ = w.Write(out.Header)
+	write := kind.open(ctx, out)
 	if eachPage(ctx.Context(), out, func(rows [][]string) {
 		for _, row := range rows {
-			_ = w.Write(inert(row))
+			write.row(row)
 		}
 	}, func() {
-		w.Flush()
+		write.flush()
 		going()
 	}) != nil {
-		// The status is long gone by the time this can fail. A comment row is
-		// the only honest thing left: a file that simply stops is a file
-		// somebody reads as complete.
-		_ = w.Write([]string{"# this export stopped early and is incomplete"})
+		// The status is long gone by the time this can fail. Saying so in the
+		// file is the only honest thing left: a file that simply stops is a
+		// file somebody reads as complete.
+		write.cutShort()
+		return
 	}
-	w.Flush()
+	write.done()
+}
+
+// An export format: what it calls itself, and how it writes rows.
+type exportFormat struct {
+	contentType string
+	extension   string
+	// open writes whatever goes above the rows and answers with the sink.
+	// Called after the headers, because the body writer is what commits them.
+	open func(huma.Context, Exporting) sink
+}
+
+// A sink is one format's four acts. Kept as closures over the writer rather
+// than as an interface with four implementations of nothing: what varies is
+// this much and no more.
+type sink struct {
+	row      func(row []string)
+	flush    func()
+	cutShort func()
+	done     func()
+}
+
+var asCSV = exportFormat{
+	contentType: "text/csv; charset=utf-8",
+	extension:   "csv",
+	open: func(ctx huma.Context, out Exporting) sink {
+		w := csv.NewWriter(ctx.BodyWriter())
+		// What the file says about itself, above the column names, because a
+		// spreadsheet has nowhere else to carry it.
+		if out.About[0] != "" {
+			_ = w.Write([]string{"# " + out.About[0], out.About[1]})
+		}
+		_ = w.Write(out.Header)
+		return sink{
+			row:   func(row []string) { _ = w.Write(inert(row)) },
+			flush: w.Flush,
+			cutShort: func() {
+				_ = w.Write([]string{"# this export stopped early and is incomplete"})
+				w.Flush()
+			},
+			done: w.Flush,
+		}
+	},
+}
+
+var asJSON = exportFormat{
+	contentType: "application/json; charset=utf-8",
+	extension:   "json",
+	open: func(ctx huma.Context, out Exporting) sink {
+		body := ctx.BodyWriter()
+		// Written by hand rather than marshalled whole, for the reason the
+		// CSV is streamed: the point is that no complete list ever exists in
+		// memory.
+		if out.About[0] != "" {
+			_, _ = fmt.Fprintf(body, `{%s:%s,"items":[`,
+				quoted(asKey(out.About[0])), quoted(out.About[1]))
+		} else {
+			_, _ = fmt.Fprint(body, `{"items":[`)
+		}
+		first := true
+		return sink{
+			row: func(row []string) {
+				if !first {
+					_, _ = fmt.Fprint(body, ",")
+				}
+				first = false
+				_, _ = fmt.Fprint(body, "{")
+				for i, column := range out.Header {
+					if i > 0 {
+						_, _ = fmt.Fprint(body, ",")
+					}
+					value := ""
+					if i < len(row) {
+						value = row[i]
+					}
+					_, _ = fmt.Fprintf(body, "%s:%s", quoted(column), quoted(value))
+				}
+				_, _ = fmt.Fprint(body, "}")
+			},
+			flush:    func() {},
+			cutShort: func() { _, _ = fmt.Fprint(body, `],"incomplete":true}`) },
+			done:     func() { _, _ = fmt.Fprint(body, `]}`) },
+		}
+	},
 }
 
 // eachPage walks an export's rows, a page at a time, until there are none.
@@ -244,45 +329,6 @@ func inert(row []string) []string {
 	return out
 }
 
-func writeExportJSON(ctx huma.Context, name string, out Exporting) {
-	ctx.SetHeader("Content-Type", "application/json; charset=utf-8")
-	ctx.SetHeader("Content-Disposition", `attachment; filename="`+downloadName(name)+`.json"`)
-	going := writing(ctx)
-	body := ctx.BodyWriter()
-	// Written by hand rather than marshalled whole, for the reason the CSV is
-	// streamed: the point is that no complete list ever exists in memory.
-	if out.About[0] != "" {
-		_, _ = fmt.Fprintf(body, `{%s:%s,"items":[`, quoted(asKey(out.About[0])), quoted(out.About[1]))
-	} else {
-		_, _ = fmt.Fprint(body, `{"items":[`)
-	}
-	first := true
-	if eachPage(ctx.Context(), out, func(rows [][]string) {
-		for _, row := range rows {
-			if !first {
-				_, _ = fmt.Fprint(body, ",")
-			}
-			first = false
-			_, _ = fmt.Fprint(body, "{")
-			for i, column := range out.Header {
-				if i > 0 {
-					_, _ = fmt.Fprint(body, ",")
-				}
-				value := ""
-				if i < len(row) {
-					value = row[i]
-				}
-				_, _ = fmt.Fprintf(body, "%s:%s", quoted(column), quoted(value))
-			}
-			_, _ = fmt.Fprint(body, "}")
-		}
-	}, going) != nil {
-		_, _ = fmt.Fprint(body, `],"incomplete":true}`)
-		return
-	}
-	_, _ = fmt.Fprint(body, `]}`)
-}
-
 // asKey is what a stated fact is called in JSON: the words it is written in on
 // paper, joined the way every other field here is named.
 func asKey(label string) string {
@@ -323,40 +369,13 @@ func registerExport(api huma.API, in Ingest) {
 		AtOneBuild
 		Narrowing
 	}) (*huma.StreamResponse, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		at, err := narrowing(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, input.AtOneBuild, input.Narrowing, "the triage line could not be read")
 		if err != nil {
 			return nil, err
 		}
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the triage line could not be read", err)
-		}
-		// The list's own mapping, not a second one written beside it. Copying
-		// the fields by hand is what left nineteen of them out: a parameter
-		// this endpoint did not declare was dropped before the handler ran,
-		// with no error, so a screen's Export link produced a file answering a
-		// different question than the screen it came from — and a filter that
-		// changes the population rather than narrowing it, like asking for
-		// what has closed, silently produced a file that could not contain a
-		// single row of what was asked for.
-		narrowed, err := input.filter(floor)
-		if err != nil {
-			return nil, err
-		}
-		narrowed.DiffersBetweenBuilds = input.Differs
-		store := finding.NewStore(in.DB.DB)
-		if narrowed.Beneath, err = beneathIn(ctx, in, scope, input.Beneath); err != nil {
-			return nil, err
-		}
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
 
 		line := "everything"
 		if floor.Hides() {

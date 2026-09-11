@@ -66,22 +66,11 @@ func registerBundles(api huma.API, in Ingest) {
 			Total int          `json:"total"`
 		}
 	}, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		subject, scope, floor, err := scopedFloor(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, "the triage line could not be read")
 		if err != nil {
 			return nil, err
-		}
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the triage line could not be read", err)
 		}
 		bundles, total, err := finding.NewStore(in.DB.DB).Bundles(ctx, subject, scope,
 			input.Limit, input.Offset, finding.Filter{
