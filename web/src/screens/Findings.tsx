@@ -238,6 +238,11 @@ export function Findings() {
   }, [asked, stream, variant]);
 
   const queries = useQueryClient();
+  // What one action may write here, as the deployment sets it. A selection is
+  // handed over a row at a time, so this is the bound on how many round trips
+  // one click makes. Read up here with the other hooks, because the screen
+  // returns early for two of its views.
+  const bulkCap = useWho().data?.bulk_cap ?? 0;
   // What people have marked findings with here, for the filter to offer. Read
   // only while the panel that uses it is open: it is a per-product list nobody
   // needs unless they are narrowing by one.
@@ -631,10 +636,6 @@ export function Findings() {
     (row) => `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`,
   );
 
-  // What one action may write here, as the deployment sets it. A selection is
-  // handed over a row at a time, so this is the bound on how many round trips
-  // one click makes.
-  const bulkCap = useWho().data?.bulk_cap ?? 0;
   const overCap = bulkCap > 0 && picked.size > bulkCap;
 
   // Handing a selection to somebody, which is the one thing a selection can do
