@@ -29,21 +29,4 @@ export default tseslint.config(
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },
   },
-  {
-    files: ["**/*.{ts,tsx}"],
-    rules: {
-      // Reported rather than refused, and the distinction is deliberate.
-      //
-      // Every instance here is one pattern: local state reset when a prop
-      // changes or when a panel opens. React's answer is to remount with a
-      // key rather than to write state from an effect, which is a change to
-      // how nine components are mounted rather than a change inside them —
-      // each needing to be driven in a browser to know it still behaves.
-      //
-      // Left visible instead of switched off, because the rule is right and
-      // the count is the honest measure of the work. Switching it off would
-      // make the same nine invisible and let a tenth join them.
-      "react-hooks/set-state-in-effect": "warn",
-    },
-  },
 );

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
+import { useReseed } from "./reseed";
 
 // Composing a CVSS base vector, and showing what it scores.
 //
@@ -116,6 +117,18 @@ function vectorOf(chosen: Record<string, string>): string {
   return "CVSS:3.1/" + METRICS.map((m, i) => `${m.key}:${parts[i]}`).join("/");
 }
 
+// The metrics a vector states, which is the reverse of the above. A vector
+// somebody pasted names some or all of them; one nothing has been chosen for
+// yet names none.
+function read(vector: string): Record<string, string> {
+  const chosen: Record<string, string> = {};
+  for (const part of vector.toUpperCase().split("/").slice(1)) {
+    const [metric, value] = part.split(":");
+    if (metric && value) chosen[metric] = value;
+  }
+  return chosen;
+}
+
 export function Scoring({
   vector,
   onChange,
@@ -123,19 +136,14 @@ export function Scoring({
   vector: string;
   onChange: (vector: string) => void;
 }) {
-  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const [chosen, setChosen] = useState<Record<string, string>>(() => read(vector));
   const [open, setOpen] = useState(false);
 
   // Kept in step with whatever the caller holds, so that a vector pasted in
-  // whole lights up the metrics it states.
-  useEffect(() => {
-    const read: Record<string, string> = {};
-    for (const part of vector.toUpperCase().split("/").slice(1)) {
-      const [metric, value] = part.split(":");
-      if (metric && value) read[metric] = value;
-    }
-    setChosen(read);
-  }, [vector]);
+  // whole lights up the metrics it states. Re-seeded rather than remounted:
+  // picking the last metric completes the vector, and a remount would collapse
+  // the metric list at the moment somebody finished with it.
+  useReseed(vector, () => setChosen(read(vector)));
 
   const scored = useQuery({
     queryKey: ["score", vector],

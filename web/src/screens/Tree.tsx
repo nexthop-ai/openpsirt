@@ -1,6 +1,6 @@
 import { ROLLED } from "../ui/severities";
 import { notACredential } from "../ui/noautofill";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { Over, Pane, type At, type Node } from "./TreePane";
 import { useQueries, useQuery } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import { sharedVersion } from "../ui/versions";
 import { Crumbs } from "../ui/Crumbs";
 import { Icon } from "../ui/Icons";
 import { useWho } from "../app/session";
+import { useReseed } from "../ui/reseed";
 
 // What is beneath a node, worst first, as a short strip. Only the bands that
 // are there: a row of zeros is noise on a screen whose whole job is saying
@@ -262,16 +263,15 @@ function Whole() {
   // opened so the component is on screen under the parents that pull it in,
   // rather than the reader being left at the root to find it again.
   const path = params.get("path") ?? "";
-  useEffect(() => {
+  useReseed(`${rootName}\u001f${path}`, () => {
     if (!rootName) return;
-    const steps = path.split("\u001f").filter(Boolean);
     setOpened((prev) => {
       const next = new Set(prev);
       next.add(rootName);
-      for (const step of steps) next.add(step);
+      for (const step of path.split("\u001f").filter(Boolean)) next.add(step);
       return next;
     });
-  }, [rootName, path]);
+  });
 
   // The components on the way down to the one being arrived at.
   //

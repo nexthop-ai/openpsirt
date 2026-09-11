@@ -154,6 +154,10 @@ export function Decide({
     fromStatement?: number;
   } | null;
 }) {
+  // Read once, as the form is built. Every prefill is a fresh start rather than
+  // a value merged into what is on screen — "start from this" means this and
+  // not what somebody had half written — so the screen that offers one mounts
+  // the form again, and the fields below seed themselves from it.
   const queries = useQueryClient();
   const draftKey = `decide:${at.product}:${at.stream}:${at.variant}:${at.vulnerability}:${at.component}`;
   // Nothing chosen until somebody chooses. The form used to open on
@@ -169,7 +173,16 @@ export function Decide({
     (prefill?.justification as Justification | undefined) ?? "",
   );
   const [mitigation, setMitigation] = useState("");
-  const [until, setUntil] = useState("");
+  // Counted from now rather than from when the rule was saved, which is the
+  // whole reason a prepared deferral is kept as a number of days. Without this
+  // one opened the form with the outcome chosen and no date, which cannot be
+  // submitted — a prefill that half-fires.
+  const [until, setUntil] = useState(() => {
+    if (!prefill?.deferDays) return "";
+    const day = new Date();
+    day.setUTCDate(day.getUTCDate() + prefill.deferDays);
+    return day.toISOString().slice(0, 10);
+  });
   const [lands, setLands] = useState("");
   // The deployment's deferral threshold, so the form can say which side of it
   // a date falls on while it is being chosen.
@@ -182,21 +195,6 @@ export function Decide({
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set());
   const [reviewing, setReviewing] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (prefill?.reasoning) setReasoning(prefill.reasoning);
-    if (prefill?.outcome) setOutcome(prefill.outcome);
-    if (prefill?.justification) setJustification(prefill.justification as Justification);
-    if (prefill?.deferDays) {
-      // Counted from now rather than from when the rule was saved, which is
-      // the whole reason it is kept as a number of days. Without this a
-      // prepared deferral opened the form with the outcome chosen and no
-      // date, which cannot be submitted — a prefill that half-fires.
-      const until = new Date();
-      until.setUTCDate(until.getUTCDate() + prefill.deferDays);
-      setUntil(until.toISOString().slice(0, 10));
-    }
-  }, [prefill]);
 
   const open = useMemo(() => places.filter((p) => p.decision == null), [places]);
   const answered = places.length - open.length;
