@@ -273,5 +273,32 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 			t.Errorf("across products the row is marked %q, wanted the word that was put on it",
 				marked[0].Tags)
 		}
+
+		// And the rating in force, which is what reassessing an issue is for.
+		// The two lists assembled their rows separately and this one named the
+		// severity the report published, so an issue rated worse here read as
+		// critical on the product's list and low on the one above it — the
+		// list somebody arrives at before they have picked a product.
+		f.recorded(t, 1, "someone")
+		if _, err := f.store.Assess(t.Context(), f.holding(t, access.PublicTriage),
+			f.issue(t, "CVE-2026-9"), "critical",
+			"Reachable from the network in how we ship it."); err != nil {
+			t.Fatal(err)
+		}
+		rated, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ratedAcross, _, err := f.store.Anywhere(t.Context(), who, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rated) != 1 || rated[0].Severity != "critical" {
+			t.Fatalf("the product's own list says %v, so this compares nothing", rated)
+		}
+		if len(ratedAcross) != 1 || ratedAcross[0].Severity != rated[0].Severity {
+			t.Errorf("across products the row is rated %v and within one it is %q",
+				ratedAcross, rated[0].Severity)
+		}
 	})
 }

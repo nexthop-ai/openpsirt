@@ -240,3 +240,59 @@ func TestASubtreeTrendIsRefusedWhereTheSelectionIsNotOneBuild(t *testing.T) {
 		}
 	})
 }
+
+func TestAScannerGoingQuietIsNotCountedAsWorkDone(t *testing.T) {
+	// An issue that stops being reported with the component present and
+	// unchanged is a fault to investigate, not a fix — so it leaves the open
+	// set without being counted as resolved, and the step it left in is the
+	// step it actually left in.
+	//
+	// Which step that is used to be found by walking every bucket looking for
+	// the one the moment fell in, once per step, for every row: the answer was
+	// right and it cost steps squared per row to get. The arithmetic that
+	// replaced it has to land in the same bucket, which is what this pins.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		now := time.Now().UTC()
+		run := f.run(t)
+		f.seenAt(t, run, now.Add(-20*24*time.Hour))
+		if _, err := f.store.Apply(t.Context(), f.target, run,
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		// Gone, with nothing to say why, inside the window.
+		gone := now.Add(-5 * 24 * time.Hour)
+		f.closeIt(t, "CVE-2026-1", finding.Unexplained, gone)
+
+		since := now.Add(-30 * 24 * time.Hour)
+		step := 24 * time.Hour
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			since, step, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var resolved int
+		for _, point := range points {
+			resolved += point.Resolved
+		}
+		if resolved != 0 {
+			t.Errorf("a scanner going quiet counted %d findings as resolved", resolved)
+		}
+		// And it is in the open set while it was reported and out of it from
+		// the step it disappeared in — which is the bucket the arithmetic has
+		// to land on. A step is the interval ending at the moment it names, so
+		// a finding closed exactly at a point's moment is gone by that point
+		// and one opened exactly at it is present.
+		opened := now.Add(-20 * 24 * time.Hour)
+		for i, point := range points {
+			want := 0
+			if !point.At.Before(opened) && point.At.Before(gone) {
+				want = 1
+			}
+			if point.Open != want {
+				t.Errorf("step %d (%s) says %d open, want %d",
+					i, point.At.Format(time.RFC3339), point.Open, want)
+			}
+		}
+	})
+}

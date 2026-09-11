@@ -190,23 +190,37 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	}
 
 	for _, row := range rows {
+		// Which step an unexplained disappearance falls in, worked out once
+		// from the moment rather than by walking the steps looking for it.
+		// Inside the loop below it did not depend on the step it sat in, so a
+		// row that went quiet re-walked every bucket once per step — steps
+		// squared per row, writing the same true each time, and at the
+		// hundred-and-four steps this accepts that is eleven thousand
+		// iterations to record one fact.
+		if row.ClosedAt != nil && row.ClosedAt.After(since) &&
+			Closure(row.ClosedBecause) == Unexplained {
+
+			if at := int(row.ClosedAt.Sub(since) / step); at >= 0 && at < steps {
+				// A moment exactly on a boundary belongs to the step it ends,
+				// which is what the walk this replaces said: the bucket was
+				// the one whose end the moment did not pass. Stored
+				// timestamps are rounded to what the engine keeps, so a real
+				// row lands on a boundary about never — which is why the case
+				// is written out here rather than left to be discovered.
+				if row.ClosedAt.Equal(since.Add(time.Duration(at) * step)) {
+					at--
+				}
+				if at >= 0 {
+					quiet[at][row.VulnerabilityID] = true
+				}
+			}
+		}
 		for i := 0; i < steps; i++ {
 			to := since.Add(time.Duration(i+1) * step)
 			if row.OpenedAt.After(to) {
 				continue
 			}
 			if row.ClosedAt != nil && !row.ClosedAt.After(to) {
-				// Gone by this point. Note an unexplained disappearance so the
-				// step it happened in does not read as work done.
-				if Closure(row.ClosedBecause) == Unexplained {
-					for j := 0; j < steps; j++ {
-						from := since.Add(time.Duration(j) * step)
-						until := from.Add(step)
-						if row.ClosedAt.After(from) && !row.ClosedAt.After(until) {
-							quiet[j][row.VulnerabilityID] = true
-						}
-					}
-				}
 				continue
 			}
 			open[i][row.VulnerabilityID] = row.Severity

@@ -267,24 +267,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		Visibility      string `bun:"visibility"`
 		Exploited       bool   `bun:"exploited"`
 	}
-	err := w.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		Join("JOIN product AS p ON p.id = st.product_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		// The consumer, because whether a decision still covers a place is
-		// keyed on both upstream versions and one of them is the consumer's.
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("p.name AS product").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("va.name AS variant").
-		ColumnExpr("c.name AS component").
-		ColumnExpr("v.identifier AS vulnerability").
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("v.id AS vulnerability_id").
+	err := findingsWith(w.db.NewSelect(), true).
 		ColumnExpr("MIN(f.visibility) AS visibility").
 		ColumnExpr("MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) = 1 AS exploited").
 		Where("st.kind = ?", catalog.Tag).

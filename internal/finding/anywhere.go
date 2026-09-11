@@ -9,7 +9,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -308,56 +307,22 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			continue
 		}
 		row := rows[at]
-		group := Group{
-			Product: row.Product, ProductName: row.ProductName,
-			Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
-			Places: row.Places, Answered: row.Answered,
-			Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
-			LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
-			FixState: FixState(row.FixState), FixedIn: row.FixedIn,
-			Matched:  Matched(row.Matched),
-			State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
-			SentBack: row.SentBack > 0,
-			OpenedAt: row.OpenedAt, DueAt: row.DueAt,
-			Undisclosed: row.Undisclosed,
-			DiscloseAt:  row.DiscloseAt,
-			// One build of possibly several, so a row has somewhere to link
-			// to and an action has a build to name. What says there are others
-			// is the count beside it.
-			Builds: row.Builds, Stream: row.Stream, Variant: row.Variant,
-			Tags: marks[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}],
-		}
-		if issue, has := named[head.VulnerabilityID]; has {
-			group.Vulnerability, group.Severity = issue.Identifier, issue.Severity
-			// The one line of the issue's own words the row shows, the same as
-			// the per-product list. Two lists of the same rows, one of which
-			// says what the issue is: fifty rows here read "CVE-2026-74280 ·
-			// linux-image" fifty times, and this is the list somebody arrives
-			// at before they have picked a product.
-			group.Summary = firstLineOf(issue.Description)
-		}
-		if component, has := shipped[head.ComponentID]; has {
-			group.Component, group.Version = component.Name, component.Version
-			group.Ecosystem = graph.EcosystemOf(component.Purl)
-			if component.UpstreamVersion != "" {
-				group.Upstream = component.UpstreamName + " " + component.UpstreamVersion
-			}
-			// Which source package it was built from, where that is not the
-			// name itself. Two rows that are one bump say so on both lists.
-			if component.UpstreamName != "" && component.UpstreamName != component.Name {
-				group.Source = component.UpstreamName
-			}
-		}
-		// Why there is no deadline. The two reasons are exhaustive, and which
-		// one holds is a statement about this product's line — so it is asked
-		// of the line the row's own product states rather than of one word
-		// chosen for a page that spans them.
-		if group.DueAt == nil {
-			group.NoDeadline = OutOfSupport
-			if !(Floor{Word: deployment}).Admits(group.Exploited, group.Severity) {
-				group.NoDeadline = BelowTheLine
-			}
-		}
+		// The issue and the component come off the head rather than off the
+		// row: this statement selects the product's own identifier at the
+		// outer level, so the embedded row's copy of it is never filled.
+		shape := row.decorated
+		shape.VulnerabilityID, shape.ComponentID = head.VulnerabilityID, head.ComponentID
+		group := groupFrom(shape, named, shipped,
+			// The line this row's own product states, or the deployment's
+			// where it states none. One word chosen for a page that spans
+			// products would answer for none of them.
+			Floor{Word: deployment})
+		group.Product, group.ProductName = row.Product, row.ProductName
+		// One build of possibly several, so a row has somewhere to link to and
+		// an action has a build to name. What says there are others is the
+		// count beside it.
+		group.Builds, group.Stream, group.Variant = row.Builds, row.Stream, row.Variant
+		group.Tags = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}]
 		groups = append(groups, group)
 	}
 	return groups, total, nil
