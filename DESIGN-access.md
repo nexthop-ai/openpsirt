@@ -455,9 +455,16 @@ being applied correctly to it.
 
 ## Provider sign-in
 
-Two adapters behind one interface. One speaks OpenID Connect, for an identity
-provider. The other speaks plain OAuth 2.0, for a forge that issues no identity
-token and publishes no discovery document, so the account has to be asked about.
+Two adapters behind one interface, **one of them configured at a time**. One
+speaks OpenID Connect, for an identity provider. The other speaks plain OAuth
+2.0, for a forge that issues no identity token and publishes no discovery
+document, so the account has to be asked about.
+
+| Rule | Reason |
+|---|---|
+| Configuring both stops the process, naming the two settings | An identity here is a username (REQ-41). Two providers issuing usernames independently make the same name either one person or two, and nothing in the record says which — so the ambiguity is refused rather than resolved by whichever arrived first |
+| Configuring none is not a fault | It is the arrangement where a reverse proxy authenticates instead |
+| Refused at startup, not at a sign-in | A deployment whose sign-in is broken should be visible to whoever started it, rather than to the first person who tries to use it |
 
 The exchange happens here and the browser gets a session of this deployment's. A
 provider's token is never handed to a page: one of them is opaque and this API

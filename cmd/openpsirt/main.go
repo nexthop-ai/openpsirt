@@ -484,12 +484,28 @@ func waitFor(group *sync.WaitGroup, grace time.Duration) bool {
 	}
 }
 
-// signInProviders builds the ways somebody may sign in.
+// signInProviders builds the way somebody may sign in.
 //
 // A deployment may configure none, which is the arrangement where a reverse
-// proxy authenticates instead — so an empty set is not a fault.
+// proxy authenticates instead — so an empty set is not a fault. It may not
+// configure two: an identity here is a username, and two providers issuing
+// usernames independently would make the same name two different people or one
+// person two accounts, depending on which way the ambiguity fell (REQ-41).
 func signInProviders(ctx context.Context, cfg config.Config, logger *slog.Logger) (map[string]signin.Provider, error) {
 	providers := map[string]signin.Provider{}
+
+	// Refused here rather than at somebody's first sign-in, which is the point
+	// of building providers at startup at all. Naming both settings is what
+	// makes the message actionable: whichever one is wrong, the operator can
+	// see which two are fighting.
+	if cfg.OIDCIssuer != "" && cfg.GitHubClientID != "" {
+		return nil, fmt.Errorf(
+			"two sign-in providers are configured: %sOIDC_ISSUER and %sGITHUB_CLIENT_ID. "+
+				"One provider is configured at a time, because an identity here is a username "+
+				"and two providers issuing them independently cannot be told apart. "+
+				"Remove one and start again",
+			"OPENPSIRT_", "OPENPSIRT_")
+	}
 
 	if cfg.OIDCIssuer != "" {
 		provider, err := signin.NewOIDC(ctx, signin.OIDCConfig{
