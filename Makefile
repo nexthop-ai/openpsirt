@@ -144,8 +144,8 @@ NPM ?= npm
 #               status line prints. Not what you have to type: the demo is not
 #               told a base address, so it answers on whatever name you reach
 #               it by
-#   DEMO_USER   who you arrive as. The trusted-header path prefixes it, so the
-#               administrator is proxy:$(DEMO_USER)
+#   DEMO_USER   who you arrive as, and the administrator the demo names. An
+#               identity is the username the proxy asserts, unprefixed
 DEMO_HOST ?= localhost
 DEMO_PORT ?= 8080
 DEMO_USER ?= dev
@@ -1082,7 +1082,7 @@ demo-up: demo-down
 	  -e OPENPSIRT_DATABASE_URL="sqlite:///data/dev.db" \
 	  -e OPENPSIRT_ADDR="0.0.0.0:8080" \
 	  -e OPENPSIRT_PLAIN_HTTP=1 \
-	  -e OPENPSIRT_BOOTSTRAP_ADMINS="proxy:$(DEMO_USER)" \
+	  -e OPENPSIRT_BOOTSTRAP_ADMINS="$(DEMO_USER)" \
 	  -e OPENPSIRT_TRUSTED_HEADER="X-User" \
 	  -e OPENPSIRT_TRUSTED_SOURCES="$(DEMO_SUBNET)" \
 	  -e OPENPSIRT_ATTACHMENT_DIR="/data/attachments" \
@@ -1182,7 +1182,7 @@ demo-down:
 # implied by a flag. Idempotent, so re-seeding is not a special case.
 demo-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant dev on $(1) %{http_code}\n" \
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"proxy:$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"provider\":\"proxy\",\"username\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
 	  "$(DEMO_URL)/v1/people"
 
 demo-seed:
@@ -1266,7 +1266,7 @@ demo-seed:
 	  done; \
 	  curl -sS --noproxy '*' -o /dev/null -w "  person $$who %{http_code}\n" \
 	    -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	    -d "{\"identity\":\"$$who\",\"display_name\":\"$$who\",\"provider\":\"proxy\",\"username\":\"$$who\",\"holds\":[$${holds%,}]}" \
+	    -d "{\"identity\":\"$$who\",\"display_name\":\"$$who\",\"holds\":[$${holds%,}]}" \
 	    "$(DEMO_URL)/v1/people"; \
 	done
 	@echo "  the scans run in the background; make demo-status shows when they land"
@@ -1382,7 +1382,7 @@ demo-triage:
 	variant=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ _ _ _ v <<< "$$b"; echo "$$v"; done | head -1); \
 	curl -sS --noproxy '*' -o /dev/null -w "  person holly %{http_code}\n" \
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	  -d '{"identity":"holly","display_name":"Holly","provider":"proxy","username":"holly","holds":[{"product":"'"$$product"'","role":"approver"}]}' \
+	  -d '{"identity":"holly","display_name":"Holly","holds":[{"product":"'"$$product"'","role":"approver"}]}' \
 	  "$(DEMO_URL)/v1/people"; \
 	rows=$$(curl -sS --noproxy '*' \
 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?limit=40&stream=$$stream&variant=$$variant" \
@@ -1408,6 +1408,11 @@ demo-triage:
 #
 # Undisclosed, which is what a flaw looks like before anybody announces it, and
 # recorded against the container builds because that is what the image is.
+#
+# What comes back is echoed rather than substituted into a pattern. A refusal
+# is JSON carrying a schema address, and the slashes in it ended the s/// it
+# was being pasted into — so the one path with something to say was the one
+# that could not say it.
 demo-flaw:
 	@command -v curl >/dev/null || { echo "curl is needed"; exit 1; }
 	@# Nothing here refuses a second one: an identifier is minted per record,
@@ -1423,8 +1428,11 @@ demo-flaw:
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
 	  -d '{"builds":[{"stream":"main","variant":"container"},{"stream":"v1.0","variant":"container"}],"summary":"The inventory upload accepts a document nobody authenticated and files it against whichever build the document names.","severity":"high","vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N","weaknesses":["CWE-306"],"reported_by":"A. Researcher","contact":"researcher@example.invalid","credit":"anonymous"}' \
 	  "$(DEMO_URL)/v1/products/openpsirt/findings"); \
-	echo "$$filed" | sed -e 's/.*"identifier":"\([^"]*\)".*/  filed as \1, undisclosed/' \
-	  -e 's/^{.*/  it was refused: '"$$filed"'/'
+	if echo "$$filed" | grep -q '"identifier"'; then \
+	  echo "$$filed" | sed -e 's/.*"identifier":"\([^"]*\)".*/  filed as \1, undisclosed/'; \
+	else \
+	  echo "  it was refused: $$filed"; \
+	fi
 
 demo-status:
 	@builds=""; for entry in $(DEMO_BUILDS); do \
@@ -1442,7 +1450,7 @@ demo-status:
 	    "$(DEMO_URL)/v1/products/$$product/findings?stream=$$stream&variant=$$variant&limit=1" \
 	    | sed -e 's/.*"total":\([0-9]*\).*/\1 findings/' -e 's/^{.*/unreadable/'; \
 	done
-	@echo "  open $(DEMO_URL) — you arrive as proxy:$(DEMO_USER), no sign-in"
+	@echo "  open $(DEMO_URL) — you arrive as $(DEMO_USER), no sign-in"
 	@# The rest of the cast, one door each. Two windows is two people, which is
 	@# what it takes to show a claim being agreed to: approving your own is
 	@# refused, so a single identity can propose a judgment and never finish
@@ -1475,7 +1483,7 @@ dev-up: dev-down
 	@OPENPSIRT_DATABASE_URL="sqlite://$(DEV_DB)" \
 	 OPENPSIRT_ADDR="$(DEV_API)" \
 	 OPENPSIRT_PLAIN_HTTP=1 \
-	 OPENPSIRT_BOOTSTRAP_ADMINS="proxy:$(DEMO_USER)" \
+	 OPENPSIRT_BOOTSTRAP_ADMINS="$(DEMO_USER)" \
 	 OPENPSIRT_TRUSTED_HEADER="X-User" \
 	 OPENPSIRT_TRUSTED_SOURCES="127.0.0.0/8" \
 	 OPENPSIRT_ATTACHMENT_DIR="$(DEV_DIR)/attachments" \
@@ -1553,7 +1561,7 @@ dev-status:
 	    "http://$(DEV_API)/v1/products/$$build/findings?limit=1" \
 	    | sed -e 's/.*"total":\([0-9]*\).*/\1 findings/' -e 's/^{.*/unreadable/'; \
 	done
-	@echo "  open $(DEV_URL) — you arrive as proxy:$(DEMO_USER), no sign-in"
+	@echo "  open $(DEV_URL) — you arrive as $(DEMO_USER), no sign-in"
 
 
 dev-reset: dev-down
