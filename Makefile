@@ -1504,6 +1504,23 @@ dev-down:
 	@rm -f $(DEV_DIR)/api.pid $(DEV_DIR)/web.pid
 	@sleep 1
 
+# The same grant the container demo makes, against the API this loop runs.
+#
+# Declaring a product is administration; filing a build against it is not
+# (ACC-64), so the bootstrap administrator holds nothing on a product until it
+# is granted. Without this every upload here was refused and the loop seeded a
+# deployment with three declared builds and no inventory in any of them —
+# which reads as the scans being slow rather than as nothing having been taken.
+#
+# Direct to the binary with the identity in a header, where the demo goes
+# through a proxy that asserts it. Idempotent, so re-seeding is not a special
+# case.
+dev-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1) %{http_code}\n" \
+	  -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
+	  -H 'Content-Type: application/json' \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
+	  "http://$(DEV_API)/v1/people"
+
 dev-seed:
 	@command -v xz >/dev/null || { echo "xz is needed to read the fixtures"; exit 1; }
 	@for entry in $(DEMO_BUILDS); do \
@@ -1519,6 +1536,7 @@ dev-seed:
 	      -H 'Content-Type: application/json' -d "$$body" \
 	      "http://$(DEV_API)$$path"; \
 	  done; \
+	  $(call dev-grant,$$product); \
 	  curl -sS --noproxy '*' -o /dev/null -w "  upload $$product/$$stream/$$variant %{http_code}\n" \
 	    -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
 	    -F "inventory=@$(DEV_DIR)/$$product-$$stream-$$variant.cdx.json" \
@@ -1542,6 +1560,7 @@ dev-seed:
 	    -H 'Content-Type: application/json' -d "$$body" \
 	    "http://$(DEV_API)$$path"; \
 	done
+	@$(call dev-grant,openpsirt)
 	@curl -sS --noproxy '*' -o /dev/null -w "  upload %{http_code}\n" \
 	  -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
 	  -F "inventory=@bin/openpsirt.cdx.json" \
@@ -1551,14 +1570,16 @@ dev-seed:
 dev-status:
 	@builds=""; for entry in $(DEMO_BUILDS); do \
 	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
-	  builds="$$builds $$product/streams/$$stream/variants/$$variant"; \
+	  builds="$$builds $$product:$$stream:$$variant"; \
 	done; \
-	for build in $$builds openpsirt/streams/main/variants/binary; do \
+	for triple in $$builds openpsirt:main:binary; do \
+	  IFS=':' read -r product stream variant <<< "$$triple"; \
+	  build="$$product/streams/$$stream/variants/$$variant"; \
 	  printf "  %-46s scan " "$$build"; curl -sS --noproxy '*' -H "X-User: $(DEMO_USER)" \
 	    "http://$(DEV_API)/v1/products/$$build/scans" \
 	    | sed -e 's/.*"state":"\([a-z]*\)".*/\1/' -e 's/^{.*/no scans yet/' | tr -d '\n'; \
 	  printf " · open "; curl -sS --noproxy '*' -H "X-User: $(DEMO_USER)" \
-	    "http://$(DEV_API)/v1/products/$$build/findings?limit=1" \
+	    "http://$(DEV_API)/v1/products/$$product/findings?stream=$$stream&variant=$$variant&limit=1" \
 	    | sed -e 's/.*"total":\([0-9]*\).*/\1 findings/' -e 's/^{.*/unreadable/'; \
 	done
 	@echo "  open $(DEV_URL) — you arrive as $(DEMO_USER), no sign-in"
