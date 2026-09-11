@@ -72,6 +72,15 @@ type AdminBinding struct {
 }
 
 // Bind maps a group to a role on a product.
+//
+// **The name is stored as given and matched as given.** A group name is an
+// identity the provider hands over rather than a name anybody here types, and
+// the rule for those is exact comparison — a folded column would make
+// "Security" and "security" one binding, when the provider means only one of
+// them. The cost is that a binding typed with the wrong capitals grants
+// nothing and the refusal says only "not authorized", which is what the
+// endpoint's description warns about; the alternative costs an administrator
+// the ability to bind two groups a provider genuinely distinguishes.
 func (s *Store) Bind(ctx context.Context, group string, productID int64, role Role) error {
 	group = strings.TrimSpace(group)
 	if group == "" {

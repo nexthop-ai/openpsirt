@@ -27,6 +27,7 @@ REQ-44, REQ-45, REQ-56, REQ-59, REQ-68, REQ-69's server half.
 - [Trusted-header sign-in](#trusted-header-sign-in)
 - [Name and identifier](#name-and-identifier)
 - [Sessions and request forgery](#sessions-and-request-forgery)
+- [How a group name is matched](#how-a-group-name-is-matched)
 - [Role assignment modes](#role-assignment-modes)
 - [The grant grid](#the-grant-grid)
 - [Personal tokens](#personal-tokens)
@@ -574,6 +575,17 @@ Origin is checked for both, because it costs nothing and still holds when the
 echoed value has leaked. Requests carrying a key or a token are exempt: nothing
 sends those automatically. Safe methods are named as a list, so a method nobody
 thought of is guarded rather than exempt by having been forgotten.
+
+## How a group name is matched
+
+**Exactly, with its capitals.** A group name is an identity the provider hands
+over, and the rule for those is exact comparison — the same rule that makes a
+name somebody types here folded instead.
+
+| | |
+|---|---|
+| Two spellings are two bindings | The provider distinguishes them, and folding would take that from an administrator |
+| A binding whose capitals are wrong grants nothing, silently | The refusal somebody meets is the generic one, by design, so nothing says the binding was the problem. The endpoint says so instead, where the name is typed |
 
 ## Role assignment modes
 

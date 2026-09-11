@@ -17,7 +17,7 @@ type ModeBody struct {
 
 // BindingBody is a provider group bound to a role.
 type BindingBody struct {
-	Group string `json:"group" minLength:"1" maxLength:"191" doc:"The group as the provider names it — a team slug, or a claim value"`
+	Group string `json:"group" minLength:"1" maxLength:"191" doc:"The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here"`
 	// Product is absent where the binding carries administration, which is
 	// global rather than held against a product.
 	Product string `json:"product,omitempty" doc:"The product the role is held against"`
@@ -140,7 +140,13 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		Description: "Maps one identity-provider group to one role, so that everybody in that " +
 			"group holds it from their next sign-in.\n\n" +
 			"Every role but administration names the product it applies to. Administration is " +
-			"bound without one, because it is global rather than held against a product.",
+			"bound without one, because it is global rather than held against a product.\n\n" +
+			"**The group is matched exactly, including its capitals.** It is an identity the " +
+			"provider hands over rather than a name anybody here types, so it is stored as " +
+			"given and compared as given — `Security` and `security` are two bindings, and a " +
+			"binding whose capitals do not match what the provider sends grants nothing. The " +
+			"refusal somebody then meets says only that they are not authorized, so check the " +
+			"spelling against the provider rather than against what looks right.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct{ Body BindingBody }) (*struct{ Body BindingBody }, error) {
 		rights, names, err := administerable(ctx, a)

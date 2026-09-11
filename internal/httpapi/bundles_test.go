@@ -33,10 +33,14 @@ type bundled struct {
 //
 // A date typed in goes past, and a promise landing on a date already gone is
 // refused — so every test about promising work would start failing on a day
-// that has nothing to do with what it pins. Tomorrow rather than a month out,
-// because a promise past what it covers is gated and these tests are about
-// what a promise reaches.
-var aheadOfUs = time.Now().UTC().AddDate(0, 0, 1).Format(time.DateOnly)
+// that has nothing to do with what it pins.
+//
+// Two days rather than one: read as a date, tomorrow is midnight tonight, and
+// a run that starts before midnight and reaches these tests after it finds
+// tomorrow already behind it. Two days rather than a month, because a promise
+// past the deadline it covers is gated and these tests are about what a
+// promise reaches — the shortest window in the fixture is three days.
+var aheadOfUs = time.Now().UTC().AddDate(0, 0, 2).Format(time.DateOnly)
 
 func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 	// The same bump answers thousands of rows and there was no unit for

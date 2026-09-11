@@ -760,7 +760,10 @@ type FindingDecisionBody struct {
 	Reasoning    string `json:"reasoning" minLength:"1" doc:"Why this holds"`
 	// Places is the deliberate narrowing. Absent means every place, which
 	// is the default naming the places covered asks for.
-	Places []string `json:"places,omitempty" doc:"Which places this covers, as the finding names them. Omit for all of them"`
+	// Bounded like every other array a write path takes. Each entry costs a
+	// map insert and a scan of the finding's places before anything is
+	// refused, so an unbounded one is work a caller chooses the size of.
+	Places []string `json:"places,omitempty" maxItems:"2000" maxLength:"191" doc:"Which places this covers, as the finding names them. Omit for all of them"`
 	// Extends names an approved claim this one carries to a new issue. The
 	// outcome and justification have to be the source's, and the places have
 	// to be ones the source sits at.
@@ -776,7 +779,10 @@ type FindingDecisionBody struct {
 	FromStatement int64 `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on"`
 	// Also carries the same judgment to other builds of this product, in
 	// the same transaction as the build in the path.
-	Also []AlsoBuild `json:"also,omitempty" doc:"Other builds of this product the same judgment covers. All of it is written together or none of it is"`
+	// Bounded: each entry costs a build resolution and a place lookup before
+	// any cap is consulted, so a body naming every build of a product is one
+	// resolution pass per build before the transaction opens.
+	Also []AlsoBuild `json:"also,omitempty" maxItems:"2000" doc:"Other builds of this product the same judgment covers. All of it is written together or none of it is"`
 }
 
 // AlsoBuild is another build one judgment reaches, as the reach names it.

@@ -18,6 +18,7 @@ import { Icon } from "../ui/Icons";
 import { Holder } from "../ui/Holder";
 import { Saved, type Prepared } from "../ui/Saved";
 import { said } from "../ui/Decide";
+import { useWho } from "../app/session";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
 // question of the server to offer the row before and the row after. Fifty rows
@@ -264,10 +265,10 @@ export function Findings() {
           },
         ),
       ),
-    onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["findings"] });
-      void queries.invalidateQueries({ queryKey: ["holdings"] });
-    },
+    // Nothing is invalidated per row. Handing over a selection is a loop of
+    // these, and invalidating on each one interleaved a list refetch between
+    // every write — so the page spent a long selection refetching rather than
+    // writing. The loop invalidates once when it is done.
   });
 
   const findings = useQuery({
@@ -630,6 +631,12 @@ export function Findings() {
     (row) => `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`,
   );
 
+  // What one action may write here, as the deployment sets it. A selection is
+  // handed over a row at a time, so this is the bound on how many round trips
+  // one click makes.
+  const bulkCap = useWho().data?.bulk_cap ?? 0;
+  const overCap = bulkCap > 0 && picked.size > bulkCap;
+
   // Handing a selection to somebody, which is the one thing a selection can do
   // until the bulk workflows that start from one are built.
   async function handOver() {
@@ -647,6 +654,10 @@ export function Findings() {
         failed.push(key);
       }
     }
+    // Once, after the loop. On every write it put a list refetch between
+    // each of them, so a long selection spent its time refetching.
+    void queries.invalidateQueries({ queryKey: ["findings"] });
+    void queries.invalidateQueries({ queryKey: ["holdings"] });
     setPicked(new Map(failed.map((key) => [key, picked.get(key)!])));
     setHanding("");
     setHandFailed(failed.length);
@@ -704,6 +715,16 @@ export function Findings() {
             across every page you have picked from — the list is read again after each decision, so
             a selection is by what a row is rather than where it sits
           </span>
+          {/* The bound the deployment sets on one action, said here rather
+              than met one refusal at a time: handing over is a request per
+              row, so an unbounded selection is one click turning into as many
+              round trips as the filter matched. */}
+          {overCap && (
+            <span className="alert" role="status">
+              {bulkCap.toLocaleString()} at a time is what this deployment allows. Narrow the
+              selection.
+            </span>
+          )}
           <span className="spacer" />
           {/* One lookup rather than a list of people beside a list of teams:
               both are parties, and at a hundred people a select is a list
@@ -720,7 +741,7 @@ export function Findings() {
           <button
             type="button"
             className="btn"
-            disabled={!handing || hand.isPending}
+            disabled={!handing || hand.isPending || overCap}
             onClick={() => void handOver()}
           >
             {hand.isPending ? "Assigning…" : `Assign ${picked.size}`}

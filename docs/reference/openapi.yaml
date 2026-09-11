@@ -508,7 +508,7 @@ components:
           readOnly: true
           type: string
         group:
-          description: The group as the provider names it — a team slug, or a claim value
+          description: The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here
           maxLength: 191
           minLength: 1
           type: string
@@ -1021,6 +1021,7 @@ components:
           items:
             format: int64
             type: integer
+          maxItems: 2000
           type:
             - array
             - "null"
@@ -2620,6 +2621,7 @@ components:
           description: Other builds of this product the same judgment covers. All of it is written together or none of it is
           items:
             $ref: "#/components/schemas/AlsoBuild"
+          maxItems: 2000
           type:
             - array
             - "null"
@@ -2665,7 +2667,9 @@ components:
         places:
           description: Which places this covers, as the finding names them. Omit for all of them
           items:
+            maxLength: 191
             type: string
+          maxItems: 2000
           type:
             - array
             - "null"
@@ -7521,6 +7525,10 @@ components:
         admin:
           description: Administers this deployment
           type: boolean
+        bulk_cap:
+          description: How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+          format: int64
+          type: integer
         deferral_days:
           description: How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted
           format: int64
@@ -9315,7 +9323,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9346,7 +9356,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9384,6 +9396,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -9601,7 +9614,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9727,7 +9742,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9758,7 +9775,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9796,6 +9815,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -10013,7 +10033,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11486,7 +11508,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11517,7 +11541,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11555,6 +11581,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -11772,7 +11799,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11975,7 +12004,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12006,7 +12037,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12044,6 +12077,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -12261,7 +12295,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12388,7 +12424,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12419,7 +12457,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12457,6 +12497,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -12674,7 +12715,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12827,7 +12870,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12858,7 +12903,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12896,6 +12943,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -13113,7 +13161,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -17073,6 +17123,8 @@ paths:
         Maps one identity-provider group to one role, so that everybody in that group holds it from their next sign-in.
 
         Every role but administration names the product it applies to. Administration is bound without one, because it is global rather than held against a product.
+
+        **The group is matched exactly, including its capitals.** It is an identity the provider hands over rather than a name anybody here types, so it is stored as given and compared as given — `Security` and `security` are two bindings, and a binding whose capitals do not match what the provider sends grants nothing. The refusal somebody then meets says only that they are not authorized, so check the spelling against the provider rather than against what looks right.
 
         **Requires:** administrator
       operationId: bind-group

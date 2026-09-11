@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -357,10 +356,11 @@ func trimTo(text string, most int) string {
 // a discovery document from outside, and this one was typed by the operator —
 // whose chat server is quite reasonably on their own network.
 func outboundClient() *http.Client {
-	dialer := &net.Dialer{
-		Timeout: signalTimeout,
-		Control: func(_, _ string, _ syscall.RawConn) error { return nil },
-	}
+	// No address guard, deliberately, and stated by its absence rather than
+	// by a hook that returns nil. A hook in exactly the position a reviewer
+	// looks for one reads as a control that is present, and the paragraph
+	// above is what says the permission is intended.
+	dialer := &net.Dialer{Timeout: signalTimeout}
 	return &http.Client{
 		Timeout: 15 * time.Second,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {

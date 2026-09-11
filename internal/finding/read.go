@@ -583,7 +583,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// one that is spelled the same way everywhere behaves the same way
 	// everywhere.
 	if term := strings.TrimSpace(f.Search); term != "" {
-		like := "%" + contains(term) + "%"
+		like := "%" + containsTerm(term) + "%"
 		// Either side matches. A person typing into one box does not say
 		// which of the two they mean, and an identifier cannot be mistaken
 		// for a package name in practice.
@@ -611,7 +611,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		where := q.NewSelect().TableExpr("component AS c").Column("c.id")
 		where = where.WhereGroup(" AND ", func(g *bun.SelectQuery) *bun.SelectQuery {
 			for _, kind := range kinds {
-				g = g.WhereOr("LOWER(c.purl) LIKE ? ESCAPE '#'", "pkg:"+contains(kind)+"/%")
+				g = g.WhereOr("LOWER(c.purl) LIKE ? ESCAPE '#'", "pkg:"+containsTerm(kind)+"/%")
 			}
 			return g
 		})
@@ -815,12 +815,19 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 				WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 					for _, cwe := range cwes {
 						name := strings.ToUpper(cwe)
+						// The equality takes the name as typed; the three
+						// patterns take it escaped, because the name is
+						// request text and a percent in it would match past
+						// the comma these shapes exist to respect — which is
+						// the CWE-7-matching-CWE-79 case, arriving through
+						// the term rather than through the shape.
+						pattern := strings.ToUpper(containsTerm(cwe))
 						q = q.WhereGroup(" OR ", func(q *bun.SelectQuery) *bun.SelectQuery {
 							return q.
 								WhereOr("UPPER(v.weaknesses) = ?", name).
-								WhereOr("UPPER(v.weaknesses) LIKE ?", name+",%").
-								WhereOr("UPPER(v.weaknesses) LIKE ?", "%,"+name).
-								WhereOr("UPPER(v.weaknesses) LIKE ?", "%,"+name+",%")
+								WhereOr(`UPPER(v.weaknesses) LIKE ? ESCAPE '#'`, pattern+",%").
+								WhereOr(`UPPER(v.weaknesses) LIKE ? ESCAPE '#'`, "%,"+pattern).
+								WhereOr(`UPPER(v.weaknesses) LIKE ? ESCAPE '#'`, "%,"+pattern+",%")
 						})
 					}
 					return q
@@ -1225,7 +1232,7 @@ func stateHaving(state string) string {
 // missed on the fourth. Component names are ASCII in every producer seen so
 // far, which is why this is written down rather than fixed: the day that stops
 // being true, the fix is a folded column.
-func contains(term string) string {
+func containsTerm(term string) string {
 	replacer := strings.NewReplacer("#", "##", "%", "#%", "_", "#_")
 	return replacer.Replace(strings.ToLower(term))
 }
@@ -2062,9 +2069,16 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// about where a flaw lives. Nothing here knows a kernel from a
 			// font library. Asked as a membership test rather than a join so
 			// the grouping stays on finding's covering index.
+			// Escaped, and the escape character stated. Spliced raw, a term
+			// holding a percent or an underscore selected far more issues
+			// than the box said — and this is the set a bulk judgment is
+			// then recorded against, so one justification landed on issues
+			// nobody saw. A backslash matched differently on each engine
+			// besides.
 			q = q.Where("f.vulnerability_id IN (?)",
 				q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
-					Where("LOWER(v.description) LIKE ?", "%"+strings.ToLower(contains)+"%"))
+					Where(`LOWER(v.description) LIKE ? ESCAPE '#'`,
+						"%"+containsTerm(contains)+"%"))
 		}
 		return q
 	}

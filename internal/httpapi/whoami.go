@@ -10,6 +10,8 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // CanBody is one product somebody can reach, and what they may do in it.
@@ -56,6 +58,12 @@ type WhoBody struct {
 	// policy rather than a secret — the same rule everybody here is subject
 	// to — so it is answered to anybody who may ask about themselves.
 	DeferralDays int `json:"deferral_days,omitempty" doc:"How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted"`
+	// BulkCap is how many rows one action may write. A screen offering a
+	// selection has to know it before the selection is acted on: a loop of
+	// single writes bounded by nothing turns one click into as many round
+	// trips as the filter matched, which is a page nobody can use and
+	// nothing can cancel.
+	BulkCap int `json:"bulk_cap,omitempty" doc:"How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
 }
 
 func registerWhoAmI(api huma.API, in Ingest) {
@@ -83,6 +91,12 @@ func registerWhoAmI(api huma.API, in Ingest) {
 		}
 		if threshold, err := deferralThreshold(ctx, in); err == nil {
 			body.DeferralDays = int(threshold.Hours() / 24)
+		}
+		if in.DB != nil {
+			if cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
+				triage.DefaultTogetherCap); err == nil {
+				body.BulkCap = cap
+			}
 		}
 		// What they asked to be sent, where they are a person and this
 		// process has somewhere to read it from. A credential asks for

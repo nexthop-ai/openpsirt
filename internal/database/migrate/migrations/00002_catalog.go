@@ -174,7 +174,15 @@ func typesFor(e database.Engine) *columnTypes {
 		// a four-byte character set.
 		return &columnTypes{
 			id: "BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY", ref: "BIGINT", refNull: "BIGINT",
-			name: "VARCHAR(191)", free: "TEXT", text: "TEXT", date: "DATE", timestamp: "DATETIME(6)",
+			name: "VARCHAR(191)", free: "TEXT", date: "DATE", timestamp: "DATETIME(6)",
+			// Sixteen megabytes for text somebody typed. The smaller type
+			// holds 65,535 bytes, and the policy that checks typed text
+			// before it is stored admits 65,536 — so a field that passed
+			// submission failed the write on these two engines and was
+			// recorded on the other two, or truncated silently outside
+			// strict mode, leaving an approver agreeing to words that are
+			// not the words that were written.
+			text:    "MEDIUMTEXT",
 			boolean: "TINYINT(1)", kind: "VARCHAR(16)", hash: "VARCHAR(64)",
 			// Sixteen megabytes, which is far more than a chunk ever holds.
 			// The smaller type tops out at 64 KB, which is not.

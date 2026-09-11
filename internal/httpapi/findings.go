@@ -278,15 +278,20 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 // *not* here is what belongs to one build: a subtree is a walk over one
 // build's edges, and "differs between builds" is a statement about a
 // selection.
+// Every array here carries a bound and every free-text field a length, for the
+// reason the ones that already did carry theirs: each element becomes a member
+// of an IN clause on the findings, the counts and every export, and four of
+// the seven were bounded by nothing at all — which is an inconsistency before
+// it is a limit, and the inconsistency is what says nobody decided.
 type Narrowing struct {
 	Severity   string   `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating"`
 	Exploited  bool     `query:"exploited" doc:"Keep only issues somebody is known to be exploiting"`
 	Fixable    bool     `query:"fixable" doc:"Keep only issues where an upstream fixed version is known"`
 	BelowFloor bool     `query:"below_floor" doc:"Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list"`
-	Component  []string `query:"component,explode" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
+	Component  []string `query:"component,explode" maxItems:"200" maxLength:"191" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
 	Tag        []string `query:"tag,explode" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags"`
 	Search     string   `query:"q" maxLength:"200" doc:"Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name"`
-	Ecosystem  []string `query:"ecosystem,explode" doc:"Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"`
+	Ecosystem  []string `query:"ecosystem,explode" maxItems:"200" maxLength:"64" doc:"Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"`
 	// The two questions about the release itself, kept apart because a tag
 	// can be in support and a branch can be past end-of-life. Both default to
 	// the working population, and both say so on the screen: a default that
@@ -294,7 +299,7 @@ type Narrowing struct {
 	// with nothing saying so.
 	On           []string `query:"on,explode" enum:"branch,tag" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
 	Support      []string `query:"support,explode" enum:"in-support,past-eol" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
-	Under        string   `query:"under" doc:"Keep only what sits inside the container of this name"`
+	Under        string   `query:"under" maxLength:"191" doc:"Keep only what sits inside the container of this name"`
 	UnderBuild   bool     `query:"under_build" doc:"Keep only what the build holds directly, which is what has no container above it"`
 	State        []string `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"`
 	Outcome      []string `query:"outcome,explode" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"`
@@ -315,7 +320,7 @@ type Narrowing struct {
 	Recorded     bool     `query:"recorded" doc:"Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before"`
 	Planned      string   `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`
 	Unconfirmed  bool     `query:"unconfirmed" doc:"Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does"`
-	Exclude      []string `query:"exclude,explode" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
+	Exclude      []string `query:"exclude,explode" maxItems:"200" maxLength:"191" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
 	Sort         string   `query:"sort" enum:"urgency,age,deadline,places,epss,severity" doc:"Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
 	Ascending    bool     `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
 }

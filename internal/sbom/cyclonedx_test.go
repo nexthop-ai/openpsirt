@@ -601,3 +601,37 @@ func TestReadsTheRevisionEveryShippedInventoryStates(t *testing.T) {
 			identified, len(doc.Components))
 	}
 }
+
+// The component bound is charged on the header-only read too.
+//
+// It was charged where a component is recorded, and that returns at once when
+// only the header is wanted — so a document putting its components inside the
+// root component's own nested array was walked in full, binding every one of
+// them, with nothing but the byte limit saying how many there could be. That
+// read happens synchronously inside the upload request, so it is a process
+// somebody fills from outside with a build key, and the same document read
+// whole is refused at the limit.
+func TestTheComponentBoundHoldsWhenOnlyTheHeaderIsWanted(t *testing.T) {
+	var b strings.Builder
+	b.WriteString(`{"bomFormat": "CycloneDX", "specVersion": "1.6",
+	 "metadata": {"component": {"bom-ref": "root", "name": "p", "version": "1",
+	  "components": [`)
+	for i := range 50 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"bom-ref": "n%d", "name": "n%d", "version": "1"}`, i, i)
+	}
+	b.WriteString(`]}}}`)
+
+	if _, err := sbom.ReadHeader(strings.NewReader(b.String()),
+		sbom.Limits{MaxComponents: 10}); err == nil {
+		t.Fatal("a header-only read walked a document past the component limit")
+	} else if !strings.Contains(err.Error(), "component limit") {
+		t.Errorf("refusal does not name the limit: %v", err)
+	}
+	if _, err := sbom.ReadHeader(strings.NewReader(b.String()),
+		sbom.Limits{MaxComponents: 100}); err != nil {
+		t.Errorf("a document inside the limit was refused: %v", err)
+	}
+}

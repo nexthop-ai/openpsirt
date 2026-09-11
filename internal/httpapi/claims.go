@@ -23,7 +23,7 @@ type ClaimApprovalBody struct {
 	Batch string `json:"batch,omitempty" maxLength:"64" doc:"Name a batch to agree to several claims under one name, so they can be undone together. At most 64 characters"`
 	// Except sets rows aside. What is left is approved as one claim; these go
 	// back to the proposer as a claim of their own, with the reason.
-	Except  []int64 `json:"except,omitempty" doc:"Decisions in this claim to set aside rather than approve. They return to the proposer as a claim of their own, carrying the reason given in because"`
+	Except  []int64 `json:"except,omitempty" maxItems:"2000" doc:"Decisions in this claim to set aside rather than approve. They return to the proposer as a claim of their own, carrying the reason given in because"`
 	Because string  `json:"because,omitempty" doc:"Why the rows in except are set aside, in markdown. Required when any are"`
 }
 

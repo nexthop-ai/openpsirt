@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -104,10 +105,20 @@ func registerVexImport(api huma.API, in Ingest) {
 			return nil, noSuchProduct()
 		}
 
+		// Read one byte past the limit, so a document over it is refused as
+		// too large rather than cut off and reported as malformed — and so
+		// the digest recorded is over what arrived rather than over the part
+		// that fitted. The scan-upload path refuses on size explicitly and
+		// this one silently truncated.
 		file := input.RawBody.Data().Statements
-		bytes, err := io.ReadAll(io.LimitReader(file, in.Limits.OrDefault().MaxBytes))
+		most := in.Limits.OrDefault().MaxBytes
+		bytes, err := io.ReadAll(io.LimitReader(file, most+1))
 		if err != nil {
 			return nil, huma.Error400BadRequest("that document could not be read")
+		}
+		if int64(len(bytes)) > most {
+			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
+				"that document is larger than the %d bytes this deployment reads", most))
 		}
 		digest := sha256.Sum256(bytes)
 		said, err := sbom.ReadSuppressions(strings.NewReader(string(bytes)),

@@ -154,6 +154,13 @@ only that it agrees with itself.
 
 Every field is capped at 64 KB. Rendering is time-bounded.
 
+**The column holds what the cap admits, on every engine.** Two of the four
+spell plain text as a type topping out at 65,535 bytes, one byte short of the
+cap — so a field of exactly the admitted size passed submission and failed the
+write on those two, or was truncated without a word outside strict mode, which
+leaves an approver agreeing to text that is not the text somebody wrote. The
+quick loop never saw it, because the engine it runs on stores it happily.
+
 The time bound bounds the wait, not the work: a parse cannot be interrupted, so
 the work runs to completion with nobody reading the result. What the bound buys
 is that the request answers and releases its resources. The cap on the work is

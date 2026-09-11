@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -295,11 +296,22 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 }
 
 // truncate bounds what is stored from a message that quotes a scan file.
+//
+// Cut on a rune boundary. A message quoting a producer's own text can carry
+// multi-byte characters, and a slice through one of them leaves invalid
+// UTF-8: PostgreSQL refuses it outright and MySQL and MariaDB refuse it in
+// strict mode, so recording why a scan failed failed — leaving the scan
+// accepted, with nothing saying why nothing happened. SQLite stores it
+// happily, so the quick loop never sees it.
 func truncate(s string, most int) string {
 	if len(s) <= most {
 		return s
 	}
-	return s[:most]
+	cut := s[:most]
+	for len(cut) > 0 && !utf8.ValidString(cut) {
+		cut = cut[:len(cut)-1]
+	}
+	return cut
 }
 
 // Made records what an inventory turned out to be made of.

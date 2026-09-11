@@ -32,6 +32,11 @@ export type Who = {
   // decides whether a second person has to agree, and reading that off the
   // response is reading it after the fact.
   deferral_days?: number;
+  // How many rows one action may write here. A screen acting on a selection
+  // bounds it by this and says so, rather than turning one click into as many
+  // round trips as a filter matched — a page nobody can use and nothing can
+  // cancel.
+  bulk_cap?: number;
 };
 
 // Who is asking, and what they may do. Asked once and shared, because every

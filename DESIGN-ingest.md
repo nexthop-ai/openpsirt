@@ -237,7 +237,17 @@ everywhere, including inside the parts nothing reads.
 
 **An oversized document is refused as oversized.** Truncating it and letting the
 reader fail reports a malformed file, which sends whoever sees the message
-looking at their build instead of at the limit.
+looking at their build instead of at the limit. This holds for a third party's
+VEX document as well, which was read to the limit and handed on: over-sized
+became malformed, and the digest recorded was over the part that fitted.
+
+**The component bound is charged where a component is read**, not where one is
+recorded. Charged at the recording, the header pass — which records nothing —
+counted none of them, so a document putting its components inside the root
+component's own nested array was walked in full during a read that happens
+inside the upload request, with only the size bound saying how many there
+could be. The same document read whole was refused. A bound that holds on one
+of two paths through the same parser is a bound somebody routes around.
 
 | Rule | Reason |
 |---|---|

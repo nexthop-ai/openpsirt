@@ -3439,6 +3439,8 @@ export interface paths {
          *
          *     Every role but administration names the product it applies to. Administration is bound without one, because it is global rather than held against a product.
          *
+         *     **The group is matched exactly, including its capitals.** It is an identity the provider hands over rather than a name anybody here types, so it is stored as given and compared as given — `Security` and `security` are two bindings, and a binding whose capitals do not match what the provider sends grants nothing. The refusal somebody then meets says only that they are not authorized, so check the spelling against the provider rather than against what looks right.
+         *
          *     **Requires:** administrator
          */
         post: operations["bind-group"];
@@ -4324,7 +4326,7 @@ export interface components {
              * @example https://example.com/schemas/BindingBody.json
              */
             readonly $schema?: string;
-            /** @description The group as the provider names it — a team slug, or a claim value */
+            /** @description The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here */
             group: string;
             /** @description The product the role is held against */
             product?: string;
@@ -8301,6 +8303,11 @@ export interface components {
             readonly $schema?: string;
             /** @description Administers this deployment */
             admin: boolean;
+            /**
+             * Format: int64
+             * @description How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+             */
+            bulk_cap?: number;
             /**
              * Format: int64
              * @description How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted
