@@ -466,12 +466,21 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 
 		said("undecided")
-		// A proposed row that holds no key is a shape nothing writes — a
-		// proposal is live until it is withdrawn or lapses, and both change
-		// its state — and it is none of the four words, for the row as for
-		// the filter.
+		// A proposed row that holds no key covers nothing: a proposal is live
+		// until it is withdrawn or lapses, and both release the key. So the
+		// place stands undecided — and the row and the filter say the same
+		// thing about it, which is what they exist to do. The row used to
+		// draw no word at all while the filter put the group in the
+		// undecided bucket, so a reader found it in a list whose own state
+		// column was blank.
 		record("proposed", false)
-		said("")
+		said("undecided")
+		if n := count("undecided"); n != 1 {
+			t.Errorf("a claim that holds nothing: undecided kept %d, want 1", n)
+		}
+		if n := count("waiting"); n != 0 {
+			t.Errorf("a claim that holds nothing is not waiting, yet waiting kept %d", n)
+		}
 		record("proposed", true)
 		said("waiting")
 		if n := count("waiting"); n != 1 {
@@ -500,6 +509,18 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 		if n := count("agreed"); n != 0 {
 			t.Errorf("a lapsed claim is not agreed, yet agreed kept %d", n)
+		}
+
+		// An approval that has stopped standing is not an agreement. The
+		// claim was agreed to and then withdrawn, which releases the key, and
+		// the row keeps its word: without the live key on the count a
+		// judgment taken back eighteen months ago goes on answering for its
+		// place, and the row and the filter answer it the same way because
+		// they are counting through one condition.
+		record("approved", false)
+		said("undecided")
+		if n := count("agreed"); n != 0 {
+			t.Errorf("an approval that no longer stands read as agreed: %d", n)
 		}
 
 		// And a claim that was withdrawn long ago answers for nothing: it is
@@ -787,5 +808,147 @@ func TestSeveralStatesAreAskedForTogether(t *testing.T) {
 		if none := count(t, ""); none != 2 {
 			t.Errorf("an empty set kept %d, want everything", none)
 		}
+	})
+}
+
+// The list filters on the rating in force, and shows it.
+//
+// The floor and the deadline compare the rating of ours where somebody has
+// made one, and the minimum-severity filter compared the published one — so a
+// finding reassessed from low to critical had its urgency and its deadline
+// moved and then disappeared from the list it was now at the top of, and drew
+// the word that had been overruled.
+func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mild := found("CVE-2026-1", libnl)
+		mild.Issue.Severity = "low"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Rated critical here, which is what the floor and the clock already
+		// read.
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
+			Set("assessed_severity = ?", "critical").
+			Where("identifier = ?", "CVE-2026-1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicRead)
+		groups, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{MinSeverity: "high"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(groups) != 1 {
+			t.Fatalf("asking for high and above found %d groups, want the reassessed one",
+				len(groups))
+		}
+		if groups[0].Severity != "critical" {
+			t.Errorf("the row reads %q, want the rating in force", groups[0].Severity)
+		}
+
+		// And a word typed with capitals narrows rather than doing nothing.
+		shouted, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{MinSeverity: "High"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(shouted) != len(groups) {
+			t.Errorf("asking for \"High\" found %d groups and \"high\" found %d",
+				len(shouted), len(groups))
+		}
+	})
+}
+
+// The filter that finds what is with its author, and the count the row draws
+// it from, are one question.
+//
+// The filter had written its own condition without the product and without
+// the version match, so it kept a group whose own sent-back count was zero:
+// matched by a claim returned in a different product, or by one keyed on a
+// version the place stopped holding. A reader asking for what is waiting on
+// them got rows whose state column said nothing was.
+func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issueID := f.issueID(t, "CVE-2026-1")
+		place := finding.PlaceIdentity(swss.Name, "")
+
+		sentBack := func(productID int64, version string) {
+			t.Helper()
+			if _, err := f.db.DB.NewDelete().Table("decision").
+				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			row := map[string]any{
+				"claim_id":   claimBy(t, f.db, somebody.ID),
+				"product_id": productID, "vulnerability_id": issueID,
+				"place_identity": place, "visibility": "public",
+				"state":          "proposed",
+				"needs_approval": true, "proposed_by": somebody.ID,
+				"proposed_at":                time.Now().UTC(),
+				"component_upstream_version": version,
+				"live_key":                   "the-live-key",
+				"sent_back_at":               time.Now().UTC(),
+			}
+			if _, err := f.db.DB.NewInsert().Model(&row).
+				TableExpr("decision").Exec(ctx); err != nil {
+				t.Fatalf("record a claim sent back: %v", err)
+			}
+		}
+		// Both halves of the answer, which have to agree.
+		asked := func(because string, want int) {
+			t.Helper()
+			groups, kept, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+				finding.Filter{SentBack: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kept != want {
+				t.Errorf("%s: the filter kept %d, want %d", because, kept, want)
+			}
+			all, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			drawn := 0
+			for _, group := range all {
+				if group.SentBack {
+					drawn++
+				}
+			}
+			if drawn != want {
+				t.Errorf("%s: %d rows draw as with their author, want %d", because, drawn, want)
+			}
+			if len(groups) != want {
+				t.Errorf("%s: %d rows came back, want %d", because, len(groups), want)
+			}
+		}
+
+		sentBack(f.productID, swss.Version)
+		asked("a claim sent back here, at the version shipping here", 1)
+		sentBack(f.productID, "0.9.0")
+		asked("a claim sent back about a version this place stopped holding", 0)
+		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sentBack(elsewhere.ID, swss.Version)
+		asked("a claim sent back in another product", 0)
 	})
 }

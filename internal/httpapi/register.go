@@ -29,10 +29,14 @@ type DisposedBody struct {
 	ProposedAt    string `json:"proposed_at,omitempty"`
 	ApprovedBy    string `json:"approved_by,omitempty" doc:"Who agreed. Two different people is the whole of the control, so both names are carried rather than a count"`
 	ApprovedAt    string `json:"approved_at,omitempty"`
-	Opened        string `json:"opened"`
-	Closed        string `json:"closed,omitempty"`
-	Due           string `json:"due,omitempty"`
-	Met           *bool  `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
+	// AgreementCarried says the agreement was given for an earlier claim and
+	// carried onto this one, which is what a re-affirmation stands on. The
+	// person named read those words rather than these.
+	AgreementCarried bool   `json:"agreement_carried,omitempty" doc:"Whether the agreement was carried forward from an earlier claim rather than given for this one"`
+	Opened           string `json:"opened"`
+	Closed           string `json:"closed,omitempty"`
+	Due              string `json:"due,omitempty"`
+	Met              *bool  `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
 }
 
 func registerRegister(api huma.API, in Ingest) {
@@ -122,7 +126,8 @@ func registerRegister(api huma.API, in Ingest) {
 			Header: []string{
 				"issue", "severity", "component", "version", "place", "consumer", "state",
 				"outcome", "justification", "proposed by", "proposed at",
-				"approved by", "approved at", "opened", "closed", "due", "met",
+				"approved by", "approved at", "agreement carried",
+				"opened", "closed", "due", "met",
 			},
 			// Streamed rather than paged, and neither counted. A file has no
 			// column for how many rows there are altogether, and every page
@@ -140,6 +145,7 @@ func registerRegister(api huma.API, in Ingest) {
 						body.Vulnerability, body.Severity, body.Component, body.Version,
 						body.Place, body.Consumer, body.State, body.Outcome, body.Justification,
 						body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
+						strconv.FormatBool(body.AgreementCarried),
 						body.Opened, body.Closed, body.Due, met,
 					})
 				})
@@ -159,7 +165,8 @@ func disposedBody(row finding.Disposed) DisposedBody {
 		Consumer: row.Consumer,
 		State:    row.State, Outcome: row.Outcome, Justification: row.Justification,
 		ProposedBy: row.ProposedBy, ApprovedBy: row.ApprovedBy,
-		Opened: row.OpenedAt.Format(time.DateOnly), Met: row.Met,
+		AgreementCarried: row.AgreementCarried,
+		Opened:           row.OpenedAt.Format(time.DateOnly), Met: row.Met,
 	}
 	if row.ProposedAt != nil {
 		body.ProposedAt = row.ProposedAt.Format(time.DateOnly)

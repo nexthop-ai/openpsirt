@@ -3,7 +3,6 @@ package finding
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/uptrace/bun"
 
@@ -68,7 +67,9 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	if len(visible) == 0 {
 		return nil, whole, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
-	now := time.Now().UTC()
+	// The store's clock, like everything else here, so a frozen clock
+	// reaches it and so one answer is worked out from one moment.
+	now := s.now().UTC()
 
 	// The things somebody decides about: one row per build, issue and
 	// component, with the places counted and the standing decisions counted
@@ -76,13 +77,13 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// the number of places, which is why the decisions are counted as a
 	// correlated EXISTS per place rather than joined — a join multiplies the
 	// rows and a place with two decisions would count twice.
-	decided := func(alias, condition string) string {
-		return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS de
-			WHERE de.product_id = ?
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND ` + coversHere + condition + `) THEN 1 ELSE 0 END) AS ` + alias
-	}
+	// The one count no list carries: anything that still says something about
+	// the place. A withdrawn claim does not — it covers the place so that
+	// "lapsed" can be said, and counting it as a claim took the finding out
+	// of the undecided figure while putting it in no other, which is the same
+	// hole the list's own state words had. Spelled through the same helper as
+	// the rest, so the correlation and the version match are one expression.
+	anyClaim := decisionState{"any_claim", " AND de.state <> ?", []any{"withdrawn"}}
 	// The things somebody decides about, grouped one way for the build rows
 	// and another for the product's own totals: with the build in the key it
 	// is one row per build, and without it a group in three builds is one
@@ -95,14 +96,8 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 			ColumnExpr("COUNT(*) AS places").
 			ColumnExpr("MIN(f.due_at) AS due_at").
 			ColumnExpr("MAX(f.urgency) AS urgency").
-			// Anything that still says something about the place. A withdrawn
-			// claim does not: it covers the place so that "lapsed" can be
-			// said, and counting it as a claim took the finding out of the
-			// undecided figure while putting it in no other, which is the
-			// same hole the list's own state words had.
-			ColumnExpr(decided("any_claim", " AND de.state <> ?"), productID, "withdrawn").
-			ColumnExpr(decided("approved", " AND de.state = ? AND de.live_key IS NOT NULL"),
-				productID, "approved").
+			ColumnExpr(decidedAs("?", anyClaim), productID, "withdrawn")
+		q = decisionCounts(q, "?", []any{productID}, claimApproved).
 			Where(`f.target_id IN (SELECT tg.id FROM "target" AS tg
 				JOIN "stream" AS st ON st.id = tg.stream_id
 				WHERE st.product_id = ?)`, productID).
@@ -123,7 +118,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 			ColumnExpr("SUM(CASE WHEN grouped.urgency >= ? THEN 1 ELSE 0 END) AS exploited",
 				int64(exploitedBand)).
 			ColumnExpr("SUM(CASE WHEN grouped.any_claim = 0 THEN 1 ELSE 0 END) AS undecided").
-			ColumnExpr("SUM(CASE WHEN grouped.approved = grouped.places THEN 1 ELSE 0 END) AS agreed")
+			ColumnExpr("SUM(CASE WHEN grouped.approved_here = grouped.places THEN 1 ELSE 0 END) AS agreed")
 	}
 	groups := grouped(true)
 
@@ -138,7 +133,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Agreed    int    `bun:"agreed"`
 	}
 	err := counted(s.db.NewSelect().
-		TableExpr("(?) AS grouped", groups).
+		TableExpr(`(?) AS "grouped"`, groups).
 		Join(`JOIN "target" AS tg ON tg.id = grouped.target_id`).
 		Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS va ON va.id = tg.variant_id`).
@@ -159,7 +154,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Agreed    int `bun:"agreed"`
 	}
 	if err := counted(s.db.NewSelect().
-		TableExpr("(?) AS grouped", grouped(false))).
+		TableExpr(`(?) AS "grouped"`, grouped(false))).
 		Scan(ctx, &totals); err != nil {
 		return nil, whole, fmt.Errorf("read how this product stands: %w", err)
 	}

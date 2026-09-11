@@ -166,7 +166,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		Access: access.NewResolver(rights, access.Trust{
 			Header: cfg.TrustedHeader, From: cfg.TrustedSources,
 			GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
-		}).WithLogger(logger).WithMode(roleMode(settings)),
+		}).WithLogger(logger).WithMode(roleMode(settings)).OverPlainHTTP(cfg.PlainHTTP),
 		Providers:       providers,
 		BaseURL:         cfg.BaseURL,
 		PlainHTTP:       cfg.PlainHTTP,
@@ -228,8 +228,10 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Removes uploads nothing ever referred to. Nil where this deployment
 	// holds no files, which is ordinary.
 	keeper := attach.NewKeeper(db.DB, files, logger, 0)
-	return serve(cfg, logger, handler, reader, runner, schedule, upstream, watch, post, outward,
-		keeper, routing)
+	return serve(cfg, logger, handler, passes{
+		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
+		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
+	})
 }
 
 // readInterval is how long an idle reader waits before asking for work again.
@@ -338,78 +340,71 @@ func newLogger(cfg config.Config, w *os.File) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, opts))
 }
 
-func serve(cfg config.Config, logger *slog.Logger, handler http.Handler,
-	reader *ingest.Reader, runner *scanner.Runner, schedule *scanner.Schedule,
-	upstream *currency.Refresher, watch *notify.Watch, post *notify.Post,
-	outward *notify.Signal, keeper *attach.Keeper, routing *finding.Sweeper) error {
+// passes is what runs beside the server: the nine background loops, each of
+// which may be absent because the thing it works on is not configured.
+//
+// Grouped rather than passed one at a time. Twelve parameters is past what a
+// call site can be read at, and they divide cleanly into what to serve and
+// what to run beside it — this is the second half.
+type passes struct {
+	reader   *ingest.Reader
+	runner   *scanner.Runner
+	schedule *scanner.Schedule
+	upstream *currency.Refresher
+	watch    *notify.Watch
+	post     *notify.Post
+	outward  *notify.Signal
+	keeper   *attach.Keeper
+	routing  *finding.Sweeper
+}
+
+// background starts every pass that has something to work on, and answers
+// with what to wait for.
+//
+// Waited for, not merely signalled. A worker can be mid-query when the signal
+// lands, and returning from serve closes the database underneath it — which
+// turns an orderly shutdown into a failed scan and a job that has to be
+// retried for no reason.
+func (p passes) background(ctx context.Context) *sync.WaitGroup {
+	var workers sync.WaitGroup
+	start := func(run func(context.Context, time.Duration), every time.Duration) {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			run(ctx, every)
+		}()
+	}
+	if p.reader != nil {
+		start(p.reader.Run, readInterval)
+	}
+	if p.post != nil {
+		start(p.post.Run, 0)
+	}
+	if p.outward != nil {
+		start(p.outward.Run, 0)
+	}
+	if p.keeper != nil {
+		start(p.keeper.Run, 0)
+	}
+	if p.runner != nil {
+		start(p.runner.Run, readInterval)
+	}
+	if p.routing != nil {
+		start(p.routing.Run, readInterval)
+	}
+	start(p.schedule.Run, scheduleInterval)
+	start(p.upstream.Run, askInterval)
+	start(p.watch.Run, 0)
+	return &workers
+}
+
+func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside passes) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// Reading stops when the signal arrives, before the server drains, so a
 	// scan is not picked up during the seconds we are on our way out.
-	//
-	// Waited for, not merely signalled. A worker can be mid-query when the
-	// signal lands, and returning from here closes the database underneath it
-	// — which turns an orderly shutdown into a failed scan and a job that has
-	// to be retried for no reason.
-	var workers sync.WaitGroup
-	if reader != nil {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			reader.Run(ctx, readInterval)
-		}()
-	}
-	if post != nil {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			post.Run(ctx, 0)
-		}()
-	}
-	if outward != nil {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			outward.Run(ctx, 0)
-		}()
-	}
-	if keeper != nil {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			keeper.Run(ctx, 0)
-		}()
-	}
-	if runner != nil {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			runner.Run(ctx, readInterval)
-		}()
-	}
-	if routing != nil {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			routing.Run(ctx, readInterval)
-		}()
-	}
-	workers.Add(1)
-	go func() {
-		defer workers.Done()
-		schedule.Run(ctx, scheduleInterval)
-	}()
-	workers.Add(1)
-	go func() {
-		defer workers.Done()
-		upstream.Run(ctx, askInterval)
-	}()
-	workers.Add(1)
-	go func() {
-		defer workers.Done()
-		watch.Run(ctx, 0)
-	}()
+	workers := beside.background(ctx)
 	srv := &http.Server{
 		Addr:    cfg.Addr,
 		Handler: handler,
@@ -458,7 +453,7 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler,
 	// Observed: a query that should have taken milliseconds ran for over an
 	// hour, SIGTERM did nothing, and the process had to be killed. A shutdown
 	// that cannot be completed by the signal meant for it is not a shutdown.
-	if !waitFor(&workers, cfg.ShutdownGrace) {
+	if !waitFor(workers, cfg.ShutdownGrace) {
 		logger.Warn("stopped without waiting for background work to finish",
 			"grace", cfg.ShutdownGrace,
 			"why", "a worker did not stop in time, most likely blocked on a slow query")

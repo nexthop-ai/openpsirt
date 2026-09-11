@@ -69,13 +69,6 @@ type Receipt struct {
 	Measured *finding.Run
 }
 
-// Receipts reports what became of the scans filed against a target, newest
-// first, with how many there are in total.
-//
-// A credential narrows it to what that credential sent. The narrowing belongs
-// here rather than in the caller: filtering a page after it has been read
-// returns short pages and a total counting rows the reader was not shown,
-// which is both wrong and a count of somebody else's uploads.
 // Of is one scan of one build, narrowed the way the receipts are.
 //
 // Answered here rather than in a handler for the same reason the list is: a
@@ -106,6 +99,13 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	return held, nil
 }
 
+// Receipts reports what became of the scans filed against a target, newest
+// first, with how many there are in total.
+//
+// A credential narrows it to what that credential sent. The narrowing belongs
+// here rather than in the caller: filtering a page after it has been read
+// returns short pages and a total counting rows the reader was not shown,
+// which is both wrong and a count of somebody else's uploads.
 func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID int64, credential string, limit, offset int) ([]Receipt, int, error) {
 	// Asked here rather than only in the handler. A check beside the query
 	// cannot be skipped by adding another endpoint, which is the whole reason

@@ -59,16 +59,31 @@ Engine-specific code is confined to these places:
 | Schema migrations | Data-definition language differs |
 | The migration lock | Every engine spells advisory locking differently |
 | Connection setup | Driver-specific settings |
-| Recognizing a retryable failure | Each engine reports a lost race as a different code in a different error type (REQ-71) |
+| Recognizing what an engine is telling us | Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
-| The job queue's locking | The only place outside this package, because the queue owns the statement |
+| Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
+| The job queue's locking | The only query outside this package, because the queue owns the statement |
+| The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
+| A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 
-This list is the complete set and is checked by grep rather than trusted. It
-stated three while there were five, because each new one arrived under a comment
-calling itself one of the few places an engine has to be asked. Two turned out to
-be the same expression written twice in two packages.
+This list is the complete set and is checked by grep rather than trusted —
+`make confined`, which refuses a dialect named anywhere but the places above
+and holds the same list, so widening one without the other is what fails. It
+reads the tests too: a branch in a test is a branch, and the one thing it lets
+past there is an engine named to choose which engine runs.
 
-### Portable SQL that is not portable
+What it looks for is the branch rather than the SQL: the two upsert idioms as
+bun spells them, and asking a handle which engine it is. Those were absent
+from it at first, which made the one live branch in the tree written that way
+invisible to it — a gate that cannot see the idiom the code actually uses is a
+sentence rather than a check. The
+sentence asserted that check before anything performed it, which is the shape
+this list was written about: it stated three while there were five, because
+each new one arrived under a comment calling itself one of the few places an
+engine has to be asked. Two turned out to be the same expression written twice
+in two packages.
+
+### Silently wrong query shapes
 
 Not engine-specific code — one query written once — but shapes an engine gets
 wrong. Each is a silent wrong answer rather than an error, which is why they are
@@ -104,12 +119,18 @@ engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
 implicit default and an on-update clause depending on server configuration.
 
-**Before the first release a migration is edited rather than added to**
-(REQ-72). A change to a table edits the migration that created it, and anybody
-holding a development database recreates it. The migrations that exist are kept
-only because walking the chain up and down catches an ordering mistake between
-two of them, and they collapse into a single initial migration before the first
+Before the first release a migration is edited rather than added to (REQ-72). A
+change to a table edits the migration that created it, and anybody holding a
+development database recreates it. The migrations that exist are kept only
+because walking the chain up and down catches an ordering mistake between two of
+them, and they collapse into a single initial migration before the first
 release.
+
+Ten of them did the opposite and have been folded back into the migrations
+that created their tables. What that cost while they stood: a four-statement
+engine-specific rollback that existed only because a column was added later,
+four files to read to know what one table holds, and ten more migrations for
+the collapse to unpick. Every migration now creates something.
 
 ## Migration locks
 
@@ -146,17 +167,26 @@ Two engines quote with backticks by default, so their connections are asked for
 standard quoting. Backticks keep working and string literals are untouched: this
 changes what a double quote means, not what a quote means.
 
-**The mode is appended to what is already in force, never assigned.** Assigning
+The mode is appended to what is already in force, never assigned. Assigning
 replaces the mode, and what it replaces includes the strictness that makes an
 oversized value an error rather than a quiet truncation. The first version
-assigned, and a nine-character string stored in a four-character column came back
-four characters long, with no error, on those two engines.
+assigned, and a nine-character string stored in a four-character column came
+back four characters long, with no error, on those two engines.
 
-**A name a query invents needs the same care.** A grouped count wrapped its
-subquery in `AS groups`, and `GROUPS` is a reserved word in MySQL 8, where it
-names a window frame type. Three engines parsed it and one returned a syntax
-error, which the handler above turned into a 500 with the driver's message
-discarded.
+The gate reads three places, because it read one. `AS <word>` is the syntax for
+inventing a name and was the whole of what it matched — so a table renamed in a
+migration, which names no alias, and a table alias declared in a model's own
+struct tag were both invisible to it. The settings table was aliased `as`, which
+all four engines reserve, and worked only because the library quotes what a tag
+declares; the first raw expression naming that alias would have been a syntax
+error on every one of them. Inside the migrations it reads the data-definition
+keywords as well, with the comments beside them stripped first — the prose that
+makes a schema legible is full of the words an engine reserves.
+
+A name a query invents needs the same care. A grouped count wrapped its subquery
+in `AS groups`, and `GROUPS` is a reserved word in MySQL 8, where it names a
+window frame type. Three engines parsed it and one returned a syntax error,
+which the handler above turned into a 500 with the driver's message discarded.
 
 There are about two hundred and thirty invented names in the tree, so this is a
 gate rather than an audit. The words each engine reserves are held in one list
@@ -178,8 +208,8 @@ reverting the fix and watching them fail.
 A conditional write reports a lost race only through the number of rows the
 update touched. Zero means somebody got there first.
 
-**Two engines report rows *changed* by default; the other two report rows
-*matched*.** Under the first reading, a write whose condition held but whose
+Two engines report rows *changed* by default; the other two report rows
+*matched*. Under the first reading, a write whose condition held but whose
 values were already correct reports zero, and the caller announces a conflict
 that never happened. It surfaced as an approval refused with "the reasoning
 changed while this was being agreed to", for a decision nobody had touched.
@@ -233,10 +263,11 @@ failure. Anything else is reported rather than retried — an unrecognized failu
 treated as retryable turns a constraint violation into a deployment that hammers
 its database and hangs.
 
-**Nothing a transaction depends on may be read outside it.** A retry re-runs the
-closure against a database that has moved, so a value read before the transaction
-began, or carried over from the attempt that failed, describes a world that no
-longer exists. Anything a closure uses but does not fetch is a defect.
+Nothing a transaction depends on may be read outside it. A retry re-runs the
+closure against a database that has moved, so a value read before the
+transaction began, or carried over from the attempt that failed, describes a
+world that no longer exists. Anything a closure uses but does not fetch is a
+defect.
 
 A store handed a transaction joins it rather than refusing. Both spellings exist:
 
@@ -285,10 +316,10 @@ them. The test harness adds `synchronous(OFF)`.
 
 ## Indexes
 
-**No index repeats the front of another.** A B-tree on `(a, b)` answers a lookup
-on `a` exactly as well as one on `(a)`, so an index whose columns lead another
-index on the same table is maintained on every insert and update to those columns
-and earns nothing.
+No index repeats the front of another. A B-tree on `(a, b)` answers a lookup on
+`a` exactly as well as one on `(a)`, so an index whose columns lead another
+index on the same table is maintained on every insert and update to those
+columns and earns nothing.
 
 Eight existed. Seven repeated the front of a unique constraint, which is where
 they come from: a constraint declares an index without saying the word, so the
@@ -300,10 +331,10 @@ where that is deliberate rather than a compromise, since the engines do not
 disagree about which columns an index is on, and reading index metadata is
 spelled four different ways.
 
-**One exception, measured.** The narrow index on what is open in a build leads
-the wider covering one, and scanning the narrow one reads fewer pages. Over
-hundreds of thousands of findings that is a trade. The same argument does not
-carry to the decision table, which holds thousands of rows.
+One exception, measured. The narrow index on what is open in a build leads the
+wider covering one, and scanning the narrow one reads fewer pages. Over hundreds
+of thousands of findings that is a trade. The same argument does not carry to
+the decision table, which holds thousands of rows.
 
 Dropping an index never costs a foreign key its index on the two engines that
 require one: in every case the constraint that made the wider index leads with
@@ -333,7 +364,7 @@ any format bounds these, and a column with a width turns a merely unusual value
 into a failure of the whole scan that carried it — which is indistinguishable
 from a product that stopped having problems.
 
-**The exception is text carrying a unique index**, which needs a width. There the
+The exception is text carrying a unique index, which needs a width. There the
 value is refused with a sentence rather than shortened: a decision keyed on a
 truncated version would be compared against the finding's full one, match
 nothing, and say so nowhere.
@@ -362,7 +393,7 @@ was identical in two checkouts, and one dropped the other's database mid-run.
 The line is drawn at SQL rather than at the package: a handler test that pins a
 query keeps all four.
 
-**The rule has to be applied, and a whole area arrived on two engines.** Routing
+The rule has to be applied, and a whole area arrived on two engines. Routing
 rules, VEX statements, teams, saved filters and the administration trail were
 written with handler tests on the two-engine form, and every one of them pins
 what a query returns. Between them they hold a `LIKE` with an explicit escape, a
@@ -388,7 +419,7 @@ What the suite pins:
 
 ## Not built
 
-**Nothing is purged and nothing is partitioned.** REQ-73 describes purging as
+Nothing is purged and nothing is partitioned. REQ-73 describes purging as
 exporting rows to a compressed file before dropping them. No table is
 partitioned, no retention pass runs, and nothing writes rows to a file before
 removing them. The only deletion of old data is expired sessions, a plain
@@ -419,9 +450,6 @@ and the granularity are open questions.
   its own clamp written beside it — twenty-one of them, six different pairs of
   numbers. One helper takes what was asked, the most this list will give, and what
   it gives when nobody says.
-- **Subtracting two moments is one function.** It was written twice in two
-  packages, each under a comment calling itself one of the few places an engine
-  has to be asked.
 - **Index key length is tightest on MySQL**, and package identifiers get long.
   Index a hash, not the raw string.
 - **Timestamp semantics differ between engines.** Store UTC and be explicit about

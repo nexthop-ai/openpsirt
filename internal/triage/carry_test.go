@@ -1,6 +1,7 @@
 package triage_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -173,4 +174,80 @@ func (f *fixture) placeAt(t *testing.T, stream string, target int64, component, 
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatalf("record a finding: %v", err)
 	}
+}
+
+// Carrying a judgment onto a new line goes through the same validation every
+// other write does.
+//
+// It built a proposal and went straight to the writer, so nothing asked
+// whether what it was carrying could be said at all — and the place it built
+// never read whether the new line was a tag, so the rule that refuses a dated
+// judgment on a release built once could not fire here however often it was
+// asked. A dated promise about a release that cannot change is exactly the
+// case that rule exists to refuse.
+func TestCarryingADatedJudgmentOntoATagIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		soon := time.Now().UTC().Add(30 * 24 * time.Hour)
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
+
+		offered, err := f.store.WouldCarry(ctx, f.triager, was, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offered.Postponed) != 1 {
+			t.Fatalf("the new line was offered %d postponements, want the one there is",
+				len(offered.Postponed))
+		}
+		if _, err := f.store.Carry(ctx, f.triager, was, next,
+			[]int64{offered.Postponed[0].DecisionID}, triage.DefaultTogetherCap); err == nil {
+			t.Fatal("a deferral was carried onto a release that was built once")
+		} else if !strings.Contains(err.Error(), "built once") {
+			t.Errorf("it was refused, but not for being a tag: %v", err)
+		}
+	})
+}
+
+// And a judgment whose date has already gone by is not offered at all.
+//
+// A carried judgment keeps its date rather than having it quietly moved
+// forward, so carrying one that has run out writes a claim that is finished
+// the moment it lands — and offering it is offering something the act behind
+// the button turns down.
+func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		soon := time.Now().UTC().Add(30 * 24 * time.Hour)
+		ran, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
+
+		// The date arrives, moved here rather than waited for.
+		if _, err := f.db.DB.NewUpdate().Table("claim").
+			Set("deferred_until = ?", time.Now().UTC().Add(-time.Hour)).
+			Where("id = ?", ran.ClaimID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		offered, err := f.store.WouldCarry(ctx, f.triager, was, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offered.Postponed) != 0 {
+			t.Errorf("a deferral that has run out was offered: %+v", offered.Postponed)
+		}
+	})
 }

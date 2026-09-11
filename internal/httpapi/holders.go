@@ -84,7 +84,7 @@ func registerHolders(api huma.API, in Ingest) {
 		}
 
 		store := access.NewStore(in.DB.DB)
-		people, err := store.WhoCanRead(ctx, product.ID, wanted, input.Term, input.Limit)
+		people, err := store.WhoCanRead(ctx, subject, product.ID, wanted, input.Term, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who may hold this could not be read", err)
 		}

@@ -13,7 +13,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -23,12 +22,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// Evidence is everything held about one issue in one component here.
-//
-// Assembled for somebody who has to decide about it and has a thousand more
-// waiting. The measure it is built against: nothing here should send them to a
-// search engine. If we hold the write-up, the score, the patch, or the version
-// that fixes it, it is in this answer.
 // Measured is what produced a finding: the run, and what it was measured with.
 //
 // A build reporting nothing wrong and a build last measured against a
@@ -46,6 +39,12 @@ type Measured struct {
 	RanAt *time.Time
 }
 
+// Evidence is everything held about one issue in one component here.
+//
+// Assembled for somebody who has to decide about it and has a thousand more
+// waiting. The measure it is built against: nothing here should send them to a
+// search engine. If we hold the write-up, the score, the patch, or the version
+// that fixes it, it is in this answer.
 type Evidence struct {
 	Vulnerability string
 	Aliases       []string
@@ -163,7 +162,84 @@ type Evidence struct {
 	MatchedRange string
 }
 
-// Sitting is one place a component occupies, as a finding presents it.
+// evidenceFrom is what a reader is shown about a finding, from the places it
+// sits at and the four things looked up about it.
+//
+// No query in it, which is the point: the two rules that are easy to get
+// wrong — any place answers about what the scanner matched, and disclosure is
+// asked of every place, because one undisclosed place among fifty makes the
+// whole of it undisclosed for anybody deciding what may be said — are
+// checkable without a database.
+func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Component,
+	aliases []Alias, references []Reference, weaknesses []Weakness) *Evidence {
+
+	evidence := &Evidence{
+		Vulnerability: issue.Identifier, Severity: issue.Severity,
+		Assessed: func() string {
+			if issue.AssessedSeverity == nil {
+				return ""
+			}
+			return *issue.AssessedSeverity
+		}(),
+		Vector: issue.Vector, Exploited: issue.Exploited,
+		Description: issue.Description, Advisory: issue.Advisory,
+		References: references,
+		Component:  component.Name, Version: component.Version,
+		FixState: FixState(rows[0].FixState), FixedIn: rows[0].FixedIn, FixedAt: rows[0].FixedAt,
+		ArrivedFrom: rows[0].ArrivedFrom,
+	}
+	// Any place answers. They all come from one line of a scanner's report,
+	// which the applier writes to every place of the group.
+	evidence.Matched = Matched(rows[0].Matched)
+	evidence.Recorded = Kind(rows[0].Kind) == Entered
+	// Any place answers about the kind; disclosure is asked of all of them,
+	// because one undisclosed place among fifty makes the whole of it
+	// undisclosed for anybody deciding what may be said.
+	for _, row := range rows {
+		if access.AsVisibility(row.Visibility) == access.Private {
+			evidence.Undisclosed = true
+		}
+		if row.DiscloseAt != nil &&
+			(evidence.DiscloseAt == nil || row.DiscloseAt.Before(*evidence.DiscloseAt)) {
+			evidence.DiscloseAt = row.DiscloseAt
+		}
+	}
+	evidence.MatchedFrom = rows[0].MatchedFrom
+	evidence.MatchedIn = rows[0].MatchedIn
+	evidence.MatchedRange = rows[0].MatchedRange
+	if component.LatestVersion != nil {
+		evidence.LatestVersion = *component.LatestVersion
+	}
+	evidence.LatestReleasedAt = component.LatestReleasedAt
+	if component.LatestReleasedAt != nil && FixState(rows[0].FixState) != FixedUpstream {
+		evidence.NothingSince = currency.NothingSince(
+			issue.Identifier, *component.LatestReleasedAt)
+	}
+	if issue.ScoreCenti != nil {
+		evidence.ScoreCenti = *issue.ScoreCenti
+	}
+	if issue.LikelihoodPPM != nil {
+		evidence.LikelihoodPPM = *issue.LikelihoodPPM
+	}
+
+	if component.UpstreamVersion != "" {
+		evidence.Upstream = component.UpstreamName + " " + component.UpstreamVersion
+	}
+	for _, alias := range aliases {
+		if alias.Identifier != issue.Identifier {
+			evidence.Aliases = append(evidence.Aliases, alias.Identifier)
+		}
+	}
+	for _, weakness := range weaknesses {
+		evidence.Weaknesses = append(evidence.Weaknesses, weakness.CWE)
+	}
+	// Worked out here rather than stored: an address derived from two names
+	// cannot go stale while the names are right, and storing it would be a
+	// second copy of the templates to keep in step.
+	evidence.Links = links(issue.Identifier, evidence.Aliases, component.Purl)
+	return evidence
+}
+
 // versionsOf reads the version each of these components ships at, in one
 // statement.
 func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]string, error) {
@@ -188,6 +264,7 @@ func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]string, 
 	return out, nil
 }
 
+// Sitting is one place a component occupies, as a finding presents it.
 type Sitting struct {
 	// PlaceIdentity is what a decision is made against, and what a request
 	// names when making one.
@@ -231,6 +308,39 @@ type Sitting struct {
 	Chain []graph.Step
 }
 
+// evidenceRow is one open place of the fold a finding screen is about.
+//
+// Named rather than written inline because the assembly that reads it is a
+// function of its own: what a reader is shown is worked out from these rows
+// and four lookups, with no query in it, which is what makes the rules it
+// holds — any place answers about the match, and disclosure is asked of all of
+// them — checkable without a database.
+type evidenceRow struct {
+	PlaceIdentity string     `bun:"place_identity"`
+	Consumer      string     `bun:"consumer"`
+	ConsumerID    *int64     `bun:"consumer_id"`
+	Component     string     `bun:"component"`
+	ComponentID   int64      `bun:"component_id"`
+	Decision      *int64     `bun:"decision"`
+	Claim         *int64     `bun:"claim"`
+	Suppressed    bool       `bun:"suppressed"`
+	Urgency       int64      `bun:"urgency"`
+	FixState      string     `bun:"fix_state"`
+	FixedIn       string     `bun:"fixed_in"`
+	FixedAt       *time.Time `bun:"fixed_at"`
+	Matched       string     `bun:"matched"`
+	Kind          string     `bun:"kind"`
+	MatchedFrom   string     `bun:"matched_from"`
+	MatchedIn     string     `bun:"matched_in"`
+	MatchedRange  string     `bun:"matched_range"`
+	ArrivedFrom   string     `bun:"arrived_from"`
+	Visibility    string     `bun:"visibility"`
+	DiscloseAt    *time.Time `bun:"disclose_at"`
+	OpenedAt      time.Time  `bun:"opened_at"`
+	OpenedRunID   *int64     `bun:"opened_run_id"`
+	DueAt         *time.Time `bun:"due_at"`
+}
+
 // Detail reads everything held about one issue in one component of a build.
 func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
 	componentID int64) (*Evidence, error) {
@@ -246,31 +356,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 
-	var rows []struct {
-		PlaceIdentity string     `bun:"place_identity"`
-		Consumer      string     `bun:"consumer"`
-		ConsumerID    *int64     `bun:"consumer_id"`
-		Component     string     `bun:"component"`
-		ComponentID   int64      `bun:"component_id"`
-		Decision      *int64     `bun:"decision"`
-		Claim         *int64     `bun:"claim"`
-		Suppressed    bool       `bun:"suppressed"`
-		Urgency       int64      `bun:"urgency"`
-		FixState      string     `bun:"fix_state"`
-		FixedIn       string     `bun:"fixed_in"`
-		FixedAt       *time.Time `bun:"fixed_at"`
-		Matched       string     `bun:"matched"`
-		Kind          string     `bun:"kind"`
-		MatchedFrom   string     `bun:"matched_from"`
-		MatchedIn     string     `bun:"matched_in"`
-		MatchedRange  string     `bun:"matched_range"`
-		ArrivedFrom   string     `bun:"arrived_from"`
-		Visibility    string     `bun:"visibility"`
-		DiscloseAt    *time.Time `bun:"disclose_at"`
-		OpenedAt      time.Time  `bun:"opened_at"`
-		OpenedRunID   *int64     `bun:"opened_run_id"`
-		DueAt         *time.Time `bun:"due_at"`
-	}
+	var rows []evidenceRow
 	err = s.db.NewSelect().
 		TableExpr("finding AS f").
 		Join("JOIN component AS c ON c.id = f.component_id").
@@ -379,69 +465,14 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, fmt.Errorf("read where this is written up: %w", err)
 	}
 
-	evidence := &Evidence{
-		Vulnerability: issue.Identifier, Severity: issue.Severity,
-		Assessed: func() string {
-			if issue.AssessedSeverity == nil {
-				return ""
-			}
-			return *issue.AssessedSeverity
-		}(),
-		Vector: issue.Vector, Exploited: issue.Exploited,
-		Description: issue.Description, Advisory: issue.Advisory,
-		References: references,
-		Component:  component.Name, Version: component.Version,
-		FixState: FixState(rows[0].FixState), FixedIn: rows[0].FixedIn, FixedAt: rows[0].FixedAt,
-		ArrivedFrom: rows[0].ArrivedFrom,
+	var weaknesses []Weakness
+	if err := s.db.NewSelect().Model(&weaknesses).
+		Where("vulnerability_id = ?", vulnerabilityID).
+		Order("cwe").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
 	}
-	// Any place answers. They all come from one line of a scanner's report,
-	// which the applier writes to every place of the group.
-	evidence.Matched = Matched(rows[0].Matched)
-	evidence.Recorded = Kind(rows[0].Kind) == Entered
-	// Any place answers about the kind; disclosure is asked of all of them,
-	// because one undisclosed place among fifty makes the whole of it
-	// undisclosed for anybody deciding what may be said.
-	for _, row := range rows {
-		if access.AsVisibility(row.Visibility) == access.Private {
-			evidence.Undisclosed = true
-		}
-		if row.DiscloseAt != nil &&
-			(evidence.DiscloseAt == nil || row.DiscloseAt.Before(*evidence.DiscloseAt)) {
-			evidence.DiscloseAt = row.DiscloseAt
-		}
-	}
-	evidence.MatchedFrom = rows[0].MatchedFrom
-	evidence.MatchedIn = rows[0].MatchedIn
-	evidence.MatchedRange = rows[0].MatchedRange
-	if component.LatestVersion != nil {
-		evidence.LatestVersion = *component.LatestVersion
-	}
-	evidence.LatestReleasedAt = component.LatestReleasedAt
-	if component.LatestReleasedAt != nil && FixState(rows[0].FixState) != FixedUpstream {
-		evidence.NothingSince = currency.NothingSince(
-			issue.Identifier, *component.LatestReleasedAt)
-	}
-	if issue.ScoreCenti != nil {
-		evidence.ScoreCenti = *issue.ScoreCenti
-	}
-	if issue.LikelihoodPPM != nil {
-		evidence.LikelihoodPPM = *issue.LikelihoodPPM
-	}
-	if issue.Weaknesses != "" {
-		evidence.Weaknesses = strings.Split(issue.Weaknesses, ",")
-	}
-	if component.UpstreamVersion != "" {
-		evidence.Upstream = component.UpstreamName + " " + component.UpstreamVersion
-	}
-	for _, alias := range aliases {
-		if alias.Identifier != issue.Identifier {
-			evidence.Aliases = append(evidence.Aliases, alias.Identifier)
-		}
-	}
-	// Worked out here rather than stored: an address derived from two names
-	// cannot go stale while the names are right, and storing it would be a
-	// second copy of the templates to keep in step.
-	evidence.Links = links(issue.Identifier, evidence.Aliases, component.Purl)
+
+	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
 
 	// When this first appeared here and what produced it. The earliest
 	// place, because that is the age the deadline relates to, and the run

@@ -40,6 +40,21 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 			"id"               ` + t.id + `,
 			"identity"         ` + t.hash + ` NOT NULL,
 			"purl"             ` + t.text + ` NULL,
+			-- The second identifier a component can carry.
+			--
+			-- The package identifier is what identity is derived from and
+			-- what most feeds match on. The platform enumeration is what the
+			-- national vulnerability database keys on, and a scanner given
+			-- one matches components a package identifier alone misses:
+			-- vendor firmware, operating systems, appliances, anything never
+			-- published to a package ecosystem. Captured because a real
+			-- producer emits it for most of what it ships and a scan file is
+			-- not kept once read — data discarded at ingest is recoverable
+			-- only by asking the producer to build again.
+			--
+			-- Deliberately not part of identity: adding a second basis would
+			-- move the identity of everything carrying both.
+			"cpe"              ` + t.text + ` NULL,
 			-- Everything below comes from a scan file, and nothing bounds
 			-- what a producer puts in it. A bounded column here means a
 			-- legitimate but long value fails the whole scan that carried it.
@@ -47,6 +62,29 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 			"version"          ` + t.free + ` NOT NULL,
 			"upstream_name"    ` + t.free + ` NULL,
 			"upstream_version" ` + t.free + ` NULL,
+			-- The two names, folded, for matching a name somebody typed.
+			--
+			-- Bounded, unlike the names they fold: the stored name is
+			-- unbounded because nothing bounds what a producer puts in a scan
+			-- file, and a bounded column there would fail a whole scan over
+			-- one long value. These exist to be looked up, and an index needs
+			-- a width — truncated on the way in rather than refused, because
+			-- two names agreeing for a hundred and ninety-one characters are
+			-- the same name by any reading.
+			--
+			-- Folded in Go rather than by asking an engine to compare
+			-- loosely, because the four do not agree on what that means: a
+			-- rule naming a package with a capital in it sweeps on two of
+			-- them and not the other two, and nothing reports the difference
+			-- because both answers look correct. It also makes the
+			-- comparisons use an index, where LOWER(name) cannot — every
+			-- routing sweep and every component search was a scan of this
+			-- table.
+			--
+			-- Nullable, because a component with no upstream name recorded
+			-- has no folded one either.
+			"name_folded"      ` + t.name + ` NULL,
+			"upstream_folded"  ` + t.name + ` NULL,
 			-- The binary packages one source package was built at one version
 			-- share this, and it is what a person acts on: curl, libcurl4t64
 			-- and libcurl3t64 are one bump. It groups and does not identify —
@@ -56,11 +94,31 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 			-- source packages by agreeing to an index's bound.
 			"fold_key"         ` + t.hash + ` NOT NULL,
 			"first_seen_at"    ` + t.timestamp + ` NOT NULL,
+			-- What upstream has released, and when we last asked.
+			--
+			-- Kept because "we have never asked" and "we asked and it has not
+			-- moved" are different states: without the third column a
+			-- component nobody could look up is indistinguishable from one
+			-- that is current. Only for what we build ourselves — for a
+			-- distribution package the distribution is the maintainer and its
+			-- release date says nothing about the software inside, which is
+			-- why these sit on the component rather than being inferred for
+			-- everything.
+			"latest_version"     ` + t.free + ` NULL,
+			"latest_released_at" ` + t.timestamp + ` NULL,
+			"latest_checked_at"  ` + t.timestamp + ` NULL,
 			CONSTRAINT "component_identity_unique" UNIQUE ("identity")
 		)` + t.suffix,
 
 		// Not unique: a fold is many components by construction.
 		`CREATE INDEX "component_fold_idx" ON "component" ("fold_key")`,
+
+		// What a routing rule and a component search look one up by. The
+		// upstream name matters most, because a rule names a source package:
+		// that is the key one rule uses to reach every binary package built
+		// from it.
+		`CREATE INDEX "component_folded_idx" ON "component" ("name_folded")`,
+		`CREATE INDEX "component_upstream_folded_idx" ON "component" ("upstream_folded")`,
 
 		// A node is one component's presence in one variant. The graph is a
 		// graph, not a tree: a component reached by several parents is one
@@ -114,7 +172,11 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 
 func downGraph(ctx context.Context, tx *sql.Tx) error {
 	for _, table := range []string{"graph_edge", "graph_node", "component"} {
-		if _, err := tx.ExecContext(ctx, `DROP TABLE `+table); err != nil {
+		// Quoted, like every other identifier in the schema. A reserved word
+		// is only reserved when bare, and the four engines do not agree on
+		// which words those are — so an unquoted name fails on whichever
+		// engine somebody is least likely to be running.
+		if _, err := tx.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
 			return err
 		}
 	}

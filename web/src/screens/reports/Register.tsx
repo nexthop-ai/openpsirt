@@ -155,6 +155,9 @@ export function Register() {
                             <>
                               <span className="id">{row.approved_by}</span>{" "}
                               <span className="hint">{on(row.approved_at)}</span>
+                              {/* Given for the claim this one re-affirms, so
+                                  the name above read those words. */}
+                              {row.agreement_carried && <span className="hint"> · carried</span>}
                             </>
                           ) : (
                             <span className="hint">—</span>

@@ -21,7 +21,13 @@ import (
 
 // Setting is one named value.
 type Setting struct {
-	bun.BaseModel `bun:"table:application_setting,alias:as"`
+	// Aliased "st", not "as": all four engines reserve the second, and it
+	// worked only because the library quotes what a tag declares — a property
+	// of the library rather than of this code. The first raw expression
+	// naming the alias would have been a syntax error on every one of them,
+	// and the gate that checks invented names read call arguments rather than
+	// struct tags, so nothing could have said so.
+	bun.BaseModel `bun:"table:application_setting,alias:st"`
 
 	Name      string    `bun:"name,pk"`
 	Value     string    `bun:"value,notnull"`
@@ -63,6 +69,14 @@ const (
 	// Without a separate one the deadline contradicts the ranking, which
 	// puts an exploited medium above an unexploited critical — the list
 	// would say look at this first while the clock said ninety days.
+	// SignInKey is the deployment's own key for signing what a sign-in
+	// leaves in the browser while it is away at a provider.
+	//
+	// Not an offered setting and not in the settable list: an operator
+	// never types it and nothing reads it back out. It lives here because
+	// it has to be the same across replicas and survive a restart, and this
+	// is where deployment state already is. Minted on first use.
+	SignInKey = "signin.key"
 	// TriageFloor is what this deployment considers worth triaging: a
 	// severity word, below which a finding is recorded and counted but
 	// kept out of the working list. A product may state its own instead.
@@ -123,6 +137,18 @@ const (
 	// should be is a judgment about a deployment rather than a constant.
 	AttachmentMaxSize = "attachment.max-size"
 	AttachmentQuota   = "attachment.quota"
+	// RoutingBatch is how many findings one pass of the routing sweep may
+	// place. A bulk write is bounded, and the bound is a setting: an
+	// operator on a large estate has a reason to move it either way, and
+	// rebuilding is not a way to change a number.
+	RoutingBatch = "routing.batch"
+	// AttachmentShare is how much of that one person may hold, in bytes.
+	//
+	// The deployment-wide quota bounds the store and nothing bounded any
+	// one uploader's part of it, so filling it was one person's to do and
+	// what it cost everybody else was every upload afterwards, in every
+	// product.
+	AttachmentShare = "attachment.per-person-quota"
 	// The four periods after which work that has not moved is a condition
 	// somebody is told about.
 	//
@@ -190,6 +216,15 @@ const (
 	DefaultQueuedAfter    = 3 * 24 * time.Hour
 )
 
+// DefaultRoutingBatch is how many findings one routing pass places where
+// nobody has said.
+//
+// Generous, because the case it exists for is an estate where a rule matches
+// tens of thousands of rows at once; the bound is there because an unbounded
+// write is something somebody triggers by accident, not because two thousand
+// is a suspicious number.
+const DefaultRoutingBatch = 2000
+
 // DefaultAttachmentMaxSize is what one file may be where nobody has said.
 //
 // Screenshots and logs are what people attach, and both fit comfortably. It is
@@ -202,6 +237,15 @@ const DefaultAttachmentMaxSize = 25 << 20
 // said. Four hundred files at the default size, which is a working year for a
 // team and small enough that filling it is noticed rather than invoiced.
 const DefaultAttachmentQuota = 10 << 30
+
+// DefaultAttachmentShare is how much of that one person holds where nobody has
+// said.
+//
+// An eighth of the shipped total: a starting point rather than a
+// recommendation, like every other shipped number here. What it is for is that
+// one account cannot take the whole store, and a deployment where somebody
+// legitimately needs more says so.
+const DefaultAttachmentShare = 1 << 30
 
 // DefaultQuietAfter is how long a build may go unscanned before it is reported
 // as having gone quiet, where a deployment has not said otherwise.

@@ -245,10 +245,13 @@ export function Streams() {
         ok={kind === "tag" ? "Add tag" : "Add branch"}
         hint="A tag names the branch it was cut from, which is what lets a decision made on the branch carry into it rather than being made again. A new branch inherits most of its triage by matching — and once its first inventory arrives, its Inventories screen offers what it would carry over from another line, and which of it to take."
       >
-        <div className="field">
-          <label>Product</label>
+        {/* The label wraps the input, as every other field here does. Beside
+            it with no htmlFor and no id, a screen reader announced a text
+            field with no name at all. */}
+        <label className="field">
+          <span>Product</span>
           <input {...notACredential} type="text" value={product} disabled />
-        </div>
+        </label>
         <Field
           label="Name"
           value={name}

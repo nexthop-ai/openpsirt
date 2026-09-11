@@ -479,7 +479,7 @@ export function Record() {
           {/* Why the first one cannot be picked, in the open. It was a
               tooltip on a disabled button, which is the shape that reads as a
               broken control rather than as a right somebody does not hold —
-              nothing about a greyed button says whether it is unavailable
+              nothing about a grayed button says whether it is unavailable
               here, unavailable now, or unavailable to you. */}
           {!mayHide && (
             <span className="hint">

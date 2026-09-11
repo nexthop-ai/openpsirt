@@ -168,6 +168,10 @@ function title(name?: string): string {
       return "Maximum attachment size";
     case "attachment.quota":
       return "Total attachment storage";
+    case "attachment.per-person-quota":
+      return "Attachment storage per person";
+    case "routing.batch":
+      return "Findings placed per pass";
     case "people.absent-after":
       return "Inactive account threshold";
     // These three fell through to the last segment of the key, which named
@@ -225,12 +229,12 @@ const choices: Record<string, string[]> = {
 // time. Named here because everything else here is a duration, and a duration
 // is composed rather than typed — asking somebody to write "8760h" is asking
 // for a mistake that is a factor of twenty-four.
-const counts = new Set(["triage.together-cap"]);
+const counts = new Set(["triage.together-cap", "routing.batch"]);
 
 // The settings whose value is a number of bytes. Composed for the same reason
 // a duration is: 26214400 is twenty-five megabytes, and nobody reads it as
 // that — the mistake available in a raw byte field is a factor of a thousand.
-const sizes = new Set(["attachment.max-size", "attachment.quota"]);
+const sizes = new Set(["attachment.max-size", "attachment.quota", "attachment.per-person-quota"]);
 
 function Field({
   setting,

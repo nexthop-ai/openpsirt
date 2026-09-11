@@ -7,7 +7,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 
-// Where a promise stands, said in words rather than left to a colour.
+// Where a promise stands, said in words rather than left to a color.
 const STANDING: Record<string, string> = {
   planned: "promised, with work outstanding and the date still ahead",
   landed: "every piece of it gone, which the scans say",
@@ -127,7 +127,7 @@ export function Upgrades() {
                       )}{" "}
                       <span className="hint">{row.from}</span>
                     </td>
-                    {/* A column rather than grey hint text beside the name:
+                    {/* A column rather than gray hint text beside the name:
                         the version a release is moving to is the thing
                         somebody is waiting on. */}
                     <td>

@@ -275,11 +275,12 @@ func Everything(what string) Subject {
 
 // Holds reports whether this subject holds a role on a product.
 //
-// **An administrator does not hold every role**. Administration is
-// people, roles, credentials, settings and the catalog; reading and triaging
-// are granted on a product like anybody else's, and an administrator who wants
-// them grants them to themselves — visibly, in the same record everyone else's
-// grants live in.
+// **An administrator does not hold every role**. Administration is people,
+// roles, credentials, settings, the catalog, and the two acts on the record
+// itself — removing an attached file and supplying a third party's evidence
+// about a product; reading and triaging are granted on a product like anybody
+// else's, and an administrator who wants them grants them to themselves —
+// visibly, in the same record everyone else's grants live in.
 //
 // It read the other way, and nothing said so: `privileges.md` says holding
 // every role does not amount to admin and never claimed the reverse. What it
@@ -344,13 +345,9 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 	return s.Holds(PublicTriage, productID) || s.Holds(PrivateTriage, productID)
 }
 
-// Sees reports whether this subject may know a product exists.
-//
-// A product somebody holds nothing on is invisible rather than merely
-// unreadable — not listed and not counted — because the list of products is
-// itself a statement about what an organization ships. VisibleOn is which
-// visibilities this subject may read of one named issue in one product: what
-// the product's own grant allows, widened by a case they were brought into.
+// VisibleOn is which visibilities this subject may read of one named issue in
+// one product: what the product's own grant allows, widened by a case they
+// were brought into.
 //
 // Asked wherever a read is about one issue rather than about a product. A
 // collaborator reads that issue at any visibility and reads nothing else of
@@ -395,6 +392,11 @@ func Visible(s Subject, productID int64) []Visibility {
 	return visible
 }
 
+// Sees reports whether this subject may know a product exists.
+//
+// A product somebody holds nothing on is invisible rather than merely
+// unreadable — not listed and not counted — because the list of products is
+// itself a statement about what an organization ships.
 func (s Subject) Sees(productID int64) bool {
 	if s.Kind == Pipeline && s.scope != nil {
 		// A pipeline knows the product it may send to exists, because it may
@@ -459,7 +461,15 @@ func (s Subject) Products() (ids []int64, all bool) {
 		return nil, true
 	}
 	for id := range s.grants {
-		if s.Sees(id) {
+		// The read roles directly, not Sees. Sees answers "may they know this
+		// product exists", which is true for an administrator everywhere and
+		// true for anybody holding a bare capability here — so an
+		// administrator who granted themselves nothing but the ability to
+		// approve or to assign on a product got that product into the set
+		// that narrows findings, counts, aggregates and exports, and read
+		// every disclosed finding in it. A capability grants no visibility of
+		// its own, and this is where that stopped being true.
+		if s.Reads(Public, id) || s.Reads(Private, id) {
 			ids = append(ids, id)
 		}
 	}

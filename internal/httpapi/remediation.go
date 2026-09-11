@@ -110,7 +110,7 @@ func registerRemediation(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-repeated-deferrals", Method: http.MethodGet, Path: "/v1/deferrals/repeated",
-		Summary: "List what keeps being put off",
+		Summary: "List repeated deferrals",
 		Description: "Places deferred more than once, most-deferred first, with how long they " +
 			"have been put off for in total.\n\n" +
 			"The cumulative threshold already refuses a further deferral past a point, one item " +

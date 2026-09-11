@@ -32,6 +32,45 @@ func InBatches[T any](ctx context.Context, db bun.IDB, rows []T) error {
 	return nil
 }
 
+// InBatchesKeeping inserts rows a bounded number at a time, leaving alone any
+// row another writer got to first.
+//
+// **For a table whose rows are facts rather than somebody's state.** A
+// component identified by its content is the same row whoever writes it, so
+// two writers describing the same library at the same version are agreeing
+// rather than colliding — and the loser of that race had its whole
+// transaction fail. Two replicas reading two scans at once is the shipped
+// arrangement, and the first time a portfolio meets a shared dependency both
+// of them try to write it; one was told its upload could not be read, for a
+// component that is now present.
+//
+// **The caller reads the identifiers back rather than taking them from here.**
+// A row somebody else wrote has their identifier and not one this statement
+// can report, and a row skipped reports nothing at all — so what the rows say
+// afterwards is what a read says, which is the only answer that is true for
+// both halves of the set.
+//
+// One of the few places an engine is asked directly, and it lives here for the
+// reason every other such answer does. There is no portable spelling: two of
+// them want ON CONFLICT and the other two want INSERT IGNORE.
+func InBatchesKeeping[T any](ctx context.Context, db bun.IDB, rows []T) error {
+	for start := 0; start < len(rows); start += BatchSize {
+		end := min(start+BatchSize, len(rows))
+		batch := rows[start:end]
+		insert := db.NewInsert().Model(&batch)
+		switch db.Dialect().Name().String() {
+		case "pg", "sqlite":
+			insert = insert.On("CONFLICT DO NOTHING")
+		default:
+			insert = insert.Ignore()
+		}
+		if _, err := insert.Exec(ctx); err != nil {
+			return fmt.Errorf("insert rows %d to %d: %w", start, end, err)
+		}
+	}
+	return nil
+}
+
 // IDsInBatches calls fn with the identifiers a bounded number at a time.
 //
 // A list of identifiers in a statement has the same ceiling as a list of rows,

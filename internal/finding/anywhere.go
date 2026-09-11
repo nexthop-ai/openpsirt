@@ -9,7 +9,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -179,7 +178,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr("COUNT(*) AS places").
 		ColumnExpr("MAX(f.urgency) AS urgency").
 		ColumnExpr("COUNT(*) OVER () AS total").
-		GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedAcross)
 	if err := page.OrderExpr(sortedAcross(filter)).
 		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open anywhere: %w", err)
@@ -190,10 +189,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	} else {
 		counted := narrow(s.db.NewSelect()).
 			ColumnExpr("f.vulnerability_id").
-			GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+			GroupExpr(GroupedAcross)
 		var err error
 		if total, err = s.db.NewSelect().
-			TableExpr("(?) AS grouped", counted).Count(ctx); err != nil {
+			TableExpr(`(?) AS "grouped"`, counted).Count(ctx); err != nil {
 			return nil, 0, fmt.Errorf("count what is open anywhere: %w", err)
 		}
 		return nil, total, nil
@@ -215,13 +214,6 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// no row asked for, which are read and dropped on the way into the map;
 	// what it buys is the index, which is the same trade the per-product page
 	// makes.
-	decided := func(alias, condition string) string {
-		return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS de
-			WHERE de.product_id = st.product_id
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND ` + coversHere + condition + `) THEN 1 ELSE 0 END) AS ` + alias
-	}
 	var rows []struct {
 		ProductID       int64  `bun:"product_id"`
 		Product         string `bun:"product"`
@@ -252,7 +244,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr("SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS answered").
 		ColumnExpr("MIN(f.opened_at) AS opened_at").
 		ColumnExpr("MIN(f.due_at) AS due_at").
-		ColumnExpr("MAX(f.visibility) AS visibility").
+		// One undisclosed place makes the group undisclosed, counted rather
+		// than aggregated over the word — a maximum of the word returns
+		// "public" for a mixed group, which is the one case it matters for.
+		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS undisclosed",
+			access.Private).
 		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
 		ColumnExpr("MIN(f.fix_state) AS fix_state").
 		ColumnExpr("MIN(f.fixed_in) AS fixed_in").
@@ -261,20 +257,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr("MIN(f.consumer_id) AS consumer_id").
 		ColumnExpr("COUNT(DISTINCT f.consumer_id) AS consumers").
 		ColumnExpr("SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS direct").
-		ColumnExpr(decided("any_claim", "")).
-		ColumnExpr(decided("waiting_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
-			"proposed").
-		ColumnExpr(decided("approved_here", " AND de.state = ? AND de.live_key IS NOT NULL"),
-			"approved").
-		ColumnExpr(decided("lapsed_here", " AND de.state = ?"), "lapsed").
-		ColumnExpr(decided("sent_back_here",
-			" AND de.state = ? AND de.live_key IS NOT NULL AND de.sent_back_at IS NOT NULL"),
-			"proposed").
-		ColumnExpr("0 AS total").
+		ColumnExpr("0 AS total")
+	// How far each of them has been decided, spelled once for every list
+	// that asks (see decided.go). Across products the row names its own.
+	body = decisionCounts(body, "st.product_id", nil,
+		claimWaiting, claimApproved, claimLapsed, claimSentBack).
 		Where("st.product_id IN (?)", bun.List(within)).
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedAcross)
 	if err := body.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read about what is open anywhere: %w", err)
 	}
@@ -316,56 +307,22 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			continue
 		}
 		row := rows[at]
-		group := Group{
-			Product: row.Product, ProductName: row.ProductName,
-			Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
-			Places: row.Places, Answered: row.Answered,
-			Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
-			LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
-			FixState: FixState(row.FixState), FixedIn: row.FixedIn,
-			Matched:  Matched(row.Matched),
-			State:    stateWord(row.Places, row.AnyClaim, row.Waiting, row.Approved, row.Lapsed),
-			SentBack: row.SentBack > 0,
-			OpenedAt: row.OpenedAt, DueAt: row.DueAt,
-			Undisclosed: access.AsVisibility(row.Visibility) == access.Private,
-			DiscloseAt:  row.DiscloseAt,
-			// One build of possibly several, so a row has somewhere to link
-			// to and an action has a build to name. What says there are others
-			// is the count beside it.
-			Builds: row.Builds, Stream: row.Stream, Variant: row.Variant,
-			Tags: marks[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}],
-		}
-		if issue, has := named[head.VulnerabilityID]; has {
-			group.Vulnerability, group.Severity = issue.Identifier, issue.Severity
-			// The one line of the issue's own words the row shows, the same as
-			// the per-product list. Two lists of the same rows, one of which
-			// says what the issue is: fifty rows here read "CVE-2026-74280 ·
-			// linux-image" fifty times, and this is the list somebody arrives
-			// at before they have picked a product.
-			group.Summary = firstLineOf(issue.Description)
-		}
-		if component, has := shipped[head.ComponentID]; has {
-			group.Component, group.Version = component.Name, component.Version
-			group.Ecosystem = graph.EcosystemOf(component.Purl)
-			if component.UpstreamVersion != "" {
-				group.Upstream = component.UpstreamName + " " + component.UpstreamVersion
-			}
-			// Which source package it was built from, where that is not the
-			// name itself. Two rows that are one bump say so on both lists.
-			if component.UpstreamName != "" && component.UpstreamName != component.Name {
-				group.Source = component.UpstreamName
-			}
-		}
-		// Why there is no deadline. The two reasons are exhaustive, and which
-		// one holds is a statement about this product's line — so it is asked
-		// of the line the row's own product states rather than of one word
-		// chosen for a page that spans them.
-		if group.DueAt == nil {
-			group.NoDeadline = OutOfSupport
-			if !(Floor{Word: deployment}).Admits(group.Exploited, group.Severity) {
-				group.NoDeadline = BelowTheLine
-			}
-		}
+		// The issue and the component come off the head rather than off the
+		// row: this statement selects the product's own identifier at the
+		// outer level, so the embedded row's copy of it is never filled.
+		shape := row.decorated
+		shape.VulnerabilityID, shape.ComponentID = head.VulnerabilityID, head.ComponentID
+		group := groupFrom(shape, named, shipped,
+			// The line this row's own product states, or the deployment's
+			// where it states none. One word chosen for a page that spans
+			// products would answer for none of them.
+			Floor{Word: deployment})
+		group.Product, group.ProductName = row.Product, row.ProductName
+		// One build of possibly several, so a row has somewhere to link to and
+		// an action has a build to name. What says there are others is the
+		// count beside it.
+		group.Builds, group.Stream, group.Variant = row.Builds, row.Stream, row.Variant
+		group.Tags = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}]
 		groups = append(groups, group)
 	}
 	return groups, total, nil

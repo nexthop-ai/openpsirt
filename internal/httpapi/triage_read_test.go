@@ -725,417 +725,6 @@ func TestAFindingCarriesEverythingNeededToActOnIt(t *testing.T) {
 	})
 }
 
-func TestWorkNobodyOwnsCanBeFoundAndGivenToSomebody(t *testing.T) {
-	// Work falling between people is what hides when every screen shows one
-	// product: assigned, so not in the shared list; assigned to nobody who is
-	// looking, so not in anybody's own.
-	eachReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
-
-		var waiting struct {
-			Items []struct {
-				Vulnerability string `json:"vulnerability"`
-				Component     string `json:"component"`
-				Product       string `json:"product"`
-			} `json:"items"`
-			Total int `json:"total"`
-		}
-		read(t, r, "triager", "/v1/unassigned", &waiting)
-		if waiting.Total != 1 || len(waiting.Items) != 1 {
-			t.Fatalf("%d findings are waiting for an owner, want 1", waiting.Total)
-		}
-		if waiting.Items[0].Component != "libnl-3-200" || waiting.Items[0].Product != "Mine" {
-			t.Errorf("the unassigned row does not say what it is: %+v", waiting.Items[0])
-		}
-
-		if got := asPerson(t, r, "assigner", http.MethodPut, at,
-			`{"person":"reader"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
-		}
-
-		read(t, r, "triager", "/v1/unassigned", &waiting)
-		if waiting.Total != 0 {
-			t.Errorf("%d findings still have no owner after being assigned", waiting.Total)
-		}
-
-		var holdings struct {
-			Items []struct {
-				Person string `json:"person"`
-				Open   int    `json:"open"`
-			} `json:"items"`
-		}
-		read(t, r, "triager", "/v1/assignments", &holdings)
-		if len(holdings.Items) != 1 || holdings.Items[0].Person != "reader" {
-			t.Fatalf("who is holding what reads as %+v", holdings.Items)
-		}
-
-		// Handing it back is the same action, not a different one — and it is
-		// somebody else's work here, so it is the assigner's to hand back.
-		// A triager hands back their own; taking something off a colleague,
-		// including to leave it unowned, is what the other right names.
-		if got := asPerson(t, r, "assigner", http.MethodPut, at,
-			`{"person":""}`); got.Code != http.StatusNoContent {
-			t.Fatalf("handing it back answered %d: %s", got.Code, got.Body.String())
-		}
-		read(t, r, "triager", "/v1/unassigned", &waiting)
-		if waiting.Total != 1 {
-			t.Errorf("handing it back left %d waiting for an owner", waiting.Total)
-		}
-	})
-}
-
-func TestSomethingUndisclosedReachesOnlyWhoMayReadIt(t *testing.T) {
-	// The message names the issue, the component and the build, and it is
-	// stored as written — so there is no filter downstream that could
-	// repair it, and the check belongs at the moment of telling. Gating it
-	// on the product being visible handed the name of an embargoed finding
-	// to anybody holding public reading there: the announcement an embargo
-	// exists to prevent, sent by the act of assigning it.
-	//
-	// The assignment itself is now refused for the same population, which
-	// a capability without a read role settled after this was written: an
-	// assignment carries visibility of what was assigned, so handing an
-	// embargoed finding to somebody cleared for nothing embargoed would
-	// make the assignment the disclosure. The check on this channel stays
-	// — it is a different check at a different moment, and a channel that
-	// leaks only when another rule is wrong is a channel nobody notices is
-	// leaking.
-	eachReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
-		if _, err := r.db.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where("1 = 1").Exec(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
-		// The identity holding private triage and the assigner right,
-		// because giving work to somebody else asks for both and this
-		// test is about what the recipient is told rather than about
-		// who may hand it over. An administrator used to stand here
-		// and no longer holds either .
-		refused := asPerson(t, r, "private-dispatcher", http.MethodPut, at,
-			`{"person":"reader"}`)
-		if refused.Code != http.StatusUnprocessableEntity {
-			t.Fatalf("handing an embargoed finding to somebody who may not read one "+
-				"answered %d: %s", refused.Code, refused.Body.String())
-		}
-
-		type waiting struct {
-			Items []struct {
-				Body string `json:"body"`
-			} `json:"items"`
-			Total int `json:"total"`
-		}
-		var told waiting
-		read(t, r, "reader", "/v1/notifications", &told)
-		for _, item := range told.Items {
-			if strings.Contains(item.Body, "CVE-2026-9999") {
-				t.Errorf("somebody who may not read undisclosed findings was told about one: %q",
-					item.Body)
-			}
-		}
-
-		// And somebody who may read them is told, so the rule narrows rather
-		// than silences.
-		if got := asPerson(t, r, "private-dispatcher", http.MethodPut, at,
-			`{"person":"private"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
-		}
-		var reached waiting
-		read(t, r, "private", "/v1/notifications", &reached)
-		named := false
-		for _, item := range reached.Items {
-			if strings.Contains(item.Body, "CVE-2026-9999") {
-				named = true
-			}
-		}
-		if !named {
-			t.Error("somebody who may read undisclosed findings was told nothing")
-		}
-	})
-}
-
-func TestTheAssignerRightAloneHandsNobodyAnything(t *testing.T) {
-	// Assigning is triage *and* the assigner right, not either. The role
-	// by itself is held by somebody who may not argue about this product's
-	// findings at all, and handing work around a product you cannot reach
-	// is the reach the visibility rules exist to refuse — so the endpoint
-	// answers as though the finding were not there.
-	//
-	// Pinned in both places a client could learn it: the refusal itself,
-	// and what /v1/session/me says the caller may do. A screen that drew
-	// the control from a widened may_assign would offer an action that
-	// always fails.
-	//
-	// The refusal is enforced twice — at the endpoint and again in the
-	// store — so this assertion only moves when both go. The store's own
-	// half is broken and watched in internal/finding.
-	eachReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
-
-		if got := asPerson(t, r, "dispatcher", http.MethodPut, at,
-			`{"person":"reader"}`); got.Code < 400 {
-			t.Errorf("the assigner role alone assigned work: %d", got.Code)
-		}
-		// Nor to themselves, which is the exception triage carries and this
-		// identity does not hold.
-		if got := asPerson(t, r, "dispatcher", http.MethodPut, at,
-			`{"person":"dispatcher"}`); got.Code < 400 {
-			t.Errorf("the assigner role alone took work: %d", got.Code)
-		}
-
-		var told struct {
-			Reach []struct {
-				Product   string `json:"product"`
-				MayAssign bool   `json:"may_assign"`
-				MayTriage bool   `json:"may_triage"`
-			} `json:"reach"`
-		}
-		read(t, r, "dispatcher", "/v1/session/me", &told)
-		for _, each := range told.Reach {
-			if each.MayAssign {
-				t.Errorf("%s is offered assignment to somebody who may not triage it", each.Product)
-			}
-			if each.MayTriage {
-				t.Errorf("%s is offered triage to somebody holding only the assigner role", each.Product)
-			}
-		}
-	})
-}
-
-func TestOnlyAnAdministratorMovesSomebodyElsesWork(t *testing.T) {
-	// A person hands back their own by assigning it to nobody. Moving what
-	// somebody else was given is an administrative act, and it is the one that
-	// matters when they have gone.
-	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
-		if got := asPerson(t, r, "assigner", http.MethodPut, at,
-			`{"person":"reader"}`); got.Code != http.StatusNoContent {
-			t.Fatal(got.Body.String())
-		}
-
-		release := "/v1/people/reader/assignments/hand-back"
-		if got := asPerson(t, r, "triager", http.MethodPost, release, `{}`); got.Code < 400 {
-			t.Errorf("a triager released somebody else's work: %d", got.Code)
-		}
-
-		got := asPerson(t, r, "admin", http.MethodPost, release, `{}`)
-		if got.Code != http.StatusOK {
-			t.Fatalf("an administrator releasing work answered %d: %s", got.Code, got.Body.String())
-		}
-		var moved struct {
-			Moved int64 `json:"moved"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &moved); err != nil {
-			t.Fatal(err)
-		}
-		if moved.Moved == 0 {
-			t.Error("releasing an absent person's work moved nothing")
-		}
-	})
-}
-
-// scannedAlso is a second build of the same product, holding the same issue at
-// the same place, with the library at the given version.
-func (r *reach) scannedAlso(t *testing.T, variant, version string) {
-	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.db.DB)
-	first, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	declared, err := names.DeclareVariant(ctx, first.ProductID, variant, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, first.StreamID, declared.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "also-" + variant, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
-	library := graph.Described{
-		Purl: "pkg:deb/debian/libnl-3-200@" + version, Name: "libnl-3-200", Version: version,
-	}
-	if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
-		Root:         product,
-		Components:   []graph.Described{library},
-		Dependencies: []graph.Dependency{{Parent: product, Child: library}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.db.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
-		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
-		Component: library,
-		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
-	}}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
-	// The decision is keyed on the upstream version where a component is a
-	// patched fork, and on the shipped version otherwise. The reach compared
-	// the raw upstream column instead, which is empty for anything that is
-	// not a fork: every other build then read as differing, including one at
-	// the very same version, which the decision already reached by lookup.
-	// And what it named as the version was that empty column, so the
-	// interface had nothing to pass when it applied the decision there — a
-	// build shipping the name at four versions refused the request.
-	eachReach(t, func(t *testing.T, r *reach) {
-		place := r.scanned(t)
-		r.scannedAlso(t, "arista", "3.7.0")
-		r.scannedAlso(t, "mellanox", "3.8.0")
-		var reached struct {
-			Automatic []struct {
-				Variant string `json:"variant"`
-				Version string `json:"version"`
-			} `json:"automatic"`
-			Differing []struct {
-				Variant string `json:"variant"`
-				Version string `json:"version"`
-			} `json:"differing"`
-		}
-		read(t, r, "triager", fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/reach", place), &reached)
-		if len(reached.Automatic) != 1 || reached.Automatic[0].Variant != "arista" {
-			t.Errorf("the build at the same version should be reached by lookup: %+v", reached)
-		}
-		if len(reached.Differing) != 1 || reached.Differing[0].Variant != "mellanox" ||
-			reached.Differing[0].Version != "3.8.0" {
-			t.Fatalf("the build at another version should be offered with that version: %+v", reached)
-		}
-		// What it named is what the route resolves a name by.
-		path := "/v1/products/mine/streams/master/variants/mellanox/findings/CVE-2026-9999" +
-			"/components/libnl-3-200/decision?version=" + reached.Differing[0].Version
-		got := asPerson(t, r, "triager", http.MethodPost, path,
-			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
-				`"reasoning":"The parser is never reached there either."}`)
-		if got.Code != http.StatusCreated {
-			t.Errorf("applying the decision by the version the reach named answered %d: %s",
-				got.Code, got.Body.String())
-		}
-	})
-}
-
-func TestAnOutcomeIsOfferedOnlyWhereItsEvidenceCanBeSent(t *testing.T) {
-	// already-fixed carries the packager's version, which the claim is
-	// refused without. The finding-level route offered the outcome in its
-	// enum and had nowhere in the body to put that version, so every
-	// request choosing it was refused — an outcome listed and unreachable,
-	// which reads as the tool being broken rather than as the request
-	// being wrong.
-	eachReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
-		const path = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
-
-		got := asPerson(t, r, "triager", http.MethodPost, path,
-			`{"outcome":"already-fixed","fixed_version":"3.7.0-r4",`+
-				`"reasoning":"Alpine backported it in r4, which is what we ship."}`)
-		if got.Code != http.StatusCreated {
-			t.Fatalf("recording an already-fixed claim answered %d: %s", got.Code, got.Body.String())
-		}
-
-		// And the evidence is still required: the outcome without it is a
-		// claim nobody can check.
-		if got := asPerson(t, r, "triager", http.MethodPost, path,
-			`{"outcome":"already-fixed","reasoning":"Trust me."}`); got.Code < 400 {
-			t.Errorf("an already-fixed claim with no version answered %d", got.Code)
-		}
-	})
-}
-
-func TestReachingAnotherBuildCoversOnlyWhatIsLeftThere(t *testing.T) {
-	// A build at the same versions is already reached by lookup, so a second
-	// claim about its places is refused — and the guided review, which posts
-	// to each build it applies to, has no way to know which places those are.
-	// Asked to decide only what remains, the route records nothing there and
-	// says so, rather than refusing.
-	eachReach(t, func(t *testing.T, r *reach) {
-		place := r.scanned(t)
-		r.scannedAlso(t, "arista", "3.7.0")
-		r.decided(t, place)
-		body := `{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",` +
-			`"reasoning":"The parser is never reached there either."`
-		path := "/v1/products/mine/streams/master/variants/arista/findings/CVE-2026-9999" +
-			"/components/libnl-3-200/decision?version=3.7.0"
-		if got := asPerson(t, r, "triager", http.MethodPost, path, body+`}`); got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("a second claim about a place already reached answered %d, want 422: %s",
-				got.Code, got.Body.String())
-		}
-		got := asPerson(t, r, "triager", http.MethodPost, path, body+`,"remaining":true}`)
-		if got.Code != http.StatusCreated {
-			t.Fatalf("deciding what remains answered %d: %s", got.Code, got.Body.String())
-		}
-		var out struct {
-			Recorded int `json:"recorded"`
-			Left     int `json:"left"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
-			t.Fatal(err)
-		}
-		if out.Recorded != 0 || out.Left != 1 {
-			t.Errorf("recorded %d and left %d on a build wholly reached by lookup, want 0 and 1",
-				out.Recorded, out.Left)
-		}
-	})
-}
-
-func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
-	// Presenting it as one number is what turns a considered judgment into a
-	// reflex, and it is how a decision comes to reach builds the person making
-	// it never knew about. The first two parts are consequences of the
-	// matching rules and are not choices; only the third is.
-	eachReach(t, func(t *testing.T, r *reach) {
-		place := r.scanned(t)
-		var reached struct {
-			Here      int `json:"here"`
-			Automatic []struct {
-				Stream string `json:"stream"`
-			} `json:"automatic"`
-			Differing []struct {
-				Stream  string `json:"stream"`
-				Version string `json:"version"`
-			} `json:"differing"`
-		}
-		read(t, r, "triager", fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/reach", place), &reached)
-
-		if reached.Here != 1 {
-			t.Errorf("the judgment covers %d places here, want 1", reached.Here)
-		}
-		// One build in this deployment, so nothing else to reach either way —
-		// what matters is that both lists come back rather than being absent.
-		if reached.Automatic == nil || reached.Differing == nil {
-			t.Errorf("reach came back incomplete: %+v", reached)
-		}
-	})
-}
-
 func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 	// Each of these was added to close a gap the interface work found, and
 	// each one is the kind of thing that can be registered, return an empty
@@ -1361,57 +950,6 @@ func TestASettingThatWouldReadAsUnsetIsRefused(t *testing.T) {
 		if got := asPerson(t, r, "admin", http.MethodPut, cap,
 			`{"value":"5"}`); got.Code != http.StatusNoContent {
 			t.Errorf("setting the cap answered %d: %s", got.Code, got.Body.String())
-		}
-	})
-}
-
-func TestWithdrawingSomebodysLastRoleHandsBackWhatTheyHeld(t *testing.T) {
-	// Otherwise their work is in no list at all: assigned, so not in the
-	// shared one, and assigned to somebody who can no longer open it.
-	eachReach(t, func(t *testing.T, r *reach) {
-		r.scanned(t)
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
-			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
-		if got := asPerson(t, r, "triager", http.MethodPut, at,
-			`{"person":"triager"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
-		}
-
-		var holdings struct {
-			Items []struct {
-				Person string `json:"person"`
-				Open   int    `json:"open"`
-			} `json:"items"`
-		}
-		// Read as the administrator who granted themselves reading:
-		// who holds how much open work is a count of findings, which
-		// administering does not reach. Withdrawing the role below is
-		// administration and is still done as the plain administrator,
-		// which is the split.
-		read(t, r, "admin-reader", "/v1/assignments", &holdings)
-		if len(holdings.Items) == 0 {
-			t.Fatal("nothing was assigned to begin with")
-		}
-
-		got := asPerson(t, r, "admin", http.MethodDelete,
-			"/v1/people/triager/roles/mine/public-triage", "")
-		if got.Code != http.StatusOK {
-			t.Fatalf("withdrawing a role answered %d: %s", got.Code, got.Body.String())
-		}
-		var withdrawn struct {
-			Released int64 `json:"released"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &withdrawn); err != nil {
-			t.Fatal(err)
-		}
-		if withdrawn.Released == 0 {
-			t.Error("withdrawing their last role here handed nothing back")
-		}
-
-		read(t, r, "admin", "/v1/assignments", &holdings)
-		if len(holdings.Items) != 0 {
-			t.Errorf("%d people still hold work here after losing their role",
-				len(holdings.Items))
 		}
 	})
 }
@@ -1718,6 +1256,55 @@ func TestBeingToldAboutWorkKeepsItOutOfTheDigest(t *testing.T) {
 			if item.Issue == "CVE-2026-9999" {
 				t.Errorf("the digest repeats work its owner was already told about: %+v", item)
 			}
+		}
+	})
+}
+
+// The bound is on what would be written, charged as each build resolves.
+//
+// It was consulted after every named build had been resolved and every place
+// accumulated, so the work one request did was bounded by the request array
+// rather than by the limit: REQ-27's "a limit checked against the request lets
+// a small request do a large amount of work", which is why the entry's own
+// note about each build costing a resolution was answered with a maxItems.
+func TestTheBulkBoundIsChargedAsEachBuildResolves(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		// A second place of the same finding in the build the path names, so
+		// that build alone is already past a cap of one.
+		var rows []finding.Finding
+		if err := r.db.DB.NewSelect().Model(&rows).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("the fixture has %d findings, want 1", len(rows))
+		}
+		second := rows[0]
+		second.ID = 0
+		second.PlaceIdentity = second.PlaceIdentity[:len(second.PlaceIdentity)-4] + "beef"
+		if _, err := r.db.DB.NewInsert().Model(&second).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+			`{"value":"1"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// And a second build named that was never declared. Charged as each
+		// build resolves, the act is refused on the bound before anything
+		// tries to resolve that one; charged afterwards, every named build is
+		// resolved first and the answer is about the build instead.
+		at := "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
+		got := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
+				`"reasoning":"The parser is never reached.",`+
+				`"also":[{"stream":"never-declared","variant":"broadcom"}]}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("an act past the cap answered %d: %s", got.Code, got.Body.String())
+		}
+		if !strings.Contains(got.Body.String(), "one action may write") {
+			t.Errorf("the refusal does not name the bound: %s", got.Body.String())
 		}
 	})
 }

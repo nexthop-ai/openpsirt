@@ -85,24 +85,6 @@ type Outlier struct {
 // the counts say how many there are.
 const outlierRows = 20
 
-// Queue returns what is waiting for somebody, newest first, one entry per
-// claim.
-//
-// Narrowed to what the asker may act on, in the query. A reviewer who cannot
-// triage a product should not be shown its claims at all — a queue is a work
-// list, and one containing work somebody cannot do teaches them to skip rows.
-//
-// A claim is shown only where the reader may act on every row in it. Acting on
-// a claim is acting on the argument, which does not come in halves: shown the
-// part they may approve, a reader would agree to words whose other half stays
-// waiting on somebody else, and the count beside the card would be wrong.
-//
-// **And not their own.** Approving your own claim is refused, because a control
-// one person completes alone is not one — so a queue containing them
-// is a work list of things the reader cannot do, which teaches them to skip
-// rows. `mine` asks for exactly those instead: somebody wants to find what they
-// proposed and nobody has agreed to yet, and that is a different question from
-// what is waiting on them.
 // WaitingIn counts the claims about one product waiting for a second person.
 //
 // The same population the queue lists, narrowed to one product: a number
@@ -131,6 +113,24 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	return total, nil
 }
 
+// Queue returns what is waiting for somebody, newest first, one entry per
+// claim.
+//
+// Narrowed to what the asker may act on, in the query. A reviewer who cannot
+// triage a product should not be shown its claims at all — a queue is a work
+// list, and one containing work somebody cannot do teaches them to skip rows.
+//
+// A claim is shown only where the reader may act on every row in it. Acting on
+// a claim is acting on the argument, which does not come in halves: shown the
+// part they may approve, a reader would agree to words whose other half stays
+// waiting on somebody else, and the count beside the card would be wrong.
+//
+// **And not their own.** Approving your own claim is refused, because a control
+// one person completes alone is not one — so a queue containing them
+// is a work list of things the reader cannot do, which teaches them to skip
+// rows. `mine` asks for exactly those instead: somebody wants to find what they
+// proposed and nobody has agreed to yet, and that is a different question from
+// what is waiting on them.
 func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, limit, offset int) ([]Waiting, int, error) {
 	limit = database.AList.Of(limit)
 
@@ -155,45 +155,17 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 				Where(`"other".claim_id = de.claim_id`), subject, `"other"`))
 	}
 
-	total, err := s.db.NewSelect().
-		TableExpr("(?) AS \"waiting_claims\"", waitingClaims()).Count(ctx)
+	page, err := s.pageClaims(ctx, subject, waitingClaims, limit, offset, "what is waiting")
 	if err != nil {
-		return nil, 0, fmt.Errorf("count what is waiting: %w", err)
+		return nil, 0, err
 	}
+	if len(page.Order) == 0 {
+		return nil, page.Total, nil
+	}
+	total, ids, byID, rows := page.Total, page.Order, page.Claims, page.Rows
 
-	var page []struct {
-		ClaimID int64 `bun:"claim_id"`
-		Newest  int64 `bun:"newest"`
-	}
-	if err := waitingClaims().OrderExpr("newest DESC").
-		Limit(limit).Offset(offset).Scan(ctx, &page); err != nil {
-		return nil, 0, fmt.Errorf("read what is waiting: %w", err)
-	}
-	if len(page) == 0 {
-		return nil, total, nil
-	}
-	ids := make([]int64, 0, len(page))
-	for _, row := range page {
-		ids = append(ids, row.ClaimID)
-	}
-
-	var claims []Claim
-	if err := s.db.NewSelect().Model(&claims).
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read what is waiting: %w", err)
-	}
-	byID := make(map[int64]Claim, len(claims))
-	for _, claim := range claims {
-		byID[claim.ID] = claim
-	}
-
-	// Every row of every claim on the page, in one read. The representative
-	// is the earliest row; the sizes are counted over all of them.
-	var rows []Decision
-	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where("de.claim_id IN (?)", bun.List(ids)).Order("de.id ASC").Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read what is waiting: %w", err)
-	}
+	// The representative is the earliest row; the sizes are counted over all
+	// of them.
 	first := map[int64]Decision{}
 	issues := map[int64]map[int64]bool{}
 	places := map[int64]map[string]bool{}
@@ -209,9 +181,9 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 		count[row.ClaimID]++
 	}
 
-	representatives := make([]Decision, 0, len(page))
-	for _, row := range page {
-		representatives = append(representatives, first[row.ClaimID])
+	representatives := make([]Decision, 0, len(ids))
+	for _, id := range ids {
+		representatives = append(representatives, first[id])
 	}
 	reasoning, err := s.currentReasoning(ctx, representatives)
 	if err != nil {
@@ -231,8 +203,8 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 		return nil, 0, err
 	}
 	var bulk []Claim
-	for _, row := range page {
-		if claim := byID[row.ClaimID]; claim.Kind == TogetherClaim {
+	for _, id := range ids {
+		if claim := byID[id]; claim.Kind == TogetherClaim {
 			bulk = append(bulk, claim)
 		}
 	}
@@ -248,23 +220,23 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 		return nil, 0, err
 	}
 
-	out := make([]Waiting, 0, len(page))
-	for _, row := range page {
-		claim := byID[row.ClaimID]
-		representative := first[row.ClaimID]
+	out := make([]Waiting, 0, len(ids))
+	for _, id := range ids {
+		claim := byID[id]
+		representative := first[id]
 		// Agreed to before and back in the queue: an approver meeting it again
 		// should know they are re-reading something. Asked of the claim, which
 		// is what an agreement is given for.
-		before := seenBefore[row.ClaimID]
+		before := seenBefore[id]
 		one := Waiting{
 			Claim: claim, Decision: representative,
 			Reasoning:          reasoning[representative.ID],
 			PreviouslyApproved: before,
 			DeferredSoFar:      deferred[representative.ID],
-			Decisions:          count[row.ClaimID],
-			Issues:             len(issues[row.ClaimID]),
-			Places:             len(places[row.ClaimID]),
-			Builds:             builds[row.ClaimID],
+			Decisions:          count[id],
+			Issues:             len(issues[id]),
+			Places:             len(places[id]),
+			Builds:             builds[id],
 			Counter:            against[representative.ID],
 		}
 		if claim.Kind == TogetherClaim {
@@ -514,43 +486,6 @@ func clip(text string, n int) string {
 	return string(runes[:n]) + "\u2026"
 }
 
-// notApprovableBy narrows a query to the decisions a subject may not agree
-// to — the complement of approvableBy, used to ask whether a claim has any
-// row outside what the reader may act on.
-func notApprovableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
-	if subject.Kind != access.Person {
-		return query
-	}
-	products, all := subject.Products()
-	if all {
-		return query.Where("1 = 0")
-	}
-	var private, public []int64
-	for _, id := range products {
-		switch {
-		case mayApprove(subject, id, access.Private):
-			private = append(private, id)
-		case mayApprove(subject, id, access.Public):
-			public = append(public, id)
-		}
-	}
-	if len(private) == 0 && len(public) == 0 {
-		return query
-	}
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		if len(private) > 0 {
-			q = q.Where(column+".product_id NOT IN (?)", bun.List(private))
-		}
-		if len(public) > 0 {
-			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.WhereOr(column+".product_id NOT IN (?)", bun.List(public)).
-					WhereOr(column+".visibility <> ?", access.Public)
-			})
-		}
-		return q
-	})
-}
-
 // ReasoningFor returns the reasoning each decision currently rests on, keyed
 // by decision.
 //
@@ -628,149 +563,6 @@ func (s *Store) everApproved(ctx context.Context, ids []int64) (map[int64]bool, 
 	return seen, nil
 }
 
-// DeferredSoFar is the total time a finding has been put off, across every
-// deferral ever recorded about the same place.
-//
-// Cumulative rather than per deferral, because otherwise deferring repeatedly
-// for just under the threshold never needs agreement — and four consecutive
-// twenty-nine day deferrals are a year nobody approved.
-func (s *Store) DeferredSoFar(ctx context.Context, decision Decision) (time.Duration, error) {
-	decision.ID = -1
-	totals, err := s.deferredSoFar(ctx, []Decision{decision})
-	if err != nil {
-		return 0, err
-	}
-	return totals[decision.ID], nil
-}
-
-// deferredSoFar reads, in one statement for all of them, how long each of
-// these decisions' places has been put off for in total, keyed by the
-// decision asked about.
-//
-// One statement for the page rather than one per row: the deferrals in the
-// products on the page are read together and matched to each decision's
-// place here. The set is small — a deferral is a decision of ours, in these
-// products, and most decisions are not deferrals — where a lookup per row
-// was a statement per queue entry.
-func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[int64]time.Duration, error) {
-	totals := make(map[int64]time.Duration, len(decisions))
-	if len(decisions) == 0 {
-		return totals, nil
-	}
-	products := map[int64]bool{}
-	issues := map[int64]bool{}
-	for _, decision := range decisions {
-		products[decision.ProductID] = true
-		issues[decision.VulnerabilityID] = true
-	}
-	productIDs := make([]int64, 0, len(products))
-	for id := range products {
-		productIDs = append(productIDs, id)
-	}
-	issueIDs := make([]int64, 0, len(issues))
-	for id := range issues {
-		issueIDs = append(issueIDs, id)
-	}
-
-	var deferrals []Decision
-	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
-		Where("de.product_id IN (?)", bun.List(productIDs)).
-		Where("de.vulnerability_id IN (?)", bun.List(issueIDs)).
-		Where("claim.outcome = ?", Deferred).
-		// What was taken back was not time the finding spent put off. Counting
-		// a withdrawn deferral would make the number shown to an approver —
-		// "how long has this been postponed" — include time it was not.
-		Where("de.state <> ?", Withdrawn).
-		Where("claim.deferred_until IS NOT NULL").Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read how long these have been put off: %w", err)
-	}
-
-	type place struct {
-		product, issue int64
-		at             string
-	}
-	spans := map[place]time.Duration{}
-	for _, deferral := range deferrals {
-		if deferral.Claim == nil || deferral.Claim.DeferredUntil == nil {
-			continue
-		}
-		// Measured from when it was asked for, so a deferral that has not yet
-		// run out counts the whole of what it asked for rather than only the
-		// part already spent. The question is how long this has been put off
-		// for, not how long it has been put off so far.
-		if span := deferral.Claim.DeferredUntil.Sub(deferral.ProposedAt); span > 0 {
-			spans[place{deferral.ProductID, deferral.VulnerabilityID, deferral.PlaceIdentity}] += span
-		}
-	}
-	for _, decision := range decisions {
-		totals[decision.ID] = spans[place{decision.ProductID, decision.VulnerabilityID, decision.PlaceIdentity}]
-	}
-	return totals, nil
-}
-
-// NeedsApproval reports whether a proposal may stand on its own.
-//
-// Hiding risk needs a second person. The exception is a short deferral: a
-// quick "not this sprint" is ordinary triage and gating it would put every
-// routine act through a queue, which is how a queue stops being read.
-//
-// "Short" is measured against everything this finding has already been put off
-// for. Otherwise the exception swallows the rule one twenty-nine day deferral
-// at a time.
-func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Duration) (bool, error) {
-	if !p.Outcome.HidesRisk() {
-		return false, nil
-	}
-	// A promise to act by a date is gated against the deadline the work
-	// already has rather than against a configured span. Inside it, nothing
-	// is being hidden for longer than the policy already allowed, which is
-	// ordinary triage — and gating every planned upgrade would put the most
-	// routine act in the queue, which is how a queue stops being read.
-	//
-	// Past it, the promise defers the worst thing the act covers, and that is
-	// exactly what a second person is for. A commitment with no date at all
-	// is not a commitment, so it is gated.
-	if p.Outcome.Commits() {
-		if p.CommittedTo == nil {
-			return true, nil
-		}
-		if p.Binding == nil {
-			// Nothing it covers has a deadline, so there is none to go past.
-			// A product below its own triage line is the ordinary case here.
-			return false, nil
-		}
-		return p.CommittedTo.After(*p.Binding), nil
-	}
-	if p.Outcome != Deferred {
-		return true, nil
-	}
-	if threshold <= 0 {
-		return true, nil
-	}
-
-	asking := time.Duration(0)
-	if p.DeferredUntil != nil {
-		// Measured from this store's own clock, like every other time decision
-		// here, and never negative. A date already past asks for no time at
-		// all; letting it come out negative would let a back-dated deferral
-		// subtract from what a finding has already been postponed for and slip
-		// under the threshold.
-		if span := p.DeferredUntil.Sub(s.now()); span > 0 {
-			asking = span
-		}
-	}
-
-	// What has already been asked for about this same place.
-	already, err := s.DeferredSoFar(ctx, Decision{
-		ProductID: p.Place.ProductID, VulnerabilityID: p.Place.VulnerabilityID,
-		PlaceIdentity: p.Place.PlaceIdentity,
-	})
-	if err != nil {
-		return false, err
-	}
-	return already+asking >= threshold, nil
-}
-
 // waiting narrows a query to what somebody has to look at.
 //
 // Three things, not one. A claim awaiting agreement is the obvious case. The
@@ -784,6 +576,12 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 // A decision the code moved out from under is the same shape: somebody made a
 // judgment, it no longer applies, and they are the person who should be told.
 //
+// A promise whose date has gone by is the third of that shape. The work was
+// to be done by then and the finding is still open, so the promise did not
+// hold — and nothing else notices, because a commitment has no expiry: it goes
+// on suppressing the finding, and the deadline the finding had passes behind
+// it in silence.
+//
 // A claim that needed nobody — a short deferral — is not here at all. A work
 // list containing work nobody has to do teaches people to skip rows.
 func waiting(query *bun.SelectQuery, now time.Time) *bun.SelectQuery {
@@ -793,10 +591,15 @@ func waiting(query *bun.SelectQuery, now time.Time) *bun.SelectQuery {
 	// nothing here but would have to be repeated at every caller.
 	ranOut := `EXISTS (SELECT 1 FROM "claim" AS wc WHERE wc.id = de.claim_id
 		AND wc.outcome = ? AND wc.deferred_until IS NOT NULL AND wc.deferred_until <= ?)`
+	// The promise that came due, asked the same way of the same table.
+	cameDue := `EXISTS (SELECT 1 FROM "claim" AS wp WHERE wp.id = de.claim_id
+		AND wp.outcome IN (?) AND wp.committed_to IS NOT NULL AND wp.committed_to <= ?)`
 	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.
 			WhereOr("de.state = ? AND de.needs_approval = ? AND de.sent_back_at IS NULL", Proposed, true).
 			WhereOr("de.state = ?", LapsedState).
-			WhereOr("de.state IN (?, ?) AND "+ranOut, Proposed, Approved, Deferred, now)
+			WhereOr("de.state IN (?, ?) AND "+ranOut, Proposed, Approved, Deferred, now).
+			WhereOr("de.state IN (?, ?) AND "+cameDue, Proposed, Approved,
+				bun.List([]Outcome{UpgradeNeeded, PatchNeeded}), now)
 	})
 }

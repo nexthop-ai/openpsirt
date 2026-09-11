@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -47,8 +48,24 @@ type VexSaidBody struct {
 	At        string `json:"at" doc:"When it was uploaded here"`
 	// Offers is the outcome this would prefill, where it offers one. A
 	// publisher saying they will not fix something is not the same as saying
-	// it does not apply, so that offers a won't-fix and never a dismissal.
+	// it does not apply, so that offers a will-not-fix and never a dismissal.
 	Offers string `json:"offers,omitempty" enum:"not-applicable,wont-fix,already-fixed" doc:"The outcome this offers as a prefill. Never applied by itself"`
+}
+
+// counting is a reader that says how much has gone past it.
+//
+// What a size refusal needs and what a stream does not otherwise carry: the
+// document is never held, so its length is only knowable by counting it on
+// the way through.
+type counting struct {
+	r io.Reader
+	n int64
+}
+
+func (c *counting) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
 }
 
 func registerVexImport(api huma.API, in Ingest) {
@@ -104,16 +121,44 @@ func registerVexImport(api huma.API, in Ingest) {
 			return nil, noSuchProduct()
 		}
 
+		// Read as a stream, digested as it goes, and never held whole. Read
+		// into memory it was held twice — the growing buffer and then a copy
+		// of it to parse from — which is about two and a half times the
+		// limit, against a container that ships with less than that: an
+		// administrator importing a large vendor document got the process
+		// killed rather than an answer. The scan upload streams a document of
+		// the same size past the same digest and holds none of it.
+		//
+		// Read one byte past the limit, so a document over it is refused as
+		// too large rather than cut off and reported as malformed — and so
+		// the digest recorded is over what arrived rather than over the part
+		// that fitted.
 		file := input.RawBody.Data().Statements
-		bytes, err := io.ReadAll(io.LimitReader(file, in.Limits.OrDefault().MaxBytes))
-		if err != nil {
-			return nil, huma.Error400BadRequest("that document could not be read")
+		most := in.Limits.OrDefault().MaxBytes
+		digest := sha256.New()
+		counted := &counting{r: io.TeeReader(io.LimitReader(file, most+1), digest)}
+		said, err := sbom.ReadSuppressions(counted, in.Limits.OrDefault())
+		// Asked before the parse error, because a document cut off at the
+		// limit fails as malformed and the honest answer is its size.
+		if counted.n > most {
+			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
+				"that document is larger than the %d bytes this deployment reads", most))
 		}
-		digest := sha256.Sum256(bytes)
-		said, err := sbom.ReadSuppressions(strings.NewReader(string(bytes)),
-			in.Limits.OrDefault())
 		if err != nil {
 			return nil, asked(in.Logger, err)
+		}
+		// Whatever the parser left. It reads this format to the end today, so
+		// there is nothing here to find and no test can make this line matter
+		// — it is here because the digest is the whole document by definition
+		// and a reader that answered early would otherwise record a hash of
+		// the part it read, which is the failure the scan upload copies past
+		// its own digest to avoid.
+		if _, err := io.Copy(digest, counted); err != nil {
+			return nil, huma.Error400BadRequest("that document could not be read")
+		}
+		if counted.n > most {
+			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
+				"that document is larger than the %d bytes this deployment reads", most))
 		}
 
 		publisher := strings.TrimSpace(input.Publisher)
@@ -134,7 +179,7 @@ func registerVexImport(api huma.API, in Ingest) {
 			}
 		}
 		recorded, superseded, err := finding.NewStore(in.DB.DB).RecordStatements(ctx, by,
-			product.ID, publisher, file.Filename, hex.EncodeToString(digest[:]), statements)
+			product.ID, publisher, file.Filename, hex.EncodeToString(digest.Sum(nil)), statements)
 		if err != nil {
 			return nil, asked(in.Logger, err)
 		}
@@ -143,7 +188,7 @@ func registerVexImport(api huma.API, in Ingest) {
 
 		return &struct{ Body StatementsTakenBody }{Body: StatementsTakenBody{
 			Publisher: strings.ToLower(publisher), Recorded: recorded, Superseded: superseded,
-			Digest: hex.EncodeToString(digest[:]),
+			Digest: hex.EncodeToString(digest.Sum(nil)),
 		}}, nil
 	})
 }

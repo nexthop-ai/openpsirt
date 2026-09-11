@@ -121,14 +121,20 @@ stored, so both survive the redirect.
 
 | Rule | Detail |
 |---|---|
-| A maximum file size and a per-deployment quota | Both configurable |
+| A maximum file size, a per-deployment quota, and one person's share of it | All three configurable. The deployment-wide ceiling is one account's to reach alone, and what reaching it costs is everybody else's next upload — a triager's evidence on an active embargo in another product answering "no room" |
 | Never deleted while anything references it | Removal is an explicit administrative redaction, recorded, leaving the reference and a tombstone |
 | Unattached uploads are reaped | A file attached to an abandoned form is bytes nothing will ever reach |
 | One object per attachment, never content-addressed | Deduplicating by digest would let a redaction blank a file somebody else relies on. The digest is kept beside the row, so a redaction can state what it removed once the bytes are gone |
 
-The quota is checked twice: before anything is carried, so an upload that cannot
-be kept is refused rather than transferred and discarded; and inside the writing
-transaction, because the first answer was read before the bytes were.
+Both bounds are checked twice: before anything is carried, so an upload that
+cannot be kept is refused rather than transferred and discarded; and inside the
+writing transaction, because the first answer was read before the bytes were.
+
+Attaching is triage work. It asked the read test — whether the subject may see
+the issue the file hangs off — so a role granting nothing but the ability to
+read disclosed findings on one product could write files into the store. A
+collaborator brought onto the case may attach, because evidence is usually why
+they were brought in.
 
 ## Write and delete ordering
 

@@ -7,6 +7,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
@@ -122,6 +123,15 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 				until := *old.DeferredUntil
 				proposal.DeferredUntil = &until
 			}
+			// The same check every other write path makes. This one built a
+			// proposal and went straight to the writer, so nothing asked
+			// whether what it was carrying could be said at all — a dated
+			// judgment landed on a line built once, which is the case the
+			// rule exists to refuse, and a commitment arrived with the date
+			// left behind.
+			if err := proposal.valid(s.now()); err != nil {
+				return fmt.Errorf("carry decision %d: %w", one.DecisionID, err)
+			}
 			// The inner form, because this is already inside a transaction:
 			// carrying six judgments is one act, and half of it landing is a
 			// line nobody can tell from one somebody chose that way.
@@ -153,6 +163,10 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		Visibility      string `bun:"visibility"`
 		Component       string `bun:"component_now"`
 		Consumer        string `bun:"consumer_now"`
+		// OnTag as an integer, because the four engines spell a boolean
+		// three ways and a CASE returning 1 or 0 reads the same on all of
+		// them.
+		OnTag int `bun:"on_tag"`
 	}
 	err := s.db.NewSelect().
 		TableExpr("decision AS de").
@@ -175,6 +189,14 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS consumer_now`, toTarget).
+		// Whether the line being carried onto was built once. It is a fact
+		// about the target rather than about the decision, and leaving it
+		// off made every carried place read as a branch — so the rule that
+		// refuses a dated judgment on a tag could not fire here however
+		// often it was asked.
+		ColumnExpr(`(SELECT CASE WHEN st.kind = ? THEN 1 ELSE 0 END
+			FROM "target" AS tg JOIN "stream" AS st ON st.id = tg.stream_id
+			WHERE tg.id = ?) AS on_tag`, catalog.Tag, toTarget).
 		Where("de.id = ?", decisionID).
 		Scan(ctx, &row)
 	if err != nil {
@@ -185,6 +207,7 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		PlaceIdentity:     row.PlaceIdentity,
 		Visibility:        access.AsVisibility(row.Visibility),
 		ComponentUpstream: row.Component, ConsumerUpstream: row.Consumer,
+		OnTag: row.OnTag == 1,
 	}, nil
 }
 

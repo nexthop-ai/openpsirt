@@ -42,6 +42,26 @@ import (
 // one is already safe, and that is the fix when this reports something.
 var invented = regexp.MustCompile(`(?i)\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
 
+// declared matches a bare schema identifier in data-definition language.
+//
+// **Only inside the migrations**, where every string is DDL by construction,
+// so the false positives that keep this check narrow elsewhere cannot arise.
+// The alias pattern above cannot see these at all — a `DROP TABLE` names no
+// alias and contains no AS — so a table renamed to something one engine
+// reserves passed the gate that exists to catch exactly that.
+var declared = regexp.MustCompile(
+	`(?i)\b(?:TABLE|INDEX|COLUMN|CONSTRAINT|REFERENCES)\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
+
+// aliased matches the table alias a model declares in its struct tag.
+//
+// Read because a tag is where an alias is written for most of this codebase's
+// queries, and the walk below sees only call arguments: the settings table
+// was aliased `as`, which all four engines reserve. It works only because the
+// library quotes what a tag declares — a property of the library rather than
+// of this code — and the first raw expression naming that alias is a syntax
+// error on every one of the four.
+var aliased = regexp.MustCompile(`\balias:([A-Za-z_][A-Za-z0-9_]*)`)
+
 // writing is the query builder's methods that take SQL as text.
 //
 // Matched by name rather than by resolving the type, which is the same
@@ -93,7 +113,43 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
+		// The data-definition half. Read from the string literals in a
+		// migration rather than from the file, because the prose beside them
+		// is full of the same words — and with the SQL comments inside those
+		// strings taken off first, for the same reason.
+		definitions := strings.Contains(path, "database/migrate/migrations/")
 		ast.Inspect(file, func(node ast.Node) bool {
+			if definitions {
+				if lit, ok := node.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					text, err := strconv.Unquote(lit.Value)
+					if err != nil {
+						return true
+					}
+					for _, match := range declared.FindAllStringSubmatch(withoutSQLComments(text), -1) {
+						word := strings.ToLower(match[1])
+						if reserved[word] {
+							bad = append(bad, found{
+								word: word, file: path,
+								line: fset.Position(lit.Pos()).Line,
+							})
+						}
+					}
+				}
+			}
+			// The alias a model declares, which is written in a struct tag
+			// rather than passed to anything.
+			if field, ok := node.(*ast.Field); ok && field.Tag != nil {
+				for _, match := range aliased.FindAllStringSubmatch(field.Tag.Value, -1) {
+					word := strings.ToLower(match[1])
+					if reserved[word] {
+						bad = append(bad, found{
+							word: word, file: path,
+							line: fset.Position(field.Tag.Pos()).Line,
+						})
+					}
+				}
+				return true
+			}
 			call, ok := node.(*ast.CallExpr)
 			if !ok {
 				return true
@@ -140,6 +196,24 @@ func main() {
 	}
 	fmt.Fprintf(os.Stderr, "\n%d invented name(s) an engine will refuse to parse.\n", len(bad))
 	os.Exit(1)
+}
+
+// withoutSQLComments drops what a migration says about its own columns.
+//
+// The comments beside a schema are the reason the schema is legible, and they
+// are full of the words an engine reserves — "the table exists", "on and
+// over" — so reading them as identifiers reported fifty names, none of which
+// was one.
+func withoutSQLComments(text string) string {
+	var kept strings.Builder
+	for line := range strings.SplitSeq(text, "\n") {
+		if cut := strings.Index(line, "--"); cut >= 0 {
+			line = line[:cut]
+		}
+		kept.WriteString(line)
+		kept.WriteString("\n")
+	}
+	return kept.String()
 }
 
 // literal reads a string argument, following the concatenations these queries

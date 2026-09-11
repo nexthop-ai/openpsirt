@@ -3,7 +3,7 @@
 
 /* ---------- a narrow screen ---------- */
 /* The mockup's phone shaping: no rail, a tab bar, the findings table as
-   cards, one column everywhere (UIX-15, UIX-16). */
+   cards, one column everywhere. */
 .menubtn {
   display: none;
   width: 34px;
@@ -368,7 +368,7 @@ a {
   color: var(--muted);
 }
 
-/* The finding an approver is judging, above the argument about it (TRI-09). */
+/* The finding an approver is judging, above the argument about it. */
 .about {
   font-size: var(--step--1);
   color: var(--ink);
@@ -462,10 +462,9 @@ a {
   cursor: pointer;
 }
 
-/* The words people put on a finding (TRI-61). Deliberately quieter than a
-   severity or a state chip: a mark is somebody's own note about the work, not
-   a judgment the tool made, and one styled like a verdict would be read as
-   one. */
+/* The words people put on a finding. Deliberately quieter than a severity or
+   a state chip: a mark is somebody's own note about the work, not a judgment
+   the tool made, and one styled like a verdict would be read as one. */
 .marks {
   display: flex;
   flex-wrap: wrap;
@@ -551,7 +550,7 @@ a {
   font-size: var(--step--1);
   font-variant-numeric: tabular-nums;
 }
-/* Each count opens the list it counts, and a link brings its own colour with
+/* Each count opens the list it counts, and a link brings its own color with
    it. The underline arrives on hover, where it says the number is a way
    through rather than decorating every row. */
 a.n {
@@ -563,9 +562,9 @@ a.n:hover {
   text-decoration: underline;
 }
 
-/* Filters somebody kept (UIX-10). Beside the chips rather than above them:
-   opening one is the same act as pressing a chip, and putting it somewhere
-   else would read as a mode. */
+/* Filters somebody kept. Beside the chips rather than above them: opening one
+   is the same act as pressing a chip, and putting it somewhere else would
+   read as a mode. */
 .kept {
   display: inline-flex;
   align-items: center;

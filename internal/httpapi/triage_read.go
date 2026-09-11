@@ -120,6 +120,10 @@ type ApprovalBody struct {
 	// appear — comparing this against what it covers now is how "agreed
 	// covering six, now covers sixty-one" gets asked.
 	Covered int `json:"covered,omitempty" doc:"Findings this covered when it was agreed to"`
+	// CarriedFrom names the agreement this one was carried forward from,
+	// where a re-affirmation stood on the agreement its predecessor had. The
+	// approver named here read that claim's reasoning rather than this one's.
+	CarriedFrom int64 `json:"carried_from,omitempty" doc:"The approval this was carried forward from, where a re-affirmation stood on an earlier agreement rather than a fresh one"`
 }
 
 // CommentBody is one remark on a decision.
@@ -342,6 +346,10 @@ func registerTriageReading(api huma.API, in Ingest) {
 		Summary: "List who approved a claim",
 		Description: "Returns every approval recorded against this claim, including ones later " +
 			"withdrawn, each naming the revision of the justification it was given for.\n\n" +
+			"An approval carrying `carried_from` was not given for this claim. A " +
+			"re-affirmation states its own reasoning and stands on the agreement its " +
+			"predecessor had, so the person named agreed to the earlier claim's words; " +
+			"`carried_from` is the approval where those are.\n\n" +
 			"A withdrawn approval is kept rather than deleted: who agreed to what, and when it " +
 			"stopped counting, is part of the record.\n\n" +
 			"`covered` is how many findings the claim covered **when it was agreed to**. A claim " +
@@ -387,135 +395,13 @@ func registerTriageReading(api huma.API, in Ingest) {
 			if approval.Covered != nil {
 				body.Covered = *approval.Covered
 			}
-			out.Body.Items = append(out.Body.Items, body)
-		}
-		return out, nil
-	})
-
-	huma.Register(api, requiring(huma.Operation{
-		OperationID: "list-claim-comments", Method: http.MethodGet,
-		Path:    "/v1/claims/{id}/comments",
-		Summary: "List comments on a claim",
-		Description: "Returns the comments on a claim, oldest first, with who wrote each and " +
-			"when. A comment that has been edited also carries when it was last changed.\n\n" +
-			"Comments are separate from the justification and never affect an approval.",
-		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		ID int64 `path:"id"`
-	}) (*listOutput[CommentBody], error) {
-		subject, store, err := triaging(ctx, in)
-		if err != nil {
-			return nil, err
-		}
-		comments, err := store.Discussion(ctx, subject, input.ID)
-		if err != nil {
-			return nil, refusedDecision(in.Logger, err)
-		}
-
-		authors := make([]int64, 0, len(comments))
-		for _, comment := range comments {
-			authors = append(authors, comment.WrittenBy)
-		}
-		names, err := access.NewStore(in.DB.DB).Names(ctx, authors)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the discussion could not be read", err)
-		}
-
-		out := &listOutput[CommentBody]{}
-		out.Body.Items = make([]CommentBody, 0, len(comments))
-		for _, comment := range comments {
-			body := CommentBody{
-				ID: comment.ID, Body: comment.Body,
-				WrittenBy: names[comment.WrittenBy],
-				WrittenAt: comment.WrittenAt.Format(time.RFC3339),
-			}
-			if comment.EditedAt != nil {
-				body.EditedAt = comment.EditedAt.Format(time.RFC3339)
+			if approval.CarriedFrom != nil {
+				body.CarriedFrom = *approval.CarriedFrom
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		return out, nil
 	})
-
-	huma.Register(api, requiring(huma.Operation{
-		OperationID: "edit-comment", Method: http.MethodPut, Path: "/v1/comments/{id}",
-		Summary: "Edit a comment",
-		Description: "Replaces the text of a comment. Only its author may do this.\n\n" +
-			"**What it said before is kept**, and read back with " +
-			"`GET /v1/comments/{id}/history`. A comment is part of the record that goes " +
-			"public at disclosure, and a record whose earlier text is unrecoverable is " +
-			"readable rather than checkable — which is the property the whole append-only " +
-			"history exists for.\n\n" +
-			"The text is markdown and is validated before it is stored; a 422 names the line and " +
-			"the offending text.",
-		Tags: []string{"Triage"},
-	}, perProduct, "Only the author may edit a comment.", approveRights()...), func(ctx context.Context, input *struct {
-		ID   int64 `path:"id"`
-		Body struct {
-			Body string `json:"body" minLength:"1"`
-		}
-	}) (*struct{ Body MentionsBody }, error) {
-		subject, store, err := triaging(ctx, in)
-		if err != nil {
-			return nil, err
-		}
-		claimID, err := store.Reword(ctx, subject, input.ID, input.Body.Body)
-		if err != nil {
-			return nil, refusedDecision(in.Logger, err)
-		}
-		dropped := tellMentioned(ctx, in, subject, store, claimID, input.Body.Body)
-		return &struct{ Body MentionsBody }{Body: MentionsBody{NotNotified: dropped}}, nil
-	})
-
-	huma.Register(api, requiring(huma.Operation{
-		OperationID: "get-comment-history", Method: http.MethodGet,
-		Path:    "/v1/comments/{id}/history",
-		Summary: "List earlier revisions of a comment",
-		Description: "Every version of a comment that has been replaced, oldest first. " +
-			"The comment itself carries what it says now.\n\n" +
-			"A comment is part of the record that goes public at disclosure, so what it said " +
-			"before has to be recoverable: an edit that overwrites leaves a record somebody " +
-			"can read and nobody can check.\n\n" +
-			"Answers only where you may read what the comment is about — the same rule as " +
-			"reading the comment itself, asked of the decision rather than of the comment, " +
-			"because two rules for one question is one rule out of step.",
-		Tags: []string{"Triage"},
-	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
-		ID int64 `path:"id"`
-	}) (*listOutput[WasSaidBody], error) {
-		subject, store, err := triaging(ctx, in)
-		if err != nil {
-			return nil, err
-		}
-		rows, err := store.Earlier(ctx, subject, input.ID)
-		if err != nil {
-			return nil, refusedDecision(in.Logger, err)
-		}
-		out := &listOutput[WasSaidBody]{}
-		out.Body.Items = make([]WasSaidBody, 0, len(rows))
-		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, WasSaidBody{
-				Version: row.Ordinal, Body: row.Body,
-				ReplacedAt: row.ReplacedAt.Format(time.RFC3339),
-			})
-		}
-		return out, nil
-	})
-}
-
-// WasSaidBody is one version of a comment that has been replaced.
-type WasSaidBody struct {
-	Version    int    `json:"version" doc:"Which version this was, counting from one"`
-	Body       string `json:"body" doc:"What it said, in markdown"`
-	ReplacedAt string `json:"replaced_at" doc:"When it stopped saying that"`
-}
-
-// DecisionsOutput is a page of decisions, with how many there are behind it.
-type DecisionsOutput struct {
-	Body struct {
-		Items []DecisionDetail `json:"items"`
-		Total int              `json:"total"`
-	}
 }
 
 // describeDecisions fills in the names a decision refers to by identifier.
@@ -649,7 +535,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		where, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
 			input.Vulnerability, input.Place)
 		if err != nil {
 			return nil, err
@@ -700,9 +586,13 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			"Only the person who made the original may do this, and it normally needs no second " +
 			"approver: two people already agreed to the claim, and a version bump is a prompt to " +
 			"re-check rather than a new claim.\n\n" +
-			"It does need approval again if the justification differs from the original, or if " +
-			"the vulnerability's severity has risen since — both mean this is not the claim that " +
-			"was agreed to. The response says which happened.\n\n" +
+			"It does need approval again if the vulnerability's severity has risen since the " +
+			"original was agreed to, or if nothing was ever agreed to. What was agreed was " +
+			"that this did not matter much, which is not an agreement about what it has " +
+			"become. The response says whether a second person is needed.\n\n" +
+			"Where no second person is needed, the earlier agreement is carried onto the new " +
+			"claim and recorded as carried. The approver named agreed to the previous " +
+			"claim's reasoning, not to what is written here.\n\n" +
 			"`reasoning` is required. \"Still true\" with nothing behind it is what a " +
 			"re-affirmation becomes when it is made too easy.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
@@ -721,7 +611,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		where, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
 			input.Vulnerability, input.Place)
 		if err != nil {
 			return nil, err
@@ -736,7 +626,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			},
 			Reasoning: input.Body.Reasoning,
 			By:        subject.ID,
-		}, where.SeverityCenti)
+		})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}

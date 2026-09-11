@@ -39,12 +39,6 @@ import (
 // risk rather than hiding it, and the queue exists to stop risk being hidden
 // unseen.
 func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int64, reasoning string) (*Revision, error) {
-	if strings.TrimSpace(reasoning) == "" {
-		return nil, errors.New("a revision has to say something")
-	}
-	if err := markdown.Check(reasoning); err != nil {
-		return nil, err
-	}
 	db, ok := s.db.(*bun.DB)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
@@ -60,8 +54,22 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int6
 	return written, err
 }
 
+// revise is the whole of a revision, inside a transaction the caller opened.
+//
+// **The policy is checked here rather than by each caller.** Every path that
+// stores typed text runs it before the text is stored, so that what is in the
+// column is known to have passed what was in force when it arrived — and a
+// second entry point that reached the write without it stored raw HTML,
+// remote images and text past the bound a render is kept inside.
 func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int64,
 	reasoning string) (*Revision, error) {
+
+	if strings.TrimSpace(reasoning) == "" {
+		return nil, errors.New("a revision has to say something")
+	}
+	if err := markdown.Check(reasoning); err != nil {
+		return nil, err
+	}
 
 	claim, rows, err := s.claimRows(ctx, subject, claimID, mayDecide)
 	if err != nil {
@@ -381,26 +389,4 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 		return 0, fmt.Errorf("count what this covers: %w", err)
 	}
 	return covered, nil
-}
-
-// readableVisibilities is what this person may read across the products a set
-// of rows sits in: private where they may read private on every one of those
-// products, public only otherwise.
-//
-// A claim is one action on one build, so its rows share a product and this is
-// the per-row rule asked once. Where a set does span products the answer is
-// the narrower one, which discloses less rather than more.
-func readableVisibilities(subject access.Subject, ids []int64, s *Store, ctx context.Context) []access.Visibility {
-	var products []int64
-	if err := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr("DISTINCT de.product_id").
-		Where("de.id IN (?)", bun.List(ids)).Scan(ctx, &products); err != nil {
-		return []access.Visibility{access.Public}
-	}
-	for _, product := range products {
-		if !subject.Reads(access.Private, product) {
-			return []access.Visibility{access.Public}
-		}
-	}
-	return []access.Visibility{access.Public, access.Private}
 }

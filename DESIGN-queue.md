@@ -65,7 +65,7 @@ so several renewals may fail before the claim is at risk.
 
 | Event | Behavior |
 |---|---|
-| Renewal refused, another worker holds the job | The work is cancelled and the worker is told the claim was lost, not that the work failed |
+| Renewal refused, another worker holds the job | The work is canceled and the worker is told the claim was lost, not that the work failed |
 | Renewal fails for any other reason | Reported and retried next interval. The claim is not lost until the timeout passes with nothing landing |
 | The job ends | Renewal stops first and the worker waits for it, so nothing else writes to the job while the ending is written |
 | The claim went stale while the work ran | Only the claim holder finishes a job: the finishing statement carries the claim's condition. A refused finish is reported as "no longer held" and logged |
@@ -115,7 +115,14 @@ The caller states whether a job commits with the rows it is about.
   window.
 - **The claim timeout is not shortened to match the renewal interval.** On
   SQLite the pool is one connection, so a renewal waits behind the job's own
-  statement and a long transaction can hold it for minutes.
+  statement and a long transaction can hold it for minutes. **On that engine
+  a renewal cannot succeed at all while the work holds the connection**, so
+  the claim timeout is not a safety margin there — it is the bound, and it has
+  to exceed the longest single unit of work a deployment runs. Past it the
+  claim goes stale, and once the work's own transaction commits a second
+  worker's claim succeeds and the job runs twice, which on an ingest looks
+  like real change. The renewal is kept because it is the whole of the
+  protection on the other three engines.
 - **No queue library is used.** The mature Go queues either tie to one database
   engine or require a separate service — one would cut engine support from four
   to one, the other adds a component to every deployment.

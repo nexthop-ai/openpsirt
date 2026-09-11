@@ -86,8 +86,9 @@ func registerAttachments(api huma.API, in Ingest) {
 			"The content type is decided here from the bytes and is never the one that was " +
 			"uploaded. Everything outside a small allowlist of raster images is served as an " +
 			"attachment download whatever it is.\n\n" +
-			"Refused when the file is larger than this deployment accepts, or when it has no " +
-			"room left; both limits are settings. A deployment that has configured no store " +
+			"Refused when the file is larger than this deployment accepts, when it has no " +
+			"room left, or when it would take you past your own share of the store; all " +
+			"three limits are settings. A deployment that has configured no store " +
 			"holds no attachments and says so.\n\n" +
 			"An upload nothing refers to is removed after a day, so a file attached and then " +
 			"abandoned does not accumulate. Send `evidence=true` where the file hangs off the " +
@@ -103,7 +104,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		// per request and this is fixed when the route is built, so the
 		// setting refuses inside it and this refuses the absurd.
 		Middlewares: huma.Middlewares{boundedForm(api, maxAttachmentRequest)},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, perProduct, "A collaborator brought onto this issue may attach to it too.",
+		triageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, under any identifier it goes by"`
 		RawBody       huma.MultipartFormFiles[attachmentParts]
@@ -124,7 +126,7 @@ func registerAttachments(api huma.API, in Ingest) {
 			return nil, huma.Error404NotFound(attach.ErrNoSuchIssue.Error())
 		}
 
-		maxSize, quota, err := attachmentLimits(ctx, in)
+		maxSize, quota, share, err := attachmentLimits(ctx, in)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "cannot tell what this deployment accepts", err)
 		}
@@ -135,7 +137,7 @@ func registerAttachments(api huma.API, in Ingest) {
 		// text never arrives.
 		evidence := input.RawBody.Data().Evidence == "true"
 		stored, err := files.Upload(ctx, subject, productID, vulnerabilityID,
-			part.Filename, part, part.Size, maxSize, quota, evidence)
+			part.Filename, part, part.Size, maxSize, quota, share, evidence)
 		switch {
 		case errors.Is(err, attach.ErrTooLarge):
 			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
@@ -258,8 +260,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		Description: "Takes the bytes back out and leaves the record. The reference in the text " +
 			"stays and says the file was removed, which is the difference between a redaction " +
 			"and a hole in the record.\n\n" +
-			"Administrators only, and a reason is required. It is the answer to somebody having " +
-			"attached a credential, so it is deliberate and it is recorded.",
+			"Administrators only. A reason is required, and it is recorded and shown wherever " +
+			"the text referred to the file.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Token string `path:"token"`
@@ -287,15 +289,19 @@ func registerAttachments(api huma.API, in Ingest) {
 }
 
 // attachmentLimits reads what this deployment accepts.
-func attachmentLimits(ctx context.Context, in Ingest) (maxSize, quota int64, err error) {
+func attachmentLimits(ctx context.Context, in Ingest) (maxSize, quota, share int64, err error) {
 	settings := setting.NewStore(in.DB.DB)
 	size, err := settings.Count(ctx, setting.AttachmentMaxSize, setting.DefaultAttachmentMaxSize)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	held, err := settings.Count(ctx, setting.AttachmentQuota, setting.DefaultAttachmentQuota)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
-	return int64(size), int64(held), nil
+	each, err := settings.Count(ctx, setting.AttachmentShare, setting.DefaultAttachmentShare)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return int64(size), int64(held), int64(each), nil
 }

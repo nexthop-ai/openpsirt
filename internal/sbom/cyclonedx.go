@@ -72,6 +72,12 @@ type reader struct {
 	// above are only what survived.
 	stated  int
 	charged int
+	// claimed counts the patch claims a document makes, against the same bound
+	// the two VEX readers charge their statements against. It is not covered
+	// by the component bound: the claims hang off one component's pedigree, so
+	// a document of one component can carry millions of them, and this is read
+	// in full inside the upload request.
+	claimed int
 	seen    map[string]int
 	edges   []refEdge
 	// contained is the structure a producer declared by nesting one component
@@ -267,6 +273,21 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		nested    []graph.Described
 		carried   []Suppression
 	)
+	// **Charged on the way in, before anything is held.** The bound was
+	// charged where components are recorded, which returns at once on the
+	// header-only read — so a document putting its components inside the
+	// root component's own array was walked in full during a read that
+	// happens synchronously inside the upload request, binding every one of
+	// them, with nothing but the byte limit saying how many there could be.
+	// Ten million of them at twenty-six bytes each is a quarter of a
+	// gigabyte of file and several gigabytes of process, which is the
+	// failure this bound exists to prevent, arriving in the request rather
+	// than in a background reader.
+	c.stated++
+	if c.stated > c.lim.MaxComponents {
+		return graph.Described{}, "", nil, fmt.Errorf(
+			"scan file describes more than the %d component limit", c.lim.MaxComponents)
+	}
 	err := c.b.object(func(key string) error {
 		switch key {
 		case "bom-ref":
@@ -384,6 +405,9 @@ func (c *reader) patches(carried *[]Suppression) error {
 				})
 			case "resolves":
 				return c.b.array(func() error {
+					if err := c.claim(); err != nil {
+						return err
+					}
 					claim, err := c.resolved()
 					if err != nil {
 						return err
@@ -479,17 +503,14 @@ func (c *reader) dependencies() error {
 
 // add records a component, once per identity.
 //
-// The limit counts what the document states rather than what survives
-// deduplication. Counting the survivors would mean a file of one component
-// repeated is unbounded — every copy is read, held and discarded, and the
-// count that was supposed to stop it never moves.
+// The bound is charged where a component is read rather than here, so that it
+// counts what the document states on every path rather than what this one
+// keeps. Counting the survivors would mean a file of one component repeated
+// is unbounded — every copy is read, held and discarded, and the count that
+// was supposed to stop it never moves.
 func (c *reader) add(described graph.Described) error {
 	if c.headerOnly {
 		return nil
-	}
-	c.stated++
-	if c.stated > c.lim.MaxComponents {
-		return fmt.Errorf("scan file describes more than the %d component limit", c.lim.MaxComponents)
 	}
 	// One package described twice is one package, and the two descriptions are
 	// not always the same description. A build that merges two sources emits
@@ -510,6 +531,19 @@ func (c *reader) add(described graph.Described) error {
 	}
 	c.seen[identity] = len(c.described)
 	c.described = append(c.described, described)
+	return nil
+}
+
+// claim counts one more patch claim against the limit.
+//
+// Charged as each one is read rather than after the array, for the reason the
+// edge count is: what a bound has to stop is the walk, and a count taken after
+// the walk has already done the work.
+func (c *reader) claim() error {
+	c.claimed++
+	if c.claimed > c.lim.MaxStatements {
+		return fmt.Errorf("scan file carries more than the %d claim limit", c.lim.MaxStatements)
+	}
 	return nil
 }
 

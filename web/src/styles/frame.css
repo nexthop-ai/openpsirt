@@ -496,11 +496,11 @@ button {
   font-weight: 500;
 }
 
-/* The way to the next finding without going back to the list (UIX-63). It sits
-   on the head's line because it belongs to the list rather than to the
-   finding: it says where the reader is in what they were reading. An end of
-   the walk is shown rather than removed, so the pair does not move under the
-   pointer at the first and last row. */
+/* The way to the next finding without going back to the list. It sits on the
+   head's line because it belongs to the list rather than to the finding: it
+   says where the reader is in what they were reading. An end of the walk is
+   shown rather than removed, so the pair does not move under the pointer at
+   the first and last row. */
 .walking {
   display: flex;
   align-items: center;

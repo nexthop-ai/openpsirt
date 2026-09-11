@@ -176,7 +176,10 @@ behind every line of it.
 ### Access and permissions
 
 - **Sign-in is federated** — OIDC, GitHub or a trusted header — and no account
- is ever created automatically on any path
+ is created for anybody nothing authorized in advance. Where roles are derived
+ from identity-provider groups, that mapping is the advance grant: somebody it
+ covers is recorded on their first arrival, and somebody in no mapped group is
+ refused exactly as a stranger is
 - **Roles are granted per product; administration is global.** A product
  somebody holds no role on is invisible to them: not listed, not counted
 - **Visibility is enforced in the data-access layer**, with a required subject,

@@ -2,7 +2,9 @@ package graph_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -100,4 +102,70 @@ func TestAPackageIdentifierKeepsWhatIdentityThrowsAway(t *testing.T) {
 			t.Errorf("PartsOfPurl(%q) = %+v, want %+v", c.purl, got, c.want)
 		}
 	}
+}
+
+// Two writers describing the same component are agreeing, not colliding.
+//
+// The lookup is inside the caller's transaction, which says nothing about
+// another transaction against another target finding the same component
+// absent at the same moment. A unique violation is not retryable, so the
+// loser did not retry: its whole scan apply failed and the producer was told
+// its upload could not be read, for a component that is now present. Two
+// replicas reading two scans at once is the shipped arrangement, and a
+// portfolio first meeting a shared dependency is exactly when it happens.
+//
+// The race is staged rather than run: the row is written directly, the way
+// the other writer would have written it, and then a set still believing it
+// absent is written over the top.
+func TestTwoWritersInterningOneComponentBothSucceed(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		shared := graph.Described{
+			Purl: "pkg:deb/debian/openssl@3.0.11-1", Name: "openssl", Version: "3.0.11-1",
+		}
+		fresh := graph.Described{
+			Purl: "pkg:deb/debian/zlib1g@1.3", Name: "zlib1g", Version: "1.3",
+		}
+
+		components := graph.NewComponents(f.db.DB)
+		written, err := components.Intern(ctx, []graph.Described{shared})
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs := written[shared.Identity()]
+		if theirs == 0 {
+			t.Fatal("the first writer recorded nothing")
+		}
+
+		// What the loser of the race does: it read before that row existed,
+		// so it writes both, and one of them is already there.
+		if err := database.InBatchesKeeping(ctx, f.db.DB, []graph.Component{
+			{
+				Identity: shared.Identity(), Purl: shared.Purl, Name: shared.Name,
+				Version: shared.Version, NameFolded: graph.Folded(shared.Name),
+				FoldKey: shared.FoldKey(), FirstSeenAt: time.Now().UTC(),
+			},
+			{
+				Identity: fresh.Identity(), Purl: fresh.Purl, Name: fresh.Name,
+				Version: fresh.Version, NameFolded: graph.Folded(fresh.Name),
+				FoldKey: fresh.FoldKey(), FirstSeenAt: time.Now().UTC(),
+			},
+		}); err != nil {
+			t.Fatalf("the writer that lost the race failed: %v", err)
+		}
+
+		// One row for the shared component, still the first writer's, and the
+		// new one written.
+		after, err := components.Intern(ctx, []graph.Described{shared, fresh})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after[shared.Identity()] != theirs {
+			t.Errorf("the shared component is now %d, was %d: a second row was written",
+				after[shared.Identity()], theirs)
+		}
+		if after[fresh.Identity()] == 0 {
+			t.Error("the component that was new was not written")
+		}
+	})
 }

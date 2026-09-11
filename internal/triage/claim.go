@@ -247,7 +247,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 	if len(proposals) == 0 {
 		return nil, nil
 	}
-	if err := allowed(subject, proposals, cap); err != nil {
+	if err := allowed(subject, proposals, cap, s.now()); err != nil {
 		return nil, err
 	}
 
@@ -265,6 +265,11 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		if err != nil {
 			return err
 		}
+		// The gate, worked out here for the reason every other write path
+		// works it out here.
+		if err := within.gate(ctx, subject, proposals); err != nil {
+			return err
+		}
 		claim, err := within.newClaim(ctx, ExtensionClaim, subject.ID, &source.ID, "", proposals[0])
 		if err != nil {
 			return err
@@ -273,17 +278,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return err
 	})
 	if err != nil {
-		if errors.Is(err, ErrAlreadyDecided) {
-			for _, p := range proposals {
-				if standing, found := s.liveAt(ctx, liveKeyFor(p.Place)); found {
-					return nil, fmt.Errorf(
-						"%w: decision %d is already %s at one of these places — revise that one "+
-							"rather than recording a second claim about the same code",
-						ErrAlreadyDecided, standing.ID, standing.State)
-				}
-			}
-		}
-		return nil, err
+		return nil, s.alreadyDecided(ctx, err, placesOf(proposals))
 	}
 	return recorded, nil
 }
@@ -539,7 +534,17 @@ func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, 
 	if err != nil {
 		return fmt.Errorf("record an approval: %w", err)
 	}
-	if n, err := moved.RowsAffected(); err == nil && n != int64(len(ids)) {
+	// The count is the control, so a driver that cannot report it is a
+	// refusal rather than a pass. Read as optional, the whole revision-bound
+	// check was skipped on any driver or proxy that does not answer — after
+	// the approval row was already written, leaving a claim agreed to under
+	// an approval naming reasoning that is no longer what it rests on.
+	n, err := moved.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("cannot tell whether the reasoning changed while this "+
+			"was being agreed to: %w", err)
+	}
+	if n != int64(len(ids)) {
 		return fmt.Errorf("the reasoning changed while this was being agreed to; read it again")
 	}
 	return nil
@@ -792,7 +797,12 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 		if err != nil {
 			return fmt.Errorf("record that this was sent back: %w", err)
 		}
-		if n, err := marked.RowsAffected(); err == nil && n != int64(len(ids)) {
+		n, err := marked.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("cannot tell whether the claim changed while it was "+
+				"being sent back: %w", err)
+		}
+		if n != int64(len(ids)) {
 			return fmt.Errorf("the claim changed while it was being sent back; read it again")
 		}
 		result.Sent = len(ids)

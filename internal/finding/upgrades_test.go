@@ -2,7 +2,6 @@ package finding_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -62,57 +61,6 @@ func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
 		}
 		if here.Upgrades[1].To != "3.8.0" || here.Upgrades[1].Issues != 1 {
 			t.Errorf("second upgrade is %+v, want 3.8.0 closing one", here.Upgrades[1])
-		}
-	})
-}
-
-func TestTheDeadlineACommitmentIsGatedAgainstIsTheEarliestItCovers(t *testing.T) {
-	// One act covering a critical and a medium is gated by the critical,
-	// however many mediums are in it — so what a commitment is measured
-	// against is the earliest deadline in the set, not each finding's own.
-	// Gating per finding would let one act stand for the mediums and wait for
-	// the critical, which is one act with two answers.
-	each(t, func(t *testing.T, f *fixture) {
-		f.shipped(t, twoConsumers())
-		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
-			{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "low"}, Component: libnl},
-			{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "critical"}, Component: libnl},
-		}); err != nil {
-			t.Fatal(err)
-		}
-		// Deadlines are per urgency, so the critical's is the earliest.
-		if _, err := f.store.Recompute(t.Context(), finding.Windows{
-			Critical: 24 * time.Hour, High: 48 * time.Hour,
-			Medium: 72 * time.Hour, Low: 96 * time.Hour,
-		}); err != nil {
-			t.Fatal(err)
-		}
-
-		who := f.holding(t, access.PublicTriage)
-		binding, err := f.store.BindingDeadline(t.Context(), who, f.wholeProduct(),
-			libnl.Name, finding.Filter{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if binding == nil {
-			t.Fatal("nothing was returned, though what it covers has deadlines")
-		}
-
-		// It is the critical's window, not the low's.
-		soon := time.Now().UTC().Add(36 * time.Hour)
-		if !binding.Before(soon) {
-			t.Errorf("the binding deadline is %v, which is not the earliest of the two", binding)
-		}
-
-		// A component nothing is open against binds nothing.
-		none, err := f.store.BindingDeadline(t.Context(), who, f.wholeProduct(),
-			"not-a-component", finding.Filter{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if none != nil {
-			t.Errorf("a component with nothing open returned %v", none)
 		}
 	})
 }

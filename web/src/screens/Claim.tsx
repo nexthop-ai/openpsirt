@@ -10,15 +10,15 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useRevise, useWithdraw } from "../api/mutations";
+import { Outward } from "../ui/Outward";
 import { useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
 import { Comments, Revisions } from "./FindingClaim";
-import { Happened } from "./Queue";
-import { Editor, forget } from "../ui/Editor";
+import { Happened } from "./QueueMine";
+import { Editor } from "../ui/Editor";
+import { ReasonEditor } from "../ui/ReasonEditor";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
-import { Markdown } from "../ui/Markdown";
-import { Because, labelled } from "../ui/Outcome";
+import { Because, labeled } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
 import { useWho } from "../app/session";
@@ -32,7 +32,7 @@ function same(name?: string): string {
 }
 
 // The stripe down the card, which says the claim's state before anybody reads
-// a word of it. Three colours and no fourth: waiting, in force, and finished
+// a word of it. Three colors and no fourth: waiting, in force, and finished
 // with — the same three the finding screen draws.
 function stripe(happened?: string): string {
   if (happened === "approved") return "approved";
@@ -84,7 +84,7 @@ export function Claim({ who }: { who: Who }) {
               ? (it.finding?.component ?? it.place.vulnerability)
               : it.place.vulnerability}
           </span>{" "}
-          · {labelled(it.argument.outcome)}{" "}
+          · {labeled(it.argument.outcome)}{" "}
           {it.issues > 1 && <span className="n">{it.issues} issues</span>}
         </h2>
         <p className="hint">
@@ -104,7 +104,7 @@ export function Claim({ who }: { who: Who }) {
       </div>
 
       <Argument claim={it} id={id} onChanged={again} />
-      <Reasoning claim={it} mine={mine} about={about} onChanged={again} />
+      <Reasoning claim={it} about={about} onChanged={again} />
       <Answer claim={it} mine={mine} onAnswered={again} />
       <HoldBack claim={it} mine={mine} onHeld={again} />
       <Revisions claimId={id} />
@@ -145,7 +145,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
         <div>
           <span className="l">Outcome</span>
           <span className="v">
-            {labelled(claim.argument.outcome)}
+            {labeled(claim.argument.outcome)}
             {claim.argument.deferred_until && <> until {claim.argument.deferred_until}</>}
             {claim.argument.committed_to && <> by {claim.argument.committed_to}</>}
           </span>
@@ -261,9 +261,10 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
       {where ? (
         <>
           Being worked on at{" "}
-          <a href={where} target="_blank" rel="noreferrer noopener" className="linkish">
-            {where}
-          </a>
+          {/* Typed here rather than supplied by a scanner, and still a string
+              that becomes somewhere to click — so it is judged the same way a
+              scanner's reference is, by the one component that judges. */}
+          <Outward href={where} />
           {". "}
         </>
       ) : (
@@ -287,115 +288,42 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
   );
 }
 
-// The reasoning as it stands, and the two acts its author has.
+// The reasoning as it stands, and the two acts anybody who may argue about it
+// has.
+//
+// **Not the author's alone.** The server asks whether the subject may decide
+// about each row of the claim and nothing about who wrote it, which is what
+// the act-and-needs table says: propose, revise and withdraw all ask for
+// triage on the product at the finding's visibility. Gated on authorship
+// here, a triager reading a colleague's stale claim had no way to revise or
+// withdraw it on this screen and every way to do it from the finding — the
+// same person, the same claim, two answers.
 //
 // Revising keeps the old words readable, takes back the approval given for
 // them, and returns the claim to the queue. Withdrawing needs nobody.
 function Reasoning({
   claim,
-  mine,
   about,
   onChanged,
 }: {
   claim: Claimed;
-  mine: boolean;
   about: { product: string; vulnerability: string };
   onChanged: () => void;
 }) {
   const id = claim.claim.id;
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(claim.argument.reasoning);
-  const revise = useRevise();
-  const withdraw = useWithdraw();
-  const draftKey = `revise:${id}`;
-  const standing = live(claim.happened) || claim.happened === "approved";
-
   // The card names the screen so the reasoning block is styled as something
   // read rather than as the editor it toggles into on the finding.
   return (
     <div className="card claim">
       <h3>Reasoning</h3>
-      {editing ? (
-        <div style={{ maxWidth: "78ch" }}>
-          <div className="alert" style={{ marginBottom: 10 }}>
-            <strong>Revising the reasoning withdraws the approval</strong>
-            <span>
-              The earlier words stay readable in the revision history, and the claim returns to the
-              review queue marked as previously approved.
-            </span>
-          </div>
-          <Editor
-            value={text}
-            onChange={setText}
-            draftKey={draftKey}
-            label="Reasoning"
-            attachTo={about}
-          />
-          {revise.error != null && <Failed error={revise.error} what="That could not be stored." />}
-          <div className="actions" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn"
-              disabled={!text.trim() || revise.isPending}
-              onClick={() =>
-                revise.mutate(
-                  { id, reasoning: text },
-                  {
-                    onSuccess: () => {
-                      forget(draftKey);
-                      setEditing(false);
-                      onChanged();
-                    },
-                  },
-                )
-              }
-            >
-              Save revision
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="why rendered">
-          {claim.argument.reasoning ? (
-            <Markdown source={claim.argument.reasoning} />
-          ) : (
-            <p className="hint">Nothing written.</p>
-          )}
-        </div>
-      )}
-      {withdraw.error != null && (
-        <Failed error={withdraw.error} what="That could not be withdrawn." />
-      )}
-      {mine && standing && !editing && (
-        <div className="actions" style={{ marginTop: 12 }}>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={() => {
-              setText(claim.argument.reasoning);
-              setEditing(true);
-            }}
-          >
-            Revise reasoning
-          </button>
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={withdraw.isPending}
-            onClick={() => withdraw.mutate({ id }, { onSuccess: onChanged })}
-          >
-            Withdraw
-          </button>
-          <span className="consequence">
-            {claim.happened === "approved"
-              ? "Revising withdraws the approval; withdrawing needs nobody"
-              : "Withdrawing needs nobody"}
-          </span>
-        </div>
-      )}
+      <ReasonEditor
+        claimId={id}
+        reasoning={claim.argument.reasoning}
+        state={claim.happened ?? ""}
+        approved={claim.happened === "approved"}
+        about={about}
+        onDone={onChanged}
+      />
     </div>
   );
 }

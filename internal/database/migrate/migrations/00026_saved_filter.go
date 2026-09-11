@@ -55,6 +55,25 @@ func upSavedFilter(ctx context.Context, tx *sql.Tx) error {
 			"product_id" ` + t.ref + ` NOT NULL,
 			-- The query string of the list it opens, without a leading "?".
 			"query"      ` + t.text + ` NOT NULL,
+			-- What a saved filter proposes about what it catches, where
+			-- somebody made it a prepared claim.
+			--
+			-- On the saved filter rather than in a table of its own: what a
+			-- rule is here is a narrowing plus what to say about what it
+			-- catches, and those are one thing somebody names. A second table
+			-- would make "the filter" and "the rule" two objects that have to
+			-- be kept pointing at each other.
+			--
+			-- All four absent is an ordinary saved filter, which is most of
+			-- them. None of this proposes anything by itself — picking the
+			-- filter fills the decision form, and submitting it is a person's
+			-- act carrying their name, because a rule that proposed a claim
+			-- of its own would leave the approver as the only human judgment
+			-- on it.
+			"outcome"       ` + t.kind + ` NULL,
+			"justification" ` + t.free + ` NULL,
+			"reasoning"     ` + t.text + ` NULL,
+			"defer_days"    INTEGER NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "saved_filter_person_fk" FOREIGN KEY ("person_id") REFERENCES "person"("id"),
 			CONSTRAINT "saved_filter_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),

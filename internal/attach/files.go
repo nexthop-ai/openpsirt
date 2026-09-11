@@ -27,7 +27,6 @@ import (
 // depends on every caller staying careful is the kind that stops holding.
 type Files struct {
 	root *os.Root
-	name string
 }
 
 // NewFiles returns a store under root, or nil where none is configured.
@@ -43,9 +42,13 @@ func NewFiles(dir string) (*Files, error) {
 	if err != nil {
 		return nil, fmt.Errorf("attachment directory: %w", err)
 	}
-	return &Files{root: root, name: dir}, nil
+	return &Files{root: root}, nil
 }
 
+// Name is the kind of store rather than the directory it came up on. The
+// interface says it is "what this store is called in a log line and in the
+// readiness answer", which is a question about which backend is configured —
+// and the directory was kept on the struct for it and never read.
 func (f *Files) Name() string { return "files" }
 
 func (f *Files) Put(ctx context.Context, key string, body io.Reader, size int64, _ string) error {

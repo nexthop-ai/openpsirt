@@ -27,6 +27,12 @@ type WhoTold struct {
 
 	ID              int64 `bun:"id,pk,autoincrement"`
 	VulnerabilityID int64 `bun:"vulnerability_id,notnull"`
+	// ProductID is the product it was reported against, which is what decides
+	// who may read it. An issue's identity spans its aliases, so the same
+	// issue appears in other products as soon as a shared name is recorded,
+	// and a report keyed on the issue alone was readable from every one of
+	// them.
+	ProductID int64 `bun:"product_id,notnull"`
 	// ReportedBy and Contact are free text, because a reporter is somebody
 	// outside this deployment with no account here — which is the whole shape
 	// of the thing rather than an omission.
@@ -81,10 +87,19 @@ func (t Told) When() *time.Time {
 
 // ReportFor reads who told us about one issue, or nil where nobody did.
 //
-// Authorized by the caller, which has already resolved the issue in a product
-// they may read: a report carries somebody's address, and the rule for who may
-// see it is the rule for who may see the flaw.
-func (s *Store) ReportFor(ctx context.Context, vulnerabilityID int64) (*WhoTold, error) {
+// **Authorized here, against the product the report was made against.** It was
+// authorized by the caller instead, which resolved the issue in whatever
+// product the request named — and an issue's identity spans its aliases, so
+// the moment a shared name is recorded the same issue is open in other
+// products. Somebody holding triage rights in any of those could read a
+// reporter's name, address and received date for a report made about a
+// product they hold nothing in.
+//
+// A report the subject may not reach and no report at all answer alike, so
+// asking is not a way to find out that one exists.
+func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
+	vulnerabilityID int64) (*WhoTold, error) {
+
 	row := new(WhoTold)
 	err := s.db.NewSelect().Model(row).
 		Where("vulnerability_id = ?", vulnerabilityID).Scan(ctx)
@@ -93,6 +108,13 @@ func (s *Store) ReportFor(ctx context.Context, vulnerabilityID int64) (*WhoTold,
 		return nil, nil
 	case err != nil:
 		return nil, fmt.Errorf("read who told us: %w", err)
+	}
+	reachable, err := s.MayBeToldOfIn(ctx, subject, row.ProductID, vulnerabilityID)
+	if err != nil {
+		return nil, err
+	}
+	if !reachable {
+		return nil, nil
 	}
 	return row, nil
 }
@@ -110,6 +132,16 @@ func (s *Store) ReportFor(ctx context.Context, vulnerabilityID int64) (*WhoTold,
 func (s *Store) Acknowledge(ctx context.Context, subject access.Subject,
 	vulnerabilityID int64) error {
 
+	// Against the product it was reported against, like reading it. Clearing
+	// the condition in one product's queue from another product's rights is
+	// the same hole seen from the write side.
+	told, err := s.ReportFor(ctx, subject, vulnerabilityID)
+	if err != nil {
+		return err
+	}
+	if told == nil {
+		return nil
+	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	if _, err := s.db.NewUpdate().Model((*WhoTold)(nil)).
 		Set("acknowledged_at = ?", now).
@@ -170,6 +202,11 @@ func (s *Store) Unacknowledged(ctx context.Context) ([]Unanswered, error) {
 			access.Private).
 		Where("fr.acknowledged_at IS NULL").
 		Where("f.closed_at IS NULL").
+		// The product it was reported against, not every product the issue
+		// turns up in. One report is one letter to answer, and fanning it out
+		// across the products a shared name reaches told each of them about a
+		// reporter who wrote to one.
+		Where("st.product_id = fr.product_id").
 		GroupExpr("fr.vulnerability_id, st.product_id").
 		Scan(ctx, &rows)
 	if err != nil {

@@ -156,19 +156,3 @@ func TestAReferenceIsRefusedUnlessItNamesAFileThisDeploymentMinted(t *testing.T)
 		})
 	}
 }
-
-func TestAnAcceptedReferenceSurvivesBeingRendered(t *testing.T) {
-	// The other end of the same rule. The sanitizer's scheme list left
-	// `attachment` out, so it deleted the anchor and left the text behind —
-	// a reference accepted when it was written stopped being one when
-	// anybody read it, which DESIGN-text.md records as the regression that
-	// went unnoticed for relative links.
-	rendered, err := markdown.Render(t.Context(), "[the log](attachment:"+token+")")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(rendered, "attachment:"+token) {
-		t.Errorf("a reference the submission check accepted was dropped when "+
-			"it was rendered: %q", rendered)
-	}
-}

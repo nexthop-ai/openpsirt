@@ -123,7 +123,7 @@ inputs.
 
 | # | Requirement | Why |
 |---|---|---|
-| REQ-32 | Findings are ordered by one urgency, worked out from severity, known exploitation, exploitation likelihood, and whether the component reaches customers | Severity alone puts thousands of criticals in one bucket |
+| REQ-32 | Findings are ordered by one urgency, worked out from severity, known exploitation, exploitation likelihood, and whether the component reaches customers | Severity alone puts every critical in one bucket, and one image produces 335,021 findings (REQ-57) — so "look at the criticals first" names a population too large to order by hand |
 | REQ-33 | Every finding above the line carries a deadline set by policy from its urgency. Being overdue is reported, never acted on automatically | Dates people can edit per item are dates that mean nothing |
 
 ### 3.8 Remediation
@@ -147,7 +147,7 @@ inputs.
 
 | # | Requirement | Why |
 |---|---|---|
-| REQ-41 | Sign-in is federated — GitHub and Okta — and **no account is ever created automatically on any path**. Roles may instead be derived from identity-provider groups, deployment-wide, never both modes at once | Access is granted in advance or not at all, and a hybrid is a permission nobody can explain the source of |
+| REQ-41 | Sign-in is federated — GitHub and Okta — and **no account is created for anybody nothing granted access to in advance**. Where roles are derived from identity-provider groups, the mapping an administrator made is that advance grant, and a record is written for somebody it covers on their first arrival; somebody in no mapped group is refused exactly as a stranger is. Roles come from groups or from grants, deployment-wide, never both modes at once | Access is granted in advance or not at all, and a hybrid is a permission nobody can explain the source of. Stated as "never on any path" it read as forbidding the one path where the advance grant is a mapping rather than a row, which is the mode's whole shape |
 | REQ-42 | Roles are granted per product; administration is global. A product somebody holds no role on is invisible to them: not listed, not counted | A product name is itself information |
 | REQ-43 | Every finding carries a visibility, enforced in the data-access layer with a required subject — counts, aggregates, search and exports included. One person can be brought into one undisclosed case without being granted the product | Enforcement per handler is enforcement that is missing somewhere. The alternative to a per-case grant is granting the whole product to get one opinion |
 | REQ-44 | Machine credentials are their own subject type: scoped, ingest-only, rotatable, and able to read back only their own uploads | A CI pipeline holding a person's rights is a person's rights on a build server |
@@ -191,7 +191,7 @@ inputs.
 | REQ-62 | Every operation declares what it asks of a caller, and a gate refuses one that declares nothing | "Who may call this" should not be a question you read source code to answer |
 | REQ-63 | Documentation is published, versioned, and built from the same specification the application serves. The application itself serves none | It leaves no unauthenticated route at all |
 | REQ-64 | Findings are answerable across every product a caller may see, and one page answers for an issue | "A critical just landed in openssl — which of our products ship an affected version" |
-| REQ-65 | Markdown is what a person writes and what the API returns, with what each reference resolved to travelling beside it | An integrator can lay out markdown; resolving a mention needs data and checks they do not hold |
+| REQ-65 | Markdown is what a person writes and what the API returns, with what each reference resolved to traveling beside it | An integrator can lay out markdown; resolving a mention needs data and checks they do not hold |
 
 ### 3.15 Security
 
@@ -199,8 +199,8 @@ inputs.
 |---|---|---|
 | REQ-66 | Untrusted input never becomes SQL, markup or a filesystem path. Values are parameterized, identifiers come from an allowlist, and text a scan file supplied is never rendered | A placeholder cannot bind a column name, so a sort column from a query parameter is the live hole. A scan file is a third party's data rendered to staff who hold the most access |
 | REQ-67 | Markdown a person writes is policed on the server at submission, before storage: no raw HTML, restricted link schemes, and nothing fetched from anywhere when it renders | A rendered document that fetches a remote image leaks who read it and when |
-| REQ-68 | Credentials are stored hashed, shown once, and never logged at any level | |
-| REQ-69 | Ingest is bounded — file size, nesting depth, component count — every written field is length- and time-bounded to render, and outbound requests reach only their configured host | A scan file is hostile input, and the deployment sits inside somebody's network |
+| REQ-68 | Credentials are stored hashed, shown once, and never logged at any level | A credential this deployment can read back is one an operator, a backup, a support session and anybody who reaches a log already holds. Shown once is what makes the hash honest: a value that can be recovered was never really hashed, it was merely stored twice |
+| REQ-69 | Ingest is bounded — file size, nesting depth, component count — every written field is length-bounded, and outbound requests reach only their configured host | A scan file is hostile input, and the deployment sits inside somebody's network |
 | REQ-70 | Attachments are stored outside the database, in no public bucket, and every fetch is authorized against the finding it hangs off before any URL is issued | A signed URL issued before the check is the check not happening |
 
 ### 3.16 Data and operations

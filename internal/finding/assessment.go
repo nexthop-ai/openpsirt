@@ -353,6 +353,89 @@ func rerank(ctx context.Context, tx bun.Tx, vulnerabilityID int64, assessed stri
 	return nil
 }
 
+// Reranked puts every open finding of these issues back where the signals now
+// say it belongs.
+//
+// **Three of the four signals the order is worked out from are properties of
+// the issue** — known exploitation, exploitation likelihood, and the score —
+// and a report raises them for the issue wherever it appears. The order is
+// stored per finding and was rewritten only for the build being scanned, so
+// every other build kept a number computed from a world that had moved: a
+// known-exploited issue in a shipped tag sat below the triage line, answered
+// no exploited filter, got no exploited deadline and sorted at the bottom,
+// until somebody rescanned that tag — which for a tag is never.
+//
+// It is not a cache being refreshed. The stored order describes an issue
+// rather than a moment, so it is rewritten when the signals move; what is
+// stored because it cannot be worked out again is a different thing and is
+// not this.
+//
+// **Only the exploited flag moves a deadline**, and only for the rows it was
+// raised on, counted from when this was learned — the same rule and the same
+// moment the scanned build's own rows are clocked by. A score or a likelihood
+// moving deliberately changes no clock: neither is in the deadline, and a
+// clock reset by a revised number would never arrive.
+//
+// Takes the handle because the caller writes inside its own transaction: the
+// scan that raised the signal and the re-ranking it forces are one act.
+func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Time) error {
+	if len(issues) == 0 {
+		return nil
+	}
+	windows, err := LoadWindows(ctx, tx)
+	if err != nil {
+		return err
+	}
+	for _, id := range issues {
+		var issue struct {
+			Exploited bool   `bun:"exploited"`
+			Assessed  string `bun:"assessed"`
+		}
+		if err := tx.NewSelect().
+			TableExpr("vulnerability AS v").
+			ColumnExpr("COALESCE(v.exploited, ?) AS exploited", false).
+			ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed").
+			Where("v.id = ?", id).Scan(ctx, &issue); err != nil {
+			return fmt.Errorf("read what is known about this issue: %w", err)
+		}
+
+		if issue.Exploited {
+			// Which rows are learning it now, read before the flag is
+			// raised: afterwards there is nothing to tell them from the
+			// ones that already carried it.
+			var learning []int64
+			if err := tx.NewSelect().Model((*Finding)(nil)).
+				ColumnExpr("id").
+				Where("vulnerability_id = ?", id).
+				Where("closed_at IS NULL").
+				Where("urgency_exploited = ?", false).
+				Scan(ctx, &learning); err != nil {
+				return fmt.Errorf("read what is learning this: %w", err)
+			}
+			if len(learning) > 0 {
+				if _, err := tx.NewUpdate().Model((*Finding)(nil)).
+					Set("urgency_exploited = ?", true).
+					// Counted from this moment rather than from when the
+					// finding opened. Counted from the opening, an issue
+					// that became exploited after six months would land
+					// three days before it was known — a deadline nobody
+					// could have met.
+					Set("due_at = ?", learnedAt.Add(windows.Exploited)).
+					Where("id IN (?)", bun.List(learning)).Exec(ctx); err != nil {
+					return fmt.Errorf("mark what is being exploited: %w", err)
+				}
+			}
+		}
+
+		// The order itself, from the rating in force and the flags each row
+		// now carries.
+		if err := rerank(ctx, tx, id, issue.Assessed); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // redue rewrites the deadline on an issue's open findings.
 //
 // Severity sets how long something may stay open, so a rating of ours that did

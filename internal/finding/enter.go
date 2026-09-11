@@ -217,10 +217,13 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		name      string
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	var rows []Finding
 	var identifier string
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// The moment, taken on every attempt. It decides the year the
+		// identifier is minted in and every timestamp written, and a retry
+		// crossing midnight would otherwise file a flaw under last year.
+		now := s.now().UTC().Truncate(time.Microsecond)
 		// Resolved in every build, inside the transaction that writes
 		// the rows. A name one build holds and another does not is a
 		// question about which builds are affected — so it is refused,
@@ -242,6 +245,21 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			}
 			places = append(places,
 				at{target: target, component: componentID, name: componentName})
+		}
+
+		// The product, read again in here. It was resolved before the
+		// transaction for the refusal — a request is authorized before a name
+		// in it is resolved, so that read has to stay — and then used inside
+		// to mint the identifier, to name the product in it, and to read the
+		// triage floor. A retry runs against a database where a stream may
+		// have been re-pointed, and the identifier would have been minted
+		// from a product that is gone, under an authorization taken against
+		// it. Refused rather than guessed at, the way widening a flaw's build
+		// set is.
+		if still, err := productOf(ctx, tx, in.TargetIDs[0]); err != nil {
+			return err
+		} else if still != productID {
+			return fmt.Errorf("the builds changed products while this was being written; try again")
 		}
 
 		product, err := productNameOf(ctx, tx, productID)
@@ -342,12 +360,15 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if told := in.Told; told.Stated() {
 			row := &WhoTold{
 				VulnerabilityID: vulnerabilityID,
-				ReportedBy:      strings.TrimSpace(told.ReportedBy),
-				Contact:         strings.TrimSpace(told.Contact),
-				Credit:          strings.TrimSpace(told.Credit),
-				ReceivedOn:      told.When(),
-				RecordedBy:      subject.ID,
-				RecordedAt:      now,
+				// The product it was reported against, which is what decides
+				// who may read the reporter's name and address later.
+				ProductID:  productID,
+				ReportedBy: strings.TrimSpace(told.ReportedBy),
+				Contact:    strings.TrimSpace(told.Contact),
+				Credit:     strings.TrimSpace(told.Credit),
+				ReceivedOn: told.When(),
+				RecordedBy: subject.ID,
+				RecordedAt: now,
 			}
 			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
 				return fmt.Errorf("record who told us: %w", err)

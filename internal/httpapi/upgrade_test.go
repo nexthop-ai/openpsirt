@@ -57,9 +57,8 @@ func TestAPromiseInsideTheDeadlineStandsOnItsOwn(t *testing.T) {
 	// it would put the most routine act of all through the review queue.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
-		// Nothing has a deadline in this fixture, so there is none to be past
-		// and the promise stands — which is also the ordinary case for a
-		// product below its own triage line.
+		// A finding gets its deadline when it is first seen, and these are
+		// days out, so tomorrow is inside them.
 		tomorrow := time.Now().UTC().Add(24 * time.Hour).Format("2006-01-02")
 		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
 			"builds":[{"stream":"master","variant":"broadcom"}],
@@ -91,6 +90,117 @@ func TestPlanningAnUpgradeNeedsTheTriageRight(t *testing.T) {
 			"/v1/products/mine/components/linux-image/upgrade", body)
 		if got.Code < 400 {
 			t.Fatalf("somebody who may not triage planned an upgrade: %d", got.Code)
+		}
+	})
+}
+
+// Moving the date is moving the thing the gate is about. A promise first made
+// inside the deadline the work already had was recorded as needing nobody,
+// and nothing recomputed that when the date changed — so the same claim could
+// be pushed years out, stay in force, go on suppressing everything it covered,
+// and never appear in the review queue.
+func TestMovingAPromisePastTheDeadlineGatesItAgain(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+
+		tomorrow := time.Now().UTC().Add(24 * time.Hour).Format(time.DateOnly)
+		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
+			"builds":[{"stream":"master","variant":"broadcom"}],
+			"reasoning":"Landing in the next build."}`, tomorrow)
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/components/linux-image/upgrade", body)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
+		}
+		var done struct {
+			ClaimID int64 `json:"claim_id"`
+			Waiting bool  `json:"waiting"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
+			t.Fatal(err)
+		}
+		if done.Waiting {
+			t.Fatalf("a promise inside the deadline was gated, so this tests nothing")
+		}
+
+		// The same promise, a year out.
+		later := time.Now().UTC().Add(365 * 24 * time.Hour).Format(time.DateOnly)
+		moved := asPerson(t, r, "private-triage", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Slipping to next year."}`, later))
+		if moved.Code != http.StatusNoContent {
+			t.Fatalf("moving the promise answered %d: %s", moved.Code, moved.Body.String())
+		}
+
+		// It is now waiting on somebody, which is what the review queue lists.
+		var queue struct {
+			Total int `json:"total"`
+		}
+		read(t, r, "reviewer", "/v1/review-queue", &queue)
+		if queue.Total != 1 {
+			t.Errorf("a promise moved a year out left %d claims waiting", queue.Total)
+		}
+	})
+}
+
+// A promise lands on a date still to come. Moving one onto a date already
+// past says the work will have happened before now.
+func TestAPromiseCannotBeMovedOntoADateAlreadyPast(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+
+		tomorrow := time.Now().UTC().Add(24 * time.Hour).Format(time.DateOnly)
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/components/linux-image/upgrade",
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,
+				"builds":[{"stream":"master","variant":"broadcom"}],
+				"reasoning":"Landing in the next build."}`, tomorrow))
+		if made.Code != http.StatusCreated {
+			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
+		}
+		var done struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
+			t.Fatal(err)
+		}
+		gone := time.Now().UTC().Add(-24 * time.Hour).Format(time.DateOnly)
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Backdated."}`, gone)); got.Code < 400 {
+			t.Errorf("a promise moved onto a date already past answered %d", got.Code)
+		}
+	})
+}
+
+// Every path that stores typed text runs the markdown policy before storing
+// it. Re-promising reached the write through the inner revision, which did
+// not, so raw HTML and remote images went into the claim's history.
+func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+
+		tomorrow := time.Now().UTC().Add(24 * time.Hour).Format(time.DateOnly)
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/components/linux-image/upgrade",
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,
+				"builds":[{"stream":"master","variant":"broadcom"}],
+				"reasoning":"Landing in the next build."}`, tomorrow))
+		if made.Code != http.StatusCreated {
+			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
+		}
+		var done struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
+			t.Fatal(err)
+		}
+		later := time.Now().UTC().Add(48 * time.Hour).Format(time.DateOnly)
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,`+
+				`"reasoning":"Slipping <script>alert(1)</script>"}`, later)); got.Code < 400 {
+			t.Errorf("reasoning carrying a script tag answered %d", got.Code)
 		}
 	})
 }

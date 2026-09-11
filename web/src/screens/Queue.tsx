@@ -1,21 +1,22 @@
 import { notACredential } from "../ui/noautofill";
+import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
+import { Became } from "./QueueMine";
+import { Embargoes, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
+import { usePaging } from "./list";
 import { unwrap } from "../api/queries";
-import { claimOf, useApproveClaim, useRejectClaim, useSplitClaim, type Claim } from "../api/claims";
+import { claimOf, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
 import { Severity, Exploited } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
-import { Because, called, labelled } from "../ui/Outcome";
-
-// AssessmentRow is one claim about how bad an issue is.
-type AssessmentRow = Body<"AssessmentBody">;
+import { Because, called, labeled } from "../ui/Outcome";
 
 // A page of claims. The queue is read at the grain of a claim, and a claim
 // is a card with its whole argument, so a page is what fits a sitting.
@@ -29,17 +30,26 @@ const PAGE = 50;
 // those again, but each needs a fresh reason.
 export function Queue() {
   const [params, setParams] = useSearchParams();
-  const offset = Number(params.get("offset") ?? 0);
+  const { offset, go } = usePaging();
   // A claim somebody was sent to, by a notice or a link. Found on the page
   // and shown, or said to be missing — a link that lands on the queue with
   // nothing marked leaves somebody hunting through cards for the one meant.
   const wanted = Number(params.get("claim") ?? 0);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  // The claim beside its key, not the key alone. A selection deliberately
+  // survives paging — a row is selected by what it is rather than by where it
+  // sits — and the loop that acted on it filtered the current page, so
+  // everything ticked on an earlier page was counted in the button and
+  // silently never approved.
+  const [picked, setPicked] = useState<Map<string, Claim>>(new Map());
+  const { cap, over } = useBulkCap(picked.size);
   const [batch, setBatch] = useState("");
   // The batch just agreed to, which is the only one there is a safe control
   // for: undoing one named at some point in the past is a control nobody can
   // use without knowing what is in it.
   const [justDone, setJustDone] = useState("");
+  // How many of a batch were refused, so a partial result says so rather than
+  // leaving somebody to compare counts.
+  const [refused, setRefused] = useState(0);
   const approveClaim = useApproveClaim();
   const queries = useQueryClient();
   const undo = useMutation({
@@ -145,17 +155,45 @@ export function Queue() {
 
   async function approvePicked() {
     // Sequential rather than parallel: each is a separate claim and a refusal
-    // on one should not decide the fate of the rest.
+    // on one should not decide the fate of the rest — which is what the loop
+    // said and did not do. An unguarded await abandoned every claim after the
+    // first refusal, left the selection reading its original size, and never
+    // set the batch name, so the undo control for the approvals that did land
+    // never appeared.
     const named = batch.trim();
-    for (const claim of claims.filter((c) => picked.has(c.key))) {
-      await approveClaim.mutateAsync({ id: claim.id, batch: named || undefined });
+    const failed: string[] = [];
+    let landed = 0;
+    for (const [key, claim] of picked) {
+      try {
+        await approveClaim.mutateAsync({ id: claim.id, batch: named || undefined });
+        landed++;
+      } catch {
+        failed.push(key);
+      }
     }
-    setPicked(new Set());
+    // Kept from the current selection rather than from the snapshot this loop
+    // started with, so anything ticked while it ran survives.
+    setPicked((prev) => {
+      const left = new Map<string, Claim>();
+      for (const [key, claim] of prev) {
+        if (failed.includes(key) || !claims.some((c) => c.key === key)) {
+          left.set(key, claim);
+        }
+      }
+      for (const key of failed) {
+        const held = picked.get(key);
+        if (held) left.set(key, held);
+      }
+      return left;
+    });
+    setRefused(failed.length);
     // What was just agreed to under one name, so it can be taken back
     // without remembering the name. The control the queue already promised:
     // "approvals under one batch name can be undone together" said so and
     // there was nowhere to do it.
-    if (named) setJustDone(named);
+    // Whenever at least one landed, which is the moment somebody notices —
+    // not only when every one of them did.
+    if (named && landed > 0) setJustDone(named);
   }
 
   return (
@@ -237,10 +275,18 @@ export function Queue() {
           <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
             <input
               type="checkbox"
-              checked={picked.size > 0 && picked.size === claims.length}
-              onChange={(event) =>
-                setPicked(event.target.checked ? new Set(claims.map((c) => c.key)) : new Set())
-              }
+              checked={claims.length > 0 && claims.every((c) => picked.has(c.key))}
+              onChange={(event) => {
+                // This page either way, so ticking and unticking are
+                // inverses. Unticking cleared every page's selection where
+                // ticking added only this one's.
+                const next = new Map(picked);
+                for (const claim of claims) {
+                  if (event.target.checked) next.set(claim.key, claim);
+                  else next.delete(claim.key);
+                }
+                setPicked(next);
+              }}
               aria-label="Select every claim shown"
             />
             <b>{picked.size === 0 ? "Nothing selected" : `${picked.size} selected`}</b>
@@ -256,10 +302,19 @@ export function Queue() {
             aria-label="Batch name"
             style={{ width: 150 }}
           />
+          {/* Bounded by what this deployment allows in one act, and said
+              rather than met one refusal at a time: approving is a request
+              per claim, and this selection deliberately survives paging, so
+              it can be arbitrarily large. */}
+          {over && (
+            <span className="alert" role="status">
+              {overCapNotice(cap)}
+            </span>
+          )}
           <button
             type="button"
             className="btn"
-            disabled={picked.size === 0 || approveClaim.isPending}
+            disabled={picked.size === 0 || approveClaim.isPending || over}
             onClick={() => void approvePicked()}
           >
             {picked.size === 0 ? "Approve selected" : `Approve ${picked.size} selected`}
@@ -267,6 +322,13 @@ export function Queue() {
         </div>
       )}
 
+      {refused > 0 && (
+        <p className="alert" role="status">
+          {refused === 1
+            ? "One claim could not be agreed to and is still selected."
+            : `${refused.toLocaleString()} claims could not be agreed to and are still selected.`}
+        </p>
+      )}
       {approveClaim.error != null && (
         <Failed error={approveClaim.error} what="That could not be approved." />
       )}
@@ -316,8 +378,8 @@ export function Queue() {
               marked={claim.id === wanted}
               picked={picked.has(claim.key)}
               onPick={(on) => {
-                const next = new Set(picked);
-                if (on) next.add(claim.key);
+                const next = new Map(picked);
+                if (on) next.set(claim.key, claim);
                 else next.delete(claim.key);
                 setPicked(next);
               }}
@@ -330,12 +392,7 @@ export function Queue() {
         total={mine ? became.data?.total : queue.data?.total}
         offset={offset}
         limit={PAGE}
-        onGo={(next) => {
-          const now = new URLSearchParams(params);
-          if (next === 0) now.delete("offset");
-          else now.set("offset", String(next));
-          setParams(now);
-        }}
+        onGo={go}
       />
 
       <Ratings waiting={(ratings.data?.items ?? []).filter((each) => each.needs_approval)} />
@@ -390,7 +447,7 @@ function Stopped({ row }: { row: Standing }) {
           {row.place?.vulnerability}
         </Link>
         <span style={{ color: "var(--muted)" }}>
-          {row.place?.product} · {labelled(it?.outcome ?? "")}
+          {row.place?.product} · {labeled(it?.outcome ?? "")}
           {it?.justification && (
             <>
               {" "}
@@ -855,393 +912,6 @@ function findingPath(f: {
   );
 }
 
-// Ratings of issues waiting for a second person.
-//
-// A milder rating hides things, so it waits the way a dismissal does — and
-// there was nowhere to be that second person, because the route existed and no
-// screen reached it.
-//
-// **What it says beyond "agree or not" is the point.** Rating something milder
-// pushes its deadline out, which is what the second person is there for. But
-// where a product has said what it considers worth triaging at all, a rating
-// that crosses that line does something different in kind: the findings stop
-// being work rather than becoming later work, and they carry no deadline at
-// all. Those are two different things to agree to, and an approver was shown
-// neither.
-// What became of each claim this person proposed.
-//
-// A table rather than cards: the question here is not "should this be agreed
-// to" — it has already been answered — it is "what happened to the things I
-// said", which is one line each. The cards exist to be judged from; this
-// exists to be read down.
-function Became({
-  rows,
-  query,
-}: {
-  rows: Body<"BecameBody">[];
-  query: { isPending: boolean; isError: boolean; error: unknown };
-}) {
-  if (query.isPending) return <Loading />;
-  if (query.isError) {
-    return <Failed error={query.error} what="What you proposed could not be read." />;
-  }
-  if (rows.length === 0) {
-    return (
-      <Empty
-        title="You have not proposed anything."
-        detail="A judgment you record appears here with what became of it, whether or not anybody had to agree."
-      />
-    );
-  }
-  return (
-    <div className="tablewrap">
-      <table>
-        <thead>
-          <tr>
-            <th>What became of it</th>
-            <th>Issue</th>
-            <th>Component</th>
-            <th>Where</th>
-            <th className="num">Covers</th>
-            <th>When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <Mine key={row.claim?.id} row={row} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// One claim somebody proposed, and — where it is a bulk claim still being
-// argued — what in it does not look like the rest, with a way to hold those
-// rows back.
-//
-// The same signals an approver is shown. An approver reading a bulk claim may
-// agree to most of it and set some aside; until this the author could only
-// withdraw the whole thing and start again, so "this holds for most of them
-// but not those four" was unavailable to the person best placed to say it.
-function Mine({ row }: { row: Body<"BecameBody"> }) {
-  const split = useSplitClaim();
-  const [holding, setHolding] = useState<Set<number>>(new Set());
-  const [because, setBecause] = useState("");
-  const outliers = row.outliers;
-  const claimId = row.claim?.id ?? 0;
-
-  return (
-    <>
-      <tr className="row">
-        <td>
-          <Happened word={row.happened} by={row.by} />
-        </td>
-        <td>
-          {row.finding ? (
-            <Link
-              to={
-                `/products/${encodeURIComponent(row.finding.product ?? "")}` +
-                `/streams/${encodeURIComponent(row.finding.stream ?? "")}` +
-                `/variants/${encodeURIComponent(row.finding.variant ?? "")}` +
-                `/findings/${encodeURIComponent(row.finding.vulnerability ?? "")}` +
-                `/components/${encodeURIComponent(row.finding.component ?? "")}`
-              }
-              className="id"
-            >
-              {row.place?.vulnerability}
-            </Link>
-          ) : (
-            <span className="id">{row.place?.vulnerability}</span>
-          )}{" "}
-          <Because code={row.decision?.justification} />
-        </td>
-        <td className="id">{row.finding?.component ?? "—"}</td>
-        <td className="hint">
-          {row.place?.product}
-          {row.finding?.stream && (
-            <>
-              {" "}
-              · {row.finding.stream} · {row.finding.variant}
-            </>
-          )}
-        </td>
-        <td className="num">
-          {/* In the units the queue card uses, said rather than left to
-                    be guessed at: one judgment can be one row or hundreds. */}
-          {(row.issues ?? 0) > 1 ? (
-            <>
-              {row.issues} issues · {row.decisions} rows
-            </>
-          ) : (
-            <span title={`${row.places} ${row.places === 1 ? "place" : "places"} underneath`}>
-              one judgment
-            </span>
-          )}
-        </td>
-        <td className="hint">{row.when ? row.when.replace("T", " ").slice(0, 16) : "—"}</td>
-      </tr>
-      {outliers && (outliers.rows ?? []).length > 0 && (
-        <tr>
-          <td colSpan={6}>
-            <div className="outliers">
-              <header>
-                <h5>Rows that do not match the rest</h5>
-                <span className="hint">
-                  Hold them back and they become a claim of yours, with the argument they were made
-                  under. Revise it to say what is different about them.
-                </span>
-              </header>
-              <div className="tablewrap" style={{ boxShadow: "none" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ width: 30 }} />
-                      <th>Severity</th>
-                      <th>Issue</th>
-                      <th>Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(outliers.rows ?? []).map((one) => (
-                      <tr key={one.decision_id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label="Hold back"
-                            checked={holding.has(one.decision_id)}
-                            onChange={(event) => {
-                              const next = new Set(holding);
-                              if (event.target.checked) next.add(one.decision_id);
-                              else next.delete(one.decision_id);
-                              setHolding(next);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Severity word={one.severity} />
-                        </td>
-                        <td>
-                          <span className="id">{one.vulnerability}</span>{" "}
-                          <Exploited when={one.exploited} />
-                        </td>
-                        <td className="hint">{(one.why ?? []).join(", ")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {holding.size > 0 && (
-                <div className="mt-2">
-                  {split.error != null && (
-                    <Failed error={split.error} what="Those rows could not be held back." />
-                  )}
-                  <label className="block text-sm" htmlFor={`hold-${claimId}`}>
-                    Why these are different
-                  </label>
-                  <textarea
-                    id={`hold-${claimId}`}
-                    rows={2}
-                    value={because}
-                    onChange={(event) => setBecause(event.target.value)}
-                    className="w-full rounded border border-[var(--line)] bg-[var(--surface)] p-2 text-sm"
-                  />
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={split.isPending || because.trim() === ""}
-                    onClick={() =>
-                      split.mutate(
-                        { id: claimId, rows: [...holding], because },
-                        {
-                          onSuccess: () => {
-                            setHolding(new Set());
-                            setBecause("");
-                          },
-                        },
-                      )
-                    }
-                  >
-                    Hold {holding.size} back
-                  </button>
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
-
-// One word for what became of a claim, and who did it where a person did.
-//
-// "Undone" is drawn apart from "waiting" though the claim is waiting in both:
-// somebody had agreed, and the proposer is entitled to find that surprising.
-export function Happened({ word, by }: { word?: string; by?: string }) {
-  const how: Record<string, { cls: string; said: string }> = {
-    waiting: { cls: "waiting", said: "Waiting" },
-    "sent-back": { cls: "lapsed", said: "Sent back" },
-    approved: { cls: "agreed", said: "Approved" },
-    withdrawn: { cls: "lapsed", said: "Withdrawn" },
-    lapsed: { cls: "lapsed", said: "Lapsed" },
-    undone: { cls: "lapsed", said: "Agreement undone" },
-    mixed: { cls: "waiting", said: "Ended several ways" },
-  };
-  const shown = how[word ?? ""] ?? { cls: "", said: word ?? "" };
-  return (
-    <>
-      <span className={`state ${shown.cls}`}>{shown.said}</span>
-      {by && <span className="hint"> by {by}</span>}
-    </>
-  );
-}
-
-// Embargo extensions waiting for a second person.
-//
-// **The reason is the whole of what is being agreed to.** An extension moves a
-// date somebody outside could hold us to, and the only thing distinguishing a
-// judgment from a habit is why — so the reason leads and the dates follow it.
-//
-// **A request of your own is shown and cannot be agreed to.** The person who
-// asked may not be the one who agrees, which is the control the threshold
-// exists to reach; hiding it would leave somebody hunting for what is holding
-// their case up.
-function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[] }) {
-  const queries = useQueryClient();
-  const agree = useMutation({
-    mutationFn: async (id: number) =>
-      unwrap(
-        await api.POST("/v1/disclosure-extensions/{id}/approval", { params: { path: { id } } }),
-      ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["extensions"] }),
-  });
-
-  if (waiting.length === 0) return null;
-
-  return (
-    <>
-      <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
-        <h2>Extension requests</h2>
-        <p>
-          {waiting.length.toLocaleString()} · somebody has asked to keep something hidden longer
-          than this deployment allows on one person&rsquo;s word. Reaching the date discloses
-          nothing by itself; what is being agreed to is how long it stays hidden.
-        </p>
-      </div>
-      {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
-      <div className="queue">
-        {waiting.map((row) => (
-          <div className="card" key={row.id}>
-            <div className="cardhead">
-              <span className="id">{row.vulnerability}</span>
-              <span className="hint">
-                {row.product} · asked by {row.by}
-                {row.mine && <> · yours</>}
-              </span>
-            </div>
-            <p className="reading">{row.reason}</p>
-            <p className="hint">
-              Ends <b>{row.was}</b> → <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()} days
-              longer.
-            </p>
-            <div className="cardfoot">
-              <button
-                type="button"
-                className="btn"
-                disabled={agree.isPending || row.mine}
-                title={
-                  row.mine
-                    ? "You asked for this one. The person who asks may not be the one who agrees"
-                    : "Agree, and move the date"
-                }
-                onClick={() => agree.mutate(row.id ?? 0)}
-              >
-                Agree
-              </button>
-              {row.mine && (
-                <span className="note">Waiting on somebody else — you asked for this one</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
-  const queries = useQueryClient();
-  const agree = useMutation({
-    mutationFn: async (id: number) =>
-      unwrap(await api.POST("/v1/assessments/{id}/agreement", { params: { path: { id } } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["queue"] }),
-  });
-
-  if (waiting.length === 0) return null;
-
-  return (
-    <>
-      <div className="screen-head" id="ratings" style={{ marginTop: 22 }}>
-        <h2>Ratings awaiting approval</h2>
-        <p>
-          {waiting.length.toLocaleString()} · somebody says an issue is milder than the world does.
-          A rating of ours holds wherever the issue appears, so it waits for a second person.
-        </p>
-      </div>
-      {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
-      <div className="queue">
-        {waiting.map((row) => (
-          <div className="card" key={row.id}>
-            <div className="cardhead">
-              <span className="id">{row.vulnerability}</span>
-              <span>
-                <Severity word={row.published ?? ""} /> → <Severity word={row.severity ?? ""} />
-              </span>
-            </div>
-            <p className="reading">{row.reasoning}</p>
-            <p className="hint">
-              {(row.open ?? 0).toLocaleString()} open{" "}
-              {(row.open ?? 0) === 1 ? "finding" : "findings"} you can see, in{" "}
-              {(row.in_products ?? 0).toLocaleString()}{" "}
-              {(row.in_products ?? 0) === 1 ? "product" : "products"}.
-            </p>
-            {(row.off_the_list ?? 0) > 0 ? (
-              <p className="alert" style={{ margin: "6px 0 0" }}>
-                <strong>
-                  This takes {(row.off_the_list ?? 0).toLocaleString()} of them off the working list
-                  in {(row.off_the_list_in_products ?? 0).toLocaleString()}{" "}
-                  {(row.off_the_list_in_products ?? 0) === 1 ? "product" : "products"}.
-                </strong>
-                <span>
-                  Below what a product considers worth triaging, a finding is still recorded,
-                  counted and reportable — and it carries no deadline. You are agreeing that it is
-                  not work, rather than that it is later work.
-                </span>
-              </p>
-            ) : (
-              <p className="hint" style={{ margin: "6px 0 0" }}>
-                Still above what every product here triages from, so this makes them later work
-                rather than no work.
-              </p>
-            )}
-            <div className="cardfoot">
-              <button
-                type="button"
-                className="btn"
-                disabled={agree.isPending}
-                onClick={() => agree.mutate(row.id ?? 0)}
-              >
-                Agree
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
 // What is being claimed, said as its own thing.
 //
 // The outcome is what an approver is agreeing to, and it was the fifth clause
@@ -1260,7 +930,7 @@ function Outcome({
 }) {
   return (
     <span className={`claimed ${outcome}`}>
-      <b>{labelled(outcome)}</b>
+      <b>{labeled(outcome)}</b>
       {justification && <span className="why mono">{justification}</span>}
       {until && <span className="why">until {until}</span>}
     </span>

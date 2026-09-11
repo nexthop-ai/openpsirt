@@ -306,3 +306,66 @@ func TestAScanDoesNotCloseWhatAPersonRecorded(t *testing.T) {
 		}
 	})
 }
+
+// A signal moving reaches every build the issue is open in, not only the one
+// being scanned.
+//
+// Three of the four signals the order is worked out from are properties of
+// the issue, and the order is stored per finding — rewritten only for the
+// build the scan was about. So a nightly branch scan learning that something
+// is being exploited left the shipped tag carrying a number from before:
+// below the triage line, answering no exploited filter, on no exploited
+// clock, at the bottom of the list, until somebody rescanned the tag, which
+// for a tag is never.
+func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// The same issue in two builds of the product: the branch that is
+		// scanned nightly, and a release that was scanned once.
+		tag := f.anotherBuild(t, "24.06")
+		quiet := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
+			Component: libnl, FixState: finding.NoFix,
+		}
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{quiet}); err != nil {
+			t.Fatal(err)
+		}
+		f.shippedTo(t, tag, twoConsumers())
+		if _, err := f.store.Apply(ctx, tag, f.runOn(t, tag),
+			[]finding.Reported{quiet}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Tonight's branch scan learns it is being exploited. The tag is not
+		// rescanned, and will not be.
+		exploited := quiet
+		exploited.Issue.Exploited = true
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{exploited}); err != nil {
+			t.Fatal(err)
+		}
+
+		var onTheTag []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&onTheTag).
+			Where("target_id = ?", tag).Where("closed_at IS NULL").
+			Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(onTheTag) == 0 {
+			t.Fatal("the release holds none of it")
+		}
+		for _, row := range onTheTag {
+			if !row.RankExploited {
+				t.Error("a release nobody rescanned does not know this is exploited")
+			}
+			if !finding.Rank(row.Urgency).Exploited() {
+				t.Errorf("its urgency is %d, which does not read as exploited", row.Urgency)
+			}
+			if row.DueAt == nil {
+				t.Error("it has no deadline at all")
+			}
+		}
+	})
+}

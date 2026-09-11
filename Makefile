@@ -151,8 +151,8 @@ DEMO_PORT ?= 8080
 DEMO_USER ?= dev
 # The rest of the cast, one per line as port:identity:roles.
 #
-# **One person cannot demonstrate this tool.** Approving your own claim is
-# refused, because a control one person completes alone is not one (TRI-41) —
+# One person cannot demonstrate this tool. Approving your own claim is refused,
+# because a control one person completes alone is not one —
 # so a demo with a single identity can propose a judgment and can never show it
 # agreed to, and the record an auditor reads says "same person" against every
 # row. Somebody has to be somebody else.
@@ -199,7 +199,7 @@ DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 
-.PHONY: secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
 
 all: check build
 
@@ -470,7 +470,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
+check: build vet lint unreachable unclaimed reserved confined attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -495,7 +495,7 @@ web: web-deps
 web-deps:
 	$(NPM) --prefix web ci
 
-# The client is generated from the committed document (UIX-19), so a drifted
+# The client is generated from the committed document, so a drifted
 # document is a compile error in the interface rather than a runtime surprise.
 web-api: openapi
 	$(NPM) --prefix web run api
@@ -569,6 +569,18 @@ readable:
 # answer.
 reserved:
 	$(GO) run ./internal/tools/reserved
+
+# That no query outside the database package asks an engine what it is. The
+# list of places where that is allowed lives here and in DESIGN-database.md,
+# and widening one without the other is what fails.
+confined:
+	$(GO) run ./internal/tools/confined
+
+# A doc comment describing something other than what it sits on, which is what
+# a file split leaves behind and what nothing else here can see: the code is
+# correct, and godoc renders one symbol's documentation under another's name.
+attached:
+	$(GO) run ./internal/tools/attached
 
 # The word list the check above reads, asked of the engines rather than typed.
 # Needs them running: "make engines-up" first. MariaDB has no KEYWORDS table,
@@ -834,6 +846,15 @@ pins-check:
 	  echo "the image has $$defaults version defaults and they differ, so an"; \
 	  echo "unpassed build says one thing in the binary and another in its SBOM."; \
 	  fail=1; }; \
+	cp go.mod $${TMPDIR:-/tmp}/openpsirt-go.mod.was && cp go.sum $${TMPDIR:-/tmp}/openpsirt-go.sum.was; \
+	$(GO) mod tidy; \
+	cmp -s go.mod $${TMPDIR:-/tmp}/openpsirt-go.mod.was && cmp -s go.sum $${TMPDIR:-/tmp}/openpsirt-go.sum.was || { \
+	  echo "go.mod or go.sum is not what go mod tidy produces: a dependency is"; \
+	  echo "declared that nothing imports, or one is imported and not declared."; \
+	  echo "A requirement nothing uses stays in the vulnerability and licence"; \
+	  echo "surface for code that never runs. Run go mod tidy and commit it."; \
+	  cp $${TMPDIR:-/tmp}/openpsirt-go.mod.was go.mod; cp $${TMPDIR:-/tmp}/openpsirt-go.sum.was go.sum; fail=1; }; \
+	rm -f $${TMPDIR:-/tmp}/openpsirt-go.mod.was $${TMPDIR:-/tmp}/openpsirt-go.sum.was; \
 	[ "$$fail" = 0 ] || exit 1
 
 # Measurements, not gates.
@@ -1250,14 +1271,14 @@ demo-seed:
 # Written from the export rather than by hand for the same reason. Two
 # statements per kind, because what the layer is worth showing is the pair: a
 # distribution saying "affected, not fixing it here" is not a distribution
-# saying "not affected", and only the second offers a dismissal (TRI-55).
+# saying "not affected", and only the second offers a dismissal.
 demo-vex:
 	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); 	rows=$$(curl -sS --noproxy '*' 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none&limit=6" 	  | awk -F',' 'NR>1 { gsub(/"/,""); if ($$1 ~ /^CVE-/ && $$5 != "") print $$1 "|" $$5 }'); 	if [ -z "$$rows" ]; then 	  echo "  no findings to speak about yet — run make demo-status and try again"; exit 0; 	fi; 	{ printf '{"@context":"https://openvex.dev/ns/v0.2.0",'; 	  printf '"@id":"https://demo.openpsirt.invalid/vex/debian-1",'; 	  printf '"author":"Debian Security Team","version":1,'; 	  printf '"timestamp":"%s","statements":[' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; 	  n=0; 	  while IFS='|' read -r cve name; do 	    [ -n "$$cve" ] || continue; 	    [ $$n -gt 0 ] && printf ','; 	    if [ $$((n % 2)) -eq 0 ]; then 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"affected","action_statement":"Minor issue in %s; no update planned for this release. Will be fixed in a later point release."}' "$$name"; 	    else 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"not_affected","justification":"vulnerable_code_not_in_execute_path",'; 	      printf '"impact_statement":"The affected code path is not built in the Debian package of %s."}' "$$name"; 	    fi; 	    n=$$((n + 1)); 	  done <<< "$$rows"; 	  printf ']}'; } > $(DEMO_DIR)/debian.vex.json; 	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" 	  -X POST -H "Origin: $(DEMO_URL)" 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" 	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
 
 # A few judgments, so the screens that report on triage have something to
-# report (RPT-26, TRI-63).
+# report.
 #
-# **A demo where every figure reads zero demonstrates nothing.** The seed gives
+# A demo where every figure reads zero demonstrates nothing. The seed gives
 # a deployment two products, six builds and a quarter of a million findings and
 # nobody who has ever decided anything — so the review queue, the record of
 # judgments, how long triage is taking, what is planned and what is being

@@ -30,10 +30,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
-// New returns the HTTP handler and the API description it was built from.
-//
-// The description is returned so the OpenAPI document can be written out
-// without starting a server.
 // Ready reports whether the service can do its job. A nil Ready means the
 // readiness probe only reflects the process being up.
 type Ready func(context.Context) error
@@ -141,6 +137,10 @@ func changesSomething(method string) bool {
 	return true
 }
 
+// New returns the HTTP handler and the API description it was built from.
+//
+// The description is returned so the OpenAPI document can be written out
+// without starting a server.
 func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	in.Logger = logger
 	router := chi.NewMux()
@@ -289,6 +289,9 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	cfg.DocsPath = ""
 
 	api := humachi.New(router, cfg)
+	// Before anything registers, so no operation can be added without the
+	// scope on its own declaration being enforced.
+	enforceDeclarations(api)
 	registerVersion(api)
 	registerScans(api, in)
 	registerFindings(api, in)
@@ -358,6 +361,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerFindingDecision(api, in)
 	registerAssessment(api, in)
 	registerTriageReading(api, in)
+	registerComments(api, in)
 	registerClaims(api, in)
 	registerProposing(api, in)
 	registerPlaceDecisions(api, in)

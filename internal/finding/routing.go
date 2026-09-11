@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // Routing is a standing rule that hands work nobody holds to a team.
@@ -144,7 +145,7 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // rest never routed.
 func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, error) {
 	if cap <= 0 {
-		cap = 2000
+		cap = setting.DefaultRoutingBatch
 	}
 	rules, err := s.Rules(ctx, productID)
 	if err != nil {
@@ -240,7 +241,14 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 	if err != nil {
 		return 0, 0, fmt.Errorf("place what that rule matched: %w", err)
 	}
-	n, _ := res.RowsAffected()
+	// What the write matched, which is what the receipt reports and what the
+	// caller counts a pass by. A count that cannot be read is a fault: read
+	// as zero it reports a pass that placed nothing, which is indistinguishable
+	// from a rule that matched nothing.
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, 0, fmt.Errorf("cannot tell how much that rule placed: %w", err)
+	}
 	return len(ids), int(n), nil
 }
 
@@ -409,7 +417,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return Catches{}, err
 	}
-	work, err := s.db.NewSelect().TableExpr("(?) AS matched", counted).Count(ctx)
+	work, err := s.db.NewSelect().TableExpr(`(?) AS "matched"`, counted).Count(ctx)
 	if err != nil {
 		return Catches{}, fmt.Errorf("count what that would match: %w", err)
 	}
@@ -422,7 +430,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return Catches{}, err
 	}
-	free, err := s.db.NewSelect().TableExpr("(?) AS unheld", unheld).Count(ctx)
+	free, err := s.db.NewSelect().TableExpr(`(?) AS "unheld"`, unheld).Count(ctx)
 	if err != nil {
 		return Catches{}, fmt.Errorf("count what nobody holds: %w", err)
 	}

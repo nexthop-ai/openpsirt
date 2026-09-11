@@ -34,7 +34,7 @@ func registerBundles(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-fix-bundles", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/fix-bundles",
-		Summary: "List what is open, gathered by the bump that would fix it",
+		Summary: "List findings by upgrade",
 		Description: "One row per upstream bump, with the issues it closes.\n\n" +
 
 			"Keyed on the **source package** where one is recorded and on the component's " +
@@ -66,22 +66,11 @@ func registerBundles(api huma.API, in Ingest) {
 			Total int          `json:"total"`
 		}
 	}, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		subject, scope, floor, err := scopedFloor(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, "the triage line could not be read")
 		if err != nil {
 			return nil, err
-		}
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the triage line could not be read", err)
 		}
 		bundles, total, err := finding.NewStore(in.DB.DB).Bundles(ctx, subject, scope,
 			input.Limit, input.Offset, finding.Filter{

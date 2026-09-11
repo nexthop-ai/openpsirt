@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -126,6 +127,68 @@ func declaring(op huma.Operation, asks requires, roles ...access.Role) huma.Oper
 	op.Extensions[requiresExtension] = asks
 	op.Description = strings.TrimRight(op.Description, "\n ") + "\n\n**Requires:** " + asks.said()
 	return op
+}
+
+// enforceDeclarations refuses, before any handler runs, a caller the scope on
+// the operation's own declaration excludes.
+//
+// **The declaration wrote a document and nothing else.** What refused a caller
+// was a line inside each handler, so the published requirement and the code
+// were two statements of one rule that could differ — and did: an
+// administrator-only operation whose store check somebody deleted still
+// rendered "Requires: administrator", still carried the extension a client
+// generator reads, and answered anybody holding a credential.
+//
+// Only the part of a requirement that is about the subject alone runs here. A
+// role on the product needs the product resolved, which is the handler's work
+// and stays there; the scope is the half that is mechanically checkable, and
+// it was the half checking nothing.
+//
+// It reads the declaration off the operation rather than being written per
+// route, so an operation cannot be registered without it.
+func enforceDeclarations(api huma.API) {
+	api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
+		op := ctx.Operation()
+		if op == nil {
+			next(ctx)
+			return
+		}
+		asks, stated := op.Extensions[requiresExtension].(requires)
+		if !stated {
+			next(ctx)
+			return
+		}
+		// The same words every refusal here uses. Which rule refused is not
+		// a caller's business, and saying would answer questions about what
+		// exists.
+		refuse := func(status int) {
+			_ = huma.WriteErr(api, ctx, status, "not authorized")
+		}
+		if asks.Scope == noCredential {
+			next(ctx)
+			return
+		}
+		subject, err := access.From(ctx.Context())
+		if err != nil {
+			refuse(http.StatusUnauthorized)
+			return
+		}
+		switch asks.Scope {
+		case deploymentWide:
+			if !subject.Admin {
+				refuse(http.StatusForbidden)
+				return
+			}
+		case ownSubject:
+			// About the caller themselves, so there has to be a person for
+			// it to be about.
+			if subject.Kind != access.Person {
+				refuse(http.StatusForbidden)
+				return
+			}
+		}
+		next(ctx)
+	})
 }
 
 // triageRights is the pair meaning "may argue about findings here". Either is

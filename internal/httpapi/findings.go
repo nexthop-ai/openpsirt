@@ -14,6 +14,26 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
+// sortOrder is the query parameter for which order to page in, and it takes
+// the orders it offers from the store rather than naming them again.
+//
+// The list a caller sees was a literal in a struct tag, and `finding.SortKeys`
+// — which says it is the one list "so the two cannot disagree" — was reached
+// from nothing but a test asserting the two matched. That is a second copy
+// kept in step by a check rather than by construction, and the check is the
+// thing that goes missing. The framework asks a type for its own schema, so
+// the enum is built from the same slice the store looks the ordering up in.
+type sortOrder string
+
+// Schema answers with the orders the store knows, in its order.
+func (sortOrder) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(finding.SortKeys()))
+	for _, key := range finding.SortKeys() {
+		offered = append(offered, string(key))
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
+}
+
 // daysBack is the moment a finding must have opened before to have been open
 // this long, or none where no age was asked for.
 func daysBack(days int) *time.Time {
@@ -47,8 +67,13 @@ type FindingBody struct {
 	// Summary is the one line of the issue's own words the row shows. Without
 	// it a list of fifty reads "CVE-2026-74280 · linux-image" fifty times, and
 	// telling two rows apart costs a click each.
-	Summary   string `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding"`
-	Severity  string `json:"severity,omitempty" doc:"As the scanner rated it. A word, not a score"`
+	Summary string `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding"`
+	// The rating in force rather than the published one, which is what the
+	// row is ranked, filtered and clocked by — so a word that said "as the
+	// scanner rated it" meant the published rating on the evidence and the
+	// in-force one here, which is the disagreement this list exists not to
+	// have.
+	Severity  string `json:"severity,omitempty" doc:"The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"`
 	Component string `json:"component" doc:"What carries it"`
 	Version   string `json:"version" doc:"The version that ships"`
 	Upstream  string `json:"upstream,omitempty" doc:"What a fork was made from, where it is one"`
@@ -148,14 +173,14 @@ type FindingsOutput struct {
 	}
 }
 
-// ComponentFindingBody is one component at one version, with what is open
-// against it counted.
 // UpgradeBody is a version a component could move to, and what that would fix.
 type UpgradeBody struct {
 	To     string `json:"to" doc:"The version, as whoever packages the component wrote it"`
 	Issues int    `json:"issues" doc:"How many distinct vulnerabilities open here it would close"`
 }
 
+// ComponentFindingBody is one component at one version, with what is open
+// against it counted.
 type ComponentFindingBody struct {
 	Component string `json:"component"`
 	Version   string `json:"version"`
@@ -184,11 +209,6 @@ type ComponentFindingsOutput struct {
 	}
 }
 
-// filter turns what was asked for into what the store narrows by.
-//
-// One mapping for both lists, for the same reason the parameters are one
-// struct: two of these would drift, and the drift would be a filter that
-// answers on one list and is quietly ignored on the other.
 // planned is what a promised upgrade should do to the list. "either" is a word
 // in the request and the absence of a filter in the store, because a screen
 // that narrows by default needs a way to say "stop" that is distinguishable
@@ -211,6 +231,11 @@ func fixStates(words []string) []finding.FixState {
 	return out
 }
 
+// filter turns what was asked for into what the store narrows by.
+//
+// One mapping for both lists, for the same reason the parameters are one
+// struct: two of these would drift, and the drift would be a filter that
+// answers on one list and is quietly ignored on the other.
 func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 	narrowed := finding.Filter{
 		MinSeverity:   n.Severity,
@@ -278,46 +303,51 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 // *not* here is what belongs to one build: a subtree is a walk over one
 // build's edges, and "differs between builds" is a statement about a
 // selection.
+// Every array here carries a bound and every free-text field a length, for the
+// reason the ones that already did carry theirs: each element becomes a member
+// of an IN clause on the findings, the counts and every export, and four of
+// the seven were bounded by nothing at all — which is an inconsistency before
+// it is a limit, and the inconsistency is what says nobody decided.
 type Narrowing struct {
 	Severity   string   `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating"`
 	Exploited  bool     `query:"exploited" doc:"Keep only issues somebody is known to be exploiting"`
 	Fixable    bool     `query:"fixable" doc:"Keep only issues where an upstream fixed version is known"`
 	BelowFloor bool     `query:"below_floor" doc:"Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list"`
-	Component  []string `query:"component,explode" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
-	Tag        []string `query:"tag,explode" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags"`
+	Component  []string `query:"component,explode" maxItems:"200" maxLength:"191" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
+	Tag        []string `query:"tag,explode" maxItems:"200" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags"`
 	Search     string   `query:"q" maxLength:"200" doc:"Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name"`
-	Ecosystem  []string `query:"ecosystem,explode" doc:"Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"`
+	Ecosystem  []string `query:"ecosystem,explode" maxItems:"200" maxLength:"64" doc:"Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"`
 	// The two questions about the release itself, kept apart because a tag
 	// can be in support and a branch can be past end-of-life. Both default to
 	// the working population, and both say so on the screen: a default that
 	// narrows silently makes the count something other than the whole count
 	// with nothing saying so.
-	On           []string `query:"on,explode" enum:"branch,tag" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
-	Support      []string `query:"support,explode" enum:"in-support,past-eol" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
-	Under        string   `query:"under" doc:"Keep only what sits inside the container of this name"`
-	UnderBuild   bool     `query:"under_build" doc:"Keep only what the build holds directly, which is what has no container above it"`
-	State        []string `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"`
-	Outcome      []string `query:"outcome,explode" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"`
-	Assigned     []string `query:"assigned,explode" enum:"me,somebody,nobody" doc:"Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"`
-	Likelihood   float64  `query:"epss_at_least" minimum:"0" maximum:"1" doc:"Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1"`
-	OpenFor      int      `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
-	DueWithin    int      `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
-	Overdue      bool     `query:"overdue" doc:"Keep only what is already past its deadline"`
-	FixState     []string `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in"`
-	Weakness     []string `query:"weakness,explode" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
-	SentBack     bool     `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
-	Publisher    []string `query:"vex_publisher,explode" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
-	OpenedAfter  string   `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
-	ClosedAfter  string   `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
-	DecidedAfter string   `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
-	Said         []string `query:"vex_status,explode" enum:"not_affected,affected,fixed,under_investigation" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
-	Reassessed   bool     `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`
-	Recorded     bool     `query:"recorded" doc:"Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before"`
-	Planned      string   `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`
-	Unconfirmed  bool     `query:"unconfirmed" doc:"Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does"`
-	Exclude      []string `query:"exclude,explode" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
-	Sort         string   `query:"sort" enum:"urgency,age,deadline,places,epss,severity" doc:"Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
-	Ascending    bool     `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
+	On           []string  `query:"on,explode" enum:"branch,tag" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
+	Support      []string  `query:"support,explode" enum:"in-support,past-eol" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
+	Under        string    `query:"under" maxLength:"191" doc:"Keep only what sits inside the container of this name"`
+	UnderBuild   bool      `query:"under_build" doc:"Keep only what the build holds directly, which is what has no container above it"`
+	State        []string  `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"`
+	Outcome      []string  `query:"outcome,explode" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"`
+	Assigned     []string  `query:"assigned,explode" enum:"me,somebody,nobody" doc:"Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"`
+	Likelihood   float64   `query:"epss_at_least" minimum:"0" maximum:"1" doc:"Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1"`
+	OpenFor      int       `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
+	DueWithin    int       `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
+	Overdue      bool      `query:"overdue" doc:"Keep only what is already past its deadline"`
+	FixState     []string  `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in"`
+	Weakness     []string  `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
+	SentBack     bool      `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
+	Publisher    []string  `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
+	OpenedAfter  string    `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
+	ClosedAfter  string    `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
+	DecidedAfter string    `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
+	Said         []string  `query:"vex_status,explode" enum:"not_affected,affected,fixed,under_investigation" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
+	Reassessed   bool      `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`
+	Recorded     bool      `query:"recorded" doc:"Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before"`
+	Planned      string    `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`
+	Unconfirmed  bool      `query:"unconfirmed" doc:"Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does"`
+	Exclude      []string  `query:"exclude,explode" maxItems:"200" maxLength:"191" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
+	Sort         sortOrder `query:"sort" doc:"Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
+	Ascending    bool      `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
 }
 
 // Paging is how much of a list to return, kept apart from the filters so that
@@ -371,38 +401,13 @@ func registerFindings(api huma.API, in Ingest) {
 		Narrowing
 		Paging
 	}) (*FindingsOutput, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-
-		// Resolved and authorized together, so a product somebody may not see
-		// reads as one that was never declared. A selection matching no build
-		// — declared and never scanned — comes back empty from the store
-		// rather than as a refusal: nothing is open because nothing has run.
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		at, err := narrowing(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
 		}
-
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell what is worth triaging here", err)
-		}
-		narrowed, err := input.filter(floor)
-		if err != nil {
-			return nil, err
-		}
-		narrowed.DiffersBetweenBuilds = input.Differs
-		store := finding.NewStore(in.DB.DB)
-		if narrowed.Beneath, err = beneathIn(ctx, in, scope, input.Beneath); err != nil {
-			return nil, err
-		}
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
 		groups, total, err := store.Groups(ctx, subject, scope,
 			input.Limit, input.Offset, narrowed)
 		if err != nil {
@@ -482,7 +487,7 @@ func registerComponentFindings(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-finding-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings/components",
-		Summary: "List what is open, gathered by component",
+		Summary: "List findings by component",
 		Description: "One row per component and version, with how many distinct issues are " +
 			"open against it and how many places those sit at. The level above the findings " +
 			"list: it answers where the weight is rather than what is wrong, which is the " +
@@ -512,33 +517,13 @@ func registerComponentFindings(api huma.API, in Ingest) {
 		Narrowing
 		Paging
 	}) (*ComponentFindingsOutput, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		at, err := narrowing(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
 		}
-
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot tell what is worth triaging here", err)
-		}
-		narrowed, err := input.filter(floor)
-		if err != nil {
-			return nil, err
-		}
-		narrowed.DiffersBetweenBuilds = input.Differs
-		if narrowed.Beneath, err = beneathIn(ctx, in, scope, input.Beneath); err != nil {
-			return nil, err
-		}
+		subject, scope, narrowed := at.Subject, at.Scope, at.Filter
 		groups, total, err := finding.NewStore(in.DB.DB).ComponentGroups(ctx, subject, scope,
 			input.Limit, input.Offset, narrowed)
 		if err != nil {

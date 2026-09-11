@@ -45,9 +45,11 @@ func TestACommitmentIsGatedAgainstTheDeadlineItCovers(t *testing.T) {
 			if !ask(nil, &soon) {
 				t.Errorf("%s with no date was not gated", outcome)
 			}
-			// Nothing it covers has a deadline, so there is none to go past.
-			if ask(&later, nil) {
-				t.Errorf("%s covering work with no deadline was gated", outcome)
+			// Nothing it covers has a deadline, so there is no date the
+			// promise can be inside: the exemption has nothing to measure
+			// against and a second person agrees.
+			if !ask(&later, nil) {
+				t.Errorf("%s covering work with no deadline was not gated", outcome)
 			}
 		}
 	})

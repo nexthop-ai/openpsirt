@@ -53,7 +53,7 @@ type Statement struct {
 // **A distribution saying it will not fix something is not the distribution
 // saying it is not affected**. Debian's `no-dsa`, Ubuntu's `ignored`
 // and Red Hat's will-not-fix all mean *affected, and judged minor* — so they
-// offer a won't-fix, never a dismissal. Prefilling `not-applicable` from one
+// offer a will-not-fix, never a dismissal. Prefilling `not-applicable` from one
 // would record a claim the publisher never made, with their name on it, which
 // is the one way a third party's evidence turns into a lie rather than into
 // help.
@@ -66,7 +66,7 @@ func (s Statement) Prefills() (outcome string, offers bool) {
 		return "not-applicable", true
 	case "affected":
 		// They say it applies and they are not fixing it here, which is a
-		// won't-fix in our vocabulary and never a dismissal.
+		// will-not-fix in our vocabulary and never a dismissal.
 		return "wont-fix", true
 	case "fixed":
 		return "already-fixed", true

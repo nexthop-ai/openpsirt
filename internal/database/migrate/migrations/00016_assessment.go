@@ -41,7 +41,6 @@ func upAssessment(ctx context.Context, tx *sql.Tx) error {
 	}
 
 	statements := []string{
-		`ALTER TABLE "vulnerability" ADD COLUMN "assessed_severity" ` + t.kind + ` NULL`,
 
 		// One claim per issue. state is 'proposed', 'live' or
 		// 'withdrawn'.
@@ -113,7 +112,6 @@ func upAssessment(ctx context.Context, tx *sql.Tx) error {
 func downAssessment(ctx context.Context, tx *sql.Tx) error {
 	for _, stmt := range []string{
 		`DROP TABLE "assessment"`,
-		`ALTER TABLE "vulnerability" DROP COLUMN "assessed_severity"`,
 	} {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("%s: %w", firstLine(stmt), err)

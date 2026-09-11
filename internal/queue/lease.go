@@ -77,7 +77,15 @@ func (l *Leases) Take(ctx context.Context, name, holder string, until time.Durat
 	if err != nil {
 		return false, fmt.Errorf("take the lease on %s: %w", name, err)
 	}
-	n, _ := res.RowsAffected()
+	// A count that cannot be read is a fault, not "somebody else holds it".
+	// Read as the second, a driver or proxy that cannot report one stops every
+	// recurring sweep on every replica — notifications, digests and the lapse
+	// sweep never run again — with nothing logged, because each replica is
+	// simply told it lost a race it never ran.
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("cannot tell whether the lease on %s was taken: %w", name, err)
+	}
 	return n > 0, nil
 }
 

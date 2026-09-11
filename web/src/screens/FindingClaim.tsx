@@ -15,11 +15,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useComment, useEditComment, useRevise, useWithdraw } from "../api/mutations";
+import { Outward } from "../ui/Outward";
+import { useComment, useEditComment } from "../api/mutations";
 import { Failed } from "../ui/Failed";
+import { ReasonEditor } from "../ui/ReasonEditor";
 import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
-import { Because, labelled } from "../ui/Outcome";
+import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 
 type Detail = Body<"DecisionDetail">;
@@ -57,7 +59,7 @@ export function stateOf(
   if (states.some((s) => s === "proposed")) return { label: "Pending approval", cls: "waiting" };
   if (states.every((s) => s === "approved")) {
     const outcome = claims[0]?.decision?.outcome ?? "";
-    return { label: `${labelled(outcome)} · approved`, cls: "agreed" };
+    return { label: `${labeled(outcome)} · approved`, cls: "agreed" };
   }
   if (states.some((s) => s === "lapsed")) return { label: "Lapsed", cls: "lapsed" };
   return { label: "Decided", cls: "agreed" };
@@ -100,10 +102,6 @@ export function Standing({
     !!rows &&
     [rows.proposed ?? 0, rows.sent_back ?? 0, rows.approved ?? 0].filter((n) => n > 0).length > 1;
   const sentBackAt = summary?.sent_back_at ?? claim.decision?.sent_back_at;
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(claim.reasoning ?? "");
-  const revise = useRevise();
-  const withdraw = useWithdraw();
   const queries = useQueryClient();
   // Where this claim's work is happening. Stored and never fetched.
   const point = useMutation({
@@ -123,7 +121,6 @@ export function Standing({
   });
   const live = (approvals.data?.items ?? []).filter((a) => !a.withdrawn_at);
   const last = live[live.length - 1];
-  const draftKey = `revise:${id}`;
   const stripe =
     state === "proposed"
       ? "pending"
@@ -174,7 +171,7 @@ export function Standing({
         <div>
           <span className="l">Outcome</span>
           <span className="v">
-            {labelled(claim.decision?.outcome ?? "")}
+            {labeled(claim.decision?.outcome ?? "")}
             {claim.decision?.deferred_until && <> until {claim.decision.deferred_until}</>}
           </span>
         </div>
@@ -240,6 +237,10 @@ export function Standing({
               <>
                 <span className="state agreed">Approved</span> by <b>{last.approved_by}</b>
                 {last.approved_at && <>, {last.approved_at.replace("T", " ").slice(0, 16)}</>}
+                {/* Carried onto this claim from the one it re-affirms: they
+                    agreed to those words rather than to the reasoning shown
+                    here. */}
+                {last.carried_from && <span className="hint"> · carried forward</span>}
                 {typeof last.covered === "number" && (
                   <> · covered {last.covered} records at the time</>
                 )}
@@ -257,88 +258,15 @@ export function Standing({
         </div>
       </div>
 
-      {editing ? (
-        <div style={{ marginTop: 12, maxWidth: "78ch" }}>
-          <div className="alert" style={{ marginBottom: 10 }}>
-            <strong>Revising the reasoning withdraws the approval</strong>
-            <span>
-              The earlier words stay readable in the revision history, and the decision returns to
-              the review queue marked as previously approved.
-            </span>
-          </div>
-          <Editor
-            value={text}
-            onChange={setText}
-            draftKey={draftKey}
-            label="Reasoning"
-            attachTo={about}
-          />
-          {revise.error != null && <Failed error={revise.error} what="That could not be stored." />}
-          <div className="actions" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn"
-              disabled={!text.trim() || revise.isPending}
-              onClick={() =>
-                revise.mutate(
-                  { id, reasoning: text },
-                  {
-                    onSuccess: () => {
-                      forget(draftKey);
-                      setEditing(false);
-                      onRevised();
-                    },
-                  },
-                )
-              }
-            >
-              Save revision
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="why rendered" style={{ marginTop: 12 }}>
-          {claim.reasoning ? (
-            <Markdown source={claim.reasoning} />
-          ) : (
-            <p className="hint">Nothing written.</p>
-          )}
-        </div>
-      )}
-
-      {withdraw.error != null && (
-        <Failed error={withdraw.error} what="That could not be withdrawn." />
-      )}
-      {!editing && (state === "proposed" || state === "approved") && (
-        <div className="actions" style={{ marginTop: 12 }}>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={() => {
-              setText(claim.reasoning ?? "");
-              setEditing(true);
-            }}
-          >
-            Revise reasoning
-          </button>
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={withdraw.isPending}
-            onClick={() => withdraw.mutate({ id }, { onSuccess: onRevised })}
-          >
-            Withdraw
-          </button>
-          <span className="consequence">
-            {state === "approved"
-              ? "Revising withdraws the approval; withdrawing needs nobody"
-              : "Withdrawing needs nobody"}
-          </span>
-        </div>
-      )}
+      <ReasonEditor
+        claimId={id}
+        reasoning={claim.reasoning ?? ""}
+        state={state}
+        approved={state === "approved"}
+        about={about}
+        onDone={onRevised}
+        spaced
+      />
       {/* Where this is being worked on or argued about outside here.
           Anybody who may argue about the claim may set it: a link is a note
           about where the conversation is rather than a judgment, and needing a
@@ -347,14 +275,9 @@ export function Standing({
         {summary?.elsewhere ? (
           <>
             Being worked on at{" "}
-            <a
-              href={summary.elsewhere}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="linkish"
-            >
-              {summary.elsewhere}
-            </a>
+            {/* Judged before it is somewhere to click, like every other
+                address that was somebody's text. */}
+            <Outward href={summary.elsewhere} />
             {". "}
           </>
         ) : (
@@ -414,7 +337,7 @@ export function Activity({
   now.push({
     when: claim.proposed_at ?? "",
     who: claim.proposed_by ?? "",
-    what: `proposed #${claimId} — ${labelled(claim.decision?.outcome ?? "")} · ${places ?? claim.decision?.places ?? 1} ${(places ?? claim.decision?.places ?? 1) === 1 ? "place" : "places"}`,
+    what: `proposed #${claimId} — ${labeled(claim.decision?.outcome ?? "")} · ${places ?? claim.decision?.places ?? 1} ${(places ?? claim.decision?.places ?? 1) === 1 ? "place" : "places"}`,
   });
   for (const r of revisions.data?.items ?? []) {
     if ((r.ordinal ?? 1) > 1)
@@ -428,7 +351,9 @@ export function Activity({
     now.push({
       when: a.approved_at ?? "",
       who: a.approved_by ?? "",
-      what: `approved revision ${a.revision_id}${a.batch ? ` (batch ${a.batch})` : ""}`,
+      what: a.carried_from
+        ? `agreement carried forward onto revision ${a.revision_id}`
+        : `approved revision ${a.revision_id}${a.batch ? ` (batch ${a.batch})` : ""}`,
     });
     if (a.withdrawn_at)
       now.push({ when: a.withdrawn_at, who: a.approved_by ?? "", what: "approval withdrawn" });
@@ -447,7 +372,7 @@ export function Activity({
   const earlier: Event[] = previous.map((p) => ({
     when: p.proposedAt,
     who: p.proposedBy,
-    what: `proposed #${p.id} — ${labelled(p.outcome)}${p.state ? ` · ${p.state}` : ""}`,
+    what: `proposed #${p.id} — ${labeled(p.outcome)}${p.state ? ` · ${p.state}` : ""}`,
     earlier: true,
   }));
   earlier.sort((a, b) => b.when.localeCompare(a.when));
@@ -812,7 +737,7 @@ export function Prior({
   return (
     <article className="prior">
       <header>
-        <span className="id">#{item.id}</span> <b>{labelled(item.outcome)}</b>
+        <span className="id">#{item.id}</span> <b>{labeled(item.outcome)}</b>
         {item.justification && (
           <>
             {" "}

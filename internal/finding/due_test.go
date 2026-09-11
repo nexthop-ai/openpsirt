@@ -288,6 +288,17 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 					because, overdue, want)
 			}
 		}
+		// Sending the standing claim back, which is the other way one stops
+		// applying: only a claim needing nobody can be both sent back and
+		// standing, and while it is returned nobody is relying on it.
+		sendBack := func() {
+			t.Helper()
+			if _, err := f.db.DB.NewUpdate().TableExpr("decision").
+				Set("sent_back_at = ?", time.Now().UTC()).
+				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
+				t.Fatalf("send the claim back: %v", err)
+			}
+		}
 		yesterday := time.Now().UTC().Add(-24 * time.Hour)
 		nextMonth := time.Now().UTC().Add(30 * 24 * time.Hour)
 
@@ -304,6 +315,17 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		onTheClock(false, "a deferral applies until its date")
 		record("approved", true, "deferred", &yesterday, swss.Version)
 		onTheClock(true, "a deferral past its date is back on the clock")
+
+		// The rule the triage store asks when it decides whether a decision
+		// applies, asked here — because it was added to that store's own copy
+		// of the condition and to nothing else, so a claim an approver had
+		// returned went on holding its finding off the clock, out of this
+		// list and out of the overdue figure, while the notice to its author
+		// said it applied to nothing until it was revised.
+		record("proposed", false, "deferred", &nextMonth, swss.Version)
+		onTheClock(false, "a deferral needing no agreement applies")
+		sendBack()
+		onTheClock(true, "a claim an approver sent back holds nothing off the clock")
 	})
 }
 

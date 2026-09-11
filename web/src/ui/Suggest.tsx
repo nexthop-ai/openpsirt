@@ -1,5 +1,6 @@
 import { notACredential } from "./noautofill";
-import { useEffect, useRef, useState } from "react";
+import { useClickAway } from "./away";
+import { useRef, useState } from "react";
 
 // A name typed against a list the server holds, with what matches shown.
 //
@@ -50,14 +51,7 @@ export function Suggest({
   // Closing on a click anywhere else, which is what a list over the page has
   // to do. Blur alone is not enough: picking is a click inside, and a blur
   // handler that closed first would take the list away before the click landed.
-  useEffect(() => {
-    if (!open) return;
-    function away(event: MouseEvent) {
-      if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", away);
-    return () => document.removeEventListener("mousedown", away);
-  }, [open]);
+  useClickAway(box, open, () => setOpen(false), false);
 
   const asked = value.trim().length >= from;
   const showing = open && asked;

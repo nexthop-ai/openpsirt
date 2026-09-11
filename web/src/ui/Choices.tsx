@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useClickAway } from "./away";
 
 // Several answers to one question, as a list of checkboxes behind a control
 // that says what is ticked.
@@ -43,21 +44,7 @@ export function Choices({
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function away(event: MouseEvent) {
-      if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
-    }
-    function key(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", key);
-    };
-  }, [open]);
+  useClickAway(box, open, () => setOpen(false));
 
   const offered = options.filter(([word]) => word !== "");
   const ticked = offered.filter(([word]) => chosen.includes(word));

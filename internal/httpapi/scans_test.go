@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
@@ -155,6 +156,9 @@ func ingestOn(t *testing.T, on engines, opts queue.Options, fn func(t *testing.T
 		handler, _ := httpapi.New(quiet, nil, httpapi.Ingest{
 			DB: db, Queue: q,
 			Access: access.NewResolver(rights, access.Trust{}),
+			// Small enough that a test can write a document past it. Every
+			// other bound is the default, which OrDefault fills in.
+			Limits: sbom.Limits{MaxBytes: 4096},
 		})
 		fn(t, &ingestFixture{
 			handler: handler, db: db, queue: q, key: secret,

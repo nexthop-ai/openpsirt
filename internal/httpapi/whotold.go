@@ -48,11 +48,11 @@ func registerWhoTold(api huma.API, in Ingest) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*struct{ Body ReportBody }, error) {
-		_, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
+		subject, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
-		told, err := finding.NewStore(in.DB.DB).ReportFor(ctx, issue)
+		told, err := finding.NewStore(in.DB.DB).ReportFor(ctx, subject, issue)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who told us could not be read", err)
 		}
@@ -87,7 +87,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 			return nil, err
 		}
 		store := finding.NewStore(in.DB.DB)
-		told, err := store.ReportFor(ctx, issue)
+		told, err := store.ReportFor(ctx, subject, issue)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who told us could not be read", err)
 		}
@@ -112,19 +112,25 @@ func registerWhoTold(api huma.API, in Ingest) {
 			"here rather than opening a second issue, the finding shows it, and the advisory " +
 			"carries it in the field a reader looks in — which is the one lookup a published " +
 			"advisory exists to serve.\n\n" +
+			"**A name is identity, and identity is deployment-wide.** From here on a scan of " +
+			"any product reporting that name resolves to this issue and inherits its " +
+			"decisions. So this asks for the right to triage the issue in every product it " +
+			"is currently open in, at the visibility each one carries, and is refused rather " +
+			"than partly done.\n\n" +
 			"Recording a name it already goes by succeeds and changes nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "Also asks for triage in every other product the issue is open in.",
+		triageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The other identifier, as it is written"`
 	}) (*struct{}, error) {
-		_, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
+		subject, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
 		switch err := finding.NewVulnerabilities(in.DB.DB).
-			AlsoKnownAs(ctx, issue, input.Alias); {
+			AlsoKnownAs(ctx, subject, issue, input.Alias); {
 		case errors.Is(err, finding.ErrNameTaken):
 			return nil, huma.Error409Conflict(
 				"another issue already goes by that name, so this would merge two records")

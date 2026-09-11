@@ -19,7 +19,7 @@ tmp:
 image:
   # Published by the release workflow, one image per tag. While the repository
   # is private this needs a pull secret your cluster can use; see
-  # imagePullSecrets below. `linux/amd64` only for now.
+  # imagePullSecrets below. The image is single-architecture: `linux/amd64`.
   #
   # There is no image before the first tag. Until then, build one from the
   # repository and push it somewhere your cluster can reach, then point this

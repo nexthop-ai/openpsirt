@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // Sweeper applies standing routing rules to work nobody holds.
@@ -28,13 +29,22 @@ type Sweeper struct {
 	queue  *queue.Queue
 	logger *slog.Logger
 	name   string
-	// batch is how many findings one job may place. A setting would be one
-	// more thing to get wrong for a number nobody has measured a problem with.
+	// batch is how many findings one job may place, where a test fixes it.
+	// Zero reads the deployment's own number as each pass begins.
 	batch int
 }
 
+// NewSweeper is the sweep as a deployment runs it, taking its bound from the
+// deployment rather than from the binary.
+//
+// The bound was a constant here and a second constant in the writer, under a
+// comment declining the decision that says a bulk write's cap is a setting.
+// An operator on a large estate has reason to move it in either direction — a
+// pass too big holds a connection through the whole of it, and one too small
+// leaves a fifty-thousand-finding product re-queuing twenty-five times — and
+// neither is a rebuild.
 func NewSweeper(db *database.DB, q *queue.Queue, logger *slog.Logger, name string) *Sweeper {
-	return NewSweeperOfSize(db, q, logger, name, 2000)
+	return &Sweeper{db: db, queue: q, logger: logger, name: name}
 }
 
 // NewSweeperOfSize is a sweeper with a batch of a given size, so that what a
@@ -95,8 +105,20 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
+	// Read as the pass begins rather than when the sweeper was built, so a
+	// number an administrator changes takes effect on the next pass rather
+	// than on the next restart.
+	batch := s.batch
+	if batch <= 0 {
+		batch, err = setting.NewStore(s.db.DB).Count(ctx, setting.RoutingBatch,
+			setting.DefaultRoutingBatch)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	working, release := s.queue.Holding(ctx, job.ID, s.name, s.logger)
-	placed, filled, err := NewStore(s.db.DB).ApplyRules(working, productID, s.batch)
+	placed, filled, err := NewStore(s.db.DB).ApplyRules(working, productID, batch)
 	taken := release()
 
 	settled, done := queue.Settling(ctx)

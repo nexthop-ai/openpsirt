@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,9 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
@@ -122,6 +119,16 @@ type Approval struct {
 	// what it covers *now* answers a different question from what somebody
 	// consented to, and only one of those two can be recovered after the fact.
 	Covered *int `bun:"covered"`
+	// CarriedFrom names the agreement this one was carried forward from,
+	// where it was carried rather than given.
+	//
+	// A re-affirmation states fresh reasoning and stands on the agreement its
+	// predecessor had. Recorded as an ordinary approval that read as the
+	// earlier approver agreeing, today, to words they have never seen — which
+	// is what an approval naming one revision of the reasoning exists to make
+	// impossible. What is true is that they agreed to the earlier words, and
+	// this is what says so.
+	CarriedFrom *int64 `bun:"carried_from"`
 }
 
 // Place is what a decision is a claim about, as a finding presents it.
@@ -148,65 +155,6 @@ type Place struct {
 	// reason to ask somebody the same question again.
 	ComponentUpstream string
 	ConsumerUpstream  string
-}
-
-// ErrNotTheirs is returned when somebody reaches for a decision about a
-// product they may not triage.
-//
-// The same answer whether the product is one they cannot see or one they can
-// only read: telling those apart would say which products exist to somebody
-// who was told they may not ask.
-var ErrNotTheirs = errors.New("not authorized")
-
-// mayDecide is whether a subject may argue about findings of this visibility
-// here, in the shape the narrowing rules take.
-//
-// A thin name over the subject's own answer, because the rules beside it are
-// passed around as functions of this signature — and the rule itself lives on
-// the subject, where every package asking it can reach one copy.
-func mayDecide(subject access.Subject, productID int64, visibility access.Visibility) bool {
-	return subject.Triages(visibility, productID)
-}
-
-// mayDecideOn is the same question about one named issue, which is what a
-// collaborator was brought into.
-//
-// Separate from mayDecide rather than another argument to it, because the two
-// are asked at different units: "may they decide in this product" is a
-// question about a product and has no issue to name, and every caller that has
-// one is arguing about that one issue.
-//
-// It never widens approving. mayApprove is built on mayDecide and stays there:
-// two collaborators could otherwise satisfy the two people a dismissal on an
-// embargoed finding asks for, with nobody accountable for the product.
-func mayDecideOn(subject access.Subject, productID, vulnerabilityID int64,
-	visibility access.Visibility) bool {
-
-	return mayDecide(subject, productID, visibility) ||
-		subject.OnCase(productID, vulnerabilityID)
-}
-
-// mayApprove reports whether a subject may agree to somebody else's claim.
-//
-// Approving is not deciding, and requiring the triage role for it made the
-// approver capability decorative: somebody granted exactly the right to
-// approve could not approve anything. It is a capability rather than a grant
-// of visibility, so it is asked alongside whether they may read the finding —
-// otherwise handing somebody the ability to approve hands them everything
-// there is to approve.
-//
-// A triager may also approve, on somebody else's claim. Two triagers agreeing
-// to each other's work is the ordinary shape of a small team, and the control
-// that matters is that the two are different people — which is checked
-// separately and has no override.
-func mayApprove(subject access.Subject, productID int64, visibility access.Visibility) bool {
-	if subject.Kind != access.Person {
-		return false
-	}
-	if !subject.Reads(visibility, productID) {
-		return false
-	}
-	return subject.Holds(access.Approver, productID) || mayDecide(subject, productID, visibility)
 }
 
 // ErrSamePerson is returned when somebody tries to approve their own claim.
@@ -263,9 +211,22 @@ type Proposal struct {
 	// covers, and a second person agrees. Computed over the whole set by the
 	// caller, because one act covering a critical and a medium is gated by
 	// the critical however many mediums are in it.
-	Binding   *time.Time
-	Reasoning string
-	By        int64
+	Binding *time.Time
+	// BindingAcross is the builds the act covers, for a caller that cannot
+	// resolve the binding itself inside the transaction.
+	//
+	// The deadline it is gated against is a stored value that a re-rating or
+	// an arriving scan moves, so reading it before the transaction opens gates
+	// the promise against a deadline that may be gone by the time it is
+	// written — and a retry of the closure re-reads everything else and would
+	// keep this one stale value. Handed over as what it is resolved *from*,
+	// and resolved in `gate`, where the threshold is already read.
+	//
+	// The upgrade paths resolve theirs in their own transaction and pass
+	// Binding instead.
+	BindingAcross []int64
+	Reasoning     string
+	By            int64
 	// SeverityCenti is how bad this is judged to be right now, in hundredths.
 	// Recorded with the claim so that a later re-affirmation can ask whether
 	// it has risen since.
@@ -279,9 +240,14 @@ type Proposal struct {
 	// what the claim rests on, which is the reasoning somebody typed.
 	FromStatement *int64
 	// NeedsApproval says a second person must agree before this takes effect.
-	// Worked out by the caller through NeedsApproval, and recorded, because a
-	// claim that is waiting and one that is in force must be distinguishable
-	// afterwards.
+	//
+	// **Worked out by the store, inside the transaction that writes.** Not
+	// something whoever is proposing states: it turns on the deployment's
+	// threshold and on what this place has already been put off for, and read
+	// before the transaction opened it described a world that a retry — or a
+	// policy somebody changed in between — has left behind. The acts that are
+	// gated by construction rather than by arithmetic set it themselves and
+	// say why.
 	NeedsApproval bool
 }
 
@@ -298,7 +264,7 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 	if !mayDecideOn(subject, p.Place.ProductID, p.Place.VulnerabilityID, visibilityOf(p.Place)) {
 		return nil, ErrNotTheirs
 	}
-	if err := p.valid(); err != nil {
+	if err := p.valid(s.now()); err != nil {
 		return nil, err
 	}
 	if p.By != subject.ID {
@@ -316,24 +282,24 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 	var recorded *Decision
 	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
-		claim, err := within.newClaim(ctx, FindingClaim, p.By, nil, "", p)
+		// Worked out here rather than taken from the caller, and re-worked on
+		// every attempt: what it turns on is the policy and what this place
+		// has already been put off for, both of which a retry re-reads.
+		gated := []Proposal{p}
+		if err := within.gate(ctx, subject, gated); err != nil {
+			return err
+		}
+		claim, err := within.newClaim(ctx, FindingClaim, p.By, nil, "", gated[0])
 		if err != nil {
 			return err
 		}
-		recorded, err = within.propose(ctx, claim, p)
+		recorded, err = within.propose(ctx, claim, gated[0])
 		return err
 	})
-	if errors.Is(err, ErrAlreadyDecided) {
-		// Read now the transaction has unwound, so the refusal can say which
-		// claim to go and read rather than which constraint was violated.
-		if standing, found := s.liveAt(ctx, liveKeyFor(p.Place)); found {
-			return nil, fmt.Errorf(
-				"%w: decision %d is already %s here — revise that one rather than recording a "+
-					"second claim about the same code",
-				ErrAlreadyDecided, standing.ID, standing.State)
-		}
+	if err != nil {
+		return recorded, s.alreadyDecided(ctx, err, []Place{p.Place})
 	}
-	return recorded, err
+	return recorded, nil
 }
 
 // ProposeMany records the same claim at several places as one action.
@@ -356,7 +322,7 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 	if len(proposals) == 0 {
 		return nil, nil
 	}
-	if err := allowed(subject, proposals, cap); err != nil {
+	if err := allowed(subject, proposals, cap, s.now()); err != nil {
 		return nil, err
 	}
 	if err := oneArgument(proposals); err != nil {
@@ -372,6 +338,14 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
 		recorded = recorded[:0]
+		// Asked per place rather than once for the set: the threshold reads
+		// the claim, and two places of one finding can differ in what they
+		// carry. Re-worked on every attempt, against the policy and the
+		// postponement in force when the write lands rather than when the
+		// request arrived.
+		if err := within.gate(ctx, subject, proposals); err != nil {
+			return err
+		}
 		// One action, one claim, however many places it covers. The
 		// claim is what the queue lists, what an approver agrees to, and what
 		// the argument is held on; the rows underneath stay one per place and
@@ -384,19 +358,7 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 		return err
 	})
 	if err != nil {
-		// Named the same way one at a time names it: which claim to go and
-		// read, rather than which constraint was violated.
-		if errors.Is(err, ErrAlreadyDecided) {
-			for _, p := range proposals {
-				if standing, found := s.liveAt(ctx, liveKeyFor(p.Place)); found {
-					return nil, fmt.Errorf(
-						"%w: decision %d is already %s at one of these places — revise that one "+
-							"rather than recording a second claim about the same code",
-						ErrAlreadyDecided, standing.ID, standing.State)
-				}
-			}
-		}
-		return nil, err
+		return nil, s.alreadyDecided(ctx, err, placesOf(proposals))
 	}
 	return recorded, nil
 }
@@ -522,7 +484,11 @@ func sameDay(a, b *time.Time) bool {
 }
 
 // valid reports whether a proposal says enough to be recorded.
-func (p Proposal) valid() error {
+//
+// It takes the moment rather than reading a clock, because a store's clock is
+// injectable and a rule about dates that read a different clock from the rest
+// of the package would be a rule no test could pin.
+func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
 		return fmt.Errorf("%q is not an outcome", p.Outcome)
 	}
@@ -622,6 +588,23 @@ func (p Proposal) valid() error {
 	}
 	if !p.Outcome.Commits() && p.CommittedTo != nil {
 		return fmt.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
+	}
+	// **A date already past is not a date.** Nothing here checked, and the two
+	// dates fail in opposite directions: a deferral until last year takes the
+	// place's live key so nobody else may decide there, suppresses nothing,
+	// and lands in the review queue already run out — a work item the tool
+	// made for itself. A promise to act by last year is worse, because the
+	// gate asks whether the date is past the deadline the work has and a date
+	// in the past never is, so the promise stands on one signature.
+	if p.DeferredUntil != nil && !p.DeferredUntil.After(now) {
+		return fmt.Errorf(
+			"a deferral returns on a date still to come: %s has passed",
+			p.DeferredUntil.Format(time.DateOnly))
+	}
+	if p.CommittedTo != nil && !p.CommittedTo.After(now) {
+		return fmt.Errorf(
+			"promised work lands on a date still to come: %s has passed",
+			p.CommittedTo.Format(time.DateOnly))
 	}
 	// A backport moves no version, which is the whole difference between the
 	// two: naming one here would record an upgrade under the outcome
@@ -723,6 +706,49 @@ func liveKeyFor(at Place) string {
 // it: two claims about one finding are a disagreement, and a disagreement
 // belongs in one place where both sides are readable.
 var ErrAlreadyDecided = errors.New("a decision already stands here")
+
+// placesOf is the places a set of proposals is about, for a refusal that has
+// to name one of them.
+func placesOf(proposals []Proposal) []Place {
+	places := make([]Place, 0, len(proposals))
+	for _, p := range proposals {
+		places = append(places, p.Place)
+	}
+	return places
+}
+
+// alreadyDecided turns the constraint's refusal into a sentence naming which
+// claim to go and read.
+//
+// Read after the transaction has unwound, which is why it is not part of the
+// write: inside it the row that collided is the row this attempt could not
+// see. Where the claim has since gone — withdrawn between the collision and
+// the read — the original refusal stands, because a message naming a decision
+// that is no longer there is worse than one naming none.
+//
+// Written four times, in three files, with the wording drifting by a word at
+// each: the same refusal read "here" from one path and "at one of these
+// places" from another for the same act on one place.
+func (s *Store) alreadyDecided(ctx context.Context, err error, places []Place) error {
+	if !errors.Is(err, ErrAlreadyDecided) {
+		return err
+	}
+	where := "here"
+	if len(places) > 1 {
+		where = "at one of these places"
+	}
+	for _, place := range places {
+		standing, found := s.liveAt(ctx, liveKeyFor(place))
+		if !found {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: decision %d is already %s %s — revise that one rather than recording a "+
+				"second claim about the same code",
+			ErrAlreadyDecided, standing.ID, standing.State, where)
+	}
+	return err
+}
 
 // ErrNothingOpen says a selection named nothing that is actually open where it
 // was claimed to be.
@@ -830,471 +856,4 @@ func (s *Store) reaching(ctx context.Context, subject access.Subject, decisionID
 		}
 	}
 	return decision, nil
-}
-
-// mayTakePart reports whether a subject may add to a decision rather than only
-// read it — writing a comment, or changing their own.
-//
-// This is what readable meant before the record readable at the finding's
-// visibility widened reading to the finding's own visibility. Writing had
-// leaned on the reading rule, so widening one widened the other, and a reader
-// could comment on a decision they may not argue about. Named separately so
-// the two cannot drift back together.
-func mayTakePart(subject access.Subject, productID int64, visibility access.Visibility) bool {
-	return mayApprove(subject, productID, visibility) || mayDecide(subject, productID, visibility)
-}
-
-// readable reports whether a subject may see what was decided.
-//
-// It is the finding's own visibility and nothing else — the same question
-// readableFindings asks a few lines below, which is the point: a decision is
-// part of the record of a finding, and who may read that record is who may
-// read the finding.
-//
-// It asked whether the subject may decide or approve, and that was narrower
-// than disclosure opening the record, which says the whole record — comments,
-// decisions, actors — goes public when a private issue is disclosed. Under the
-// old rule that was true only for people who could already see it: a reader
-// holding private reading on a product opened a finding and was told none of
-// its decisions existed, so they saw "deferred" with no way to see why or by
-// whom, and the screen called the record was empty for anybody who is not a
-// triager.
-//
-// Acting on any of it is unchanged. Arguing still asks for triage (mayDecide)
-// and agreeing still asks for the approver capability (mayApprove); this
-// widens reading alone.
-func readable(subject access.Subject, productID int64, visibility access.Visibility) bool {
-	if subject.Kind != access.Person {
-		return false
-	}
-	return subject.Reads(visibility, productID)
-}
-
-// readableOn is readable with the case grant asked beside the product-wide
-// question.
-//
-// The list narrowing already asks it, so a collaborator's own case appeared
-// among the decisions and every route that reads one of them by identifier
-// refused it: listed and then not there, which reads as a fault rather than as
-// a rule. The grant is the pair of a product and an issue, so it needs the
-// issue, which a row carries and a bare product-and-visibility rule cannot
-// see.
-func readableOn(subject access.Subject, productID, vulnerabilityID int64,
-	visibility access.Visibility) bool {
-
-	if readable(subject, productID, visibility) {
-		return true
-	}
-	for _, may := range access.VisibleOn(subject, productID, vulnerabilityID) {
-		if may == visibility {
-			return true
-		}
-	}
-	return false
-}
-
-// approvableBy narrows a query to the decisions a subject may agree to, which
-// is a wider set than the ones they may argue about.
-func approvableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
-	// Deliberately without the cases. A collaborator may argue about the
-	// issue they were brought in on and may not agree to anybody's claim
-	// about it : two of them could otherwise satisfy the two people a
-	// dismissal on an embargoed finding asks for, with nobody accountable
-	// for the product involved.
-	return narrowedBy(query, subject, column, mayApprove, withoutCases)
-}
-
-// readableBy narrows a query to the decisions a subject may see.
-func readableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
-	return narrowedBy(query, subject, column, readable, onCases)
-}
-
-// narrowedBy applies one of those rules as a condition on the query.
-//
-// Written as a condition rather than as filtering afterwards, because a count,
-// an export or a report is exactly where filtering afterwards gets forgotten —
-// and where the number is the leak even when no row is shown.
-//
-// Public and private are kept apart because they permit different things:
-// reaching undisclosed findings implies reaching disclosed ones, and the
-// reverse is exactly what must not happen. The rule is asked separately for
-// each, per product, so a new right cannot widen one by being written into the
-// other.
-//
-// The products are bound as values. They come from the subject's own grants
-// rather than from anything typed, so writing them into the statement would be
-// safe today and would be the shape somebody copies later when the list does
-// come from outside. Whether a narrowing also lets through the cases somebody
-// was brought into . Named rather than a bare boolean at two call sites,
-// because which of the two a narrowing is decides whether a collaborator can
-// approve.
-const (
-	onCases      = true
-	withoutCases = false
-)
-
-func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
-	allowed func(access.Subject, int64, access.Visibility) bool, cases bool) *bun.SelectQuery {
-
-	if subject.Kind != access.Person {
-		return query.Where("1 = 0")
-	}
-	products, all := subject.Products()
-	if all {
-		return query
-	}
-
-	var private, public []int64
-	for _, id := range products {
-		switch {
-		case allowed(subject, id, access.Private):
-			private = append(private, id)
-		case allowed(subject, id, access.Public):
-			public = append(public, id)
-		}
-	}
-	brought := map[int64][]int64{}
-	if cases {
-		for _, id := range subject.CaseProducts() {
-			// Only where the product's own grant is not already wider. A case
-			// adds nothing where somebody reads the product undisclosed, and
-			// the narrower clause would be dead weight on every read.
-			if !subject.Reads(access.Private, id) {
-				brought[id] = subject.Cases(id)
-			}
-		}
-	}
-	if len(private) == 0 && len(public) == 0 && len(brought) == 0 {
-		return query.Where("1 = 0")
-	}
-
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		if len(private) > 0 {
-			q = q.WhereOr(column+".product_id IN (?)", bun.List(private))
-		}
-		if len(public) > 0 {
-			q = q.WhereOr(column+".product_id IN (?) AND "+column+".visibility = ?",
-				bun.List(public), access.Public)
-		}
-		// One issue in one product, which is what a collaborator was brought
-		// into. Read from the subject rather than from anything typed, so the
-		// pairs are the ones resolved at sign-in.
-		for _, productID := range sortedKeys(brought) {
-			q = q.WhereOr(column+".product_id = ? AND "+column+".vulnerability_id IN (?)",
-				productID, bun.List(brought[productID]))
-		}
-		return q
-	})
-}
-
-// sortedKeys is the products of a case map in a settled order, so that two
-// runs of the same query produce the same statement — which is what makes a
-// prepared statement cache and a slow-query log worth reading.
-func sortedKeys(cases map[int64][]int64) []int64 {
-	out := make([]int64, 0, len(cases))
-	for id := range cases {
-		out = append(out, id)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
-// readableFindings narrows a query that joins findings to the ones a subject
-// may read, per product: undisclosed findings where they read undisclosed
-// findings on that product, disclosed ones everywhere else.
-//
-// The same rule as narrowedBy, asked of the finding's visibility and the
-// product it sits in rather than the decision's. A decision somebody may read
-// matches findings they may not, and a build name, a fix version or a count
-// read off those is the disclosure — so every read that walks from a decision
-// to its findings carries this.
-//
-// The finding's visibility is read through the given alias, and the product
-// through the expression given — the stream's product where the read has
-// joined that far, and the decision's where the match already requires the two
-// to agree.
-func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, product string) *bun.SelectQuery {
-	if subject.Kind != access.Person {
-		return query.Where("1 = 0")
-	}
-	products, all := subject.Products()
-	if all {
-		return query
-	}
-	var private []int64
-	for _, id := range products {
-		if subject.Reads(access.Private, id) {
-			private = append(private, id)
-		}
-	}
-	if len(private) == 0 {
-		return query.Where(finding+".visibility = ?", access.Public)
-	}
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.WhereOr(finding+".visibility = ?", access.Public).
-			WhereOr(product+" IN (?)", bun.List(private))
-	})
-}
-
-// DefaultTogetherCap is how many findings one action may claim about when
-// nobody has set a limit.
-//
-// Generous, because the case this exists for is a kernel: a real image put
-// 305,487 findings against one, and a person narrowing that down to the
-// drivers their build does not include is doing the right thing with a long
-// list. The bound is there because an unbounded write is something somebody
-// triggers by accident, not because two thousand is a suspicious number.
-const DefaultTogetherCap = 2000
-
-// allowed is what every proposal has to satisfy before any of them is written.
-//
-// Checked over the whole set first, because refusing halfway is the failure
-// these actions exist to avoid — and the bound is on the rows about to be
-// written rather than on what a caller named, since one name expands into as
-// many places as the issue sits at.
-func allowed(subject access.Subject, proposals []Proposal, cap int) error {
-	if cap <= 0 {
-		cap = DefaultTogetherCap
-	}
-	if len(proposals) > cap {
-		return fmt.Errorf("that is %d findings and the limit here is %d: narrow it, "+
-			"or raise the limit deliberately", len(proposals), cap)
-	}
-	for _, p := range proposals {
-		if !mayDecideOn(subject, p.Place.ProductID, p.Place.VulnerabilityID, visibilityOf(p.Place)) {
-			return ErrNotTheirs
-		}
-		if err := p.valid(); err != nil {
-			return err
-		}
-		if p.By != subject.ID {
-			return fmt.Errorf("a decision is recorded as made by whoever made it")
-		}
-	}
-	return nil
-}
-
-// TogetherAt names what one judgment covers: some issues, and the build and
-// component they sit at.
-//
-// The places themselves are not named. A caller free to name a place would be
-// choosing which decisions apply where, and would be naming rows it read
-// before this ran — so they are resolved here, inside the transaction that
-// writes.
-type TogetherAt struct {
-	TargetID         int64
-	ComponentID      int64
-	VulnerabilityIDs []int64
-}
-
-// Together records the same judgment against many issues at one component.
-//
-// The transpose of grouping. One issue across many places is what a decision
-// already covers; a component carrying thousands of issues — a kernel, most of
-// them in drivers a given image never builds — has no answer at all, and
-// without one the choices are answering two thousand findings individually,
-// which nobody does, or hiding them, which is refused.
-//
-// One outcome, one justification, one reasoning, one approval, and a separate
-// record per issue **and per place**. Each is keyed and expires on its own,
-// which is what makes one action across many findings defensible rather than a
-// blanket claim — and covering every place is what stops it reporting that it
-// answered a consumer it left open.
-//
-// Everything authorization turns on is read inside the transaction that writes
-// . Which product these sit in, and whether any of them is undisclosed, decide
-// whether this person may make the claim at all; read before the transaction,
-// they would be answers about a database that has since moved.
-//
-// Bounded, because one action writing an unbounded number of rows is a denial
-// of service somebody triggers by accident. The bound is checked against the
-// places this actually resolves to — the count somebody is asked to narrow is
-// the number of rows about to be written, not the number of names they typed.
-func (s *Store) Together(ctx context.Context, subject access.Subject, at TogetherAt, p Proposal,
-	cap int) (claimID int64, recorded []int64, err error) {
-
-	if len(at.VulnerabilityIDs) == 0 {
-		return 0, nil, fmt.Errorf("nothing was selected, so there is nothing to claim")
-	}
-	if p.By != subject.ID {
-		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
-	}
-
-	db, ok := s.db.(*bun.DB)
-	if !ok {
-		return 0, nil, fmt.Errorf("this store is already inside a transaction")
-	}
-
-	err = database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		// Cleared on every attempt. A retry re-runs this against a database
-		// that has moved, and carrying identifiers over from the attempt that
-		// failed would report claims that no longer exist.
-		recorded = recorded[:0]
-		claimID = 0
-		within := &Store{db: tx, now: s.now}
-
-		places, err := placesWithin(ctx, tx, subject, at)
-		if err != nil {
-			return err
-		}
-		if len(places) == 0 {
-			return fmt.Errorf("%w against that component", ErrNothingOpen)
-		}
-		if cap > 0 && len(places) > cap {
-			return fmt.Errorf("that is %d findings and the limit here is %d: narrow the "+
-				"selection, or raise the limit deliberately", len(places), cap)
-		}
-
-		claim, err := within.newClaim(ctx, TogetherClaim, subject.ID, nil, p.SelectedBy, p)
-		if err != nil {
-			return err
-		}
-		claimID = claim.ID
-		each := make([]Proposal, 0, len(places))
-		for _, place := range places {
-			if !mayDecide(subject, place.ProductID, visibilityOf(place.Place)) {
-				return ErrNotTheirs
-			}
-			one := p
-			one.Place = place.Place
-			one.SeverityCenti = place.SeverityCenti
-			if err := one.valid(); err != nil {
-				return err
-			}
-			each = append(each, one)
-		}
-		made, err := within.proposeAll(ctx, claim, each)
-		if err != nil {
-			// One live claim per combination of code holds here too. A
-			// selection covering something already decided is a selection
-			// somebody should look at again rather than one to write around.
-			if errors.Is(err, ErrAlreadyDecided) {
-				return fmt.Errorf("%w: something in this selection is already decided",
-					ErrAlreadyDecided)
-			}
-			return err
-		}
-		for _, one := range made {
-			recorded = append(recorded, one.ID)
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, nil, err
-	}
-	return claimID, recorded, nil
-}
-
-// onlyDecidable narrows a places query to what this subject may argue about.
-//
-// Written here rather than through narrowedBy because the product and the
-// visibility sit on different tables in this statement — the product on the
-// stream, the visibility on the finding — and narrowedBy takes one alias for
-// both.
-func onlyDecidable(query *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
-	if subject.Kind != access.Person {
-		return query.Where("1 = 0")
-	}
-	products, all := subject.Products()
-	if all {
-		return query
-	}
-	var private, public []int64
-	for _, id := range products {
-		switch {
-		case mayDecide(subject, id, access.Private):
-			private = append(private, id)
-		case mayDecide(subject, id, access.Public):
-			public = append(public, id)
-		}
-	}
-	if len(private) == 0 && len(public) == 0 {
-		return query.Where("1 = 0")
-	}
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		if len(private) > 0 {
-			q = q.WhereOr("st.product_id IN (?)", bun.List(private))
-		}
-		if len(public) > 0 {
-			q = q.WhereOr("st.product_id IN (?) AND f.visibility = ?",
-				bun.List(public), access.Public)
-		}
-		return q
-	})
-}
-
-// resolved is a place a judgment is about to be written against, with how bad
-// the issue there is judged to be.
-type resolved struct {
-	Place
-	SeverityCenti int
-}
-
-// placesWithin reads every open place the named issues occupy at one
-// component, in the transaction that is about to write against them.
-//
-// Narrowed to what this subject may read, like every other query here. A claim
-// therefore covers every place the person making it can see, and the places
-// they cannot are left open for whoever can — which is the ordinary division
-// of work rather than a gap. The alternative, refusing the whole action
-// because something undisclosed sits at the same component, answers a person
-// who picked from the list they were shown with a bare "not found" and no way
-// to tell why.
-func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
-	at TogetherAt) ([]resolved, error) {
-
-	var rows []struct {
-		ProductID         int64  `bun:"product_id"`
-		VulnerabilityID   int64  `bun:"vulnerability_id"`
-		PlaceIdentity     string `bun:"place_identity"`
-		Visibility        string `bun:"visibility"`
-		ComponentUpstream string `bun:"component_upstream"`
-		ConsumerUpstream  string `bun:"consumer_upstream"`
-		Severity          int    `bun:"severity_centi"`
-		OnTag             int    `bun:"on_tag"`
-	}
-	query := tx.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("f.visibility AS visibility").
-		ColumnExpr(finding.ComponentUpstreamExpr+" AS component_upstream").
-		ColumnExpr(finding.ConsumerUpstreamExpr+" AS consumer_upstream").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS severity_centi").
-		// Whether the release was built once, which decides what may be said
-		// about it. As an integer rather than a boolean: the four engines
-		// spell a boolean three ways.
-		ColumnExpr("MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS on_tag", catalog.Tag).
-		Where("f.target_id = ?", at.TargetID).
-		Where("f.component_id = ?", at.ComponentID).
-		Where("f.closed_at IS NULL").
-		Where("f.vulnerability_id IN (?)", bun.List(at.VulnerabilityIDs)).
-		GroupExpr("st.product_id, f.vulnerability_id, f.place_identity, f.visibility, " +
-			"c.upstream_version, c.version, uc.upstream_version, uc.version, v.score_centi").
-		OrderExpr("f.vulnerability_id, f.place_identity")
-	if err := onlyDecidable(query, subject).Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read where these issues sit: %w", err)
-	}
-
-	places := make([]resolved, 0, len(rows))
-	for _, row := range rows {
-		places = append(places, resolved{
-			Place: Place{
-				ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
-				PlaceIdentity:     row.PlaceIdentity,
-				Visibility:        access.AsVisibility(row.Visibility),
-				ComponentUpstream: row.ComponentUpstream,
-				ConsumerUpstream:  row.ConsumerUpstream,
-				OnTag:             row.OnTag == 1,
-			},
-			SeverityCenti: row.Severity,
-		})
-	}
-	return places, nil
 }

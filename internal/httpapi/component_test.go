@@ -24,7 +24,7 @@ func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
 		const at = "/v1/products/mine/components/libcurl4t64/upgrade"
 		plan := func(who, holder string) *httptest.ResponseRecorder {
 			return asPerson(t, r, who, http.MethodPost, at,
-				`{"to":"8.5.0-1","by":"2026-09-08",`+
+				`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
 					`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
 					holder+
 					`"builds":[{"stream":"master","variant":"broadcom"}]}`)

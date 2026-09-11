@@ -473,3 +473,66 @@ func drawn(t *testing.T, identifier string) int {
 	}
 	return n
 }
+
+// A report is readable in the product it was made against and nowhere else.
+//
+// An issue's identity spans its aliases, so the moment a CVE is recorded for
+// a flaw entered here, the same issue is open in every other product a scan
+// reports it in. The report itself carries no product and was read by
+// vulnerability alone, so a triager holding rights in one of those products —
+// and nothing at all here — read the researcher's name, address and the day
+// they wrote, about a flaw in a product they cannot see. They could
+// acknowledge it too, clearing the unanswered-report condition out of this
+// product's queue.
+func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+
+		who := f.planner(t, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "The management socket accepts a request nobody authenticated.",
+			Told: finding.Told{
+				ReportedBy: "A. Researcher", Contact: "a@example.org",
+				Credit: "anonymous",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := rows[0].VulnerabilityID
+
+		// Whoever recorded it reads it.
+		told, err := f.store.ReportFor(ctx, who, issue)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if told == nil || told.Contact != "a@example.org" {
+			t.Fatalf("the product it was reported against cannot read it: %+v", told)
+		}
+
+		// Somebody holding private triage on another product entirely does
+		// not, however the issue reached them.
+		stranger := access.NewPerson(2, "stranger", false,
+			map[int64][]access.Role{f.productID + 999: {access.PrivateTriage}}, 0)
+		hidden, err := f.store.ReportFor(ctx, stranger, issue)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hidden != nil {
+			t.Errorf("a reporter's address was readable from another product: %+v", hidden)
+		}
+		// And they cannot answer the reporter either.
+		if err := f.store.Acknowledge(ctx, stranger, issue); err != nil {
+			t.Fatal(err)
+		}
+		again, err := f.store.ReportFor(ctx, who, issue)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.AcknowledgedAt != nil {
+			t.Error("somebody who cannot read the report cleared its condition")
+		}
+	})
+}

@@ -759,3 +759,97 @@ func TestRecordingAClaimIsABoundedNumberOfStatementsHoweverManyPlacesItCovers(t 
 		}
 	})
 }
+
+// A claim that was sent back applies to nothing until it is revised, which is
+// what the notice to its author says in those words.
+//
+// Only a claim needing nobody can be both sent back and standing — a gated
+// one suppresses nothing while it waits — and that is exactly the one that
+// went on hiding the finding after an approver had returned it.
+func TestAClaimSentBackStopsApplying(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		soon := time.Now().UTC().Add(24 * time.Hour)
+		short, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if short.NeedsApproval {
+			t.Fatal("a short deferral was gated, so this tests nothing")
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing == nil {
+			t.Fatal("a deferral needing nobody did not stand, so this tests nothing")
+		}
+
+		if _, err := f.store.SendBackClaim(ctx, f.reviewer, short.ClaimID,
+			"Say which sprint, and why not this one."); err != nil {
+			t.Fatal(err)
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
+			t.Error("a claim an approver sent back went on suppressing the finding")
+		}
+
+		// And revising it puts it back, which is what returning it asked for.
+		if _, err := f.store.Revise(ctx, f.triager, short.ClaimID,
+			"Waiting on the 6.2 rebase, which lands next sprint."); err != nil {
+			t.Fatal(err)
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing == nil {
+			t.Error("a revised claim did not start applying again")
+		}
+	})
+}
+
+// The personal page counts only the rows this person may still read.
+//
+// The page query narrowed and the follow-up row read did not, and a claim's
+// rows need not agree about visibility — so a claim listed through one
+// disclosed row counted its undisclosed ones into the row, issue and place
+// totals, and could hand one of them back as the claim's representative,
+// carrying its issue and its place. A count is the leak even where no row is
+// shown, and the page's own docstring promises the opposite: losing the
+// reading of something does not leave a list of its issues behind here.
+func TestThePersonalPageCountsOnlyWhatIsStillReadable(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// One claim over two places, one of them undisclosed.
+		here, hidden := f.at(), f.at()
+		hidden.PlaceIdentity = "undisclosed-place"
+		hidden.Visibility = access.Private
+		// Proposed while they could still read both, which is the only way a
+		// claim comes to hold a row its proposer may not read.
+		both := access.NewPerson(f.proposer, "proposer", false,
+			map[int64][]access.Role{f.product: {access.PrivateTriage}}, 0)
+		if _, err := f.store.ProposeMany(ctx, both, []triage.Proposal{
+			{
+				Place: here, Outcome: triage.WontFix,
+				Reasoning: "Not worth the churn.", By: f.proposer,
+			},
+			{
+				Place: hidden, Outcome: triage.WontFix,
+				Reasoning: "Not worth the churn.", By: f.proposer,
+			},
+		}, triage.DefaultTogetherCap); err != nil {
+			t.Fatal(err)
+		}
+
+		// Their private reading is withdrawn; the public half stays.
+		page, total, err := f.store.Became(ctx, f.triager, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || len(page) != 1 {
+			t.Fatalf("the page holds %d of %d claims, want the one they proposed", len(page), total)
+		}
+		if page[0].Rows != 1 || page[0].Places != 1 {
+			t.Errorf("it counts %d rows at %d places, want the one they may still read",
+				page[0].Rows, page[0].Places)
+		}
+		if page[0].Decision.PlaceIdentity == hidden.PlaceIdentity {
+			t.Error("an undisclosed place was handed back as the claim's representative")
+		}
+	})
+}

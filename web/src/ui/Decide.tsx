@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Editor, forget } from "./Editor";
 import { Failed } from "./Failed";
-import { JUSTIFICATIONS, labelled, type Justification } from "./Outcome";
+import { JUSTIFICATIONS, labeled, type Justification } from "./Outcome";
 import { Covering, type Sitting } from "./Covering";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
@@ -480,7 +480,7 @@ export function Decide({
               aria-pressed={outcome === each}
               onClick={() => setOutcome(each)}
             >
-              {labelled(each)}
+              {labeled(each)}
             </button>
           ))}
         </div>
@@ -501,7 +501,7 @@ export function Decide({
             >
               Same as last time
             </button>{" "}
-            — {labelled(same.outcome)}
+            — {labeled(same.outcome)}
             {same.justification ? ` · ${same.justification.replaceAll("_", " ")}` : ""}
           </p>
         )}

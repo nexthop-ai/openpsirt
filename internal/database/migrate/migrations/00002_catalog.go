@@ -46,6 +46,21 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 			"name"         ` + t.name + ` NOT NULL,
 			"display_name" ` + t.text + ` NOT NULL,
 			"eol_on"       ` + t.date + ` NULL,
+			-- What a product considers worth triaging.
+			--
+			-- Five thousand findings is a list nobody reads, and the ones that drown it
+			-- are the ones nobody was ever going to act on. Below this line a finding is
+			-- still recorded, still counted and still reportable — it leaves the working
+			-- list, not the system, because an auditor asking what we knew is entitled to
+			-- an answer whether or not it was worth an afternoon.
+			--
+			-- On the product rather than in application_setting because products differ in
+			-- what they can afford to ignore: one line for a whole estate is either too
+			-- strict somewhere or too loose somewhere else. Null means the deployment's
+			-- own line applies, which is the ordinary case and is why this is not NOT NULL
+			-- — a product with no opinion should not have to state the default, or it
+			-- would stop following it when the default changes.
+			"triage_floor" ` + t.kind + ` NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "product_name_unique" UNIQUE ("name")
 		)` + t.suffix,
@@ -136,7 +151,11 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 
 func downCatalog(ctx context.Context, tx *sql.Tx) error {
 	for _, table := range []string{"target", "variant", "stream", "product"} {
-		if _, err := tx.ExecContext(ctx, `DROP TABLE `+table); err != nil {
+		// Quoted, like every other identifier in the schema. A reserved word
+		// is only reserved when bare, and the four engines do not agree on
+		// which words those are — so an unquoted name fails on whichever
+		// engine somebody is least likely to be running.
+		if _, err := tx.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
 			return err
 		}
 	}
@@ -174,7 +193,15 @@ func typesFor(e database.Engine) *columnTypes {
 		// a four-byte character set.
 		return &columnTypes{
 			id: "BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY", ref: "BIGINT", refNull: "BIGINT",
-			name: "VARCHAR(191)", free: "TEXT", text: "TEXT", date: "DATE", timestamp: "DATETIME(6)",
+			name: "VARCHAR(191)", free: "TEXT", date: "DATE", timestamp: "DATETIME(6)",
+			// Sixteen megabytes for text somebody typed. The smaller type
+			// holds 65,535 bytes, and the policy that checks typed text
+			// before it is stored admits 65,536 — so a field that passed
+			// submission failed the write on these two engines and was
+			// recorded on the other two, or truncated silently outside
+			// strict mode, leaving an approver agreeing to words that are
+			// not the words that were written.
+			text:    "MEDIUMTEXT",
 			boolean: "TINYINT(1)", kind: "VARCHAR(16)", hash: "VARCHAR(64)",
 			// Sixteen megabytes, which is far more than a chunk ever holds.
 			// The smaller type tops out at 64 KB, which is not.

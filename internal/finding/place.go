@@ -126,7 +126,19 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		// upstream, so it is unaffected.
 		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
 		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS severity_centi").
+		// The three the rating in force is worked out from, scored by the
+		// project's one rule rather than by a second one in SQL: an
+		// assessment writes the word and never the published score, so the
+		// score alone says an issue rated critical here is worth zero.
+		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
+		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
+		// The deadline, because a promise to act is gated against the earliest
+		// one among what the act covers. Read from the rows rather than
+		// supplied, like the versions and the visibility: it is a fact about
+		// the place and a caller free to state it would be choosing whether
+		// their own commitment needed a second person.
+		ColumnExpr("f.due_at AS due_at").
 		// Whether the release was built once. A tag cannot change, so what may
 		// be said about a finding on one is narrower, and that is a fact about
 		// the build rather than about who is asking.
@@ -154,11 +166,125 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		Visibility:        access.AsVisibility(rows[0].Visibility),
 		ComponentUpstream: rows[0].ComponentUpstream,
 		ConsumerUpstream:  rows[0].ConsumerUpstream,
-		SeverityCenti:     rows[0].Severity,
+		SeverityCenti:     rows[0].score(),
+		DueAt:             earliestDue(rows),
 		OnTag:             rows[0].OnTag == 1,
 		Places:            len(rows),
 		distinctVersions:  distinctVersions(rows),
 	}, nil
+}
+
+// earliestDue is the deadline a place is gated against: the earliest among the
+// findings sitting there, and nil where none of them has one.
+//
+// The earliest rather than the first row's, for the reason one act covering a
+// critical and a medium is gated by the critical — a place holding the same
+// package under two consumers is one thing to decide about, and the strictest
+// deadline among them is what the decision is measured against.
+func earliestDue(rows []placeRow) *time.Time {
+	var earliest *time.Time
+	for _, row := range rows {
+		if row.DueAt == nil {
+			continue
+		}
+		if earliest == nil || row.DueAt.Before(*earliest) {
+			at := *row.DueAt
+			earliest = &at
+		}
+	}
+	return earliest
+}
+
+// At names one place a decision was made about, for asking what is open there
+// now.
+type At struct {
+	VulnerabilityID int64
+	PlaceIdentity   string
+}
+
+// DeadlineAt is the earliest deadline among the open findings at these places,
+// in these builds.
+//
+// What a promise already recorded is measured against, asked again rather than
+// remembered: the deadline moves when the policy or the rating moves, so a
+// promise being edited is gated against the deadline in force now and not the
+// one in force when it was first made.
+//
+// Narrowed by what the subject may see, like every other read here, and taking
+// a handle because the caller opens the transaction: resolved beforehand, a
+// retry recomputes a gate from findings somebody closed in between.
+func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID int64, targets []int64, places []At) (*time.Time, error) {
+
+	if !subject.Sees(productID) {
+		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+	visible := access.Visible(subject, productID)
+	if len(visible) == 0 {
+		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+	if len(targets) == 0 || len(places) == 0 {
+		return nil, nil
+	}
+
+	// The pair of lists matches more combinations than were asked for, so what
+	// was not asked for is dropped after the read. Naming each pair in the
+	// statement would be one OR group per place, and a claim reaches as many
+	// places as the issue sits at.
+	issues := make([]int64, 0, len(places))
+	identities := make([]string, 0, len(places))
+	wanted := make(map[At]bool, len(places))
+	for _, place := range places {
+		if wanted[place] {
+			continue
+		}
+		wanted[place] = true
+		issues = append(issues, place.VulnerabilityID)
+		identities = append(identities, place.PlaceIdentity)
+	}
+
+	var rows []struct {
+		VulnerabilityID int64      `bun:"vulnerability_id"`
+		PlaceIdentity   string     `bun:"place_identity"`
+		DueAt           *time.Time `bun:"due_at"`
+	}
+	if err := db.NewSelect().
+		TableExpr("finding AS f").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
+		ColumnExpr("f.place_identity AS place_identity").
+		ColumnExpr("MIN(f.due_at) AS due_at").
+		Where("f.target_id IN (?)", bun.List(targets)).
+		Where("f.vulnerability_id IN (?)", bun.List(issues)).
+		Where("f.place_identity IN (?)", bun.List(identities)).
+		Where("f.closed_at IS NULL").
+		Where("f.due_at IS NOT NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.vulnerability_id, f.place_identity").
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read the deadline this covers: %w", err)
+	}
+
+	var earliest *time.Time
+	for _, row := range rows {
+		if row.DueAt == nil || !wanted[At{row.VulnerabilityID, row.PlaceIdentity}] {
+			continue
+		}
+		if earliest == nil || row.DueAt.Before(*earliest) {
+			at := *row.DueAt
+			earliest = &at
+		}
+	}
+	return earliest, nil
+}
+
+// score is how bad this place's issue is judged to be now, by the one rule for
+// the number: the rating somebody made here where there is one, the published
+// score where there is not, and the published word scored where there is
+// neither.
+func (r placeRow) score() int {
+	return Rating{
+		Published: r.Published, Assessed: r.Assessed, ScoreCenti: r.ScoreCenti,
+	}.Score()
 }
 
 // placeRow is one open finding at the place being decided about.
@@ -167,7 +293,9 @@ type placeRow struct {
 	DueAt             *time.Time `bun:"due_at"`
 	ComponentUpstream string     `bun:"component_upstream"`
 	ConsumerUpstream  string     `bun:"consumer_upstream"`
-	Severity          int        `bun:"severity_centi"`
+	Published         string     `bun:"published_severity"`
+	Assessed          string     `bun:"assessed_severity"`
+	ScoreCenti        int        `bun:"score_centi"`
 	// OnTag as an integer rather than a boolean: the four engines spell a
 	// boolean three ways, and a CASE returning 1 or 0 reads the same on all of
 	// them.
@@ -191,18 +319,8 @@ func distinctVersions(rows []placeRow) int {
 	return len(seen)
 }
 
-// PlacesFor resolves every place one issue occupies in one component.
-//
-// This is what a judgment made on the finding covers: all of them by default,
-// with a narrower set chosen deliberately. Deciding one place at a time was
-// the only thing on offer, and a finding sitting at thirty places then meant
-// thirty judgments — which is how somebody stops reading.
-//
-// Read in one statement and grouped here rather than asked per place. A place
-// is a pair of names and the rows under one are ordered the same way PlaceFor
-// orders them, so which version a decision is keyed on does not depend on what
-// the database happened to return first. InBundle is one component of a fix
-// bundle, with the places the bundle reaches in it.
+// InBundle is one component of a fix bundle, with the places the bundle
+// reaches in it.
 //
 // Grouped by component and issue because that is the grain a decision and a
 // fix target are both keyed on: a bundle spanning two binary packages of one
@@ -271,7 +389,13 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		ColumnExpr("f.visibility AS visibility").
 		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
 		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS severity_centi").
+		// The three the rating in force is worked out from, scored by the
+		// project's one rule rather than by a second one in SQL: an
+		// assessment writes the word and never the published score, so the
+		// score alone says an issue rated critical here is worth zero.
+		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
+		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
 		ColumnExpr("f.due_at AS due_at").
 		ColumnExpr("CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS on_tag", catalog.Tag).
@@ -330,7 +454,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 			Visibility:        access.AsVisibility(row.Visibility),
 			ComponentUpstream: row.ComponentUpstream,
 			ConsumerUpstream:  row.ConsumerUpstream,
-			SeverityCenti:     row.Severity,
+			SeverityCenti:     row.score(),
 			DueAt:             row.DueAt,
 			FixedIn:           row.FixedIn,
 			Consumer:          row.Consumer,
@@ -345,6 +469,17 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 	return bundled, nil
 }
 
+// PlacesFor resolves every place one issue occupies in one component.
+//
+// This is what a judgment made on the finding covers: all of them by default,
+// with a narrower set chosen deliberately. Deciding one place at a time was
+// the only thing on offer, and a finding sitting at thirty places then meant
+// thirty judgments — which is how somebody stops reading.
+//
+// Read in one statement and grouped here rather than asked per place. A place
+// is a pair of names and the rows under one are ordered the same way PlaceFor
+// orders them, so which version a decision is keyed on does not depend on what
+// the database happened to return first.
 func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID int64,
 	vulnerabilityID, componentID int64) ([]Deciding, error) {
 
@@ -377,8 +512,16 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		ColumnExpr("f.visibility AS visibility").
 		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
 		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS severity_centi").
+		// The three the rating in force is worked out from, scored by the
+		// project's one rule rather than by a second one in SQL: an
+		// assessment writes the word and never the published score, so the
+		// score alone says an issue rated critical here is worth zero.
+		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
+		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
+		// The deadline each place carries, for the reason PlaceFor reads it.
+		ColumnExpr("f.due_at AS due_at").
 		ColumnExpr("CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS on_tag", catalog.Tag).
 		Join(`JOIN target AS tg ON tg.id = f.target_id`).
 		Join(`JOIN stream AS st ON st.id = tg.stream_id`).
@@ -421,7 +564,8 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 			Visibility:        access.AsVisibility(at[0].Visibility),
 			ComponentUpstream: at[0].ComponentUpstream,
 			ConsumerUpstream:  at[0].ConsumerUpstream,
-			SeverityCenti:     at[0].Severity,
+			SeverityCenti:     at[0].score(),
+			DueAt:             earliestDue(at),
 			FixedIn:           fixes[identity],
 			Consumer:          consumers[identity],
 			OnTag:             at[0].OnTag == 1,

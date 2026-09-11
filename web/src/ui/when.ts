@@ -50,46 +50,42 @@ export function since(moment: string | null | undefined, now: Date = new Date())
   if (seconds < 60) {
     return "just now";
   }
-  const scale: [number, string][] = [
-    [60, "minute"],
-    [3600, "hour"],
-    [86400, "day"],
-    [604800, "week"],
-    [2629800, "month"],
-    [31557600, "year"],
-  ];
-  let size = 60;
-  let unit = "minute";
-  for (const [each, name] of scale) {
-    if (seconds >= each) {
-      size = each;
-      unit = name;
-    }
-  }
-  const n = Math.floor(seconds / size);
-  return `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+  return `${magnitude(seconds)} ago`;
 }
 
 function ahead(seconds: number): string {
   if (seconds < 60) {
     return "in a moment";
   }
-  const scale: [number, string][] = [
-    [60, "minute"],
-    [3600, "hour"],
-    [86400, "day"],
-    [604800, "week"],
-    [2629800, "month"],
-    [31557600, "year"],
-  ];
+  return `in ${magnitude(seconds)}`;
+}
+
+// The units an interval is said in, largest that fits winning.
+//
+// One table. It was written twice, once per side of now, and a unit added to
+// one copy and not the other makes "3 days ago" and "in 3 days" answer
+// differently about the same interval — the failure the severity ladder has a
+// gate against, one table down.
+const SCALE: [number, string][] = [
+  [60, "minute"],
+  [3600, "hour"],
+  [86400, "day"],
+  [604800, "week"],
+  [2629800, "month"],
+  [31557600, "year"],
+];
+
+// magnitude is how long an interval is, in words, with no sense of direction.
+// Which side of now it falls on is the caller's sentence to write.
+function magnitude(seconds: number): string {
   let size = 60;
   let unit = "minute";
-  for (const [each, name] of scale) {
+  for (const [each, name] of SCALE) {
     if (seconds >= each) {
       size = each;
       unit = name;
     }
   }
   const n = Math.floor(seconds / size);
-  return `in ${n} ${unit}${n === 1 ? "" : "s"}`;
+  return `${n} ${unit}${n === 1 ? "" : "s"}`;
 }

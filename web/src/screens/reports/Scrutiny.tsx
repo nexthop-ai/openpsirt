@@ -9,6 +9,7 @@ import { Loading } from "../../ui/Loading";
 import { Outcome } from "../../ui/Outcome";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { WindowPicker, coveringWords } from "./Window";
 
 // How long back to look. Ninety days is a quarter, which is the period an
 // audit asks about; the other two are here because a control question is
@@ -29,7 +30,7 @@ const DISMISSALS = new Set(["not-applicable", "wont-fix", "already-fixed"]);
 // not apply, and where did it apply in form only.
 export function Scrutiny() {
   const at = useScope();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const days = Number(params.get("days") ?? 90);
   const product = at.product ?? "";
 
@@ -51,26 +52,9 @@ export function Scrutiny() {
     <Sheet
       name="Rubber-stamp"
       answers="how much a second pair of eyes actually did."
-      asked={`the last ${days} days`}
+      asked={coveringWords(days)}
     >
-      <div className="controls">
-        <div className="seg" role="group" aria-label="Window">
-          {WINDOWS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={days === n}
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                next.set("days", String(n));
-                setParams(next);
-              }}
-            >
-              {n === 365 ? "a year" : `${n} days`}
-            </button>
-          ))}
-        </div>
-      </div>
+      <WindowPicker offered={WINDOWS} days={days} />
 
       {got.isPending ? (
         <Loading />

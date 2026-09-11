@@ -11,9 +11,10 @@ import DOMPurify from "dompurify";
 // the allowlist whether it allows something proves only that it agrees with
 // itself.
 
-// The fenced-block tags that may reach a class attribute. The same list the
-// server's sanitizer holds: a language tag is somebody's input, and three
-// backticks followed by chosen text landing in markup is small and real.
+// The fenced-block tags that may reach a class attribute. This list is this
+// renderer's own — the server emits no markup and holds no such list — because
+// a language tag is somebody's input, and three backticks followed by chosen
+// text landing in markup is small and real.
 //
 // An unknown language keeps its block and loses the label rather than failing.
 // Refusing to render over a language nobody listed would make the tool argue
@@ -55,8 +56,8 @@ const md = new MarkdownIt({
   html: false,
   linkify: true,
   breaks: false,
-  // The server emits the language as a class and stops there; so does this.
-  // Coloring is applied afterwards, over already-sanitized markup.
+  // The language becomes a class and nothing else. Coloring is applied
+  // afterwards, over already-sanitized markup.
   highlight: () => "",
 });
 
@@ -77,8 +78,9 @@ md.renderer.rules.fence = (tokens, index) => {
 // finding that is a disclosure channel.
 //
 // An image of a file attached here is not that: it is fetched from this origin
-// through a path that asks who is looking, and the content security policy
-// permits images from this origin and no other. So the element is permitted
+// through a path that asks who is looking. The content security policy permits
+// images from this origin and from `data:`, so the policy is not what stops an
+// image pointing elsewhere — the rewrite below is. So the element is permitted
 // and its source is rewritten to that path before anything sees it; an image
 // pointing anywhere else loses the whole element rather than the attribute,
 // because an img with no src is a broken-image icon in the middle of somebody
@@ -183,37 +185,49 @@ function sameDeployment(href: string): boolean {
 // held to the one prefix the highlighter needs rather than left open — a class
 // is a small thing to permit and a large thing to permit freely.
 function tidy(node: Element) {
-  if (node.tagName === "A") {
-    const href = node.getAttribute("href") ?? "";
-    // A file held here is ours, so it keeps its href and is not sent out to
-    // another tab with a referrer policy meant for somebody else's site.
-    if (href.startsWith(ATTACHMENT_PATH)) {
-      return;
-    }
-    if (!SCHEMES.test(href)) {
-      // A link to somewhere in this deployment keeps its href. One finding
-      // referring to another is ordinary, the submission check accepts it,
-      // and deleting the anchor while leaving the text is the disagreement
-      // DESIGN-text.md records as the one nothing reports: accepted when it
-      // was written, no longer a link when anybody read it.
-      //
-      // Resolved against this page rather than matched against a pattern,
-      // because `//somewhere.else/x` is relative-looking and is not ours, and
-      // a scheme the browser refuses resolves to no origin at all.
-      if (sameDeployment(href)) {
-        return;
-      }
-      node.removeAttribute("href");
-    } else {
-      // Nothing linked from here is ours. No referrer, and no handle back to
-      // this window from whatever opens.
-      node.setAttribute("rel", "noreferrer noopener nofollow");
-      node.setAttribute("target", "_blank");
-    }
-  }
+  anchor(node);
   const className = node.getAttribute("class");
   if (className !== null && !/^language-[a-z0-9+#-]+$/.test(className)) {
     node.removeAttribute("class");
+  }
+}
+
+// anchor is the half of that about where a link goes.
+//
+// Separated so the class check above runs on every element that leaves here.
+// Written as early returns inside one function, the two anchors that keep
+// their href — a file held here, and a link into this deployment — left
+// without it, so the stated invariant was true of some of what the sanitizer
+// emits rather than of all of it.
+function anchor(node: Element) {
+  if (node.tagName !== "A") {
+    return;
+  }
+  const href = node.getAttribute("href") ?? "";
+  // A file held here is ours, so it keeps its href and is not sent out to
+  // another tab with a referrer policy meant for somebody else's site.
+  if (href.startsWith(ATTACHMENT_PATH)) {
+    return;
+  }
+  if (!SCHEMES.test(href)) {
+    // A link to somewhere in this deployment keeps its href. One finding
+    // referring to another is ordinary, the submission check accepts it,
+    // and deleting the anchor while leaving the text is the disagreement
+    // DESIGN-text.md records as the one nothing reports: accepted when it
+    // was written, no longer a link when anybody read it.
+    //
+    // Resolved against this page rather than matched against a pattern,
+    // because `//somewhere.else/x` is relative-looking and is not ours, and
+    // a scheme the browser refuses resolves to no origin at all.
+    if (sameDeployment(href)) {
+      return;
+    }
+    node.removeAttribute("href");
+  } else {
+    // Nothing linked from here is ours. No referrer, and no handle back to
+    // this window from whatever opens.
+    node.setAttribute("rel", "noreferrer noopener nofollow");
+    node.setAttribute("target", "_blank");
   }
 }
 
@@ -338,8 +352,12 @@ export function render(source: string): string {
   const clean = DOMPurify.sanitize(md.render(source), {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
-    // rel and target are set by the hook above rather than accepted from the
-    // text, so they are not in ALLOWED_ATTR and cannot be supplied.
+    // ADD_ATTR *extends* what is allowed, so these are accepted from the
+    // document as well as set by the hook. What stops an author supplying
+    // them is that raw markup is off at the parser (`html: false` above), so
+    // no author-written attribute reaches the sanitizer at all — and that is
+    // the control to keep, not this list. These are here so the hook's own
+    // additions survive attribute sanitizing.
     ADD_ATTR: ["rel", "target", "loading", "referrerpolicy"],
     ALLOW_DATA_ATTR: false,
     ALLOW_ARIA_ATTR: false,

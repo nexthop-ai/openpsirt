@@ -475,6 +475,12 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject) ([]Holding, 
 		ColumnExpr("f.assigned_to AS person_id").
 		GroupExpr("f.assigned_to, f.vulnerability_id, f.component_id, st.product_id")
 
+	// Bounded like every other list. It is a name-yielding projection —
+	// one row per person holding open work the caller can see — and it was
+	// the only one with no ceiling at all: no limit parameter, no default,
+	// and a response that grows with the deployment. Ordered by who is
+	// holding most, so the bound cuts the tail rather than an arbitrary
+	// slice.
 	var held []Holding
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "work"`, pieces).
@@ -483,6 +489,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject) ([]Holding, 
 		ColumnExpr("0 AS places").
 		ColumnExpr("0 AS overdue").
 		GroupExpr(`"work".person_id`).
+		OrderExpr("open DESC, person_id").
+		Limit(database.InBulk.Most).
 		Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("read who is holding what: %w", err)
 	}
@@ -756,7 +764,12 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		ColumnExpr("MIN(f.target_id) AS target_id").
 		ColumnExpr("COUNT(DISTINCT f.target_id) AS builds").
 		ColumnExpr("MAX(f.urgency) AS urgency").
-		ColumnExpr("MAX(f.opened_at) AS opened_at").
+		// The oldest place decides, as it does everywhere else here: a group
+		// open for a month with one place added yesterday has been somebody's
+		// problem for a month, and a maximum made it read as a day old — so
+		// the unassigned queue and the digest built on it sorted a six-week
+		// backlog item as new work.
+		ColumnExpr("MIN(f.opened_at) AS opened_at").
 		// Any undisclosed row makes the group undisclosed. Written as a sum
 		// rather than a boolean aggregate: the four engines do not agree on
 		// one, and counting is the same question asked portably.

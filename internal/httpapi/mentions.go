@@ -56,7 +56,7 @@ func registerMentions(api huma.API, in Ingest) {
 			return nil, noSuchProduct()
 		}
 
-		found, err := access.NewStore(in.DB.DB).WhoCanRead(ctx, product.ID, wanted, input.Term, input.Limit)
+		found, err := access.NewStore(in.DB.DB).WhoCanRead(ctx, subject, product.ID, wanted, input.Term, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who may be mentioned could not be read", err)
 		}

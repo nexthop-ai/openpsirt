@@ -221,20 +221,20 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 		// A version: refused, because a backport moves none — that is the
 		// whole difference between the two outcomes.
 		if got := asPerson(t, r, "triager", http.MethodPost, at,
-			`{"outcome":"patch-needed","committed_to":"2026-10-01","upgrade_to":"3.9.0",`+
+			`{"outcome":"patch-needed","committed_to":"`+aheadOfUs+`","upgrade_to":"3.9.0",`+
 				`"reasoning":"Taking the upstream commit as a distro patch."}`); got.Code < 400 {
 			t.Errorf("a backport naming a version answered %d", got.Code)
 		}
 		// The grain, not the word: an upgrade is right, and this is the wrong
 		// place for it.
 		if got := asPerson(t, r, "triager", http.MethodPost, at,
-			`{"outcome":"upgrade-needed","committed_to":"2026-10-01","upgrade_to":"3.9.0",`+
+			`{"outcome":"upgrade-needed","committed_to":"`+aheadOfUs+`","upgrade_to":"3.9.0",`+
 				`"reasoning":"Moving to 3.9.0."}`); got.Code < 400 {
 			t.Errorf("an upgrade recorded from one finding answered %d", got.Code)
 		}
 
 		got := asPerson(t, r, "triager", http.MethodPost, at,
-			`{"outcome":"patch-needed","committed_to":"2026-10-01",`+
+			`{"outcome":"patch-needed","committed_to":"`+aheadOfUs+`",`+
 				`"reasoning":"Taking the upstream commit as a distro patch in the next build."}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("recording a backport answered %d: %s", got.Code, got.Body.String())
@@ -246,7 +246,7 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 		if err := json.Unmarshal(got.Body.Bytes(), &wrote); err != nil {
 			t.Fatal(err)
 		}
-		if wrote.Outcome != "patch-needed" || wrote.CommittedTo != "2026-10-01" {
+		if wrote.Outcome != "patch-needed" || wrote.CommittedTo != aheadOfUs {
 			t.Errorf("the claim reads back as %+v", wrote)
 		}
 

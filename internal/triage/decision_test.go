@@ -396,13 +396,22 @@ func TestADeferralStopsStandingOnItsDate(t *testing.T) {
 			t.Error("a deferral did not stand before its date")
 		}
 
-		past := time.Now().UTC().Add(-time.Hour)
+		// The other half, recorded the only way it can happen: a deferral is
+		// written with a date still to come — one already gone is refused —
+		// and the date then arrives. Moved here rather than waited for.
 		lapsedPlace := f.at()
 		lapsedPlace.PlaceIdentity = "another-place"
-		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: lapsedPlace, Outcome: triage.Deferred, DeferredUntil: &past,
+		ran, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: lapsedPlace, Outcome: triage.Deferred, DeferredUntil: &soon,
 			Reasoning: "Was not that sprint either.", By: f.proposer,
-		}); err != nil {
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		past := time.Now().UTC().Add(-time.Hour)
+		if _, err := f.db.DB.NewUpdate().Table("claim").
+			Set("deferred_until = ?", past).
+			Where("id = ?", ran.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if standing, _ := f.store.Applying(ctx, lapsedPlace); standing != nil {
@@ -991,6 +1000,50 @@ func TestAVersionTooLongToKeyOnIsRefusedRatherThanShortened(t *testing.T) {
 			By:            f.proposer, NeedsApproval: true,
 		}); err != nil {
 			t.Errorf("a version exactly at the limit was refused: %v", err)
+		}
+	})
+}
+
+// A date already past is not a date.
+//
+// Nothing checked, and the two dates failed in opposite directions. A
+// deferral until last year took the place's live key so nobody else could
+// decide there, suppressed nothing, and landed in the review queue already
+// run out — a work item the tool made for itself. A promise to act by last
+// year was worse: the gate asks whether the date is past the deadline the
+// work already has, and a date in the past never is, so the promise stood on
+// one signature and hid the finding for good.
+func TestADateAlreadyPastIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		gone := time.Now().UTC().Add(-24 * time.Hour)
+		ahead := time.Now().UTC().Add(24 * time.Hour)
+
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &gone,
+			Reasoning: "Not this sprint, last sprint.", By: f.proposer,
+		}); err == nil {
+			t.Error("a deferral returning on a date already past was recorded")
+		}
+
+		// A place of its own, because one live claim per place means a
+		// refusal here would otherwise be indistinguishable from the
+		// refusal above having left a claim standing.
+		elsewhere := f.at()
+		elsewhere.PlaceIdentity = "somewhere-else"
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: elsewhere, Outcome: triage.PatchNeeded, CommittedTo: &gone,
+			Reasoning: "Backport landed before it was promised.", By: f.proposer,
+		}); err == nil {
+			t.Error("work promised for a date already past was recorded")
+		}
+
+		// And the same claims, on a date still to come.
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &ahead,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		}); err != nil {
+			t.Errorf("a deferral onto a date still to come was refused: %v", err)
 		}
 	})
 }

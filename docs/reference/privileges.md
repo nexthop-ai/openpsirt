@@ -10,9 +10,15 @@ of that as four tables of a hundred and sixty rows, which is the reference
 again at lower resolution — nobody looking up one endpoint reads a table to
 find it, and nobody reading about roles wants a list of paths.
 
-Access is granted in advance or not at all: **no account is created by signing
-in**. Somebody who authenticates and has no record is refused, so a role is
-something an administrator gave a person before they arrived.
+Access is granted in advance or not at all: **no account is created for
+anybody nothing authorized in advance**. Somebody who authenticates and has no
+record is refused, so a role is something an administrator gave a person
+before they arrived.
+
+Where a deployment derives roles from identity-provider groups, the mapping is
+that advance grant, and a record is written on first arrival for somebody it
+covers. Somebody in no mapped group is refused exactly as a stranger is, and
+nothing is recorded for them.
 
 ## The roles
 
@@ -39,8 +45,9 @@ capability bounded by what its holder may read, so granted alone it reaches
 nothing — somebody who may agree to claims needs a read role as well, and a
 deployment that grants only the capability has given somebody an empty tool.
 
-**An administrator administers** (REQ-42). People, roles, credentials, settings
-and the catalog. Reading and triaging are granted on a product like anybody
+**An administrator administers** (REQ-42). People, roles, credentials, settings,
+the catalog, and acts on the record itself — removing an attached file, and
+supplying a third party's evidence about a product. Reading and triaging are granted on a product like anybody
 else's, and an administrator who wants them grants them to themselves. Holding
 every product role there is does not amount to administration either — the two
 do not imply each other in either direction. This is what makes a read-only
@@ -59,30 +66,46 @@ Two rules are not roles and cannot be granted:
 
 Listing people is administration, and it stays that way: a directory of
 everybody who works here is not something a role about findings should carry.
-Two narrower questions are answered instead, each scoped to a product and
-capped, and neither is that list (REQ-42):
+Three narrower questions are answered instead, each narrowed by what the asker
+may see and each bounded, and none of them is that list (REQ-42):
 
 - **Who can be mentioned** in a comment on a particular finding — people who
- can already read it.
+ can already read it. Scoped to the product, capped.
 - **Who can hold work** in a product — people who could open what they would be
- given, and the teams routed work there.
+ given, and the teams routed work there. Scoped to the product, capped.
+- **Who is holding open work you can see** — a name and how much, across the
+ products your grants reach. Narrowed by subject in the data layer rather than
+ by a product in the path, and bounded like every other list, worst first.
 
 They are different projections on purpose. A team cannot be mentioned in prose
-but is a perfectly good holder of work, and somebody who can read a finding is
-not necessarily somebody it should be handed to.
+but is a perfectly good holder of work, somebody who can read a finding is not
+necessarily somebody it should be handed to, and who is overloaded is a
+question about work rather than about people.
 
 ## What a declaration is, and is not
 
-Each operation *declares* what it asks of a caller, and the declaration is not
-the check: the check is a line in the handler. Where somebody wrote a narrower
-check than the operation declares, the two disagree, and the reference follows
-the declaration. Six have disagreed, and every one was found by reading them
-against each other rather than by anything failing.
+Each operation *declares* what it asks of a caller. **The part of that about
+the caller alone runs; the part about the product is a line in the handler.**
 
-Enforcing the declaration centrally instead was considered and refused. A
-refusal's shape is part of the answer, and many of these deliberately report
-"not there" rather than "not yours" — a check that ran before the handler would
-answer the question the handler exists to avoid answering.
+The scope — administrator, your own credential, any recognized credential,
+none — is a fact about the subject and nothing else, so it is enforced from the
+declaration before any handler runs. Nothing had enforced it: an
+administrator-only operation whose handler check somebody deleted still
+rendered "Requires: administrator", still carried the extension a client
+generator reads, and answered anybody holding a credential.
+
+A role on a product is different, because it needs the product resolved, and
+that is where the handler's own refusal shape matters: many of these
+deliberately report "not there" rather than "not yours", and a check running
+before the handler would answer the question the handler exists to avoid
+answering. That reasoning is why the *scope* half is enforced centrally and the
+*role* half is not — enforcing both centrally was considered and refused, and
+enforcing neither is what left the ladder unverifiable.
+
+Where somebody wrote a narrower check than the operation declares, the two
+disagree, and the reference follows the declaration. Six have disagreed, and
+every one was found by reading them against each other rather than by anything
+failing.
 
 **Two kinds of rule, and each says which it is.** A gate refuses somebody
 holding none of the roles. Where the reference says *what you hold decides what
@@ -90,8 +113,17 @@ comes back rather than whether you may ask*, the roles narrow the answer
 instead: a stranger is answered, with nothing of theirs in it, and an empty list
 is the correct answer rather than a check that was skipped.
 
-**Every gate is swept.** A test walks the operations the server registers, and
-asks each gated one as somebody who holds none of its roles; a 2xx fails it.
+**Every gate is swept, at every scope.** A test walks the operations the server
+registers and asks each gated one as somebody it excludes: for a role on a
+product, somebody holding none of those roles; for an administrator gate,
+somebody holding a role and not administering; for a role on any product,
+somebody holding none anywhere. A 2xx fails it.
+
+It counts each of the three classes separately and refuses to pass on a class
+that has emptied. It swept only the first for a long time, which left the
+thirty-seven administrator gates and the three any-product ones walked by
+nothing — the ones a mistake would be worst on.
+
 That is a floor rather than a proof the check is the right one, and the rest is
 the authorization tests and review. It reads the operations rather than this
 page, which is why this page can be prose.

@@ -3,11 +3,12 @@ import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { usePaging } from "./list";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
-import { Because, labelled } from "../ui/Outcome";
+import { Because, labeled } from "../ui/Outcome";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 
@@ -77,7 +78,6 @@ export function Audit() {
   // as an answer: an auditor reading a year cannot narrow to something they
   // have not read yet, and the rows past the cap were unreachable from this
   // screen entirely.
-  const offset = Number(params.get("offset") ?? 0);
 
   function set(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -99,11 +99,12 @@ export function Audit() {
     setParams(next);
   }
 
+  // The shared handler, with the record's own addition: this list is long
+  // and paging it from the foot leaves the reader at the foot of the next
+  // page, looking at rows they have to scroll up to reach.
+  const { offset, go: paged } = usePaging();
   function go(to: number) {
-    const next = new URLSearchParams(params);
-    if (to <= 0) next.delete("offset");
-    else next.set("offset", String(to));
-    setParams(next);
+    paged(to);
     window.scrollTo({ top: 0 });
   }
 
@@ -402,7 +403,7 @@ function Judgment({ row }: { row: Judged }) {
           {/* The word, not the token. The justification beside it has been said
               in words for a while and this had not caught up, so a record read
               "upgrade-needed · The vulnerable code never runs". */}
-          <b>{labelled(row.outcome)}</b>
+          <b>{labeled(row.outcome)}</b>
           {row.justification && (
             <span className="why">
               <Because code={row.justification} />
@@ -444,6 +445,10 @@ function Judgment({ row }: { row: Judged }) {
               <span key={i}>
                 {i > 0 && ", "}
                 <b>{a.by}</b> · {on(a.at)}
+                {/* They read the earlier claim's words, not these. Shown
+                    because a name with no mark beside it says they read
+                    what is on the screen above it. */}
+                {a.carried && <span className="hint"> (carried forward)</span>}
               </span>
             ))
           )}
@@ -469,7 +474,8 @@ function Judgment({ row }: { row: Judged }) {
               {withdrawn.map((a, i) => (
                 <span key={i}>
                   {i > 0 && ", "}
-                  <b>{a.by}</b> agreed {on(a.at)}, withdrawn {on(a.withdrawn_at)}
+                  <b>{a.by}</b> agreed {on(a.at)}
+                  {a.carried && " (carried forward)"}, withdrawn {on(a.withdrawn_at)}
                 </span>
               ))}
             </dd>

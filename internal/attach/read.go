@@ -255,6 +255,14 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 		// folded the same way on the way in, so this is an equality an
 		// index can be used for.
 		Where("v.identifier_folded = ?", strings.ToLower(strings.TrimSpace(identifier))).
+		// Bounded and ordered, because the folded column carries an index
+		// and no uniqueness rule: the unique constraint is on the
+		// content-derived identity, which two rows whose folded names agree
+		// can differ in. Unbounded, which row answered was the engine's
+		// choice, so the same request listed a different issue's files on
+		// one engine than on another.
+		OrderExpr("v.id").
+		Limit(1).
 		Scan(ctx, &issue)
 	if database.IsNoRows(err) {
 		return 0, 0, ErrNoSuchIssue

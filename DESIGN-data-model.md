@@ -151,7 +151,7 @@ Bounded: no leading or trailing spaces, nothing empty, and a length keeping a
 unique index inside every engine's key-length limit. Uniqueness is within the
 parent — a product name globally, a stream and a variant within their product.
 
-**Capitals do not distinguish two names.** These are typed by hand into build
+Capitals do not distinguish two names. These are typed by hand into build
 scripts, so a pipeline saying `sonic` against a product declared `SONiC` is the
 same typo problem declaration-before-use exists to catch.
 
@@ -163,8 +163,8 @@ lower-case value compares the same under any collation, and the unique constrain
 means one thing on all four. The first attempt treated it as an engine difference
 to be configured around.
 
-**An identity a sign-in provider hands over is compared exactly.** It is not
-typed here and not ours to reinterpret; deciding that two accounts are one person
+An identity a sign-in provider hands over is compared exactly. It is not typed
+here and not ours to reinterpret; deciding that two accounts are one person
 merges access nobody granted.
 
 ## Engine differences
@@ -271,7 +271,7 @@ is three acts that can disagree with each other. Every component carries a
 | Source package | The binaries cut from it, which is the grouping itself |
 | Version it was built at | One source shipped twice in one build |
 
-**The source package's name alone is not enough**, and the fourth part is the one
+The source package's name alone is not enough, and the fourth part is the one
 that looks optional. Measured on the demo: keyed on all four, **41 groups fold
 and none of them holds binaries that disagree** about which issues they carry or
 which version fixes them. Keyed on the name alone, 72 fold and 14 disagree. The
@@ -288,7 +288,7 @@ none, one source at two versions in one build with one of them already fixed.
 | **Folded for capitals, like every other matched name** | The four engines do not fold alike outside ASCII, so it is folded here rather than asked of one of them |
 | **It does not reach the two records that name what shipped** | The disposition register is one row per issue and place, and a VEX or CSAF statement is one per issue and component — the binary a customer's scanner matched on, not the source it was cut from. Folding either would publish a claim about a package nobody received |
 
-**Not folded at ingest**, which is a different proposal and was rejected on
+Not folded at ingest, which is a different proposal and was rejected on
 measurement. 82 of the 117 groups hold binaries pulled in by different parents,
 so a folded node answers "what pulls this in" wrongly for each of them —
 `libcurl3t64-gnutls` has 30 distinct parents where `libcurl4t64` and `curl` have
@@ -307,8 +307,8 @@ The first statement of anything stands, and anything it did not state is taken
 from the next description that does. Nothing is overwritten: two producers
 disagreeing is not something a reader can settle.
 
-**The platform enumeration is kept and excluded from identity.** A scanner given
-one matches things a package identifier alone misses — vendor firmware, operating
+The platform enumeration is kept and excluded from identity. A scanner given one
+matches things a package identifier alone misses — vendor firmware, operating
 systems, appliances, anything never published to a package ecosystem. Deriving
 identity from both would move the identity of every component carrying the
 second.

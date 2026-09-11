@@ -28,6 +28,20 @@ type bundled struct {
 	Total int `json:"total"`
 }
 
+// aheadOfUs is a date still to come and inside the deadline anything in these
+// fixtures already has, so a promise landing on it stands rather than waiting.
+//
+// A date typed in goes past, and a promise landing on a date already gone is
+// refused — so every test about promising work would start failing on a day
+// that has nothing to do with what it pins.
+//
+// Two days rather than one: read as a date, tomorrow is midnight tonight, and
+// a run that starts before midnight and reaches these tests after it finds
+// tomorrow already behind it. Two days rather than a month, because a promise
+// past the deadline it covers is gated and these tests are about what a
+// promise reaches — the shortest window in the fixture is three days.
+var aheadOfUs = time.Now().UTC().AddDate(0, 0, 2).Format(time.DateOnly)
+
 func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 	// The same bump answers thousands of rows and there was no unit for
 	// it. Keyed on the source package rather than on the component, so
@@ -220,7 +234,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		const at = "/v1/products/mine/components/libcurl4t64/upgrade"
 		// Saying nothing about why is refused like every other judgment.
 		if got := asPerson(t, r, "triager", http.MethodPost, at,
-			`{"to":"8.5.0-1","by":"2026-09-08"}`); got.Code < 400 {
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`"}`); got.Code < 400 {
 			t.Errorf("a bump with no reasoning answered %d", got.Code)
 		}
 
@@ -236,7 +250,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			t.Fatalf("retiring the release answered %d: %s", set.Code, set.Body.String())
 		}
 		refused := asPerson(t, r, "triager", http.MethodPost, at,
-			`{"to":"8.5.0-1","by":"2026-09-08",`+
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
 				`"reasoning":"Taking the bump.",`+
 				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
 		if refused.Code < 400 {
@@ -260,9 +274,18 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			"/v1/products/mine/streams/master/end-of-life", `{"on":""}`); set.Code >= 300 {
 			t.Fatalf("putting the release back answered %d: %s", set.Code, set.Body.String())
 		}
+		// Putting a release back puts what is open in it back on the clock,
+		// and that rewrite happens away from the request. Run here as well so
+		// what follows is asked of a settled state rather than of a race: it
+		// computes the same deadlines, so the pass that is still in flight
+		// writes the same values.
+		if _, err := finding.NewStore(r.db.DB).Recompute(t.Context(),
+			finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
 
 		got := asPerson(t, r, "triager", http.MethodPost, at,
-			`{"to":"8.5.0-1","by":"2026-09-08",`+
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
 				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
 		if got.Code != http.StatusCreated {
@@ -346,7 +369,7 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 		r.scannedSiblings(t)
 		if got := asPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/components/libcurl4t64/upgrade",
-			`{"to":"8.5.0-1","by":"2026-09-08",`+
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump.",`+
 				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
@@ -422,7 +445,7 @@ func TestAnUpgradeIsOneDecisionPerPlaceHoweverManyBuildsShipIt(t *testing.T) {
 
 		got := asPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/components/libcurl4t64/upgrade",
-			`{"to":"8.5.0-1","by":"2026-09-08",`+
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
 				`"builds":[{"stream":"master","variant":"broadcom"},`+
 				`{"stream":"master","variant":"mellanox"}]}`)

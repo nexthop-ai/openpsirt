@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -217,6 +218,100 @@ func TestYourOwnWaitingClaimsAreTheirOwnQuestion(t *testing.T) {
 		// And somebody else's own list does not contain it.
 		if _, total, err := f.store.Queue(ctx, f.reviewer, true, 50, 0); err != nil || total != 0 {
 			t.Errorf("a claim appeared among somebody else's own: %d (%v)", total, err)
+		}
+	})
+}
+
+// The cumulative threshold counts a withdrawn deferral for as long as it
+// actually held.
+//
+// Excluded outright, the threshold was defeated by withdrawing and deferring
+// again: each span alone stayed under the line, the running total reset to
+// zero every time, and a place stayed hidden indefinitely with no second
+// person ever seeing it. Withdrawing needs nobody, so the whole loop is one
+// person's.
+func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		const threshold = 30 * 24 * time.Hour
+
+		// A first deferral, under the line, then taken back after most of it
+		// had run.
+		soon := time.Now().UTC().Add(29 * 24 * time.Hour)
+		first, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Reasoning: "Not this sprint.", By: f.proposer,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if first.NeedsApproval {
+			t.Fatal("a deferral under the threshold was gated, so this tests nothing")
+		}
+		// Four weeks pass, moved here rather than waited for, and then it is
+		// taken back. Withdrawing needs nobody, so the whole loop is one
+		// person's.
+		if _, err := f.db.DB.NewUpdate().Table("decision").
+			Set("proposed_at = ?", time.Now().UTC().Add(-28*24*time.Hour)).
+			Where("claim_id = ?", first.ClaimID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+			t.Fatal(err)
+		}
+
+		// The same place, put off again for another span under the line. The
+		// two together are past it, and the second is what a second person
+		// has to agree to.
+		again := time.Now().UTC().Add(29 * 24 * time.Hour)
+		needs, err := f.store.NeedsApproval(ctx, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &again,
+			Reasoning: "Not this sprint either.", By: f.proposer,
+		}, threshold)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !needs {
+			t.Error("deferring again after withdrawing needed nobody, so the " +
+				"threshold resets every time somebody takes a deferral back")
+		}
+	})
+}
+
+// Whether a claim needs a second person is worked out where it is written.
+//
+// It was a field on the proposal, answered before the transaction opened and
+// taken on trust — so a threshold an administrator lowered between the answer
+// and the write stored a claim as needing nobody under a policy that says it
+// does, and nothing reported it. A caller stating the flag at all is the same
+// shape the binding deadline had.
+func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// A deferral of ten days, and a deployment that gates anything past
+		// seven.
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.DeferralThreshold,
+			(7 * 24 * time.Hour).String()); err != nil {
+			t.Fatal(err)
+		}
+		until := time.Now().UTC().Add(10 * 24 * time.Hour)
+
+		// Recorded as needing nobody, which is what a caller who read the
+		// old policy would have said.
+		made, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
+			Reasoning: "Not this sprint.", By: f.proposer,
+			NeedsApproval: false,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !made.NeedsApproval {
+			t.Error("a deferral past the deployment's threshold was stored as " +
+				"needing nobody, on the caller's word")
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
+			t.Error("and it took effect at once")
 		}
 	})
 }

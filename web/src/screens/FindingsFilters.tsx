@@ -1,4 +1,4 @@
-import { labelled } from "../ui/Outcome";
+import { labeled } from "../ui/Outcome";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
@@ -52,7 +52,7 @@ export const STATES = [
   ["lapsed", "Lapsed"],
 ] as const;
 
-// The outcomes this filter offers, labelled from the one map rather than
+// The outcomes this filter offers, labeled from the one map rather than
 // beside the tokens here: a second spelling of a word somebody picks and then
 // reads back is how the two stop agreeing, which is what happened to the
 // decision form's "Backport needed".
@@ -68,7 +68,7 @@ export const OUTCOMES: readonly (readonly [string, string])[] = [
       "upgrade-needed",
       "patch-needed",
     ] as const
-  ).map((each) => [each, labelled(each)] as const),
+  ).map((each) => [each, labeled(each)] as const),
 ];
 
 export const ASSIGNED = [

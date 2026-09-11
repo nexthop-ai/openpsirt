@@ -53,6 +53,16 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- statement filter scan this whole table once per statement.
 			"identifier_folded" ` + t.name + ` NOT NULL,
 			"severity"      ` + t.kind + ` NULL,
+			-- What we say instead, where somebody here has assessed it.
+			--
+			-- The published rating is never overwritten: a rating of ours
+			-- shown where the world's goes reads as the world's, and the
+			-- first person to check against the public record finds a
+			-- discrepancy nobody declared. Everything that ranks, filters or
+			-- clocks reads this with the published one as its fallback,
+			-- through one expression — every identity and expiry bug here
+			-- came from letting one fact into two rules.
+			"assessed_severity" ` + t.kind + ` NULL,
 			-- What somebody triaging needs in front of them. There may be
 			-- thousands of these and very few people, so a finding that
 			-- carries its own evidence is the difference between a queue that
@@ -76,14 +86,6 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- where that shows.
 			"score_centi"     ` + t.ref + ` NULL,
 			"vector"          ` + t.free + ` NULL,
-			-- What kind of flaw this is, by the classification the data
-			-- carries. Comma-separated rather than a table of its own,
-			-- because nothing joins on it: it is read with the issue and shown
-			-- with it, and a table would buy a join for a value never queried
-			-- on its own. A report usually names the same weakness from
-			-- several sources, so what is stored is deduplicated and ordered
-			-- — otherwise a re-scan would rewrite the row for no change.
-			"weaknesses"      ` + t.free + ` NULL,
 			"first_seen_at" ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "vulnerability_identity_unique" UNIQUE ("identity")
 		)` + t.suffix,
@@ -106,6 +108,34 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vulnerability_reference_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "vulnerability_reference_unique" UNIQUE ("vulnerability_id", "url_identity")
 		)` + t.suffix,
+
+		// What kind of flaw this is, by the classification the data carries.
+		//
+		// A row per weakness rather than one comma-joined column, which is the
+		// shape every other multi-valued attribute here has. Packed into one
+		// column it was queried on anyway — the class-of-flaw filter — and the
+		// only way to ask "is CWE-79 in this list" without a table is a
+		// substring match, which answers CWE-79 for a search for CWE-7 unless
+		// it is written as four separate patterns to respect the commas. Four
+		// unindexable patterns per name asked, against every issue, where a
+		// table answers with one indexed lookup.
+		//
+		// A report usually names the same weakness from several sources, so
+		// the pair is unique: a re-scan of the same data writes nothing.
+		`CREATE TABLE "vulnerability_weakness" (
+			"id"               ` + t.id + `,
+			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			-- Upper-cased on the way in, like every other identifier compared
+			-- exactly: CWE names are written CWE-79 everywhere they are
+			-- published, and a feed that shouts or whispers one should not
+			-- make two rows of it.
+			"cwe"              ` + t.name + ` NOT NULL,
+			CONSTRAINT "vulnerability_weakness_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "vulnerability_weakness_unique" UNIQUE ("vulnerability_id", "cwe")
+		)` + t.suffix,
+
+		// What the class-of-flaw filter reads: every issue of one kind.
+		`CREATE INDEX "vulnerability_weakness_cwe_idx" ON "vulnerability_weakness" ("cwe")`,
 
 		`CREATE TABLE "vulnerability_alias" (
 			"id"               ` + t.id + `,
@@ -320,6 +350,11 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- recorded, and a finding whose closure could only be read
 			-- through a run was one a person could never close at all.
 			"closed_at"        ` + t.timestamp + ` NULL,
+			-- When this runs out, worked out from how urgent it is and
+			-- counted from when it was first seen. Null where it is on no
+			-- clock at all: below the product's triage line, on a release
+			-- past end of life, or already answered.
+			"due_at"           ` + t.timestamp + ` NULL,
 			-- The run that closed it, where a run did. Null with a closed_at
 			-- set is a finding a person closed.
 			"closed_run_id"    ` + t.refNull + ` NULL,
@@ -353,6 +388,12 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			ON "vulnerability_alias" ("identifier_folded", "vulnerability_id")`,
 
 		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at")`,
+
+		// What is running out, off an index rather than a scan. It leads with
+		// the two columns always compared — a finding that is closed or
+		// already answered is not running out of anything — so the deadline
+		// itself is the range at the end of a narrow prefix.
+		`CREATE INDEX "finding_due_idx" ON "finding" ("closed_at", "suppressed_by", "due_at")`,
 		// Finding one issue everywhere it is present, which is what triaging
 		// one vulnerability across a portfolio asks for.
 		`CREATE INDEX "finding_vulnerability_idx" ON "finding" ("vulnerability_id", "closed_at")`,
@@ -401,6 +442,7 @@ func downFinding(ctx context.Context, tx *sql.Tx) error {
 		`DROP TABLE "scan_run"`,
 		`DROP TABLE "vulnerability_reference"`,
 		`DROP TABLE "vulnerability_alias"`,
+		`DROP TABLE "vulnerability_weakness"`,
 		`DROP TABLE "vulnerability"`,
 	} {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {

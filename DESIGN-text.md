@@ -21,19 +21,33 @@ Satisfies REQ-65, REQ-66, REQ-67, REQ-69.
 
 ## Policy and sanitizing
 
-Two controls, kept apart.
+Two controls, kept apart, and they run in two different places.
 
 | | Runs | Covers |
 |---|---|---|
 | Policy | Once, on the server, at submission, before storage | What is permitted, which links survive, what each reference resolves to |
-| Sanitizing | Every time the text is rendered | Text stored before a rule existed |
+| Sanitizing | Wherever the text is rendered, which is not here | Text stored before a rule existed |
 
-Both run. Policy needs data and authorization checks no client holds. Sanitizing
-covers stored text, because a sanitizer improved next year does nothing for
-markup already in the database.
+Policy needs data and authorization checks no client holds, so it is the
+server's. Sanitizing travels with rendering, and **nothing on the server
+renders**: the API returns the source as its only representation, and mail is
+sent as plain text. The interface sanitizes what it renders, and an integrator
+rendering this markdown sanitizes what they render.
 
-The source is stored; rendered markup never is. The same text reaches a browser,
-an email and an export.
+A sanitizer was written here and never called. Its policy, its language
+allowlist and its time bound sat behind an entry point no running code reached,
+so a rule improved in it next year would change nothing for anybody — while this
+document said it ran on every render, which is the shape a reviewer ticks. It is
+gone, and what is written here is what happens.
+
+What that costs, stated rather than glossed: text stored under an older
+submission policy is served as source, so a rule written after it was stored is
+applied by whoever renders it and by nobody else. For the interface that is the
+interface's own sanitizer, which is current. For an integrator it is theirs,
+which is why the API says so.
+
+The source is stored; rendered markup never is. The same text reaches a
+browser, an email and an export.
 
 ## Raw markup
 
@@ -41,8 +55,11 @@ Raw markup is refused at the parser rather than stripped afterwards. The parser
 drops a raw block and escapes an inline one. The assertion is that nothing
 arrives as live markup, not which of the two mechanisms ran.
 
-The sanitizer runs over the parser output regardless, and that is asserted
-separately.
+There is no second pass. A sanitizer ran over the parser's output once, and it
+was the only reader of the rendering this server no longer does — so what
+stands between a payload and a reader is the check at submission, which is the
+half the server owns. What renders is somebody else's, and each renderer has
+its own tests over the same corpus.
 
 ## Link schemes
 
@@ -116,24 +133,27 @@ Markdown is what an integrating application can most easily lay out, and it read
 as plain text as it stands. HTML assumes a browser, which most callers of an
 API-first tool are not.
 
-The server renders for an email's HTML part, which has no client to render for
-it. It does not render for a reader on the way out of the API.
+Mail is plain text, so nothing renders there either. An HTML part is the case
+that would need a renderer on the server, and it is not built.
 
-Sanitizing travels with rendering: for the interface that is the browser, for an
-email it is here. An integrator rendering this markdown sanitizes what they
-render. A rendering that fails is the renderer's problem, since the source is
-authoritative.
+Sanitizing travels with rendering, and every renderer is somebody else's: the
+interface for a browser, an integrator for their own application. A rendering
+that fails is the renderer's problem, since the source is authoritative.
 
 ## Rendered and escaped text
 
 | Origin | Treatment |
 |---|---|
 | Typed into this tool | Passes the submission policy and is rendered as markdown |
-| Supplied by a scan file | Escaped and displayed as written, never rendered (REQ-66) |
+| Supplied by a scan file | Shown as written, never rendered (REQ-66) |
 
 Both live in the same column, so the origin decides. Rendering the column would
 hand whoever wrote the scan file a formatting language aimed at the browsers of
 the people holding the most access in this deployment.
+
+Escaping, like sanitizing, happens where the text is put into a document —
+which is the interface, not here. What the server guarantees is that the two
+origins stay distinguishable, so a renderer can tell which it is holding.
 
 ## Refusals
 
@@ -146,18 +166,29 @@ The language tag after three backticks is input and lands in a class attribute.
 It is allowlisted. An unrecognized language keeps the block and loses the label
 rather than failing.
 
-The allowlist is applied in one place, by the sanitizer, on the way out. What is
-asserted is the rendered output, because asking the allowlist directly proves
-only that it agrees with itself.
+The allowlist is whoever renders. This server emits no markup, so the list it
+held went with the renderer — and each reader keeps its own, over which what is
+asserted is the rendered output: asking an allowlist directly proves only that
+it agrees with itself.
 
 ## Bounds
 
-Every field is capped at 64 KB. Rendering is time-bounded.
+Every field is capped at 64 KB. Nothing here renders, so the cap is the whole
+of the bound: what was time-bounded was a rendering this server stopped doing.
 
-The time bound bounds the wait, not the work: a parse cannot be interrupted, so
-the work runs to completion with nobody reading the result. What the bound buys
-is that the request answers and releases its resources. The cap on the work is
-the length limit, applied before any parsing starts.
+The column holds what the cap admits, on every engine. Two of the four spell
+plain text as a type topping out at 65,535 bytes, one byte short of the cap — so
+a field of exactly the admitted size passed submission and failed the write on
+those two, or was truncated without a word outside strict mode, which leaves an
+approver agreeing to text that is not the text somebody wrote. The quick loop
+never saw it, because the engine it runs on stores it happily.
+
+The parse that remains is the one the submission check makes, over text already
+inside that cap — so the cap is applied before any parsing starts and is what
+bounds the work. The time bound that sat beside it bounded the *wait* rather
+than the work, which is a distinction worth keeping in mind if rendering ever
+comes back: a parse cannot be interrupted, so what such a bound buys is that
+the request answers and releases its resources while the work runs on.
 
 ## Limits
 

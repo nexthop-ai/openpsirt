@@ -66,7 +66,11 @@ func visibilityOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 		Join("JOIN target AS tg ON tg.id = f.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		ColumnExpr("COUNT(*) AS here").
-		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS undisclosed",
+		// Counted rather than summed over a CASE. That shape comes back as a
+		// decimal on two of the four engines and the cast that fixes it is
+		// spelled per engine, which is why the rule says to write two counts
+		// — and this was the second copy of a shape recorded as removed.
+		ColumnExpr("COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS undisclosed",
 			access.Private).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
@@ -119,6 +123,37 @@ func mayReach(ctx context.Context, db bun.IDB, subject access.Subject,
 	return nil
 }
 
+// mayAttach reports whether a subject may put a file against this issue.
+//
+// **Attaching is triage work, not reading.** It was authorized with the read
+// test above, so a role granting nothing but the ability to read disclosed
+// findings on one product could write files into the deployment's store — and
+// what that costs is not the reader's, it is every other upload in every
+// product once the quota is gone.
+//
+// A collaborator brought onto the case may still attach. Evidence is usually
+// the reason somebody is brought in, and a grant that cannot carry it is one
+// that grants nothing where it matters.
+func mayAttach(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID, vulnerabilityID int64) error {
+
+	if err := mayReach(ctx, db, subject, productID, vulnerabilityID); err != nil {
+		return err
+	}
+	if subject.OnCase(productID, vulnerabilityID) {
+		return nil
+	}
+	visibility, _, err := visibilityOf(ctx, db, productID, vulnerabilityID)
+	if err != nil {
+		return err
+	}
+	if !subject.Triages(visibility, productID) {
+		// The same words reaching it refuses with, for the same reason.
+		return access.Denied(fmt.Sprintf("attach a file in product %d", productID))
+	}
+	return nil
+}
+
 // Upload stores a file against an issue and records it.
 //
 // The bytes are streamed rather than held (the file-size limit bounds one
@@ -135,12 +170,12 @@ func mayReach(ctx context.Context, db bun.IDB, subject access.Subject,
 // sweep took it a day later.
 func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64, filename string, body io.Reader, size int64,
-	maxSize, quota int64, hangsOffTheIssue bool) (*Attachment, error) {
+	maxSize, quota, share int64, hangsOffTheIssue bool) (*Attachment, error) {
 
 	if !s.Configured() {
 		return nil, ErrNotConfigured
 	}
-	if err := mayReach(ctx, s.db, subject, productID, vulnerabilityID); err != nil {
+	if err := mayAttach(ctx, s.db, subject, productID, vulnerabilityID); err != nil {
 		return nil, err
 	}
 	if size <= 0 {
@@ -152,6 +187,9 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	// Asked before anything is carried, so an upload that cannot be kept is
 	// refused rather than transferred and then thrown away.
 	if err := roomIn(ctx, s.db, size, quota); err != nil {
+		return nil, err
+	}
+	if err := shareLeft(ctx, s.db, subject.ID, size, share); err != nil {
 		return nil, err
 	}
 
@@ -202,6 +240,9 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		if err := roomIn(ctx, tx, size, quota); err != nil {
 			return err
 		}
+		if err := shareLeft(ctx, tx, subject.ID, size, share); err != nil {
+			return err
+		}
 		_, err := tx.NewInsert().Model(row).Exec(ctx)
 		return err
 	})
@@ -241,6 +282,32 @@ func roomIn(ctx context.Context, db bun.IDB, size, quota int64) error {
 		return fmt.Errorf("read how much is stored: %w", err)
 	}
 	if held+size > quota {
+		return ErrNoRoom
+	}
+	return nil
+}
+
+// shareLeft refuses an upload that would take one person past their part of
+// the store.
+//
+// The deployment-wide ceiling is one person's to reach on their own, and what
+// reaching it costs is everybody else's next upload — a triager's evidence on
+// an active embargo in another product answering "no room" because somebody
+// filled it. Asked with the same handle roomIn takes, for the same reason.
+func shareLeft(ctx context.Context, db bun.IDB, personID, size, share int64) error {
+	if share <= 0 || personID == 0 {
+		return nil
+	}
+	var held int64
+	if err := db.NewSelect().
+		TableExpr("attachment AS at").
+		ColumnExpr("COALESCE(SUM(at.size_bytes), 0)").
+		Where("at.redacted_at IS NULL").
+		Where("at.uploaded_by = ?", personID).
+		Scan(ctx, &held); err != nil {
+		return fmt.Errorf("read how much they are holding: %w", err)
+	}
+	if held+size > share {
 		return ErrNoRoom
 	}
 	return nil

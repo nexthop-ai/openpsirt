@@ -122,7 +122,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// The averaging happens over the grouped issues, in a statement of its
 	// own, because averaging inside the grouping would average the places.
 	if err := s.db.NewSelect().
-		TableExpr("(?) AS per_issue", closed).
+		TableExpr(`(?) AS "per_issue"`, closed).
 		ColumnExpr("per_issue.band AS band").
 		ColumnExpr("COUNT(*) AS issues").
 		ColumnExpr(secondsBetween(s.db)+" AS seconds").
@@ -147,7 +147,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Where("f.opened_at >= ?", since).
 		GroupExpr("f.vulnerability_id")
 	count, err := s.db.NewSelect().
-		TableExpr("(?) AS grouped", scope.Narrow(onlyReadable(opened, subject, products, all))).Count(ctx)
+		TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(opened, subject, products, all))).Count(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("count what opened: %w", err)
 	}
@@ -171,7 +171,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 			q = q.Where("f.opened_at > ?", now.Add(-time.Duration(bucket.to)*24*time.Hour))
 		}
 		n, err := s.db.NewSelect().
-			TableExpr("(?) AS grouped", scope.Narrow(onlyReadable(q, subject, products, all))).Count(ctx)
+			TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(q, subject, products, all))).Count(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("count what is aging: %w", err)
 		}
@@ -185,7 +185,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 			Count int    `bun:"number"`
 		}
 		byBand := q.NewSelect().
-			TableExpr("(?) AS grouped", scope.Narrow(onlyReadable(
+			TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(
 				byBandOf(q, s.db), subject, products, all))).
 			ColumnExpr("grouped.band AS band").
 			ColumnExpr("COUNT(*) AS number").
@@ -226,7 +226,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 				now.Add(-time.Duration(bucket.to)*24*time.Hour))
 		}
 		one.Undecided, err = s.db.NewSelect().
-			TableExpr("(?) AS grouped",
+			TableExpr(`(?) AS "grouped"`,
 				scope.Narrow(onlyReadable(unanswered, subject, products, all))).Count(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("count what is aging undecided: %w", err)

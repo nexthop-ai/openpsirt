@@ -42,9 +42,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 		Description: "Everybody granted this one issue in this product, oldest first.\n\n" +
 			"**Being on a case is not reading the product.** A collaborator sees this issue " +
 			"wherever it sits here and nothing else, may argue about it and comment on it, " +
-			"and may not agree to anybody's claim — two collaborators could otherwise satisfy " +
-			"the two people a dismissal on an embargoed finding asks for, with nobody " +
-			"accountable for the product involved.",
+			"and may not agree to anybody's claim.",
 		Tags: []string{"Findings"},
 	}, perProduct, "Only where you may read undisclosed work.", privateRights()...),
 		func(ctx context.Context, input *struct {
@@ -114,7 +112,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			// where an undisclosed finding may be named, and a
 			// message that said "you were given access to
 			// something" and not to what would be unactionable.
-			if err := notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
+			tell(ctx, in, "could not say that somebody was brought into a case", notify.Telling{
 				PersonID: person.ID, Kind: notify.BroughtIn,
 				Body: "You have been brought into " + input.Vulnerability + " in " +
 					input.Product + ". You can read and argue about that issue there, " +
@@ -127,10 +125,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				// and the grant is what reaches this issue.
 				ProductID:       &product,
 				VulnerabilityID: &issue,
-			}); err != nil && in.Logger != nil {
-				in.Logger.Error("could not say that somebody was brought into a case",
-					"error", err, "person", person.Identity)
-			}
+			}, "person", person.Identity)
 			return &struct{}{}, nil
 		})
 

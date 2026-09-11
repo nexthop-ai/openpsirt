@@ -27,10 +27,18 @@ export const api = createClient<paths>({
 // readable by script, where the session cookie is not — that asymmetry is what
 // makes echoing it evidence the request came from a page rather than from a
 // form somebody else's site submitted.
+//
+// Held under two names: over TLS the server sets it with the `__Host-` prefix,
+// which is what stops a sibling host writing one for this deployment to read,
+// and without TLS a browser refuses that prefix at all. Both are looked for,
+// because which one is there is a property of the deployment rather than of
+// the page.
 function csrfCookie(): string {
   for (const part of document.cookie.split(";")) {
     const [name, ...rest] = part.trim().split("=");
-    if (name === "openpsirt_csrf") return decodeURIComponent(rest.join("="));
+    if (name === "__Host-openpsirt_csrf" || name === "openpsirt_csrf") {
+      return decodeURIComponent(rest.join("="));
+    }
   }
   return "";
 }

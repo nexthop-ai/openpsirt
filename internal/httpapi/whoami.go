@@ -10,6 +10,8 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // CanBody is one product somebody can reach, and what they may do in it.
@@ -30,7 +32,7 @@ type CanBody struct {
 	MayTriage bool   `json:"may_triage" doc:"Argue about a finding"`
 	MayAssign bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
 	MayHide   bool   `json:"may_hide" doc:"Argue about a finding nobody has disclosed"`
-	MayAgree  bool   `json:"may_agree" doc:"Agree to somebody else's claim"`
+	MayAgree  bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
 }
 
 // WhoBody is the caller, as the caller.
@@ -56,12 +58,18 @@ type WhoBody struct {
 	// policy rather than a secret — the same rule everybody here is subject
 	// to — so it is answered to anybody who may ask about themselves.
 	DeferralDays int `json:"deferral_days,omitempty" doc:"How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted"`
+	// BulkCap is how many rows one action may write. A screen offering a
+	// selection has to know it before the selection is acted on: a loop of
+	// single writes bounded by nothing turns one click into as many round
+	// trips as the filter matched, which is a page nobody can use and
+	// nothing can cancel.
+	BulkCap int `json:"bulk_cap,omitempty" doc:"How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
 }
 
 func registerWhoAmI(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-current-subject", Method: http.MethodGet, Path: "/v1/session/me",
-		Summary: "Describe whoever is asking",
+		Summary: "Describe the current subject",
 		Description: "Returns the caller, the products they can reach, and what they may do in " +
 			"each one.\n\n" +
 			"It answers what a screen has to know before it draws: whether to offer an action " +
@@ -83,6 +91,12 @@ func registerWhoAmI(api huma.API, in Ingest) {
 		}
 		if threshold, err := deferralThreshold(ctx, in); err == nil {
 			body.DeferralDays = int(threshold.Hours() / 24)
+		}
+		if in.DB != nil {
+			if cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
+				triage.DefaultTogetherCap); err == nil {
+				body.BulkCap = cap
+			}
 		}
 		// What they asked to be sent, where they are a person and this
 		// process has somewhere to read it from. A credential asks for
@@ -132,7 +146,13 @@ func registerWhoAmI(api huma.API, in Ingest) {
 				MayAssign: triages && subject.Holds(access.Assigner, product.ID),
 				MayTriage: triages,
 				MayHide:   subject.Holds(access.PrivateTriage, product.ID),
-				MayAgree:  subject.Holds(access.Approver, product.ID),
+				// The capability, or a triage role — which is what the
+				// operation accepts, and what makes a two-person team where
+				// neither holds the capability able to review at all. Asked
+				// of the capability alone, a screen drawing its controls
+				// from this hid approve and reject from somebody the server
+				// would have accepted, with nothing saying why.
+				MayAgree: subject.Holds(access.Approver, product.ID) || triages,
 			})
 		}
 		sort.Slice(body.Reach, func(i, j int) bool {

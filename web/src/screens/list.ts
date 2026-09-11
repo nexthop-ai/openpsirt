@@ -1,3 +1,5 @@
+import { useSearchParams } from "react-router-dom";
+
 import type { Body } from "../api/client";
 
 // The findings list, apart from the screen that draws it.
@@ -263,4 +265,26 @@ export function fromAt(from: string, absolute: number, limit: number): string {
   if (page === 0) next.delete("offset");
   else next.set("offset", String(page));
   return next.toString();
+}
+
+// Where a list is paged to, kept in its address.
+//
+// The offset lives in the address for the reason every filter does: a page
+// somebody sends is the page they were looking at. Five screens each had
+// their own copy of this — read the offset, clone the parameters, delete it
+// or set it, write them back — and the rule that keeps a first page's address
+// clean, deleting rather than setting zero, was five chances to write
+// `?offset=0` into a link.
+export function usePaging(): { offset: number; go: (to: number) => void } {
+  const [params, setParams] = useSearchParams();
+  const offset = Number(params.get("offset") ?? 0);
+  return {
+    offset,
+    go(to: number) {
+      const next = new URLSearchParams(params);
+      if (to <= 0) next.delete("offset");
+      else next.set("offset", String(to));
+      setParams(next);
+    },
+  };
 }

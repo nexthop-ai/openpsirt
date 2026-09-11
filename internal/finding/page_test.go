@@ -258,3 +258,48 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 		}
 	})
 }
+
+// A group holding one undisclosed place among any number of public ones is
+// undisclosed.
+//
+// It was derived as a maximum of the visibility word, on the belief that
+// "private" sorts after "public". It does not — 'r' comes before 'u' — so the
+// expression answered "public" for exactly the mixed group it was written to
+// catch, and the list drew no embargo marker on a row holding a finding
+// nobody has announced. Somebody reads the row, sees nothing, and repeats it
+// outside the deployment.
+func TestOneUndisclosedPlaceMakesTheWholeGroupUndisclosed(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// One issue at a package two things pull in, so the fold holds two
+		// places — and one of them is not disclosed.
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		var hidden int64
+		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
+			ColumnExpr("MIN(id)").Scan(ctx, &hidden); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("visibility = ?", access.Private).
+			Where("id = ?", hidden).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PrivateTriage)
+		groups, _, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(groups) != 1 {
+			t.Fatalf("the fold read as %d groups, want the one it is: %+v", len(groups), groups)
+		}
+		if !groups[0].Undisclosed {
+			t.Error("a group holding an undisclosed place read as disclosed, so the list " +
+				"would show no embargo marker on it")
+		}
+	})
+}

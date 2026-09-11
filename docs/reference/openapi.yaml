@@ -168,6 +168,9 @@ components:
         by:
           description: Their sign-in identity
           type: string
+        carried:
+          description: Whether this agreement was carried forward from an earlier claim rather than given for this one
+          type: boolean
         withdrawn_at:
           description: When the agreement was taken back, by the approver or by somebody editing the words it was given for
           type: string
@@ -222,6 +225,10 @@ components:
         batch:
           description: The batch it was approved under, if it was a bulk approval
           type: string
+        carried_from:
+          description: The approval this was carried forward from, where a re-affirmation stood on an earlier agreement rather than a fresh one
+          format: int64
+          type: integer
         covered:
           description: Findings this covered when it was agreed to
           format: int64
@@ -287,6 +294,9 @@ components:
           description: How many products those sit in
           format: int64
           type: integer
+        mine:
+          description: You made this rating, so you may not be the one who agrees
+          type: boolean
         needs_approval:
           description: Whether a second person has to agree before it takes effect
           type: boolean
@@ -501,7 +511,7 @@ components:
           readOnly: true
           type: string
         group:
-          description: The group as the provider names it — a team slug, or a claim value
+          description: The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here
           maxLength: 191
           minLength: 1
           type: string
@@ -742,7 +752,7 @@ components:
       additionalProperties: false
       properties:
         may_agree:
-          description: Agree to somebody else's claim
+          description: Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
           type: boolean
         may_assign:
           description: Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage
@@ -1014,6 +1024,7 @@ components:
           items:
             format: int64
             type: integer
+          maxItems: 2000
           type:
             - array
             - "null"
@@ -1884,6 +1895,9 @@ components:
     DisposedBody:
       additionalProperties: false
       properties:
+        agreement_carried:
+          description: Whether the agreement was carried forward from an earlier claim rather than given for this one
+          type: boolean
         approved_at:
           type: string
         approved_by:
@@ -2546,7 +2560,7 @@ components:
           description: A live claim at one of these places is currently with its author, sent back for more
           type: boolean
         severity:
-          description: As the scanner rated it. A word, not a score
+          description: "The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"
           type: string
         source:
           description: "The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"
@@ -2610,6 +2624,7 @@ components:
           description: Other builds of this product the same judgment covers. All of it is written together or none of it is
           items:
             $ref: "#/components/schemas/AlsoBuild"
+          maxItems: 2000
           type:
             - array
             - "null"
@@ -2655,7 +2670,9 @@ components:
         places:
           description: Which places this covers, as the finding names them. Omit for all of them
           items:
+            maxLength: 191
             type: string
+          maxItems: 2000
           type:
             - array
             - "null"
@@ -7511,6 +7528,10 @@ components:
         admin:
           description: Administers this deployment
           type: boolean
+        bulk_cap:
+          description: How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+          format: int64
+          type: integer
         deferral_days:
           description: How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted
           format: int64
@@ -7793,7 +7814,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Get how the second-person rule is holding
+      summary: Get approval coverage
       tags:
         - Reports
       x-openpsirt-requires:
@@ -7842,7 +7863,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what we have said about issues
+      summary: List issue assessments
       tags:
         - Triage
       x-openpsirt-requires:
@@ -7940,7 +7961,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List how much each person is dealing with
+      summary: List assignment totals
       tags:
         - Findings
       x-openpsirt-requires:
@@ -7951,7 +7972,7 @@ paths:
       description: |-
         Takes the bytes back out and leaves the record. The reference in the text stays and says the file was removed, which is the difference between a redaction and a hole in the record.
 
-        Administrators only, and a reason is required. It is the answer to somebody having attached a credential, so it is deliberate and it is recorded.
+        Administrators only. A reason is required, and it is recorded and shown wherever the text referred to the file.
 
         **Requires:** administrator
       operationId: redact-attachment
@@ -8412,6 +8433,8 @@ paths:
     get:
       description: |-
         Returns every approval recorded against this claim, including ones later withdrawn, each naming the revision of the justification it was given for.
+
+        An approval carrying `carried_from` was not given for this claim. A re-affirmation states its own reasoning and stands on the agreement its predecessor had, so the person named agreed to the earlier claim's words; `carried_from` is the approval where those are.
 
         A withdrawn approval is kept rather than deleted: who agreed to what, and when it stopped counting, is part of the record.
 
@@ -9088,7 +9111,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what keeps being put off
+      summary: List repeated deferrals
       tags:
         - Reports
       x-openpsirt-requires:
@@ -9303,7 +9326,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9316,6 +9341,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9334,7 +9360,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9372,6 +9400,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -9491,6 +9520,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9510,6 +9540,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9589,7 +9620,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9647,7 +9680,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is open across every product
+      summary: List findings across every product
       tags:
         - Findings
       x-openpsirt-requires:
@@ -9715,7 +9748,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9728,6 +9763,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9746,7 +9782,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9784,6 +9822,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -9903,6 +9942,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -9922,6 +9962,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -10001,7 +10042,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -10225,7 +10268,7 @@ paths:
       description: |-
         Four figures about how this deployment is working, as against what it holds: how long a finding sits before anybody proposes anything, how long a claim waits for a second person, what each person got through, and how much came back.
 
-        **The two waits are said three ways** — the middle, what nine in ten came in under, and the longest. An average alone hides the case somebody is asking about: ten decisions in a day and one in a quarter average to a fortnight, which describes neither.
+        **The two waits come back three ways each** — the middle, what nine in ten came in under, and the longest — so a caller reads three numbers per wait rather than one.
 
         **Per severity**, because a critical waiting a week and a low waiting a week are not the same fact.
 
@@ -10384,7 +10427,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is waiting on you
+      summary: List your notifications
       tags:
         - Notifications
       x-openpsirt-requires:
@@ -11474,7 +11517,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11487,6 +11532,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11505,7 +11551,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11543,6 +11591,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -11662,6 +11711,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11681,6 +11731,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11760,7 +11811,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11963,7 +12016,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11976,6 +12031,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -11994,7 +12050,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12032,6 +12090,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -12151,6 +12210,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12170,6 +12230,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12249,7 +12310,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12376,7 +12439,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12389,6 +12454,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12407,7 +12473,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12445,6 +12513,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -12564,6 +12633,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12583,6 +12653,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12662,7 +12733,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12720,7 +12793,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is open, gathered by component
+      summary: List findings by component
       tags:
         - Findings
       x-openpsirt-requires:
@@ -12815,7 +12888,9 @@ paths:
           schema:
             description: "Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12828,6 +12903,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12846,7 +12922,9 @@ paths:
           schema:
             description: "Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi"
             items:
+              maxLength: 64
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -12884,6 +12962,7 @@ paths:
           name: under
           schema:
             description: Keep only what sits inside the container of this name
+            maxLength: 191
             type: string
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
@@ -13003,6 +13082,7 @@ paths:
             items:
               maxLength: 32
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -13022,6 +13102,7 @@ paths:
             items:
               maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -13101,7 +13182,9 @@ paths:
           schema:
             description: "Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"
             items:
+              maxLength: 191
               type: string
+            maxItems: 200
             type:
               - array
               - "null"
@@ -13135,7 +13218,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Export what is open, gathered by component
+      summary: Export findings by component
       tags:
         - Findings
       x-openpsirt-requires:
@@ -13258,7 +13341,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is open, gathered by the bump that would fix it
+      summary: List findings by upgrade
       tags:
         - Findings
       x-openpsirt-requires:
@@ -13477,9 +13560,11 @@ paths:
 
         **Nothing about the finding, the decisions or the approvals moves**, because they are keyed on the issue rather than on what it is called. What changes is that the name travels with it: a report arriving under the new name resolves here rather than opening a second issue, the finding shows it, and the advisory carries it in the field a reader looks in — which is the one lookup a published advisory exists to serve.
 
+        **A name is identity, and identity is deployment-wide.** From here on a scan of any product reporting that name resolves to this issue and inherits its decisions. So this asks for the right to triage the issue in every product it is currently open in, at the visibility each one carries, and is refused rather than partly done.
+
         Recording a name it already goes by succeeds and changes nothing.
 
-        **Requires:** public-triage or private-triage on the product
+        **Requires:** public-triage or private-triage on the product. Also asks for triage in every other product the issue is open in.
       operationId: add-alias
       parameters:
         - in: path
@@ -13517,6 +13602,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+        note: Also asks for triage in every other product the issue is open in.
   /v1/products/{product}/issues/{vulnerability}/attachments:
     get:
       description: |-
@@ -13562,11 +13648,11 @@ paths:
 
         The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
 
-        Refused when the file is larger than this deployment accepts, or when it has no room left; both limits are settings. A deployment that has configured no store holds no attachments and says so.
+        Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings. A deployment that has configured no store holds no attachments and says so.
 
         An upload nothing refers to is removed after a day, so a file attached and then abandoned does not accumulate. Send `evidence=true` where the file hangs off the issue itself — a test case that proves the flaw — rather than off text you are about to write: it is then listed at once and never swept, because the issue is what points at it.
 
-        **Requires:** any recognized credential. Answers only what you may see.
+        **Requires:** public-triage or private-triage on the product. A collaborator brought onto this issue may attach to it too.
       operationId: upload-attachment
       parameters:
         - in: path
@@ -13619,8 +13705,11 @@ paths:
       tags:
         - Findings
       x-openpsirt-requires:
-        scope: any
-        note: Answers only what you may see.
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: A collaborator brought onto this issue may attach to it too.
   /v1/products/{product}/issues/{vulnerability}/builds:
     put:
       description: |-
@@ -13682,7 +13771,7 @@ paths:
       description: |-
         Everybody granted this one issue in this product, oldest first.
 
-        **Being on a case is not reading the product.** A collaborator sees this issue wherever it sits here and nothing else, may argue about it and comment on it, and may not agree to anybody's claim — two collaborators could otherwise satisfy the two people a dismissal on an embargoed finding asks for, with nobody accountable for the product involved.
+        **Being on a case is not reading the product.** A collaborator sees this issue wherever it sits here and nothing else, may argue about it and comment on it, and may not agree to anybody's claim.
 
         **Requires:** private-read or private-triage on the product. Only where you may read undisclosed work.
       operationId: list-collaborators
@@ -15805,7 +15894,9 @@ paths:
 
         Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version bump is a prompt to re-check rather than a new claim.
 
-        It does need approval again if the justification differs from the original, or if the vulnerability's severity has risen since — both mean this is not the claim that was agreed to. The response says which happened.
+        It does need approval again if the vulnerability's severity has risen since the original was agreed to, or if nothing was ever agreed to. What was agreed was that this did not matter much, which is not an agreement about what it has become. The response says whether a second person is needed.
+
+        Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
 
         `reasoning` is required. "Still true" with nothing behind it is what a re-affirmation becomes when it is made too easy.
 
@@ -16440,7 +16531,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Read back a document a build sent
+      summary: Fetch a scan document
       tags:
         - Ingest
       x-openpsirt-requires:
@@ -16531,7 +16622,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List the words in use on a product
+      summary: List a product's tags
       tags:
         - Findings
       x-openpsirt-requires:
@@ -17054,6 +17145,8 @@ paths:
 
         Every role but administration names the product it applies to. Administration is bound without one, because it is global rather than held against a product.
 
+        **The group is matched exactly, including its capitals.** It is an identity the provider hands over rather than a name anybody here types, so it is stored as given and compared as given — `Security` and `security` are two bindings, and a binding whose capitals do not match what the provider sends grants nothing. The refusal somebody then meets says only that they are not authorized, so check the spelling against the provider rather than against what looks right.
+
         **Requires:** administrator
       operationId: bind-group
       requestBody:
@@ -17411,9 +17504,7 @@ paths:
   /v1/score:
     get:
       description: |-
-        Returns the base score and the severity band a vector works out to.
-
-        It exists so that a screen composing a vector can show what it will score without holding a second copy of the formula. One implementation, and what somebody sees while choosing is what gets stored.
+        Returns the base score and the severity band a vector works out to. It reads nothing and records nothing.
 
         CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a different scheme, and scoring either with this one produces a number nothing downstream could tell apart from a real one.
 
@@ -17441,7 +17532,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Work out what a CVSS vector scores
+      summary: Score a CVSS vector
       tags:
         - Findings
       x-openpsirt-requires:
@@ -17496,7 +17587,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Describe whoever is asking
+      summary: Describe the current subject
       tags:
         - Access
       x-openpsirt-requires:
@@ -17556,7 +17647,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what this deployment has decided
+      summary: List this deployment's settings
       tags:
         - Administration
       x-openpsirt-requires:
@@ -17591,7 +17682,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Change something for this deployment
+      summary: Change one setting
       tags:
         - Administration
       x-openpsirt-requires:
@@ -17618,7 +17709,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List the ways in
+      summary: List sign-in providers
       tags:
         - Access
       x-openpsirt-requires:

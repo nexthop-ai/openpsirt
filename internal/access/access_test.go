@@ -524,3 +524,82 @@ func TestBeingOnACaseIsNotReadingTheProduct(t *testing.T) {
 		t.Error("a collaborator reads an issue they were not brought into")
 	}
 }
+
+// A capability grants no visibility of its own, including to an
+// administrator.
+//
+// The set that narrows findings, counts, aggregates and exports was built by
+// asking whether the subject may know the product exists, which is true for
+// an administrator everywhere and true for anybody holding a bare capability
+// there. So an administrator who granted themselves the ability to assign
+// work on a product — and no read role — read every disclosed finding in it.
+// A non-administrator with the same grant was correctly excluded, which is
+// what makes it a widening rather than a policy.
+func TestACapabilityAloneNarrowsNoFindings(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		sonic, onie := f.products["sonic"], f.products["onie"]
+
+		boss := access.NewPerson(1, "boss", true, map[int64][]access.Role{
+			sonic: {access.Assigner},
+			onie:  {access.PublicRead},
+		}, 0)
+		products, all := boss.Products()
+		if all {
+			t.Fatal("an administrator narrows to every product, which is not what Products is")
+		}
+		for _, id := range products {
+			if id == sonic {
+				t.Error("a product held by nothing but a capability narrows findings")
+			}
+		}
+		if len(products) != 1 || products[0] != onie {
+			t.Errorf("the products whose findings they read are %v, want the one read role", products)
+		}
+
+		// And they still know the product exists, which is what administering
+		// the catalog means.
+		if !boss.Sees(sonic) {
+			t.Error("an administrator cannot see a product they administer")
+		}
+	})
+}
+
+// A grant that grants nothing is not access, including here.
+//
+// Every other question about what somebody holds reads past an inactive
+// grant; this one counted every row. So in group-bound mode — where every
+// assigned grant is inactive by construction — withdrawing somebody's last
+// live role answered "they still hold something here", their assigned
+// findings stayed with somebody who can no longer open them, and the
+// response said nothing had been released. That is the exact outcome the
+// question exists to prevent.
+func TestAnInactiveGrantIsNotSomethingSomebodyHolds(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		sonic := f.products["sonic"]
+		person, err := f.store.Ensure(ctx, "alice", "Alice", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, sonic, access.PrivateTriage); err != nil {
+			t.Fatal(err)
+		}
+		if held, err := f.store.HoldsAnythingIn(ctx, person.ID, sonic); err != nil || !held {
+			t.Fatalf("a live grant reads as nothing: %v %v", held, err)
+		}
+
+		// The deployment switches to group-bound roles, which leaves every
+		// assigned grant inactive rather than deleting it.
+		if err := f.store.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+		held, err := f.store.HoldsAnythingIn(ctx, person.ID, sonic)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held {
+			t.Error("a grant that grants nothing reads as something they hold, " +
+				"so their assigned work is never handed back")
+		}
+	})
+}

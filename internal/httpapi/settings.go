@@ -53,6 +53,8 @@ var settable = []struct {
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else"},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time"},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it"},
+	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog"},
+	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload"},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here"},
 	{setting.WaitingAfter, "How long a claim may wait on a second person before whoever can approve it is told. What is wrong is that nothing has happened, which is the one thing no message driven by an event can report"},
 	{setting.SentBackAfter, "How long a claim an approver asked more of may sit untouched before its proposer is told again. Shorter than the wait above: the question was asked of the person already holding it"},
@@ -85,7 +87,8 @@ func aSeverity(name string) bool { return name == setting.TriageFloor }
 // value checked as the wrong kind is stored and then silently ignored.
 func aCount(name string) bool {
 	switch name {
-	case setting.TogetherCap, setting.AttachmentMaxSize, setting.AttachmentQuota:
+	case setting.TogetherCap, setting.AttachmentMaxSize, setting.AttachmentQuota,
+		setting.AttachmentShare, setting.RoutingBatch:
 		return true
 	}
 	return false
@@ -94,7 +97,7 @@ func aCount(name string) bool {
 func registerSettings(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-settings", Method: http.MethodGet, Path: "/v1/settings",
-		Summary: "List what this deployment has decided",
+		Summary: "List this deployment's settings",
 		Description: "Returns every setting an operator may change, its value, and what it " +
 			"decides. `default` means nobody has set it and the shipped value is in use.\n\n" +
 			"The shipped numbers are a starting point rather than a recommendation. What a " +
@@ -126,7 +129,7 @@ func registerSettings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "set-setting", Method: http.MethodPut, Path: "/v1/settings/{name}",
-		Summary: "Change something for this deployment",
+		Summary: "Change one setting",
 		Description: "Sets one value for everybody here. Durations are written the way Go writes " +
 			"them — `72h`, `30m` — and a value that cannot be read is refused rather than " +
 			"stored, since a setting nothing can parse is a policy silently reverting to the " +
@@ -352,8 +355,12 @@ func shipped(name string) string {
 		return strconv.Itoa(triage.DefaultTogetherCap)
 	case setting.AttachmentMaxSize:
 		return strconv.Itoa(setting.DefaultAttachmentMaxSize)
+	case setting.RoutingBatch:
+		return strconv.Itoa(setting.DefaultRoutingBatch)
 	case setting.AttachmentQuota:
 		return strconv.Itoa(setting.DefaultAttachmentQuota)
+	case setting.AttachmentShare:
+		return strconv.Itoa(setting.DefaultAttachmentShare)
 	case setting.AbsentAfter:
 		return setting.DefaultAbsentAfter.String()
 	case setting.WaitingAfter:

@@ -392,7 +392,7 @@ func registerComponentExport(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-finding-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings/components.{format}",
-		Summary: "Export what is open, gathered by component",
+		Summary: "Export findings by component",
 		Description: "One row per component and version, with how many distinct issues are " +
 			"open against it and how many places those sit at — every row, not one page.\n\n" +
 			"This is the shape a release meeting argues over: where the weight is rather " +
@@ -410,32 +410,13 @@ func registerComponentExport(api huma.API, in Ingest) {
 		AtOneBuild
 		Narrowing
 	}) (*huma.StreamResponse, error) {
-		subject, err := reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if in.DB == nil {
-			return nil, noDatabase(in.Logger)
-		}
-		scope, err := scoped(ctx, in, subject, ScopeQuery{
+		at, err := narrowing(ctx, in, ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		})
+		}, input.AtOneBuild, input.Narrowing, "the triage line could not be read")
 		if err != nil {
 			return nil, err
 		}
-		floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the triage line could not be read", err)
-		}
-		narrowed, err := input.filter(floor)
-		if err != nil {
-			return nil, err
-		}
-		narrowed.DiffersBetweenBuilds = input.Differs
-		if narrowed.Beneath, err = beneathIn(ctx, in, scope, input.Beneath); err != nil {
-			return nil, err
-		}
-		store := finding.NewStore(in.DB.DB)
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
 		line := "everything"
 		if floor.Hides() {
 			line = floor.Word

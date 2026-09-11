@@ -109,47 +109,15 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 		return readableBy(q, subject, "de")
 	}
 
-	total, err := s.db.NewSelect().
-		TableExpr("(?) AS \"mine\"", mine()).Count(ctx)
+	page, err := s.pageClaims(ctx, subject, mine, limit, offset, "what you proposed")
 	if err != nil {
-		return nil, 0, fmt.Errorf("count what you proposed: %w", err)
+		return nil, 0, err
 	}
+	if len(page.Order) == 0 {
+		return nil, page.Total, nil
+	}
+	total, ids, byID, rows := page.Total, page.Order, page.Claims, page.Rows
 
-	var page []struct {
-		ClaimID int64 `bun:"claim_id"`
-		Newest  int64 `bun:"newest"`
-	}
-	if err := mine().OrderExpr("newest DESC").
-		Limit(limit).Offset(offset).Scan(ctx, &page); err != nil {
-		return nil, 0, fmt.Errorf("read what you proposed: %w", err)
-	}
-	if len(page) == 0 {
-		return nil, total, nil
-	}
-	ids := make([]int64, 0, len(page))
-	for _, row := range page {
-		ids = append(ids, row.ClaimID)
-	}
-
-	var claims []Claim
-	if err := s.db.NewSelect().Model(&claims).
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read what you proposed: %w", err)
-	}
-	byID := make(map[int64]Claim, len(claims))
-	for _, claim := range claims {
-		byID[claim.ID] = claim
-	}
-
-	// Every row of every claim on the page, in one read, and every agreement
-	// ever recorded against those rows — because "somebody agreed and then
-	// took it back" is a fact about the agreements rather than about the row,
-	// which reads as proposed again either way.
-	var rows []Decision
-	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where("de.claim_id IN (?)", bun.List(ids)).Order("de.id ASC").Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read what you proposed: %w", err)
-	}
 	var agreements []Approval
 	if err := s.db.NewSelect().Model(&agreements).
 		Where("claim_id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
@@ -192,9 +160,9 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 		entry.Happened, entry.When, entry.By = became(byClaim[id], agreed)
 	}
 
-	representatives := make([]Decision, 0, len(page))
-	for _, row := range page {
-		if entry, ok := gathered[row.ClaimID]; ok {
+	representatives := make([]Decision, 0, len(ids))
+	for _, id := range ids {
+		if entry, ok := gathered[id]; ok {
 			representatives = append(representatives, entry.Decision)
 		}
 	}
@@ -207,8 +175,8 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 	// hold part of back. Only a bulk claim has outliers, and only one that is
 	// still being argued has anything to do about them.
 	var bulk []Claim
-	for _, row := range page {
-		entry, ok := gathered[row.ClaimID]
+	for _, id := range ids {
+		entry, ok := gathered[id]
 		if !ok || entry.Claim.Kind != TogetherClaim {
 			continue
 		}
@@ -222,9 +190,9 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 		return nil, 0, err
 	}
 
-	out := make([]Became, 0, len(page))
-	for _, row := range page {
-		entry, ok := gathered[row.ClaimID]
+	out := make([]Became, 0, len(ids))
+	for _, id := range ids {
+		entry, ok := gathered[id]
 		if !ok {
 			continue
 		}

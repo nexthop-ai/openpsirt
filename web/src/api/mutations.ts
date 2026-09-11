@@ -1,23 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { unwrap } from "./queries";
-
-// Anything that changes a decision invalidates the same set: the queue it may
-// have left, the decision itself, and the finding it hangs off. Listed once
-// rather than per call, because the one somebody forgets is the screen that
-// silently shows the old answer.
-function useAfterDeciding() {
-  const queries = useQueryClient();
-  return () => {
-    void queries.invalidateQueries({ queryKey: ["queue"] });
-    void queries.invalidateQueries({ queryKey: ["decision"] });
-    void queries.invalidateQueries({ queryKey: ["decided"] });
-    void queries.invalidateQueries({ queryKey: ["home"] });
-  };
-}
+import { useAfterClaim } from "./claims";
 
 export function useWithdraw() {
-  const done = useAfterDeciding();
+  const done = useAfterClaim();
   return useMutation({
     mutationFn: async ({ id }: { id: number }) =>
       unwrap(await api.DELETE("/v1/claims/{id}", { params: { path: { id } } })),
@@ -26,7 +13,7 @@ export function useWithdraw() {
 }
 
 export function useRevise() {
-  const done = useAfterDeciding();
+  const done = useAfterClaim();
   return useMutation({
     mutationFn: async ({ id, reasoning }: { id: number; reasoning: string }) =>
       unwrap(

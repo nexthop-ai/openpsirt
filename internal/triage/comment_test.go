@@ -2,8 +2,10 @@ package triage_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -152,6 +154,42 @@ func TestARewriteRefusedForOneReasonRatherThanTwo(t *testing.T) {
 		// And the author is still refused nothing.
 		if _, err := f.store.Reword(ctx, f.triager, said.ID, "Second thought."); err != nil {
 			t.Errorf("the author could not change their own comment: %v", err)
+		}
+	})
+}
+
+// A field the text policy admits fits the column on every engine.
+//
+// The policy bounds typed text at 65,536 bytes and the column held 65,535 on
+// two of the four, so a justification of exactly the admitted size passed
+// submission and failed the write on MySQL and MariaDB — or was truncated
+// silently outside strict mode, which leaves an approver agreeing to words
+// that are not the words that were written. The quick loop never saw it,
+// because SQLite stores it happily.
+func TestTextThePolicyAdmitsFitsTheColumn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// Exactly what the policy admits, in plain prose so nothing else
+		// refuses it.
+		reasoning := strings.Repeat("a", markdown.MaxBytes)
+		if err := markdown.Check(reasoning); err != nil {
+			t.Fatalf("the policy refuses what it says it admits: %v", err)
+		}
+
+		made, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Place: f.at(), Outcome: triage.WontFix,
+			Reasoning: reasoning, By: f.proposer,
+		})
+		if err != nil {
+			t.Fatalf("a field of exactly the admitted size could not be stored: %v", err)
+		}
+		kept, err := f.store.ReasoningFor(ctx, []triage.Decision{*made})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(kept[made.ID]) != len(reasoning) {
+			t.Errorf("%d bytes were written and %d came back",
+				len(reasoning), len(kept[made.ID]))
 		}
 	})
 }

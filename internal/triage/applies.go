@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Applying returns the decision standing against a place, if one is.
@@ -40,21 +41,22 @@ import (
 // without the finding itself having been authorized.
 func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	decision := new(Decision)
+	standing, held := finding.InForce()
 	// With its argument: what suppresses a finding is the outcome, and a
 	// deferral stops standing on a date that is held there too.
 	query := s.db.NewSelect().Model(decision).Relation("Claim").
 		Where("de.product_id = ?", at.ProductID).
 		Where("de.vulnerability_id = ?", at.VulnerabilityID).
 		Where("de.place_identity = ?", at.PlaceIdentity).
-		// Approved, or proposed and never needing agreement. A claim that
-		// hides risk and is waiting for a second person does not suppress
-		// anything in the meantime — otherwise the queue is decorative and one
-		// person can dismiss a finding on their own, which is the whole thing
-		// the second pair of eyes exists to prevent.
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("de.state = ?", Approved).
-				WhereOr("de.state = ? AND de.needs_approval = ?", Proposed, false)
-		})
+		// Approved, or proposed and never needing agreement, and not one
+		// that was sent back — asked of the one spelling rather than written
+		// out here. It was written out here, and the sent-back half was added
+		// to this copy alone, so a claim an approver returned went on
+		// suppressing its finding everywhere else that asks the same
+		// question: the overdue figure, the list, the backlog, the compliance
+		// rate, the notice saying a deferral is ending, and the count of what
+		// stands on one signature.
+		Where(standing, held...)
 
 	query = matchVersion(query, "de.component_upstream_version", at.ComponentUpstream)
 	query = matchVersion(query, "de.consumer_upstream_version", at.ConsumerUpstream)
@@ -227,7 +229,7 @@ type Filter struct {
 	// entirely legitimate — an outcome that hides nothing needs no second
 	// person, and a short deferral stands on its own — so it is asked together
 	// with an outcome. What it is for is showing that no *dismissal* sits in
-	// it: not-applicable, won't-fix and already-fixed all require approval, so
+	// it: not-applicable, will-not-fix and already-fixed all require approval, so
 	// that query should return nothing, and a row in it is a control that
 	// failed.
 	//

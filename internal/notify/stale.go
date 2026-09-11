@@ -9,6 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // Work that has stopped moving.
@@ -82,7 +83,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		// of this private" by alphabetical accident.
 		ColumnExpr("SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS private_rows",
 			access.Private).
-		Where("de.state = ?", "proposed").
+		Where("de.state = ?", triage.Proposed).
 		Where("de.needs_approval = ?", true).
 		Where("de.sent_back_at IS NULL").
 		Where("de.proposed_at <= ?", since).
@@ -124,7 +125,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 				continue
 			}
 			at := per[row.ProductID]
-			if !at.approves || !at.public || (private && !at.private) {
+			if !at.approves || !at.public() || (private && !at.private()) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
@@ -170,7 +171,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		ColumnExpr("MIN(de.sent_back_at) AS sent_back_at").
 		ColumnExpr("SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS private_rows",
 			access.Private).
-		Where("de.state = ?", "proposed").
+		Where("de.state = ?", triage.Proposed).
 		Where("de.sent_back_at IS NOT NULL").
 		Where("de.sent_back_at <= ?", since).
 		GroupExpr("de.claim_id, de.product_id, de.proposed_by").
@@ -195,7 +196,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		// A proposer who has since lost the reading that made the claim
 		// possible hears nothing. The condition is about a finding, and an
 		// alert is not a way back in.
-		if !at.public || (private && !at.private) {
+		if !at.public() || (private && !at.private()) {
 			continue
 		}
 		days := int(now.Sub(row.SentBackAt).Hours() / 24)
@@ -261,7 +262,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		// the claim applies to nothing until somebody agrees.
 		Where("de.live_key IS NOT NULL").
 		Where(standing, held...).
-		Where("cl.outcome = ?", "deferred").
+		Where("cl.outcome = ?", triage.Deferred).
 		Where("cl.deferred_until IS NOT NULL").
 		Where("cl.deferred_until > ?", now).
 		Where("cl.deferred_until <= ?", now.Add(lead)).
@@ -283,7 +284,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	for _, row := range rows {
 		private := row.PrivateRows > 0
 		at := reach[row.ProposedBy][row.ProductID]
-		if !at.public || (private && !at.private) {
+		if !at.public() || (private && !at.private()) {
 			continue
 		}
 		out[row.ProposedBy] = append(out[row.ProposedBy], Holds{
@@ -371,7 +372,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			Where(finding.KeyMatches))
 
 	err = w.db.NewSelect().
-		TableExpr("(?) AS q", work).
+		TableExpr(`(?) AS "q"`, work).
 		ColumnExpr("q.team_id AS team_id").
 		ColumnExpr("MIN(COALESCE(NULLIF(q.team_display, ''), q.team_name)) AS team").
 		// The matched name for the link and the typed one for the sentence:
@@ -419,78 +420,10 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		}
 		for _, personID := range members {
 			at := reach[personID][row.ProductID]
-			if !at.public || (private && !at.private) {
+			if !at.public() || (private && !at.private()) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
-		}
-	}
-	return out, nil
-}
-
-// acts is what one person may do with one product, as the three questions
-// these conditions ask of it.
-//
-// Approving and reading are separate: Approver is a capability bounded by what
-// the person may read (ACC), so a claim waiting goes to somebody who holds
-// both and to nobody who holds one.
-type acts struct{ approves, public, private bool }
-
-// whoActs is everybody, with what they may do with each product.
-//
-// Read once per sweep rather than per condition. Four conditions each asking
-// the same two tables is four times the work to answer one question, and — the
-// part that matters more — four places for "may read" to be spelled slightly
-// differently.
-func (w *Watch) whoActs(ctx context.Context) (map[int64]map[int64]acts, error) {
-	people, held, err := access.NewStore(w.db).People(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("read who may hear about this: %w", err)
-	}
-	out := make(map[int64]map[int64]acts, len(people))
-	for _, person := range people {
-		per := map[int64]acts{}
-		for _, grant := range held[person.ID] {
-			if !grant.Active {
-				continue
-			}
-			at := per[grant.ProductID]
-			switch grant.Role {
-			case access.Approver:
-				at.approves = true
-			case access.PublicTriage, access.PublicRead:
-				at.public = true
-			case access.PrivateTriage, access.PrivateRead:
-				at.public, at.private = true, true
-			}
-			per[grant.ProductID] = at
-		}
-		out[person.ID] = per
-	}
-	return out, nil
-}
-
-// everybody is the map a sweep starts from: an entry for every person who
-// might hold one of these, and for every person already holding one.
-//
-// Both halves are needed. Reconcile makes somebody's open set exactly what it
-// is handed, so a person whose condition has stopped being true has to be
-// handed an empty list — and a person who has never been told anything has to
-// be in the map before anything can be added for them.
-func (w *Watch) everybody(ctx context.Context, kind Kind,
-	reach map[int64]map[int64]acts) (map[int64][]Holds, error) {
-
-	out := map[int64][]Holds{}
-	told, err := w.beingTold(ctx, kind)
-	if err != nil {
-		return nil, err
-	}
-	for _, person := range told {
-		out[person] = nil
-	}
-	for personID := range reach {
-		if _, already := out[personID]; !already {
-			out[personID] = nil
 		}
 	}
 	return out, nil
@@ -584,7 +517,7 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 		}
 		for personID, per := range reach {
 			at := per[row.ProductID]
-			if !at.public || (row.Undisclosed && !at.private) {
+			if !at.public() || (row.Undisclosed && !at.private()) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)

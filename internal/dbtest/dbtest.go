@@ -545,6 +545,9 @@ var tables = []string{
 	"claim_comment_revision",
 	"claim_comment",
 	"vulnerability_reference",
+	// Points at itself, which no position in this list can answer: a carried
+	// agreement names the one it came from. The key is declared to null
+	// rather than to block, so emptying the table needs no ordering.
 	"claim_approval",
 	"decision",
 	// After the rows that point at it, and before the claim it hangs off.
@@ -569,7 +572,7 @@ var tables = []string{
 	"routing_rule",
 	// Before person, product and vulnerability, all of which it points at.
 	"case_collaborator",
-	// Before person and vulnerability, both of which it points at.
+	// Before person, vulnerability and product, all of which it points at.
 	"flaw_report",
 	// Before person, product and vulnerability, all of which it points at.
 	"advisory_issuance",
@@ -586,6 +589,7 @@ var tables = []string{
 	"suppression",
 	"scan_run",
 	"vulnerability_alias",
+	"vulnerability_weakness",
 	"vulnerability",
 	"scan_document_chunk",
 	"scan_document",

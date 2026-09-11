@@ -75,7 +75,15 @@ export function claimOf(row: QueueRow): Claim {
 
 // Anything that changes a claim invalidates the same set: the queue it may
 // have left, the decisions it wrote, and the findings they hang off.
-function useAfterClaim() {
+//
+// **One list, because there were two.** A second copy listed four of these
+// keys and was used by revising and withdrawing, so a revision — which takes
+// back every standing approval — left the revision history and the approvals
+// beside the editor showing the old approval as standing. Somebody reading
+// that screen concluded the approval had survived the edit, which is the one
+// state the second-person control exists to make visible, reported wrong at
+// the moment it changes.
+export function useAfterClaim() {
   const queries = useQueryClient();
   return () => {
     void queries.invalidateQueries({ queryKey: ["queue"] });
@@ -86,6 +94,15 @@ function useAfterClaim() {
     // And the proposer's own list, which is where a claim they split appears
     // as two.
     void queries.invalidateQueries({ queryKey: ["my-claims"] });
+    // The claim's own blocks: what it has said, and who agreed to it. Both
+    // change under a revision and neither list held them.
+    void queries.invalidateQueries({ queryKey: ["claim"] });
+    void queries.invalidateQueries({ queryKey: ["comments"] });
+    // And the list the work came from. A claim answers findings, so agreeing
+    // to one moves what the list says about every place it covers — nine
+    // other screens invalidate this key after a write and this one did not,
+    // which is the shape of a list that silently shows the old answer.
+    void queries.invalidateQueries({ queryKey: ["findings"] });
   };
 }
 

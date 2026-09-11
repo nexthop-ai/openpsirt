@@ -20,8 +20,11 @@ import (
 // fixture is one migrated database with a variant to file scans against, and a
 // way to mint scans in order.
 type fixture struct {
-	store    *graph.Store
-	scans    *ingest.Store
+	store *graph.Store
+	scans *ingest.Store
+	// db is the same database the store reads, for the tests that need a
+	// second store over it.
+	db       *database.DB
 	targetID int64
 	// scope is the same build as a selection, for the findings list, which
 	// takes one rather than a build identifier.
@@ -74,7 +77,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			t.Fatal(err)
 		}
 		fn(t, &fixture{
-			store: graph.NewStore(db.DB), scans: ingest.NewStore(db.DB),
+			store: graph.NewStore(db.DB), scans: ingest.NewStore(db.DB), db: db,
 			targetID: target.ID,
 			scope: finding.Scope{
 				ProductID: &p.ID, StreamID: &br.ID, VariantID: &v.ID,
@@ -157,11 +160,6 @@ func TestFirstSnapshotIsStored(t *testing.T) {
 	})
 }
 
-// TestAnUnchangedRebuildWritesNothing is the claim the whole interval design
-// exists for. A nightly build that changed nothing must cost nothing: not a
-// row, not a re-stamped timestamp. Without it, storage grows with the calendar
-// rather than with change, and a product tracked for a year costs the same
-// whether or not anything happened to it.
 func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 	// The product's version changes on every build — a real one carries a
 	// build stamp — so if that reached identity, the node standing for the
@@ -183,6 +181,10 @@ func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 	})
 }
 
+// The claim the whole interval design exists for. A nightly build that changed
+// nothing must cost nothing: not a row, not a re-stamped timestamp. Without it,
+// storage grows with the calendar rather than with change, and a product
+// tracked for a year costs the same whether or not anything happened to it.
 func TestAnUnchangedRebuildWritesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree()); err != nil {

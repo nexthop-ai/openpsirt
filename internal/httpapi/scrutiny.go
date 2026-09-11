@@ -87,7 +87,7 @@ func registerScrutiny(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-approval-scrutiny", Method: http.MethodGet,
 		Path:    "/v1/approvals/scrutiny",
-		Summary: "Get how the second-person rule is holding",
+		Summary: "Get approval coverage",
 		Description: "Five answers about approvals over a period, for somebody auditing whether " +
 			"they mean anything here.\n\n" +
 			"`alone` is risk standing with nobody's agreement behind it, by outcome. That is " +

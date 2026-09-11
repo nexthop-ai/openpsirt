@@ -77,7 +77,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	inner = inOneProduct(inner, subject, productID, all)
 
 	query := s.db.NewSelect().
-		TableExpr("(?) AS at", inner).
+		TableExpr(`(?) AS "at"`, inner).
 		ColumnExpr("at.stream AS stream").
 		ColumnExpr("at.kind AS kind").
 		ColumnExpr("at.variant AS variant").

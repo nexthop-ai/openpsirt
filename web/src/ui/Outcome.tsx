@@ -55,7 +55,7 @@ export function called(outcome?: string): string {
 // "patch-needed" or "upgrade-needed" showed the stored token to the person
 // being asked to agree with it. One map, and a word it does not know is still
 // shown as it arrived.
-export function labelled(outcome?: string): string {
+export function labeled(outcome?: string): string {
   return said[outcome ?? ""]?.label ?? outcome ?? "";
 }
 

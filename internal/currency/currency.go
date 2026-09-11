@@ -203,11 +203,6 @@ func (g goProxy) Latest(ctx context.Context, name string) (Latest, error) {
 	return Latest{Version: answer.Version, Released: answer.Time}, nil
 }
 
-// escapeModule spells a module path the way the proxy requires.
-//
-// An uppercase letter becomes "!" and its lowercase, because the proxy serves
-// from a case-insensitive filesystem and would otherwise confuse two modules
-// whose paths differ only in case.
 // escapePath escapes each segment of a module path, keeping the separators
 // between them.
 func escapePath(name string) string {
@@ -218,6 +213,11 @@ func escapePath(name string) string {
 	return strings.Join(segments, "/")
 }
 
+// escapeModule spells a module path the way the proxy requires.
+//
+// An uppercase letter becomes "!" and its lowercase, because the proxy serves
+// from a case-insensitive filesystem and would otherwise confuse two modules
+// whose paths differ only in case.
 func escapeModule(name string) string {
 	var out strings.Builder
 	for _, r := range name {

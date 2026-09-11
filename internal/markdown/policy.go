@@ -41,25 +41,6 @@ const Attachment = "attachment"
 // explaining rather than citing.
 const Issue = "issue"
 
-// Languages are the fenced-block tags that may reach a class attribute.
-//
-// The tag is somebody's input. Three backticks followed by attacker-chosen
-// text landing in markup is small and real, and it is the only
-// highlighting-related hole left once the highlighter runs over already
-// sanitized markup rather than before it.
-//
-// An unknown language keeps its block and loses the label rather than failing:
-// refusing a justification because somebody wrote a language nobody listed
-// would make the tool argue with people about syntax highlighting.
-var Languages = map[string]bool{
-	"bash": true, "c": true, "cpp": true, "diff": true, "dockerfile": true,
-	"go": true, "hcl": true, "ini": true, "java": true, "javascript": true,
-	"json": true, "makefile": true, "markdown": true, "nginx": true,
-	"none": true, "patch": true, "perl": true, "php": true, "python": true,
-	"ruby": true, "rust": true, "shell": true, "sql": true, "text": true,
-	"toml": true, "typescript": true, "xml": true, "yaml": true,
-}
-
 // inspect reports what is wrong with submitted text.
 //
 // **The document is parsed and its structure examined, not scanned as lines.**
@@ -215,6 +196,25 @@ func schemeOf(destination string) (string, bool) {
 	destination = strings.TrimSpace(stdhtml.UnescapeString(destination))
 	if destination == "" {
 		return "", true
+	}
+	// **A destination beginning with two separators is not relative**, whatever
+	// the absence of a colon suggests. `//evil.example/x` is an address on
+	// another host that inherits whatever scheme the page was served over, and
+	// `/\evil.example/x` is the same thing to a browser — so read as relative,
+	// both were accepted at submission and rendered as an anchor with neither
+	// the referrer rule nor the new-tab rule applied, because neither applies
+	// to something with no scheme. A reader clicking it navigated in the same
+	// tab to a third party, handing over this deployment's own address — which
+	// names the product, the build and the finding — as the referrer. A
+	// relative link inside this deployment never starts with two separators.
+	//
+	// Asked as "two separators" rather than as a list of the two spellings
+	// somebody thought of: a browser reads all four the same way, and the list
+	// held `//` and `/\` while `\\` and `\/` went past it as relative.
+	if len(destination) > 1 &&
+		strings.ContainsAny(destination[:1], `/\`) &&
+		strings.ContainsAny(destination[1:2], `/\`) {
+		return "", false
 	}
 	// Anything before a path separator, a query or a fragment is not a scheme.
 	head := destination

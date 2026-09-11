@@ -554,8 +554,14 @@ func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Ro
 // their assigned work into work nobody can reach: assigned, so not in the
 // shared queue, and assigned to somebody who can no longer open it.
 func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) (bool, error) {
+	// Active ones, like every other question about what somebody holds. A
+	// row that grants nothing must never be counted as access — a grant left
+	// inactive by a switch to group-bound roles answered "they still hold
+	// something here", so their assigned findings stayed with somebody who
+	// could no longer open them, and the response said nothing was released.
 	n, err := s.db.NewSelect().Model((*Grant)(nil)).
 		Where("person_id = ?", personID).
+		Where("active = ?", true).
 		Where("product_id = ?", productID).Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
@@ -623,46 +629,37 @@ type Mentionable struct {
 // the mention itself says that a finding exists — which is the disclosure the
 // visibility rule is there to prevent.
 //
-// Administrators are included because they reach everything. Inactive grants
-// are read past entirely, the same way every other question about what
-// somebody holds reads past them.
+// **An administrator is not included for being one.** Administering the
+// catalog is not reading its findings, which is the split the roles were
+// separated to make possible — so an administrator holding nothing on the
+// product was offered as a mention target on an undisclosed finding there,
+// and the mention itself told them a finding exists that they may not open.
+// One who wants to be mentionable grants themselves a read role, which is how
+// everything else here works.
 //
-// There is no such thing as a deactivated person here — an account is recorded
-// or it is not — so nothing filters on one.
-func (s *Store) WhoCanRead(ctx context.Context, productID int64, visibility Visibility,
-	term string, limit int) ([]Mentionable, error) {
+// Inactive grants are read past entirely, the same way every other question
+// about what somebody holds reads past them, and so is somebody who has left:
+// they are refused at sign-in, so offering their name mentions somebody who
+// will never see it.
+func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64,
+	visibility Visibility, term string, limit int) ([]Mentionable, error) {
 
-	limit = database.APicker.Of(limit)
-
-	// Which roles are enough to read at this visibility. Asked of the same
-	// rule every query uses rather than spelled again here: triage implies
-	// reading at the same visibility, and reading what is undisclosed implies
-	// reading what is not.
-	var enough []Role
-	for _, role := range Roles() {
-		if NewPerson(0, "", false, map[int64][]Role{productID: {role}}, 0).Reads(visibility, productID) {
-			enough = append(enough, role)
-		}
-	}
-	if len(enough) == 0 {
+	// Asking who may read something undisclosed is itself a question about
+	// undisclosed work, and the answer is the one every other read gives:
+	// nothing. Asked here rather than only at the two handlers that call it,
+	// because a third endpoint over this query would answer for everybody —
+	// which is the rule this project does not bend, and the gate was written
+	// out at each caller instead of being carried on the query.
+	if !subject.Reads(visibility, productID) {
 		return nil, nil
 	}
+	limit = database.APicker.Of(limit)
 
-	var found []Mentionable
-	query := s.db.NewSelect().
-		TableExpr("person AS p").
-		ColumnExpr("p.id AS id").
-		ColumnExpr("p.identity AS identity").
-		ColumnExpr("COALESCE(NULLIF(p.display_name, ''), p.identity) AS name").
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("p.is_admin = ?", true).
-				WhereOr(`EXISTS (SELECT 1 FROM "role_grant" AS g
-					WHERE g.person_id = p.id AND g.active = ?
-					  AND g.product_id = ? AND g.role IN (?))`,
-					true, productID, bun.List(enough))
-		}).
-		OrderExpr("p.identity").
-		Limit(limit)
+	query := s.readersIn(productID, visibility)
+	if query == nil {
+		return nil, nil
+	}
+	query = query.OrderExpr("p.identity").Limit(limit)
 	// Narrowed here rather than in the caller, because a picker at a
 	// hundred people cannot fetch them all and filter in a browser — and
 	// the limit would cut the list before the term did, so the name
@@ -679,10 +676,77 @@ func (s *Store) WhoCanRead(ctx context.Context, productID int64, visibility Visi
 				WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?", like)
 		})
 	}
+	var found []Mentionable
 	if err := query.Scan(ctx, &found); err != nil {
 		return nil, fmt.Errorf("read who may be mentioned: %w", err)
 	}
 	return found, nil
+}
+
+// ReadersNamed resolves these sign-in identities to the people among them who
+// may read findings of this visibility in this product.
+//
+// The resolver behind a mention, and the reason it is not the picker's query
+// with a different argument: the picker narrows by what somebody typed and
+// then takes a page, and a mention has a name in hand and needs the answer
+// for that name. Paging the picker instead answered from the
+// alphabetically-first hundred readers, so mentioning anybody sorting past
+// position one hundred reached nobody, deterministically, and the author was
+// told the name matched nobody — a failure that grows with the deployment.
+//
+// A name nobody holds and a name held by somebody who may not read this both
+// come back absent, and are not told apart.
+func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int64,
+	visibility Visibility, names []string) ([]Mentionable, error) {
+
+	// The same gate the picker carries, for the same reason: what this answers
+	// is who may read something, which is a fact about the thing being read.
+	if !subject.Reads(visibility, productID) {
+		return nil, nil
+	}
+	query := s.readersIn(productID, visibility)
+	if query == nil || len(names) == 0 {
+		return nil, nil
+	}
+	wanted := make([]string, 0, len(names))
+	for _, name := range names {
+		wanted = append(wanted, strings.ToLower(strings.TrimSpace(name)))
+	}
+	// Lowered on both sides rather than asked to compare loosely, for the
+	// reason the picker does it: the engines do not agree on what a
+	// case-insensitive comparison is.
+	var found []Mentionable
+	if err := query.Where("LOWER(p.identity) IN (?)", bun.List(wanted)).
+		Scan(ctx, &found); err != nil {
+		return nil, fmt.Errorf("read who may be told: %w", err)
+	}
+	return found, nil
+}
+
+// readersIn is the half the picker and the mention resolver share: the people
+// who may read findings of this visibility in this product.
+//
+// Nil where no role reaches that visibility at all, which is an answer rather
+// than an empty condition to be filled in.
+func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQuery {
+	// Which roles are enough to read at this visibility, asked of the rule
+	// rather than of a list. It was the same four lines as rolesReading, in
+	// the same package, one of them named and one not — which is how "may
+	// read" comes to mean two things.
+	enough := rolesReading(productID, visibility)
+	if len(enough) == 0 {
+		return nil
+	}
+	return s.db.NewSelect().
+		TableExpr("person AS p").
+		ColumnExpr("p.id AS id").
+		ColumnExpr("p.identity AS identity").
+		ColumnExpr("COALESCE(NULLIF(p.display_name, ''), p.identity) AS name").
+		Where("p.deactivated_at IS NULL").
+		Where(`EXISTS (SELECT 1 FROM "role_grant" AS g
+			WHERE g.person_id = p.id AND g.active = ?
+			  AND g.product_id = ? AND g.role IN (?))`,
+			true, productID, bun.List(enough))
 }
 
 // Deactivate records that somebody has left, and Reactivate that they are
