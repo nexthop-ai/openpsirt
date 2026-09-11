@@ -240,7 +240,7 @@ because a thousand components can declare a million edges between them.
 
 ## The formats read
 
-Two, sharing one reader. What a vocabulary knows is which keys its format uses
+Three vocabularies for two formats, sharing one reader. What a vocabulary knows is which keys its format uses
 and what they mean; how a component is deduplicated, how an edge is resolved
 and where a bound is charged are the reader's, and neither half knows the
 other's business (REQ-05).
@@ -272,7 +272,7 @@ and one reader is what the seam was for.
 | **A document carries several creation records** | Anything it imported brought its own. The one the document points at is the document's; where it points at nothing the first read stands in, because reporting no build time at all has every later scan of that target refused as not newer |
 | **One relationship states a list of ends** | The edge bound is charged per end rather than per relationship, as each is read |
 | **An element does not say what it is until it has been read** | Every entry is charged against the component bound on the way in, because what a bound stops is the walk; the ones that turn out to be paths hand that charge back and take the file bound instead. So the walk is bounded throughout and the two are still sized the way they differ |
-| **Identifiers are absolute** | Nothing here depends on their shape. They resolve a document to itself and are discarded, which is what the other formats' identifiers are for too |
+| **Identifiers are absolute** | Nothing here depends on their shape. Every one but the document's own resolves the document to itself and is discarded, which is what the other formats' in-file identifiers are for too |
 
 **A path and a package may not share an identifier**, and this format states
 both in one array — so the check runs where a package is bound and where a path
@@ -299,7 +299,7 @@ each fact.
 | The version | `version` | `versionInfo` | `software_packageVersion` |
 | The package identifier and the database key | fields of the component | external references, by type | a field of the package, or external identifiers by type |
 | Structure | `dependencies`, and one component nested in another | relationships, stated either way round | relationships, stated one way round |
-| What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` |
+| What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` or `descendantOf` |
 | What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** (REQ-77) | **cannot be stated** (REQ-77) |
 
 **The root is resolved at the end rather than where it is named.** One format
@@ -362,10 +362,14 @@ bound, because an unbounded array of them is the same hazard under a different
 name.
 
 **The third version drops the reversed spellings**, so a type is an edge or it
-is not and there is no direction to get wrong: `contains`, `dependsOn`,
-`hasDynamicLink`, `hasStaticLink`, `hasPrerequisite`, `hasOptionalComponent`,
-`hasOptionalDependency` and `hasProvidedDependency`, with `ancestorOf` and
-`descendantOf` for a derivation and `describes` for the root.
+is not and there is no direction to get wrong.
+
+| Read as | Types |
+|---|---|
+| An edge | `contains`, `dependsOn`, `hasDynamicLink`, `hasStaticLink`, `hasPrerequisite`, `hasOptionalComponent`, `hasOptionalDependency`, `hasProvidedDependency` |
+| What the document is about | `describes` |
+| What a component was derived from | `ancestorOf`, `descendantOf` |
+| Nothing | Everything else |
 
 ### Lifecycle scopes
 
@@ -376,21 +380,13 @@ one judgment in this area the format leaves to a reader (REQ-78).
 
 | Scope | Read as |
 |---|---|
-| `test` | Not in the product. A test artifact is in the document and not in what ships, which is the same statement `TEST_DEPENDENCY_OF` makes in the second version |
-| Everything else | In the product |
+| `test` | Places nothing. The target is still held and still counted as sitting under nothing, which is the same treatment `TEST_DEPENDENCY_OF` gets in the second version |
+| Everything else | Places its target under the element the relationship is stated from |
 
-**Reading `build` as "does not ship" is the inference that looks obvious and is
-wrong for every compiled language.** A crate or a module linked into a binary is
-stated as a build-phase dependency and is inside what the product ships, so
-dropping it hides a finding that is somebody's problem. Getting it wrong the
-other way adds something to triage, which is a cost somebody can see and act
-on; getting it wrong this way removes a finding nobody ever learns about.
-
-The format's own example settles that it is a real risk rather than a
-hypothetical one: one application's three dependencies are `DEPENDS_ON` in the
-second version and `dependsOn` scoped `build` in the third, which is the same
-application described twice. Read as not shipping, that document loses every
-component it has.
+**Reading `build` as "does not ship" is wrong for every compiled language**: a
+crate or a module linked into a binary is stated as a build-phase dependency
+and is inside what the product ships. The two errors are not equal, and
+`Limits` says what that costs.
 
 ### Files are not components
 
@@ -741,3 +737,17 @@ to retrofit were settled early.
   so a hash read back carries trailing spaces that make an exact-match lookup fail.
 - **A component with no distribution context in its identifier is one nothing will
   match**, and that is invisible rather than an error.
+
+**A lifecycle scope is read the way that keeps a component** (REQ-78), and the
+two errors it sits between are not equal. Keeping too much adds something to
+triage, which somebody sees and acts on; dropping too much removes a finding
+nobody ever learns about. Measured against the format's own example 11: its
+three dependencies are stated unscoped in the second version and scoped `build`
+in the third, which is one application described twice — so read as not
+shipping, that document loses every component it has.
+
+**The third version is read against the specification's documents and no
+producer's output.** Nothing this deployment ingests emits it; the scanner
+shipped here emits 2.3 and tag-value. The four fixtures are hand-written and
+small by construction, so which shapes a real producer actually uses is not yet
+evidence anything here has.

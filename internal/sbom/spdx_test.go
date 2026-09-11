@@ -598,7 +598,7 @@ func TestADocumentStatingTwoFormatsIsRefused(t *testing.T) {
 	both := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
 	  "serialNumber": "urn:uuid:1", "documentNamespace": "https://example.invalid/2",
 	  "components": [{"name": "libc"}]}`
-	if why := refuses(t, both); !strings.Contains(why, "states both CycloneDX and SPDX") {
+	if why := refuses(t, both); !strings.Contains(why, "states both CycloneDX 1.x and SPDX 2.x") {
 		t.Errorf("refused with %q", why)
 	}
 
@@ -607,7 +607,7 @@ func TestADocumentStatingTwoFormatsIsRefused(t *testing.T) {
 	swapped := `{"bomFormat": "CycloneDX", "specVersion": "1.6",
 	  "documentNamespace": "https://example.invalid/2", "serialNumber": "urn:uuid:1",
 	  "components": [{"name": "libc"}]}`
-	if why := refuses(t, swapped); !strings.Contains(why, "states both CycloneDX and SPDX") {
+	if why := refuses(t, swapped); !strings.Contains(why, "states both CycloneDX 1.x and SPDX 2.x") {
 		t.Errorf("refused with %q", why)
 	}
 }

@@ -85,6 +85,27 @@ func TestAllThreeVocabulariesReadTheSameInventoryTheSame(t *testing.T) {
 	}
 }
 
+func TestTheExpandedSpellingsAreRead(t *testing.T) {
+	// The linked form of the two keys that identify an element. No fixture
+	// uses either — every one of them writes `spdxId` and `type` — so the
+	// expanded spelling is a branch the whole suite leaves green when it is
+	// deleted, and the paths check cannot catch it either.
+	for _, tc := range []struct{ name, from, to string }{
+		{"the type", `"type":`, `"@type":`},
+		{"the identifier", `"spdxId":`, `"@id":`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := read(t, strings.ReplaceAll(minimalSPDX3, tc.from, tc.to))
+			if len(doc.Components) != 1 {
+				t.Fatalf("read %d components, want 1", len(doc.Components))
+			}
+			if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
+				t.Errorf("edges are %v", got)
+			}
+		})
+	}
+}
+
 func TestTheTypeMayArriveAfterTheFieldsItGoverns(t *testing.T) {
 	// The order of an object's keys is the producer's business, so an element
 	// is read into one neutral shape and interpreted when it closes. A reader
@@ -166,12 +187,25 @@ func TestTheBuildTimeComesFromTheDocumentsOwnCreationRecord(t *testing.T) {
 
 func TestTheHeaderOfTheThirdVersionIsReadFromInsideTheContents(t *testing.T) {
 	// This format puts the header in the same array as the packages, so the
-	// header read walks the whole graph and builds nothing from it. That is as
-	// cheap as this format allows rather than as cheap as the others are, and
-	// it is pinned because it is a property worth noticing if it changes.
-	header, err := sbom.ReadHeader(strings.NewReader(minimalSPDX3), sbom.Limits{})
+	// header read walks the whole graph. What it must not do is build anything
+	// from it — which `!RootDeclared` does not show, since resolveRoot returns
+	// on any header read whatever the graph left behind.
+	//
+	// What shows it is a document the full read refuses. A nameless package is
+	// a fault in the contents, and the other two formats skip their contents
+	// on this pass, so the same document is answered 202 and fails later in
+	// the background reader. Reporting it here instead would have the same
+	// fault surface at two different times depending on which format a build
+	// happens to emit.
+	nameless := strings.Replace(minimalSPDX3, `"name": "libc", `, "", 1)
+
+	if _, err := sbom.Read(strings.NewReader(nameless), sbom.Limits{}); err == nil {
+		t.Fatal("a whole read accepted a package with no name")
+	}
+
+	header, err := sbom.ReadHeader(strings.NewReader(nameless), sbom.Limits{})
 	if err != nil {
-		t.Fatalf("read header: %v", err)
+		t.Fatalf("a header read was refused for something in the contents: %v", err)
 	}
 	if want := "https://example.invalid/product-1.0"; header.Serial != want {
 		t.Errorf("serial is %q, want %q", header.Serial, want)
@@ -179,8 +213,19 @@ func TestTheHeaderOfTheThirdVersionIsReadFromInsideTheContents(t *testing.T) {
 	if want := time.Date(2026, 8, 14, 9, 12, 33, 0, time.UTC); !header.BuiltAt.Equal(want) {
 		t.Errorf("built at %v, want %v", header.BuiltAt, want)
 	}
-	if header.RootDeclared {
-		t.Error("a header-only read resolved a root it built no packages for")
+
+	// The bounds still hold on that pass, because what they stop is the walk.
+	var b strings.Builder
+	b.WriteString(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [`)
+	for i := range 50 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"spdxId": "urn:f%d", "type": "software_File", "name": "f%d"}`, i, i)
+	}
+	b.WriteString(`]}`)
+	if _, err := sbom.ReadHeader(strings.NewReader(b.String()), sbom.Limits{MaxFiles: 10}); err == nil {
+		t.Error("a header read walked past a bound rather than charging it")
 	}
 }
 
@@ -230,8 +275,12 @@ func TestALifecycleScopeSaysWhenNotWhether(t *testing.T) {
 	// ship" is wrong for every compiled language — a crate linked into a binary
 	// is stated as a build-phase dependency and is inside what ships — and
 	// getting it wrong in that direction hides findings rather than adding
-	// noise. A test artifact is the exception, and it is the same exception the
-	// second version's table makes.
+	// noise. A test dependency is the exception, and it is the same exception
+	// the second version's table makes.
+	//
+	// What the exception drops is the edge and not the component: the package
+	// is in the document either way, so it is held and counted as sitting
+	// under nothing.
 	scoped := func(scope string) string {
 		return strings.Replace(minimalSPDX3, `"type": "Relationship", "creationInfo": "_:creationInfo",`,
 			`"type": "LifecycleScopedRelationship", "creationInfo": "_:creationInfo", "scope": "`+scope+`",`, 1)
@@ -403,9 +452,10 @@ func TestReadsTheThirdVersionsOwnExamples(t *testing.T) {
 	})
 
 	t.Run("the largest of them", func(t *testing.T) {
-		// A hundred and three elements, of which six are packages and
-		// eighteen are files, with sixty-two relationships between them —
-		// most of which say nothing about structure.
+		// A hundred and three elements: seven packages, fifteen files and
+		// sixty-three relationships, most of which say nothing about
+		// structure. Six packages survive as components because one of the
+		// seven is the root, and eighteen of its edges name a file.
 		doc, err := sbom.Read(fixture(t, "appbom.spdx3.json"), sbom.Limits{})
 		if err != nil {
 			t.Fatal(err)
@@ -482,4 +532,144 @@ func TestTheThirdVersionRefusesAPathAndAPackageSharingAnIdentifier(t *testing.T)
 			t.Errorf("refused with %q", why)
 		}
 	})
+}
+
+func TestADocumentStatingTwoVersionsOfOneFormatIsRefused(t *testing.T) {
+	// Two major versions of one format are as unreadable together as two
+	// formats are, and for the same reason: a handler writes the document's
+	// identity before anything has checked what the document is, so a file
+	// carrying keys from both is stored under whichever handler ran last.
+	//
+	// Recorded per vocabulary rather than per format, because keyed by format
+	// these two are one entry and the refusal can never fire between them.
+	both := `{
+	  "spdxVersion": "SPDX-2.3", "documentNamespace": "https://example.invalid/two",
+	  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+	  "packages": [{"SPDXID": "SPDXRef-a", "name": "libc", "versionInfo": "2.41"}],
+	  "@graph": [{"spdxId": "urn:a", "type": "software_Package", "name": "libc"}]
+	}`
+	if why := refuses(t, both); !strings.Contains(why, "states both SPDX 2.x and SPDX 3.x") {
+		t.Errorf("refused with %q", why)
+	}
+
+	// And with the two identity keys the other way round, which is the
+	// property that matters — the same bytes must not read two ways.
+	swapped := `{
+	  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+	  "@graph": [{"spdxId": "urn:a", "type": "software_Package", "name": "libc"}],
+	  "spdxVersion": "SPDX-2.3", "documentNamespace": "https://example.invalid/two",
+	  "packages": [{"SPDXID": "SPDXRef-a", "name": "libc", "versionInfo": "2.41"}]
+	}`
+	if why := refuses(t, swapped); !strings.Contains(why, "states both SPDX 2.x and SPDX 3.x") {
+		t.Errorf("refused with %q", why)
+	}
+}
+
+func TestADerivationTheThirdVersionStatesIsNotThrownAway(t *testing.T) {
+	// Read, charged against the claim bound, and then dropped, because the
+	// slice the resolution walks was only ever appended to on the other
+	// version's path. The package came out with no upstream at all where the
+	// byte-equivalent 2.x document fills both fields — and the version is what
+	// expiry compares.
+	body := strings.Replace(minimalSPDX3, `"@graph": [`, `"@graph": [`+
+		`{"spdxId": "urn:up", "type": "software_Package", "name": "glibc",`+
+		` "software_packageVersion": "2.41-9"},`+
+		`{"spdxId": "urn:anc", "type": "Relationship", "from": "urn:up",`+
+		` "relationshipType": "ancestorOf", "to": ["urn:a"]},`, 1)
+
+	doc := read(t, body)
+	var found bool
+	for _, c := range doc.Components {
+		if c.Name != "libc" {
+			continue
+		}
+		found = true
+		if c.UpstreamName != "glibc" || c.UpstreamVersion != "2.41-9" {
+			t.Errorf("derived from %q@%q, want glibc@2.41-9", c.UpstreamName, c.UpstreamVersion)
+		}
+	}
+	if !found {
+		t.Error("the component the relationship was about is not in the document")
+	}
+}
+
+func TestWhatTheThirdVersionSaysItIsAboutIsBounded(t *testing.T) {
+	// One graph entry is charged one component on the way in, and without a
+	// per-element charge that entry carries an array as long as the byte bound
+	// allows — in the synchronous upload request.
+	var b strings.Builder
+	b.WriteString(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [` +
+		`{"spdxId": "urn:d", "type": "SpdxDocument", "rootElement": [`)
+	for i := range 50 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`"urn:a"`)
+	}
+	b.WriteString(`]}]}`)
+
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10}); err == nil {
+		t.Fatal("fifty references passed a bound of ten")
+	} else if !strings.Contains(err.Error(), "component limit") {
+		t.Errorf("refused with %q", err)
+	}
+}
+
+func TestARelationshipDoesNotSpendTheComponentBound(t *testing.T) {
+	// This format states file membership as a relationship, so a real image
+	// scan carries far more relationships than packages. Charged as components
+	// they refuse a document well inside both real ceilings, naming a bound it
+	// never exceeded.
+	var b strings.Builder
+	b.WriteString(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [` +
+		`{"spdxId": "urn:a", "type": "software_Package", "name": "libc"}`)
+	for i := range 50 {
+		fmt.Fprintf(&b, `,{"spdxId": "urn:r%d", "type": "Relationship", "from": "urn:a",`+
+			` "relationshipType": "contains", "to": ["urn:a"]}`, i)
+	}
+	b.WriteString(`]}`)
+
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10}); err != nil {
+		t.Errorf("fifty relationships spent a component bound of ten: %v", err)
+	}
+	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxEdges: 10}); err == nil {
+		t.Error("fifty relationship ends passed an edge bound of ten")
+	}
+}
+
+func TestADocumentThatDoesNotPointAtItsOwnCreationRecordSaysNoBuildTime(t *testing.T) {
+	// Standing in another record's time records a value that does not move
+	// between builds, so the first scan is taken and every later one is
+	// refused as not newer — for good. The upload refuses a missing build time
+	// at the door instead, which is a message about this upload rather than a
+	// target that quietly stops accepting them.
+	//
+	// Reachable: only the document element records the pointer, so a graph
+	// carrying an inventory element and no document element falls through.
+	body := strings.Replace(minimalSPDX3,
+		`{"spdxId": "https://example.invalid/product-1.0", "type": "SpdxDocument",
+     "creationInfo": "_:creationInfo", "rootElement": ["urn:root"]}`,
+		`{"spdxId": "urn:sbom", "type": "software_Sbom", "rootElement": ["urn:root"]}`, 1)
+
+	doc := read(t, body)
+	if !doc.BuiltAt.IsZero() {
+		t.Errorf("built at %v, want nothing — no record of this document's own was pointed at", doc.BuiltAt)
+	}
+	// The rest of the document still reads, so what is missing is one fact
+	// rather than the file.
+	if len(doc.Components) != 1 {
+		t.Errorf("read %d components, want 1", len(doc.Components))
+	}
+}
+
+func TestABuildTimeThatIsNotATimeSaysSo(t *testing.T) {
+	// Swallowed, the upload answers "does not say when it was built" when it
+	// did say, and said it wrongly — which sends whoever is debugging it
+	// looking for a missing field rather than a malformed one. Both other
+	// formats refuse this with the accurate text.
+	body := strings.Replace(minimalSPDX3, `"created": "2026-08-14T09:12:33Z"`,
+		`"created": "last Tuesday"`, 1)
+	if why := refuses(t, body); !strings.Contains(why, `build time "last Tuesday" is not a time`) {
+		t.Errorf("refused with %q", why)
+	}
 }

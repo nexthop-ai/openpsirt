@@ -16,8 +16,8 @@ nobody can tell a producer quirk from a typo in.
 | `maven-app.spdx.json` | The specification's own example 14, a Maven application enriched by a second tool. Eleven relationships of which six are structural types, four of them surviving as edges because two `CONTAINS` name files rather than packages — which is a better demonstration than the count alone. The remaining five are a test dependency, a test case, what generated what, what the document amends, and the root. It also carries packages with no identifier at all and no version, which is what identity falling back to a name is for |
 | `rust-app.spdx3.json` | The same Rust application as `rust-app.spdx.json`, at **SPDX 3.0**. Example 11 again, which is what makes the pair worth keeping: one application described twice, in two versions that share no key path |
 | `maven-app.spdx3.json` | The same Maven application as `maven-app.spdx.json`, at 3.0, and the two disagree. See below |
-| `acme-app.spdx3.json` | The specification's own example 13. It states the root on an inventory element rather than on the document, which is a shape only this version has, and it is the only document to hand that carries an external identifier on a package |
-| `appbom.spdx3.json` | The specification's own example 9, and the largest at 3.0: 103 elements, of which 6 are packages and 18 are files, with 62 relationships between them — most of which say nothing about structure |
+| `acme-app.spdx3.json` | The specification's own example 13. It states the root on an inventory element rather than on the document, which is a shape only this version has, and it is the only 3.0 document to hand that carries an `externalIdentifier` on a package — the 2.x fixtures all carry the same thing under `externalRefs` |
+| `appbom.spdx3.json` | The specification's own example 9, and the largest at 3.0: 103 elements — 7 packages, 15 files and 63 relationships, most of which say nothing about structure. Six packages survive as components because one of the seven is the root, and 18 of its edges name a file |
 
 ## The SPDX fixtures
 
@@ -28,12 +28,15 @@ package with no identifier, and a document whose relationships are mostly not
 structure. A reader written against one of the three looks correct against one
 of the three.
 
-Every fixture below that is not the scanner's comes from the
+The four SPDX examples — `rust-app`, `maven-app`, `acme-app` and `appbom`, in
+both versions where there is a pair — come from the
 [spdx-examples](https://github.com/spdx/spdx-examples) repository, under
-`software/example<N>/spdx2.3` and `software/example<N>/spdx3.0`. **The SPDX
-documents there are CC0-1.0**, which the repository states and each document
-repeats in its own `dataLicense`. The sample source code beside them is
-GPL-3.0-or-later and is not taken.
+`software/example<N>/spdx2.3` and `software/example<N>/spdx3.0`. **The SPDX documents there are CC0-1.0**, which the repository states. How
+each one repeats that differs, and one does not: the 2.3 documents carry the
+literal string in `dataLicense`, the 3.0 documents point `dataLicense` at a
+license-expression element instead, and `acme-app.spdx3.json` states no license
+of its own at all. The sample source code beside them is GPL-3.0-or-later and
+is not taken.
 
 What is deliberately not here is a document converted from the other format.
 One was made to see what conversion costs, and the answer is why it is not kept:
@@ -66,7 +69,7 @@ every decision already made alone.
 somebody's own output as well as against a written specification. Nothing this
 deployment ingests emits 3.0 — the scanner it ships emits 2.3 and tag-value —
 so these are the specification's own documents, which are hand-written and
-small by construction. `TODO.md` records what that leaves open.
+small by construction. `DESIGN-ingest.md` records what that leaves open.
 
 They are worth having anyway, because two of them pair with a 2.3 fixture
 describing the same application, which is a comparison no single document

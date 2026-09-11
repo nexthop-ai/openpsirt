@@ -3,7 +3,6 @@ package sbom
 import (
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 )
 
@@ -13,28 +12,40 @@ import (
 // table and the handlers it names.
 type vocabulary struct {
 	format Format
-	top    map[string]func(*reader) error
+	// name is what a refusal calls it, which is narrower than the format:
+	// telling somebody their file states both SPDX and SPDX would say nothing.
+	name string
+	top  map[string]func(*reader) error
 }
 
 // vocabularies are the formats read, in the order a document is tried against.
 //
-// The third major version of SPDX has a table of its own rather than a branch
-// in the second's, because it shares no key with it.
+// Three of them for two formats: the third major version of SPDX has a table
+// of its own rather than a branch in the second's, because it shares no key
+// with it. **A vocabulary rather than a format is what a document is checked
+// against being two of**, since two major versions of one format are as
+// unreadable together as two formats are.
 var vocabularies = []vocabulary{
-	{format: CycloneDX, top: cyclonedxTop},
-	{format: SPDX, top: spdxTop},
-	{format: SPDX, top: spdx3Top},
+	{format: CycloneDX, name: "CycloneDX 1.x", top: cyclonedxTop},
+	{format: SPDX, name: "SPDX 2.x", top: spdxTop},
+	{format: SPDX, name: "SPDX 3.x", top: spdx3Top},
 }
 
 // ReadHeader reads what a document says about itself and stops.
 //
-// The contents are skipped rather than parsed, so this stays cheap on a file
-// that is about to be refused. It is not free — the interesting fields are not
-// guaranteed to come first, and some producers sort their keys — but skipping
-// values costs a walk rather than a structure per component.
+// The contents are skipped rather than parsed **where the format states its
+// header outside them**, which two of the three do. It is not free even then —
+// the interesting fields are not guaranteed to come first, and some producers
+// sort their keys — but skipping values costs a walk rather than a structure
+// per component.
 //
-// What it does not answer is which component the document is about, where the
-// format states that by pointing at one of the contents. Nothing asks: the
+// The third states its header inside the contents, as one entry of the array
+// its packages are in, so that one is walked in full and builds nothing from
+// what it walks. The bounds hold on this pass either way, because what they
+// stop is the walk.
+//
+// What none of them answers is which component the document is about, where
+// the format states that by pointing at one of the contents. Nothing asks: the
 // arrival decision turns on the document's identity and its build time, and
 // the root is settled by the read that applies the scan.
 func ReadHeader(r io.Reader, lim Limits) (Header, error) {
@@ -76,12 +87,12 @@ func Read(r io.Reader, lim Limits) (*Document, error) {
 // depending only on how its producer sorted them.
 func (c *reader) read() error {
 	err := c.b.object(func(key string) error {
-		for _, v := range vocabularies {
+		for at, v := range vocabularies {
 			handler, ours := v.top[key]
 			if !ours {
 				continue
 			}
-			c.fired[v.format] = true
+			c.fired[at] = true
 			return handler(c)
 		}
 		return c.b.skip()
@@ -93,8 +104,12 @@ func (c *reader) read() error {
 		return err
 	}
 	// One format states its build time inside the contents, pointing at it
-	// rather than carrying it, so it cannot be settled where it is read.
+	// rather than carrying it, so it cannot be settled where it is read — and
+	// nor can a fault in it be reported where the other two report theirs.
 	c.spdx3Settle()
+	if c.settleErr != nil {
+		return fmt.Errorf("reading scan file: %w", c.settleErr)
+	}
 	return nil
 }
 
@@ -111,9 +126,9 @@ func (c *reader) checkFormat() error {
 		// answer. Refused rather than preferred: nothing here can say which
 		// half the producer meant.
 		var named []string
-		for _, v := range vocabularies {
-			if c.fired[v.format] && !slices.Contains(named, string(v.format)) {
-				named = append(named, string(v.format))
+		for at, v := range vocabularies {
+			if c.fired[at] {
+				named = append(named, v.name)
 			}
 		}
 		return fmt.Errorf("scan file states both %s, so which format it is cannot be settled",

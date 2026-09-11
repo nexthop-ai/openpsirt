@@ -32,7 +32,11 @@ type reader struct {
 	// vocabularies actually read a key, which is not the same question: a
 	// handler runs before anything has checked what the document is.
 	declared Format
-	fired    map[Format]bool
+	// fired is keyed by vocabulary rather than by format, because two
+	// vocabularies can be two major versions of one format — and a document
+	// carrying keys from both of those is as unreadable as one carrying keys
+	// from two formats, for the same reason.
+	fired map[int]bool
 	// named and versioned are the two halves of a CycloneDX declaration.
 	// Either alone leaves the other unstated, and an unstated version is one
 	// this was not written against.
@@ -88,6 +92,9 @@ type reader struct {
 	spdx3Order     []string
 	// spdx3DocumentCreation is the one the document itself points at.
 	spdx3DocumentCreation string
+	// settleErr is a fault found after the walk, where the format states
+	// something by pointing at an element rather than by carrying it.
+	settleErr error
 }
 
 func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
@@ -96,7 +103,7 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 		b:          newBounded(&capped{r: r, left: lim.MaxBytes}, lim.MaxDepth),
 		lim:        lim,
 		headerOnly: headerOnly,
-		fired:      map[Format]bool{},
+		fired:      map[int]bool{},
 		byRef:      map[string]graph.Described{},
 		files:      map[string]bool{},
 		seen:       map[string]int{},

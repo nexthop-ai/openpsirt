@@ -63,8 +63,13 @@ var spdx3Edges = map[string]bool{
 // it.
 var spdx3Ancestors = map[string]bool{"ancestorOf": true, "descendantOf": true}
 
-// spdx3TestScope is the one lifecycle phase that takes a relationship out of
-// the product.
+// spdx3TestScope is the one lifecycle phase whose relationship does not place
+// its target under anything.
+//
+// It drops the edge and not the component: what the scope says is about the
+// relationship, and the package is in the document either way. So it is held,
+// counted as sitting under nothing, stored and scanned — which is what a
+// component the producer could not place gets too.
 //
 // **A scope is when a relationship matters, not whether the target ships**, and
 // the specification says nothing about the second. Reading `build` as "does not
@@ -77,8 +82,8 @@ var spdx3Ancestors = map[string]bool{"ancestorOf": true, "descendantOf": true}
 // described twice.
 //
 // A test is the exception, and it is the exception in the second version's
-// table too: a test artifact is in the document and not in the product, which
-// is what `TEST_DEPENDENCY_OF` says there and what this scope says here.
+// table too: a test dependency is not part of what ships, which is what
+// `TEST_DEPENDENCY_OF` says there and what this scope says here.
 const spdx3TestScope = "test"
 
 // spdx3Element is one entry of the graph, collected before its type is known.
@@ -173,7 +178,15 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 		case "creationInfo":
 			return c.into(&e.creationInfo)
 		case "rootElement":
+			// Charged per element, as its twin in the other version is. One
+			// graph entry costs one component on the way in, and without this
+			// that single entry carries an array as long as the byte bound
+			// allows — in the synchronous upload request, on the header pass
+			// too.
 			return c.b.each(func(ref string) error {
+				if err := c.count(); err != nil {
+					return err
+				}
 				e.rootElements = append(e.rootElements, ref)
 				return nil
 			})
@@ -242,16 +255,27 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 	case spdx3Document:
 		c.doc.Serial = e.id
 		c.spdx3DocumentCreation = e.creationInfo
+		if c.headerOnly {
+			return nil
+		}
 		c.rootRefs = append(c.rootRefs, e.rootElements...)
 		return nil
 	case spdx3Sbom:
+		if c.headerOnly {
+			return nil
+		}
 		c.rootRefs = append(c.rootRefs, e.rootElements...)
 		return nil
 	case spdx3File:
 		if err := c.refile(); err != nil {
 			return err
 		}
-		if e.id == "" {
+		// Charged and then walked past on a header read. The bound has to hold
+		// on both paths — it is the walk it stops — but holding half a million
+		// identifiers to answer a question about the document's own record is
+		// work nobody asked for, and every handler in the other two formats
+		// skips its contents outright.
+		if e.id == "" || c.headerOnly {
 			return nil
 		}
 		// The same rule the other version's arrays are held to, across a
@@ -271,6 +295,14 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 	// so what identifies a relationship here is having them rather than being
 	// named in a list of type names that grows with the profiles.
 	if e.kinds != "" && e.from != "" {
+		// The ends were charged against the edge bound where they were read,
+		// so the component charge levied on the way in is handed back —
+		// including on a header read, since both passes charged it. Kept, it
+		// would have a document's relationships spend the ceiling meant for
+		// its packages, and this format states file membership as a
+		// relationship, so that is the ordinary shape rather than a hostile
+		// one.
+		c.stated--
 		return c.spdx3Relate(e)
 	}
 	return nil
@@ -304,6 +336,15 @@ func (c *reader) spdx3Created(e spdx3Element) error {
 
 // spdx3Package records one package.
 func (c *reader) spdx3Package(e spdx3Element) error {
+	// Nothing is built or checked on a header read, which is what the other
+	// two formats do by skipping their contents outright. Validating here
+	// would refuse a nameless package inside the upload request, where the
+	// same document in either other format is answered 202 and fails later in
+	// the background reader — the same fault, reported at two different times
+	// depending on which format a build happens to emit.
+	if c.headerOnly {
+		return nil
+	}
 	described := graph.Described{
 		Name:    e.name,
 		Version: sentinel(e.version),
@@ -312,9 +353,6 @@ func (c *reader) spdx3Package(e spdx3Element) error {
 	}
 	if err := described.Valid(); err != nil {
 		return fmt.Errorf("%w, so it cannot be tracked", err)
-	}
-	if c.headerOnly {
-		return nil
 	}
 	described.UpstreamName, described.UpstreamVersion = graph.UpstreamFromPurl(described.Purl)
 	if strings.TrimSpace(described.Version) == "" {
@@ -359,6 +397,7 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 			}
 			if _, stated := c.upstream[from]; !stated {
 				c.upstream[from] = ancestor
+				c.upstreamOrder = append(c.upstreamOrder, from)
 			}
 		}
 		return nil
@@ -377,24 +416,23 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 //
 // A document carries more than one creation-information element, because
 // anything it imported brought its own. The one the document points at is the
-// document's; where it points at nothing, the first that was read stands in,
-// which is better than reporting no build time at all and having every later
-// scan of the target refused as not newer.
+// document's, and where it points at nothing **the document has not said when
+// it was built**: an imported document's time is a value that does not move
+// between builds, so standing it in has the first scan taken and every later
+// one refused as not newer, for good. Saying nothing is refused at the door
+// instead, which is a message about this upload rather than a target that
+// quietly stops accepting them.
 func (c *reader) spdx3Settle() {
 	if len(c.spdx3Creations) == 0 || !c.doc.BuiltAt.IsZero() {
 		return
 	}
 	raw, ours := c.spdx3Creations[c.spdx3DocumentCreation]
 	if !ours {
-		for _, first := range c.spdx3Order {
-			if created, held := c.spdx3Creations[first]; held {
-				raw = created
-				break
-			}
-		}
+		return
 	}
 	built, err := time.Parse(time.RFC3339, raw)
 	if err != nil {
+		c.settleErr = fmt.Errorf("build time %q is not a time: %w", trim(raw), err)
 		return
 	}
 	c.doc.BuiltAt = built.UTC()
