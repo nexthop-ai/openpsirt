@@ -42,9 +42,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 		Description: "Everybody granted this one issue in this product, oldest first.\n\n" +
 			"**Being on a case is not reading the product.** A collaborator sees this issue " +
 			"wherever it sits here and nothing else, may argue about it and comment on it, " +
-			"and may not agree to anybody's claim — two collaborators could otherwise satisfy " +
-			"the two people a dismissal on an embargoed finding asks for, with nobody " +
-			"accountable for the product involved.",
+			"and may not agree to anybody's claim.",
 		Tags: []string{"Findings"},
 	}, perProduct, "Only where you may read undisclosed work.", privateRights()...),
 		func(ctx context.Context, input *struct {

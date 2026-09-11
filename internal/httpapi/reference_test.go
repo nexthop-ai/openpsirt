@@ -8,8 +8,13 @@ import (
 
 // namesADecision matches a decision identifier, which belongs in REQUIREMENTS.md
 // and the design documents and nowhere a client reads.
-var namesADecision = regexp.MustCompile(
-	`\b(ACC|API|ATT|CIG|DAT|ING|MDL|NTF|REJ|REL|REM|RNK|RPT|SCP|SEC|STA|TRI|UIX)-[0-9]+\b`)
+//
+// Any three or four capitals and a number, rather than a list of prefixes.
+// The list named eighteen, not one of which appears anywhere in this
+// repository — every decision here is REQ-nn, which was not among them — so
+// the control this gate is credited with could never have fired. A rule
+// matching the shape cannot go stale the way a list of names does.
+var namesADecision = regexp.MustCompile(`\b[A-Z]{3,4}-[0-9]+\b`)
 
 // paraphrases is the shapes AGENTS.md names as the wrong way to write a
 // summary, quoted from it: a verb that avoids naming the act, and a summary

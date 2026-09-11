@@ -39,7 +39,7 @@ func registerNotifications(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-notifications", Method: http.MethodGet,
 		Path:    "/v1/notifications",
-		Summary: "List what is waiting on you",
+		Summary: "List your notifications",
 		Description: "Returns what you have not dealt with, newest first, and how many there " +
 			"are.\n\n" +
 			"Everyone has one of these, and what appears in it differs by what you hold: work " +

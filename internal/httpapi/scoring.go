@@ -13,11 +13,9 @@ import (
 func registerScoring(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "score-vector", Method: http.MethodGet, Path: "/v1/score",
-		Summary: "Work out what a CVSS vector scores",
-		Description: "Returns the base score and the severity band a vector works out to.\n\n" +
-			"It exists so that a screen composing a vector can show what it will score without " +
-			"holding a second copy of the formula. One implementation, and what somebody sees " +
-			"while choosing is what gets stored.\n\n" +
+		Summary: "Score a CVSS vector",
+		Description: "Returns the base score and the severity band a vector works out to. " +
+			"It reads nothing and records nothing.\n\n" +
 			"CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a " +
 			"different scheme, and scoring either with this one produces a number nothing " +
 			"downstream could tell apart from a real one.",

@@ -48,7 +48,7 @@ type VexSaidBody struct {
 	At        string `json:"at" doc:"When it was uploaded here"`
 	// Offers is the outcome this would prefill, where it offers one. A
 	// publisher saying they will not fix something is not the same as saying
-	// it does not apply, so that offers a won't-fix and never a dismissal.
+	// it does not apply, so that offers a will-not-fix and never a dismissal.
 	Offers string `json:"offers,omitempty" enum:"not-applicable,wont-fix,already-fixed" doc:"The outcome this offers as a prefill. Never applied by itself"`
 }
 

@@ -86,7 +86,7 @@ func registerTags(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-tags", Method: http.MethodGet, Path: "/v1/products/{product}/tags",
-		Summary: "List the words in use on a product",
+		Summary: "List a product's tags",
 		Description: "Every tag anybody has used here, most-used first.\n\n" +
 			"What a filter offers rather than a vocabulary: the list is what people have " +
 			"actually written, which is also the evidence for promoting one of them to a " +

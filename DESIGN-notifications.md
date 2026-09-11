@@ -34,8 +34,8 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49.
 | Condition | It stops being true | A build stopped being scanned; a claim is waiting for approval |
 
 A condition names what it is about, and the pass that derives conditions
-**reconciles rather than appends**: what is true is opened, what has stopped
-being true is cleared, and running the same pass twice changes nothing.
+reconciles rather than appends: what is true is opened, what has stopped being
+true is cleared, and running the same pass twice changes nothing.
 
 | Rule | Reason |
 |---|---|
@@ -63,8 +63,10 @@ being true is cleared, and running the same pass twice changes nothing.
 | Somebody away still holding work | condition | Below |
 | A VEX publisher revising a cited statement | condition | Below |
 | A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges |
+| Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
+| An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 
-**A new build notifies nobody.** A build arriving is the ordinary state of a tool
+A new build notifies nobody. A build arriving is the ordinary state of a tool
 scanned nightly. What a build *changed* is on the receipts and in the trend.
 
 ## The in-application area
@@ -120,22 +122,22 @@ lapses, and a queue is nobody's turn at all.
 Every one is bounded by what the person may read. An alert is not a way back in
 to something somebody has lost the reading of.
 
-**The team queue is the one that needs stating.** Work routed to a team is
-neither owned nor unowned, so it sits in a gap where it looks handled and is not.
+The team queue is the one that needs stating. Work routed to a team is neither
+owned nor unowned, so it sits in a gap where it looks handled and is not.
 
-**A deferral that is not in force has no end to announce.** The notice states
-that a date is coming, what it covers, and that the finding returns as work when
-it passes — every clause false about a claim still waiting for a second person.
-The sweep asks the same "is this in force" test the compliance rate and the
-outcome filter ask, spelled once for all three.
+A deferral that is not in force has no end to announce. The notice states that a
+date is coming, what it covers, and that the finding returns as work when it
+passes — every clause false about a claim still waiting for a second person. The
+sweep asks the same "is this in force" test the compliance rate and the outcome
+filter ask, spelled once for all three.
 
-**Sitting still means undecided**, by the same test every screen uses: a claim
+Sitting still means undecided, by the same test every screen uses: a claim
 standing at the versions the code holds now. The expression is shared with the
 findings list.
 
-**The queue is counted per team and product; the others per claim.** A claim is
-one person's action and one thing to read, however many rows it wrote. A queue is
-a population: one routing rule places thousands of findings in a sweep.
+The queue is counted per team and product; the others per claim. A claim is one
+person's action and one thing to read, however many rows it wrote. A queue is a
+population: one routing rule places thousands of findings in a sweep.
 
 ## Absent holders
 
@@ -174,7 +176,7 @@ A claim has no state of its own; its rows do, so the word is read from the rows
 every time. A stored word would need every path that approves, withdraws, sends
 back or lapses one to update it.
 
-**Seven words:** waiting, sent back, approved, withdrawn, lapsed, undone, and
+Seven words: waiting, sent back, approved, withdrawn, lapsed, undone, and
 several ways.
 
 | Word | Why it is distinct |
@@ -182,7 +184,7 @@ several ways.
 | Undone | Drawn apart from waiting though the claim is waiting in both, because somebody had agreed and the proposer is entitled to find that surprising |
 | Several ways | An approver agreeing to most of a bulk set and setting some aside leaves a claim that is genuinely two things |
 
-**An undo and a lapse each notify.** Neither is an expected outcome: an undo
+An undo and a lapse each notify. Neither is an expected outcome: an undo
 reverses something the proposer was relying on, and a lapse hands the work back
 having taken a judgment out of force.
 
@@ -218,7 +220,7 @@ what somebody may do, not what they want to read.
 | A first digest reports nothing under "nobody owns" | There is no "since" to measure against |
 | One message is bounded | What is over the bound stays in the application |
 
-**It names what has been disclosed and gives numbers for what has not.** A public
+It names what has been disclosed and gives numbers for what has not. A public
 finding is listed with its issue, component and build. Undisclosed ones become a
 count and the figures that say how urgent they are: how many at each severity,
 how many known to be exploited, how many nobody owns.
@@ -233,7 +235,7 @@ its own.
 
 ## What leaves the deployment
 
-**A message about an undisclosed finding carries no detail** — that there is
+A message about an undisclosed finding carries no detail — that there is
 something, and a link. Not the identifier, not the component, not the summary,
 and not in the subject line, which a preview shows without anybody opening
 anything.
@@ -249,17 +251,17 @@ Narrowing the recipients and emptying the body are different controls: the first
 stops it reaching somebody who should not know, the second stops it being
 disclosed by the delivery itself.
 
-**Who hears about an embargo is narrower than who hears about the tool's
-health.** Administrators, and whoever holds it — the second only where they may
-still read undisclosed work in that product. An assignment can outlive the role
-that allowed it.
+Who hears about an embargo is narrower than who hears about the tool's health.
+Administrators, and whoever holds it — the second only where they may still read
+undisclosed work in that product. An assignment can outlive the role that
+allowed it.
 
 ## Reading what you were told
 
 Narrowed in the data-access layer, with a subject, like every other read
 (REQ-42 and REQ-43). The list and its badge go through one set of conditions.
 
-**A notification stays readable while the reason it was sent still holds.** Not
+A notification stays readable while the reason it was sent still holds. Not
 "while you could read the finding it names" — a notification is a message
 addressed to somebody under a rule recorded here, and the audiences those rules
 name are what a later read has to ask about.
@@ -271,26 +273,26 @@ name are what a later read has to ask about.
 | It names an issue they were brought onto, one case at a time | A case grant is a pair. Widening it to the product would hand a collaborator the rest of that product's embargo list, which is the whole of what the grant is not |
 | They administer the deployment | Administering is not reading, and every other read here says so — but the embargo notice names administrators as an audience of its own, and a message sent under that rule and withheld under this one is written for somebody who cannot open it. An administrator grants roles, so it hands them nothing they could not hand themselves |
 
-**Filtered, never deleted.** Destroying the row destroys the record that
-somebody was told, which is what an auditor most wants after a leak. Granting
-the role back returns the line, because they were told and that is a fact about
-a moment. It also avoids a clear-on-revoke path somebody has to remember, and
-there is more than one way to lose a role.
+Filtered, never deleted. Destroying the row destroys the record that somebody
+was told, which is what an auditor most wants after a leak. Granting the role
+back returns the line, because they were told and that is a fact about a moment.
+It also avoids a clear-on-revoke path somebody has to remember, and there is
+more than one way to lose a role.
 
-**A row marked private carries the product it is about, or the write is
-refused.** A private row attributable to nothing could only be shown to
-everybody or to nobody. Refusing where it is written makes that a failure at
-the producer rather than a leak, or a silent disappearance, at the reader.
+A row marked private carries the product it is about, or the write is refused. A
+private row attributable to nothing could only be shown to everybody or to
+nobody. Refusing where it is written makes that a failure at the producer rather
+than a leak, or a silent disappearance, at the reader.
 
-**The product and the issue are columns.** Not parsed back out of the string a
+The product and the issue are columns. Not parsed back out of the string a
 digest matches on: what a read narrows by cannot rest on a shape another pass
 invented.
 
-**Reading a list addressed to somebody else is an administrator's act.** Every
-other read of this table is somebody reading their own. This one exists so that
-a leak can be investigated, and it is the only reason to look at what was sent
-to another person — so it is refused for anybody else, in the store, where the
-rest of this table's rules are.
+Reading a list addressed to somebody else is an administrator's act. Every other
+read of this table is somebody reading their own. This one exists so that a leak
+can be investigated, and it is the only reason to look at what was sent to
+another person — so it is refused for anybody else, in the store, where the rest
+of this table's rules are.
 
 | Rule | Reason |
 |---|---|
@@ -350,7 +352,7 @@ An embargo running out is announced before its date (REQ-38), at a lead time
 somebody sets — two weeks by default — inside the application rather than by
 mail, because mail may not name an undisclosed issue.
 
-**Two conditions, not one.** An embargo that is coming and one that has arrived
+Two conditions, not one. An embargo that is coming and one that has arrived
 clear differently, and a single alert would go on saying "coming" after the date
 had passed. The approaching one clears when the date arrives, at which point the
 other opens, or when the embargo is extended past the lead time.
@@ -359,11 +361,11 @@ The approaching notice states that extending needs a second person and that
 arranging it takes time, which is the reason for warning early rather than on the
 day.
 
-**A VEX publisher revising a cited statement raises an alert.** The decision
-stands whatever they now say, but somebody approved a dismissal on the strength
-of that evidence.
+A VEX publisher revising a cited statement raises an alert. The decision stands
+whatever they now say, but somebody approved a dismissal on the strength of that
+evidence.
 
-**"Cited" is recorded rather than inferred.** A decision started from a VEX
+"Cited" is recorded rather than inferred. A decision started from a VEX
 statement carries which statement that was. Inferring it from the issue and the
 component would raise an alert about every decision at a place a publisher
 happens to have spoken about.
@@ -374,23 +376,21 @@ A notification identifier is a number a caller supplies, so reading and
 acknowledging both check whose it is. One belonging to somebody else answers
 exactly as one that does not exist.
 
-**A key is not a person.** Identifiers for keys and people come from different
+A key is not a person. Identifiers for keys and people come from different
 tables and collide as a matter of course, so the subject kind is checked rather
 than inferred from the number: without it, a key numbered three reads and
 acknowledges the notifications of person three. A test pins that by giving the
 key the person's own number.
 
-**The body is stored rather than derived at read time.** It describes a moment:
-the finding it names may since have been decided, closed or reopened.
+The body is stored rather than derived at read time. It describes a moment: the
+finding it names may since have been decided, closed or reopened.
 
 ## Not built
 
-**A chat adapter**, behind the same interface mail uses. A chat adapter
-translates rather than forwarding markdown, and mostly sends a summary and a
-link.
-
-**The HTML part of a mail**, which is the only remaining reader for the
-server-side renderer and the reason it is kept rather than deleted.
+| Not built | Detail |
+|---|---|
+| A chat adapter | Behind the same interface mail uses. A chat adapter translates rather than forwarding markdown, and mostly sends a summary and a link |
+| The HTML part of a mail | The only remaining reader for the server-side renderer, and the reason it is kept rather than deleted |
 
 ## Limits
 

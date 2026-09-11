@@ -115,7 +115,7 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 	// what its name suggests.
 	//
 	// What it is for is showing that no *dismissal* sits in that
-	// population. Not-applicable, won't-fix and already-fixed all require
+	// population. Not-applicable, will-not-fix and already-fixed all require
 	// approval, so asked of one of those it should return nothing, and a
 	// row in it is a control that failed.
 	//

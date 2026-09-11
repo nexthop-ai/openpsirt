@@ -130,9 +130,9 @@ Both bounds are checked twice: before anything is carried, so an upload that
 cannot be kept is refused rather than transferred and discarded; and inside the
 writing transaction, because the first answer was read before the bytes were.
 
-**Attaching is triage work.** It asked the read test — whether the subject may
-see the issue the file hangs off — so a role granting nothing but the ability
-to read disclosed findings on one product could write files into the store. A
+Attaching is triage work. It asked the read test — whether the subject may see
+the issue the file hangs off — so a role granting nothing but the ability to
+read disclosed findings on one product could write files into the store. A
 collaborator brought onto the case may attach, because evidence is usually why
 they were brought in.
 

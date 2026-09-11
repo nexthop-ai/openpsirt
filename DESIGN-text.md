@@ -34,17 +34,17 @@ renders**: the API returns the source as its only representation, and mail is
 sent as plain text. The interface sanitizes what it renders, and an integrator
 rendering this markdown sanitizes what they render.
 
-**A sanitizer was written here and never called.** Its policy, its language
-allowlist and its time bound sat behind an entry point no running code
-reached, so a rule improved in it next year would change nothing for anybody —
-while this document said it ran on every render, which is the shape a reviewer
-ticks. It is gone, and what is written here is what happens.
+A sanitizer was written here and never called. Its policy, its language
+allowlist and its time bound sat behind an entry point no running code reached,
+so a rule improved in it next year would change nothing for anybody — while this
+document said it ran on every render, which is the shape a reviewer ticks. It is
+gone, and what is written here is what happens.
 
-**What that costs, stated rather than glossed:** text stored under an older
-submission policy is served as source, so a rule written after it was stored
-is applied by whoever renders it and by nobody else. For the interface that is
-the interface's own sanitizer, which is current. For an integrator it is
-theirs, which is why the API says so.
+What that costs, stated rather than glossed: text stored under an older
+submission policy is served as source, so a rule written after it was stored is
+applied by whoever renders it and by nobody else. For the interface that is the
+interface's own sanitizer, which is current. For an integrator it is theirs,
+which is why the API says so.
 
 The source is stored; rendered markup never is. The same text reaches a
 browser, an email and an export.
@@ -171,12 +171,12 @@ only that it agrees with itself.
 
 Every field is capped at 64 KB. Rendering is time-bounded.
 
-**The column holds what the cap admits, on every engine.** Two of the four
-spell plain text as a type topping out at 65,535 bytes, one byte short of the
-cap — so a field of exactly the admitted size passed submission and failed the
-write on those two, or was truncated without a word outside strict mode, which
-leaves an approver agreeing to text that is not the text somebody wrote. The
-quick loop never saw it, because the engine it runs on stores it happily.
+The column holds what the cap admits, on every engine. Two of the four spell
+plain text as a type topping out at 65,535 bytes, one byte short of the cap — so
+a field of exactly the admitted size passed submission and failed the write on
+those two, or was truncated without a word outside strict mode, which leaves an
+approver agreeing to text that is not the text somebody wrote. The quick loop
+never saw it, because the engine it runs on stores it happily.
 
 The time bound bounds the wait, not the work: a parse cannot be interrupted, so
 the work runs to completion with nobody reading the result. What the bound buys

@@ -44,15 +44,15 @@ scan of the release either finds the issue or does not. A second record of the
 same fact is one somebody has to keep true, and the way that fails is the tool
 reporting a fix that shipped in nobody's release.
 
-**A flaw recorded by hand is the exception** (REQ-19). No scan reports one, so
-there is no second opinion to check a declaration against, and refusing the
+A flaw recorded by hand is the exception (REQ-19). No scan reports one, so there
+is no second opinion to check a declaration against, and refusing the
 declaration leaves the finding open forever. That class is closed by a person,
 with who, when and why on the record. `DESIGN-findings.md` carries the shape.
 
 ## The unit
 
-**A commitment is one build moving one fold**: a source package, at the version
-it was built at, going to another version. That is the piece of work somebody
+A commitment is one build moving one fold: a source package, at the version it
+was built at, going to another version. That is the piece of work somebody
 actually does, and it is one row.
 
 A release is named by its stream and its variant together, never by one of them:
@@ -75,8 +75,8 @@ commitment's build. **Nothing is written onto findings.**
 | A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump, so a commitment recorded against one covers all of them |
 | No version comparison is involved | An upgrade covers everything open on the fold rather than only what records this version as its fix. Deciding otherwise needs a per-ecosystem ordering nothing here has (REQ-21) |
 
-**A build has one commitment per fold**, enforced by the database rather than by
-a check somebody remembers. A release moves a package to one version; two rows
+A build has one commitment per fold, enforced by the database rather than by a
+check somebody remembers. A release moves a package to one version; two rows
 saying otherwise is a plan a coordinator cannot read.
 
 ### Moving a commitment
@@ -159,14 +159,14 @@ There is no fourth reason, because a deadline is worked out at ingest for
 everything else. Left blank, the column reads as missing data on the one screen
 whose purpose is noticing what is running out.
 
-**What has no deadline is absent from every figure built on one**, which is the
+What has no deadline is absent from every figure built on one, which is the
 point and also the gap: nothing overdue, nothing due soon, and nothing in the
 compliance rate. Two of the three reasons already have somewhere to be seen —
 the line is stated wherever a list hides something, and a tag's findings are
-read at the release. The third does not, so releases out of support are a
-report of their own; `DESIGN-reporting.md` holds it.
+read at the release. The third does not, so releases out of support are a report
+of their own; `DESIGN-reporting.md` holds it.
 
-**A tag was built once and is what somebody received.** No work will land in it
+A tag was built once and is what somebody received. No work will land in it
 whatever a date says, so a deadline on one was unmeetable the moment it was
 written. Measured on the demo before this rule: all 26 open findings on its one
 tag carried a deadline, every one of them unmeetable by construction. Real
@@ -191,10 +191,10 @@ commitment. They are read off the findings that are still open, and landing the
 bump closes them — so a plan deriving them went blank on a bump exactly as the
 bump succeeded.
 
-**What each row reports is what is still open under it**, counted from the
-findings rather than from anything written down: the distinct issues the bump
-would close here, and how many places those sit at. Nothing is declared done by
-hand — a build is clear when it stops holding them.
+What each row reports is what is still open under it, counted from the findings
+rather than from anything written down: the distinct issues the bump would close
+here, and how many places those sit at. Nothing is declared done by hand — a
+build is clear when it stops holding them.
 
 ## Promise states
 
@@ -233,8 +233,15 @@ evidence.
 ## External links
 
 A fix target and a claim each carry a link to work happening elsewhere, and
-**nothing is sent to it** (REQ-36). The half that sends is the signed outbound
-request (REQ-46), which is not built.
+**nothing is sent to it** (REQ-36): the link is stored and read by people. What
+is not built is the tracker hand-off — opening or updating an item in whatever
+system that link points at.
+
+The signed outbound request (REQ-46) is a different thing and it is built;
+`DESIGN-notifications.md` owns it, including the egress controls and the one
+place a private address is deliberately permitted. Recorded here as unbuilt, it
+read as there being no egress path at all, so the most review-worthy egress in
+the deployment sat behind a document saying it did not exist.
 
 | Rule | Reason |
 |---|---|
@@ -294,10 +301,10 @@ customer — which is the reason the two-person approval on those claims exists.
 | Every statement carries the other names its issue answers to (REQ-18) | A customer holds identifiers their own scanner produced, matched under the name *its* database uses. The primary is not repeated among the aliases |
 | Ordered here rather than by the engine | Two documents generated from the same state are byte-for-byte identical |
 
-**A statement is made only where every open place agrees, and agrees the same
-way.** The format says "this product, this component, not affected" and has no
-finer grain. A component commonly sits at several places, so a dismissal agreed
-at one of them is not a claim about the component. Published as one it was a
+A statement is made only where every open place agrees, and agrees the same way.
+The format says "this product, this component, not affected" and has no finer
+grain. A component commonly sits at several places, so a dismissal agreed at one
+of them is not a claim about the component. Published as one it was a
 machine-readable "not affected" about something that is affected, sent to every
 customer running a scanner against the image.
 
@@ -334,17 +341,17 @@ its own product is a vendor, which is what the format wants to be told.
 
 ## Not built
 
-**The CSAF document's VEX profile.** The generated document is categorized as a
+The CSAF document's VEX profile. The generated document is categorized as a
 security advisory rather than as VEX, because that profile's point is "not
 affected, and here is why" and those justifications are not assembled into it.
-The vocabulary is already correct; what is missing is the mapping from a decision
-to the releases it covers. This does not concern the OpenVEX document above,
-which is built and is a different document for a different reader.
+The vocabulary is already correct; what is missing is the mapping from a
+decision to the releases it covers. This does not concern the OpenVEX document
+above, which is built and is a different document for a different reader.
 
-**Every delivery adapter.** The signed outbound request is the first of them and
-covers most destinations at once; the tracker hand-off splits off the half that
-stores a link and sends nothing. What exists is the document and a way to fetch
-it.
+The tracker hand-off (REQ-36). What exists is the link somebody typed, stored
+and never fetched; what is missing is opening or updating an item in the system
+it points at. The signed outbound request is built and is described in
+`DESIGN-notifications.md`.
 
 ## Limits
 

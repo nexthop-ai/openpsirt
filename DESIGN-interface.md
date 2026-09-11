@@ -128,10 +128,10 @@ root element and its grid on the application container. That is the whole
 translation, and it is why a screen here can be put beside its mockup and
 compared control for control.
 
-**Two looks, one markup.** A look is a token set — colors, the two typefaces,
-radii, shadows — and nothing else. One is a dark rail over a light surface; the
-other is dark throughout. They are called light mode and dark mode, because that
-is what every other application on the same screen calls them.
+Two looks, one markup. A look is a token set — colors, the two typefaces, radii,
+shadows — and nothing else. One is a dark rail over a light surface; the other
+is dark throughout. They are called light mode and dark mode, because that is
+what every other application on the same screen calls them.
 
 | Rule | |
 |---|---|
@@ -157,10 +157,10 @@ to upload, what is waiting on you, and who you are.
 | **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many |
 | **Manage** | The catalog, the users and the settings. Branches, tags and variants have entries of their own, scoped to the picked product |
 
-**A build-only entry declines rather than opening on a scope that means
-nothing.** With a product, branch or variant unpicked, the tree and inventories
-entries are disabled and say why. Findings is not one of them: it takes whatever
-is selected, and the count beside it is of what the list it opens will show.
+A build-only entry declines rather than opening on a scope that means nothing.
+With a product, branch or variant unpicked, the tree and inventories entries are
+disabled and say why. Findings is not one of them: it takes whatever is
+selected, and the count beside it is of what the list it opens will show.
 
 Other bar rules:
 
@@ -182,42 +182,42 @@ the screen; scrolling with the page leaves the menu a thousand pixels above
 somebody reading the foot of a findings list, which is where they are when they
 want it.
 
-**A group heading folds what is under it, and "Manage" starts folded.** Declaring
-a product or granting a role is occasional rather than something done while
-working, and with it away the rail asks for under seven hundred. The heading stays
-a heading to look at — a caret is the only thing marking it as a control, because
-three headings drawn as buttons read as three more places to go. What is folded
-is kept in the browser, per person.
+A group heading folds what is under it, and "Manage" starts folded. Declaring a
+product or granting a role is occasional rather than something done while
+working, and with it away the rail asks for under seven hundred. The heading
+stays a heading to look at — a caret is the only thing marking it as a control,
+because three headings drawn as buttons read as three more places to go. What is
+folded is kept in the browser, per person.
 
 ## The scope picker
 
-**The picker narrows the whole interface, and every level offers "all"**
-(REQ-58). Product, branch and variant are chosen once and every cross-product
-screen answers for that selection. The levels are independent: a variant belongs
-to its product, so "this product, every branch, this variant" is a real question.
+The picker narrows the whole interface, and every level offers "all" (REQ-58).
+Product, branch and variant are chosen once and every cross-product screen
+answers for that selection. The levels are independent: a variant belongs to its
+product, so "this product, every branch, this variant" is a real question.
 Choosing "all" for the product leaves the two below it unselectable.
 
-**A screen that needs a whole build cannot be given half a scope.** Five exist
-for one build and no other — a finding, deciding a place, the dependency tree,
+A screen that needs a whole build cannot be given half a scope. Five exist for
+one build and no other — a finding, deciding a place, the dependency tree,
 deciding several together, and scans — because there is no dependency graph
 across branches and each is about a way down. On those the levels that would go
 to "all" are disabled and say why. A control that declines is less surprising
 than one that relocates you.
 
-**The findings list is not one of them.** What the list is of is an issue at a
+The findings list is not one of them. What the list is of is an issue at a
 component, and neither that nor any decision about it is keyed on a build
 (REQ-25). With a product picked and the branch or variant at "all", the list
 answers for every build in scope: a row is still one issue at one component, its
-places counted across every build, naming one of those builds and saying how many
-hold it. The one thing it cannot draw there is the way down, because a chain
-belongs to one build's graph, so the Path column becomes the build the row names
-and the count of builds beside it.
+places counted across every build, naming one of those builds and saying how
+many hold it. The one thing it cannot draw there is the way down, because a
+chain belongs to one build's graph, so the Path column becomes the build the row
+names and the count of builds beside it.
 
-**It has two addresses, and they are the same screen.** A whole build keeps the
+It has two addresses, and they are the same screen. A whole build keeps the
 address the rest of that build shares; anything wider is the product's list
-carrying the levels that are set. Choosing a wider scope while standing on either
-moves to the other — not the jump refused above, because it is the same screen
-answering the question just asked of it.
+carrying the levels that are set. Choosing a wider scope while standing on
+either moves to the other — not the jump refused above, because it is the same
+screen answering the question just asked of it.
 
 | Rule | |
 |---|---|
@@ -229,13 +229,13 @@ answering the question just asked of it.
 
 ## Home
 
-**Home leads with the work and puts the shape of things underneath**: what is
+Home leads with the work and puts the shape of things underneath: what is
 waiting for review, what is being worked on, what stopped applying, then the
-trends, and the operational state at the foot. The trends answer a question asked
-occasionally, and they are also the slowest part of the page.
+trends, and the operational state at the foot. The trends answer a question
+asked occasionally, and they are also the slowest part of the page.
 
-**Four figures lead, and they follow the scope**: open at or above the floor,
-known exploited, pending the reader's approval, and overdue. Open is the trend's
+Four figures lead, and they follow the scope: open at or above the floor, known
+exploited, pending the reader's approval, and overdue. Open is the trend's
 latest point at every scope, which counts distinct issues — the findings list
 counts one row per issue and component, and a tile switching between the two as
 the picker moved would quote two figures for one word.
@@ -246,14 +246,14 @@ the picker moved would quote two figures for one word.
 | **Quiet builds** | A build that stops being scanned reports no new findings and fails nothing, so it looks healthier than one still being scanned. Named one at a time rather than counted, because a number is read past and a name is acted on. On the front page and on the scans screen |
 | **Overdue and due soon** | Overdue is a report about something that has already happened; due-soon is the week somebody can still finish. Both come from one read of the deadline list. The overdue tile pointed at the assignments screen, which answers what is *mine*, so the number and the screen it opened disagreed for everybody but the person holding all of it |
 
-**Every figure opens the list it counts**, narrowed the way the figure was
-counted — the aging buckets, the fixed and appeared counts, both deadline tiles.
-A number nobody can act on from where they read it sends somebody to build the
-same question by hand, and the question they build is not always the same one.
+Every figure opens the list it counts, narrowed the way the figure was counted —
+the aging buckets, the fixed and appeared counts, both deadline tiles. A number
+nobody can act on from where they read it sends somebody to build the same
+question by hand, and the question they build is not always the same one.
 
 ## The findings list
 
-**One row per issue and fold**, not per place and not per package. A real image
+One row per issue and fold, not per place and not per package. A real image
 produced 281,890 individual findings that collapse to 6,775 rows.
 
 The fold is the source package at the version it was built at — curl,
@@ -262,12 +262,12 @@ about, one thing to upgrade and one rule to route. Keyed on the component
 instead, the same image gives 7,648 rows, a third of the difference being the
 same work said again.
 
-**Each row says how many packages and how many consumers it covers**, because
-one judgment covering sixty consumers is a different act from one covering one —
-and because those are the units somebody acts in. The place count is stored,
-sorted on, and shown as a title; it is what the bulk cap is measured against and
-what the disposition register expands to, rather than a figure a reader is asked
-to reconcile with the other two.
+Each row says how many packages and how many consumers it covers, because one
+judgment covering sixty consumers is a different act from one covering one — and
+because those are the units somebody acts in. The place count is stored, sorted
+on, and shown as a title; it is what the bulk cap is measured against and what
+the disposition register expands to, rather than a figure a reader is asked to
+reconcile with the other two.
 
 The list is where a day's work is assembled, so the sort, the page size, the
 filters, selection across pages and saved filters are all built.
@@ -283,8 +283,8 @@ reading "CVE-2026-74280 · linux-image" cost a click each to tell apart.
 | Clamped to one line | The row's height is what makes a page of fifty five thousand pixels tall. The whole of it is on the finding, and on the row's title |
 | The version sits beside the component, not under it | Every line a row spends is fifty lines on a page |
 
-**A row says where the component sits, as both ends of the way down**: the part
-of the product it belongs to, and what directly pulls it in. Those two are what
+A row says where the component sits, as both ends of the way down: the part of
+the product it belongs to, and what directly pulls it in. Those two are what
 differ between sibling rows; the steps between them rarely distinguish anything,
 so they are counted rather than named.
 
@@ -309,44 +309,44 @@ rather than naming the product itself.
 | A triage line is announced where it applies, never silently | The list says so and says how many it is not showing |
 | Narrow screens get cards, not a table that scrolls sideways (REQ-55) | |
 
-**One CVE at three binaries is one piece of work, and the row says so.** A third
-of the rows on a real image are the same issue at a sibling package: curl,
+One CVE at three binaries is one piece of work, and the row says so. A third of
+the rows on a real image are the same issue at a sibling package: curl,
 `libcurl4t64` and `libcurl3t64` are one source package. Said on the row rather
-than folded away — the places are real, and a reader counting them should get the
-same number the list and the export do. So the row carries the source package and
-how many other rows on this page are the same issue at another of its binaries,
-with the way through to the component. **Counted over the page**, because a page
-is what somebody is reading and a number gathered any other way would disagree
-with the total printed beside it.
+than folded away — the places are real, and a reader counting them should get
+the same number the list and the export do. So the row carries the source
+package and how many other rows on this page are the same issue at another of
+its binaries, with the way through to the component. **Counted over the page**,
+because a page is what somebody is reading and a number gathered any other way
+would disagree with the total printed beside it.
 
-**The row previews in place.** The plus on a row opens the description and where
-the component sits, under the row, without going anywhere. Deciding is a click
+The row previews in place. The plus on a row opens the description and where the
+component sits, under the row, without going anywhere. Deciding is a click
 further on, and that click is the point.
 
 ### The cross-product list
 
-**The cross-product list is this screen with the product left out** (REQ-64), not
-a screen of its own, and one entry on the rail rather than two. It was a second
-screen offering four of this one's filters, so "which of our products carry this,
-and what is running out anywhere" was answered by the weaker of the two lists. The
-server never had that split: both routes take the same filters from one
-definition.
+The cross-product list is this screen with the product left out (REQ-64), not a
+screen of its own, and one entry on the rail rather than two. It was a second
+screen offering four of this one's filters, so "which of our products carry
+this, and what is running out anywhere" was answered by the weaker of the two
+lists. The server never had that split: both routes take the same filters from
+one definition.
 
-**What is absent without a product is what has no meaning without one.** A
-subtree is a walk over one build's edges and "differs between builds" is a
-statement about a selection, so neither is offered and neither is sent — dropped
-from the query rather than left in the address, because a filter somebody can no
-longer see or clear is one that narrows a list for reasons it does not show.
-Saved filters, deciding from the list and the export are a product's own and come
-back the moment a product is picked.
+What is absent without a product is what has no meaning without one. A subtree
+is a walk over one build's edges and "differs between builds" is a statement
+about a selection, so neither is offered and neither is sent — dropped from the
+query rather than left in the address, because a filter somebody can no longer
+see or clear is one that narrows a list for reasons it does not show. Saved
+filters, deciding from the list and the export are a product's own and come back
+the moment a product is picked.
 
 The product becomes a column where it varies, and the row links to that product's
 list.
 
 ## Filters
 
-**Every filter the server offers is on the screen** (REQ-60). That sentence was
-not true when it was written: the server narrowed by twenty-nine things and the
+Every filter the server offers is on the screen (REQ-60). That sentence was not
+true when it was written: the server narrowed by twenty-nine things and the
 screen could reach twenty-five, with the exploit-likelihood threshold and the
 three date bounds having no control at all.
 
@@ -358,13 +358,13 @@ three date bounds having no control at all.
 | Filtering is the server's, not the browser's | A list narrowed after it arrives is narrowed within one page of it, so "hide the kernel" would hide it from the twenty rows already fetched and from nothing else |
 | The common ones stay one click away | Severity, exploited and fix-available. Package kind, what holds a thing, and how far it has been decided sit in a panel that opens, with how many are on written on the control while it is shut |
 
-**Exploited and fix-available are two flags**, not one parameter holding one of
-two words — otherwise "exploited, and a fix exists", the first population anybody
-assembling a batch wants, could not be asked for. The old word is still read so a
-saved address still opens the list it saved.
+Exploited and fix-available are two flags, not one parameter holding one of two
+words — otherwise "exploited, and a fix exists", the first population anybody
+assembling a batch wants, could not be asked for. The old word is still read so
+a saved address still opens the list it saved.
 
-**Two filters are about the release rather than the row**, and are the reason
-the list is a work list rather than an inventory.
+Two filters are about the release rather than the row, and are the reason the
+list is a work list rather than an inventory.
 
 | Filter | Default | Widens to |
 |---|---|---|
@@ -390,14 +390,14 @@ Three filters need defining:
 
 ### Multi-value filters
 
-**A filter whose values are not exclusive takes several at once.** Four do: the
-decision state, the decision outcome, what upstream did, and the kind of package.
-Each was one word, so "undecided or pending approval" had to be asked twice and
-read side by side. **Four more take a set**: who is dealing with it, what a VEX
-document says, and, among the typed boxes, the component, the tag, the VEX
-publisher and the weakness. The typed ones are chip fields, because a box showing
-one value while narrowing by three is what the summary above the list exists to
-prevent.
+A filter whose values are not exclusive takes several at once. Four do: the
+decision state, the decision outcome, what upstream did, and the kind of
+package. Each was one word, so "undecided or pending approval" had to be asked
+twice and read side by side. **Four more take a set**: who is dealing with it,
+what a VEX document says, and, among the typed boxes, the component, the tag,
+the VEX publisher and the weakness. The typed ones are chip fields, because a
+box showing one value while narrowing by three is what the summary above the
+list exists to prevent.
 
 | Rule | |
 |---|---|
@@ -406,11 +406,11 @@ prevent.
 | Drawn as checkboxes behind a control that says what is ticked | A closed control reading "Any" over three ticked boxes is how a narrowed list comes to look unnarrowed. The chips above name each separately, so removing one leaves the rest |
 | Carried in the address as the parameter repeated | A server reading only the first word narrows to less than was asked for, which looks like an answer rather than a mistake. Marked exploded on both sides, with a test at the HTTP layer that asks for two states and counts the rows |
 
-**The decision state is above the list, beside the severity floor**, where the
-exploited and fix-available chips used to sit. Neither earned the place: the list
-is ordered by urgency, so what is being exploited is already at the top, and a fix
-being available is a column on every row. What somebody reaches for first is what
-has not been answered yet.
+The decision state is above the list, beside the severity floor, where the
+exploited and fix-available chips used to sit. Neither earned the place: the
+list is ordered by urgency, so what is being exploited is already at the top,
+and a fix being available is a column on every row. What somebody reaches for
+first is what has not been answered yet.
 
 | Rule | |
 |---|---|
@@ -422,13 +422,13 @@ has not been answered yet.
 
 ## Sorting, paging and selection
 
-**Sorting is by a column the server names, never by one a caller does** (REQ-66).
+Sorting is by a column the server names, never by one a caller does (REQ-66).
 Four headers order the list — severity, EPSS, locations and the deadline — and
-clicking the one already sorted turns it around. What reaches the statement is an
-expression the server stores against each of its own keys: a placeholder cannot
-bind a column name, so this is the one query parameter that has to become SQL
-text. A word that is not one of the keys is not a sort, and the list comes back in
-its own order rather than refusing.
+clicking the one already sorted turns it around. What reaches the statement is
+an expression the server stores against each of its own keys: a placeholder
+cannot bind a column name, so this is the one query parameter that has to become
+SQL text. A word that is not one of the keys is not a sort, and the list comes
+back in its own order rather than refusing.
 
 | Rule | |
 |---|---|
@@ -443,13 +443,13 @@ its own order rather than refusing.
 | Searching is submitted rather than sent per keystroke | Each is a query over every open finding in the build, and a half-typed word is not a question worth asking. It matches anywhere in a component's name, ignoring capitals |
 | A component's name opens the component (reversed) | It narrowed the list, and the component itself sat behind a small "Open →" in the last column next to "Hide" — an act parked away from the thing it acts on, which is the shape the By fix view was deleted for. The name is the way to the thing; narrowing and hiding are the two small acts beside it, and they sit together. The same name on the finding screen opens the same screen, so one word means one thing everywhere it appears |
 
-**Selection across rows is a prerequisite, not a convenience.** Both bulk
-workflows — accepting a publisher's judgment, and declaring a bump — start by
-picking a filtered set out of the list.
+Selection across rows is a prerequisite, not a convenience. Both bulk workflows
+— accepting a publisher's judgment, and declaring a bump — start by picking a
+filtered set out of the list.
 
 ## Saved filters
 
-**Personal, and nothing is shared** (REQ-57). No ownership, no permissions, no
+Personal, and nothing is shared (REQ-57). No ownership, no permissions, no
 arguing about whose filter is authoritative, and nobody hesitates to save
 something half-formed.
 
@@ -461,15 +461,15 @@ something half-formed.
 | Personal is enforced at the query, not only on the screen | A name somebody else kept is not there, which is the same answer a name nobody kept gives |
 | Opening one goes back to exactly the list that was on screen | The saved address wins outright rather than merging. The page it happened to be on is dropped — a saved filter is a narrowing rather than a position in one |
 
-**A saved filter can prepare a claim, and proposes nothing** (REQ-27). Where it
+A saved filter can prepare a claim, and proposes nothing (REQ-27). Where it
 carries an outcome and the words, picking it fills the decision form and says so
 above the list. Submitting is a person's act, and the record carries their name.
 
-**What a filter prepares carries its own length rather than a date.** A rule saved
-in March means "put this off for a quarter", not "until 3 March", so a deferral it
-prepares is kept as a number of days and turned into a date when somebody opens
-the form. Kept as a date and never read, the prefill opened the form with the
-outcome chosen and no date, which cannot be submitted.
+What a filter prepares carries its own length rather than a date. A rule saved
+in March means "put this off for a quarter", not "until 3 March", so a deferral
+it prepares is kept as a number of days and turned into a date when somebody
+opens the form. Kept as a date and never read, the prefill opened the form with
+the outcome chosen and no date, which cannot be submitted.
 
 Saved filters were argued for as the cheap half of ownership by subtree; the
 expensive half is now team routing, so what they are for is being the thing a
@@ -486,7 +486,7 @@ data, different subject.
 | Each row carries the issues by severity and the worst among them | Ranking by count alone answers the view's own question backwards: a package with forty-four issues outranks one with three criticals |
 | The weight stays the order | Where the volume is is what the view is for. Making urgency the default would reproduce the by-issue list at worse resolution. "Which of these is worst" is the other question people read it for, so the column is sortable |
 
-**The By fix view is gone.** It listed one row per version pair with an action in
+The By fix view is gone. It listed one row per version pair with an action in
 the last column — the thing somebody does presented apart from the thing it is
 done to — and read as a stray list of version numbers with an unexplained link.
 The grouping it existed for did not go with it: the act follows the source
@@ -519,8 +519,8 @@ its findings and nothing else, so a component could be read and never acted on.
 | Where it could go is listed, never ordered | Telling which of two versions comes first needs an ordering per ecosystem this does not have, so what is offered is every version the scanner named as carrying a fix, most-closing first. "Nearest" is not a question this can answer |
 | The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the bulk cap is measured against |
 
-**It is where an upgrade is promised**, on the terms `DESIGN-triage.md` sets:
-the releases it is for, the version, the date, the reason, and who carries it.
+It is where an upgrade is promised, on the terms `DESIGN-triage.md` sets: the
+releases it is for, the version, the date, the reason, and who carries it.
 
 ## The finding screen
 
@@ -532,12 +532,12 @@ The finding is the working screen after a decision as well as before it.
 | **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
 | **Under both** | One activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
 
-**The description leads, at full width** (REQ-60, as amended). The rule that put
-the action first is still the defect it fixes — the form had been three screens
-down — but the description went into the narrow column with it, where a paragraph
+The description leads, at full width (REQ-60, as amended). The rule that put the
+action first is still the defect it fixes — the form had been three screens down
+— but the description went into the narrow column with it, where a paragraph
 runs four words to a line.
 
-**Evidence full width, then the action full width beneath it** — a reversal of
+Evidence full width, then the action full width beneath it — a reversal of
 evidence on one side and the action on the other. Both are still above the fold,
 which is what the side-by-side arrangement was for, and what it cost was
 measurable: rendered from the demo the narrow column held severity 7.8, EPSS
@@ -545,19 +545,19 @@ measurable: rendered from the demo the narrow column held severity 7.8, EPSS
 at 380 pixels, while the widest thing on the screen was an empty text area.
 Somebody weighs the evidence and then acts, and the page runs in that order.
 
-**The references move down**, with the timeline, the revisions and the comments.
-Eleven links between the facts and the form recreates the defect the side-by-side
-layout was built to fix, arriving by a different route: what is consulted
-elsewhere is read after the judgment rather than during it. What is neither
-evidence nor action — the timeline, the revisions, the comments, the holder, the
-fix targets, the assessment — was already there.
+The references move down, with the timeline, the revisions and the comments.
+Eleven links between the facts and the form recreates the defect the
+side-by-side layout was built to fix, arriving by a different route: what is
+consulted elsewhere is read after the judgment rather than during it. What is
+neither evidence nor action — the timeline, the revisions, the comments, the
+holder, the fix targets, the assessment — was already there.
 
-**A decision is made on the finding's own screen, and nowhere else** (REQ-57,
-reversed). The list opened the decision form inside a row for a while, so a run of
-similar findings could be answered without leaving it. What that did not carry was
-everything else the finding puts beside a judgment — the references, the way down,
-what a VEX document said, the history, the comments. The saving was navigation and
-the cost was the evidence.
+A decision is made on the finding's own screen, and nowhere else (REQ-57,
+reversed). The list opened the decision form inside a row for a while, so a run
+of similar findings could be answered without leaving it. What that did not
+carry was everything else the finding puts beside a judgment — the references,
+the way down, what a VEX document said, the history, the comments. The saving
+was navigation and the cost was the evidence.
 
 | Rule | |
 |---|---|
@@ -568,7 +568,7 @@ the cost was the evidence.
 | Where it sits shows the chain, not the immediate parent | The same parent can be reached by several routes, and a screen naming only the nearest cannot tell them apart |
 | Where upstream currency is switched on, it says what upstream released and when (REQ-69) | Two facts rather than a judgment about anybody's project. Where an issue was named a clear year after the last release and is still unfixed, the screen says that is why there is no fix — never as a claim that a project is abandoned. It needs a full year of silence, because comparing two year-numbers makes a five-week gap look identical to a five-year one. Switched off, the panel is absent rather than empty |
 
-**Three situations for what pulls something in, and they are not one.**
+Three situations for what pulls something in, and they are not one.
 
 | Situation | Drawn as |
 |---|---|
@@ -590,7 +590,7 @@ the chain underneath it.
 
 ## The decision form
 
-**Nothing is chosen for you** (REQ-59). The outcome opens unselected, the
+Nothing is chosen for you (REQ-59). The outcome opens unselected, the
 justification opens unselected, and submit is refused until each question being
 asked has an answer.
 
@@ -609,17 +609,17 @@ collects the answer it suggested.
 | A justification is shown with a label and a one-line meaning, never as its bare token (REQ-60) | An accuracy defect rather than a cosmetic one: the token somebody picks out of a list of five snake_case strings at the end of a long day is what ships to a customer, machine-readable, as our claim about their exposure. The stored token stays reachable, on the title, because it is what an approver is checking |
 | One list, and one way of rendering it | The vocabulary carries its own labels, the two forms that offer a choice read from it, and the six places that display a stored one go through a single renderer. Two screens had already started to diverge. A test asserts that every value the type allows is in the list and carries a label that is not its own token |
 
-**Which locations a decision covers is a summary with an exception, not a list of
-checkboxes** (REQ-26). The form says "all 62 locations"; "exclude locations" opens
-the list grouped by what pulls the component in — the consumer, which is the axis
-that decides applicability — with a checkbox per group that reads as mixed when
-part of a group is out, and a filter box when there are more than a dozen. What it
-reads back is "59 of 62, three left open under X".
+Which locations a decision covers is a summary with an exception, not a list of
+checkboxes (REQ-26). The form says "all 62 locations"; "exclude locations" opens
+the list grouped by what pulls the component in — the consumer, which is the
+axis that decides applicability — with a checkbox per group that reads as mixed
+when part of a group is out, and a filter box when there are more than a dozen.
+What it reads back is "59 of 62, three left open under X".
 
 ## The reach sheet
 
-**A guided review on submit** (REQ-25), not a list of checkboxes. The sheet opens
-on a summary: this build, the builds covered automatically, the builds at other
+A guided review on submit (REQ-25), not a list of checkboxes. The sheet opens on
+a summary: this build, the builds covered automatically, the builds at other
 versions, and any not offered.
 
 The builds at other versions are **one list rather than one sheet each**, ticked
@@ -638,8 +638,8 @@ written, and only then is anything sent.
 
 ## Walking the list
 
-**The primary action is above the fold, and the next finding is reachable without
-going back** (REQ-60). The decision form sat at about 1,550 pixels on a page
+The primary action is above the fold, and the next finding is reachable without
+going back (REQ-60). The decision form sat at about 1,550 pixels on a page
 running to 2,800.
 
 | Rule | |
@@ -652,19 +652,19 @@ running to 2,800.
 
 ## The dependency tree
 
-**A tree, and its counts are cumulative.** Each row carries what is open beneath
-it as well as on it, so a container reads as the sum of what it holds rather than
+A tree, and its counts are cumulative. Each row carries what is open beneath it
+as well as on it, so a container reads as the sum of what it holds rather than
 as zero. Those totals are worked out when the tree is read rather than stored
 after a scan, because they are derived from findings and findings move.
 
-**Both numbers are distinct issues, per path.** A node's own count is the distinct
+Both numbers are distinct issues, per path. A node's own count is the distinct
 issues open against that component; the cumulative count is the distinct issues
 across it and everything under it, each component counted once however many ways
 it is reached. A finding is one issue at one place, and a library at thirty-six
 places with two issues is seventy-two rows — which is what every parent used to
-read, where somebody who drilled down one path is looking at one place and expects
-two. **One recursive statement for the row's whole set of children**: 0.08 s for
-the root's thirty children on the full-size image.
+read, where somebody who drilled down one path is looking at one place and
+expects two. **One recursive statement for the row's whole set of children**:
+0.08 s for the root's thirty children on the full-size image.
 
 | Rule | |
 |---|---|
@@ -685,16 +685,16 @@ this one made branches alphabetical on purpose, because an edge means "contains
 packages each depending on the one kernel all report its total. That fault is
 back, deep in the tree, and it is the lesser of the two.
 
-**The list a tree number opens is `beneath`**: every open finding at the component
-or anywhere under it, by the same walk. `under` stays the direct consumer. The two
-do not always show the same figure and are not forced to — the tree counts
-distinct issues and the list is one row per issue and component. A name the build
-does not hold is refused rather than answered with an empty list, since an empty
-list is also what a clean subtree looks like.
+The list a tree number opens is `beneath`: every open finding at the component
+or anywhere under it, by the same walk. `under` stays the direct consumer. The
+two do not always show the same figure and are not forced to — the tree counts
+distinct issues and the list is one row per issue and component. A name the
+build does not hold is refused rather than answered with an empty list, since an
+empty list is also what a clean subtree looks like.
 
 ## The review queue
 
-**One card per claim** (REQ-28): one proposer's action, however many decisions it
+One card per claim (REQ-28): one proposer's action, however many decisions it
 wrote. The card carries the reasoning as it stands, how many records the claim
 wrote, how many locations and builds it reaches, whether it was approved before
 and came back, and how long the finding has been put off.
@@ -709,7 +709,7 @@ adds:
 | **Lapsed decisions and deferrals that ran out sit underneath** | The row carries the decision and not the build it was made in, so reaffirming happens on the finding, where its locations are |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 
-**The queue filters on mine and nothing else**, so an approver holding several
+The queue filters on mine and nothing else, so an approver holding several
 products reads one interleaved list. *Not built* — see the list at the end.
 
 ## The claim page
@@ -727,31 +727,31 @@ agree, send it back, hold rows back, and say where the work is happening.
 | **A decision's address resolves here** | Notifications, the record, the reports and the evidence list all name a decision by identifier. Each of those is somebody being sent to read what was decided, and what was decided belongs to the claim. The address is replaced rather than pushed, so going back does not land on it again |
 | **Reaffirming is not here** | It is a claim about one place in one build, and this screen is about an argument that may cover many. It happens on the finding, where the places are |
 
-**Which acts are offered follows the act-and-needs table in
-`DESIGN-triage.md`**, rather than being restated here: offering a button that
-would refuse somebody is worse than offering nothing, and a second copy of the
-rule is a copy that disagrees. It said revising and withdrawing were the
-author's, where the rule and the code both ask for triage on the product at
-the finding's visibility — so a triager reading a colleague's stale claim had
-no way to revise it on this screen and every way to do it from the finding.
+Which acts are offered follows the act-and-needs table in `DESIGN-triage.md`,
+rather than being restated here: offering a button that would refuse somebody is
+worse than offering nothing, and a second copy of the rule is a copy that
+disagrees. It said revising and withdrawing were the author's, where the rule
+and the code both ask for triage on the product at the finding's visibility — so
+a triager reading a colleague's stale claim had no way to revise it on this
+screen and every way to do it from the finding.
 
 The one thing drawn narrower than the rule is holding rows back, which is
 offered only on a bulk claim that still has outliers, because it is the
 author's side of the choice an approver already has.
 
-**A screen asks what it may do rather than working it out from roles.** That
-is what the capability answer is for, and it is only usable as a gate while it
-means what the operation accepts: agreeing was reported from the approver
-capability alone while the operation accepts a triager too, so a two-person
-team where neither holds the capability — the ordinary shape of a small team —
-was shown a claim, its reasoning and its history with no way to answer it.
+A screen asks what it may do rather than working it out from roles. That is what
+the capability answer is for, and it is only usable as a gate while it means
+what the operation accepts: agreeing was reported from the approver capability
+alone while the operation accepts a triager too, so a two-person team where
+neither holds the capability — the ordinary shape of a small team — was shown a
+claim, its reasoning and its history with no way to answer it.
 
 ## Assignments and routing rules
 
-**Assignments is two tabs**: what is due soon and undecided, and who holds what.
-Unassigned work is its own screen with its own rail entry, and a row nobody holds
-says "unassigned" in muted text rather than drawing nobody as a person with an
-avatar.
+Assignments is two tabs: what is due soon and undecided, and who holds what.
+Unassigned work is its own screen with its own rail entry, and a row nobody
+holds says "unassigned" in muted text rather than drawing nobody as a person
+with an avatar.
 
 | Rule | |
 |---|---|
@@ -759,25 +759,25 @@ avatar.
 | Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. The finding carries "Take this" and the unassigned list's batch bar carries "Take", beside the picker rather than through it |
 | Offering work to somebody is a question about one product | The unassigned list spans every product somebody can see, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
 
-**A screen for the standing rules** (REQ-34), per product, shown as a **numbered
-list because the order *is* the precedence**: the first rule that matches places
-the work, and a set with no visible order is a precedence nobody wrote down.
+A screen for the standing rules (REQ-34), per product, shown as a numbered list
+because the order *is* the precedence: the first rule that matches places the
+work, and a set with no visible order is a precedence nobody wrote down.
 
 The form says which of the two kinds does what before anybody fills it in.
-**Saving says the sweep has started, not that it has finished** — one rule can
-place thousands of findings, so it is queued, and a reply claiming the work was
-done would be a reply about something that has not happened yet.
+Saving says the sweep has started, not that it has finished — one rule can place
+thousands of findings, so it is queued, and a reply claiming the work was done
+would be a reply about something that has not happened yet.
 
-**The finding says which rule placed it**, on the same card that says who is
-dealing with it, along with what somebody needs to know next: taking it is picking
-up work nobody holds, and the rule will not take it back.
+The finding says which rule placed it, on the same card that says who is dealing
+with it, along with what somebody needs to know next: taking it is picking up
+work nobody holds, and the rule will not take it back.
 
 ## Catalog and inventories
 
-**Adding to the catalog is an action, not a form above the table** (REQ-60).
-Products, branches and tags, variants and users each carry an "add" control in the
-header and a floating action, both opening a drawer with the form; the table is
-what the screen is about.
+Adding to the catalog is an action, not a form above the table (REQ-60).
+Products, branches and tags, variants and users each carry an "add" control in
+the header and a floating action, both opening a drawer with the form; the table
+is what the screen is about.
 
 | Rule | |
 |---|---|
@@ -803,18 +803,18 @@ input — which is a different job from reading how something is going.
 | "Undecided" and "agreed" are the findings list's own words | By the same definition and from the same expression. Two screens with two definitions of "decided" is how they come to disagree in front of somebody |
 | A build nobody has ever scanned is a row, not an omission | A product reads as clean when part of it was never looked at. One whose release is out of support says so |
 
-**A scan run has a detail page.** A receipt says a run happened; a row reading
+A scan run has a detail page. A receipt says a run happened; a row reading
 "7,604 opened" is a number with no shape. The page says what the run opened and
 closed, broken down by the rating in force, with how much of what it opened is
 known to be exploited — which is what decides whether an overnight jump is an
-evening's work or a night's. A band with none in it is left out rather than drawn
-as a zero, because a row of zeros reads as a chart that failed to load.
+evening's work or a night's. A band with none in it is left out rather than
+drawn as a zero, because a row of zeros reads as a chart that failed to load.
 
-**Release comparison carries a chart across every build**, not only the two being
+Release comparison carries a chart across every build, not only the two being
 compared: the comparison answers what changed between two, and the chart answers
-whether it is getting better or worse. Bars rather than a line, because these are
-separate builds and a line between two releases draws a trend through a gap where
-nothing happened.
+whether it is getting better or worse. Bars rather than a line, because these
+are separate builds and a line between two releases draws a trend through a gap
+where nothing happened.
 
 ## Recording a flaw
 
@@ -840,27 +840,27 @@ are about to file against — which the screen also says as a count.
 | Weaknesses are suggested and never restricted | A picker that refused an identifier it had not heard of would refuse next year's |
 | Files that prove it are attached on the same screen | Stored after the finding exists, because an attachment hangs off an issue and there is no issue until it is recorded. A file that will not store does not undo the record — the words are the finding and the file is evidence for them — and what is reported is which file failed |
 
-**The description is written and read as markdown.** It is our own prose, so it
-goes through the same editor and the same submission policy as a justification.
-What a scan file said stays escaped and unrendered (REQ-66): the two live in the
-same column, so which it is decides, and rendering the column would render the
+The description is written and read as markdown. It is our own prose, so it goes
+through the same editor and the same submission policy as a justification. What
+a scan file said stays escaped and unrendered (REQ-66): the two live in the same
+column, so which it is decides, and rendering the column would render the
 scanner's text.
 
-**A VEX publisher's own words are shown the same way, and for the same reason.**
+A VEX publisher's own words are shown the same way, and for the same reason.
 What a distribution or an upstream security team publishes arrives in a document
 they wrote, so it is a third party's text reaching the people who hold the most
-access here. It was being rendered as markdown on the finding screen. Raw HTML is
-off at the parser and the page's own policy blocks scripts, so what that bought an
-author was not code: **it was headings, tables, bold assertions and the text of
-arbitrary outbound links, laid out on the screen a triager is deciding from**,
-plus the ability to name one of this deployment's own attachments and have it
-drawn beside their argument. A judgment somebody else publishes may be evidence
-and may never be presentation.
+access here. It was being rendered as markdown on the finding screen. Raw HTML
+is off at the parser and the page's own policy blocks scripts, so what that
+bought an author was not code: **it was headings, tables, bold assertions and
+the text of arbitrary outbound links, laid out on the screen a triager is
+deciding from**, plus the ability to name one of this deployment's own
+attachments and have it drawn beside their argument. A judgment somebody else
+publishes may be evidence and may never be presentation.
 
 ## Disclosure and advisories
 
-**Partly built.** A finding says whether it is disclosed, and there is a screen
-for what is running out with the extension request on it. Agreeing to an extension
+Partly built. A finding says whether it is disclosed, and there is a screen for
+what is running out with the extension request on it. Agreeing to an extension
 is still reachable over HTTP and referenced nowhere in the interface.
 
 | Rule | |
@@ -901,11 +901,11 @@ eventually disagrees with what gets published.
 
 ### Drafts
 
-**Unsent text is kept and restored.** A draft is written to the browser as
-somebody types and cleared only once the server has taken it, so a refused
-submission, an expired session and a closed tab all leave the words where they
-were. Losing what somebody wrote is what teaches people to write less, and the
-reasoning is the part of a decision that matters most.
+Unsent text is kept and restored. A draft is written to the browser as somebody
+types and cleared only once the server has taken it, so a refused submission, an
+expired session and a closed tab all leave the words where they were. Losing
+what somebody wrote is what teaches people to write less, and the reasoning is
+the part of a decision that matters most.
 
 | Rule | |
 |---|---|
@@ -917,11 +917,11 @@ reasoning is the part of a decision that matters most.
 
 ## An expired session
 
-**A write refused for want of a session offers the way back over the screen rather
-than instead of it.** What the person was looking at stays behind it and comes
+A write refused for want of a session offers the way back over the screen rather
+than instead of it. What the person was looking at stays behind it and comes
 back when they return. The words are already safe — a draft is written as it is
-typed — but the finding somebody was reading, the filters they had set and the row
-they had open are not a draft.
+typed — but the finding somebody was reading, the filters they had set and the
+row they had open are not a draft.
 
 | Rule | |
 |---|---|
@@ -947,8 +947,8 @@ file's name.
 
 ## Mentions and assignment pickers
 
-**Autocomplete after an `@` offers the people who can read findings of that
-visibility in that product, and nobody else.** An autocomplete listing everybody
+Autocomplete after an `@` offers the people who can read findings of that
+visibility in that product, and nobody else. An autocomplete listing everybody
 teaches somebody to name a colleague who then cannot open what they were called
 to; on an undisclosed finding the mention itself says a finding exists.
 
@@ -958,7 +958,7 @@ to; on an undisclosed finding the mention itself says a finding exists.
 | What is being typed after an `@` is read from the text before the cursor | Rather than tracked as state, so it stays right however somebody edits |
 | The pickers that say who is dealing with a finding ask the same endpoint (REQ-34) | They asked for the list of people, which is administration, so for every triager in the deployment both selects were empty. Asking who may *read* it rather than who *exists* also narrows the offer to people who can open what they are handed |
 
-**Both people pickers are typed against the list rather than scrolled.** Adding
+Both people pickers are typed against the list rather than scrolled. Adding
 somebody to a team and bringing somebody onto a case were selects over
 everybody, which is a control that stops working at the size a deployment
 reaches: a scroll through hundreds of names in no order anybody chose. The one
@@ -974,8 +974,8 @@ has always taken and never received.
 
 ## The search box
 
-**One box, matching component names and issue names alike, at whatever scope is
-chosen** (REQ-64).
+One box, matching component names and issue names alike, at whatever scope is
+chosen (REQ-64).
 
 | Rule | |
 |---|---|
@@ -1022,11 +1022,11 @@ other, and two that could not be asked at all.
 | A name nobody holds and a name the caller may not reach answer alike | Resolving first and refusing after makes the refusal informative, which turns a lookup into a directory |
 | Each list is a page, with its total beside it | Both only grow, and a screen that asks for all of either is one that stops answering |
 
-**Leaving is recorded here**, at the foot, and says what it does before it is
-done: refused at every way in, sessions ended, work handed back, nothing
-deleted and no role withdrawn. Once it is recorded the screen says so at the
-top rather than at the foot — every other number on it reads differently once
-somebody has gone — and offers bringing them back.
+Leaving is recorded here, at the foot, and says what it does before it is done:
+refused at every way in, sessions ended, work handed back, nothing deleted and
+no role withdrawn. Once it is recorded the screen says so at the top rather than
+at the foot — every other number on it reads differently once somebody has gone
+— and offers bringing them back.
 
 ## A release, gathered
 
@@ -1036,8 +1036,8 @@ line poses, from the catalog rather than from a naming convention: a branch is
 rebuilt nightly and what matters is what it is built as, and a tag never
 changes and what matters is what was handed over when it was cut.
 
-**A release is a hand-off, not a fifth summary page.** What belongs here is
-what goes out with the release, which sat in four places reached four ways.
+A release is a hand-off, not a fifth summary page. What belongs here is what
+goes out with the release, which sat in four places reached four ways.
 
 | Section | What it answers |
 |---|---|
@@ -1057,7 +1057,7 @@ what goes out with the release, which sat in four places reached four ways.
 
 ## Reports, settings, inheritance
 
-**Reports is a catalog of named reports**, under "Across products", beside "The
+Reports is a catalog of named reports, under "Across products", beside "The
 record" rather than inside it — the record is what was judged and who agreed; a
 report is the shape of the judging. **Reports may span products**, unlike every
 other screen: comparing products is often the point, and it costs no visibility,
@@ -1097,8 +1097,8 @@ said so.
 
 ## Units, dates and copy
 
-**Every count says what it is a count of** (REQ-60). Five counts appeared within
-one screen of each other in three units — findings, distinct issues, and distinct
+Every count says what it is a count of (REQ-60). Five counts appeared within one
+screen of each other in three units — findings, distinct issues, and distinct
 issues beneath a path — and only one was labeled, so a rail badge and the page
 title beside it disagreed by thousands and both were right.
 
@@ -1116,41 +1116,43 @@ than calling the row a finding. **The rail has room for a number and not for a
 noun**, so a badge carries its unit on the title and on what a screen reader is
 given.
 
-**Dates take one absolute form and one relative form.** Four were in use at once,
-two of them machine-shaped — a stored moment interpolated whole, with its time and
-its offset, is the tool showing its storage rather than answering the question.
+Dates take one absolute form and one relative form. Four were in use at once,
+two of them machine-shaped — a stored moment interpolated whole, with its time
+and its offset, is the tool showing its storage rather than answering the
+question.
 
 | Form | |
 |---|---|
 | **Absolute** | The calendar day as stored, deliberately not localized. These are dates people quote to each other across time zones, and one that reads differently for two people looking at the same row is worse than one that reads unfamiliarly for both |
 | **Relative** | For the reader asking whether something is stale. It reads the same scale in both directions, because a deadline and a last scan are the same question about opposite sides of now, and it carries the absolute form on the title |
 
-**Waiting looks the same everywhere, and says so.** The sentence was typed out
+Waiting looks the same everywhere, and says so. The sentence was typed out
 thirty-nine times in four spellings, and none of them announced anything — which
 leaves a reader who cannot see the page with nothing between asking and arriving
 that distinguishes a slow answer from a page that did nothing. One component,
-announced politely, with the one real variation the thirty-nine had between them.
+announced politely, with the one real variation the thirty-nine had between
+them.
 
-**A statement about a trend waits for enough history to support it** (REQ-54). The
+A statement about a trend waits for enough history to support it (REQ-54). The
 trend answers for a fixed window whether or not this deployment existed through
-it, so a week-old deployment gets twelve weekly steps of which eleven are zeros —
-and the copy read "Backlog growing: new exceeded resolved in 1 of 12 weeks" and
-"Critical went 0 → 389", both describing the first scan landing. The guard was
-there and counted the steps *returned* rather than the steps that held anything.
+it, so a week-old deployment gets twelve weekly steps of which eleven are zeros
+— and the copy read "Backlog growing: new exceeded resolved in 1 of 12 weeks"
+and "Critical went 0 → 389", both describing the first scan landing. The guard
+was there and counted the steps *returned* rather than the steps that held
+anything.
 
-**Leading empty steps are dropped and the rest are kept.** An empty week inside
-the history is real; a leading one is only the absence of us. Four steps of real
+Leading empty steps are dropped and the rest are kept. An empty week inside the
+history is real; a leading one is only the absence of us. Four steps of real
 history before a direction is claimed, because three points is one change plus a
 confirmation. The panels still draw — the chart shows what there is and claims
 nothing; only the sentence is held back.
 
 ## Interface-wide rules
 
-**A screen works on a phone, and that is a requirement rather than an
-enhancement** (REQ-55). It rules out any packaged data grid that owns its own
-markup: the findings table has to become something else on a narrow screen rather
-than scroll sideways. That is why the tables here are written rather than
-installed.
+A screen works on a phone, and that is a requirement rather than an enhancement
+(REQ-55). It rules out any packaged data grid that owns its own markup: the
+findings table has to become something else on a narrow screen rather than
+scroll sideways. That is why the tables here are written rather than installed.
 
 | Rule | |
 |---|---|
@@ -1168,8 +1170,8 @@ Screens are split by route. The findings list has to stay usable against a
 full-size product and has no business downloading a charting library, and the
 markdown renderer is only needed where somebody reads or writes a justification.
 
-**Measured: one bundle of 820 KB became a 248 KB initial load**, with the chart
-(369 KB) and the renderer (146 KB) fetched only by the screens that use them.
+Measured: one bundle of 820 KB became a 248 KB initial load, with the chart (369
+KB) and the renderer (146 KB) fetched only by the screens that use them.
 
 ## Running it locally
 
@@ -1208,13 +1210,13 @@ than inherited.
 | The inventories table carries product, branch and variant columns | The screen is scoped to one build, so those are the scope bar rather than a column repeated on every row. What it adds is when the producer says the build was made |
 | Settings write "3 days" in the field | The server takes and returns its own duration syntax, so what is typed is what is stored and the reading — "= 3 days" — sits beside it rather than in it |
 
-**The trend is drawn by hand rather than by the charting library.** Open runs to
+The trend is drawn by hand rather than by the charting library. Open runs to
 thousands and a week's new or resolved to tens, so on the library's one shared
-scale the two lines the chart exists for flattened into the baseline. The mockup's
-form — open as an area in its own band, new against resolved as paired bars
-beneath on their own scale, one x axis — has no expression in the library short of
-two charts pretending to be one. The severity split and the ring stay with the
-library.
+scale the two lines the chart exists for flattened into the baseline. The
+mockup's form — open as an area in its own band, new against resolved as paired
+bars beneath on their own scale, one x axis — has no expression in the library
+short of two charts pretending to be one. The severity split and the ring stay
+with the library.
 
 ## Test coverage
 
@@ -1223,15 +1225,15 @@ document, so a screen cannot disagree with the shape the server sends and a
 drifted endpoint is a compile error rather than a blank panel. **That is real
 coverage and it is most of what the frontend needs.**
 
-**What it is not is a test of what a screen *says*.** Five pieces are pulled out
-and tested on their own — what a notification is called, the count on the control
+What it is not is a test of what a screen *says*. Five pieces are pulled out and
+tested on their own — what a notification is called, the count on the control
 that opens it, where an unsent draft is kept, where a sign-in comes back to, and
 how a session that ended is noticed — because each is a defect rather than a
-matter of taste if it is wrong. Everything else is checked by a person looking at
-it.
+matter of taste if it is wrong. Everything else is checked by a person looking
+at it.
 
-**The draft rules are tested; the sign-out that calls them is not**, and nor is
-the panel that offers a way back in. There is no component test here to click a
+The draft rules are tested; the sign-out that calls them is not, and nor is the
+panel that offers a way back in. There is no component test here to click a
 control or to see what is drawn over what, so both connections are checked by
 reading. They are the weakest links in the chains those rules describe.
 
@@ -1244,7 +1246,6 @@ beside them.
 | | |
 |---|---|
 | **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
-| **Ownership by subtree** | No longer undecided: it is built, as routing to a team by rule, keyed on component identity as well as on a place in the tree |
 | **Narrowing the review queue** | By product, by what kind of thing is waiting, by who proposed it, by age or by severity |
 | **A deadline and an owner in the finding's header** | The row carries both; the header does not |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |

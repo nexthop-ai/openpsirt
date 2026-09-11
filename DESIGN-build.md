@@ -22,7 +22,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Probes](#probes)
 - [Documentation](#documentation)
 - [The review checklist](#the-review-checklist)
-- [Actions are pinned](#actions-are-pinned)
+- [Action pinning](#action-pinning)
 - [Repository settings](#repository-settings)
 - [Limits](#limits)
 
@@ -62,14 +62,14 @@ Everything is under `internal/`, so nothing is importable by another module.
 Every check CI runs is a `make` target, so a CI failure reproduces locally with
 the same command and the same pinned tool versions (REQ-75).
 
-**The Go package pattern is not `./...`.** An npm dependency ships a Go
-package — `web/node_modules/flatted/golang` — and `./...` matched it, so it
-was compiled, vetted, tested and scanned as part of this module. Nothing
-chose that: a JavaScript dependency putting Go source into the build graph is
-a surface, not a curiosity. Every tool written here already skips
-`node_modules` by name; the package pattern was the one place that did not,
-and it is now the list `go list` gives minus that directory, computed rather
-than written out so a new directory of ours needs no edit.
+The Go package pattern is not `./...`. An npm dependency ships a Go package —
+`web/node_modules/flatted/golang` — and `./...` matched it, so it was compiled,
+vetted, tested and scanned as part of this module. Nothing chose that: a
+JavaScript dependency putting Go source into the build graph is a surface, not a
+curiosity. Every tool written here already skips `node_modules` by name; the
+package pattern was the one place that did not, and it is now the list `go list`
+gives minus that directory, computed rather than written out so a new directory
+of ours needs no edit.
 
 | Target | Runs |
 |---|---|
@@ -146,14 +146,13 @@ rather than for tidiness.
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
 
-**Dependency review was a fourth and is not.** The action needs GitHub
-Advanced Security on a private repository — a paid add-on, per active
-committer, that nothing else in this organization buys. What it checked is
-covered by targets instead, and covered better: `licenses` reads the npm tree
-as well as the Go one, `web-audit` scans what the interface installs, and
-`secrets` replaces the platform's secret scanning. Each runs locally with one
-command, which the action never did, and that is the half of REQ-75 the action
-was quietly failing.
+Dependency review was a fourth and is not. The action needs GitHub Advanced
+Security on a private repository — a paid add-on, per active committer, that
+nothing else in this organization buys. What it checked is covered by targets
+instead, and covered better: `licenses` reads the npm tree as well as the Go
+one, `web-audit` scans what the interface installs, and `secrets` replaces the
+platform's secret scanning. Each runs locally with one command, which the action
+never did, and that is the half of REQ-75 the action was quietly failing.
 
 Two workflows beside this one report no build of their own. `PR` is the
 aggregator that waits for every check here and is the only one the ruleset
@@ -162,34 +161,33 @@ Both declare `merge_group:` as this one does — a workflow that does not
 contributes no check to a queue entry, and the aggregator cannot tell that
 from one that has not started.
 
-**The first job runs one target, not a list of them.** `make check` is the
+The first job runs one target, not a list of them. `make check` is the
 definition of what CI checks, so a target added to it is run by CI without
 anybody remembering to add a step.
 
-**Naming targets individually is how the two drifted.** CI was six jobs listing
+Naming targets individually is how the two drifted. CI was six jobs listing
 their targets by hand, and three targets `make check` runs were in no job:
 `reserved`, `readable` and `pins-check`. So the rule that local and CI run the
 identical command was written down, believed, and false in three places —
 including the one that checks no invented name collides with a word an engine
 reserves, which is a non-negotiable.
 
-**Five of the six were a checkout and a Go setup.** The interface, static
-analysis, vulnerabilities and licenses, the API document and the bill of
-materials each declared nothing else before running a make target: same runner
-image, same toolchain, same module cache, no services, no conditions. Six clones
-and six toolchain restores did one machine's worth of work. Parallelism was the
-only thing lost by folding them together, and it was not what any of them was
-for.
+Five of the six were a checkout and a Go setup. The interface, static analysis,
+vulnerabilities and licenses, the API document and the bill of materials each
+declared nothing else before running a make target: same runner image, same
+toolchain, same module cache, no services, no conditions. Six clones and six
+toolchain restores did one machine's worth of work. Parallelism was the only
+thing lost by folding them together, and it was not what any of them was for.
 
-**A composite action was considered and is not needed.** The shared setup was
-going to become one, but after the fold there is exactly one Go setup left in
-the workflow, so an action abstracting it would have a single caller. A reusable
+A composite action was considered and is not needed. The shared setup was going
+to become one, but after the fold there is exactly one Go setup left in the
+workflow, so an action abstracting it would have a single caller. A reusable
 workflow would not have helped at all: it runs on a runner of its own, so it
 re-clones and re-installs, which organizes the file and keeps the cost.
 
-**Publishing documentation is a workflow of its own**, not this one's fourth
-job. It runs on `main` alone, writes to the repository, and publishes rather
-than checks.
+Publishing documentation is a workflow of its own, not this one's fourth job. It
+runs on `main` alone, writes to the repository, and publishes rather than
+checks.
 
 ## Interface checks
 
@@ -217,7 +215,7 @@ browser.
 
 ## Class-name checks
 
-**A class name this project defines that Tailwind also defines.** Tailwind is
+A class name this project defines that Tailwind also defines. Tailwind is
 imported wholesale, so it emits a utility rule for any class name in the source
 it recognizes. Where that name is also defined here, both rules apply and
 Tailwind's wins for the properties it sets. Nothing fails: a column with
@@ -227,12 +225,12 @@ The set is derived rather than listed. Every class this stylesheet defines a rul
 for is put to Tailwind's compiler, and anything it answers for is a collision. A
 utility Tailwind adds in a later version is caught on the next run.
 
-**A rule that styles nothing.** Matched against the whole source rather than
-against `className=`, because class names are built as well as written:
-`col ${kind}` puts a modifier in the markup that appears nowhere as a literal.
-The check is deliberately weak — it finds a name mentioned nowhere at all, and
-stays quiet otherwise. Names from a charting library or the markdown renderer's
-`language-` prefix are excluded.
+A rule that styles nothing. Matched against the whole source rather than against
+`className=`, because class names are built as well as written: `col ${kind}`
+puts a modifier in the markup that appears nowhere as a literal. The check is
+deliberately weak — it finds a name mentioned nowhere at all, and stays quiet
+otherwise. Names from a charting library or the markdown renderer's `language-`
+prefix are excluded.
 
 ## Database engines
 
@@ -264,11 +262,11 @@ on each engine, so packages share nothing and run in parallel.
 | SQLite | A copy of a template migrated once per binary | Not needed — each test holds its own file |
 | The three servers | The package's own database on the server | By deleting from the tables that hold rows |
 
-**A server database is kept between runs and reused.** Applying the migrations
-was nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
-MariaDB, once per package per engine, which was 475 s of server work in a run
-that spent 43 s of processor time — and none of it tests anything the migration
-tests do not.
+A server database is kept between runs and reused. Applying the migrations was
+nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on MariaDB,
+once per package per engine, which was 475 s of server work in a run that spent
+43 s of processor time — and none of it tests anything the migration tests do
+not.
 
 What makes reuse safe is the name. Until the first release a schema change edits
 the migration that created the thing rather than adding one beside it, so the
@@ -279,9 +277,9 @@ stale one, and the databases the older fingerprints named are dropped as the new
 one is created, so a server does not accumulate them. A kept database is emptied
 before the first test sees it.
 
-**The race detector runs on SQLite alone.** A Go data race does not vary by
-database engine, and the detector's cost is in-process work — which is most of
-what SQLite spends and almost none of what a server engine does.
+The race detector runs on SQLite alone. A Go data race does not vary by database
+engine, and the detector's cost is in-process work — which is most of what
+SQLite spends and almost none of what a server engine does.
 
 | `internal/httpapi`, one engine | With the detector | Without |
 |---|---|---|
@@ -293,23 +291,23 @@ what SQLite spends and almost none of what a server engine does.
 The detector is a property of the binary and cannot be turned on for one
 subtest, so `test-all` is two runs: SQLite with it, the three servers without.
 
-**It was not true of four tests.** `OPENPSIRT_TEST_ENGINES` narrows which
-engines a run touches, and `test` and `test-race` both set it to `sqlite` — but
-the pool's idle reaper, the migration lock and the version floor open
-connections themselves rather than through `dbtest`, and each read its URL
-without consulting the variable. So the quick loop and the race run opened
-three servers, and the measurements above understate what the race run costs.
-It surfaced as five failures the day the servers were stopped, which reads as
-a code regression rather than a stopped container.
+It was not true of four tests. `OPENPSIRT_TEST_ENGINES` narrows which engines a
+run touches, and `test` and `test-race` both set it to `sqlite` — but the pool's
+idle reaper, the migration lock and the version floor open connections
+themselves rather than through `dbtest`, and each read its URL without
+consulting the variable. So the quick loop and the race run opened three
+servers, and the measurements above understate what the race run costs. It
+surfaced as five failures the day the servers were stopped, which reads as a
+code regression rather than a stopped container.
 
 The rule now lives in `dbtest/engines`, a package below both `dbtest` and
 `migrate`: the migration lock's test is an internal test of `migrate`, which
 `dbtest` depends on, so it could not reach the rule and a second copy of the
 parsing was the alternative.
 
-**Tests within a package run beside each other when SQLite is the whole run.**
-That is the only run where each test already holds a database nothing else can
-reach; on a server the package has one database and its tests empty it between
+Tests within a package run beside each other when SQLite is the whole run. That
+is the only run where each test already holds a database nothing else can reach;
+on a server the package has one database and its tests empty it between
 themselves, so two at once would clear each other's rows. A test that changes
 something the whole process shares — an environment variable, the working
 directory — says so and runs alone.
@@ -329,12 +327,12 @@ tests run against, this answers what the release is built from. It found drift o
 its first run — the image carried two defaults for the version passed in, so a
 build with none reported `dev` in the binary and `0.0.0` in its own inventory.
 
-**The Go patch counts, and it did not used to.** The image built from
+The Go patch counts, and it did not used to. The image built from
 `golang:1.27-alpine`, which floats, and the check truncated `go.mod` to the
 minor so the two could be compared at all. The first release shipped a tarball
 built by 1.27.0 and an image built by 1.27.1 — one Go patch apart, and green.
-The image now names the patch `go.mod` declares and the check compares the
-whole version.
+The image now names the patch `go.mod` declares and the check compares the whole
+version.
 
 | What that costs | What answers it |
 |---|---|
@@ -370,12 +368,12 @@ threshold would accept every other unreadable license silently.
 Build tooling is exempt. The linter is GPL-licensed; running a tool over the code
 affects its license no more than the compiler does.
 
-**Both ecosystems, one allowlist.** The interface is built into the binary, so
-what npm installs ships exactly as a Go module does, and it went unchecked
-until the product that would have caught it turned out to be paid. `make
-licenses` runs both halves against the same `ALLOWED_LICENSES`, passed in
-rather than repeated, and dev dependencies are unrestricted on both sides
-because a build tool binds whoever builds rather than whoever installs.
+Both ecosystems, one allowlist. The interface is built into the binary, so what
+npm installs ships exactly as a Go module does, and it went unchecked until the
+product that would have caught it turned out to be paid. `make licenses` runs
+both halves against the same `ALLOWED_LICENSES`, passed in rather than repeated,
+and dev dependencies are unrestricted on both sides because a build tool binds
+whoever builds rather than whoever installs.
 
 | Exception | Why |
 |---|---|
@@ -435,7 +433,7 @@ consulted when somebody remembers (REQ-75).
 It is not enforced by the pipeline. What CI can check, CI checks; the gate is
 long precisely so the checklist holds only what a machine cannot decide.
 
-## Actions are pinned
+## Action pinning
 
 | Rule | Why |
 |---|---|
@@ -458,12 +456,12 @@ absence looks like — an absent setting fails somewhere far from itself.
 | Actions pinned to a SHA | The section above | A tag somebody else controls executes here |
 | Pages, serving the `gh-pages` branch | Documentation publishing | The workflow succeeds and nothing is served |
 
-**Private and public differ, and what differs is paid for.** Secret scanning,
-push protection and dependency review are free on a public repository and are
-Advanced Security products on a private one, billed per active committer
-across the repositories that enable them. None is enabled here: the gate runs
-`make secrets`, `make licenses` and `make web-audit` instead, which cost
-nothing and run locally. Dependabot alerts are free either way and are on.
+Private and public differ, and what differs is paid for. Secret scanning, push
+protection and dependency review are free on a public repository and are
+Advanced Security products on a private one, billed per active committer across
+the repositories that enable them. None is enabled here: the gate runs `make
+secrets`, `make licenses` and `make web-audit` instead, which cost nothing and
+run locally. Dependabot alerts are free either way and are on.
 
 What is genuinely lost by not buying them is history: a credential committed
 and later removed is still in the objects, and scanning the working tree

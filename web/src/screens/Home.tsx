@@ -266,7 +266,7 @@ function Readiness({ at }: { at: Scoped }) {
 }
 
 // The move, said as a direction rather than as a signed number. Fewer is
-// better here, so the colour follows the meaning and not the arithmetic.
+// better here, so the color follows the meaning and not the arithmetic.
 function Change({ from, to }: { from: number; to: number }) {
   const by = to - from;
   if (by === 0) return <span className="hint">same</span>;

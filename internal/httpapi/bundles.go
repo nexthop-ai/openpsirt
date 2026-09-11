@@ -34,7 +34,7 @@ func registerBundles(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-fix-bundles", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/fix-bundles",
-		Summary: "List what is open, gathered by the bump that would fix it",
+		Summary: "List findings by upgrade",
 		Description: "One row per upstream bump, with the issues it closes.\n\n" +
 
 			"Keyed on the **source package** where one is recorded and on the component's " +

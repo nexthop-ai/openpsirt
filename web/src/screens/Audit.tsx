@@ -7,7 +7,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
-import { Because, labelled } from "../ui/Outcome";
+import { Because, labeled } from "../ui/Outcome";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 
@@ -402,7 +402,7 @@ function Judgment({ row }: { row: Judged }) {
           {/* The word, not the token. The justification beside it has been said
               in words for a while and this had not caught up, so a record read
               "upgrade-needed · The vulnerable code never runs". */}
-          <b>{labelled(row.outcome)}</b>
+          <b>{labeled(row.outcome)}</b>
           {row.justification && (
             <span className="why">
               <Because code={row.justification} />

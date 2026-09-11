@@ -20,7 +20,7 @@ import { useComment, useEditComment, useRevise, useWithdraw } from "../api/mutat
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
-import { Because, labelled } from "../ui/Outcome";
+import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 
 type Detail = Body<"DecisionDetail">;
@@ -58,7 +58,7 @@ export function stateOf(
   if (states.some((s) => s === "proposed")) return { label: "Pending approval", cls: "waiting" };
   if (states.every((s) => s === "approved")) {
     const outcome = claims[0]?.decision?.outcome ?? "";
-    return { label: `${labelled(outcome)} · approved`, cls: "agreed" };
+    return { label: `${labeled(outcome)} · approved`, cls: "agreed" };
   }
   if (states.some((s) => s === "lapsed")) return { label: "Lapsed", cls: "lapsed" };
   return { label: "Decided", cls: "agreed" };
@@ -175,7 +175,7 @@ export function Standing({
         <div>
           <span className="l">Outcome</span>
           <span className="v">
-            {labelled(claim.decision?.outcome ?? "")}
+            {labeled(claim.decision?.outcome ?? "")}
             {claim.decision?.deferred_until && <> until {claim.decision.deferred_until}</>}
           </span>
         </div>
@@ -425,7 +425,7 @@ export function Activity({
   now.push({
     when: claim.proposed_at ?? "",
     who: claim.proposed_by ?? "",
-    what: `proposed #${claimId} — ${labelled(claim.decision?.outcome ?? "")} · ${places ?? claim.decision?.places ?? 1} ${(places ?? claim.decision?.places ?? 1) === 1 ? "place" : "places"}`,
+    what: `proposed #${claimId} — ${labeled(claim.decision?.outcome ?? "")} · ${places ?? claim.decision?.places ?? 1} ${(places ?? claim.decision?.places ?? 1) === 1 ? "place" : "places"}`,
   });
   for (const r of revisions.data?.items ?? []) {
     if ((r.ordinal ?? 1) > 1)
@@ -460,7 +460,7 @@ export function Activity({
   const earlier: Event[] = previous.map((p) => ({
     when: p.proposedAt,
     who: p.proposedBy,
-    what: `proposed #${p.id} — ${labelled(p.outcome)}${p.state ? ` · ${p.state}` : ""}`,
+    what: `proposed #${p.id} — ${labeled(p.outcome)}${p.state ? ` · ${p.state}` : ""}`,
     earlier: true,
   }));
   earlier.sort((a, b) => b.when.localeCompare(a.when));
@@ -825,7 +825,7 @@ export function Prior({
   return (
     <article className="prior">
       <header>
-        <span className="id">#{item.id}</span> <b>{labelled(item.outcome)}</b>
+        <span className="id">#{item.id}</span> <b>{labeled(item.outcome)}</b>
         {item.justification && (
           <>
             {" "}

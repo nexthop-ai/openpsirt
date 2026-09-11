@@ -235,7 +235,7 @@ type Filter struct {
 	// entirely legitimate — an outcome that hides nothing needs no second
 	// person, and a short deferral stands on its own — so it is asked together
 	// with an outcome. What it is for is showing that no *dismissal* sits in
-	// it: not-applicable, won't-fix and already-fixed all require approval, so
+	// it: not-applicable, will-not-fix and already-fixed all require approval, so
 	// that query should return nothing, and a row in it is a control that
 	// failed.
 	//

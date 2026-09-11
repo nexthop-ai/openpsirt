@@ -3,7 +3,7 @@
 The one surface. Everything a person or a pipeline can do goes through it, and
 the web interface is a client of it.
 
-Satisfies REQ-40, REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67.
+Satisfies REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67.
 
 ## Contents
 
@@ -76,8 +76,8 @@ route never adds an exception.
 | 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim |
 | 422 | Understood, and cannot be stored as written |
 
-**Not found and not yours are one answer.** A product somebody holds nothing on
-is invisible rather than unreadable: not listed, not counted, and reported as not
+Not found and not yours are one answer. A product somebody holds nothing on is
+invisible rather than unreadable: not listed, not counted, and reported as not
 declared — the answer a name nobody ever declared gets. The same applies to a
 decision identifier, a person and a credential.
 
@@ -89,25 +89,25 @@ described the wrong thing.
 
 ## Refusal shape
 
-**`application/problem+json`, for everything**, including the handlers in front
-of the router — the credential check and the sign-in callbacks, which are
-ordinary handlers rather than operations because a redirect arriving from a
-provider is not an API call. They answered `text/plain`, so a client parsing the
-documented error model read a refusal as a transport fault.
+`application/problem+json`, for everything, including the handlers in front of
+the router — the credential check and the sign-in callbacks, which are ordinary
+handlers rather than operations because a redirect arriving from a provider is
+not an API call. They answered `text/plain`, so a client parsing the documented
+error model read a refusal as a transport fault.
 
-**A refusal states where to look.** Each fault travels as its own detail carrying
+A refusal states where to look. Each fault travels as its own detail carrying
 the line and the offending text. This is an API shape decision rather than a
 presentation one: an interface can only point at the problem if the answer says
 where it is.
 
-**A store's own sentence and a failed query are distinguished by the engine's
-error types**, asked in one place, rather than by the message text. Thirty
+A store's own sentence and a failed query are distinguished by the engine's
+error types, asked in one place, rather than by the message text. Thirty
 handlers answered both as a 422 with the message in it, so a broken database
 reached the caller as a bad request carrying the statement text and, for a
 connection failure, the address and user it tried. Where the type cannot decide,
 the error is treated as a refusal.
 
-**A process with no database answers with one sentence.** Every handler guards
+A process with no database answers with one sentence. Every handler guards
 against it, because a nil pointer inside one is worse than a refusal. Each guard
 had invented its own wording — twenty-one of them, reading as twenty-one
 conditions. It says nothing about what the caller asked for, because the caller
@@ -150,7 +150,7 @@ by.
 
 ## Issue-keyed and cross-product reads
 
-**One page answers for an issue** (REQ-64): every product, build and component it
+One page answers for an issue (REQ-64): every product, build and component it
 sits at, with how far it has been decided in each.
 
 | Rule | Reason |
@@ -160,8 +160,8 @@ sits at, with how far it has been decided in each.
 | No new visibility rule, but the narrowing is in the query | A page spanning products is where filtering afterwards gets forgotten, and the count leaks even when no row is shown |
 | The search box lands here, with no product picked | An issue by name spans products by construction. Which of the two searches it is is decided by asking the server, not by the shape of the text |
 
-**The findings list spans products too**, at `/v1/findings` with no product in
-the path: one row per product, issue and component, with the same filters, sort
+The findings list spans products too, at `/v1/findings` with no product in the
+path: one row per product, issue and component, with the same filters, sort
 allowlist and paging.
 
 Every product's own triage line applies per row from that product's own column
@@ -208,17 +208,17 @@ A declaration states which of two kinds of rule it is:
 Read as a gate, a narrowed operation looks like one whose check is missing; read
 as narrowed, a gate hides a real hole.
 
-**Every gate is swept.** A test walks the document the server builds and asks
-each gated operation as somebody holding none of its roles; a 2xx fails it.
+Every gate is swept. A test walks the document the server builds and asks each
+gated operation as somebody holding none of its roles; a 2xx fails it.
 
-**A gate refuses an operation declaring neither scope nor roles.** An endpoint
-added without one is not broken, it is undocumented.
+A gate refuses an operation declaring neither scope nor roles. An endpoint added
+without one is not broken, it is undocumented.
 
-**The privileges page keeps only what a per-endpoint line cannot carry**: what
-each role means, how roles are granted, what a declaration is and is not, and
-that seeing is never changing. Two rules in it are not roles and cannot be
-granted: visibility narrows every answer, and the proposer of a claim may never
-approve it.
+The privileges page keeps only what a per-endpoint line cannot carry: what each
+role means, how roles are granted, what a declaration is and is not, and that
+seeing is never changing. Two rules in it are not roles and cannot be granted:
+visibility narrows every answer, and the proposer of a claim may never approve
+it.
 
 ## Representation
 

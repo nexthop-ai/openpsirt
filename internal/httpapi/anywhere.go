@@ -25,7 +25,7 @@ type AnywhereOutput struct {
 func registerAnywhere(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-findings-anywhere", Method: http.MethodGet, Path: "/v1/findings",
-		Summary: "List what is open across every product",
+		Summary: "List findings across every product",
 		Description: "The findings list, without a product picked.\n\n" +
 			"**One row per product, issue and component.** The same library carrying the same " +
 			"issue in two products is two pieces of work, decided separately by different " +

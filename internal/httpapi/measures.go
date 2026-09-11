@@ -54,10 +54,9 @@ func registerMeasures(api huma.API, in Ingest) {
 			"holds: how long a finding sits before anybody proposes anything, how long a " +
 			"claim waits for a second person, what each person got through, and how much " +
 			"came back.\n\n" +
-			"**The two waits are said three ways** — the middle, what nine in ten came in " +
-			"under, and the longest. An average alone hides the case somebody is asking " +
-			"about: ten decisions in a day and one in a quarter average to a fortnight, " +
-			"which describes neither.\n\n" +
+			"**The two waits come back three ways each** — the middle, what nine in ten came " +
+			"in under, and the longest — so a caller reads three numbers per wait rather " +
+			"than one.\n\n" +
 			"**Per severity**, because a critical waiting a week and a low waiting a week " +
 			"are not the same fact.\n\n" +
 			"**Bounded, and it says so.** The two waits are worked out from at most the most " +

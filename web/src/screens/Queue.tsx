@@ -12,7 +12,7 @@ import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
 import { Severity, Exploited } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
-import { Because, called, labelled } from "../ui/Outcome";
+import { Because, called, labeled } from "../ui/Outcome";
 
 // AssessmentRow is one claim about how bad an issue is.
 type AssessmentRow = Body<"AssessmentBody">;
@@ -441,7 +441,7 @@ function Stopped({ row }: { row: Standing }) {
           {row.place?.vulnerability}
         </Link>
         <span style={{ color: "var(--muted)" }}>
-          {row.place?.product} · {labelled(it?.outcome ?? "")}
+          {row.place?.product} · {labeled(it?.outcome ?? "")}
           {it?.justification && (
             <>
               {" "}
@@ -1311,7 +1311,7 @@ function Outcome({
 }) {
   return (
     <span className={`claimed ${outcome}`}>
-      <b>{labelled(outcome)}</b>
+      <b>{labeled(outcome)}</b>
       {justification && <span className="why mono">{justification}</span>}
       {until && <span className="why">until {until}</span>}
     </span>

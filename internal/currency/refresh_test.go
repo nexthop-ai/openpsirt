@@ -296,7 +296,7 @@ func TestTheNameAskedComesFromTheIdentifier(t *testing.T) {
 
 // The message this drives tells somebody that waiting for a fix is unlikely to
 // work, so the evidence for it has to be a real silence rather than an
-// artefact of comparing two year-numbers.
+// artifact of comparing two year-numbers.
 func TestUpstreamIsOnlyCalledSilentAfterAClearYear(t *testing.T) {
 	for _, c := range []struct {
 		what       string

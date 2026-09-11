@@ -25,7 +25,7 @@ func registerRetained(api huma.API, in Ingest) {
 		OperationID: "fetch-scan-document", Method: http.MethodGet,
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
 			"/scans/{scan}/documents/{document}",
-		Summary: "Read back a document a build sent",
+		Summary: "Fetch a scan document",
 		Description: "Returns the bytes as they arrived, byte for byte: the hash on the receipt " +
 			"is over what comes back from here, so a copy can be checked against what was " +
 			"actually read.\n\n" +

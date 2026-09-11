@@ -3,7 +3,7 @@
 What a scan run found, where it sits, and how it is ranked and closed.
 
 Satisfies REQ-08, REQ-11, REQ-13, REQ-14, REQ-15, REQ-17, REQ-18, REQ-19,
-REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37, REQ-73.
+REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 
 ## Contents
 
@@ -41,8 +41,8 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37, REQ-73.
 A scanner reports that a package at a version is affected and stops. It never
 saw the dependency graph — it was given a list.
 
-**Fanning one reported issue out across the places it occupies is this
-deployment's work**, derived from the edges the inventory described. It is the
+Fanning one reported issue out across the places it occupies is this
+deployment's work, derived from the edges the inventory described. It is the
 step where one line in a report becomes the number of decisions somebody has to
 make.
 
@@ -56,10 +56,10 @@ builds.
 
 ## The row a person reads
 
-**Store expanded, present collapsed.** Every place is stored, because the graph
-has to stay answerable and the exact record has to name the artifact that
-shipped. What a person reads is the fold: one issue at one source package, at
-the version it was built at.
+Store expanded, present collapsed. Every place is stored, because the graph has
+to stay answerable and the exact record has to name the artifact that shipped.
+What a person reads is the fold: one issue at one source package, at the version
+it was built at.
 
 | | |
 |---|---|
@@ -70,8 +70,8 @@ Concentrated rather than uniform. Most rows are untouched; what collapses is the
 work that was already one thing — `util-linux` was fourteen rows of the same
 judgment, the same upgrade and the same routing rule.
 
-**Every number a person sees is counted in the unit they acted in.** A row says
-how many packages of the fold sit here and how many things pull them in, because
+Every number a person sees is counted in the unit they acted in. A row says how
+many packages of the fold sit here and how many things pull them in, because
 deciding on the row decides about all of them. The place count is still stored
 and still what the bulk cap is measured against and what the disposition
 register expands to — it is not a figure a reader is asked to reconcile with the
@@ -147,29 +147,28 @@ Derived at read time and stored nowhere. An address worked out from two names
 cannot go stale while the names are right, and storing it would put a second copy
 of the templates somewhere to fall behind the first.
 
-**Kept apart from the references a report carried**, because the provenance is a
+Kept apart from the references a report carried, because the provenance is a
 different claim. On this deployment's own image, the references for a package
 matched by identifier were a vendor bulletin, two gists and two mailing-list
 attachments; the issue's write-up was another distribution's tracker; and the
 record for the identifier on the screen appeared nowhere.
 
-**Nothing here fetches any of them.** They are addresses handed to a person, so
-the restriction on outbound network access is untouched (REQ-69).
+Nothing here fetches any of them. They are addresses handed to a person, so the
+restriction on outbound network access is untouched (REQ-69).
 
-**References list patches first.** Somebody deciding whether to backport rather
-than upgrade needs the change itself. What is a patch is guessed from the shape
-of the address — a commit, a pull request, a diff — and the guess errs toward
+References list patches first. Somebody deciding whether to backport rather than
+upgrade needs the change itself. What is a patch is guessed from the shape of
+the address — a commit, a pull request, a diff — and the guess errs toward
 saying less: an unrecognized address is reported as discussion rather than
 asserted to be a patch.
 
-**Patches are usually on another record.** A Debian package matches Debian's
-record, which points at Debian's tracker; the commits that carry the fix sit on
-the upstream record, which the scanner reports alongside as a related
-vulnerability. The parser declared the related records as carrying an identifier
-and nothing else, so a kernel CVE whose upstream record lists eight
-`git.kernel.org` commits showed one tracker link and no patches. References from
-every identifier an issue answers to are kept, deduplicated against the matched
-record's own.
+Patches are usually on another record. A Debian package matches Debian's record,
+which points at Debian's tracker; the commits that carry the fix sit on the
+upstream record, which the scanner reports alongside as a related vulnerability.
+The parser declared the related records as carrying an identifier and nothing
+else, so a kernel CVE whose upstream record lists eight `git.kernel.org` commits
+showed one tracker link and no patches. References from every identifier an
+issue answers to are kept, deduplicated against the matched record's own.
 
 ## How a match was made
 
@@ -215,17 +214,17 @@ A vulnerability in what this deployment ships is usually known here before it is
 known anywhere. It is a finding of a different kind (REQ-21), triaged, assigned,
 decided, clocked and reported like everything else.
 
-**Filed under an identifier this deployment mints** (REQ-19): the product's name,
+Filed under an identifier this deployment mints (REQ-19): the product's name,
 the year, and a number — `SONIC-2026-481907` — which is the shape a vendor
-advisory takes. A flaw nobody has published has no CVE, and waiting for one means
-the record of what was known starts after the work does. Nothing is configured
-for that prefix: the product has a name people type.
+advisory takes. A flaw nobody has published has no CVE, and waiting for one
+means the record of what was known starts after the work does. Nothing is
+configured for that prefix: the product has a name people type.
 
-**The number is drawn rather than counted.** Counted from one it is a running
-total of what the product has kept quiet: ask for the first, walk upward until
-the answers change, and both how many undisclosed flaws exist and when the last
-was recorded fall out of the names alone. Six digits, so every identifier reads
-the same length. A collision is answered by drawing again inside the same
+The number is drawn rather than counted. Counted from one it is a running total
+of what the product has kept quiet: ask for the first, walk upward until the
+answers change, and both how many undisclosed flaws exist and when the last was
+recorded fall out of the names alone. Six digits, so every identifier reads the
+same length. A collision is answered by drawing again inside the same
 transaction, which also stops two people recording at the same moment being
 handed the same one.
 
@@ -238,10 +237,10 @@ somebody holds and a name nobody holds identically (REQ-43).
 | A name another issue already answers to is refused, checked before the write | A constraint violation cannot distinguish "already recorded" from "that would merge two issues" |
 | It starts undisclosed, and recording one asks for the private triage right (REQ-37) | Defaulting the other way makes the dangerous mistake the quiet one. Somebody who may argue about known issues in shipped components has not been handed the ones nobody has announced. Already-public is a flag on the request, asking the ordinary right |
 
-**One identifier, one finding per build.** The same code goes out on several
-lines and as several variants at once, so a flaw in it is not a fact about one
-build. This is the shape a scanner's findings already have, so it lists, ranks,
-comes due, carries decisions, groups across variants and appears in a comparison
+One identifier, one finding per build. The same code goes out on several lines
+and as several variants at once, so a flaw in it is not a fact about one build.
+This is the shape a scanner's findings already have, so it lists, ranks, comes
+due, carries decisions, groups across variants and appears in a comparison
 exactly as a reported one does.
 
 | Rule | Reason |
@@ -276,6 +275,7 @@ A public intake form is out of scope. This is the inside half.
 |---|---|
 | A score is never taken alongside a vector | Two values a caller states separately can disagree, and afterwards nothing says which was meant. The number sorts and the vector is what somebody can argue with |
 | Base metrics only | Temporal and environmental scores describe a moment and a deployment, and the deployment reading a finding is not the one it is about |
+| **The formula is here and nowhere else** | A screen composing a vector shows what it will score by asking, rather than holding a second copy: two implementations of a score disagree eventually, and what somebody saw while choosing would not be what was stored. That is what the scoring operation is for — it reads nothing, writes nothing and is reachable by any recognized credential, because a vector is not a secret |
 | Version 3.0 and 3.1; anything else refused by name | They share a base formula, version 4 does not, and version 2 is a different scheme. A vector scored with the wrong formula produces a number nothing downstream can tell from a real one |
 | Rounding is the scheme's own, in integer arithmetic | Floating point gets a different answer for some inputs: a value that should be exactly 8.6 is not representable, and a naive ceiling returns 8.7 |
 | An unstated vector is not a score of zero | Zero says "harmless", a judgment nobody made during early triage |
@@ -327,11 +327,11 @@ A run is the authority on what it reported. It opens what it found and **closes
 everything open that it no longer reports**, which is how a component leaving a
 build stops being a finding without anybody saying so.
 
-**The sweep is bounded by what a scan can have an opinion about.** A finding
-carries a kind saying what produced it, and the sweep covers only the kind a scan
+The sweep is bounded by what a scan can have an opinion about. A finding carries
+a kind saying what produced it, and the sweep covers only the kind a scan
 produces. Without that bound, a flaw somebody recorded by hand is closed by the
-first run after it is written — silently, with a closure reason reading as though
-the issue went away, and nothing reporting it.
+first run after it is written — silently, with a closure reason reading as
+though the issue went away, and nothing reporting it.
 
 The kind exists ahead of the second thing to put in it for that reason: a model
 assuming every finding came from a scan could not take one that did not without
@@ -343,7 +343,7 @@ Findings are open until closed and never deleted. Re-scanning happens nightly
 against a vulnerability database that has barely moved, so a run finding the same
 things writes nothing.
 
-**A finding carries when it opened and when it closed**, rather than reaching the
+A finding carries when it opened and when it closed, rather than reaching the
 run for a timestamp.
 
 Three passes did the reaching, all as inner joins: the trend, the deadline
@@ -384,20 +384,19 @@ Superseded is told apart from Upgraded because they are opposite answers to "was
 this fixed", and conflating them put one issue in a release comparison as both
 fixed and newly present.
 
-**Invalid is on a different axis.** Every other reason answers "why did this stop
-being present"; this says it was never present, so it is neither a resolution nor
-a disappearance. **It never means the finding exists but does not apply here** —
-that is a triage decision of `not-applicable` with the justification that fits,
-agreed by a second person and exported as VEX. Letting the closure absorb that
-case would route dismissals around approval.
+Invalid is on a different axis. Every other reason answers "why did this stop
+being present"; this says it was never present, so it is neither a resolution
+nor a disappearance. **It never means the finding exists but does not apply
+here** — that is a triage decision of `not-applicable` with the justification
+that fits, agreed by a second person and exported as VEX. Letting the closure
+absorb that case would route dismissals around approval.
 
-**Unexplained is always reported and never suppressed.** There is no volume at
-which "we cannot account for this" stops mattering. Several in one scan
-additionally raise a scan-level warning, which says nothing the individual flags
-do not — only that the likely fault is one broken scan rather than a dozen
-independent oddities. A count rather than a proportion: on a large image a
-handful of genuine disappearances is ordinary and a handful of unexplained ones
-is not.
+Unexplained is always reported and never suppressed. There is no volume at which
+"we cannot account for this" stops mattering. Several in one scan additionally
+raise a scan-level warning, which says nothing the individual flags do not —
+only that the likely fault is one broken scan rather than a dozen independent
+oddities. A count rather than a proportion: on a large image a handful of
+genuine disappearances is ordinary and a handful of unexplained ones is not.
 
 The reason is worked out from what the build now contains, compared against what
 the finding was about. That comparison reads the departed component from the
@@ -419,7 +418,7 @@ Claims are held over intervals, so re-sending them writes nothing; withdrawing
 one closes it rather than deleting it, because what a release argued is a
 question asked years later.
 
-**A covered finding is marked, not dropped.** This is why claims are applied here
+A covered finding is marked, not dropped. This is why claims are applied here
 rather than upstream: a finding that never arrived is indistinguishable from a
 scanner fault.
 
@@ -456,11 +455,11 @@ presentation.** What is read back is one row per issue in a component, carrying
 how many places it occupies and how many the build has already argued about. The
 same image reads as **7,906 rows rather than 335,021**.
 
-**The grouping is done by the database.** A page of fifty grouped rows read out
-of a third of a million findings is not a page of fifty findings, and counting in
-the application would mean reading all of them to show any of them. Only the
-names are fetched in a second pass, because aggregating text is spelled
-differently on every engine.
+The grouping is done by the database. A page of fifty grouped rows read out of a
+third of a million findings is not a page of fifty findings, and counting in the
+application would mean reading all of them to show any of them. Only the names
+are fetched in a second pass, because aggregating text is spelled differently on
+every engine.
 
 ## Decision state on a row
 
@@ -478,33 +477,33 @@ Some places approved and the rest never decided, with nothing waiting or lapsed,
 is none of the four: the row carries no state, and the interface labels it partly
 decided.
 
-**Undecided is nothing standing, not nothing ever said.** Reading it as "no
-decision row covers this place" left a withdrawn claim in no state at all — the
-row it leaves behind covers the place, deliberately, so that "lapsed" can be said
-about a claim holding no key. A finding somebody claimed and took back was
-neither undecided nor any of the other three, disappeared from the count above
-the list as well as from the list, and was never offered as work again. The
-product's own totals counted it the same way and agreed.
+Undecided is nothing standing, not nothing ever said. Reading it as "no decision
+row covers this place" left a withdrawn claim in no state at all — the row it
+leaves behind covers the place, deliberately, so that "lapsed" can be said about
+a claim holding no key. A finding somebody claimed and took back was neither
+undecided nor any of the other three, disappeared from the count above the list
+as well as from the list, and was never offered as work again. The product's own
+totals counted it the same way and agreed.
 
-**The word on the row and the filter's own buckets are one rule**, not two
-spellings of it. They came apart twice: the filter counted a place as waiting
-without asking whether the claim still held its key, while the row required it,
-so a claim proposed and withdrawn put its group in the waiting list with a
-blank state column; and the row asked "was anything ever said" for undecided
-where the filter asked "does anything stand", so the same group was undecided
-to one and nothing to the other. Both now ask the filter's question.
+The word on the row and the filter's own buckets are one rule, not two spellings
+of it. They came apart twice: the filter counted a place as waiting without
+asking whether the claim still held its key, while the row required it, so a
+claim proposed and withdrawn put its group in the waiting list with a blank
+state column; and the row asked "was anything ever said" for undecided where the
+filter asked "does anything stand", so the same group was undecided to one and
+nothing to the other. Both now ask the filter's question.
 
-**A live decision covers a place at the versions it was keyed on and no other.**
+A live decision covers a place at the versions it was keyed on and no other.
 These counts match a live decision by product, issue, place and both versions,
-and match a lapsed or withdrawn one — which holds no key — by place alone. Matched
-by place alone, a decision approved against one build's version read as agreed
-over the next build shipping another.
+and match a lapsed or withdrawn one — which holds no key — by place alone.
+Matched by place alone, a decision approved against one build's version read as
+agreed over the next build shipping another.
 
 A row also states when a live claim at one of its places is with its author, sent
 back for more. That is the row a proposer is looking for, and the one the queue
 no longer shows.
 
-**The page is read in two statements:**
+The page is read in two statements:
 
 1. Group every open finding in the build by issue and component and keep the
    fifty most urgent, reading only the columns a covering index on the finding
@@ -519,8 +518,9 @@ a membership test against the table that holds it. The decision-state filter is
 built from the decisions outward, joined to the grouping by the finding's
 identifier rather than a lookup per open row.
 
-**Measured on the full-size build, 241,479 open rows in 7,329 groups:** the page
-went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18 s.
+Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
+went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18
+s.
 
 ## Urgency
 
@@ -531,19 +531,18 @@ of, for every row, on every page of every list.
 Ordering by how many places something occupies puts whatever is most widespread
 at the top, which on a real image is the kernel.
 
-**It is worked out from what is on record about the issue, not from the report
-being applied.** A report is one source's account of one moment: it may omit that
+It is worked out from what is on record about the issue, not from the report
+being applied. A report is one source's account of one moment: it may omit that
 something is being exploited, or carry a score lower than last week's. What the
 issue holds is the worst anybody has claimed, moving only toward worse, plus a
 rating of ours where somebody has made one.
 
-**And it is rewritten wherever the issue is open, not only in the build being
-scanned.** Three of the four signals are properties of the issue, so a nightly
+And it is rewritten wherever the issue is open, not only in the build being
+scanned. Three of the four signals are properties of the issue, so a nightly
 branch scan raising one of them left every other build carrying a number worked
-out from a world that had moved — a known-exploited issue in a shipped tag
-below the triage line, answering no exploited filter, on no exploited clock,
-at the bottom of the list, until somebody rescanned that tag, which for a tag
-is never.
+out from a world that had moved — a known-exploited issue in a shipped tag below
+the triage line, answering no exploited filter, on no exploited clock, at the
+bottom of the list, until somebody rescanned that tag, which for a tag is never.
 
 | Rule | |
 |---|---|
@@ -552,7 +551,7 @@ is never.
 | The clock runs from when it was learned | Counted from when the finding opened, an issue that became exploited after six months lands three days before it was known — a deadline nobody could have met |
 | It is not a cache being refreshed | The stored order describes an issue rather than a moment, so it is rewritten when the signals move. What is stored because it cannot be worked out again is a different thing |
 
-**Four signals, in this order:**
+Four signals, in this order:
 
 | Signal | Reason for its position |
 |---|---|
@@ -561,34 +560,33 @@ is never.
 | Severity | How bad it would be if it happened |
 | Likelihood of exploitation | Which of two equally severe things to look at first |
 
-**Severity above likelihood, measured rather than assumed.** The original order
-had them the other way, and on a real image that put a 2004 negligible with no
-score at all above every one of 379 criticals: its likelihood was 0.80 where
-theirs topped out at 0.073. Multiplying the two — the published practice where
-these scores are well spread — was tried next and reversed on the same image: 95%
-of its open issues sit between 0.001 and 0.01 likelihood, so multiplying mostly
+Severity above likelihood, measured rather than assumed. The original order had
+them the other way, and on a real image that put a 2004 negligible with no score
+at all above every one of 379 criticals: its likelihood was 0.80 where theirs
+topped out at 0.073. Multiplying the two — the published practice where these
+scores are well spread — was tried next and reversed on the same image: 95% of
+its open issues sit between 0.001 and 0.01 likelihood, so multiplying mostly
 amplifies what is inside that spike and mediums jump criticals on noise.
 
-**The number is packed rather than weighted:** each signal owns a range of
-digits, so a signal never trades against a lower one. The reason is
-explainability — "it scored 0.4 higher on a weighted sum of four things" is not
-something anyone trusts or argues with, and packing gives a rule statable in a
-sentence.
+The number is packed rather than weighted: each signal owns a range of digits,
+so a signal never trades against a lower one. The reason is explainability — "it
+scored 0.4 higher on a weighted sum of four things" is not something anyone
+trusts or argues with, and packing gives a rule statable in a sentence.
 
-**Explainability is the packing, not a sentence generated beside it.** A function
+Explainability is the packing, not a sentence generated beside it. A function
 that turned a rank back into a list of reasons existed, exported and called by
 nothing but its own test. What makes a position explainable is that the rule is
 statable, and the interface says it from the signals a finding already carries.
 
-**A signal reported out of range is clamped.** A source sending something
-impossible would otherwise carry into the band above and rank as though it were
-being exploited.
+A signal reported out of range is clamped. A source sending something impossible
+would otherwise carry into the band above and rank as though it were being
+exploited.
 
 Where a report rates an issue only in words, the word stands in for a number, so
 a finding rated in words does not sort below everything rated at all. A group
 takes the urgency of the worst place it covers.
 
-**What is known changes under a finding that has not:**
+What is known changes under a finding that has not:
 
 | Rule | Reason |
 |---|---|
@@ -616,29 +614,30 @@ the day a second variant was seeded, and the list went from 7,354 items to
 | Acting on it acts on all of it | Assigning covers every build of the product holding the component. Assigning one build would leave the identical work unassigned beside it |
 | Counted in pieces of work | Counted in findings, one kernel flaw assigned to one person read as forty-eight held against her on the summary and as the single item it is in her own list. Late is counted the same way: a piece of work is late when any of its places is |
 
-**Measured on two variants of one switch image:** 7,587 rows on one and 7,610 on
-the other, which is 15,197 rows read one build at a time. Across the product it is
+Measured on two variants of one switch image: 7,587 rows on one and 7,610 on the
+other, which is 15,197 rows read one build at a time. Across the product it is
 7,612 — so 7,585 of those rows were one piece of work seen twice, and **27 were
 the genuine differences.**
 
-**What it gives up across builds is the way down.** A dependency chain belongs to
-one build's graph, so the column naming the two ends of the chain is empty rather
-than filled from whichever build the row named. That is why the screens *about* a
-chain still require a whole build, and why narrowing the list to a subtree is
-refused rather than answered with the empty list walking no build would produce.
+What it gives up across builds is the way down. A dependency chain belongs to
+one build's graph, so the column naming the two ends of the chain is empty
+rather than filled from whichever build the row named. That is why the screens
+*about* a chain still require a whole build, and why narrowing the list to a
+subtree is refused rather than answered with the empty list walking no build
+would produce.
 
-**A row names what pulls it in even where the route up is unknown.** Where the
-walk up reaches nothing, both ends used to be blank and the row read "nothing
-records what pulls this in" — two different statements, and the second was false.
-The finding records its consumer whatever the graph managed; what was missing was
+A row names what pulls it in even where the route up is unknown. Where the walk
+up reaches nothing, both ends used to be blank and the row read "nothing records
+what pulls this in" — two different statements, and the second was false. The
+finding records its consumer whatever the graph managed; what was missing was
 the route up, which happens where an inventory describes something under a
 component not itself reachable from the root. A row with no walkable chain names
 its consumer and leaves the owner empty.
 
-**A place names the claim standing on it**, not only the decision. At most one
-live decision stands per combination of code, so the two reach the same row — but
-the claim is what a person acts on, and without it a claim shown there can count
-its places and cannot name them.
+A place names the claim standing on it, not only the decision. At most one live
+decision stands per combination of code, so the two reach the same row — but the
+claim is what a person acts on, and without it a claim shown there can count its
+places and cannot name them.
 
 ## Incomplete upgrades
 
@@ -661,7 +660,7 @@ because the component that carried the issue leaves the inventory when the run
 ends. It is recorded only where the version change closed the finding — not for a
 removed component, and not for an unexplained closure.
 
-**Shown** on the finding as the version it arrived from, and in the still-present
+Shown on the finding as the version it arrived from, and in the still-present
 column of a release comparison. Not in the review queue, which lists decisions
 rather than findings.
 
@@ -682,14 +681,14 @@ be done rather than doing it.
 The interval storage was shaped so a rebuild changing nothing writes nothing, and
 a test asserts that. What nobody had checked was the shape after a year.
 
-**The model**, stated because every number depends on it: a build of 700
-components, each sitting in 34 containers, so 23,800 places; 260 issues open at
-the start; 365 nightly rebuilds; 1% of components changing version each night;
-three new issues a night matching something already shipped. A real image at
-about a tenth of its size, with the shape kept and the constant shrunk.
+The model, stated because every number depends on it: a build of 700 components,
+each sitting in 34 containers, so 23,800 places; 260 issues open at the start;
+365 nightly rebuilds; 1% of components changing version each night; three new
+issues a night matching something already shipped. A real image at about a tenth
+of its size, with the shape kept and the constant shrunk.
 
-**The table grew 16.8 times over the year**, from 8,840 rows to 148,614. The
-graph grew alongside: 23,834 edges to 110,466, and 736 nodes to 3,284, because a
+The table grew 16.8 times over the year, from 8,840 rows to 148,614. The graph
+grew alongside: 23,834 edges to 110,466, and 736 nodes to 3,284, because a
 component whose version moves opens a new node and 34 new edges while the old
 ones stay as closed intervals. Neither is a leak — every row is an interval
 somebody can ask a question about — but **a deployment sizing a disk should know
@@ -702,10 +701,10 @@ the shape is multiplicative in consumers, not additive in components.**
 | MySQL | 65 ms | 100 ms | 259 ms | 4.82 s | 12.56 s |
 | MariaDB | 24 ms | 115 ms | 215 ms | 0.32 s | 0.83 s |
 
-**Read the read columns as an order of magnitude, not as a benchmark.** Each is
-one sample, and the harness takes two seconds apart on identical data: MySQL's
-trend was 1.19 s and then 259 ms, MariaDB's findings list 212 ms and then 24 ms.
-What the run is for is the *growth*, which is stable across both samples.
+Read the read columns as an order of magnitude, not as a benchmark. Each is one
+sample, and the harness takes two seconds apart on identical data: MySQL's trend
+was 1.19 s and then 259 ms, MariaDB's findings list 212 ms and then 24 ms. What
+the run is for is the *growth*, which is stable across both samples.
 
 | Finding | Detail |
 |---|---|
@@ -718,15 +717,15 @@ A quiet night issues **more** statements than the first — 1,699 against 1,077 
 because the first night is bulk inserts five hundred at a time and a quiet night
 is an update per finding that moved.
 
-**The correction to the model says what that cost is made of.** An earlier run
+The correction to the model says what that cost is made of. An earlier run
 applied twice the churn it documented and its figures were withdrawn rather than
-halved. Halving the churn halved MariaDB (0.64 s to 0.32 s) and cut PostgreSQL by
-a third (1.04 s to 0.67 s) — and moved MySQL by four percent, from 5.01 s to
+halved. Halving the churn halved MariaDB (0.64 s to 0.32 s) and cut PostgreSQL
+by a third (1.04 s to 0.67 s) — and moved MySQL by four percent, from 5.01 s to
 4.82 s. A cost that barely responds to how many rows changed is paid per
 statement, and the error did not scale the four engines alike, which is why the
 withdrawal was right.
 
-**Two reads grow with the calendar rather than with a build:**
+Two reads grow with the calendar rather than with a build:
 
 | After | receipts, first page | receipts, last page | release counts |
 |---|---:|---:|---:|
@@ -737,11 +736,11 @@ The last page costs what the first does, because the pairing is done over all of
 history precisely so it does not depend on which page is read. It is quadratic in
 the number of runs, so a decade is a hundred times this work.
 
-**What this does not measure:** it was read as an administrator, who sees every
+What this does not measure: it was read as an administrator, who sees every
 product, so the queries ran with no narrowing by product — the cheapest plan
-available. One build, not the several a deployment tracks. And it assumes a churn
-rate rather than observing one. `make measure` re-runs it, and the constants at
-the top of the harness are the model.
+available. One build, not the several a deployment tracks. And it assumes a
+churn rate rather than observing one. `make measure` re-runs it, and the
+constants at the top of the harness are the model.
 
 ## The total above a list
 

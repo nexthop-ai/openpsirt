@@ -2,8 +2,8 @@
    First, because everything after it is written in terms of these. */
 
 /* The tokens, the type scale, the shell and every component are the restyled
-   mockup's, taken as they were settled rather than approximated (UIX-50). The
-   mockup drew the interface inside a frame; here the frame is the page, so its
+   mockup's, taken as they were settled rather than approximated. The mockup
+   drew the interface inside a frame; here the frame is the page, so its
    tokens sit on the root and its grid on the app container. Three looks, one
    markup: a look is a token set, chosen per person and kept in the browser.
    Severity is its own scale, deliberately not the accent — "urgent" and
@@ -55,8 +55,8 @@
   --sev-medium: #a3760c;
   --sev-low: #4a6a8c;
   /* Not a rating. A scanner's own "unknown", a producer's invented word and
-     no rating at all are one state, and it is grey because it is the absence
-     of a judgment rather than a mild one — drawn in the low band's colour it
+     no rating at all are one state, and it is gray because it is the absence
+     of a judgment rather than a mild one — drawn in the low band's color it
      would say somebody had looked and decided it was small. */
   --sev-unrated: #8a8f98;
   --ok: #1f7a4d;

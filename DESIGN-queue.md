@@ -65,7 +65,7 @@ so several renewals may fail before the claim is at risk.
 
 | Event | Behavior |
 |---|---|
-| Renewal refused, another worker holds the job | The work is cancelled and the worker is told the claim was lost, not that the work failed |
+| Renewal refused, another worker holds the job | The work is canceled and the worker is told the claim was lost, not that the work failed |
 | Renewal fails for any other reason | Reported and retried next interval. The claim is not lost until the timeout passes with nothing landing |
 | The job ends | Renewal stops first and the worker waits for it, so nothing else writes to the job while the ending is written |
 | The claim went stale while the work ran | Only the claim holder finishes a job: the finishing statement carries the claim's condition. A refused finish is reported as "no longer held" and logged |

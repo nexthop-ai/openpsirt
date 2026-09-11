@@ -260,8 +260,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		Description: "Takes the bytes back out and leaves the record. The reference in the text " +
 			"stays and says the file was removed, which is the difference between a redaction " +
 			"and a hole in the record.\n\n" +
-			"Administrators only, and a reason is required. It is the answer to somebody having " +
-			"attached a credential, so it is deliberate and it is recorded.",
+			"Administrators only. A reason is required, and it is recorded and shown wherever " +
+			"the text referred to the file.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Token string `path:"token"`

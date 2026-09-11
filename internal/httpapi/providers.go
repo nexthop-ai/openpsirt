@@ -17,7 +17,7 @@ type ProviderBody struct {
 func registerProviders(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-sign-in-providers", Method: http.MethodGet, Path: "/v1/sign-in",
-		Summary: "List the ways in",
+		Summary: "List sign-in providers",
 		Description: "Returns the sign-in providers this deployment has configured, so a " +
 			"sign-in page can offer them.\n\n" +
 			"**Answered without a credential**, because it is what somebody sees before they " +

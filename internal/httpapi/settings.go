@@ -97,7 +97,7 @@ func aCount(name string) bool {
 func registerSettings(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-settings", Method: http.MethodGet, Path: "/v1/settings",
-		Summary: "List what this deployment has decided",
+		Summary: "List this deployment's settings",
 		Description: "Returns every setting an operator may change, its value, and what it " +
 			"decides. `default` means nobody has set it and the shipped value is in use.\n\n" +
 			"The shipped numbers are a starting point rather than a recommendation. What a " +
@@ -129,7 +129,7 @@ func registerSettings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "set-setting", Method: http.MethodPut, Path: "/v1/settings/{name}",
-		Summary: "Change something for this deployment",
+		Summary: "Change one setting",
 		Description: "Sets one value for everybody here. Durations are written the way Go writes " +
 			"them — `72h`, `30m` — and a value that cannot be read is refused rather than " +
 			"stored, since a setting nothing can parse is a policy silently reverting to the " +

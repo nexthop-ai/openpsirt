@@ -9,11 +9,11 @@
   grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   gap: var(--gap-room);
 }
-/* Evidence on one side, the action on the other (UIX-63). The action leads,
-   because it is what the screen is for and because the decision form carries
-   its own aside — the arrangement inside the form and the arrangement of the
-   page then read the same way round. Everything that is neither, the timeline
-   and the comments and the holder, stays below at full width: it is consulted
+/* Evidence on one side, the action on the other. The action leads, because it
+   is what the screen is for and because the decision form carries its own
+   aside — the arrangement inside the form and the arrangement of the page
+   then read the same way round. Everything that is neither, the timeline and
+   the comments and the holder, stays below at full width: it is consulted
    after the judgment rather than during it. */
 /* The description, above both columns. A paragraph of a vulnerability
    description is prose, and prose in a 380-pixel column is four words to a

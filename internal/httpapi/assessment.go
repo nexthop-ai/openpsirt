@@ -152,7 +152,7 @@ func registerAssessment(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-assessments", Method: http.MethodGet,
 		Path:    "/v1/assessments",
-		Summary: "List what we have said about issues",
+		Summary: "List issue assessments",
 		Description: "Every claim about an issue you may be told about, or those in one " +
 			"state. The ones waiting are milder ratings somebody has proposed and nobody " +
 			"has agreed to yet, which are the ones not yet affecting anything.\n\n" +

@@ -90,7 +90,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get how the second-person rule is holding
+         * Get approval coverage
          * @description Five answers about approvals over a period, for somebody auditing whether they mean anything here.
          *
          *     `alone` is risk standing with nobody's agreement behind it, by outcome. That is not a failure by itself: a short deferral and an upgrade promised inside the deadline the work already had are both deliberately exempt. A dismissal in this list is a different matter.
@@ -118,7 +118,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what we have said about issues
+         * List issue assessments
          * @description Every claim about an issue you may be told about, or those in one state. The ones waiting are milder ratings somebody has proposed and nobody has agreed to yet, which are the ones not yet affecting anything.
          *
          *     A claim carries the severity recorded against its issue, so claims about findings you cannot read are absent rather than refused.
@@ -186,7 +186,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List how much each person is dealing with
+         * List assignment totals
          * @description Returns everyone holding open work you can see, with how much.
          *
          *     Counted in pieces of work — an issue in a component in a product — which is the unit the list behind each person is in. `places` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
@@ -228,7 +228,7 @@ export interface paths {
          * Remove an attached file
          * @description Takes the bytes back out and leaves the record. The reference in the text stays and says the file was removed, which is the difference between a redaction and a hole in the record.
          *
-         *     Administrators only, and a reason is required. It is the answer to somebody having attached a credential, so it is deliberate and it is recorded.
+         *     Administrators only. A reason is required, and it is recorded and shown wherever the text referred to the file.
          *
          *     **Requires:** administrator
          */
@@ -708,7 +708,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what keeps being put off
+         * List repeated deferrals
          * @description Places deferred more than once, most-deferred first, with how long they have been put off for in total.
          *
          *     The cumulative threshold already refuses a further deferral past a point, one item at a time. What it cannot show is the shape across everything: one item deferred three times is a judgment, and forty of them is a policy nobody wrote down.
@@ -814,7 +814,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what is open across every product
+         * List findings across every product
          * @description The findings list, without a product picked.
          *
          *     **One row per product, issue and component.** The same library carrying the same issue in two products is two pieces of work, decided separately by different people; in three builds of one product it is one row, and `builds` says how many. Each row names one of those builds so there is somewhere to link to.
@@ -981,7 +981,7 @@ export interface paths {
          * Show how long triage is taking and who is doing it
          * @description Four figures about how this deployment is working, as against what it holds: how long a finding sits before anybody proposes anything, how long a claim waits for a second person, what each person got through, and how much came back.
          *
-         *     **The two waits are said three ways** — the middle, what nine in ten came in under, and the longest. An average alone hides the case somebody is asking about: ten decisions in a day and one in a quarter average to a fortnight, which describes neither.
+         *     **The two waits come back three ways each** — the middle, what nine in ten came in under, and the longest — so a caller reads three numbers per wait rather than one.
          *
          *     **Per severity**, because a critical waiting a week and a low waiting a week are not the same fact.
          *
@@ -1036,7 +1036,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what is waiting on you
+         * List your notifications
          * @description Returns what you have not dealt with, newest first, and how many there are.
          *
          *     Everyone has one of these, and what appears in it differs by what you hold: work arriving, a dismissal sent back, an approval an edit withdrew, or — for an administrator — that the tool itself is unwell.
@@ -1668,7 +1668,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what is open, gathered by component
+         * List findings by component
          * @description One row per component and version, with how many distinct issues are open against it and how many places those sit at. The level above the findings list: it answers where the weight is rather than what is wrong, which is the question somebody asks before deciding what to read and what to put aside.
          *
          *     It is also how a person finds the one package worth hiding. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58 — a fact no list of issues makes visible, because ordered by urgency it just looks like a long list.
@@ -1696,7 +1696,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Export what is open, gathered by component
+         * Export findings by component
          * @description One row per component and version, with how many distinct issues are open against it and how many places those sit at — every row, not one page.
          *
          *     This is the shape a release meeting argues over: where the weight is rather than what is wrong. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58, which is a one-line answer here and invisible in a list of issues.
@@ -1722,7 +1722,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what is open, gathered by the bump that would fix it
+         * List findings by upgrade
          * @description One row per upstream bump, with the issues it closes.
          *
          *     Keyed on the **source package** where one is recorded and on the component's own name otherwise, so packages built from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
@@ -1945,7 +1945,7 @@ export interface paths {
          * List who has been brought into a case
          * @description Everybody granted this one issue in this product, oldest first.
          *
-         *     **Being on a case is not reading the product.** A collaborator sees this issue wherever it sits here and nothing else, may argue about it and comment on it, and may not agree to anybody's claim — two collaborators could otherwise satisfy the two people a dismissal on an embargoed finding asks for, with nobody accountable for the product involved.
+         *     **Being on a case is not reading the product.** A collaborator sees this issue wherever it sits here and nothing else, may argue about it and comment on it, and may not agree to anybody's claim.
          *
          *     **Requires:** private-read or private-triage on the product. Only where you may read undisclosed work.
          */
@@ -3120,7 +3120,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Read back a document a build sent
+         * Fetch a scan document
          * @description Returns the bytes as they arrived, byte for byte: the hash on the receipt is over what comes back from here, so a copy can be checked against what was actually read.
          *
          *     **A tagged release keeps its documents and a branch build does not.** A nightly build's contents are let go once they have been read, because keeping them costs storage that grows with the calendar; a tag's are kept because re-scanning it years from now needs both what it contained and what the build had already argued about its own patches. One that was let go answers **410**, which says the bytes went on purpose — the record of what arrived is still on the receipt.
@@ -3174,7 +3174,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the words in use on a product
+         * List a product's tags
          * @description Every tag anybody has used here, most-used first.
          *
          *     What a filter offers rather than a vocabulary: the list is what people have actually written, which is also the evidence for promoting one of them to a real concept.
@@ -3604,10 +3604,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Work out what a CVSS vector scores
-         * @description Returns the base score and the severity band a vector works out to.
-         *
-         *     It exists so that a screen composing a vector can show what it will score without holding a second copy of the formula. One implementation, and what somebody sees while choosing is what gets stored.
+         * Score a CVSS vector
+         * @description Returns the base score and the severity band a vector works out to. It reads nothing and records nothing.
          *
          *     CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a different scheme, and scoring either with this one produces a number nothing downstream could tell apart from a real one.
          *
@@ -3652,7 +3650,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Describe whoever is asking
+         * Describe the current subject
          * @description Returns the caller, the products they can reach, and what they may do in each one.
          *
          *     It answers what a screen has to know before it draws: whether to offer an action at all. Without it a client either hides nothing and lets people find the refusal, or re-implements the mapping from roles to capabilities and drifts from the one the server enforces.
@@ -3706,7 +3704,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what this deployment has decided
+         * List this deployment's settings
          * @description Returns every setting an operator may change, its value, and what it decides. `default` means nobody has set it and the shipped value is in use.
          *
          *     The shipped numbers are a starting point rather than a recommendation. What a deployment can hold to is a question about that deployment, and a deadline nobody agreed to produces an estate that is permanently late and a signal everybody ignores.
@@ -3731,7 +3729,7 @@ export interface paths {
         };
         get?: never;
         /**
-         * Change something for this deployment
+         * Change one setting
          * @description Sets one value for everybody here. Durations are written the way Go writes them — `72h`, `30m` — and a value that cannot be read is refused rather than stored, since a setting nothing can parse is a policy silently reverting to the shipped one.
          *
          *     Only the settings this deployment recognizes may be set. A name it does not know is refused, because storing it would create something nothing ever reads.
@@ -3754,7 +3752,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the ways in
+         * List sign-in providers
          * @description Returns the sign-in providers this deployment has configured, so a sign-in page can offer them.
          *
          *     **Answered without a credential**, because it is what somebody sees before they have one. It is the only reading endpoint that is, and it reports names an operator configured and nothing else — no account exists or does not exist as far as this is concerned, which is the disclosure that would matter.

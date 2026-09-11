@@ -7811,7 +7811,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Get how the second-person rule is holding
+      summary: Get approval coverage
       tags:
         - Reports
       x-openpsirt-requires:
@@ -7860,7 +7860,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what we have said about issues
+      summary: List issue assessments
       tags:
         - Triage
       x-openpsirt-requires:
@@ -7958,7 +7958,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List how much each person is dealing with
+      summary: List assignment totals
       tags:
         - Findings
       x-openpsirt-requires:
@@ -7969,7 +7969,7 @@ paths:
       description: |-
         Takes the bytes back out and leaves the record. The reference in the text stays and says the file was removed, which is the difference between a redaction and a hole in the record.
 
-        Administrators only, and a reason is required. It is the answer to somebody having attached a credential, so it is deliberate and it is recorded.
+        Administrators only. A reason is required, and it is recorded and shown wherever the text referred to the file.
 
         **Requires:** administrator
       operationId: redact-attachment
@@ -9108,7 +9108,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what keeps being put off
+      summary: List repeated deferrals
       tags:
         - Reports
       x-openpsirt-requires:
@@ -9674,7 +9674,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is open across every product
+      summary: List findings across every product
       tags:
         - Findings
       x-openpsirt-requires:
@@ -10259,7 +10259,7 @@ paths:
       description: |-
         Four figures about how this deployment is working, as against what it holds: how long a finding sits before anybody proposes anything, how long a claim waits for a second person, what each person got through, and how much came back.
 
-        **The two waits are said three ways** — the middle, what nine in ten came in under, and the longest. An average alone hides the case somebody is asking about: ten decisions in a day and one in a quarter average to a fortnight, which describes neither.
+        **The two waits come back three ways each** — the middle, what nine in ten came in under, and the longest — so a caller reads three numbers per wait rather than one.
 
         **Per severity**, because a critical waiting a week and a low waiting a week are not the same fact.
 
@@ -10418,7 +10418,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is waiting on you
+      summary: List your notifications
       tags:
         - Notifications
       x-openpsirt-requires:
@@ -12775,7 +12775,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is open, gathered by component
+      summary: List findings by component
       tags:
         - Findings
       x-openpsirt-requires:
@@ -13197,7 +13197,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Export what is open, gathered by component
+      summary: Export findings by component
       tags:
         - Findings
       x-openpsirt-requires:
@@ -13320,7 +13320,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what is open, gathered by the bump that would fix it
+      summary: List findings by upgrade
       tags:
         - Findings
       x-openpsirt-requires:
@@ -13750,7 +13750,7 @@ paths:
       description: |-
         Everybody granted this one issue in this product, oldest first.
 
-        **Being on a case is not reading the product.** A collaborator sees this issue wherever it sits here and nothing else, may argue about it and comment on it, and may not agree to anybody's claim — two collaborators could otherwise satisfy the two people a dismissal on an embargoed finding asks for, with nobody accountable for the product involved.
+        **Being on a case is not reading the product.** A collaborator sees this issue wherever it sits here and nothing else, may argue about it and comment on it, and may not agree to anybody's claim.
 
         **Requires:** private-read or private-triage on the product. Only where you may read undisclosed work.
       operationId: list-collaborators
@@ -16510,7 +16510,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Read back a document a build sent
+      summary: Fetch a scan document
       tags:
         - Ingest
       x-openpsirt-requires:
@@ -16601,7 +16601,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List the words in use on a product
+      summary: List a product's tags
       tags:
         - Findings
       x-openpsirt-requires:
@@ -17483,9 +17483,7 @@ paths:
   /v1/score:
     get:
       description: |-
-        Returns the base score and the severity band a vector works out to.
-
-        It exists so that a screen composing a vector can show what it will score without holding a second copy of the formula. One implementation, and what somebody sees while choosing is what gets stored.
+        Returns the base score and the severity band a vector works out to. It reads nothing and records nothing.
 
         CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a different scheme, and scoring either with this one produces a number nothing downstream could tell apart from a real one.
 
@@ -17513,7 +17511,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Work out what a CVSS vector scores
+      summary: Score a CVSS vector
       tags:
         - Findings
       x-openpsirt-requires:
@@ -17568,7 +17566,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Describe whoever is asking
+      summary: Describe the current subject
       tags:
         - Access
       x-openpsirt-requires:
@@ -17628,7 +17626,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what this deployment has decided
+      summary: List this deployment's settings
       tags:
         - Administration
       x-openpsirt-requires:
@@ -17663,7 +17661,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Change something for this deployment
+      summary: Change one setting
       tags:
         - Administration
       x-openpsirt-requires:
@@ -17690,7 +17688,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List the ways in
+      summary: List sign-in providers
       tags:
         - Access
       x-openpsirt-requires:

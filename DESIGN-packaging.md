@@ -54,10 +54,11 @@ argument, so the stages cannot drift apart. The version is pinned rather than
 tracking latest: what a finding means depends on what was measured, and a base
 that moves under a rebuild changes the answer.
 
-**The packages inside that release are upgraded at build time** (REQ-04). This
-is distinct from moving the pin. A base tag's package set is frozen when that
-image was published while the distribution continues publishing fixes for it, so
-pinning alone ships what was known-vulnerable on that date and keeps shipping it.
+The packages inside that release are upgraded at build time (REQ-04). This is
+distinct from moving the pin. A base tag's package set is frozen when that image
+was published while the distribution continues publishing fixes for it, so
+pinning alone ships what was known-vulnerable on that date and keeps shipping
+it.
 
 Measured on this image the day the base moved from 3.21 to 3.24: **22 findings
 against the distribution's own packages, 20 of them OpenSSL at `3.5.7-r0` with
@@ -171,11 +172,12 @@ The image inventory is read off the assembled filesystem rather than by scanning
 a published image, because the image being described does not exist until the
 build finishes.
 
-**Packages, not files.** The file catalogers add a component per path with no
-version and no package identifier — eight hundred of them here — which no scanner
-can match and no finding can hang off, and they carry the build-time scan path
-into a shipped document. With them off the count is 357 components: seventeen
-Alpine packages, the operating system, and the modules of both binaries.
+Packages, not files. The file catalogers add a component per path with no
+version and no package identifier — eight hundred of them here — which no
+scanner can match and no finding can hang off, and they carry the build-time
+scan path into a shipped document. With them off the count is 357 components:
+seventeen Alpine packages, the operating system, and the modules of both
+binaries.
 
 ## Inventory composition
 
@@ -248,11 +250,11 @@ them: an archive named `0.2.0` whose binary reports `0.1.9` is what makes
 "which version were you running" unanswerable, and nothing else in the build
 compares the two.
 
-**The binary's inventory is told its version rather than asked for it.** A
-binary built here comes from no module the proxy has seen, so its build
-information records the main module as `(devel)` — and the document went out
-describing a component with no version at all, which is the one field a scanner
-needs to decide whether a release is affected.
+The binary's inventory is told its version rather than asked for it. A binary
+built here comes from no module the proxy has seen, so its build information
+records the main module as `(devel)` — and the document went out describing a
+component with no version at all, which is the one field a scanner needs to
+decide whether a release is affected.
 
 ## Image tags and labels
 
@@ -323,19 +325,19 @@ git push origin v0.2.0
 | A prerelease moves nothing | No `latest` image tag, no `<major>.<minor>` tag, no documentation alias. It exists to be tried, not to be landed on by somebody who asked for the current version |
 | A release is never rebuilt under the same tag | The tag names one set of bytes. Something wrong in a published release is fixed by the next tag, not by moving this one |
 
-**When a step fails**, the tag stays and the release does not exist yet.
-Fix what failed, delete the tag on the remote and locally, and tag again — the
-only case where a tag is allowed to move, because nothing has been published
-under it. Once assets exist under a tag, that tag is spent.
+When a step fails, the tag stays and the release does not exist yet. Fix what
+failed, delete the tag on the remote and locally, and tag again — the only case
+where a tag is allowed to move, because nothing has been published under it.
+Once assets exist under a tag, that tag is spent.
 
 ## Not built
 
-**Multi-architecture images.** The image is published for `linux/amd64`. The
-binaries are cross-compiled for both, because cgo is off and Go needs no
-machine of its own to do it — the image cannot follow, because the stage that
-catalogs what it ships runs the cataloger at the target architecture, so an
-`arm64` image builds `node`, `go` and `syft` under emulation. What that costs
-is measured in tens of minutes, not seconds.
+Multi-architecture images. The image is published for `linux/amd64`. The
+binaries are cross-compiled for both, because cgo is off and Go needs no machine
+of its own to do it — the image cannot follow, because the stage that catalogs
+what it ships runs the cataloger at the target architecture, so an `arm64` image
+builds `node`, `go` and `syft` under emulation. What that costs is measured in
+tens of minutes, not seconds.
 
 The fix is named rather than guessed at: build the binary stage at the build
 platform and cross-compile from there (`FROM --platform=$BUILDPLATFORM`, with
@@ -343,8 +345,8 @@ platform and cross-compile from there (`FROM --platform=$BUILDPLATFORM`, with
 not done, so the manifest holds one architecture and the chart runs on
 `amd64` nodes.
 
-**Compatibility is not promised yet.** A tag is where that promise would start
-and it does not start until the schema is collapsed into one initial migration
+Compatibility is not promised yet. A tag is where that promise would start and
+it does not start until the schema is collapsed into one initial migration
 (REQ-72), so releases before then are prereleases: they exercise the whole
 publication path and undertake nothing about upgrading from one to the next.
 

@@ -19,7 +19,7 @@ import { Editor, forget } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Markdown } from "../ui/Markdown";
-import { Because, labelled } from "../ui/Outcome";
+import { Because, labeled } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
 import { useWho } from "../app/session";
@@ -33,7 +33,7 @@ function same(name?: string): string {
 }
 
 // The stripe down the card, which says the claim's state before anybody reads
-// a word of it. Three colours and no fourth: waiting, in force, and finished
+// a word of it. Three colors and no fourth: waiting, in force, and finished
 // with — the same three the finding screen draws.
 function stripe(happened?: string): string {
   if (happened === "approved") return "approved";
@@ -85,7 +85,7 @@ export function Claim({ who }: { who: Who }) {
               ? (it.finding?.component ?? it.place.vulnerability)
               : it.place.vulnerability}
           </span>{" "}
-          · {labelled(it.argument.outcome)}{" "}
+          · {labeled(it.argument.outcome)}{" "}
           {it.issues > 1 && <span className="n">{it.issues} issues</span>}
         </h2>
         <p className="hint">
@@ -146,7 +146,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
         <div>
           <span className="l">Outcome</span>
           <span className="v">
-            {labelled(claim.argument.outcome)}
+            {labeled(claim.argument.outcome)}
             {claim.argument.deferred_until && <> until {claim.argument.deferred_until}</>}
             {claim.argument.committed_to && <> by {claim.argument.committed_to}</>}
           </span>

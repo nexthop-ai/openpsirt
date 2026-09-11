@@ -69,7 +69,7 @@ type WhoBody struct {
 func registerWhoAmI(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-current-subject", Method: http.MethodGet, Path: "/v1/session/me",
-		Summary: "Describe whoever is asking",
+		Summary: "Describe the current subject",
 		Description: "Returns the caller, the products they can reach, and what they may do in " +
 			"each one.\n\n" +
 			"It answers what a screen has to know before it draws: whether to offer an action " +

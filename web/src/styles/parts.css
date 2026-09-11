@@ -26,7 +26,7 @@
   border-color: var(--accent-line);
 }
 /* A figure is drawn as a button where it acts and as a link where it opens a
-   list. Both are the same card, and a link brings its own colour and underline
+   list. Both are the same card, and a link brings its own color and underline
    with it. */
 a.kpi,
 a.kpi:hover {
@@ -845,8 +845,8 @@ th.num {
   border-color: var(--accent-line);
   color: var(--accent);
 }
-/* What a comment said before it was changed (TRI-59). Indented under the
-   current text and quieter than it, because it is the record rather than the
+/* What a comment said before it was changed. Indented under the current text
+   and quieter than it, because it is the record rather than the
    conversation. */
 .earlier {
   margin-top: 8px;
@@ -866,10 +866,10 @@ button.edited {
   text-decoration: underline dotted;
 }
 
-/* What would make an approver disagree (TRI-60). Beside the claim rather than a
-   page away from it, because a card that shows only the argument for is the
-   rubber stamp the queue exists to prevent — and quiet rather than alarming,
-   since none of it says the claim is wrong. */
+/* What would make an approver disagree. Beside the claim rather than a page
+   away from it, because a card that shows only the argument for is the rubber
+   stamp the queue exists to prevent — and quiet rather than alarming, since
+   none of it says the claim is wrong. */
 .counter {
   margin-top: 10px;
   padding: 9px 12px;

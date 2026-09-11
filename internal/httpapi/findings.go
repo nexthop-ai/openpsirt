@@ -487,7 +487,7 @@ func registerComponentFindings(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-finding-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings/components",
-		Summary: "List what is open, gathered by component",
+		Summary: "List findings by component",
 		Description: "One row per component and version, with how many distinct issues are " +
 			"open against it and how many places those sit at. The level above the findings " +
 			"list: it answers where the weight is rather than what is wrong, which is the " +

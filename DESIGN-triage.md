@@ -95,7 +95,7 @@ judgment made about a leaf.
 | **Affected** | It applies, and goes to remediation |
 | **Not applicable** | It does not affect this product here |
 | **Deferred** | It affects us, and is not being worked on until a date |
-| **Won't fix** | It affects us, and will not be addressed |
+| **Will not fix** | It affects us, and will not be addressed |
 | **Already fixed** | The version shipping here carries the fix, and nothing here can see that it does |
 | **Upgrade needed** | A component is being upgraded, by a date |
 | **Patch needed** | One issue is being backported, by a date |
@@ -136,8 +136,8 @@ make the claim, using the same word.
 
 ## Approval
 
-**The proposer and the approver are always different people, with no override.**
-A deployment with one person cannot approve anything.
+The proposer and the approver are always different people, with no override. A
+deployment with one person cannot approve anything.
 
 | Rule | |
 |---|---|
@@ -169,6 +169,20 @@ Arguing, agreeing and reading are separate questions.
 | Every check reads the product and visibility from the row | Never from what a caller stated |
 | A place stating no visibility is undisclosed, normalized before the check | Doing it only before the write let a place stating nothing pass the check for disclosed findings and then be stored as undisclosed |
 | Unreachable and non-existent give the same answer | Guessing identifiers says nothing |
+
+Nothing under a finding carries a visibility of its own (REQ-40). A decision,
+every revision of its reasoning, every approval on it, every comment and every
+person named in any of them is read at the finding's visibility and at nothing
+else — so disclosing a finding discloses the whole record of what was decided
+about it, by whom, and when.
+
+That is the decision rather than a consequence of it: a reader who sees a
+disclosed finding and not the argument behind it has been handed a conclusion
+with no way to check it, and a coordinated disclosure whose timeline stops at
+the finding is one nobody outside can evidence. Adding a visibility column to
+a comment or a decision would read as a tightening and would defeat it
+silently, which is why it is written here rather than left to be inferred from
+the read rule above.
 
 ## Readback
 
@@ -227,7 +241,7 @@ was narrowed, and — for two kinds — which claim it came from.
 
 ### The claim and its rows
 
-**One act is one argument.** The claim carries what the judgment says; the rows
+One act is one argument. The claim carries what the judgment says; the rows
 underneath carry where it lands and when it stops applying.
 
 | On the claim | On each row |
@@ -240,15 +254,15 @@ underneath carry where it lands and when it stops applying.
 | The reasoning, every revision of it, and which revision stands | The VEX statement the argument was started from, where one was |
 | The approvals given for it, and the comments about it | |
 
-**This was on the row.** A judgment reaching forty-four places was forty-four
-copies of one sentence, each revisable on its own — so revising one returned that
-row to the queue and left the other forty-three saying the old thing under a
-claim that read as agreed. Measured on the demo before the move: 11 claims, 155
+This was on the row. A judgment reaching forty-four places was forty-four copies
+of one sentence, each revisable on its own — so revising one returned that row
+to the queue and left the other forty-three saying the old thing under a claim
+that read as agreed. Measured on the demo before the move: 11 claims, 155
 decisions, 155 revisions, and **five distinct pieces of reasoning**; one claim
 carried forty-four identical copies of its own words. Every payload field was
 constant across every row of every claim.
 
-**An action recording two things is refused.** A proposal per place permitted a
+An action recording two things is refused. A proposal per place permitted a
 per-place outcome and version, and nothing has ever produced one. Refused rather
 than quietly taking the first, because a set that disagrees is two claims
 somebody meant to record as one, and taking the first loses whichever half was
@@ -265,22 +279,22 @@ not first.
 | Comment | The claim. A note on one place of forty-four is one nobody else reading the claim would see |
 | Re-affirm | One place. A version moved under one row and not the others, so what is being re-made is that row's judgment |
 
-**Recording in bulk and changing your mind one row at a time was the split, and
-it was the wrong middle.** Approval was already claim-scoped while revising,
+Recording in bulk and changing your mind one row at a time was the split, and it
+was the wrong middle. Approval was already claim-scoped while revising,
 withdrawing and commenting were not, so somebody could record five hundred rows
 in one act, have them agreed to in one act, and then only unpick them five
 hundred times.
 
-**One approval row, not one per place.** An approver reads the words once and
-agrees to them once. Per row, a claim over a kernel wrote two thousand copies of
-one agreement, each able to go on standing after the words changed.
+One approval row, not one per place. An approver reads the words once and agrees
+to them once. Per row, a claim over a kernel wrote two thousand copies of one
+agreement, each able to go on standing after the words changed.
 
 The queue lists one entry per claim, newest first, with a representative row, its
 place and reasoning, how many rows, issues and places it covers, and every build
 it currently reaches by matching. The count beside the queue counts claims.
 
-**An entry says what it is about** (REQ-28): the build to open, the issue and
-what the report says of it, the component and version, how bad and whether it is
+An entry says what it is about (REQ-28): the build to open, the issue and what
+the report says of it, the component and version, how bad and whether it is
 being exploited, what upstream has done, the two ends of the way down, how many
 places the issue sits at, and how many of those the claim covers. All read from
 the open finding the row matches — by place and versions while live, by place
@@ -320,8 +334,8 @@ Measured on SQLite: 500 rows with two set aside in 15 statements. A test pins th
 statement count rather than the time, because the count is what a per-row loop
 cannot satisfy.
 
-**Recording is set-based for the same reason.** One judgment covers every place
-it sits at, and on shared code that is many — 507 for the worst case on the demo,
+Recording is set-based for the same reason. One judgment covers every place it
+sits at, and on shared code that is many — 507 for the worst case on the demo,
 which one row at a time is 1.4 s on MySQL. The rows are written in batches, the
 shape the scan apply already uses; measured on SQLite, 500 places in 6
 statements, pinned by a test the same way.
@@ -359,10 +373,10 @@ were made under, with the reason recorded as a comment and the rows sitting with
 their author until the argument for them is stated again. Revising is what gives
 them one of their own.
 
-**The outliers are shown to the author too.** Whoever wrote a bulk claim faces
-the choice an approver faces — hold part of it back, or argue all of it as
-one — and the signals that help an approver choose a subset were shown only to
-the approver.
+The outliers are shown to the author too. Whoever wrote a bulk claim faces the
+choice an approver faces — hold part of it back, or argue all of it as one — and
+the signals that help an approver choose a subset were shown only to the
+approver.
 
 | Rule | |
 |---|---|
@@ -376,11 +390,10 @@ Until this the author could only withdraw the whole thing and start again, so
 "this holds for most of them but not those four" was unavailable to the person
 best placed to say it.
 
-**Narrowing within a fold is a different thing and is not offered.** One
-judgment covers the whole fold, with no escape hatch. A claim still spans
-several folds — a judgment about many issues at one component, or one carried
-across builds — which is what makes splitting a real need that folding does not
-remove.
+Narrowing within a fold is a different thing and is not offered. One judgment
+covers the whole fold, with no escape hatch. A claim still spans several folds —
+a judgment about many issues at one component, or one carried across builds —
+which is what makes splitting a real need that folding does not remove.
 
 ## Extensions
 
@@ -430,11 +443,11 @@ read.
 It shows only work the reader can do, narrowed in the query. A work list holding
 work somebody cannot do teaches them to skip rows.
 
-**It carries what would make an approver disagree** (REQ-28) — two counts and no
-argument: what has already been *agreed* about the same issue at other places, by
-outcome; and how much else at the same place nobody has answered. Neither says
-the claim is wrong. They say what a careful reader would go and look up, so that
-not looking is a choice rather than an omission.
+It carries what would make an approver disagree (REQ-28) — two counts and no
+argument: what has already been *agreed* about the same issue at other places,
+by outcome; and how much else at the same place nobody has answered. Neither
+says the claim is wrong. They say what a careful reader would go and look up, so
+that not looking is a choice rather than an omission.
 
 | Rule | |
 |---|---|
@@ -488,8 +501,8 @@ A deferral shorter than a configured threshold stands on its own. A quick "not
 this sprint" is ordinary triage, and putting every routine act through a queue is
 how a queue stops being read.
 
-**Short is measured against everything the finding has already been put off
-for**, not against the deferral being asked for. Otherwise four twenty-nine-day
+Short is measured against everything the finding has already been put off for,
+not against the deferral being asked for. Otherwise four twenty-nine-day
 deferrals are a year nobody approved. **The time counted is what each deferral
 asked for**, not what it has spent.
 
@@ -503,13 +516,13 @@ date.
 | One taken back **before it held** counts for nothing | Correcting a mistake is not avoiding the work, and counting it would make the two read alike |
 | A deferral asking for a date **already past** counts for nothing | It asks for nothing, and it is refused at submission besides. Counting it as a negative would let a back-dated request subtract from what a finding has already been put off for |
 
-**Whether a claim needs a second person is worked out where it is written.** It
-was a field on the proposal, answered before the transaction opened and taken
-on trust — so a threshold somebody lowered between the answer and the write
-stored a claim as needing nobody under a policy that says it does, and the
-answer telling the caller it was waiting was the only trace of a control that
-had not run. The threshold itself is read inside that transaction too, for the
-same reason.
+Whether a claim needs a second person is worked out where it is written. It was
+a field on the proposal, answered before the transaction opened and taken on
+trust — so a threshold somebody lowered between the answer and the write stored
+a claim as needing nobody under a policy that says it does, and the answer
+telling the caller it was waiting was the only trace of a control that had not
+run. The threshold itself is read inside that transaction too, for the same
+reason.
 
 The report that shows the pattern counts them the same way, and groups on the
 product and the issue rather than on the words they are displayed under. Only
@@ -570,7 +583,7 @@ A published rating can be wrong for us: the score assumes a configuration we do
 not ship, or the world has not rated it and it is being treated as a medium by
 default.
 
-**The claim is about the issue, not about a place.** A rating being wrong is one
+The claim is about the issue, not about a place. A rating being wrong is one
 statement about the vulnerability: true wherever it appears, true in products it
 has not reached yet, and it does not stop being true because somebody rebuilt.
 Keyed to a place it would be repeated at each one and would lapse on a version
@@ -684,14 +697,14 @@ forty-four issues, discovered after typing the reasoning. **Measured on a real
 image, 805 candidates narrowed by hand became eighteen separate claims**, each
 with its own outlier table.
 
-**Whatever is offered to narrow the set — a weakness class, a subsystem named in
+Whatever is offered to narrow the set — a weakness class, a subsystem named in
 advisory text — is a starting point for a person, never a selection the tool
-asserts is right.** No SBOM says whether a driver was compiled in, so this is a
+asserts is right. No SBOM says whether a driver was compiled in, so this is a
 claim somebody makes and signs for, with the kernel config or whatever else
 supports it written into the reasoning.
 
-**How the set was narrowed is recorded with every claim in it**, separately from
-the reasoning. Narrowing is how a candidate was found; the reasoning is why the
+How the set was narrowed is recorded with every claim in it, separately from the
+reasoning. Narrowing is how a candidate was found; the reasoning is why the
 claim is true. "These matched a word" is not a defense anybody would accept.
 
 ## Fix bundles
@@ -749,9 +762,9 @@ somebody decided and what a release was waiting on could come to disagree.
 | Saying who carries it is part of the act | A person or a team, in the same transaction, so a promise nobody carries and a holder with no promise are both impossible. The handover is product-wide, and the level that matters is the strictest in the set — one embargoed finding among fifty makes the handover a disclosure |
 | The upgrade is reachable as a claim | Where its reasoning, its approval and the conversation about it already live |
 
-**What it covers is derived, never marked.** A covered finding is one a standing
-promise reaches, which the decision already records, so the mark is a join rather
-than a tag across every row.
+What it covers is derived, never marked. A covered finding is one a standing
+promise reaches, which the decision already records, so the mark is a join
+rather than a tag across every row.
 
 | | |
 |---|---|
@@ -759,7 +772,7 @@ than a tag across every row.
 | Withdrawing a promise puts what it covered back | Nothing to clean up: there was never a second record to keep in step |
 | It is offered as a filter and its negation | Asking for what is *not* covered is the working list once planned work is out of view, and a flag could not ask it |
 | It is what the by-issue list asks unless told otherwise | Deciding covered work again one finding at a time is what the promise was made instead of. The by-component view is untouched, because that is where the upgrade is managed |
-| The default is written into the address | A chip above the list like every other filter, removable by clicking, travelling with a link somebody sends. That is why the parameter has a word for "either" |
+| The default is written into the address | A chip above the list like every other filter, removable by clicking, traveling with a link somebody sends. That is why the parameter has a word for "either" |
 | Only the claim that currently stands counts | A promise that was withdrawn is not one |
 
 ### Approval gate
@@ -776,7 +789,7 @@ deferrals is **where the gate sits**.
 | **Nothing the act covers has a deadline** | There is no date to be past, so the exemption has nothing to measure against and a second person agrees. A product below its own triage line is the ordinary case, and it was the one place a promise could hide a finding for years on one signature |
 | **A commitment with no date at all** | Not a commitment |
 
-**The deadline is resolved with the places, never supplied.** It is a fact about
+The deadline is resolved with the places, never supplied. It is a fact about
 what the act covers rather than something whoever is promising may state, and a
 caller free to state it would be choosing whether their own promise needed a
 second person. The same rule the visibility and the versions follow.
@@ -809,7 +822,7 @@ shipped numbers are a starting point rather than a recommendation: a deadline
 nobody agreed to, applied to everything, leaves the whole estate permanently
 overdue and the signal ignored inside a month.
 
-**Changing a window rewrites what is stored.** A deadline is written onto the
+Changing a window rewrites what is stored. A deadline is written onto the
 finding when it is first seen, so editing the policy is the one event that makes
 every stored one wrong. The rewrite happens away from the request.
 
@@ -896,11 +909,11 @@ above.
 
 ## VEX statements as evidence
 
-**It is called VEX rather than "supplier"** (REQ-31), everywhere: the publisher,
-the status, the import, the filters. The old word described who tends to publish
+It is called VEX rather than "supplier" (REQ-31), everywhere: the publisher, the
+status, the import, the filters. The old word described who tends to publish
 rather than what the thing is, so an empty panel read as "nobody has an opinion
-about this" when it meant no document had been uploaded. The emptiness is stated:
-the panel says there is nothing and says why.
+about this" when it meant no document had been uploaded. The emptiness is
+stated: the panel says there is nothing and says why.
 
 It is a third layer, beside the claims a build supplies with its inventory and
 the decisions made here. The screen says what the build claims, what the
@@ -908,9 +921,9 @@ distribution says, and what we decided — three statements, not one collapsed
 answer. Applying a VEX statement by itself would put a third party's claim into a
 number somebody here quotes.
 
-**What the document adds is the reasoning.** The status is already in the fix
-state the scanner reports; the reasoning is what a triager otherwise types from
-memory and an approver has no way to check.
+What the document adds is the reasoning. The status is already in the fix state
+the scanner reports; the reasoning is what a triager otherwise types from memory
+and an approver has no way to check.
 
 Filterable by what a statement said and by which publisher said it. 1,113 of
 1,125 no-fix findings on a real image are distribution packages, and a
@@ -919,7 +932,7 @@ they are an afternoon; unfound, they are retyped one claim at a time.
 
 | Rule | |
 |---|---|
-| A distribution declining to fix is not a distribution saying it is not affected | Debian's `no-dsa`, Ubuntu's `ignored` and Red Hat's will-not-fix all mean *affected, and judged minor*, so they prefill a won't-fix and never `not-applicable`. A publisher saying they have not decided offers nothing at all |
+| A distribution declining to fix is not a distribution saying it is not affected | Debian's `no-dsa`, Ubuntu's `ignored` and Red Hat's will-not-fix all mean *affected, and judged minor*, so they prefill a will-not-fix and never `not-applicable`. A publisher saying they have not decided offers nothing at all |
 | The statements are resolved once, never asked per row | There are far fewer statements than findings, so the cheap direction is to work out which pairs the statements name, once, and join the list to that. Distinct on the pair, by `UNION` rather than `UNION ALL`, so joining cannot multiply a finding by the number of statements about it |
 | The issue's identifier is folded on write, like every other typed name | A published identifier arrives in whatever case its reporter chose and a statement arrives folded, so without a folded column the two could only be compared through a function — and a function on the indexed side is an index nobody can use |
 | Only what stands narrows | A statement set aside by a later document from the same publisher stops answering the filter, while the superseded row stays readable: an approval granted on the strength of it has to remain explicable |
@@ -987,11 +1000,11 @@ fact about the place.
 
 ## Tags
 
-**A finding takes free-text tags** (REQ-57), filterable, with no fixed
-vocabulary. At a dozen products and thousands of findings people mark work
-regardless — customer-escalated, release-blocker, waiting on a vendor — and with
-nowhere to put it they put it in the reasoning, where nothing can filter on it
-and where an approver reads it as part of the argument for the claim.
+A finding takes free-text tags (REQ-57), filterable, with no fixed vocabulary.
+At a dozen products and thousands of findings people mark work regardless —
+customer-escalated, release-blocker, waiting on a vendor — and with nowhere to
+put it they put it in the reasoning, where nothing can filter on it and where an
+approver reads it as part of the argument for the claim.
 
 No vocabulary is fixed, because none has been earned. A tag that becomes
 universal is a signal rather than a success: "waiting on vendor" has a subject,
@@ -1010,9 +1023,9 @@ promoting one.
 
 ## Rule-prepared claims
 
-**A rule produces a saved filter and a prefilled outcome, justification and
+A rule produces a saved filter and a prefilled outcome, justification and
 reasoning. A named person submits it as their own claim, and a second person
-approves it** (REQ-27).
+approves it (REQ-27).
 
 | Rule | |
 |---|---|
@@ -1035,11 +1048,11 @@ things: what already applies has nothing to agree to, what covers nothing here
 has nothing to apply to, what moved is a question, and what was postponed is a
 question that carries its own history.
 
-**Reasoning travels and conclusions do not.** Everything carried arrives as a
-claim waiting for a second person, however confident whoever carried it was: the
-version moved, which is what made the old judgment stop applying. Making somebody
-start from a blank page is how a tool teaches people to stop writing reasoning at
-all.
+Reasoning travels and conclusions do not. Everything carried arrives as a claim
+waiting for a second person, however confident whoever carried it was: the
+version moved, which is what made the old judgment stop applying. Making
+somebody start from a blank page is how a tool teaches people to stop writing
+reasoning at all.
 
 | Rule | |
 |---|---|
@@ -1057,8 +1070,8 @@ all.
 | Choosing a narrower set than "all of them" when a judgment covers many places | An interface question. What exists is the count, which is what makes the choice an informed one when it arrives |
 | Nothing refuses a deferral for being long | The cumulative threshold is the whole of the refusal. The pattern is reported instead, at `/v1/deferrals/repeated`: one item deferred three times is a judgment, and forty of them is a policy nobody wrote down. A deliberate absence of a rule rather than a gap |
 
-**A deferred item is never published as not-affected**, and the rule is built
-where the outbound documents are: the VEX generator takes only approved
+A deferred item is never published as not-affected, and the rule is built where
+the outbound documents are: the VEX generator takes only approved
 `not-applicable` and `already-fixed` claims, so a deferral is absent rather than
 published as anything, and silence in that format already reads as affected.
 

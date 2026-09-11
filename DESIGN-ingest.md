@@ -39,11 +39,13 @@ A build sends two things, in one request:
 | Inventory | Every component that ships, with its dependency edges |
 | Suppressions | Findings the build has already argued are not applicable, usually because it carries a patch |
 
-**CycloneDX is the format read. SPDX is intended and not built** (REQ-05); what
-is missing is a fixture carrying enough metadata to write the reader against.
-`TODO.md` records it.
+CycloneDX is the format read. SPDX is intended and not built (REQ-05); what is
+missing is a fixture carrying enough metadata to write the reader against. The
+reader refuses an SPDX document by name rather than failing at a field, and the
+upload screen says so, because a format nobody wrote support for should say that
+rather than look broken.
 
-**The vulnerability data is produced here rather than sent.** The inventory is
+The vulnerability data is produced here rather than sent. The inventory is
 reproducible and a vulnerability report is not, since new issues are disclosed
 daily, so a producer emitting both would have to give up one of the two
 properties. Keeping the inventory standalone lets a year-old release be
@@ -54,14 +56,14 @@ running its own scanner measures each product with whatever version its pipeline
 installed, so a difference between two products may be only a difference in
 their build images.
 
-**The model keeps room for a producer-supplied vulnerability report, and nothing
-reads one.** A run records which scanner produced it and whether this deployment
+The model keeps room for a producer-supplied vulnerability report, and nothing
+reads one. A run records which scanner produced it and whether this deployment
 ran it, so a producer's own findings would carry their provenance. The upload
 takes an inventory and suppressions and nothing else, the reader skips a
 `vulnerabilities` array, and every run is recorded as ours.
 
-**Fanning one reported issue out across the places it occupies is this
-deployment's work.** A vulnerability report says "this package at this version"
+Fanning one reported issue out across the places it occupies is this
+deployment's work. A vulnerability report says "this package at this version"
 and stops; it never saw the graph. That step is where one line in a report
 becomes the number of decisions a person has to make.
 
@@ -77,22 +79,22 @@ specification.
 | Identifiers for one issue vary | The same vulnerability arrives under different schemes depending on which database matched it. That choice is a scanner's preference, so identity spans the aliases (REQ-18) |
 | Severity arrives as a word | A rating, not a vector, often with the method given as unspecified. A number is taken where the report carries one, and the feeds carry numeric scores (REQ-12) |
 
-**A scanner does not read pedigree.** Measured: given a forked package carrying
-its ancestor in `pedigree.ancestors`, the reference scanner matched nothing;
-given the same package with no pedigree at all but with its distribution named
-in the package identifier, it matched **forty-three advisories**. What it matches
-on is the identifier and the distribution context.
+A scanner does not read pedigree. Measured: given a forked package carrying its
+ancestor in `pedigree.ancestors`, the reference scanner matched nothing; given
+the same package with no pedigree at all but with its distribution named in the
+package identifier, it matched **forty-three advisories**. What it matches on is
+the identifier and the distribution context.
 
 Pedigree is kept for two other reasons: it explains a finding to whoever reads
 it, and expiry is keyed on the upstream version, because a fork's own revision
 moves for packaging reasons unrelated to whether a vulnerability is still there.
 
-**Suppressions are applied here, not upstream.** The build's judgment about its
-own carried patches is never refuted; what changed is where it is applied.
-Receiving results a producer already filtered made a suppressed finding simply
-stop appearing — component present, version unchanged, pedigree unchanged —
-which is indistinguishable from a scanner fault, and lands in the bucket REQ-21
-makes unsuppressable by design.
+Suppressions are applied here, not upstream. The build's judgment about its own
+carried patches is never refuted; what changed is where it is applied. Receiving
+results a producer already filtered made a suppressed finding simply stop
+appearing — component present, version unchanged, pedigree unchanged — which is
+indistinguishable from a scanner fault, and lands in the bucket REQ-21 makes
+unsuppressable by design.
 
 ## Request handling
 
@@ -119,8 +121,8 @@ refuse it.
 | Unprocessable | The inventory could not be read at all |
 | Service unavailable | Too much is already waiting to be read |
 
-**Already held is a success**, because the ordinary case is a retry after a
-timeout that had in fact succeeded.
+Already held is a success, because the ordinary case is a retry after a timeout
+that had in fact succeeded.
 
 | Rule | Reason |
 |---|---|
@@ -138,17 +140,11 @@ contents. Parsing is expensive; refusing is not.
 | 2 | Have we already taken this exact file? | Answered with success. Failing it turns a landed scan into a red build, and the usual response is retry logic that swallows errors |
 | 3 | Is it newer than what is held? | Uploads do not arrive in the order they were made. Taking an older one replaces today's picture with yesterday's, reopening closed findings with no visible symptom |
 
-**Equal build times are refused.** Neither is newer, so choosing between them
-would be a coin toss over which picture is current.
-
-**Ordering is by build time, not arrival.** A few minutes of clock skew is
-tolerated, because build machines are seconds out rather than hours.
-
-**Timestamps are rounded to what the database keeps.** Go carries nanoseconds and
-no supported engine stores them, so without rounding a value written and read
-back is fractionally *older* than the one in memory: a scan compares as newer
-than itself, and a second file claiming the same build time is accepted. A latent
-fault on every engine, exposed by one and passed by the others on timing luck.
+| Rule | Reason |
+|---|---|
+| Equal build times are refused | Neither is newer, so choosing between them would be a coin toss over which picture is current |
+| Ordering is by build time, not arrival | A few minutes of clock skew is tolerated, because build machines are seconds out rather than hours |
+| Timestamps are rounded to what the database keeps | Go carries nanoseconds and no supported engine stores them, so without rounding a value written and read back is fractionally *older* than the one in memory: a scan compares as newer than itself, and a second file claiming the same build time is accepted. A latent fault on every engine, exposed by one and passed by the others on timing luck |
 
 ## Document storage
 
@@ -169,13 +165,13 @@ optional by requirement, so ingest cannot make it mandatory.
 | Nightly branch | Deleted once read | The next night supersedes it, and keeping them grows storage with the calendar rather than with what is tracked |
 | Tagged release | Inventory and suppressions both kept | Re-scanning years later needs what it contained *and* what the build had already argued about its carried patches. Keeping only the first would undo every one of those arguments on the next re-scan |
 
-**The record of what arrived outlives the contents**: kind, size, and the hash of
+The record of what arrived outlives the contents: kind, size, and the hash of
 the bytes as received. A re-parse means asking the build to send the file again,
 which is the whole recovery path, and without the hash the second copy is taken
 on trust. An upload whose contents are gone would otherwise read back as one
 that arrived with nothing.
 
-**A document whose contents were released answers 410, not 404.** On screen, one
+A document whose contents were released answers 410, not 404. On screen, one
 still held is a link and one released is not: a link that answered 410 is a
 control that looks like it works.
 
@@ -185,25 +181,25 @@ A worker claims the scan, reads its documents, and applies what they describe.
 Every replica does both; a separate worker deployment would be a second thing to
 run and get wrong for an installation this size.
 
-**The suppression documents are read here** even though applying them waits on
-the scan itself. A document that cannot be read is a fault in what the build
-sent, and finding that out while the producer still has the build in front of
-them is worth more than finding out later. What the build argued is stored
-against the **target** rather than the scan, because it is what the next
-vulnerability scan has to apply, and by then the documents may be gone.
+The suppression documents are read here even though applying them waits on the
+scan itself. A document that cannot be read is a fault in what the build sent,
+and finding that out while the producer still has the build in front of them is
+worth more than finding out later. What the build argued is stored against the
+**target** rather than the scan, because it is what the next vulnerability scan
+has to apply, and by then the documents may be gone.
 
-**A failure is recorded against the scan, not only against the job.** A job that
+A failure is recorded against the scan, not only against the job. A job that
 keeps retrying is visible only to whoever operates the deployment, which is the
 wrong person to be the only one who knows.
 
-**A read cut short by a shutdown is not recorded against the scan.** Nothing is
+A read cut short by a shutdown is not recorded against the scan. Nothing is
 wrong with the document, and marking it failed would leave the receipt saying so
 after a retry had stored it.
 
-**The queue is polled.** A notification mechanism exists on one of the four
-engines and nothing portable replaces it, so an idle reader asks again after a
-few seconds. A queue that is not empty drains at the speed of the work rather
-than the speed of the poll.
+The queue is polled. A notification mechanism exists on one of the four engines
+and nothing portable replaces it, so an idle reader asks again after a few
+seconds. A queue that is not empty drains at the speed of the work rather than
+the speed of the poll.
 
 ## Concurrent scans of one target
 
@@ -218,36 +214,22 @@ them up.
 
 ## Parsing
 
-**The header is read separately from the contents.** Everything the arrival
-decision turns on is answered by a pass that skips the contents. Parsing a file
-about to be refused is work nobody asked for, and on the largest producer it is
-most of the cost of taking the file. Skipping is not free — the reference
-producer sorts its keys, putting tens of thousands of components ahead of the
-metadata — but walking past a value is far cheaper than building something from
-it.
+The header is read separately from the contents. Everything the arrival decision
+turns on is answered by a pass that skips the contents. Parsing a file about to
+be refused is work nobody asked for, and on the largest producer it is most of
+the cost of taking the file. Skipping is not free — the reference producer sorts
+its keys, putting tens of thousands of components ahead of the metadata — but
+walking past a value is far cheaper than building something from it.
 
-**Read as a stream, with four bounds, all settable per read**: document size,
+Read as a stream, with four bounds, all settable per read: document size,
 component count, edge count, and nesting depth. Edges need their own bound,
 because a thousand components can declare a million edges between them.
 
-**The depth bound is why the document is walked rather than decoded.** Decoding
-has no depth limit anyone can set, so a file nested far enough to exhaust the
-process would be discovered by running out of memory. Nesting is bounded
-everywhere, including inside the parts nothing reads.
-
-**An oversized document is refused as oversized.** Truncating it and letting the
-reader fail reports a malformed file, which sends whoever sees the message
-looking at their build instead of at the limit. This holds for a third party's
-VEX document as well, which was read to the limit and handed on: over-sized
-became malformed, and the digest recorded was over the part that fitted.
-
-**The component bound is charged where a component is read**, not where one is
-recorded. Charged at the recording, the header pass — which records nothing —
-counted none of them, so a document putting its components inside the root
-component's own nested array was walked in full during a read that happens
-inside the upload request, with only the size bound saying how many there
-could be. The same document read whole was refused. A bound that holds on one
-of two paths through the same parser is a bound somebody routes around.
+| Rule | Reason |
+|---|---|
+| The depth bound is why the document is walked rather than decoded | Decoding has no depth limit anyone can set, so a file nested far enough to exhaust the process would be discovered by running out of memory. Nesting is bounded everywhere, including inside the parts nothing reads |
+| An oversized document is refused as oversized | Truncating it and letting the reader fail reports a malformed file, which sends whoever sees the message looking at their build instead of at the limit. This holds for a third party's VEX document as well, which was read to the limit and handed on: over-sized became malformed, and the digest recorded was over the part that fitted |
+| The component bound is charged where a component is read, not where one is recorded | Charged at the recording, the header pass — which records nothing — counted none of them, so a document putting its components inside the root component's own nested array was walked in full during a read that happens inside the upload request, with only the size bound saying how many there could be. The same document read whole was refused. A bound that holds on one of two paths through the same parser is a bound somebody routes around |
 
 | Rule | Reason |
 |---|---|
@@ -259,7 +241,7 @@ of two paths through the same parser is a bound somebody routes around.
 ## Tolerated and refused
 
 The specification requires very little, and producers differ enormously in what
-they fill in. **A document that is valid and sparse is not a broken one.**
+they fill in. A document that is valid and sparse is not a broken one.
 
 | Tolerated | Behavior |
 |---|---|
@@ -268,7 +250,7 @@ they fill in. **A document that is valid and sparse is not a broken one.**
 | An edge names something the document never describes | Dropped and counted. The missing component is not invented |
 | Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
 
-**The counts matter as much as the tolerance.** Each is a number that should be
+The counts matter as much as the tolerance. Each is a number that should be
 stable build to build, so a change says the producer changed.
 
 | Refused | Reason |
@@ -279,7 +261,7 @@ stable build to build, so a change says the producer changed.
 | A build time nothing can read | The build time orders scans against each other |
 | Past any of the four bounds | A broken or hostile file has to fail rather than exhaust the process |
 
-**Reading is all or nothing.** A partial inventory is indistinguishable from a
+Reading is all or nothing. A partial inventory is indistinguishable from a
 product that shrank, and acting on one closes findings that are still somebody's
 problem. This concerns a *failed parse* rather than producer variation.
 
@@ -292,19 +274,19 @@ person.
 A field nobody reads because it was considered and a field nobody reads because
 nobody noticed it look identical in the code.
 
-**Every key path the recorded documents contain is written down**, with what is
-done with it: acted on, or seen and deliberately left alone. A document
-containing a path that list does not have fails the check. The reverse is checked
-too — a path the reader acts on that no recorded document contains is a branch
-nothing exercises.
+Every key path the recorded documents contain is written down, with what is done
+with it: acted on, or seen and deliberately left alone. A document containing a
+path that list does not have fails the check. The reverse is checked too — a
+path the reader acts on that no recorded document contains is a branch nothing
+exercises.
 
 This checks the recorded documents, not what is accepted. The reader itself
 ignores anything it does not recognize.
 
-**A minor revision of the format is read, and is now shown to be.** The reader
+A minor revision of the format is read, and is now shown to be. The reader
 checks the major version and refuses what it has not been written against;
-anything within that major version parses. That made every revision accepted **by
-construction rather than by evidence**, and the gap was live: the reference
+anything within that major version parses. That made every revision accepted
+**by construction rather than by evidence**, and the gap was live: the reference
 producer moved to 1.7 while every fixture stated 1.6, so the inventory this
 deployment's own image carries and the one the demo ingests were both revisions
 nothing had been tested against.
@@ -326,15 +308,15 @@ A build's claims arrive two ways, and they are not equally precise.
 Both are read into one shape with the origin recorded, because the second can
 point at something that cannot be resolved and the first cannot.
 
-**The vocabulary is kept rather than translated.** A build saying "we carry the
-fix" and one saying "the vulnerable code is never reached" make different claims.
-Two of the four statuses remove a finding from what somebody has to look at; the
+The vocabulary is kept rather than translated. A build saying "we carry the fix"
+and one saying "the vulnerable code is never reached" make different claims. Two
+of the four statuses remove a finding from what somebody has to look at; the
 other two say the build looked.
 
-**A carried patch reports as fixed.** The vulnerable code was there and a patch
+A carried patch reports as fixed. The vulnerable code was there and a patch
 resolved it, which is not the same statement as the vulnerability never having
-applied. Only what a patch *claims* is read: a patch names a vulnerability in its
-own name or in a header saying what it fixes.
+applied. Only what a patch *claims* is read: a patch names a vulnerability in
+its own name or in a header saying what it fixes.
 
 | Matching rule | Reason |
 |---|---|
@@ -343,10 +325,10 @@ own name or in a header saying what it fixes.
 | A claim against a source tree matches a component of that name, or a fork of one | The build knows which packages came out of a tree and this deployment does not |
 | A claim is matched at every place its component sits | The fan-out is ours either way |
 
-**A claim that matched nothing is reported, not dropped.** A build's judgment
-that went nowhere means a finding it already answered comes back as noise. The
-producer's automatically-extracted claims name source trees rather than packages,
-so this is the ordinary case.
+A claim that matched nothing is reported, not dropped. A build's judgment that
+went nowhere means a finding it already answered comes back as noise. The
+producer's automatically-extracted claims name source trees rather than
+packages, so this is the ordinary case.
 
 | Choice | Reason |
 |---|---|
@@ -372,15 +354,11 @@ interval.
 | Ask for more than a slice at a time | A deployment tracking many builds would fill the queue in one pass and push arriving inventories behind work that is not urgent |
 | Fail when the queue is full | It stops. What is due stays due, and a full queue is a fact about how much is in flight |
 
-**One replica asks**, settled by a lease (`DESIGN-queue.md`). Two reading the same
-list at the same moment would both see the same build as due, because the check
-that nothing is queued is made when the list is read.
-
-**The interval is a setting, shipping at a day.** The databases the scanner reads
-are published daily.
-
-**This does not discover.** The component list still comes from the build. What
-changes between one scan and the next is what is known about those components.
+| Rule | Reason |
+|---|---|
+| One replica asks, settled by a lease (`DESIGN-queue.md`) | Two reading the same list at the same moment would both see the same build as due, because the check that nothing is queued is made when the list is read |
+| The interval is a setting, shipping at a day | The databases the scanner reads are published daily |
+| This does not discover | The component list still comes from the build. What changes between one scan and the next is what is known about those components |
 
 ## Scanner warnings
 
@@ -388,8 +366,8 @@ Warnings were read only when the scanner failed, which discarded the case that
 matters: a run that answers and states that its answer is coarse. They are
 recorded on the run, kept apart from the failure, and travel with the receipt.
 
-**Today it captures nothing.** A scan runs over an inventory written here from
-the components held — name, version, package identifier and CPE — not over the
+Today it captures nothing. A scan runs over an inventory written here from the
+components held — name, version, package identifier and CPE — not over the
 document that arrived. The scanner is told far less than the producer said, so
 the warnings it would raise about a producer's document it has no grounds to
 raise about ours.
@@ -401,7 +379,7 @@ binary. The findings are the same either way. Recorded rather than fixed, becaus
 carrying a producer's metadata as far as the scanner changes what an inventory is
 here.
 
-**Two things reported per match are kept**, as evidence for the question REQ-13
+Two things reported per match are kept, as evidence for the question REQ-13
 asks:
 
 | Kept | Use |
@@ -443,22 +421,22 @@ The four states are this deployment's, not the queue's. Reading and scanning are
 two jobs with different rhythms, and a producer has no business knowing which
 queue its work is sitting in.
 
-**Which run answers an upload** is a rule rather than a lookup, because a run
-covers a build rather than an upload: **the earliest successful run to finish
-after that upload was parsed.** A run that failed answers it only while nothing
-has succeeded since. The first version took the earliest run to finish after
-parsing whatever became of it, so a scanner that fell over once poisoned every
-receipt already waiting on it, permanently.
+Which run answers an upload is a rule rather than a lookup, because a run covers
+a build rather than an upload: **the earliest successful run to finish after
+that upload was parsed.** A run that failed answers it only while nothing has
+succeeded since. The first version took the earliest run to finish after parsing
+whatever became of it, so a scanner that fell over once poisoned every receipt
+already waiting on it, permanently.
 
-**What each run changed** is counted when asked for rather than stored, from the
+What each run changed is counted when asked for rather than stored, from the
 runs the findings already point at, as issues at components rather than places.
 The count is attributed to the newest upload that run covered and omitted from
 the rest, because one fact repeated down three rows reads as three changes.
 
-**Which run produced a finding is recorded on it** (REQ-13): the one that opened
-it and the one that closed it, with the scanner and vulnerability-database
-versions of each run on every receipt item. A feed shipping bad data for a week
-is corrected afterwards, and the work done on the strength of it has to be found.
+Which run produced a finding is recorded on it (REQ-13): the one that opened it
+and the one that closed it, with the scanner and vulnerability-database versions
+of each run on every receipt item. A feed shipping bad data for a week is
+corrected afterwards, and the work done on the strength of it has to be found.
 
 | Rule | Reason |
 |---|---|
@@ -466,10 +444,10 @@ is corrected afterwards, and the work done on the strength of it has to be found
 | The versions go on every receipt the run answers | They are a property of the run rather than a change it made. A page of receipts spanning a scanner upgrade is what somebody reads that screen to notice |
 | Absent rather than invented where there is no run | A finding a person recorded (REQ-19) was produced by nobody, and one whose run has been pruned is still a finding |
 
-**Two numbers are kept once a scan has been read**: how many components the
-inventory described, and how many of them anything placed in the graph. The pair,
-not either alone — a component nothing places is ordinary, but a document that
-places *none* is a list rather than a graph, whose every finding will be
+Two numbers are kept once a scan has been read: how many components the
+inventory described, and how many of them anything placed in the graph. The
+pair, not either alone — a component nothing places is ordinary, but a document
+that places *none* is a list rather than a graph, whose every finding will be
 individually correct and unable to answer "why is this here".
 
 ## Reading back a document

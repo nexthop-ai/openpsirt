@@ -392,7 +392,7 @@ func registerComponentExport(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-finding-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings/components.{format}",
-		Summary: "Export what is open, gathered by component",
+		Summary: "Export findings by component",
 		Description: "One row per component and version, with how many distinct issues are " +
 			"open against it and how many places those sit at — every row, not one page.\n\n" +
 			"This is the shape a release meeting argues over: where the weight is rather " +

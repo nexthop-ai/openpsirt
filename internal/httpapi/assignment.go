@@ -411,7 +411,7 @@ func registerAssignment(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-holdings", Method: http.MethodGet, Path: "/v1/assignments",
-		Summary: "List how much each person is dealing with",
+		Summary: "List assignment totals",
 		Description: "Returns everyone holding open work you can see, with how much.\n\n" +
 			"Counted in pieces of work — an issue in a component in a product — which is the " +
 			"unit the list behind each person is in. `places` says how many findings those " +
