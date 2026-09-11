@@ -5,7 +5,7 @@ import { useWho } from "./session";
 import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
 import { Shell } from "./Shell";
-import { SignIn } from "../screens/SignIn";
+import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
 import { Findings } from "../screens/Findings";
 import { Products } from "../screens/Products";
@@ -70,6 +70,12 @@ export function App() {
   // session's own identity and is the shape that stops being harmless the
   // moment it depends on anything a discarded render computed.
   useEffect(() => belongTo(who.data?.identity), [who.data?.identity]);
+
+  // Somebody is signed in, so the guard that stops the sign-in screen
+  // forwarding twice has done its job and the next arrival may forward again.
+  useEffect(() => {
+    if (who.data) forgetForward();
+  }, [who.data]);
 
   if (who.isPending) return <Waiting />;
 

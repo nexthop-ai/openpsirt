@@ -621,7 +621,13 @@ function Me({ who }: { who: Who }) {
                 // A full load rather than a route change: signing out has to
                 // drop every cached answer, and starting again is the way to
                 // be sure.
-                window.location.assign("/");
+                //
+                // Said in the address, because the sign-in screen forwards
+                // straight to the provider where there is only one — and the
+                // provider still holds its own session, so an unmarked arrival
+                // here would sign them back in and make signing out
+                // impossible.
+                window.location.assign("/?signed-out");
               }
             }}
           >

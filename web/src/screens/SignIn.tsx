@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loading } from "../ui/Loading";
 import { api } from "../api/client";
@@ -22,6 +23,62 @@ export function returningHere(): string {
   return "?return=" + encodeURIComponent(here);
 }
 
+// Whether a forward to the provider has already been tried in this tab.
+//
+// One provider means the button is the only thing on the screen, so the screen
+// is a stop on the way rather than a choice — but a forward that repeats is a
+// person who can never read why they were refused. Somebody who authenticates
+// and was granted nothing is refused by design, and the refusal is an API
+// answer rather than a screen; coming back to the application afterwards has to
+// show the way in rather than send them round again.
+//
+// Per tab, and cleared once somebody is actually signed in. Storage can be
+// unavailable or throw, and the honest answer then is to draw the button: a
+// screen with a button works, and a forward that cannot be remembered loops.
+const triedKey = "signin-forwarded";
+
+function alreadyTried(): boolean {
+  try {
+    return window.sessionStorage.getItem(triedKey) !== null;
+  } catch {
+    return true;
+  }
+}
+
+export function rememberForward() {
+  try {
+    window.sessionStorage.setItem(triedKey, "1");
+  } catch {
+    // Nothing to do. The forward happens anyway and the next arrival draws
+    // the button, which is the safe direction.
+  }
+}
+
+// Forgotten once somebody holds a session, so the next sign-in forwards again.
+export function forgetForward() {
+  try {
+    window.sessionStorage.removeItem(triedKey);
+  } catch {
+    // Nothing stored, nothing to clear.
+  }
+}
+
+// Whether this arrival is one to send straight on to the provider.
+//
+// Deliberately narrow. It is a stop on the way only where there is nothing to
+// decide and nothing to read.
+export function forwardable(count: number, resuming: boolean | undefined): boolean {
+  if (count !== 1) return false;
+  // Drawn over the screen somebody was already on, so forwarding would take
+  // them away from work they can still see.
+  if (resuming) return false;
+  // Signing out lands here, and the provider still holds its own session — so
+  // forwarding would sign them straight back in and make signing out
+  // impossible.
+  if (new URLSearchParams(window.location.search).has("signed-out")) return false;
+  return !alreadyTried();
+}
+
 // The one screen somebody sees before they hold anything. It offers the ways
 // in this deployment has configured and says nothing else — which of them a
 // given person can use is not knowable until they have used it, and guessing
@@ -36,6 +93,20 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
     retry: false,
     queryFn: async () => unwrap(await api.GET("/v1/sign-in", {})),
   });
+
+  const offered = providers.data?.items ?? [];
+  const only = offered.length === 1 ? offered[0] : undefined;
+  const forwarding = Boolean(only) && forwardable(offered.length, resuming);
+
+  useEffect(() => {
+    if (!forwarding || !only) return;
+    rememberForward();
+    window.location.assign(only.path + returningHere());
+  }, [forwarding, only]);
+
+  // Nothing is drawn while the browser is on its way out. Drawing the button
+  // first would show a screen that vanishes under whoever reached for it.
+  if (forwarding) return <Loading />;
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
