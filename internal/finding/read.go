@@ -965,7 +965,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedOn)
 	if words := filter.Floor.admits(); len(words) > 0 {
 		// The line's own condition, negated: not exploited, and rated
 		// beneath the line. Both read the way Floor.narrow reads them.
@@ -1753,7 +1753,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedOn)
 	// The issue is joined only where the order needs it. The default page
 	// reads finding's covering index and nothing else, which is what makes it
 	// a page rather than a scan, and a join added for everybody would pay for
@@ -1794,7 +1794,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedOn)
 	total, err := s.db.NewSelect().
 		TableExpr("(?) AS grouped", filter.narrow(counted)).
 		Count(ctx)
@@ -1836,7 +1836,7 @@ func sortedBy(filter Filter) string {
 	// grouped by — MySQL refuses an ordering on a column the grouping does not
 	// determine, and it is right to: a tie-break on a column that varies
 	// within a row is not a tie-break at all.
-	return sorted + ", f.vulnerability_id, " + FoldedOn
+	return sorted + ", " + GroupedOn
 }
 
 // decorate reads what the page shows about each of its groups, in one
@@ -1957,7 +1957,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// too.
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr("f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedOn)
 	if err := filter.narrow(q).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read about what is open: %w", err)
 	}

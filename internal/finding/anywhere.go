@@ -179,7 +179,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr("COUNT(*) AS places").
 		ColumnExpr("MAX(f.urgency) AS urgency").
 		ColumnExpr("COUNT(*) OVER () AS total").
-		GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedAcross)
 	if err := page.OrderExpr(sortedAcross(filter)).
 		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open anywhere: %w", err)
@@ -190,7 +190,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	} else {
 		counted := narrow(s.db.NewSelect()).
 			ColumnExpr("f.vulnerability_id").
-			GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+			GroupExpr(GroupedAcross)
 		var err error
 		if total, err = s.db.NewSelect().
 			TableExpr("(?) AS grouped", counted).Count(ctx); err != nil {
@@ -278,7 +278,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Where("st.product_id IN (?)", bun.List(within)).
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr("st.product_id, f.vulnerability_id, " + FoldedOn)
+		GroupExpr(GroupedAcross)
 	if err := body.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read about what is open anywhere: %w", err)
 	}

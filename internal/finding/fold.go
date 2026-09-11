@@ -21,6 +21,20 @@ package finding
 // one word for different packages.
 const FoldedOn = "c.fold_key"
 
+// GroupedOn is the grain the findings list, its hidden count and its
+// cross-product form all group by: one issue at one fold.
+//
+// Spelled once because the empty-page fallback grouped one step finer than
+// the page it belongs to, and the figure above the list then changed
+// depending on which page was being looked at. The grain of a page and the
+// grain of the number above it are one fact, and it was written out at five
+// sites by hand.
+const GroupedOn = "f.vulnerability_id, " + FoldedOn
+
+// GroupedAcross is the same grain across products, where a row is an issue at
+// a fold in one product.
+const GroupedAcross = "st.product_id, " + GroupedOn
+
 // SourceName and SourceVersion are what a fold is called and what it is at:
 // what the producer said the component was built from, and the component's own
 // where it said nothing.
