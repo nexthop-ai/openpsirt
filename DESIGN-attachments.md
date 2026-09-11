@@ -3,7 +3,7 @@
 Files hanging off a finding: storage, references, authorization, limits,
 redaction and the reaper.
 
-Satisfies REQ-70 and REQ-79.
+Satisfies REQ-70.
 
 ## Contents
 
@@ -85,7 +85,7 @@ An object store reached through the S3-compatible API. Never the database.
 
 ### Reaching the store in the clear
 
-An endpoint that is not `https` is refused, and two things lift that (REQ-79).
+An endpoint that is not `https` is refused, and two things lift that (REQ-70).
 
 | Lifts it | |
 |---|---|

@@ -47,7 +47,7 @@ type BucketConfig struct {
 	PathStyle bool
 	// AllowHTTP permits a plaintext endpoint that is not this machine. Off
 	// unless an operator says otherwise, because what it exposes is not
-	// visible from the configuration that turns it on (REQ-79).
+	// visible from the configuration that turns it on (REQ-70).
 	AllowHTTP bool
 }
 
@@ -88,7 +88,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		// network in the clear is a file anybody on the path may fetch — the
 		// redirect is the part that leaves us. So plain HTTP is refused unless
 		// it reaches no further than this machine, or an operator has said
-		// that this network is one they accept it on (REQ-79).
+		// that this network is one they accept it on (REQ-70).
 		clear = parsed.Scheme != "https" && !loopback(parsed.Hostname())
 		if clear && !settings.AllowHTTP {
 			return nil, fmt.Errorf(

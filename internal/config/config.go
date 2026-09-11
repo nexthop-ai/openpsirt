@@ -86,7 +86,7 @@ type Config struct {
 	// machine, for a store on a network an operator accepts that on. Off
 	// unless it is set, and distinct from PlainHTTP, which is about how this
 	// application is served and loosens cookies rather than anything about
-	// where attachments are kept (REQ-79).
+	// where attachments are kept (REQ-70).
 	AttachmentAllowHTTP bool
 	AttachmentDir       string
 
