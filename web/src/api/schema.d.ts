@@ -1342,6 +1342,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/people/{identity}/roles/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a user's role on every product
+         * @description Withdraws a role held across the estate. Takes effect at their next request; end their sessions to cut them off now.
+         *
+         *     It leaves no per-product grants in its place. Expanding one at withdrawal would record the products of that moment, so a product declared afterwards would silently not be covered — which is what holding a role across the estate exists to avoid. Anything still wanted on one product is granted there deliberately.
+         *
+         *     Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
+         *
+         *     **Requires:** administrator
+         */
+        delete: operations["withdraw-estate-role"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/people/{identity}/sessions": {
         parameters: {
             query?: never;
@@ -5733,8 +5759,10 @@ export interface components {
             items: components["schemas"]["ReleasePointBody"][] | null;
         };
         GrantBody: {
-            /** @description The product the role is held against */
-            product: string;
+            /** @description Hold it across every product, including products declared later. The product is then omitted */
+            everywhere?: boolean;
+            /** @description The product the role is held against. Omit it and set everywhere instead to hold it across the estate */
+            product?: string;
             /**
              * @description What they may do with it
              * @enum {string}
@@ -5781,8 +5809,10 @@ export interface components {
         HeldBody: {
             /** @description Whether this grants anything right now */
             effective: boolean;
-            /** @description The product the role is held against */
-            product: string;
+            /** @description Held across every product, including products declared later */
+            everywhere?: boolean;
+            /** @description The product the role is held against. Absent where it is held across every product */
+            product?: string;
             /**
              * @description What they may do with it
              * @enum {string}
@@ -10376,6 +10406,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Withdraw-roleResponse"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-estate-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

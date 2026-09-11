@@ -294,6 +294,22 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 			}
 		}
 
+		// A role held across every product rather than against one, which is
+		// how a security team holds the estate. Granted disclosed reading
+		// deliberately: the hazard is that "every product" is read as "no
+		// narrowing at all", which would hand this identity the undisclosed
+		// findings in both products (REQ-42 and REQ-43).
+		estate, err := rights.Ensure(ctx, "estate-reader", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.Claim(ctx, estate.ID, "estate-reader"); err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantEstateRole(ctx, estate.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
 		// Somebody who exists and was granted nothing at all.
 		ungranted, err := rights.Ensure(ctx, "nothing", "", false)
 		if err != nil {

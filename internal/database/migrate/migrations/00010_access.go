@@ -154,6 +154,32 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "role_grant_unique" UNIQUE ("person_id", "product_id", "role", "source")
 		)` + t.suffix,
 
+		// A role held across every product, including products declared
+		// afterwards (REQ-42). A security team holds the same role over the
+		// estate, and issuing that one product at a time leaves every new
+		// product a permissions sweep across everybody.
+		//
+		// Its own table rather than a nullable product on the one above. All
+		// four engines treat NULLs in a unique key as distinct from each
+		// other, so a nullable product would let duplicate estate rows
+		// accumulate with the database enforcing nothing, and the partial
+		// index that would fix it is engine-specific.
+		//
+		// source and active mean what they mean above, so setting assignments
+		// aside and restoring them covers these rows by the same act. Nothing
+		// derives one today: a group binding names a product, so a derived row
+		// here has no way to be written.
+		`CREATE TABLE "role_grant_all" (
+			"id"         ` + t.id + `,
+			"person_id"  ` + t.ref + ` NOT NULL,
+			"role"       ` + t.kind + ` NOT NULL,
+			"source"     ` + t.kind + ` NOT NULL,
+			"active"     ` + t.boolean + ` NOT NULL,
+			"created_at" ` + t.timestamp + ` NOT NULL,
+			CONSTRAINT "role_grant_all_person_fk" FOREIGN KEY ("person_id") REFERENCES "person"("id"),
+			CONSTRAINT "role_grant_all_unique" UNIQUE ("person_id", "role", "source")
+		)` + t.suffix,
+
 		// How one person signs in.
 		//
 		// A username moves — people change their name at work, and a forge
@@ -353,6 +379,7 @@ func downAccess(ctx context.Context, tx *sql.Tx) error {
 		`DROP TABLE "group_role"`,
 		`DROP TABLE "session"`,
 		`DROP TABLE "api_key"`,
+		`DROP TABLE "role_grant_all"`,
 		`DROP TABLE "role_grant"`,
 		`DROP TABLE "person"`,
 		`DROP TABLE "party"`,

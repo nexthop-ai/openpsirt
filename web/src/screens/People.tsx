@@ -68,6 +68,28 @@ export function People() {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
   });
 
+  // A role held across every product, including ones declared later. One
+  // standing grant rather than a copy per product, so what it covers is
+  // worked out when somebody asks rather than frozen when it was made.
+  const grantEverywhere = useMutation({
+    mutationFn: async (who: { identity: string; role: string }) =>
+      unwrap(
+        await api.POST("/v1/people", {
+          body: {
+            identity: who.identity,
+            holds: [{ role: who.role as Role, everywhere: true }],
+          },
+        }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+  });
+
+  const withdrawEverywhere = useMutation({
+    mutationFn: async (who: { identity: string; role: string }) =>
+      unwrap(await api.DELETE("/v1/people/{identity}/roles/{role}", { params: { path: who } })),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+  });
+
   const endSessions = useMutation({
     mutationFn: async (who: { identity: string }) =>
       unwrap(await api.DELETE("/v1/people/{identity}/sessions", { params: { path: who } })),
@@ -235,12 +257,23 @@ export function People() {
                       <td colSpan={5}>
                         <Access
                           holds={person.holds ?? []}
-                          busy={grant.isPending || withdraw.isPending}
+                          busy={
+                            grant.isPending ||
+                            withdraw.isPending ||
+                            grantEverywhere.isPending ||
+                            withdrawEverywhere.isPending
+                          }
                           onGrant={(product, role) =>
                             grant.mutate({ identity: person.identity ?? "", product, role })
                           }
                           onWithdraw={(product, role) =>
                             withdraw.mutate({ identity: person.identity ?? "", product, role })
+                          }
+                          onGrantEverywhere={(role) =>
+                            grantEverywhere.mutate({ identity: person.identity ?? "", role })
+                          }
+                          onWithdrawEverywhere={(role) =>
+                            withdrawEverywhere.mutate({ identity: person.identity ?? "", role })
                           }
                         />
                       </td>

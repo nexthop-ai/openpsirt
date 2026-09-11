@@ -406,7 +406,19 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			Where("source = ?", Assigned).Exec(ctx); err != nil {
 			return fmt.Errorf("set aside the assigned roles: %w", err)
 		}
+		// Estate grants are assignments too, so they are set aside by the
+		// same act. Leaving them live would keep a role over every product
+		// standing in a deployment where nothing derives one.
+		if _, err := s.db.NewUpdate().Model((*EstateGrant)(nil)).
+			Set("active = ?", false).
+			Where("source = ?", Assigned).Exec(ctx); err != nil {
+			return fmt.Errorf("set aside the assigned roles over every product: %w", err)
+		}
 	case Direct:
+		if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
+			Where("source = ?", Derived).Exec(ctx); err != nil {
+			return fmt.Errorf("clear what groups derived over every product: %w", err)
+		}
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 			Where("source = ?", Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived: %w", err)
@@ -415,6 +427,11 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			Set("active = ?", true).
 			Where("source = ?", Assigned).Exec(ctx); err != nil {
 			return fmt.Errorf("restore the assigned roles: %w", err)
+		}
+		if _, err := s.db.NewUpdate().Model((*EstateGrant)(nil)).
+			Set("active = ?", true).
+			Where("source = ?", Assigned).Exec(ctx); err != nil {
+			return fmt.Errorf("restore the assigned roles over every product: %w", err)
 		}
 		// Administration derived from a group goes with it — but only what a
 		// group actually derived. Somebody an administrator promoted inside

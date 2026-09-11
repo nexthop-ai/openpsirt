@@ -344,6 +344,28 @@ func (s *Store) Resolve(ctx context.Context, identity string) (Subject, error) {
 		}
 		grants[grant.ProductID] = append(grants[grant.ProductID], grant.Role)
 	}
+	// A role held across every product is spread over the catalog as it stands
+	// now, which is what makes a product declared after the grant covered
+	// without anybody being re-granted anything (REQ-42). Read only where one
+	// is held, so the ordinary subject costs nothing.
+	var estate []EstateGrant
+	if err := s.db.NewSelect().Model(&estate).
+		Where("person_id = ?", person.ID).Where("active = ?", true).Scan(ctx); err != nil {
+		return Subject{}, fmt.Errorf("read what %q may do everywhere: %w", identity, err)
+	}
+	if len(estate) > 0 {
+		everywhere := make([]Role, 0, len(estate))
+		for _, grant := range estate {
+			if grant.Role.Valid() {
+				everywhere = append(everywhere, grant.Role)
+			}
+		}
+		products, err := s.everyProduct(ctx)
+		if err != nil {
+			return Subject{}, err
+		}
+		spreadEstate(grants, everywhere, products)
+	}
 	// Every case they were brought into, one issue at a time. Read beside
 	// the roles because it is the same question — what may they reach —
 	// asked at a smaller unit, and because being on a case is a grant:

@@ -2928,9 +2928,11 @@ components:
     GrantBody:
       additionalProperties: false
       properties:
+        everywhere:
+          description: Hold it across every product, including products declared later. The product is then omitted
+          type: boolean
         product:
-          description: The product the role is held against
-          minLength: 1
+          description: The product the role is held against. Omit it and set everywhere instead to hold it across the estate
           type: string
         role:
           description: What they may do with it
@@ -2943,7 +2945,6 @@ components:
             - private-triage
           type: string
       required:
-        - product
         - role
       type: object
     GrownBody:
@@ -3010,9 +3011,11 @@ components:
         effective:
           description: Whether this grants anything right now
           type: boolean
+        everywhere:
+          description: Held across every product, including products declared later
+          type: boolean
         product:
-          description: The product the role is held against
-          minLength: 1
+          description: The product the role is held against. Absent where it is held across every product
           type: string
         role:
           description: What they may do with it
@@ -3031,7 +3034,6 @@ components:
             - derived
           type: string
       required:
-        - product
         - role
         - effective
       type: object
@@ -10909,6 +10911,42 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Withdraw a user's role on a product
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
+  /v1/people/{identity}/roles/{role}:
+    delete:
+      description: |-
+        Withdraws a role held across the estate. Takes effect at their next request; end their sessions to cut them off now.
+
+        It leaves no per-product grants in its place. Expanding one at withdrawal would record the products of that moment, so a product declared afterwards would silently not be covered — which is what holding a role across the estate exists to avoid. Anything still wanted on one product is granted there deliberately.
+
+        Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
+
+        **Requires:** administrator
+      operationId: withdraw-estate-role
+      parameters:
+        - in: path
+          name: identity
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: role
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Withdraw a user's role on every product
       tags:
         - Administration
       x-openpsirt-requires:

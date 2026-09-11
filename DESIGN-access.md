@@ -30,6 +30,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [How a group name is matched](#how-a-group-name-is-matched)
 - [Role assignment modes](#role-assignment-modes)
 - [The grant grid](#the-grant-grid)
+- [A role across every product](#a-role-across-every-product)
 - [Personal tokens](#personal-tokens)
 - [Where each check is made](#where-each-check-is-made)
 - [Browser headers](#browser-headers)
@@ -647,9 +648,31 @@ order.
 
 | Feature | Reason |
 |---|---|
-| The row across the top is every product at once | Checked where they hold that capability everywhere, partial where they hold it somewhere, and pressing it grants or withdraws only the difference. Granting a reviewer the same capability on eight products was twenty-four gestures, and the chips gave no way to tell "on all eight" from "on six of eight" |
+| The row across the top is the estate grant | Checked where one is held, indeterminate where they hold the role on some products and not across the estate. The two are different facts, and drawing them alike is what made "on all eight" indistinguishable from "on six of eight" |
+| A product row covered by the estate grant is drawn and cannot be changed there | It is withdrawn where it was granted. Accepting a click that would have to expand the estate grant into per-product rows is the freezing this replaced |
 | A role derived from a group is drawn and cannot be changed here | It is withdrawn by changing the group, so the box is disabled and says so rather than accepting a click the next sign-in would undo. Where the deployment takes its roles from groups, the grid is not offered |
 | A capability granted where nothing is readable is marked as it is granted | Approver and assigner are bounded by what their holder may read. That was already said after the fact, on the row; the cell says it where somebody is about to do it |
+| The grid is offered before any product is declared | The estate row is meaningful with an empty catalog, because what it covers is worked out when somebody asks. A screen that said "nothing to grant on" left a fresh deployment with no way to arrange access before the catalog |
+
+## A role across every product
+
+One standing grant, covering products declared afterwards without anybody being
+re-granted anything (REQ-42).
+
+| Rule | Reason |
+|---|---|
+| One grant, never a copy per product | A grant that expands records the products of the moment it was made. The interface offered exactly that, as a button issuing one ordinary grant per product then in the catalog, so a product declared afterwards was silently uncovered and the box fell back to partial |
+| What it covers is worked out when somebody asks | The catalog is read as the subject is resolved, which is what makes "declared afterwards" true without anything being rewritten |
+| It narrows by visibility exactly as a per-product grant does | A role held across the estate is still a role of one visibility. This is the trap: the queries carry a flag for "every product" that means no narrowing at all, visibility included, and it belongs to the deployment's own background passes. An estate grant setting it would hand somebody granted disclosed reading every undisclosed finding there is (REQ-43) |
+| Withdrawn whole, leaving nothing behind | Expanding into per-product grants at withdrawal records the catalog of that day, which is the same defect by the back door. Anything still wanted on one product is granted there deliberately |
+| Withdrawing one product from it is not offered | "All except one" is a third kind of fact, with its own storage, its own narrowing and its own meaning in an access review |
+| Set aside and restored by a change of role-assignment mode | It is an assignment, so the act that makes switching reversible covers it. Nothing derives one: a group binding names a product |
+| Stored in its own table rather than as a grant with no product | All four engines treat NULLs in a unique key as distinct from each other, so a nullable product would let duplicate estate rows accumulate with the database enforcing nothing — and the partial index that fixes it is engine-specific (REQ-71) |
+
+A personal token narrowed to one product intersects with it the same way it
+intersects with anything else: the estate role is already among what its owner
+holds on that product, so the narrowed credential reaches that product and no
+more.
 
 ## Personal tokens
 

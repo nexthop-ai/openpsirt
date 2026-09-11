@@ -31,6 +31,10 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	if err != nil {
 		return nil, err
 	}
+	estate, err := store.EstateGrants(ctx, person.ID)
+	if err != nil {
+		return nil, err
+	}
 	body := &PersonBody{
 		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
 		Email: person.Email, EmailSource: string(person.EmailSource),
@@ -38,6 +42,15 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	for _, door := range doors {
 		body.SignsInBy = append(body.SignsInBy, SignInBody{
 			Username: door.Username, Pinned: door.Subject != nil,
+		})
+	}
+	// The estate grants first, because they are the wider statement and a
+	// reader scanning the list should meet "everywhere" before the exceptions
+	// to it.
+	for _, grant := range estate {
+		body.Holds = append(body.Holds, HeldBody{
+			Everywhere: true, Role: string(grant.Role),
+			Effective: grant.Active, Source: string(grant.Source),
 		})
 	}
 	for _, grant := range held {
@@ -151,10 +164,16 @@ type RecordBody struct {
 	Holds []GrantBody `json:"holds,omitempty"`
 }
 
-// GrantBody is one role against one product, as a request states it.
+// GrantBody is one role, as a request states it.
 type GrantBody struct {
-	Product string `json:"product" minLength:"1" doc:"The product the role is held against"`
+	// Product is the one it is held against, or empty with Everywhere set.
+	Product string `json:"product,omitempty" doc:"The product the role is held against. Omit it and set everywhere instead to hold it across the estate"`
 	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
+	// Everywhere holds the role across every product, including products
+	// declared afterwards. Stated rather than implied by an absent product,
+	// so that a caller that forgot the product is refused instead of quietly
+	// granting the widest thing there is.
+	Everywhere bool `json:"everywhere,omitempty" doc:"Hold it across every product, including products declared later. The product is then omitted"`
 }
 
 // SignInBody is how somebody may arrive.
@@ -168,8 +187,15 @@ type SignInBody struct {
 
 // HeldBody is one role against one product.
 type HeldBody struct {
-	Product string `json:"product" minLength:"1" doc:"The product the role is held against"`
-	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
+	// Product is the one it is held against, absent where it is held across
+	// every product.
+	Product string `json:"product,omitempty" doc:"The product the role is held against. Absent where it is held across every product"`
+	// Everywhere says it is held across the estate, covering products
+	// declared afterwards. Reported rather than left to be inferred from an
+	// absent product: an access review asks what somebody holds, and "on
+	// nothing" and "on everything" must not read alike.
+	Everywhere bool   `json:"everywhere,omitempty" doc:"Held across every product, including products declared later"`
+	Role       string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
 	// Effective says whether this grants anything right now. An assignment set
 	// aside by a change of role-assignment mode is kept so the change can be
 	// undone, and it grants nothing while it sits there — so it is shown, and
@@ -241,6 +267,16 @@ func registerAdministration(api huma.API, a Administering) {
 			for _, door := range doors {
 				body.SignsInBy = append(body.SignsInBy, SignInBody{
 					Username: door.Username, Pinned: door.Subject != nil,
+				})
+			}
+			estate, err := store.EstateGrants(ctx, person.ID)
+			if err != nil {
+				return nil, wentWrong(a.Logger, "cannot read what they hold everywhere", err)
+			}
+			for _, grant := range estate {
+				body.Holds = append(body.Holds, HeldBody{
+					Everywhere: true, Role: string(grant.Role),
+					Effective: grant.Active, Source: string(grant.Source),
 				})
 			}
 			for _, grant := range held[person.ID] {
@@ -319,6 +355,22 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 		}
 		for _, hold := range in.Body.Holds {
+			if hold.Everywhere {
+				if hold.Product != "" {
+					return nil, huma.Error422UnprocessableEntity(
+						"a role is held against one product or across every product, not both")
+				}
+				if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
+					return nil, huma.Error400BadRequest(err.Error())
+				}
+				noteAdminChange(ctx, a, trail.Role, in.Body.Identity+" on every product",
+					nil, trail.Said(hold.Role, true))
+				continue
+			}
+			if hold.Product == "" {
+				return nil, huma.Error422UnprocessableEntity(
+					"say which product the role is held against, or set everywhere")
+			}
 			product, err := names.ProductByName(ctx, hold.Product)
 			if err != nil {
 				return nil, huma.Error404NotFound(err.Error())
@@ -412,6 +464,39 @@ func registerAdministration(api huma.API, a Administering) {
 		}
 		out.Body.Released = released
 		return out, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "withdraw-estate-role", Method: http.MethodDelete,
+		Path:    "/v1/people/{identity}/roles/{role}",
+		Summary: "Withdraw a user's role on every product",
+		Description: "Withdraws a role held across the estate. Takes effect at their next " +
+			"request; end their sessions to cut them off now.\n\n" +
+			"It leaves no per-product grants in its place. Expanding one at withdrawal would " +
+			"record the products of that moment, so a product declared afterwards would " +
+			"silently not be covered — which is what holding a role across the estate exists " +
+			"to avoid. Anything still wanted on one product is granted there deliberately.\n\n" +
+			"Roles held against a named product are untouched, and are withdrawn one at a " +
+			"time through the path that names the product.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, in *struct {
+		Identity string `path:"identity"`
+		Role     string `path:"role"`
+	}) (*struct{}, error) {
+		store, _, err := administerable(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		person, err := store.ByIdentity(ctx, in.Identity)
+		if err != nil {
+			return nil, noSuchPerson()
+		}
+		if err := store.WithdrawEstateRole(ctx, person.ID, access.Role(in.Role)); err != nil {
+			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)
+		}
+		noteAdminChange(ctx, a, trail.Role, in.Identity+" on every product",
+			trail.Said(in.Role, true), nil)
+		return &struct{}{}, nil
 	})
 }
 
