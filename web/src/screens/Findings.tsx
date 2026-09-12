@@ -183,10 +183,12 @@ export function Findings() {
   // writes one row at a time, so a failure partway through leaves part of a
   // selection handed over, and the rows that failed stay picked.
   const [handFailed, setHandFailed] = useState(0);
-  // What a saved filter prepares, where the one that was picked prepares
-  // anything. Offered into the decision form and never applied: a named person
-  // submits the claim as their own.
-  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  // Which saved filter was picked and what it prepares, where the one that was
+  // picked prepares anything. Offered into the decision form and never
+  // applied: a named person submits the claim as their own. The name travels
+  // with every row, which is how a finding opened from here knows to fill its
+  // form in.
+  const [prepared, setPrepared] = useState<{ name: string; prepares: Prepared } | null>(null);
   const [typed, setTyped] = useState(searching);
   // A column header that orders by itself. Clicking the one already sorted
   // turns it around; clicking another sorts by that, most-first, because that
@@ -531,9 +533,13 @@ export function Findings() {
         <div className="alert info" style={{ margin: "10px 0" }}>
           <strong>This filter prepares a claim</strong>
           <span>
-            The decision form opens saying <b>{said(prepared.outcome ?? "")}</b> in the words the
-            filter carries. Nothing is proposed until you submit it, and it goes out as <b>your</b>{" "}
-            claim for a second person to agree to.
+            Every finding opened from this list fills its decision form in, saying{" "}
+            <b>{said(prepared.prepares.outcome ?? "")}</b> in the words “{prepared.name}” carries
+            {prepared.prepares.defer_days ? (
+              <>, put off {prepared.prepares.defer_days} days from whenever you submit it</>
+            ) : null}
+            . Nothing is proposed until you submit it, and it goes out as <b>your</b> claim for a
+            second person to agree to.
           </span>
           <button
             type="button"
@@ -844,7 +850,7 @@ export function Findings() {
               <tbody id="findingRows">
                 {rows.map((row, i) => {
                   const key = `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
-                  const at = pathTo(buildOf(row), row, carrying);
+                  const at = pathTo(buildOf(row), row, carrying, prepared?.name);
                   // How far it is decided comes from the server, defined the
                   // way the state filter defines it; a row does not guess from
                   // what the build argued away, which is a different claim by
@@ -1159,7 +1165,7 @@ export function Findings() {
 
           <div className="cards">
             {rows.map((row) => {
-              const at = pathTo(buildOf(row), row, carrying);
+              const at = pathTo(buildOf(row), row, carrying, prepared?.name);
               return (
                 // The only way to open a finding on a narrow screen, so it
                 // has to be reachable without a pointer: a card that answers

@@ -19,12 +19,12 @@ export type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
 // longer offers simply stops narrowing by it, which is a slightly wider list
 // rather than a refusal to open one.
 //
-// **A rule prepares a claim; a person proposes it**. A saved filter
-// can carry an outcome, a justification and the reasoning; picking it fills
-// the decision form with them, and a named person submits the claim as their
-// own for a second person to approve. It proposes nothing by itself — the
-// wider form was refused because it leaves the approver as the only human
-// judgment on the claim.
+// **A rule prepares a claim; a person proposes it**. A saved filter can carry
+// an outcome, a justification, the reasoning and how long a deferral it means;
+// picking it fills the decision form of every finding opened from the list,
+// and a named person submits the claim as their own for a second person to
+// approve. It proposes nothing by itself — the wider form was refused because
+// it leaves the approver as the only human judgment on the claim.
 export function Saved({
   product,
   onPrepared,
@@ -33,9 +33,12 @@ export function Saved({
   // belonging to one product, so it is kept and offered there rather than
   // everywhere.
   product: string;
-  // Told what the picked filter prepares, so the list can offer it in the
-  // decision form. Null where it prepares nothing, which is most of them.
-  onPrepared: (prepares: Prepared | null) => void;
+  // Told which filter was picked and what it prepares, so the list can carry
+  // it into the decision form. Named as well as read, because the rows travel
+  // to the finding under the filter's name rather than its words: what a rule
+  // says is decided in one place, and a copy in an address is a second. Null
+  // where it prepares nothing, which is most of them.
+  onPrepared: (picked: { name: string; prepares: Prepared } | null) => void;
 }) {
   const [params, setParams] = useSearchParams();
   const queries = useQueryClient();
@@ -45,6 +48,10 @@ export function Saved({
   const [outcome, setOutcome] = useState("");
   const [justification, setJustification] = useState("");
   const [reasoning, setReasoning] = useState("");
+  // How long a deferral it prepares, as a number of days. A length rather than
+  // a date, because a rule saved in March means "put this off for a quarter"
+  // and a date would be wrong the week after it was saved.
+  const [days, setDays] = useState("");
 
   const kept = useQuery({
     queryKey: ["saved-filters", product],
@@ -69,6 +76,7 @@ export function Saved({
                     outcome: outcome as Prepared["outcome"],
                     ...(justification ? { justification } : {}),
                     reasoning: reasoning.trim(),
+                    ...(outcome === "deferred" ? { defer_days: Number(days) } : {}),
                   },
                 }
               : {}),
@@ -82,6 +90,7 @@ export function Saved({
       setOutcome("");
       setJustification("");
       setReasoning("");
+      setDays("");
       void queries.invalidateQueries({ queryKey: ["saved-filters", product] });
     },
   });
@@ -106,7 +115,7 @@ export function Saved({
     // on screen: opening a saved filter means "show me that list", and a
     // merge would answer a question nobody saved.
     setParams(new URLSearchParams(one.query));
-    onPrepared(one.prepares ?? null);
+    onPrepared(one.prepares ? { name: one.name, prepares: one.prepares } : null);
   }
 
   return (
@@ -202,6 +211,27 @@ export function Saved({
                   </select>
                 </label>
               )}
+              {/* A length rather than a date, and the form turns it into one
+                  as somebody submits it. A rule saved in March means "put
+                  this off for a quarter"; a date kept here would be wrong the
+                  week after it was saved. */}
+              {outcome === "deferred" && (
+                <label className="field">
+                  <span>For how long</span>
+                  <input
+                    {...notACredential}
+                    type="number"
+                    min={1}
+                    max={3650}
+                    style={{ width: 90 }}
+                    value={days}
+                    placeholder="90"
+                    title="Days, counted from whenever somebody submits it"
+                    onChange={(event) => setDays(event.target.value)}
+                  />
+                  <span className="hint">days, from whenever somebody submits it</span>
+                </label>
+              )}
               <label className="field" style={{ flexBasis: "100%" }}>
                 <span>In these words</span>
                 <textarea
@@ -230,7 +260,13 @@ export function Saved({
             disabled={
               name.trim() === "" ||
               save.isPending ||
-              (rule && (outcome === "" || reasoning.trim() === ""))
+              (rule &&
+                (outcome === "" ||
+                  reasoning.trim() === "" ||
+                  // A deferral with no length opens the form with the outcome
+                  // chosen and no date, which cannot be submitted: the date is
+                  // worked out from the length as somebody submits it.
+                  (outcome === "deferred" && !(Number(days) >= 1 && Number(days) <= 3650))))
             }
             onClick={() => save.mutate()}
           >

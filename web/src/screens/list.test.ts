@@ -190,4 +190,27 @@ describe("where a row opens", () => {
     expect(asked.get("from")).toBe("state=undecided&offset=50");
     expect(asked.has("version")).toBe(false);
   });
+
+  // A rule prepares a claim and a person proposes it, so what travels to the
+  // finding is which filter was picked. The name rather than the words: the
+  // filter decides what it says, and a copy in the address would go stale the
+  // moment somebody saved over the name.
+  it("names the saved filter a prepared claim comes from", () => {
+    const at = pathTo(
+      { product: "sonic", stream: "main", variant: "broadcom" },
+      { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
+      "state=undecided",
+      "overdue kernel",
+    );
+    expect(new URLSearchParams(at.split("?")[1]).get("rule")).toBe("overdue kernel");
+  });
+
+  it("says nothing about a rule where no filter prepares one", () => {
+    const at = pathTo(
+      { product: "sonic", stream: "main", variant: "broadcom" },
+      { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
+      "",
+    );
+    expect(new URLSearchParams(at.split("?")[1]).has("rule")).toBe(false);
+  });
 });

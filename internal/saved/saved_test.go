@@ -80,6 +80,31 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 			t.Fatalf("it was kept as %+v", kept)
 		}
 
+		// A deferral with no length opens the form with the outcome chosen
+		// and no date, which cannot be submitted: the date is worked out from
+		// the length whenever somebody submits it, so there has to be one.
+		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "someday",
+			"component=linux", saved.Filter{Outcome: "deferred", Reasoning: "Not this quarter."})
+		if err == nil {
+			t.Fatal("a deferral with no length was kept")
+		}
+		if !strings.Contains(err.Error(), "defers for") {
+			t.Errorf("refused with %q, which does not say what is missing", err)
+		}
+
+		// A length beside any other outcome is a number nothing reads, so it
+		// is dropped rather than stored against the day somebody changes the
+		// outcome and inherits it.
+		other, err := f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"],
+			"gone", "component=linux", saved.Filter{Outcome: "wont-fix",
+				Reasoning: "Not built into this image.", DeferDays: 90})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if other.DeferDays != 0 {
+			t.Errorf("a length was kept beside %q: %+v", other.Outcome, other)
+		}
+
 		// A justification or a deferral beside no outcome is a prefill that
 		// half-fires, so nothing prepared is nothing carried.
 		half, err := f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "plain",

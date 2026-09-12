@@ -471,10 +471,16 @@ it prepares is kept as a number of days and turned into a date when somebody
 opens the form. Kept as a date and never read, the prefill opened the form with
 the outcome chosen and no date, which cannot be submitted.
 
-**Nothing hands one over yet.** The filter stores what it prepares, the API
-carries it, and the decision form takes a prefill and works the date out from a
-length. No screen passes one between them, so a prepared claim is stored and
-never offered, and the length reaches nothing that reads it.
+**What a picked filter prepares travels with every row it drew.** The finding's
+address names the filter rather than repeating what it says, so what a rule
+prepares is decided in one place and cannot go stale against a name somebody
+saved over. Walking to the next finding keeps it, because a list worked under a
+rule is worked under it to the end. Emptying the form on one finding drops it
+there and nowhere else.
+
+A filter is personal, so a link somebody sends prepares nothing for whoever
+opens it: a name they have not kept is a name that is not there, which is the
+answer the query gives for somebody else's filter anyway.
 
 Saved filters were argued for as the cheap half of ownership by subtree; the
 expensive half is now team routing, so what they are for is being the thing a

@@ -79,6 +79,10 @@ export function Finding() {
       outcome?: string;
       justification?: string;
       reasoning?: string;
+      // How long a deferral it offers, which the form turns into a date as it
+      // opens. Only a prepared rule carries one: a length is what a rule means
+      // by "put this off for a quarter", and a date saved months ago is not.
+      deferDays?: number;
       // Cited, never applied: what a VEX document said is not this claim, and
       // this is what lets a later revision to it be noticed.
       fromStatement?: number;
@@ -88,6 +92,41 @@ export function Finding() {
     setPrefill((was) => ({ n: was.n + 1, from }));
   }
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
+  // The saved filter this was opened under, where it is one that prepares a
+  // claim. The address names the filter rather than repeating what it says, so
+  // what a rule prepares is decided in one place — and a link somebody sends
+  // prepares nothing for the person who opens it, because the filters are
+  // personal and a name they have not kept is a name that is not there.
+  const rule = params.get("rule") ?? "";
+  const rules = useQuery({
+    enabled: rule !== "",
+    queryKey: ["saved-filters", product],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/saved-filters", {
+          params: { path: { product } },
+        }),
+      ),
+    retry: false,
+  });
+  // What that filter prepares, in the words the form takes. A rule prepares a
+  // claim and a person proposes it: this fills the form in and nothing else.
+  const prepared = useMemo(() => {
+    const one = (rules.data?.items ?? []).find((each) => each.name === rule);
+    if (!one?.prepares) return null;
+    return {
+      outcome: one.prepares.outcome,
+      justification: one.prepares.justification ?? "",
+      reasoning: one.prepares.reasoning,
+      ...(one.prepares.defer_days ? { deferDays: one.prepares.defer_days } : {}),
+    };
+  }, [rules.data, rule]);
+  // What the form opens with, and what it is mounted against. Somebody who has
+  // started from something on this screen has said which prefill they want, so
+  // theirs wins and clearing it clears the rule's too — the rule fills a form
+  // nobody has answered yet, not one somebody is working in.
+  const opening = prefill.n > 0 ? prefill.from : prepared;
+  const opened = prefill.n > 0 ? `own:${prefill.n}` : `rule:${prepared ? rule : ""}`;
 
   const list = useMemo(() => new URLSearchParams(from), [from]);
   const listed = useMemo(() => listQuery(list), [list]);
@@ -130,6 +169,9 @@ export function Finding() {
           // The neighbor is handed the list at the page it sits on, so a walk
           // that crosses a boundary leaves the list where the reader now is.
           fromAt(from, span.offset + j, listed.limit),
+          // And the rule the list was opened under, or walking to the next
+          // finding would quietly stop filling the form in.
+          rule,
         ),
       };
     }
@@ -139,7 +181,18 @@ export function Finding() {
       previous: step(i - 1),
       next: step(i + 1),
     };
-  }, [neighbors.data, span, listed.limit, list, from, product, vulnerability, component, version]);
+  }, [
+    neighbors.data,
+    span,
+    listed.limit,
+    list,
+    from,
+    rule,
+    product,
+    vulnerability,
+    component,
+    version,
+  ]);
 
   const finding = useQuery({
     queryKey: ["finding", at, version],
@@ -773,6 +826,27 @@ export function Finding() {
                 ))}
               </div>
             )}
+            {/* Said before anything is decided, because what the form is
+                filled in with is what somebody is about to put their name
+                to. A rule proposes nothing by itself, and the screen it
+                fills is where that has to be legible. */}
+            {prefill.n === 0 && prepared && (
+              <div className="alert info">
+                <strong>Filled in from “{rule}”</strong>
+                <span>
+                  Your saved filter prepares this claim. Nothing is proposed until you submit it,
+                  and it goes out as <b>your</b> claim for a second person to agree to.
+                </span>
+                <button
+                  type="button"
+                  className="linkish"
+                  style={{ marginLeft: "auto" }}
+                  onClick={() => startFrom(null)}
+                >
+                  Empty the form
+                </button>
+              </div>
+            )}
             <Decide
               at={{ ...at, version }}
               places={places}
@@ -782,8 +856,8 @@ export function Finding() {
                 setExtending(null);
               }}
               extending={extending}
-              prefill={prefill.from}
-              key={prefill.n}
+              prefill={opening}
+              key={opened}
             />
           </>
         )}

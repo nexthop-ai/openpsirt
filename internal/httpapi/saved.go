@@ -40,7 +40,7 @@ type PreparedBody struct {
 	// their name to: a prefill with an empty argument is a button that
 	// proposes a dismissal saying nothing.
 	Reasoning string `json:"reasoning" minLength:"1" maxLength:"10000" doc:"The words it offers. Required: this is what whoever submits it is putting their name to"`
-	DeferDays int    `json:"defer_days,omitempty" minimum:"1" maximum:"3650" doc:"How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved"`
+	DeferDays int    `json:"defer_days,omitempty" minimum:"1" maximum:"3650" doc:"How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, because the form works the date out from it; dropped where the outcome is anything else"`
 }
 
 func registerSaved(api huma.API, in Ingest) {

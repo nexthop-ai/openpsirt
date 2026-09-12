@@ -46,7 +46,6 @@ gap somebody rediscovers by auditing.
 | Gap | |
 |---|---|
 | The published image is `amd64` only | The binaries are cross-compiled for `arm64` as well; the image cannot follow while the stage that catalogs what it ships runs the cataloger at the target architecture, which puts `node`, `go` and `syft` under emulation. `DESIGN-packaging.md` names the fix |
-| A rule-prepared claim never reaches the decision form | Both ends are built and nothing joins them: a saved filter stores an outcome, the words and a deferral's length, the API carries all three, and the form takes a prefill and turns the length into a date. No screen passes one, so the length has no producer and a prepared claim is stored and never offered. `DESIGN-interface.md` and `DESIGN-triage.md` record which half that leaves |
 | A producer's own SPDX 3.x output as a fixture | Yocto and one vendor tool emit it, so this is gettable rather than hypothetical. What it would settle is which shapes a real producer actually uses; `DESIGN-ingest.md` records the limitation until it arrives |
 | Screens not driven in a browser | "Take this" on the finding and the unassigned bar, the decision form opening with nothing chosen, the way down drawn as one hop where the route up is unknown, "sees nothing" on People, the dropped-mention line under the comment box, and the inventory list's numbers. The type check, lint, unit tests and endpoints behind each pass; nobody has looked at the pixels |
 
