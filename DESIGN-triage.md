@@ -1040,7 +1040,7 @@ approves it (REQ-27).
 | The reasoning is required where an outcome is | A prefill with an empty argument is a button that proposes a dismissal saying nothing. Nothing prepared is nothing carried |
 | Saving over a name takes the old prefill with it | The act is deciding what that name means now, and one that survived would fire on a filter somebody had made ordinary |
 | It proposes nothing by itself, and the screen says so | Picking the filter fills the decision form; submitting it is a person's act, and the record carries their name |
-| A deferral is prepared as a length, never a date | The date is worked out from the length as somebody submits it, so a rule saved in March means "put this off for a quarter" rather than "until 3 March". Required where the outcome is a deferral and dropped where it is not — a deferral with no length fills a form that cannot be submitted, and a length beside any other outcome is a number nothing reads |
+| A deferral is prepared as a length, never a date | Required where the outcome is a deferral and refused where it is not: a deferral with no length fills a form that cannot be submitted, and a length beside any other outcome is a value nothing reads. `DESIGN-interface.md` says how the length becomes a date |
 
 The wider form — a rule proposing a pending claim of its own, marked as proposed
 by that rule — leaves the approver as the only human judgment on the claim, and

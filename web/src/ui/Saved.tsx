@@ -7,6 +7,39 @@ import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 
 export type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
+export type Kept = Body<"SavedBody">;
+
+// The bounds on a prepared deferral's length, mirroring what the endpoint takes
+// (`PreparedBody.DeferDays`). Written here because the generated client cannot
+// carry them: the document's minimum and maximum do not survive into a type,
+// so the screen refusing what the server refuses is a copy either way — one
+// copy rather than three.
+const DEFER_DAYS = { min: 1, max: 3650 };
+
+// What somebody has kept for a product. One reader rather than one per screen:
+// the list, the dropdown and a finding opened under a rule all ask the same
+// question, and a second spelling of the key is a second cache.
+export function useKept(product: string, when = true) {
+  return useQuery({
+    queryKey: ["saved-filters", product],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/saved-filters", {
+          params: { path: { product } },
+        }),
+      ),
+    enabled: when,
+    retry: false,
+  });
+}
+
+// The filter a list is currently narrowed by, where its address is exactly one
+// somebody kept. Derived rather than remembered, so narrowing further drops it
+// and coming back to the list finds it again.
+export function ruleIn(kept: Kept[], params: URLSearchParams): Kept | undefined {
+  const current = here(params);
+  return kept.find((one) => one.query === current);
+}
 
 // Filters somebody kept, and what one of them prepares.
 //
@@ -27,18 +60,17 @@ export type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
 // it leaves the approver as the only human judgment on the claim.
 export function Saved({
   product,
-  onPrepared,
+  onPicked,
 }: {
   // Whose list these narrow. A filter's query names branches and variants
   // belonging to one product, so it is kept and offered there rather than
   // everywhere.
   product: string;
-  // Told which filter was picked and what it prepares, so the list can carry
-  // it into the decision form. Named as well as read, because the rows travel
-  // to the finding under the filter's name rather than its words: what a rule
-  // says is decided in one place, and a copy in an address is a second. Null
-  // where it prepares nothing, which is most of them.
-  onPrepared: (picked: { name: string; prepares: Prepared } | null) => void;
+  // Told that a filter was picked, which replaces the list wholesale. What
+  // the picked one prepares is not passed: the list reads that off its own
+  // address, so it is dropped by narrowing further and found again by coming
+  // back.
+  onPicked: () => void;
 }) {
   const [params, setParams] = useSearchParams();
   const queries = useQueryClient();
@@ -53,16 +85,7 @@ export function Saved({
   // and a date would be wrong the week after it was saved.
   const [days, setDays] = useState("");
 
-  const kept = useQuery({
-    queryKey: ["saved-filters", product],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/saved-filters", {
-          params: { path: { product } },
-        }),
-      ),
-    retry: false,
-  });
+  const kept = useKept(product);
   const save = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -74,7 +97,12 @@ export function Saved({
               ? {
                   prepares: {
                     outcome: outcome as Prepared["outcome"],
-                    ...(justification ? { justification } : {}),
+                    // Both of these belong to one outcome and are dropped
+                    // with it: switching from "not applicable" to "deferred"
+                    // hides the Because select and would otherwise keep what
+                    // was chosen in it, storing a reason the decision endpoint
+                    // refuses.
+                    ...(outcome === "not-applicable" && justification ? { justification } : {}),
                     reasoning: reasoning.trim(),
                     ...(outcome === "deferred" ? { defer_days: Number(days) } : {}),
                   },
@@ -105,8 +133,7 @@ export function Saved({
   });
 
   const mine = kept.data?.items ?? [];
-  const current = here(params);
-  const open = mine.find((one) => one.query === current);
+  const open = ruleIn(mine, params);
 
   function pick(called: string) {
     const one = mine.find((each) => each.name === called);
@@ -115,7 +142,7 @@ export function Saved({
     // on screen: opening a saved filter means "show me that list", and a
     // merge would answer a question nobody saved.
     setParams(new URLSearchParams(one.query));
-    onPrepared(one.prepares ? { name: one.name, prepares: one.prepares } : null);
+    onPicked();
   }
 
   return (
@@ -221,8 +248,9 @@ export function Saved({
                   <input
                     {...notACredential}
                     type="number"
-                    min={1}
-                    max={3650}
+                    min={DEFER_DAYS.min}
+                    max={DEFER_DAYS.max}
+                    step={1}
                     style={{ width: 90 }}
                     value={days}
                     placeholder="90"
@@ -266,7 +294,7 @@ export function Saved({
                   // A deferral with no length opens the form with the outcome
                   // chosen and no date, which cannot be submitted: the date is
                   // worked out from the length as somebody submits it.
-                  (outcome === "deferred" && !(Number(days) >= 1 && Number(days) <= 3650))))
+                  (outcome === "deferred" && !whole(days))))
             }
             onClick={() => save.mutate()}
           >
@@ -278,10 +306,18 @@ export function Saved({
   );
 }
 
+// Whether a typed length is one the endpoint will take. Whole days, because a
+// fractional one passes a range check and comes back refused after a round
+// trip.
+function whole(days: string): boolean {
+  const n = Number(days);
+  return Number.isInteger(n) && n >= DEFER_DAYS.min && n <= DEFER_DAYS.max;
+}
+
 // The list's current address, without a leading "?" and without the page it
 // happens to be on: a saved filter is a narrowing rather than a position in
 // one.
-function here(params: URLSearchParams): string {
+export function here(params: URLSearchParams): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
   return asked.toString();

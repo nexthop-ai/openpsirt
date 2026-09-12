@@ -17,7 +17,7 @@ import { Failed } from "../ui/Failed";
 import { Exploited, Severity } from "../ui/Severity";
 import { Icon } from "../ui/Icons";
 import { Holder } from "../ui/Holder";
-import { Saved, type Prepared } from "../ui/Saved";
+import { Saved, here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
@@ -183,12 +183,11 @@ export function Findings() {
   // writes one row at a time, so a failure partway through leaves part of a
   // selection handed over, and the rows that failed stay picked.
   const [handFailed, setHandFailed] = useState(0);
-  // Which saved filter was picked and what it prepares, where the one that was
-  // picked prepares anything. Offered into the decision form and never
-  // applied: a named person submits the claim as their own. The name travels
-  // with every row, which is how a finding opened from here knows to fill its
-  // form in.
-  const [prepared, setPrepared] = useState<{ name: string; prepares: Prepared } | null>(null);
+  // The list somebody has turned down a prepared claim for, as its address.
+  // Kept rather than derived, because "do not use it" is an answer about the
+  // list on screen — narrowing further asks a different question, and the rule
+  // is offered again.
+  const [declined, setDeclined] = useState<string | null>(null);
   const [typed, setTyped] = useState(searching);
   // A column header that orders by itself. Clicking the one already sorted
   // turns it around; clicking another sorts by that, most-first, because that
@@ -249,6 +248,23 @@ export function Findings() {
     if (variant) now.set("variant", variant);
     return now.toString();
   }, [asked, stream, variant]);
+
+  // What a saved filter prepares, where this list is exactly one somebody kept
+  // and that one prepares anything. Read off the address rather than
+  // remembered from the pick: a rule that outlived the narrowing it was picked
+  // for would prefill rows it never drew, with somebody's name about to go on
+  // the claim — and one remembered on the screen is lost coming back from a
+  // finding, leaving the dropdown saying it is open while no row carries it.
+  //
+  // Offered and never applied: a named person submits the claim as their own.
+  // The filter's name travels with every row, which is how a finding opened
+  // from here knows to fill its form in.
+  const kept = useKept(product, !spanning);
+  const prepared = useMemo(() => {
+    if (declined === here(params)) return null;
+    const one = ruleIn(kept.data?.items ?? [], params);
+    return one?.prepares ? { name: one.name, prepares: one.prepares } : null;
+  }, [kept.data, params, declined]);
 
   const queries = useQueryClient();
   // What one action may write here, as the deployment sets it. A selection is
@@ -472,10 +488,10 @@ export function Findings() {
         {!spanning && (
           <Saved
             product={product}
-            onPrepared={(what) => {
-              setPrepared(what);
+            onPicked={() => {
               setPicked(new Map());
               setHandFailed(0);
+              setDeclined(null);
             }}
           />
         )}
@@ -545,7 +561,7 @@ export function Findings() {
             type="button"
             className="linkish"
             style={{ marginLeft: "auto" }}
-            onClick={() => setPrepared(null)}
+            onClick={() => setDeclined(here(params))}
           >
             Do not use it
           </button>

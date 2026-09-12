@@ -42,6 +42,57 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	})
 }
 
+// How long a prepared deferral defers for, at the store.
+//
+// A deferral is the one outcome that needs a date, and what is kept is the
+// length rather than the date: the date is worked out from it whenever
+// somebody submits the claim, so a rule saved in March means "put this off for
+// a quarter" rather than "until 3 March".
+func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Without a length, the form opens with the outcome chosen and no
+		// date, which cannot be submitted — a prefill that half-fires.
+		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "someday",
+			"component=linux", saved.Filter{Outcome: "deferred", Reasoning: "Not this quarter."})
+		if err == nil {
+			t.Fatal("a deferral with no length was kept")
+		}
+		if !strings.Contains(err.Error(), "defers for") {
+			t.Errorf("refused with %q, which does not say what is missing", err)
+		}
+
+		// Beside any other outcome it is a value somebody set that nothing
+		// reads, and it is refused rather than dropped — which is the answer a
+		// decision itself gives to a date beside an outcome that is not a
+		// deferral.
+		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"],
+			"gone", "component=linux", saved.Filter{Outcome: "wont-fix",
+				Reasoning: "Not built into this image.", DeferDays: 90})
+		if err == nil {
+			t.Fatal("a length was kept beside an outcome that is not a deferral")
+		}
+		if !strings.Contains(err.Error(), "only means something") {
+			t.Errorf("refused with %q, which does not say why", err)
+		}
+
+		// With both, it is kept and read back.
+		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"],
+			"quarter", "component=linux", saved.Filter{Outcome: "deferred",
+				Reasoning: "Waiting on the next kernel bump.", DeferDays: 90})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !kept.Prepares() || kept.DeferDays != 90 {
+			t.Fatalf("it was kept as %+v", kept)
+		}
+	})
+}
+
 // What a saved filter prepares, at the store.
 //
 // The endpoint's own schema refuses a prefill with no reasoning before the
@@ -78,31 +129,6 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 		}
 		if !kept.Prepares() || kept.DeferDays != 90 {
 			t.Fatalf("it was kept as %+v", kept)
-		}
-
-		// A deferral with no length opens the form with the outcome chosen
-		// and no date, which cannot be submitted: the date is worked out from
-		// the length whenever somebody submits it, so there has to be one.
-		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"], "someday",
-			"component=linux", saved.Filter{Outcome: "deferred", Reasoning: "Not this quarter."})
-		if err == nil {
-			t.Fatal("a deferral with no length was kept")
-		}
-		if !strings.Contains(err.Error(), "defers for") {
-			t.Errorf("refused with %q, which does not say what is missing", err)
-		}
-
-		// A length beside any other outcome is a number nothing reads, so it
-		// is dropped rather than stored against the day somebody changes the
-		// outcome and inherits it.
-		other, err := f.store.SaveFilterPreparing(t.Context(), person.ID, f.products["sonic"],
-			"gone", "component=linux", saved.Filter{Outcome: "wont-fix",
-				Reasoning: "Not built into this image.", DeferDays: 90})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if other.DeferDays != 0 {
-			t.Errorf("a length was kept beside %q: %+v", other.Outcome, other)
 		}
 
 		// A justification or a deferral beside no outcome is a prefill that
