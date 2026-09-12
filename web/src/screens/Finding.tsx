@@ -696,7 +696,7 @@ export function Finding() {
           </div>
         )}
 
-        <Places places={places} build={build} version={version} />
+        <Places places={places} build={build} version={it.version} />
 
         {(it.aliases ?? []).length > 0 && (
           <div className="evblock">
@@ -717,6 +717,7 @@ export function Finding() {
             mayApprove={!!who.data?.reach.find((r) => r.product === product)?.may_agree}
             onRevised={() => void finding.refetch()}
             about={{ product, vulnerability }}
+            undisclosed={!!it.undisclosed}
           />
         ))}
 

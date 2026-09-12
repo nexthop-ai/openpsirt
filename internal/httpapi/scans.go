@@ -631,10 +631,15 @@ func registerReceipts(api huma.API, in Ingest) {
 				Failure:    r.Failure,
 				Caution:    r.Caution,
 			}
+			// Only where the counts are this reader's to have. A reader who
+			// reaches the receipts and reads no findings in the product — a
+			// pipeline key is one — is told nothing about what a run changed,
+			// which is not the same as being told it changed nothing.
 			if r.RunID != nil {
-				change := changed[*r.RunID]
-				opened, closed := change.Opened, change.Closed
-				body.Opened, body.Closed = &opened, &closed
+				if change, counted := changed[*r.RunID]; counted {
+					opened, closed := change.Opened, change.Closed
+					body.Opened, body.Closed = &opened, &closed
+				}
 			}
 			body.Components, body.Placed = r.Scan.Components, r.Scan.Placed
 			if r.Measured != nil {

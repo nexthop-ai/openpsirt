@@ -197,12 +197,23 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 			// The way down of whichever of them the graph could walk, and the
 			// build's own argument only where it covers every row the key
 			// folds: an argument about one of two components is not an
-			// argument about the place. What a decision says is the same on
-			// both, being looked up by the key itself.
+			// argument about the place.
 			if len(places[seen].Chain) == 0 {
 				places[seen].Chain = walked
 			}
 			places[seen].Suppressed = places[seen].Suppressed && row.Suppressed
+			// A claim standing on either row stands at the place. A decision
+			// is keyed on the place and expires on the versions, and two rows
+			// of one place need not hold the same ones — the source package
+			// and the distribution's package of one name differ by a
+			// packaging revision — so a decision matches one row and not the
+			// other. Keeping the first row's answer dropped a claim somebody
+			// had just made, and offered the place again. Lowest identifier
+			// wins, so every engine answers alike.
+			if row.Decision != nil &&
+				(places[seen].Decision == nil || *row.Decision < *places[seen].Decision) {
+				places[seen].Decision, places[seen].Claim = row.Decision, row.Claim
+			}
 			continue
 		}
 		at[row.PlaceIdentity] = len(places)

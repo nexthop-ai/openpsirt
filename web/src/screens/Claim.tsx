@@ -323,6 +323,7 @@ function Reasoning({
         state={claim.happened ?? ""}
         approved={claim.happened === "approved"}
         about={about}
+        undisclosed={!!claim.undisclosed}
         onDone={onChanged}
       />
     </div>

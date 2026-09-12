@@ -56,7 +56,16 @@ export function Holder({
   // box again, because that is what somebody is doing with it.
   const holder = value?.identity ? (value.name ?? value.identity) : "";
 
-  useClickAway(box, open, () => setOpen(false), false);
+  // Closing without a pick puts the field back to stating who holds it. A
+  // half-typed fragment left in it reads as a name somebody chose, now that
+  // what the field holds is drawn in ink.
+  function close() {
+    setTyped("");
+    setOpen(false);
+    setAt(-1);
+  }
+
+  useClickAway(box, open, close, false);
 
   const found = useQuery({
     enabled: open && product !== "",
@@ -115,7 +124,7 @@ export function Holder({
             event.preventDefault();
             choose(offered[at]);
           } else if (event.key === "Escape") {
-            setOpen(false);
+            close();
           }
         }}
       />

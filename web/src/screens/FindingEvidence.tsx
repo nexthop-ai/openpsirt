@@ -429,7 +429,10 @@ export function FixingIn({
                     <td>
                       {row.stream} <span className="hint">{row.variant}</span>
                     </td>
-                    <td className="num">{row.places || "—"}</td>
+                    {/* Zero is the answer that matters here: no place left
+                        open in this build is what fixing it looks like, and a
+                        dash reads as nothing measured. */}
+                    <td className="num">{row.places.toLocaleString()}</td>
                     <td>
                       <FixState state={row.state ?? ""} />
                     </td>

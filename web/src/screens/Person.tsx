@@ -95,9 +95,9 @@ export function Person() {
                 none at all, and the list alone cannot say which. */}
             {who.sees_nothing && (
               <p className="hint" style={{ marginTop: 0 }}>
-                Every role here is a capability, and a capability is bounded by what its holder may
-                read — so none of them reaches a product and they see nothing. Holding roles that
-                grant nothing is not the same as holding none.
+                Every role in force here is a capability, and a capability is bounded by what its
+                holder may read — so none of them reaches a product and they see nothing. Holding
+                roles that grant nothing is not the same as holding none.
               </p>
             )}
             <div className="tablewrap">

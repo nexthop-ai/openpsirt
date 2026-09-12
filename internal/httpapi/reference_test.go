@@ -95,3 +95,43 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 		}
 	})
 }
+
+// One fact, described once, wherever two bodies carry it.
+//
+// A description lives in a struct tag, which has to be a literal, so a field
+// two bodies both carry is written out twice with nothing holding the two
+// equal. They had already drifted: the person screen's body and the
+// administration body described `sees_nothing` differently, and the published
+// reference carried the wrong one of the two for as long as it stood.
+//
+// Named fields rather than every repeated name: plenty of names mean different
+// things in different bodies — "places" is what a claim wrote in one and what
+// is still open in another — and a rule over all of them would be a rule
+// nobody could keep.
+func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
+	said := map[string]map[string][]string{}
+	twoReach(t, func(t *testing.T, r *reach) {
+		for name, schema := range r.api.OpenAPI().Components.Schemas.Map() {
+			for field, property := range schema.Properties {
+				switch field {
+				case "sees_nothing":
+					if said[field] == nil {
+						said[field] = map[string][]string{}
+					}
+					said[field][property.Description] = append(said[field][property.Description], name)
+				}
+			}
+		}
+		for field, descriptions := range said {
+			if len(descriptions) > 1 {
+				for description, bodies := range descriptions {
+					t.Errorf("%s is described as %q in %s", field, description, strings.Join(bodies, ", "))
+				}
+				t.Errorf("%s carries %d descriptions, want one", field, len(descriptions))
+			}
+		}
+		if len(said) == 0 {
+			t.Fatal("no field was found to check: this is not walking the schemas")
+		}
+	})
+}

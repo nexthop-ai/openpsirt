@@ -1,6 +1,7 @@
 package finding
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -126,4 +127,61 @@ func TestAPlaceIsSuppressedOnlyWhereEveryRowOfItIs(t *testing.T) {
 	if places[0].Suppressed {
 		t.Error("a place reads as argued away by the build where only one of its rows is")
 	}
+}
+
+// A decision stands at a place, and the rows of a place need not hold the same
+// versions: a decision is keyed on the place and expires on the versions, so it
+// matches one row and not its twin. Keeping the first row's answer dropped a
+// claim somebody had just made and offered the place again.
+func TestAClaimStandingOnEitherRowStandsAtThePlace(t *testing.T) {
+	place := PlaceIdentity("linux-image", "opennsl-modules")
+	decision, claim := int64(7), int64(3)
+	rows := []evidenceRow{
+		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules"},
+		{
+			PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			Decision: &decision, Claim: &claim,
+		},
+	}
+	places := placesOf(rows, nil, nil)
+	if len(places) != 1 {
+		t.Fatalf("%d places for one pair of names, want 1", len(places))
+	}
+	if places[0].Decision == nil || *places[0].Decision != decision {
+		t.Error("a place whose second row carries the standing claim reads as undecided")
+	}
+	if places[0].Claim == nil || *places[0].Claim != claim {
+		t.Error("the claim the decision is a row of was not carried with it")
+	}
+}
+
+// Lowest identifier, so two engines returning the rows in either order answer
+// the same way.
+func TestWhereBothRowsAreDecidedTheEarlierDecisionAnswers(t *testing.T) {
+	place := PlaceIdentity("linux-image", "opennsl-modules")
+	later, earlier := int64(9), int64(4)
+	laterClaim, earlierClaim := int64(9), int64(4)
+	rows := []evidenceRow{
+		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			Decision: &later, Claim: &laterClaim},
+		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			Decision: &earlier, Claim: &earlierClaim},
+	}
+	places := placesOf(rows, nil, nil)
+	if places[0].Decision == nil || *places[0].Decision != earlier {
+		t.Errorf("the place reads decision %s, want the lowest identifier",
+			numbered(places[0].Decision))
+	}
+	if places[0].Claim == nil || *places[0].Claim != earlierClaim {
+		t.Error("the claim came from a different row than the decision did")
+	}
+}
+
+// numbered is an identifier as a failure should read it, or the word for there
+// not being one.
+func numbered(id *int64) string {
+	if id == nil {
+		return "nothing"
+	}
+	return strconv.FormatInt(*id, 10)
 }

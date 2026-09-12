@@ -452,3 +452,47 @@ func shown(count *int) string {
 	}
 	return strconv.Itoa(*count)
 }
+
+// A pipeline key reaches the receipts for what it sent and reads no findings at
+// all. What a run changed is a count of findings, so it is told nothing about
+// it — which is not the same as being told the run changed nothing.
+func TestAKeyThatReadsNoFindingsIsToldNothingAboutWhatARunChanged(t *testing.T) {
+	twoIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		built := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+		if code, _ := f.send(t, upload(t, f.path, inventory(built, "curl"))); code != http.StatusAccepted {
+			t.Fatal("the upload was not taken")
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		reader := ingest.NewReader(f.db, f.queue, sbom.Limits{}, quiet, "test")
+		if _, err := reader.Once(t.Context()); err != nil {
+			t.Fatalf("reading: %v", err)
+		}
+		// A run over that upload, finished, so the receipt has one to report.
+		var target int64
+		if err := f.db.DB.NewSelect().TableExpr("target").Column("id").
+			Limit(1).Scan(t.Context(), &target); err != nil {
+			t.Fatal(err)
+		}
+		run := map[string]any{
+			"target_id": target, "scanner": "test", "ran_here": true,
+			"started_at": time.Now().UTC().Add(-time.Minute), "finished_at": time.Now().UTC(),
+		}
+		if _, err := f.db.DB.NewInsert().Model(&run).TableExpr("scan_run").
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		_, out := receipts(t, f, f.key, f.path)
+		if len(out.Body.Items) != 1 {
+			t.Fatalf("got %d receipts, want the one that was sent", len(out.Body.Items))
+		}
+		got := out.Body.Items[0]
+		if got.RunID == 0 {
+			t.Fatal("the receipt names no run, so there is nothing to be told about")
+		}
+		if got.Opened != nil || got.Closed != nil {
+			t.Errorf("a key that reads no findings is told the run opened %s and closed %s",
+				shown(got.Opened), shown(got.Closed))
+		}
+	})
+}

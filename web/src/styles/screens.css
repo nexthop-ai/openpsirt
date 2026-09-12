@@ -1129,11 +1129,14 @@ kbd.onbtn {
 .ostats .o.bad b {
   color: var(--sev-exploited);
 }
-.ostats .o.warn {
+/* Its own name rather than the block-level notice class: `.warn` sets a
+   display, a gap, a top margin and a left bar, all of which landed on a pill
+   that declares none of them. */
+.ostats .o.hot {
   border-color: var(--sev-high);
   color: var(--sev-high);
 }
-.ostats .o.warn b {
+.ostats .o.hot b {
   color: var(--sev-high);
 }
 .ostats .o.ok {

@@ -75,6 +75,7 @@ export function Standing({
   mayApprove,
   onRevised,
   about,
+  undisclosed,
 }: {
   claim: Detail;
   summary?: Body<"StandingClaimBody">;
@@ -83,6 +84,7 @@ export function Standing({
   mayApprove: boolean;
   onRevised: () => void;
   about: { product: string; vulnerability: string };
+  undisclosed?: boolean;
 }) {
   // The claim, not the row. What a judgment says — its reasoning, the
   // agreement given for it, the conversation about it — belongs to the action
@@ -264,6 +266,7 @@ export function Standing({
         state={state}
         approved={state === "approved"}
         about={about}
+        undisclosed={undisclosed}
         onDone={onRevised}
         spaced
       />

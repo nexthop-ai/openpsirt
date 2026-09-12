@@ -635,7 +635,7 @@ names.
 |---|---|
 | The way down is whichever of the two the graph could be walked to | Usually only one of them is reachable from the root |
 | It is argued away by the build only where the build argued away both | An argument about one of two components is not an argument about the place |
-| What a decision says is the same on both | A decision is looked up by the key itself |
+| A claim standing on either row stands at the place, the lowest identifier first | A decision is keyed on the place and expires on the versions, and the two rows need not hold the same versions — a source package and the distribution's package of one name differ by a packaging revision, so a decision matches one row and not the other |
 
 A row names what pulls it in even where the route up is unknown. Where the walk
 up reaches nothing, both ends used to be blank and the row read "nothing records
