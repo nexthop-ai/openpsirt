@@ -82,6 +82,12 @@ type Config struct {
 	AttachmentSecret    string
 	AttachmentToken     string
 	AttachmentPathStyle bool
+	// AttachmentAllowHTTP permits a plaintext endpoint that is not this
+	// machine, for a store on a network an operator accepts that on. Off
+	// unless it is set, and distinct from PlainHTTP, which is about how this
+	// application is served and loosens cookies rather than anything about
+	// where attachments are kept (REQ-70).
+	AttachmentAllowHTTP bool
 	AttachmentDir       string
 
 	// The bounds a scan file is read within. Each is what a deployment may
@@ -200,6 +206,9 @@ func Load() (Config, error) {
 		// having a default of its own.
 		AttachmentPathStyle: r.boolean("ATTACHMENT_PATH_STYLE",
 			env("ATTACHMENT_ENDPOINT", "") != ""),
+		// No default of its own, and it follows nothing: what it allows has to
+		// be somebody's decision rather than a consequence of another setting.
+		AttachmentAllowHTTP:    r.boolean("ATTACHMENT_ALLOW_HTTP", false),
 		PublisherName:          env("PUBLISHER_NAME", ""),
 		PublisherNamespace:     env("PUBLISHER_NAMESPACE", ""),
 		PublisherCategory:      env("PUBLISHER_CATEGORY", "vendor"),

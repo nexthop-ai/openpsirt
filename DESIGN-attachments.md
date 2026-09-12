@@ -88,6 +88,23 @@ by whom; the object-store and filesystem backends implement one interface behind
 it. A separate package would put that interface at a package boundary, where a
 second implementation is tempted to reach past it.
 
+### Reaching the store in the clear
+
+An endpoint that is not `https` is refused, and two things lift that (REQ-70).
+
+| Lifts it | |
+|---|---|
+| The endpoint reaches no further than this machine | Nothing crosses a network, so there is no path to be on. This is the development backend's neighbor and needs no saying |
+| An operator states that the network is one they accept it on | The store somebody already runs is the constraint. An installation with no TLS in front of its object store should be able to run this, rather than be told it configured the tool wrongly |
+
+| Rule | |
+|---|---|
+| Refused as the deployment starts, not at somebody's first upload | With everything else a misconfigured store is refused for |
+| The refusal names the setting that would accept it | Whoever meets it is the operator the allowance exists for, and a refusal saying only what is forbidden leaves them reading source to find the way through |
+| A deployment that lifted it is told at every start | An attachment is delivered as a redirect, so the signed address is a bearer token: anybody on the path may spend it for the file it names. That is invisible from the setting that allows it, and the person who set it is rarely the person reading the logs a year later |
+| Neither the refusal nor the notice repeats a password | An endpoint may carry credentials, and a notice at every start would otherwise write them to the log at every start |
+| Distinct from serving this application without TLS | That one is cookies on the way in, this one a file on the way out, and a deployment can want either without the other |
+
 ## Delivery
 
 | Content | Sent by |

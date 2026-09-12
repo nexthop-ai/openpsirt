@@ -190,7 +190,25 @@ environment rather than a key somebody stored.
 | `OPENPSIRT_ATTACHMENT_SECRET` | Its secret | unset |
 | `OPENPSIRT_ATTACHMENT_SESSION_TOKEN` | A session token, where the credentials are temporary ones | unset |
 | `OPENPSIRT_ATTACHMENT_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own | set when an endpoint is |
+| `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
 | `OPENPSIRT_ATTACHMENT_DIR` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |
+
+An endpoint that is not `https` is refused, because a file is handed over as a
+redirect to a signed address and that address is a bearer token: anybody on the
+path between the browser and the store may spend it for the file it names.
+Loopback is exempt, since nothing crosses a network.
+
+`OPENPSIRT_ATTACHMENT_ALLOW_HTTP` accepts one anyway, for a store on a network
+you are content to carry those addresses across. A deployment that sets it is
+told so at every start rather than only where it was configured:
+
+```
+WARN attachment links cross the network in the clear endpoint=http://minio.internal:9000
+```
+
+This is not `OPENPSIRT_PLAIN_HTTP`, which is about serving this application
+without TLS and loosens cookies. One is a file on the way out and the other a
+session on the way in; a deployment can want either without the other.
 
 ## Reading a scan file
 
