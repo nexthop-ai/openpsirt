@@ -1206,12 +1206,29 @@ environment rather than a key somebody stored.</p>
 <td>set when an endpoint is</td>
 </tr>
 <tr>
+<td><code>OPENPSIRT_ATTACHMENT_ALLOW_HTTP</code></td>
+<td>Accept an endpoint that is not <code>https</code> and is not this machine. Read what it costs below before setting it</td>
+<td>off</td>
+</tr>
+<tr>
 <td><code>OPENPSIRT_ATTACHMENT_DIR</code></td>
 <td>A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set</td>
 <td>unset</td>
 </tr>
 </tbody>
 </table>
+<p>An endpoint that is not <code>https</code> is refused, because a file is handed over as a
+redirect to a signed address and that address is a bearer token: anybody on the
+path between the browser and the store may spend it for the file it names.
+Loopback is exempt, since nothing crosses a network.</p>
+<p><code>OPENPSIRT_ATTACHMENT_ALLOW_HTTP</code> accepts one anyway, for a store on a network
+you are content to carry those addresses across. A deployment that sets it is
+told so at every start rather than only where it was configured:</p>
+<pre><code>WARN attachment links cross the network in the clear endpoint=http://minio.internal:9000
+</code></pre>
+<p>This is not <code>OPENPSIRT_PLAIN_HTTP</code>, which is about serving this application
+without TLS and loosens cookies. One is a file on the way out and the other a
+session on the way in; a deployment can want either without the other.</p>
 <h2 id="reading-a-scan-file">Reading a scan file<a class="headerlink" href="#reading-a-scan-file" title="Permanent link">&para;</a></h2>
 <p>A scan file is somebody else's output arriving over a link this deployment does
 not control, so it is read within bounds. These are the ceilings; each is
