@@ -59,3 +59,10 @@ export function humane(value: string): string {
   if (hours >= 1 && Number.isInteger(hours)) return hours === 1 ? "1 hour" : `${hours} hours`;
   return "";
 }
+
+// Whether the composer takes a stored value. A duration it can read, or
+// nothing at all: a setting nobody has set has no unit to show, and a plain
+// text box is the one control that cannot ask for one.
+export function composable(value: string): boolean {
+  return value.trim() === "" || read(value) !== null;
+}
