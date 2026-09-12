@@ -34,6 +34,14 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 
+# The one copy of the logos, which the brand files under web/public are
+# symlinks to. The link targets are relative to the repository root, and this
+# stage's /web stands in for the repository's web/ — so the copy has to land at
+# /assets for them to resolve. Without it the build fails on a stat of a
+# dangling link rather than on anything it could explain, because vite copies
+# the public directory by walking it.
+COPY assets/ /assets/
+
 COPY web/ ./
 RUN npm run build
 

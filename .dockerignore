@@ -3,5 +3,13 @@
 bin
 site
 docs
-assets
+# Not excluded, unlike the documentation it was collected for: the interface's
+# brand files are symlinks into it, so an excluded assets/ leaves them dangling
+# and the web build fails.
 *.md
+
+# Installed by a local build, and the stage that needs it runs `npm ci` for
+# itself. Copied in, it lands on top of what that stage installed and the build
+# fails on a file replacing a directory — so the image built only on a machine
+# that had never built the interface.
+web/node_modules

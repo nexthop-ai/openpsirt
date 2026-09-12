@@ -84,31 +84,15 @@ button {
   font-size: 15px;
   color: var(--side-ink);
 }
-/* The mark carries its own color, so it sits on the rail rather than inside
+/* The lockup carries its own color, so it sits on the rail rather than inside
    an accent tile: a full-color logo on a solid accent square is two brands
-   arguing. */
-.brand .glyph {
-  width: 30px;
-  height: 30px;
+   arguing. It takes the whole width of the block, which is what the artwork
+   was proportioned against — the rail is 228px, less its own 10px of padding
+   and this block's 8px, so 192 is what there is. */
+.brand .wordmark {
+  width: 100%;
+  height: auto;
   display: block;
-  flex: none;
-}
-.brand .glyph svg {
-  display: block;
-}
-/* The wordmark's second line, in full. It wraps rather than being cut: what
-   the tool is called is one word, and what it is for is the rest of the
-   sentence — a strapline truncated at the rail's width says "Product Security
-   Incident Resp…", which is worse than two lines. */
-.brand small {
-  display: block;
-  font-weight: 500;
-  font-size: 9.5px;
-  line-height: 1.35;
-  color: var(--side-muted);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  text-wrap: balance;
 }
 
 /* A heading that folds what is under it. It stays a heading to look at: the

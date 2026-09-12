@@ -151,20 +151,24 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
       {menu && <div className="railscrim" onClick={() => setMenu(false)} />}
       <nav className={menu ? "rail open" : "rail"}>
         <Link to="/" className="brand" style={{ textDecoration: "none" }}>
-          {/* The mark itself, not a stand-in for it. This drew a generic
-              shield from the icon set at 16px on an accent square, which is
-              neither the logo nor its colors — the brand files were already
-              here, used by the sign-in screen and the favicon, and only the
-              rail was drawing something else. */}
-          <img className="glyph" src="/brand/mark.svg" alt="" width={30} height={30} />
-          <span>
-            OpenPSIRT
-            {/* What the logo says, in full. "Product security" was a
-                shortening that dropped the half naming what the tool is for —
-                incident response and triage — which is the half somebody
-                arriving is trying to work out. */}
-            <small>Product Security Incident Response &amp; Triage</small>
-          </span>
+          {/* The horizontal lockup, rather than the mark beside the name typed
+              out again. The rail is dark under both themes, so the dark
+              artwork is the right one in both: the light lockup's "Open" is
+              #0d2138 and all but vanishes against --side-bg.
+
+              What the artwork says at this size: the name lands at 16.6px,
+              which is where the typed version sat, and the strapline inside
+              it lands near 3.7px, which is texture rather than text. No
+              scaling fixes that second part — twenty-six letterspaced
+              characters across 192px cap out around 6px whatever the canvas
+              does — so the alt text is what carries the sentence. */}
+          <img
+            className="wordmark"
+            src="/brand/logo-wide-dark.svg"
+            alt="OpenPSIRT — Product Security Incident Response & Triage"
+            width={192}
+            height={66}
+          />
         </Link>
 
         <Group name="across" label="Across products" shut={shut} onToggle={toggleGroup} />
