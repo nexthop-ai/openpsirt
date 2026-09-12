@@ -189,7 +189,7 @@ export function People() {
                             empty tool. */}
                           {person.sees_nothing && (
                             <span
-                              className="vchip warn"
+                              className="vchip nothing"
                               title="A capability is bounded by what its holder may read, so on its own it grants nothing. Grant a read role as well."
                             >
                               sees nothing

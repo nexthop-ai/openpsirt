@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { useRevise, useWithdraw } from "../api/mutations";
-import { Editor, forget } from "./Editor";
+import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
 import { Markdown } from "./Markdown";
 
@@ -43,6 +43,7 @@ export function ReasonEditor({
   about,
   onDone,
   spaced = false,
+  undisclosed,
 }: {
   claimId: number;
   reasoning: string;
@@ -56,6 +57,9 @@ export function ReasonEditor({
   about: { product: string; vulnerability: string };
   onDone: () => void;
   spaced?: boolean;
+  // Whether what is being argued about has been announced, which decides who
+  // may be offered after an @. This is the same text the decision form writes.
+  undisclosed?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(reasoning);
@@ -81,6 +85,7 @@ export function ReasonEditor({
             draftKey={draftKey}
             label="Reasoning"
             attachTo={about}
+            mentions={mentioning(about.product, undisclosed)}
           />
           {revise.error != null && <Failed error={revise.error} what="That could not be stored." />}
           <div className="actions" style={{ marginTop: 8 }}>

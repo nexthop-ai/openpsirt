@@ -451,8 +451,14 @@ type ReceiptBody struct {
 	// components rather than as places. Absent where no run has covered it
 	// yet, and absent on an upload whose run was already reported against a
 	// newer one: a run covers a build rather than an upload.
-	Opened int `json:"opened,omitempty" doc:"Issues this run found that were not open before"`
-	Closed int `json:"closed,omitempty" doc:"Issues that were open and are not any more"`
+	//
+	// Pointers, because a run that changed nothing and an upload whose
+	// numbers are reported on another receipt are different answers and zero
+	// is only the first of them. Sent as a number they were the same value,
+	// and the screen drew both as a dash — which reads as "this upload opened
+	// nothing" against an upload nothing was read from.
+	Opened *int `json:"opened,omitempty" doc:"Issues this run found that were not open before. Absent where this upload's run is reported against a newer one, or where none has covered it yet"`
+	Closed *int `json:"closed,omitempty" doc:"Issues that were open and are not any more. Absent for the same reasons as the count beside it"`
 	// Sent is what the upload was made of. It outlives the files themselves:
 	// a branch build's contents are let go once they have been read, and this
 	// still says what arrived and what its bytes hashed to.
@@ -625,9 +631,15 @@ func registerReceipts(api huma.API, in Ingest) {
 				Failure:    r.Failure,
 				Caution:    r.Caution,
 			}
+			// Only where the counts are this reader's to have. A reader who
+			// reaches the receipts and reads no findings in the product — a
+			// pipeline key is one — is told nothing about what a run changed,
+			// which is not the same as being told it changed nothing.
 			if r.RunID != nil {
-				change := changed[*r.RunID]
-				body.Opened, body.Closed = change.Opened, change.Closed
+				if change, counted := changed[*r.RunID]; counted {
+					opened, closed := change.Opened, change.Closed
+					body.Opened, body.Closed = &opened, &closed
+				}
 			}
 			body.Components, body.Placed = r.Scan.Components, r.Scan.Placed
 			if r.Measured != nil {

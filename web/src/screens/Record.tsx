@@ -7,7 +7,7 @@ import { api } from "../api/client";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useScope } from "../app/scope";
 import { mayOf, useWho } from "../app/session";
-import { Editor } from "../ui/Editor";
+import { Editor, mentioning } from "../ui/Editor";
 import { Suggest } from "../ui/Suggest";
 import { Failed } from "../ui/Failed";
 import { useReseed } from "../ui/reseed";
@@ -334,9 +334,7 @@ export function Record() {
             rows={6}
             label="What the flaw is"
             placeholder="The management socket answers a request before anyone has authenticated."
-            mentions={
-              product ? { product, visibility: disclosed ? "public" : "private" } : undefined
-            }
+            mentions={mentioning(product, !disclosed)}
           />
           <span className="hint">
             In your own words. It is what a triager reads first and often all they read.

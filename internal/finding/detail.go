@@ -162,6 +162,71 @@ type Evidence struct {
 	MatchedRange string
 }
 
+// placesOf folds the open rows of one finding into the places it sits at, one
+// entry per place, each with the way down to it.
+//
+// A place is what a decision is keyed on, so two rows that share a key are one
+// thing to answer about and one row to read. Two rows do share one where an
+// inventory describes the same consumer twice — the same name and version as a
+// source package and as the distribution's package are two components by
+// content and one pair of names, which is the key — and usually only one of
+// the two is reachable from the root. Listing both drew one way down twice,
+// reported the second as though nothing placed the component, and stated a
+// scope one larger than the submit then recorded.
+//
+// No query in it, for the reason evidenceFrom has none.
+func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
+	shipped map[int64]string) []Sitting {
+
+	places := make([]Sitting, 0, len(rows))
+	at := make(map[string]int, len(rows))
+	for _, row := range rows {
+		// Down to the consumer, then this component under it. Where the build
+		// pulls the component in directly there is no consumer, and the chain
+		// down to the component itself is the whole of the answer.
+		var walked []graph.Step
+		here := graph.Step{Name: row.Component, Version: shipped[row.ComponentID]}
+		if row.ConsumerID != nil {
+			if down, ok := chains[*row.ConsumerID]; ok && len(down) > 0 {
+				walked = append(append([]graph.Step{}, down...), here)
+			}
+		} else if down, ok := chains[row.ComponentID]; ok && len(down) > 0 {
+			walked = append([]graph.Step{}, down...)
+		}
+		if seen, ok := at[row.PlaceIdentity]; ok {
+			// The way down of whichever of them the graph could walk, and the
+			// build's own argument only where it covers every row the key
+			// folds: an argument about one of two components is not an
+			// argument about the place.
+			if len(places[seen].Chain) == 0 {
+				places[seen].Chain = walked
+			}
+			places[seen].Suppressed = places[seen].Suppressed && row.Suppressed
+			// A claim standing on either row stands at the place. A decision
+			// is keyed on the place and expires on the versions, and two rows
+			// of one place need not hold the same ones — the source package
+			// and the distribution's package of one name differ by a
+			// packaging revision — so a decision matches one row and not the
+			// other. Keeping the first row's answer dropped a claim somebody
+			// had just made, and offered the place again. Lowest identifier
+			// wins, so every engine answers alike.
+			if row.Decision != nil &&
+				(places[seen].Decision == nil || *row.Decision < *places[seen].Decision) {
+				places[seen].Decision, places[seen].Claim = row.Decision, row.Claim
+			}
+			continue
+		}
+		at[row.PlaceIdentity] = len(places)
+		places = append(places, Sitting{
+			PlaceIdentity: row.PlaceIdentity,
+			Component:     row.Component, Consumer: row.Consumer,
+			Suppressed: row.Suppressed, Decision: row.Decision, Claim: row.Claim,
+			Urgency: row.Urgency, Chain: walked,
+		})
+	}
+	return places
+}
+
 // evidenceFrom is what a reader is shown about a finding, from the places it
 // sits at and the four things looked up about it.
 //
@@ -533,26 +598,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, err
 	}
 
-	for _, row := range rows {
-		place := Sitting{
-			PlaceIdentity: row.PlaceIdentity,
-			Component:     row.Component, Consumer: row.Consumer,
-			Suppressed: row.Suppressed, Decision: row.Decision, Claim: row.Claim,
-			Urgency: row.Urgency,
-		}
-		// Down to the consumer, then this component under it. Where the build
-		// pulls the component in directly there is no consumer, and the chain
-		// down to the component itself is the whole of the answer.
-		here := graph.Step{Name: row.Component, Version: shipped[row.ComponentID]}
-		if row.ConsumerID != nil {
-			if down, ok := chains[*row.ConsumerID]; ok && len(down) > 0 {
-				place.Chain = append(append([]graph.Step{}, down...), here)
-			}
-		} else if down, ok := chains[row.ComponentID]; ok && len(down) > 0 {
-			place.Chain = append([]graph.Step{}, down...)
-		}
-		evidence.Places = append(evidence.Places, place)
-	}
+	evidence.Places = placesOf(rows, chains, shipped)
 
 	// Who is dealing with it. Read here rather than left to a caller, so that
 	// the screen somebody reads a finding on is the screen they can hand it

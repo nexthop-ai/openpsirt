@@ -626,6 +626,17 @@ rather than filled from whichever build the row named. That is why the screens
 subtree is refused rather than answered with the empty list walking no build
 would produce.
 
+A finding reads as one row per place. Two of its rows share a place where an
+inventory describes one consumer twice — as a source package and as the
+distribution's package: two components, one pair of names, and the key is the
+names.
+
+| Folding two rows into one place | |
+|---|---|
+| The way down is whichever of the two the graph could be walked to | Usually only one of them is reachable from the root |
+| It is argued away by the build only where the build argued away both | An argument about one of two components is not an argument about the place |
+| A claim standing on either row stands at the place, the lowest identifier first | A decision is keyed on the place and expires on the versions, and the two rows need not hold the same versions — a source package and the distribution's package of one name differ by a packaging revision, so a decision matches one row and not the other |
+
 A row names what pulls it in even where the route up is unknown. Where the walk
 up reaches nothing, both ends used to be blank and the row read "nothing records
 what pulls this in" — two different statements, and the second was false. The

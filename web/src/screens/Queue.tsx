@@ -766,13 +766,13 @@ function Card({
             <span className={`o${claim.outliers.exploited ? " bad" : ""}`}>
               <b>{claim.outliers.exploited}</b> known exploited
             </span>
-            <span className={`o${claim.outliers.severe ? " warn" : ""}`}>
+            <span className={`o${claim.outliers.severe ? " hot" : ""}`}>
               <b>{claim.outliers.severe}</b> critical or high
             </span>
             <span className="o">
               <b>{claim.outliers.fixable}</b> have a fix available
             </span>
-            <span className={`o${claim.outliers.unmatched ? " warn" : ""}`}>
+            <span className={`o${claim.outliers.unmatched ? " hot" : ""}`}>
               <b>{claim.outliers.unmatched}</b> do not match the narrowing
             </span>
           </div>

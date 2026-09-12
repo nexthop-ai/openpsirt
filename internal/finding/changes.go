@@ -49,7 +49,15 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 		return map[int64]Change{}, nil
 	}
 
+	// A run this reader may count is in the map whatever it changed, so that a
+	// caller can tell a run that changed nothing from a run it may not count.
+	// Answered here rather than by the caller asking the access package a
+	// second question: what a reader may count is this store's rule, and the
+	// two spellings would drift.
 	out := make(map[int64]Change, len(runIDs))
+	for _, id := range runIDs {
+		out[id] = Change{}
+	}
 	// One statement per direction rather than one per run: a page of fifty
 	// receipts would otherwise be a hundred round trips to fill two columns.
 	count := func(column string, into func(*Change, int)) error {

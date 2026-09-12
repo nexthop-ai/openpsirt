@@ -498,10 +498,23 @@ a.kpi:hover {
   color: var(--sev-high);
   background: color-mix(in oklab, var(--sev-high) 10%, transparent);
 }
+/* A chip marking what a row is missing rather than what it holds. It reads as
+   a warning and stays a chip: the block-level notice it used to borrow set a
+   display, a margin and three sides of padding, so it stood a row of pills on
+   end and stretched every chip beside it to its height. */
+.vchip.nothing {
+  border-color: var(--sev-high);
+  color: var(--sev-high);
+  background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  font-weight: 600;
+}
 .variants {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
+  /* Chips sit on one line rather than being stretched to the tallest of
+     them, which is what a row of items of unequal height does by default. */
+  align-items: center;
 }
 
 /* A small table inside a panel: no wrapper, no scroll, four short columns.
@@ -1059,6 +1072,16 @@ input[type="checkbox"] {
   opacity: 0.55;
   cursor: not-allowed;
   filter: none;
+}
+/* A field that is not taking anything looks like one. Nothing said so: a
+   disabled input kept the live surface and the ordinary border, so the
+   only sign was that clicking it did nothing. */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--raised);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 .actions {
   display: flex;

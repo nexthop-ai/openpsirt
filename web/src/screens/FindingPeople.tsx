@@ -236,7 +236,9 @@ export function Assignee({
             disabled={hand.isPending}
             onClick={() => hand.mutate({ kind: "person", identity: me.data!.identity, name: "" })}
           >
-            Assign to me
+            {/* The same word the unassigned list's batch bar uses, because it
+                is the same act: taking work nobody holds. */}
+            Take this
           </button>
         )}
         {hand.isPending && <span className="hint">Recording…</span>}

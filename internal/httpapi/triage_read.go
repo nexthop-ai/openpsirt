@@ -67,6 +67,12 @@ type ClaimDetail struct {
 	Builds    []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
 	// Outliers is what in a bulk set does not look like the rest.
 	Outliers *OutliersBody `json:"outliers,omitempty" doc:"For a claim over many issues: the rows that do not look like the rest, and how many there are"`
+	// Undisclosed says at least one row is about a finding nobody has
+	// announced. What a screen does with it is offer the right people to
+	// name: asking who may be mentioned is a question about the visibility
+	// of what is being discussed, and a claim is as careful as its most
+	// careful row.
+	Undisclosed bool `json:"undisclosed,omitempty" doc:"At least one row is about a finding nobody has announced"`
 }
 
 // claimArgument renders what a claim says, with the reasoning it currently
@@ -279,6 +285,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			Consumers:          whole.Reach.Consumers,
 			Findings:           whole.Reach.Findings,
 			Builds:             whole.Builds,
+			Undisclosed:        whole.Undisclosed,
 		}
 		if whole.When != nil {
 			body.When = whole.When.UTC().Format(time.RFC3339)

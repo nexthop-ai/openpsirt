@@ -32,9 +32,10 @@ type AboutPersonBody struct {
 	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"When they left. Absent means they are active"`
 	// Holds is what is in force now.
 	Holds []HeldBody `json:"holds,omitempty"`
-	// SeesNothing says every role they hold grants nothing, which reads very
-	// differently from holding none at all.
-	SeesNothing bool `json:"sees_nothing,omitempty" doc:"They hold roles and none of them is in force"`
+	// SeesNothing says every role they hold is a capability, so none of them
+	// reaches a product — which reads very differently from holding none at
+	// all, and differently again from holding roles that are out of force.
+	SeesNothing bool `json:"sees_nothing,omitempty" doc:"Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing"`
 	// Held is every grant and withdrawal against them, newest first.
 	Held      []HeldChangeBody `json:"held,omitempty"`
 	HeldTotal int              `json:"held_total" doc:"How many role changes there are, of which the list above is a page"`
