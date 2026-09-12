@@ -471,10 +471,28 @@ it prepares is kept as a number of days and turned into a date when somebody
 opens the form. Kept as a date and never read, the prefill opened the form with
 the outcome chosen and no date, which cannot be submitted.
 
-**Nothing hands one over yet.** The filter stores what it prepares, the API
-carries it, and the decision form takes a prefill and works the date out from a
-length. No screen passes one between them, so a prepared claim is stored and
-never offered, and the length reaches nothing that reads it.
+**What the list is narrowed by is what prepares a claim**, read off the address
+rather than remembered from the act of picking. Narrowing further asks a
+different question and drops it; coming back to the list finds it again. A rule
+that outlived the narrowing it was picked for would fill a form on a finding it
+never drew, with somebody's name about to go on the claim.
+
+What it prepares travels with every row, and with the walk from one finding to
+the next, because a list worked under a rule is worked under it to the end. The
+finding's address names the filter rather than repeating what it says, so what a
+rule prepares is decided in one place and cannot go stale against a name
+somebody saved over. Emptying the form on one finding drops it there and nowhere
+else.
+
+A filter is personal, so a link somebody sends carries a name rather than a
+claim: it prepares whatever the person opening it has kept under that name, and
+nothing at all where they have kept none.
+
+| Refusal | |
+|---|---|
+| A rule preparing a deferral carries how long it defers for | The date is worked out from the length as somebody submits it, so one saved without a length prepares a form that cannot be submitted |
+| A length beside any other outcome is refused, not dropped | The same answer a decision gives to a date beside an outcome that is not a deferral, and a value silently discarded is one somebody believes they set |
+| A deferral kept before there was a length to keep fills nothing, and says so | Reading it as "no rule" would leave the form blank under a banner saying the filter prepared it |
 
 Saved filters were argued for as the cheap half of ownership by subtree; the
 expensive half is now team routing, so what they are for is being the thing a

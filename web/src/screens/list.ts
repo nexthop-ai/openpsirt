@@ -216,15 +216,23 @@ export function identityOf(row: Row): string {
 // one value rather than as its own parameters, so a filter added to the list
 // needs nothing here and cannot collide with a name the finding screen already
 // uses.
+//
+// Where the list was opened through a saved filter that prepares a claim, the
+// filter's name travels too, and the finding fills its decision form from what
+// that filter prepares. The name rather than the words: the filter is the one
+// place deciding what it says, and a copy in an address is a second one that
+// goes stale the moment somebody saves over the name.
 export function pathTo(
   at: { product: string; stream: string; variant: string },
   // Only the three fields the address is built from, so that what a caller has
   // to hold is what a link needs rather than a whole row.
   row: Pick<Row, "vulnerability" | "component" | "version">,
   from?: string,
+  rule?: string,
 ): string {
   const query = new URLSearchParams();
   if (row.version) query.set("version", row.version);
+  if (rule) query.set("rule", rule);
   // Set even when it is empty, because an unfiltered list is still a list: the
   // finding tells "there was no list" from "the list asked for everything" by
   // whether the parameter is there at all, and the second one has a row before

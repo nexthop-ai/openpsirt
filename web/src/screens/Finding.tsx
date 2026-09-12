@@ -23,6 +23,7 @@ import { Severity, Exploited } from "../ui/Severity";
 import { AffectedBuilds } from "./FindingBuilds";
 import { Markdown } from "../ui/Markdown";
 import { Decide, said, type Recorded } from "../ui/Decide";
+import { useKept } from "../ui/Saved";
 import { Because } from "../ui/Outcome";
 import { fromAt, listQuery, pathTo, where, windowFor } from "./list";
 
@@ -69,25 +70,81 @@ export function Finding() {
   const who = useWho();
   const at = { product, stream, variant, vulnerability, component };
   const [recorded, setRecorded] = useState<Recorded | null>(null);
+  // Which finding the screen is on. A params-only change does not remount it,
+  // so anything below that belongs to one finding has to say which.
+  const oneFinding = `${vulnerability}|${component}|${version}`;
   // What the decision form starts from, and how many times it has been given
   // one. Starting from something is a fresh form rather than an edit to the one
   // on screen, so the count is what the form is mounted against — two prefills
   // carrying the same words are still two, and the second has to take.
   const [prefill, setPrefill] = useState<{
+    // The finding it was started on. Walking to the next one is a fresh form:
+    // without this, one decision recorded would leave the count above zero for
+    // the rest of the walk and the rule would quietly stop filling anything in.
+    at: string;
     n: number;
     from: {
       outcome?: string;
       justification?: string;
       reasoning?: string;
+      // How long a deferral it offers, which the form turns into a date as it
+      // opens. Only a prepared rule carries one: a length is what a rule means
+      // by "put this off for a quarter", and a date saved months ago is not.
+      deferDays?: number;
       // Cited, never applied: what a VEX document said is not this claim, and
       // this is what lets a later revision to it be noticed.
       fromStatement?: number;
     } | null;
-  }>({ n: 0, from: null });
+  }>({ at: oneFinding, n: 0, from: null });
+  // What was started from on the finding being read, which is nothing on one
+  // the count was not raised on.
+  const own = prefill.at === oneFinding ? prefill : { at: oneFinding, n: 0, from: null };
   function startFrom(from: (typeof prefill)["from"]) {
-    setPrefill((was) => ({ n: was.n + 1, from }));
+    setPrefill({ at: oneFinding, n: own.n + 1, from });
   }
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
+  // The saved filter this was opened under, where it is one that prepares a
+  // claim. The address names the filter rather than repeating what it says, so
+  // what a rule prepares is decided in one place — and a link somebody sends
+  // prepares nothing for the person who opens it, because the filters are
+  // personal and a name they have not kept is a name that is not there.
+  const rule = params.get("rule") ?? "";
+  const rules = useKept(product, rule !== "");
+  // What that filter prepares, in the words the form takes, and whether it
+  // prepares something no form can be submitted from. A rule prepares a claim
+  // and a person proposes it: this fills the form in and nothing else.
+  const offered = useMemo(() => {
+    const one = (rules.data?.items ?? []).find((each) => each.name === rule);
+    if (!one?.prepares) return { from: null, lengthless: false };
+    const it = one.prepares;
+    // A deferral is the one outcome that needs a date, and the date is worked
+    // out from the length. Kept without one — which every deferral saved
+    // before there was a field for it was — it would fill a form that cannot
+    // be submitted, under a banner saying the filter prepared it.
+    if (it.outcome === "deferred" && !it.defer_days) return { from: null, lengthless: true };
+    return {
+      from: {
+        outcome: it.outcome,
+        justification: it.justification ?? "",
+        reasoning: it.reasoning,
+        ...(it.defer_days ? { deferDays: it.defer_days } : {}),
+      },
+      lengthless: false,
+    };
+  }, [rules.data, rule]);
+  const prepared = offered.from;
+  // What the form opens with, and what it is mounted against. Somebody who has
+  // started from something on this finding has said which prefill they want, so
+  // theirs wins and clearing it clears the rule's too — the rule fills a form
+  // nobody has answered yet, not one somebody is working in.
+  const opening = own.n > 0 ? own.from : prepared;
+  const opened =
+    own.n > 0 ? `own:${oneFinding}:${own.n}` : `rule:${prepared ? rule : ""}:${oneFinding}`;
+  // Held until what the rule prepares is known, because a form that opens
+  // blank and refills itself a moment later loses whatever somebody put in it
+  // first — which is what a reloaded or bookmarked link does, having no
+  // answer already in hand.
+  const settled = rule === "" || !rules.isPending;
 
   const list = useMemo(() => new URLSearchParams(from), [from]);
   const listed = useMemo(() => listQuery(list), [list]);
@@ -130,6 +187,9 @@ export function Finding() {
           // The neighbor is handed the list at the page it sits on, so a walk
           // that crosses a boundary leaves the list where the reader now is.
           fromAt(from, span.offset + j, listed.limit),
+          // And the rule the list was opened under, or walking to the next
+          // finding would quietly stop filling the form in.
+          rule,
         ),
       };
     }
@@ -139,7 +199,18 @@ export function Finding() {
       previous: step(i - 1),
       next: step(i + 1),
     };
-  }, [neighbors.data, span, listed.limit, list, from, product, vulnerability, component, version]);
+  }, [
+    neighbors.data,
+    span,
+    listed.limit,
+    list,
+    from,
+    rule,
+    product,
+    vulnerability,
+    component,
+    version,
+  ]);
 
   const finding = useQuery({
     queryKey: ["finding", at, version],
@@ -773,18 +844,60 @@ export function Finding() {
                 ))}
               </div>
             )}
-            <Decide
-              at={{ ...at, version }}
-              places={places}
-              onDone={(r) => {
-                setRecorded(r);
-                startFrom(null);
-                setExtending(null);
-              }}
-              extending={extending}
-              prefill={prefill.from}
-              key={prefill.n}
-            />
+            {/* Said before anything is decided, because what the form is
+                filled in with is what somebody is about to put their name
+                to. A rule proposes nothing by itself, and the screen it
+                fills is where that has to be legible. */}
+            {/* A failure to read your filters is not the same as a filter
+                that prepares nothing, and the silent form looks identical.
+                The absence of a rule is meant to be silent; not finding out
+                is not. */}
+            {rule !== "" && rules.isError && (
+              <div className="alert">
+                <strong>Your saved filter “{rule}” could not be read</strong>
+                <span>Nothing was filled in, and what you decide here is unaffected.</span>
+              </div>
+            )}
+            {offered.lengthless && (
+              <div className="alert">
+                <strong>“{rule}” prepares a deferral with no length</strong>
+                <span>
+                  Nothing was filled in. A deferral needs a date, and the length it is worked out
+                  from was never recorded — save the filter again to give it one.
+                </span>
+              </div>
+            )}
+            {own.n === 0 && prepared && (
+              <div className="alert info">
+                <strong>Filled in from “{rule}”</strong>
+                <span>
+                  Your saved filter prepares this claim. Nothing is proposed until you submit it,
+                  and it goes out as <b>your</b> claim for a second person to agree to.
+                </span>
+                <button
+                  type="button"
+                  className="linkish"
+                  style={{ marginLeft: "auto" }}
+                  onClick={() => startFrom(null)}
+                >
+                  Empty the form
+                </button>
+              </div>
+            )}
+            {settled && (
+              <Decide
+                at={{ ...at, version }}
+                places={places}
+                onDone={(r) => {
+                  setRecorded(r);
+                  startFrom(null);
+                  setExtending(null);
+                }}
+                extending={extending}
+                prefill={opening}
+                key={opened}
+              />
+            )}
           </>
         )}
       </div>

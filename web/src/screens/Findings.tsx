@@ -17,7 +17,7 @@ import { Failed } from "../ui/Failed";
 import { Exploited, Severity } from "../ui/Severity";
 import { Icon } from "../ui/Icons";
 import { Holder } from "../ui/Holder";
-import { Saved, type Prepared } from "../ui/Saved";
+import { Saved, here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
@@ -183,10 +183,11 @@ export function Findings() {
   // writes one row at a time, so a failure partway through leaves part of a
   // selection handed over, and the rows that failed stay picked.
   const [handFailed, setHandFailed] = useState(0);
-  // What a saved filter prepares, where the one that was picked prepares
-  // anything. Offered into the decision form and never applied: a named person
-  // submits the claim as their own.
-  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  // The list somebody has turned down a prepared claim for, as its address.
+  // Kept rather than derived, because "do not use it" is an answer about the
+  // list on screen — narrowing further asks a different question, and the rule
+  // is offered again.
+  const [declined, setDeclined] = useState<string | null>(null);
   const [typed, setTyped] = useState(searching);
   // A column header that orders by itself. Clicking the one already sorted
   // turns it around; clicking another sorts by that, most-first, because that
@@ -247,6 +248,23 @@ export function Findings() {
     if (variant) now.set("variant", variant);
     return now.toString();
   }, [asked, stream, variant]);
+
+  // What a saved filter prepares, where this list is exactly one somebody kept
+  // and that one prepares anything. Read off the address rather than
+  // remembered from the pick: a rule that outlived the narrowing it was picked
+  // for would prefill rows it never drew, with somebody's name about to go on
+  // the claim — and one remembered on the screen is lost coming back from a
+  // finding, leaving the dropdown saying it is open while no row carries it.
+  //
+  // Offered and never applied: a named person submits the claim as their own.
+  // The filter's name travels with every row, which is how a finding opened
+  // from here knows to fill its form in.
+  const kept = useKept(product, !spanning);
+  const prepared = useMemo(() => {
+    if (declined === here(params)) return null;
+    const one = ruleIn(kept.data?.items ?? [], params);
+    return one?.prepares ? { name: one.name, prepares: one.prepares } : null;
+  }, [kept.data, params, declined]);
 
   const queries = useQueryClient();
   // What one action may write here, as the deployment sets it. A selection is
@@ -470,10 +488,10 @@ export function Findings() {
         {!spanning && (
           <Saved
             product={product}
-            onPrepared={(what) => {
-              setPrepared(what);
+            onPicked={() => {
               setPicked(new Map());
               setHandFailed(0);
+              setDeclined(null);
             }}
           />
         )}
@@ -531,15 +549,19 @@ export function Findings() {
         <div className="alert info" style={{ margin: "10px 0" }}>
           <strong>This filter prepares a claim</strong>
           <span>
-            The decision form opens saying <b>{said(prepared.outcome ?? "")}</b> in the words the
-            filter carries. Nothing is proposed until you submit it, and it goes out as <b>your</b>{" "}
-            claim for a second person to agree to.
+            Every finding opened from this list fills its decision form in, saying{" "}
+            <b>{said(prepared.prepares.outcome ?? "")}</b> in the words “{prepared.name}” carries
+            {prepared.prepares.defer_days ? (
+              <>, put off {prepared.prepares.defer_days} days from whenever you submit it</>
+            ) : null}
+            . Nothing is proposed until you submit it, and it goes out as <b>your</b> claim for a
+            second person to agree to.
           </span>
           <button
             type="button"
             className="linkish"
             style={{ marginLeft: "auto" }}
-            onClick={() => setPrepared(null)}
+            onClick={() => setDeclined(here(params))}
           >
             Do not use it
           </button>
@@ -844,7 +866,7 @@ export function Findings() {
               <tbody id="findingRows">
                 {rows.map((row, i) => {
                   const key = `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
-                  const at = pathTo(buildOf(row), row, carrying);
+                  const at = pathTo(buildOf(row), row, carrying, prepared?.name);
                   // How far it is decided comes from the server, defined the
                   // way the state filter defines it; a row does not guess from
                   // what the build argued away, which is a different claim by
@@ -1159,7 +1181,7 @@ export function Findings() {
 
           <div className="cards">
             {rows.map((row) => {
-              const at = pathTo(buildOf(row), row, carrying);
+              const at = pathTo(buildOf(row), row, carrying, prepared?.name);
               return (
                 // The only way to open a finding on a narrow screen, so it
                 // has to be reachable without a pointer: a card that answers

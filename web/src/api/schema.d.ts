@@ -7008,7 +7008,7 @@ export interface components {
         PreparedBody: {
             /**
              * Format: int64
-             * @description How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved
+             * @description How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else
              */
             defer_days?: number;
             /** @description The recognized reason it does not apply, where the outcome takes one */

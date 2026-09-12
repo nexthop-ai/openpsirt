@@ -19,6 +19,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // Filter is a narrowing of a list that somebody kept.
@@ -103,6 +104,10 @@ var ErrNoSuchFilter = errors.New("you have kept no filter by that name")
 // what somebody will put their name to, and a prefill with an empty argument
 // is a button that proposes a dismissal saying nothing. The person who submits
 // it owns it, which is the whole of why the narrow form was chosen.
+//
+// **A deferral carries how long it defers for, never a date.** The date is
+// worked out from the length whenever somebody submits it, so a rule saved in
+// March means "put this off for a quarter" rather than "until 3 March".
 func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int64,
 	name, query string, prepares Filter) (*Filter, error) {
 
@@ -116,6 +121,22 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 	if prepares.Prepares() && prepares.Reasoning == "" {
 		return nil, fmt.Errorf("a filter that prepares a claim has to carry the reasoning " +
 			"somebody will be proposing, because they are the one putting their name to it")
+	}
+	// The length is required where the outcome is a deferral, and refused
+	// beside any other outcome — the same answer a decision itself gives to a
+	// date beside an outcome that is not a deferral. A deferral prepared
+	// without a length fills a form that cannot be submitted, and a length
+	// prepared beside another outcome is a value somebody set that nothing
+	// will read. Where nothing is prepared at all there is nothing to refuse:
+	// a stray value beside no outcome is dropped below, because nothing
+	// prepared is nothing carried.
+	if prepares.Outcome == string(triage.Deferred) && prepares.DeferDays <= 0 {
+		return nil, fmt.Errorf("a filter that prepares a deferral has to carry how long it " +
+			"defers for, because the date is worked out from it whenever somebody submits it")
+	}
+	if prepares.Prepares() && prepares.Outcome != string(triage.Deferred) && prepares.DeferDays != 0 {
+		return nil, fmt.Errorf("how long to defer for only means something where the outcome "+
+			"is a deferral, and %q is not one", prepares.Outcome)
 	}
 	if !prepares.Prepares() {
 		// Nothing prepared is nothing carried. Keeping a justification or a
