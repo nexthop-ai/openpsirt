@@ -3,5 +3,8 @@
 bin
 site
 docs
-assets
+# Not excluded, unlike the documentation it was collected for: the interface's
+# brand files are symlinks into it, so an excluded assets/ leaves them dangling
+# and the web build fails.
 *.md
+
