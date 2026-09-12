@@ -744,8 +744,18 @@ Two reads grow with the calendar rather than with a build:
 | night 365 | 3–4 ms | 2–3 ms | 71–88 ms |
 
 The last page costs what the first does, because the pairing is done over all of
-history precisely so it does not depend on which page is read. It is quadratic in
-the number of runs, so a decade is a hundred times this work.
+history precisely so it does not depend on which page is read. It grows with the
+number of runs and not with the square of it: the uploads and the runs are both
+held newest first and walked together once, so the upload a run is attributed to
+is looked for from where the run before it stopped rather than from the top of
+the list.
+
+The two orderings that walk has to have are worth stating, because neither is
+the one the page itself wants. The uploads are ordered by when they arrived
+rather than by identifier — two recorded at the same moment take their
+identifiers in whichever order they reach the table, and "the newest upload this
+run covered" is a question about arrival. The runs are ordered by when they
+finished rather than by identifier, which is the order the page reads them in.
 
 What this does not measure: it was read as an administrator, who sees every
 product, so the queries ran with no narrowing by product — the cheapest plan

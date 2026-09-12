@@ -2,6 +2,7 @@ package ingest_test
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -260,6 +261,95 @@ func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 		// the database that was current when it was read.
 		if measured["march"] != "2026-03-01" || measured["september"] != "2026-09-01" {
 			t.Errorf("measured as %v, wanted each upload's own run", measured)
+		}
+	})
+}
+
+func TestARunIsAttributedToTheUploadThatArrivedLastBeforeIt(t *testing.T) {
+	// Which upload a run answers is decided by when the uploads arrived, and
+	// identifiers are not arrival order: two uploads recorded at the same
+	// moment take their identifiers in whichever order they reach the table.
+	// Deciding it by identifier attributed a run's numbers to the older of the
+	// two, and the receipt for the upload the run actually read said nothing.
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		ctx := t.Context()
+		target := quietTarget(t, s, ours)
+		now := time.Now().UTC()
+
+		// Filed in the order a build produces them, then set to have arrived
+		// the other way round: the lower identifier arrived second. A scan
+		// built before one already held is refused, so the two are recorded in
+		// order and their arrival is written afterwards.
+		file(t, s, target, "arrived-second", now.Add(-3*time.Hour))
+		file(t, s, target, "arrived-first", now.Add(-2*time.Hour))
+		for hash, at := range map[string]time.Time{
+			"arrived-second": now.Add(-2 * time.Hour),
+			"arrived-first":  now.Add(-3 * time.Hour),
+		} {
+			if _, err := s.DB().NewUpdate().Model((*ingest.Scan)(nil)).
+				Set("received_at = ?", at).Where("content_hash = ?", hash).
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		finishRun(t, s, target, now.Add(-time.Hour), "")
+
+		receipts, _, err := s.Receipts(ctx, reader, target, "", 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		answered := ""
+		for _, r := range receipts {
+			if r.RunID != nil {
+				if answered != "" {
+					t.Fatalf("one run was attributed to %q and %q both",
+						answered, r.Scan.ContentHash)
+				}
+				answered = r.Scan.ContentHash
+			}
+		}
+		if answered != "arrived-second" {
+			t.Errorf("the run's numbers landed on %q, want the upload that arrived last "+
+				"before it finished", answered)
+		}
+	})
+}
+
+func TestEveryRunKeepsItsOwnUploadAcrossALongHistory(t *testing.T) {
+	// The uploads and the runs are each read once and walked together, so a
+	// walk that ran ahead of itself would attribute a run to an upload older
+	// than the one it read, and every run after it would be wrong the same
+	// way. A night at a time, over enough nights for that to show.
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		ctx := t.Context()
+		target := quietTarget(t, s, ours)
+		now := time.Now().UTC()
+
+		const nights = 12
+		for i := range nights {
+			at := now.Add(-time.Duration(nights-i) * 2 * time.Hour)
+			file(t, s, target, "night-"+strconv.Itoa(i), at)
+			finishRun(t, s, target, at.Add(time.Hour), "")
+		}
+
+		receipts, _, err := s.Receipts(ctx, reader, target, "", 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		answered := 0
+		for _, r := range receipts {
+			if !strings.HasPrefix(r.Scan.ContentHash, "night-") {
+				continue
+			}
+			if r.RunID == nil {
+				t.Errorf("%q was read by a run of its own and reports no numbers",
+					r.Scan.ContentHash)
+				continue
+			}
+			answered++
+		}
+		if answered != nights {
+			t.Errorf("%d of %d nights carry their own run", answered, nights)
 		}
 	})
 }
