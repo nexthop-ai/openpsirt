@@ -47,6 +47,69 @@ for (const file of await stylesheets(src)) {
   }
 }
 
+// Class names of ours that collide with each other.
+//
+// An element carrying `class="due over"` is matched by `.due`, by `.over` and
+// by `.due.over`, and all three apply. That is the point of a modifier — until
+// the modifier's name is also a class of ours that means something else
+// somewhere else, at which point an element picks up a rule written for a
+// different element entirely.
+//
+// A two-word deadline chip did exactly this. `.over` was the full-screen
+// backdrop behind the component dialog — `position: fixed; inset: 0`, half
+// black, `z-index: 40` — and `.due.over` was the color an overdue chip is
+// written in. A findings row one day late rendered its chip as an overlay
+// across the whole viewport: the screen greyed out, nothing dismissed it, and
+// because the chip sits inside a row that navigates on click, every click
+// anywhere went to that finding.
+//
+// What is reported is narrow, because a modifier sharing a name with a text
+// style is ordinary and correct: `.linkish.id` beside a bare `.id` that sets a
+// font is two rules that agree. What cannot be right is a modifier whose bare
+// rule takes an element **out of normal flow** — a chip does not become
+// positioned because of the word beside it. So the test is the property, not
+// the name.
+const escapes = /(^|[\s;])(position\s*:\s*(fixed|absolute|sticky)|inset\s*:)/;
+const declared = new Map();
+const modifiers = new Map();
+for (const file of await stylesheets(src)) {
+  // Comments go first. A rule is read as the text before its brace, and a
+  // comment sitting above one is part of that text — so a prose paragraph
+  // above `.overpane` was read as the selector and the rule was never seen.
+  const css = (await readFile(file, "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const part of selector.split(",")) {
+      const one = part.trim();
+      if (!/^(?:\.[-\w]+)+$/.test(one)) continue;
+      const names = [...one.matchAll(/\.([-\w]+)/g)].map(([, name]) => name);
+      if (names.length === 1) {
+        declared.set(names[0], (declared.get(names[0]) ?? "") + ";" + body);
+      } else {
+        for (const name of names.slice(1)) {
+          if (!modifiers.has(name)) modifiers.set(name, one);
+        }
+      }
+    }
+  }
+}
+
+const positioned = [...modifiers.keys()]
+  .filter((name) => escapes.test(declared.get(name) ?? ""))
+  .sort();
+
+if (positioned.length > 0) {
+  console.error(
+    `${positioned.length} class name(s) are used as a modifier beside another class and\n` +
+      `also have a rule of their own that takes an element out of normal flow, so\n` +
+      `anything carrying both is positioned by a rule written for something else:\n`,
+  );
+  for (const name of positioned) {
+    console.error(`  .${name}  (${defined.get(name)})  reached as ${modifiers.get(name)}`);
+  }
+  console.error(`\nRename the standalone one — ".overpane" rather than ".over".`);
+  process.exit(1);
+}
+
 const root = path.dirname(require.resolve("tailwindcss/package.json"));
 async function loadTailwind(id, base) {
   const file =
@@ -153,4 +216,7 @@ if (clashing.length > 0) {
   console.error(`\nRename ours — "was-fixed" rather than "fixed".`);
   process.exit(1);
 }
-console.log(`no collisions: ${names.length} class names checked against Tailwind`);
+console.log(
+  `no collisions: ${names.length} class names checked against Tailwind, ` +
+    `${modifiers.size} used as a modifier checked against our own rules`,
+);

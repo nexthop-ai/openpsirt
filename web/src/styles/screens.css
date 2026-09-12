@@ -1450,8 +1450,14 @@ kbd.onbtn {
 }
 
 /* Something over the screen rather than beside it: what is known about one
-   component, when somebody asks for it. */
-.over {
+   component, when somebody asks for it.
+
+   Named for the panel it holds rather than for the word "over", because a bare
+   one-word class is also a modifier somebody writes beside another class: a
+   `due over` chip carried this rule as well as its own, and a text label two
+   words wide became a fixed, full-screen, half-black overlay that swallowed
+   every click on the screen behind it. */
+.overpane {
   position: fixed;
   inset: 0;
   z-index: 40;
