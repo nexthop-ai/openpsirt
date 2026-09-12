@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
-import { humane, read, write, UNITS, type Unit } from "./duration";
+import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
 
 // What this deployment has decided for everybody in it, grouped the way the
@@ -245,13 +245,17 @@ function Field({
 }) {
   const [value, setValue] = useState(setting.value ?? "");
   const words = choices[setting.name ?? ""];
+  // Everything that is not a word, a count or a size is a length of time.
+  const timed = !words && !counts.has(setting.name ?? "") && !sizes.has(setting.name ?? "");
   // A duration this can compose. Where it cannot — somebody set "90m" from a
   // script, and they meant it — the text field stays, because a control that
   // can only say whole hours must not offer to edit one of those.
-  const composed =
-    !words && !counts.has(setting.name ?? "") && !sizes.has(setting.name ?? "")
-      ? read(setting.value ?? "")
-      : null;
+  const composed = timed ? read(setting.value ?? "") : null;
+  // A setting nobody has set is composed too. Nothing to read is not a value
+  // the composer refuses, and the text box it used to fall to is the one
+  // control that cannot say which unit a number is in — the embargo periods
+  // arrive unset, so that is the state they are first seen in.
+  const takes = timed && composable(setting.value ?? "");
   // The same composition for a size, where the setting is one.
   const measured = sizes.has(setting.name ?? "") ? readBytes(setting.value ?? "") : null;
 
@@ -272,7 +276,10 @@ function Field({
   const [count, setCount] = useState(() =>
     composed ? String(composed.count) : measured ? String(measured.count) : "",
   );
-  const [unit, setUnit] = useState<Unit>(composed ? composed.unit : UNITS[0].unit);
+  // Days where there is nothing to read. A period nobody has set yet is an
+  // embargo, which is said in days everywhere it is written down, and hours
+  // would read a typed 90 as under four days.
+  const [unit, setUnit] = useState<Unit>(composed ? composed.unit : "days");
   const [size, setSize] = useState<Size>(measured ? measured.unit : SIZES[0].unit);
 
   // What would be stored, from whatever the controls are showing. A box left
@@ -280,7 +287,7 @@ function Field({
   // somebody.
   const typed = Number(count);
   const usable = count.trim() !== "" && Number.isFinite(typed) && typed >= 1;
-  const asked = composed
+  const asked = takes
     ? usable
       ? write(typed, unit)
       : ""
@@ -292,8 +299,13 @@ function Field({
   const changed = asked !== "" && asked !== (setting.value ?? "");
 
   return (
-    <div className="field" style={{ margin: 0, maxWidth: composed || measured ? 320 : 240 }}>
-      <label htmlFor={setting.name}>
+    <div className="field" style={{ margin: 0, maxWidth: takes || measured ? 320 : 240 }}>
+      {/* The sentence sits on the label rather than on the control. A
+          password manager classifies a field by the words it can reach
+          through it, and what a setting means is prose about sign-ins,
+          accounts and dates — which is how three of these came to be offered
+          a saved login despite saying they were not credentials. */}
+      <label htmlFor={setting.name} title={setting.means}>
         {label(setting.name)}
         {setting.default && <span className="hint"> · default</span>}
       </label>
@@ -301,10 +313,10 @@ function Field({
         {words ? (
           <select
             id={setting.name}
+            name="setting"
             {...notACredential}
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            title={setting.means}
           >
             {words.map((word) => (
               <option key={word} value={word}>
@@ -312,20 +324,21 @@ function Field({
               </option>
             ))}
           </select>
-        ) : composed ? (
+        ) : takes ? (
           <>
             <input
               id={setting.name}
+              name="setting"
               {...notACredential}
               type="number"
               min={1}
               style={{ width: 90 }}
               value={count}
-              title={setting.means}
               onChange={(event) => setCount(event.target.value)}
             />
             <select
               aria-label={`${label(setting.name)} unit`}
+              name="unit"
               {...notACredential}
               style={{ width: "auto" }}
               value={unit}
@@ -342,16 +355,17 @@ function Field({
           <>
             <input
               id={setting.name}
+              name="setting"
               {...notACredential}
               type="number"
               min={1}
               style={{ width: 90 }}
               value={count}
-              title={setting.means}
               onChange={(event) => setCount(event.target.value)}
             />
             <select
               aria-label={`${label(setting.name)} unit`}
+              name="unit"
               {...notACredential}
               style={{ width: "auto" }}
               value={size}
@@ -367,11 +381,11 @@ function Field({
         ) : (
           <input
             id={setting.name}
+            name="setting"
             {...notACredential}
             type="text"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            title={setting.means}
           />
         )}
         {changed && (
@@ -386,13 +400,13 @@ function Field({
           they chose it in, which is arithmetic nobody asked for. A value the
           composer cannot take is the case that needs the sentence: it sits in
           a plain text field, and what it means is not obvious. */}
-      {!composed && !measured && !words && humane(value) && (
+      {!takes && !measured && !words && humane(value) && (
         <span className="hint">= {humane(value)}</span>
       )}
       {!measured && sizes.has(setting.name ?? "") && humaneBytes(value) && (
         <span className="hint">= {humaneBytes(value)}</span>
       )}
-      {(composed || measured) && count.trim() !== "" && !usable && (
+      {(takes || measured) && count.trim() !== "" && !usable && (
         <span className="hint" style={{ color: "var(--sev-high)" }}>
           A whole number of one or more.
         </span>

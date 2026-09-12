@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { humane, read, write } from "./duration";
+import { composable, humane, read, write } from "./duration";
 
 describe("a length of time somebody has to set", () => {
   it("reads a stored value as the largest whole unit", () => {
@@ -37,6 +37,16 @@ describe("a length of time somebody has to set", () => {
   it("refuses to compose nothing", () => {
     expect(write(0, "days")).toBe("24h");
     expect(write(-3, "days")).toBe("24h");
+  });
+
+  it("offers the composer for a setting nobody has set", () => {
+    // An unset value has no unit to read, which is not the same as a unit
+    // this cannot say. The embargo periods arrive empty, and a plain text box
+    // cannot ask whether a typed 90 means hours, days or weeks.
+    expect(composable("")).toBe(true);
+    expect(composable("  ")).toBe(true);
+    expect(composable("168h0m0s")).toBe(true);
+    expect(composable("90m")).toBe(false);
   });
 
   it("says a length of time the way somebody would", () => {
