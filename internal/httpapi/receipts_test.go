@@ -6,11 +6,14 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -316,4 +319,136 @@ func TestAReceiptSaysHowMuchOfAnInventoryWasPlaced(t *testing.T) {
 			t.Errorf("%d components read as placed, want the one an edge leads to", *got.Placed)
 		}
 	})
+}
+
+// A run covers a build rather than an upload, so where one answers several the
+// counts are reported against the newest of them. What the rest of the rows
+// say about those counts is nothing — which has to read differently from a run
+// that opened nothing, or an upload nothing was ever read from reads as a scan
+// that found the build clean.
+func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		names := catalog.NewStore(r.db.DB)
+		located, err := names.Locate(ctx, "mine", "master", "broadcom")
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		uploads := ingest.NewStore(r.db.DB)
+		built := time.Now().UTC().Add(-6 * time.Hour)
+		sent := 0
+		// An upload as the endpoint leaves one: recorded, and its read marked
+		// done, because an upload still in the queue reads as being read
+		// whatever the runs around it did.
+		file := func(t *testing.T, at time.Time) int64 {
+			t.Helper()
+			sent++
+			scan, outcome, err := uploads.Record(ctx, ingest.Arriving{
+				TargetID: target.ID, ContentHash: strconv.Itoa(sent),
+				BuiltAt:  at, ParserVersion: "test",
+			})
+			if err != nil || outcome != ingest.Accept {
+				t.Fatalf("record upload %d: %v %v", sent, outcome, err)
+			}
+			if _, err := r.db.DB.NewUpdate().Model((*ingest.Scan)(nil)).
+				Set("received_at = ?", at).Where("id = ?", scan.ID).
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			done := map[string]any{
+				"kind": queue.Parse, "reference": strconv.FormatInt(scan.ID, 10),
+				"state": queue.Done, "attempts": 1, "max_attempts": 5,
+				"run_after": at, "created_at": at, "updated_at": at,
+			}
+			if _, err := r.db.DB.NewInsert().Model(&done).TableExpr("job").
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			return scan.ID
+		}
+
+		product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
+		library := graph.Described{
+			Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
+		}
+		// A run over what the newest upload described, finding the one issue.
+		// A component no inventory placed opens no finding, so the graph is
+		// applied from the upload the run is about.
+		findings := finding.NewStore(r.db.DB)
+		scan := func(t *testing.T, from int64, at time.Time) {
+			t.Helper()
+			if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, from, graph.Snapshot{
+				Root:         product,
+				Components:   []graph.Described{library},
+				Dependencies: []graph.Dependency{{Parent: product, Child: library}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			run, err := findings.Begin(ctx, finding.Run{
+				TargetID: target.ID, Scanner: "grype", RanHere: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+				Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+				Component: library,
+			}}); err != nil {
+				t.Fatal(err)
+			}
+			if err := findings.Finish(ctx, run.ID, "0.112.0", "2026-08-28", "", nil); err != nil {
+				t.Fatal(err)
+			}
+			// When it ran, which is what decides the upload it answers and
+			// the one its numbers are reported against.
+			if _, err := r.db.DB.NewUpdate().Model((*finding.Run)(nil)).
+				Set("started_at = ?", at.Add(-time.Minute)).Set("finished_at = ?", at).
+				Where("id = ?", run.ID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// Two uploads in one window, then the run that answers both.
+		file(t, built.Add(time.Hour))
+		scan(t, file(t, built.Add(2*time.Hour)), built.Add(3*time.Hour))
+
+		var out httpapi.ReceiptsOutput
+		path := "/v1/products/mine/streams/master/variants/broadcom/scans"
+		read(t, r, "private-triage", path, &out.Body)
+		if len(out.Body.Items) != 2 {
+			t.Fatalf("got %d receipts, want the two that were sent", len(out.Body.Items))
+		}
+		newest, older := out.Body.Items[0], out.Body.Items[1]
+		if newest.Opened == nil || *newest.Opened != 1 {
+			t.Errorf("the upload the run is attributed to reports %s opened, want 1",
+				shown(newest.Opened))
+		}
+		if older.Opened != nil || older.Closed != nil {
+			t.Errorf("an upload whose run is reported on a newer receipt states %s and %s "+
+				"rather than nothing", shown(older.Opened), shown(older.Closed))
+		}
+
+		// A third upload and a run over it that finds the same issue: nothing
+		// opened, which is an answer and reads as one.
+		scan(t, file(t, built.Add(4*time.Hour)), built.Add(5*time.Hour))
+		read(t, r, "private-triage", path, &out.Body)
+		if again := out.Body.Items[0]; again.Opened == nil || *again.Opened != 0 {
+			t.Errorf("a run that opened nothing reports %s, want a stated zero",
+				shown(again.Opened))
+		}
+	})
+}
+
+// shown is a count as a test failure should read it: the number, or the word
+// for there not being one.
+func shown(count *int) string {
+	if count == nil {
+		return "nothing"
+	}
+	return strconv.Itoa(*count)
 }

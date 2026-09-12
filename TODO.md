@@ -47,7 +47,6 @@ gap somebody rediscovers by auditing.
 |---|---|
 | The published image is `amd64` only | The binaries are cross-compiled for `arm64` as well; the image cannot follow while the stage that catalogs what it ships runs the cataloger at the target architecture, which puts `node`, `go` and `syft` under emulation. `DESIGN-packaging.md` names the fix |
 | A producer's own SPDX 3.x output as a fixture | Yocto and one vendor tool emit it, so this is gettable rather than hypothetical. What it would settle is which shapes a real producer actually uses; `DESIGN-ingest.md` records the limitation until it arrives |
-| Screens not driven in a browser | "Take this" on the finding and the unassigned bar, the decision form opening with nothing chosen, the way down drawn as one hop where the route up is unknown, "sees nothing" on People, the dropped-mention line under the comment box, and the inventory list's numbers. The type check, lint, unit tests and endpoints behind each pass; nobody has looked at the pixels |
 
 ## Measured, recorded, not fixed
 

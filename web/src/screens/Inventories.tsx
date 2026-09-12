@@ -158,31 +158,27 @@ export function Inventories() {
                   </td>
                   {/* Grouped, like every other count here. Seven thousand
                       findings written as 7587 is a number somebody has to
-                      count the digits of. */}
-                  <td className="num">
-                    {scan.opened
-                      ? scan.opened.toLocaleString()
-                      : scan.state === "scanned"
-                        ? "—"
-                        : ""}
-                  </td>
-                  <td className="num">
-                    {scan.closed
-                      ? scan.closed.toLocaleString()
-                      : scan.state === "scanned"
-                        ? "—"
-                        : ""}
-                  </td>
+                      count the digits of.
+
+                      A run that changed nothing says 0. Nothing at all is
+                      left blank, which is the row of an upload whose run is
+                      reported against a newer one — a run covers a build
+                      rather than an upload — and of one no run has answered
+                      yet. Drawn as a dash, both of those read as "this upload
+                      opened nothing", which is a statement about a scan that
+                      never read it. */}
+                  <td className="num">{counted(scan.opened)}</td>
+                  <td className="num">{counted(scan.closed)}</td>
                   <td>
                     <Sent at={at} scan={scan.scan_id ?? 0} sent={scan.sent ?? []} />
                   </td>
                   <td className="num">
                     <Placed components={scan.components} placed={scan.placed} />
                   </td>
-                  {/* What the run answering *this* upload was made with
-, rather than what the newest run was. A page
-                      spanning a scanner upgrade, or a vulnerability database
-                      that stopped moving, is exactly what somebody reads this
+                  {/* What the run answering *this* upload was made with,
+                      rather than what the newest run was. A page spanning a
+                      scanner upgrade, or a vulnerability database that
+                      stopped moving, is exactly what somebody reads this
                       screen to notice — and it is what makes a corrected feed
                       answerable afterwards. */}
                   <td className="hint">
@@ -339,6 +335,19 @@ function size(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// A count of what a run changed, or nothing where this row is not where that
+// is reported.
+//
+// Zero is an answer: a nightly run that opened nothing is a fact about the
+// night. Absent is a different one — the run that answers this upload is
+// reported against a newer upload, because a run covers a build rather than an
+// upload, or no run has answered it yet. Drawn as a dash, both of those read
+// as a scan that looked and found nothing.
+function counted(howMany?: number | null) {
+  if (howMany == null) return "";
+  return howMany.toLocaleString();
 }
 
 // How much of an inventory anything placed in the graph.

@@ -49,6 +49,12 @@ export function Holder({
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState(-1);
   const box = useRef<HTMLDivElement>(null);
+  // Who holds it now, which the field states rather than suggests. It was the
+  // placeholder: a held finding drew the holder's name in the grey a browser
+  // paints text nobody has typed, so work somebody had taken read as an empty
+  // box prompting for a name. While the list is open the field is a search
+  // box again, because that is what somebody is doing with it.
+  const holder = value?.identity ? (value.name ?? value.identity) : "";
 
   useClickAway(box, open, () => setOpen(false), false);
 
@@ -89,8 +95,8 @@ export function Holder({
         aria-autocomplete="list"
         aria-label="Who holds this"
         disabled={disabled}
-        placeholder={value?.identity ? (value.name ?? value.identity) : placeholder}
-        value={typed}
+        placeholder={holder ? "" : placeholder}
+        value={open || typed !== "" ? typed : holder}
         onFocus={() => setOpen(true)}
         onChange={(event) => {
           setTyped(event.target.value);

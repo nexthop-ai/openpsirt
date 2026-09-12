@@ -591,17 +591,21 @@ was navigation and the cost was the evidence.
 | Where it sits shows the chain, not the immediate parent | The same parent can be reached by several routes, and a screen naming only the nearest cannot tell them apart |
 | Where upstream currency is switched on, it says what upstream released and when (REQ-69) | Two facts rather than a judgment about anybody's project. Where an issue was named a clear year after the last release and is still unfixed, the screen says that is why there is no fix — never as a claim that a project is abandoned. It needs a full year of silence, because comparing two year-numbers makes a five-week gap look identical to a five-year one. Switched off, the panel is absent rather than empty |
 
-Three situations for what pulls something in, and they are not one.
+Four situations for what pulls something in, and they are not one.
 
 | Situation | Drawn as |
 |---|---|
-| A named consumer | The component under it |
+| A named consumer, walkable to the build | The whole chain, the build first and the component last |
 | The build contains it directly | A chain of two — the build, then the component — which *is* the answer |
-| The inventory placed it nowhere | "Nothing recorded what pulls this in" |
+| A named consumer nothing places | Two rows — the consumer, then the component under it — with "nothing recorded what pulls this in" on the consumer, which is the row it is true of |
+| The inventory placed it nowhere | The component, with "nothing recorded what pulls this in" |
 
-The middle case was folded into the last, so a package the image demonstrably
-contains was reported as having no recorded consumer, on the same screen that drew
-the chain underneath it.
+The middle two used to be drawn as the last, which said "nothing recorded what
+pulls this in" over records that named the consumer. The third also drew an
+empty name, read off the end of a chain that was not there.
+
+One row per place, however many rows a finding holds there. `DESIGN-findings.md`
+owns that rule.
 
 | Rule | |
 |---|---|
@@ -627,6 +631,7 @@ collects the answer it suggested.
 | Rule | |
 |---|---|
 | The deferral threshold is a number on the form, not a sentence about a threshold | Which side of it a date falls on decides whether a second person has to agree, and reading that off the response is reading it after the choice was made |
+| It names the next missing answer, beside the button | A disabled button says something is missing and never what, and Ctrl+Enter does nothing until the same answer is given. One rule decides both the sentence and the refusal |
 | Ctrl+Enter submits, and the form says so | A shortcut nobody knows about is a shortcut nobody has, and the person it is for is making a hundred of these a day |
 | The last pair is offered, never applied | Retyping the outcome and the justification is the cost the review measured, but a judgment prefilled with the last one made is a record that can say what nobody meant. So it is a button that says what it will fill in, and the fill is somebody's own click. Per session, because a default that survives a night is a default nobody chose |
 | A justification is shown with a label and a one-line meaning, never as its bare token (REQ-60) | An accuracy defect rather than a cosmetic one: the token somebody picks out of a list of five snake_case strings at the end of a long day is what ships to a customer, machine-readable, as our claim about their exposure. The stored token stays reachable, on the title, because it is what an approver is checking |
@@ -780,6 +785,8 @@ with an avatar.
 |---|---|
 | Every figure counts pieces of work, and says so | A person's row and the list behind their name are one measurement, so clicking through never turns one number into a different one. The findings those cover are a second, quieter column, and the screen states in words what each counts |
 | Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. The finding carries "Take this" and the unassigned list's batch bar carries "Take", beside the picker rather than through it |
+| Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
+| A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The unassigned list spans every product somebody can see, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
 
 A screen for the standing rules (REQ-34), per product, shown as a numbered list
@@ -809,6 +816,7 @@ is what the screen is about.
 | An inventory can be uploaded from the interface (REQ-05) | From the bar and from the inventories screen. The drawer takes the target — prefilled from the scope, refused by the server if undeclared — one inventory — CycloneDX or SPDX, as the file itself says — and any number of OpenVEX suppression documents, which is what the endpoint takes. It posts the same multipart request a pipeline sends, then opens the inventories screen, where the receipt shows "queued" until the run says what it changed |
 | The screen that lists receipts is called Inventories | A scan is what the deployment does to an inventory after it arrives; what a person uploads is inventories |
 | It says what each run changed, and what the numbers were measured against | Which scanner, at which version, reading which vulnerability database. Without it, a build with nothing wrong and a build last measured against a months-old database read identically. A run covers a build rather than an upload, so where several uploads are answered by one run the numbers sit on the newest and the rest are blank |
+| A run that changed nothing says 0; a row with no numbers to report is blank | Both were drawn as a dash, so an upload superseded before anything read it read as a scan that found the build clean. The wire tells them apart too — a count that drops its zero cannot |
 
 ## Product and scan-run pages
 
@@ -980,6 +988,7 @@ to; on an undisclosed finding the mention itself says a finding exists.
 | Asking who may be mentioned on an undisclosed finding is itself a question about undisclosed findings | Somebody who cannot read them is answered as though the product were not there. Without that, the endpoint is a way to enumerate who holds private access, which is a more useful thing to steal than the list it is attached to |
 | What is being typed after an `@` is read from the text before the cursor | Rather than tracked as state, so it stays right however somebody edits |
 | The pickers that say who is dealing with a finding ask the same endpoint (REQ-34) | They asked for the list of people, which is administration, so for every triager in the deployment both selects were empty. Asking who may *read* it rather than who *exists* also narrows the offer to people who can open what they are handed |
+| Every box people type an `@` into offers names, at the visibility of what is being discussed | The comment box is where mentions get written and it offered nobody, while the line under it explained afterwards that the name had reached nobody. A claim is asked at the visibility of its most careful row |
 
 Both people pickers are typed against the list rather than scrolled. Adding
 somebody to a team and bringing somebody onto a case were selects over
@@ -1287,6 +1296,7 @@ beside them.
 | **Five rules restated what a wider media query already applied** | A phone layout fixed by appending a corrected copy at the bottom of the stylesheet rather than editing the rule where it lives: anything under 780 is under 900, so they changed nothing and read as though they did |
 | **The thirty-first table that scrolls** | The release-readiness table on home, cut off on a phone with nothing explaining why |
 | **An operation the API offers that no screen reaches** | The generated client type-checks what a screen sends against what the server takes, so a screen cannot disagree with the shape — but an endpoint or a field nothing calls is not a disagreement, and neither the unreachable-code check nor the decision gate looks at it. Four were found by configuring a deployment from empty: creating a pipeline key, granting administration, narrowing a personal token to a product, and the withdrawn flag on a token row. Walking the API document against the generated client's call sites is what would catch it |
+| **What only a browser shows** | Six screens passed the type check, the lint and their tests, and every one of them was wrong on screen: a chip styled by a block-level class stood a row of pills on end; a holder's name was drawn in placeholder grey; a component's name was read off a chain that was not there and came out empty; a form refused to submit and never said what was missing; a comment box offered no mentions; a superseded upload reported a clean scan. None of these is a screen disagreeing with the server, which is the only kind of wrong the checks can see |
 
 ## File organization
 

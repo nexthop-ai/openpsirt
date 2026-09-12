@@ -44,6 +44,16 @@ type Whole struct {
 	// Outliers is what in a bulk set does not look like the rest. Only for a
 	// claim over many issues; nil otherwise.
 	Outliers *Outliers
+	// Undisclosed says at least one row of the claim is about a finding
+	// nobody has announced, which is what decides who may be named in the
+	// discussion of it.
+	//
+	// Any row is enough, and it is not read off the representative row: that
+	// one is chosen for naming the claim, and a claim is one action over many
+	// places whose rows need not agree about visibility — so the most careful
+	// row in the set answers for the whole of it, as it does everywhere else
+	// this question is asked.
+	Undisclosed bool
 }
 
 // Reach is what a claim covers now, counted the way the findings list counts.
@@ -94,6 +104,9 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 	for _, row := range rows {
 		issues[row.VulnerabilityID] = true
 		places[row.PlaceIdentity] = true
+		if row.Visibility == access.Private {
+			whole.Undisclosed = true
+		}
 	}
 	whole.Issues, whole.Places = len(issues), len(places)
 

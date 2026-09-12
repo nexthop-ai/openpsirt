@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { Editor, forget } from "./Editor";
+import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
 import { JUSTIFICATIONS, labeled, type Justification } from "./Outcome";
 import { Covering, type Sitting } from "./Covering";
+import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
@@ -132,9 +133,14 @@ export function Decide({
   onDone,
   extending,
   prefill,
+  undisclosed,
 }: {
   at: At;
   places: Sitting[];
+  // Whether the finding has been announced, which decides who may be offered
+  // after an @ in the reasoning: naming somebody who cannot read it calls them
+  // to something they will be refused.
+  undisclosed?: boolean;
   // Opened inside the findings list, where the keys are live and there is a
   // next row to go to.
   onDone: (recorded: Recorded) => void;
@@ -194,7 +200,6 @@ export function Decide({
   const [reasoning, setReasoning] = useState(prefill?.reasoning ?? "");
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set());
   const [reviewing, setReviewing] = useState(false);
-  const [refused, setRefused] = useState<string | null>(null);
 
   const open = useMemo(() => places.filter((p) => p.decision == null), [places]);
   const answered = places.length - open.length;
@@ -309,15 +314,25 @@ export function Decide({
     };
   }, [reach.data]);
 
-  const ready =
-    outcome !== "" &&
-    (!needsJustification || justification !== "") &&
-    covering.length > 0 &&
-    reasoning.trim() !== "" &&
-    (!needsDate || until !== "") &&
-    (!needsFixedVersion || fixedVersion.trim() !== "") &&
-    (!needsLanding || lands !== "") &&
-    (!needsMitigation || mitigation.trim() !== "");
+  // What is still missing, which is both what the form says and what stops it
+  // being submitted. Two lists of the same conditions is how one of them comes
+  // to hold a question the other does not.
+  const waiting = waitingFor({
+    outcome,
+    needsJustification,
+    justification,
+    needsMitigation,
+    mitigation,
+    needsFixedVersion,
+    fixedVersion,
+    needsLanding,
+    lands,
+    needsDate,
+    until,
+    reasoning,
+    covering: covering.length,
+  });
+  const ready = waiting === null;
 
   function body(narrow: boolean) {
     return {
@@ -403,31 +418,6 @@ export function Decide({
   startRef.current = start;
 
   function start() {
-    if (!reasoning.trim()) {
-      setRefused("Reasoning is required.");
-      return;
-    }
-    if (needsFixedVersion && !fixedVersion.trim()) {
-      setRefused("Say which package version the fix arrived in, so somebody can check it.");
-      return;
-    }
-    if (needsDate && !until) {
-      setRefused("A deferral needs a date.");
-      return;
-    }
-    if (needsLanding && !lands) {
-      setRefused("A backport needs the date it lands.");
-      return;
-    }
-    if (needsMitigation && !mitigation.trim()) {
-      setRefused("Say what stops it.");
-      return;
-    }
-    if (covering.length === 0) {
-      setRefused("Every place is excluded, so there is nothing to decide.");
-      return;
-    }
-    setRefused(null);
     // Where the reach is known and empty the sheet asks nothing, so the
     // decision goes straight through. What it would have said is still said
     // afterwards: the confirmation names the builds reached by lookup and the
@@ -621,29 +611,34 @@ export function Decide({
           onChange={setReasoning}
           draftKey={draftKey}
           label="Reasoning"
-          mentions={{ product: at.product }}
+          mentions={mentioning(at.product, undisclosed)}
           attachTo={{ product: at.product, vulnerability: at.vulnerability }}
           placeholder="Why this decision holds, and what to re-check later."
         />
       </div>
 
-      {refused && (
-        <p className="hint" style={{ color: "var(--sev-high)", marginTop: 8 }}>
-          {refused}
-        </p>
-      )}
       {submit.error != null && <Failed error={submit.error} what="That could not be recorded." />}
 
       <div className="actions" style={{ marginTop: 12 }}>
         <button type="button" className="btn" disabled={!ready || submit.isPending} onClick={start}>
           Submit decision
         </button>
-        <span className="hint">
-          {/* Advertised rather than left to be discovered. Somebody doing a
-              hundred of these a day is the person it is for, and a shortcut
-              nobody knows about is a shortcut nobody has. */}
-          or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>
-        </span>
+        {/* What it is waiting for, beside the control that is waiting. A
+            disabled button says that something is missing and never which,
+            and the shortcut below it does nothing at all until the same
+            question is answered. */}
+        {waiting ? (
+          <span className="hint" role="status">
+            {waiting}
+          </span>
+        ) : (
+          <span className="hint">
+            {/* Advertised rather than left to be discovered. Somebody doing a
+                hundred of these a day is the person it is for, and a shortcut
+                nobody knows about is a shortcut nobody has. */}
+            or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>
+          </span>
+        )}
       </div>
     </div>
   );

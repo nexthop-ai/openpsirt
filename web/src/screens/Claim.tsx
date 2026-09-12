@@ -112,6 +112,7 @@ export function Claim({ who }: { who: Who }) {
         claimId={id}
         mine={(wrote) => wrote === who.identity || wrote === who.name}
         about={about}
+        undisclosed={!!it.undisclosed}
       />
     </>
   );

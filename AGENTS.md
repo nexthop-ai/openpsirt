@@ -85,6 +85,8 @@ that way twice; what follows is the shape they were pulled into.
 | **State rather than argue** | A design document records what was decided, not the case for it. The reason belongs beside the rule in a second column, one clause long, not woven through three paragraphs |
 | **Bold marks a defined term, not a pressed claim** | Bolding the first half of every sentence is emphasis nobody reads by the third screen |
 | **Enumerations are tables** | Outcomes, refusals, closure reasons, engine differences, settings, states. A two-column `\| rule \| why \|` table is the default shape of a section |
+| **A table, a list or an example before a paragraph** | Prose is the last resort, not the default. If what is being said has parts, it is a table; if it has steps or cases, a list; if it is a shape, an example. A paragraph is for the one thing that is none of those |
+| **Plain words, short sentences** | One clause per point, ordinary vocabulary, no clause piled on a clause. A sentence that has to be read twice fails whatever it was trying to say, and the reader is somebody in a hurry years from now |
 | **One fact in one place** | A fact another document owns is pointed at, not restated. Two copies disagree eventually and neither says which is authoritative |
 | **Rationale that is not about one rule goes in `Limits`** | The block at the foot of every document, for the boundaries and the trade-offs the sections above would otherwise argue in line |
 | **Every document opens with a `Contents` section** | One entry per `##` heading, in order |

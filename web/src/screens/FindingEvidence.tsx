@@ -16,6 +16,7 @@ import { linkable } from "../ui/addressable";
 import { Outward } from "../ui/Outward";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
+import { intoTheTree, wayDown } from "./waydown";
 
 // Every place the component sits at, as the complete chain. A place is the
 // component and what directly pulled it in, which is what a decision is
@@ -41,7 +42,17 @@ function Away({ url }: { url?: string }) {
   );
 }
 
-export function Places({ places, build }: { places: Sitting[]; build: string }) {
+export function Places({
+  places,
+  build,
+  version,
+}: {
+  places: Sitting[];
+  build: string;
+  // What ships here, for a way down the graph could not be walked: the chain
+  // carries a version at every step and a place without one carries none.
+  version?: string;
+}) {
   const [all, setAll] = useState(false);
   if (places.length === 0) return null;
   const shown = all ? places : places.slice(0, CHAINS);
@@ -50,26 +61,11 @@ export function Places({ places, build }: { places: Sitting[]; build: string }) 
       <h4>Dependency path</h4>
       <div className="tree">
         {shown.map((place, i) => {
-          const chain = place.chain ?? [];
-          const bare = chain.length <= 1;
-          if (bare) {
-            return (
-              <div key={`${place.place} ${i}`} className="node here">
-                <span className="rule">└</span>
-                <span className="id">{chain[chain.length - 1]?.component ?? ""}</span>
-                <span className="hint">{UNPLACED}</span>
-                {place.decision != null && (
-                  <Link to={`/decisions/${place.decision}`} className="linkish">
-                    decided
-                  </Link>
-                )}
-              </div>
-            );
-          }
+          const { steps, rootless } = wayDown(place, version);
           return (
             <Fragment key={`${place.place} ${i}`}>
-              {chain.map((step, depth) => {
-                const last = depth === chain.length - 1;
+              {steps.map((step, depth) => {
+                const last = depth === steps.length - 1;
                 return (
                   <div
                     key={`${place.place} ${i} ${depth}`}
@@ -79,6 +75,10 @@ export function Places({ places, build }: { places: Sitting[]; build: string }) 
                     <span className="rule">└</span>
                     <span className="id">{step.component}</span>
                     {step.version && <span className="ver">{step.version}</span>}
+                    {/* Said at the top of the way down, which is where it is
+                        true: the consumer under it is what the record names,
+                        and what pulls *that* in is what nothing recorded. */}
+                    {depth === 0 && rootless && <span className="hint">{UNPLACED}</span>}
                     {last && place.suppressed && (
                       <span className="state open">suppressed by the build</span>
                     )}
@@ -101,17 +101,13 @@ export function Places({ places, build }: { places: Sitting[]; build: string }) 
       )}
       {/* The tree is handed the whole chain, not only the name: it opens
           each step on the way down and lands on the component, so arriving
-          from a finding shows where it sits rather than the root. */}
-      <Link
-        to={
-          `${build}/components?at=${encodeURIComponent(places[0]?.chain?.at(-1)?.component ?? "")}` +
-          `&path=${encodeURIComponent((places[0]?.chain ?? []).map((step) => step.component ?? "").join("\u001f"))}` +
-          (places[0]?.chain?.at(-1)?.version
-            ? `&version=${encodeURIComponent(places[0]?.chain?.at(-1)?.version ?? "")}`
-            : "")
-        }
-        className="linkish"
-      >
+          from a finding shows where it sits rather than the root.
+
+          From a place the graph could be walked to, whichever of them that
+          is. A chain is what the tree opens along, and the first place is not
+          always one that has a route up — handed that one, the tree was given
+          a name to land on and no way down to it. */}
+      <Link to={`${build}/components?${intoTheTree(places)}`} className="linkish">
         View in dependency tree →
       </Link>
     </div>

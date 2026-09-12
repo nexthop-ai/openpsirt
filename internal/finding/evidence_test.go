@@ -69,3 +69,61 @@ func TestAFoldWithNothingUndisclosedSaysSo(t *testing.T) {
 		t.Errorf("a disclosure date was invented: %v", evidence.DiscloseAt)
 	}
 }
+
+// An inventory that describes one consumer twice — as the source package and
+// as the distribution's package, two components by content and one pair of
+// names — leaves two rows sharing one place. A place is what a decision is
+// keyed on, so the screen reads one row, with the way down of whichever of the
+// two the graph could walk.
+func TestTwoRowsSharingOnePlaceReadAsOnePlace(t *testing.T) {
+	place := PlaceIdentity("linux-image", "opennsl-modules")
+	unplaced, walkable := int64(20), int64(21)
+	rows := []evidenceRow{
+		// The copy nothing placed: the walk up from the first of the two
+		// reaches nothing, so that row alone would read as unplaced.
+		{
+			PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			ComponentID: 10, ConsumerID: &unplaced,
+		},
+		{
+			PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			ComponentID: 10, ConsumerID: &walkable,
+		},
+	}
+	chains := map[int64][]graph.Step{
+		walkable: {{Name: "sonic-broadcom"}, {Name: "host-image"}, {Name: "opennsl-modules"}},
+	}
+	places := placesOf(rows, chains, map[int64]string{10: "6.12.41-1"})
+
+	if len(places) != 1 {
+		t.Fatalf("%d places for one pair of names, want 1", len(places))
+	}
+	if got := len(places[0].Chain); got != 4 {
+		t.Fatalf("the way down is %d steps, want the walkable one of the two", got)
+	}
+	if last := places[0].Chain[3]; last.Name != "linux-image" || last.Version != "6.12.41-1" {
+		t.Errorf("the way down ends at %q %q, want the component this place is",
+			last.Name, last.Version)
+	}
+}
+
+// The build's own argument covers a place only where it covers every row the
+// key folds: a VEX statement about one of two components of the same name is
+// not a statement about the place a decision is recorded against.
+func TestAPlaceIsSuppressedOnlyWhereEveryRowOfItIs(t *testing.T) {
+	place := PlaceIdentity("linux-image", "opennsl-modules")
+	unplaced, walkable := int64(20), int64(21)
+	rows := []evidenceRow{
+		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			ComponentID: 10, ConsumerID: &unplaced, Suppressed: true},
+		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			ComponentID: 10, ConsumerID: &walkable, Suppressed: false},
+	}
+	places := placesOf(rows, nil, nil)
+	if len(places) != 1 {
+		t.Fatalf("%d places for one pair of names, want 1", len(places))
+	}
+	if places[0].Suppressed {
+		t.Error("a place reads as argued away by the build where only one of its rows is")
+	}
+}

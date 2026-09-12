@@ -34,6 +34,22 @@ const MARKS: Mark[] = [
   { label: "", title: "Link", wrap: ["[", "](https://)"], icon: "link" },
 ];
 
+// Who may be offered after an @, as the editor takes it.
+//
+// The question is about what is being discussed rather than about who is
+// asking: the endpoint answers with the people who can already read findings
+// of that visibility in that product, so asking as though an undisclosed
+// finding were public offers colleagues who cannot open what they are being
+// called to. Written once because four screens ask it and two of them had
+// started to answer it differently.
+export function mentioning(
+  product?: string,
+  undisclosed?: boolean,
+): { product: string; visibility: "public" | "private" } | undefined {
+  if (!product) return undefined;
+  return { product, visibility: undisclosed ? "private" : "public" };
+}
+
 export function Editor({
   value,
   onChange,

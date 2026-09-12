@@ -140,14 +140,14 @@ export function Unassigned() {
                 spans every product somebody can see — so it fills once a
                 product is chosen. Taking work yourself needs no picker and
                 works either way, which is the button beside it. */}
-            <div
-              style={{ minWidth: 220 }}
-              title={scope.product ? undefined : "Choose a product to hand work to somebody else"}
-            >
+            <div style={{ minWidth: 220 }}>
               <Holder
                 product={scope.product ?? ""}
                 value={null}
-                placeholder="Assign to…"
+                // Said in the control rather than only in a tooltip: a box
+                // that looks live, does nothing, and explains itself on hover
+                // is one somebody clicks into and gets no answer from.
+                placeholder={scope.product ? "Assign to…" : "Pick a product to assign"}
                 none="Nobody"
                 disabled={!scope.product}
                 onPick={(held) => setPerson(held ? `${held.kind}:${held.identity}` : "")}

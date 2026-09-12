@@ -39,7 +39,7 @@ components:
         record:
           $ref: "#/components/schemas/PersonRecordBody"
         sees_nothing:
-          description: They hold roles and none of them is in force
+          description: Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing
           type: boolean
         told:
           items:
@@ -1165,6 +1165,9 @@ components:
           description: How many decisions the claim wrote
           format: int64
           type: integer
+        undisclosed:
+          description: At least one row is about a finding nobody has announced
+          type: boolean
         when:
           description: "When it became that. Absent while it is waiting: nothing has happened to it"
           type: string
@@ -5482,7 +5485,7 @@ components:
           description: "What the scanner said while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"
           type: string
         closed:
-          description: Issues that were open and are not any more
+          description: Issues that were open and are not any more. Absent for the same reasons as the count beside it
           format: int64
           type: integer
         components:
@@ -5496,7 +5499,7 @@ components:
           $ref: "#/components/schemas/MeasuredBody"
           description: What the run answering this upload was measured with. Absent until a run has covered it
         opened:
-          description: Issues this run found that were not open before
+          description: Issues this run found that were not open before. Absent where this upload's run is reported against a newer one, or where none has covered it yet
           format: int64
           type: integer
         placed:

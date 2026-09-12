@@ -20,7 +20,7 @@ import { useComment, useEditComment } from "../api/mutations";
 import { Failed } from "../ui/Failed";
 import { ReasonEditor } from "../ui/ReasonEditor";
 import { Markdown } from "../ui/Markdown";
-import { Editor, forget } from "../ui/Editor";
+import { Editor, forget, mentioning } from "../ui/Editor";
 import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 
@@ -473,12 +473,18 @@ export function Comments({
   claimId,
   mine,
   about,
+  undisclosed,
 }: {
   claimId: number;
   mine: (who: string) => boolean;
   // The issue a file would be attached to. Comments are written about one, so
   // the control can say what it is attaching to rather than guessing.
   about: { product: string; vulnerability: string };
+  // Whether what is being discussed has been announced, which is what decides
+  // who may be offered after an @: naming somebody who cannot open the finding
+  // calls them to something they will be refused, and on an undisclosed one
+  // the mention itself says a finding exists.
+  undisclosed?: boolean;
 }) {
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
@@ -522,6 +528,7 @@ export function Comments({
                     id={each.id ?? 0}
                     was={each.body ?? ""}
                     about={about}
+                    undisclosed={undisclosed}
                     onDone={() => setEditing(null)}
                   />
                 ) : (
@@ -559,6 +566,7 @@ export function Comments({
           label="Comment"
           placeholder="A question, a note, something worth knowing later."
           attachTo={about}
+          mentions={mentioning(about.product, undisclosed)}
         />
       </div>
       {comment.error != null && <Failed error={comment.error} what="That could not be added." />}
@@ -642,17 +650,26 @@ export function Edit({
   was,
   onDone,
   about,
+  undisclosed,
 }: {
   id: number;
   was: string;
   onDone: () => void;
   about: { product: string; vulnerability: string };
+  undisclosed?: boolean;
 }) {
   const [text, setText] = useState(was);
   const edit = useEditComment();
   return (
     <div className="field" style={{ margin: 0, maxWidth: "78ch" }}>
-      <Editor value={text} onChange={setText} rows={4} label="Comment" attachTo={about} />
+      <Editor
+        value={text}
+        onChange={setText}
+        rows={4}
+        label="Comment"
+        attachTo={about}
+        mentions={mentioning(about.product, undisclosed)}
+      />
       {edit.error != null && <Failed error={edit.error} what="That could not be changed." />}
       <div className="actions">
         <button

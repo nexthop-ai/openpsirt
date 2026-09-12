@@ -4093,7 +4093,7 @@ export interface components {
             holds?: components["schemas"]["HeldBody"][] | null;
             identity: string;
             record: components["schemas"]["PersonRecordBody"];
-            /** @description They hold roles and none of them is in force */
+            /** @description Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing */
             sees_nothing?: boolean;
             told?: components["schemas"]["ToldBody"][] | null;
             /**
@@ -4771,6 +4771,8 @@ export interface components {
              * @description How many decisions the claim wrote
              */
             rows: number;
+            /** @description At least one row is about a finding nobody has announced */
+            undisclosed?: boolean;
             /** @description When it became that. Absent while it is waiting: nothing has happened to it */
             when?: string;
         };
@@ -7163,7 +7165,7 @@ export interface components {
             caution?: string;
             /**
              * Format: int64
-             * @description Issues that were open and are not any more
+             * @description Issues that were open and are not any more. Absent for the same reasons as the count beside it
              */
             closed?: number;
             /**
@@ -7177,7 +7179,7 @@ export interface components {
             measured?: components["schemas"]["MeasuredBody"];
             /**
              * Format: int64
-             * @description Issues this run found that were not open before
+             * @description Issues this run found that were not open before. Absent where this upload's run is reported against a newer one, or where none has covered it yet
              */
             opened?: number;
             /**
