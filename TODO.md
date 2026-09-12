@@ -54,7 +54,6 @@ Nothing is made faster until it is measured slow. These were measured and left.
 
 | | |
 |---|---|
-| The receipts page pairs runs quadratically | About a millisecond at the start of a year of nightly scans and about four at the end. A decade is four hundred milliseconds of arithmetic in the application |
 | MySQL costs 14× MariaDB per statement | A night issues 1,699 statements on every engine: 203 µs each on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL. There is nothing to find in what the apply does; the lever is issuing fewer statements |
 | One component on the demo has no walkable route to the build root | `golang.org/x/net` under `sonic-mgmt-common-codegen`. The consumer has edges upward, the depth bound of 64 is nowhere near reached, and the root exists. The row names the consumer instead of claiming nothing pulls it in, which is true whichever the cause. It may be a disconnected fragment in that inventory |
 | The scan measurement covers one build and an assumed churn rate | A deployment tracks several. `make measure` re-runs it against a different model by changing the constants |

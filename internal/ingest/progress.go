@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -315,24 +316,48 @@ func (s *Store) claims(ctx context.Context, targetID int64, credential string,
 	if credential != "" {
 		q = q.Where("sc.credential = ?", credential)
 	}
-	if err := q.Order("sc.id DESC").Scan(ctx, &filed); err != nil {
+	// Newest first by when it arrived, which is what "the newest upload this
+	// run covered" asks about. By arrival rather than by identifier because
+	// two uploads recorded at the same moment take their identifiers in
+	// whichever order they reach the table, and identifier order is then not
+	// arrival order; the identifier breaks the tie so that the answer does not
+	// depend on which engine is underneath.
+	if err := q.Order("sc.received_at DESC", "sc.id DESC").Scan(ctx, &filed); err != nil {
 		return nil, fmt.Errorf("read what has been filed here: %w", err)
 	}
 
-	claimed := make(map[int64]int64, len(runs))
+	// The runs newest first by when they finished, which is the order the
+	// uploads are already in. Sorted here rather than by the engine: the
+	// caller holds them in identifier order because that is the order the page
+	// reads them in, and an ordering that answers one question is not the one
+	// that answers the other.
+	order := make([]int, 0, len(runs))
 	for i := range runs {
+		if runs[i].FinishedAt != nil {
+			order = append(order, i)
+		}
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		return runs[order[a]].FinishedAt.After(*runs[order[b]].FinishedAt)
+	})
+
+	// One pass over each list rather than a pass over the uploads for every
+	// run. Both lists run newest first, so the upload a run is attributed to
+	// is never newer than the one the run before it was attributed to, and the
+	// walk carries on from where that one stopped.
+	claimed := make(map[int64]int64, len(order))
+	at := 0
+	for _, i := range order {
 		run := runs[i]
-		if run.FinishedAt == nil {
-			continue
+		for at < len(filed) && filed[at].ReceivedAt.After(*run.FinishedAt) {
+			at++
 		}
-		// Scans are newest first, so the first one this run finished after is
-		// the newest upload it covered.
-		for _, sc := range filed {
-			if !sc.ReceivedAt.After(*run.FinishedAt) {
-				claimed[run.ID] = sc.ID
-				break
-			}
+		if at == len(filed) {
+			// Every upload here arrived after this run finished, which is also
+			// true of every older run behind it.
+			break
 		}
+		claimed[run.ID] = filed[at].ID
 	}
 	return claimed, nil
 }
