@@ -55,7 +55,7 @@ export function Over({ children, onClose }: { children: ReactNode; onClose: () =
     return () => document.removeEventListener("keydown", key);
   }, [onClose]);
   return (
-    <div className="over" role="dialog" aria-modal="true" onClick={onClose}>
+    <div className="overpane" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="overbox" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="overshut" aria-label="Close" onClick={onClose}>
           ×
