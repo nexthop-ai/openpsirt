@@ -350,7 +350,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 			sent++
 			scan, outcome, err := uploads.Record(ctx, ingest.Arriving{
 				TargetID: target.ID, ContentHash: strconv.Itoa(sent),
-				BuiltAt:  at, ParserVersion: "test",
+				BuiltAt: at, ParserVersion: "test",
 			})
 			if err != nil || outcome != ingest.Accept {
 				t.Fatalf("record upload %d: %v %v", sent, outcome, err)

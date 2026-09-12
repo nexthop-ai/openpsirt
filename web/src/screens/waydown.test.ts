@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { intoTheTree, wayDown } from "./waydown";
 import type { Sitting } from "../ui/Covering";
 
+// The separator the tree's path parameter uses, written as an escape: a file
+// holding the byte itself reads as binary to every text tool, which skips it
+// and says nothing.
+const SEPARATOR = "\u001f";
+
 const place = (at: Partial<Sitting>): Sitting =>
   ({ place: "p", component: "curl", ...at }) as Sitting;
 
@@ -50,7 +55,7 @@ describe("opening the dependency tree from a finding", () => {
       ]),
     );
     expect(query.get("at")).toBe("curl");
-    expect(query.get("path")).toBe("sonic-broadcomcurl");
+    expect(query.get("path")).toBe(`sonic-broadcom${SEPARATOR}curl`);
     expect(query.get("version")).toBe("8.14.1");
   });
 
