@@ -13,8 +13,6 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 
 - [Declaration, not completion](#declaration-not-completion)
 - [The unit](#the-unit)
-- [Request shape](#request-shape)
-- [Build states](#build-states)
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
 - [Pending upgrades](#pending-upgrades)
@@ -31,12 +29,20 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 
 ## Declaration, not completion
 
-A fix is declared and never completed. Somebody states which releases they
-intend to fix an issue in; whether it arrived is answered by the next scan of
-each of those releases (REQ-35).
+A fix is declared and never completed. A judgment promising work states which
+releases it is for; whether the fix arrived is answered by the next scan of each
+of those releases (REQ-35).
 
-The stored row is the declaration and nothing else: which build, who said so, and
-when. There is no state column, no completed-at, and nothing to move along.
+The stored row is the declaration and nothing else: which build, which fold, who
+said so, and when. There is no state column, no completed-at, and nothing to
+move along.
+
+**A declaration arrives with the judgment that argued for it**, from the two
+outcomes that promise work — a bump, recorded against the component, and a
+backport, recorded against the issue. There is no way to record where a fix will
+land without saying what was decided: bare intent carried no version, no date
+and no reasoning, so nothing could lapse and nobody was asked to agree to it,
+which made it a promise in the shape of a record and not in its effect.
 
 The alternative — planned, in progress, done, moved by a person — is how every
 tracker works, and is wrong here because independent evidence already exists. A
@@ -97,39 +103,6 @@ which is the failure REQ-28 exists to prevent.
 | It is measured over what the claim covers now | The builds come from the commitments the claim wrote and the places from its own rows, read inside the transaction that writes. A deadline moves when the policy or the rating moves, so the one it was made against is not the one it is judged by |
 | A date already past is refused | It says the work will have happened before now |
 | The reasoning goes through the text policy | Every path that stores typed text runs it before storing, and this one reached the write through an inner act that did not |
-
-## Request shape
-
-The plan is a set, written whole (REQ-35). Intent spans several releases and is
-decided in one sitting, so a request states what the answer now is. An empty set
-withdraws it, through the same operation rather than a second one.
-
-| Rule | Reason |
-|---|---|
-| A build already in the plan keeps the date it was first chosen on | When somebody committed to a release is a fact about a moment. An edit saying nothing about the first release must not rewrite the record of what was promised when |
-| A build of another product is refused, and the whole request with it | A partly-applied plan leaves somebody believing a release is covered. A request can only name a release and a variant, resolved against the product in the path; the store's refusal covers callers naming a build by identifier |
-| Declaring is triage work | Being able to see a finding is not being able to plan the work on it |
-
-## Build states
-
-Every build of the product that has ever held the issue is listed, chosen or
-not, and so is every build that was chosen.
-
-| State | Chosen | Scan says | Meaning |
-|---|---|---|---|
-| missed | Yes | A finished scan since, still there | The claim has evidence against it |
-| fixing | Yes | No scan has looked since | |
-| clear | Yes | Gone | The one that worked |
-| gone | No | Gone anyway | |
-| undecided | No | Still there | Nobody has said whether it will be fixed here |
-| retired | — | — | Out of support, so it carries no target |
-
-| Rule | Reason |
-|---|---|
-| A build the issue has left is listed even though nobody planned it | This is the other half of "gone from main, still present in 2.4 and 2.3". Omitting it drops a fixed build from the list, which reads identically to a build that never shipped the component. It is not tickable |
-| Undecided is not a kind of outstanding | "Open because we chose not to fix it here" and "open because nobody thought about it" are different answers, and a list holding both loses the second |
-| A missed target needs a finished scan that ran after the claim | Without the "since", every declaration made between two nights would be flagged the moment it was written. A run still going may be about to report the issue |
-| A retired release is listed and not counted | Counting it as outstanding fills the figure permanently; counting it as delivered claims a fix nobody shipped. Choosing one already out of support is refused; one that retires after being chosen drops out of the counts and stays on the list |
 
 ## Resolution
 
@@ -232,10 +205,11 @@ evidence.
 
 ## External links
 
-A fix target and a claim each carry a link to work happening elsewhere, and
-**nothing is sent to it** (REQ-36): the link is stored and read by people. What
-is not built is the tracker hand-off — opening or updating an item in whatever
-system that link points at.
+A claim carries a link to work happening elsewhere, and **nothing is sent to
+it** (REQ-36): the link is stored and read by people. One link per claim rather
+than one per release, because the conversation about a promise is one
+conversation. What is not built is the tracker hand-off — opening or updating an
+item in whatever system that link points at.
 
 The signed outbound request (REQ-46) is a different thing and it is built;
 `DESIGN-notifications.md` owns it, including the egress controls and the one
@@ -246,7 +220,7 @@ the deployment sat behind a document saying it did not exist.
 | Rule | Reason |
 |---|---|
 | Nothing fetches what a link points at | A tool that fetched an address a person typed is a request-forgery primitive. Stored as text, shown as a link, encoded on the way out |
-| Left out, a link stays; sent empty, it is cleared | A plan is written whole, so "said nothing" and "said it is nowhere" are different requests. A stale link sends somebody to a ticket that closed for a different reason |
+| Sent empty, it is cleared | A stale link sends somebody to a ticket that closed for a different reason |
 | Anybody who may argue about a claim may point it somewhere | A link is a note about where the conversation is rather than a judgment |
 
 Assigning notifies; planning does not (REQ-34). Somebody is told when work is put

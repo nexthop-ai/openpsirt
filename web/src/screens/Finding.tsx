@@ -9,7 +9,7 @@ import {
 } from "./FindingClaim";
 import { Assess } from "./FindingAssess";
 import { Notes } from "./FindingNotes";
-import { FixingIn, HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
+import { HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -1014,8 +1014,6 @@ export function Finding() {
         {it.recorded && <AffectedBuilds product={product} vulnerability={vulnerability} />}
 
         {it.recorded && <Resolve at={at} vulnerability={vulnerability} />}
-
-        <FixingIn at={at} />
 
         {previous.length > 0 && (
           <PreviousCard

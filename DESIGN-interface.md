@@ -610,7 +610,13 @@ holds for the whole block of them and not for the advisory somebody is about to
 judge from, which is consulted during the judgment rather than after it.
 
 What is neither evidence nor action — the timeline, the revisions, the
-comments, the holder, the fix targets, the assessment — stays below.
+comments, the holder, the assessment — stays below.
+
+Where a fix will land is not on this screen. It is settled by the judgment that
+promises the work, and the releases it is for are named there; a pane of its own
+offered the same set with no version, no date and no reasoning attached, which
+is a plan nothing could chase. What became of it is read from the release and
+from the build's list of what it is waiting on.
 
 A decision is made on the finding's own screen, and nowhere else (REQ-57,
 reversed). The list opened the decision form inside a row for a while, so a run

@@ -919,7 +919,11 @@ button.edited {
 .suggestions li {
   margin: 0;
 }
-.suggestions .hint {
+/* The rows that are a message rather than a choice — "Looking…", nothing
+   matched. Only those, because the same class marks what a choice says about
+   itself beside its name: a block there drops that onto a second row and
+   stands every option in the list two rows tall. */
+.suggestions > li.hint {
   display: block;
   padding: 6px 8px;
 }

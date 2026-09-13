@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -253,4 +254,19 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		})
 	})
+}
+
+// planner is somebody who exists, holding triage on this fixture's product.
+//
+// Recorded rather than invented, because a declaration names who made it and
+// the schema says that has to be a person — a plan attributed to nobody is a
+// plan nobody can be asked about.
+func (f *fixture) planner(t *testing.T, roles ...access.Role) access.Subject {
+	t.Helper()
+	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "them@example.com", "Them", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return access.NewPerson(person.ID, "them@example.com", false,
+		map[int64][]access.Role{f.productID: roles}, 0)
 }

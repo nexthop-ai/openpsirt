@@ -148,8 +148,6 @@ type PlannedBody struct {
 	// ClaimID is the claim that argued for it, which is the way through to
 	// the reasoning, the approval and the conversation about the upgrade.
 	ClaimID int64 `json:"claim_id,omitempty" doc:"The claim that argued for it, where one did: its reasoning, its approval and its comments"`
-	// Elsewhere is where the work is happening, where somebody said.
-	Elsewhere string `json:"elsewhere,omitempty" doc:"Where the work is happening, where somebody said. Stored and never fetched"`
 }
 
 func registerPendingUpgrades(api huma.API, in Ingest) {
@@ -216,7 +214,7 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 				Issues:     one.Issues, Places: one.Places,
 				DeclaredAt: one.DeclaredAt.Format(time.DateOnly),
 				HeldBy:     one.HeldBy, State: string(one.State),
-				ClaimID: one.ClaimID, Elsewhere: one.Elsewhere,
+				ClaimID: one.ClaimID,
 			}
 			if row.Components == nil {
 				row.Components = []string{}

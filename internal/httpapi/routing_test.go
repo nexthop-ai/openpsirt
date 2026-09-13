@@ -327,9 +327,5 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 		} else if got.Code >= 300 && got.Code != http.StatusConflict {
 			t.Errorf("marking answered %d: %s", got.Code, got.Body.String())
 		}
-		if got := asPerson(t, r, "triager", http.MethodGet,
-			at+"/fix-targets", ""); got.Code == http.StatusNotFound {
-			t.Errorf("reading fix targets answered 404: %s", got.Body.String())
-		}
 	})
 }

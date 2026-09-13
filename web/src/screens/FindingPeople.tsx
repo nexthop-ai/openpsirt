@@ -8,7 +8,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
@@ -178,7 +177,6 @@ export function Assignee({
   routedBy: string;
 }) {
   const queries = useQueryClient();
-  const me = useWho();
   const hand = useMutation({
     // A party, not a person: a team holds work exactly as somebody does , and
     // the picker offers both.
@@ -205,8 +203,9 @@ export function Assignee({
     },
   });
 
-  // One line: who holds it, and the one-click case beside the picker. A
-  // dropdown needs no heading and no paragraph around it.
+  // One line: the label and the picker. A dropdown needs no heading and no
+  // paragraph around it, and taking it yourself is the picker's first option
+  // rather than a second control beside it.
   return (
     <div className="assignee">
       <span
@@ -224,20 +223,6 @@ export function Assignee({
           onPick={(held) => hand.mutate(held)}
         />
       </div>
-      {/* Assigning to yourself is the common case, so it is one click beside
-          the picker rather than two. Named for what it does: beside a picker
-          that assigns to anybody, a vaguer word reads as the only thing the
-          control does. */}
-      {me.data?.identity != null && assigned !== me.data.identity && (
-        <button
-          type="button"
-          className="linkish"
-          disabled={hand.isPending}
-          onClick={() => hand.mutate({ kind: "person", identity: me.data!.identity, name: "" })}
-        >
-          Assign to me
-        </button>
-      )}
       {routedBy && <span className="hint">by rule {routedBy}</span>}
       {hand.isPending && <span className="hint">Saving…</span>}
       {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
