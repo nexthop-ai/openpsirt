@@ -1008,6 +1008,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit a note on an issue
+         * @description Replaces the text of a note. Only its author may do this: an edit another person could make is not a correction.
+         *
+         *     **What it said before is kept**, and read back with `GET /v1/notes/{id}/history`. A note is part of the record that goes public at disclosure, and a record whose earlier text is unrecoverable is readable rather than checkable.
+         *
+         *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+         *
+         *     **Requires:** public-triage or private-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
+         */
+        put: operations["edit-issue-note"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notes/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List earlier revisions of a note
+         * @description Every version of a note that has been replaced, oldest first. The note itself carries what it says now.
+         *
+         *     A note is part of the record that goes public at disclosure, so what it said before has to be recoverable: an edit that overwrites leaves a record somebody can read and nobody can check.
+         *
+         *     Answers only where you may read what the note is about — the same rule as reading the note itself, asked of the issue rather than of the note, because two rules for one question is one rule out of step.
+         *
+         *     **Requires:** any recognized credential. Answers only where you may read what the note is about, which is the note's own product and issue rather than anything in the path.
+         */
+        get: operations["get-issue-note-history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notifications": {
         parameters: {
             query?: never;
@@ -2086,6 +2138,46 @@ export interface paths {
          *     **Requires:** private-triage on the product. A second person agrees past the threshold.
          */
         post: operations["extend-disclosure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/issues/{vulnerability}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List notes on an issue in a product
+         * @description Returns the notes written about this issue in this product, oldest first, with who wrote each and when. A note that has been edited also carries when it was last changed.
+         *
+         *     A note records no judgment and changes nothing: not what ranks, not a deadline, not a triage line. It is context for whoever decides.
+         *
+         *     **It is about the issue in this product, not about one component.** A row in the findings list is one issue at one source package, and one issue is often several rows — so a note kept against a row would be written on one of them and hidden from the rest. What is about a judgment at a place is a comment on that claim instead.
+         *
+         *     **Requires:** any recognized credential. Answers where you may read a finding of this issue in this product, at its visibility — an issue with one undisclosed place here is undisclosed for this. Anywhere else it answers as an issue that is not there.
+         */
+        get: operations["list-issue-notes"];
+        put?: never;
+        /**
+         * Add a note to an issue in a product
+         * @description Adds a markdown note about this issue in this product. It records no judgment: nothing about what ranks, what a deadline is, or what the product triages changes because somebody wrote one.
+         *
+         *     **This is the way to leave something for whoever decides without deciding.** A comment hangs off a claim, so before this the first person to say anything had to record a judgment in order to say it.
+         *
+         *     It reaches every build of the product and does not lapse when a version moves. Something true of one copy and not another — "we do not call that function in the vendored build" — is about a place, and belongs on the claim there.
+         *
+         *     A name written after an `@` is told, where that person may read what the note is about; the response lists the names that reached nobody.
+         *
+         *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+         *
+         *     **Requires:** public-triage or private-triage on the product
+         */
+        post: operations["note-on-issue"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5261,6 +5353,16 @@ export interface components {
             readonly $schema?: string;
             body: string;
         };
+        "Edit-issue-noteRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Edit-issue-noteRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What it should say now, in markdown */
+            body: string;
+        };
         EmbargoedBody: {
             component: string;
             /** @description When the embargo ends. Reaching it discloses nothing */
@@ -6310,6 +6412,15 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["MentionableBody"][] | null;
         };
+        ListBodyNoteBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyNoteBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["NoteBody"][] | null;
+        };
         ListBodyOutboundBody: {
             /**
              * Format: uri
@@ -6622,6 +6733,39 @@ export interface components {
             category: string;
             text: string;
             title?: string;
+        };
+        "Note-on-issueRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Note-on-issueRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to say, in markdown */
+            body: string;
+        };
+        NoteBody: {
+            /** @description What it says, in markdown */
+            body: string;
+            /** @description When the author last changed it, where they have */
+            edited_at?: string;
+            /** Format: int64 */
+            id: number;
+            written_at: string;
+            /** @description Who wrote it */
+            written_by: string;
+        };
+        NoteWritten: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/NoteWritten.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which */
+            not_notified?: string[] | null;
         };
         NotificationBody: {
             /** @description What a condition is about. Absent for an event */
@@ -9947,6 +10091,72 @@ export interface operations {
             };
         };
     };
+    "edit-issue-note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Edit-issue-noteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteWritten"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-issue-note-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyWasSaidBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-notifications": {
         parameters: {
             query?: {
@@ -11824,6 +12034,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExtensionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-issue-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyNoteBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "note-on-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Note-on-issueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteWritten"];
                 };
             };
             /** @description Error */

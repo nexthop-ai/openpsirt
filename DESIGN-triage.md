@@ -41,6 +41,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Lapse marking](#lapse-marking)
 - [Re-affirmation](#re-affirmation)
 - [Comments and reasoning](#comments-and-reasoning)
+- [Notes on an issue](#notes-on-an-issue)
 - [VEX statements as evidence](#vex-statements-as-evidence)
 - [Dates still to come](#dates-still-to-come)
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
@@ -925,7 +926,45 @@ above.
 | Who may read it is asked of the claim, not of the comment | Asking twice is one question with two answers waiting to disagree |
 | Nobody else may edit somebody's words | An edit anybody could make is a forgery with a timestamp |
 | Being allowed near the claim is settled before anything about the comment is said back (REQ-42) | The row has to be read first, because the claim it hangs off cannot be known otherwise, but no answer turns on what was in it until the asker has been let in. Refusing on authorship first made "that is not your comment" and "there is no such comment" two different answers, so anybody holding triage anywhere could walk the identifiers |
-| Every field somebody types into runs through the same policy before storage | The reasoning, a revision of it, and a comment. `DESIGN-text.md` says what that policy is |
+| Every field somebody types into runs through the same policy before storage | The reasoning, a revision of it, a comment and a note. `DESIGN-text.md` says what that policy is |
+
+## Notes on an issue
+
+A note is what somebody wants whoever decides to know, written without
+recording a judgment (REQ-29). It changes nothing: not what ranks, not a
+deadline, not what the product triages.
+
+**There was nowhere to put one.** A comment hangs off a claim and the box for
+one appears only where a claim already exists, so the first person to say
+anything had to record a judgment in order to say it. Assignment carries no
+message either: it takes a person or a team and nothing else.
+
+| Rule | |
+|---|---|
+| Keyed on the issue and the product, like a rating (REQ-29) | A row in the findings list is one issue at one source package, and one issue is often several rows: 786 of 5,840 open issues on the seeded image, the worst at eleven, across one library at several versions and the standard library. A note kept against a row would be written on one of eleven and hidden from the other ten |
+| It reaches every build of the product and does not lapse when a version moves | It is about the issue here rather than about a version of something |
+| Reading asks whether the reader may read a finding of that issue in that product, at its visibility (REQ-43) | The same rule every other read of the record follows. A product the reader holds nothing on answers as an issue that is not there |
+| Writing asks for triage on that product at the same visibility | Saying something on the record about work is part of arguing about it. Reading the product is not |
+| One undisclosed place makes the whole thread undisclosed | A note is one thread for the issue, so it cannot be public for some of its places and private for others, and the stricter direction is the safe one. It is the rule the finding screen already applies to what may be said |
+| Only the author may change one, and what it said before is kept | A note goes public at disclosure with the rest of the record, and a record whose earlier text is unrecoverable is readable rather than checkable. Both writes go together, for the reason a comment's do |
+| A name written after an `@` is told, where that person may read what the note is about | The same rule and the same query a comment's mentions use. A name that reached nobody is reported without saying why |
+
+### Two records, not one
+
+| | Hangs off | Is about |
+|---|---|---|
+| A comment | A claim | The argument somebody made, at one place |
+| A note | An issue in a product | The issue here, however many rows it sits on |
+
+They are not merged, and cannot be. A claim is keyed on a place and a note on
+an issue, so one record cannot hold both — and the claim's record stays exactly
+what people wrote about the claim, which is what lets an approval point at one
+revision of a justification (REQ-28). Two threads are rendered near each other
+instead.
+
+**Something true of one copy and not another is a comment, not a note.** "We do
+not call that function in the vendored build" is about a judgment at a place,
+and it has a home there already.
 
 ## VEX statements as evidence
 

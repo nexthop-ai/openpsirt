@@ -446,6 +446,21 @@ component and the build, and is stored as written, so there is no visibility
 filter downstream that could repair it. The check is at the visibility of the
 finding, not of the product.
 
+### Notes on an issue
+
+A note records no judgment, and it is read and written under the rule the
+rating beside it follows: the product, and the issue's visibility in it
+(REQ-29, REQ-43).
+
+| Rule | |
+|---|---|
+| Reading asks whether the reader may read a finding of that issue in that product | A product the reader holds nothing on answers as an issue that is not there, in the words an unused name gets |
+| Writing asks for triage on that product, at the same visibility | Saying something on the record about work is part of arguing about it, and reading the product is not |
+| A collaborator brought into one case may read and write on that issue | The pair they were brought in on is the whole of what they reach, and a note about it is inside that pair |
+| An issue with one undisclosed place in that product is undisclosed for the whole thread | A note is one thread for the issue, so it cannot be public for some of its places and private for others. The stricter direction is the safe one |
+| Only the author may change one | An edit anybody could make is a forgery with a timestamp |
+| A mention in a note reaches only people who may read what it is about | The same query the editor's picker uses, so a mention cannot tell somebody that an issue exists in a product they may not open |
+
 ## Subject kinds
 
 What a request may do is decided in one place, not in each handler that remembers

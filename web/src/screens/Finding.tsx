@@ -8,6 +8,7 @@ import {
   type Previous,
 } from "./FindingClaim";
 import { Assess } from "./FindingAssess";
+import { Notes } from "./FindingNotes";
 import { FixingIn, HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { useMemo, useState } from "react";
@@ -912,6 +913,20 @@ export function Finding() {
           <References advisory={it.advisory} refs={it.references ?? []} />
           <LookItUp links={it.links ?? []} />
         </div>
+
+        {/* Keyed on the issue in this product, so it is here whether or not
+            anybody has decided anything. It sits above the claim's own thread
+            because it is the one somebody can write in before there is a
+            claim — which is what it exists for. The two stay apart: a claim is
+            keyed on a place and a note on an issue, so they cannot become one
+            record, and merging them would put text an approval never saw into
+            the record an approval points at. */}
+        <Notes
+          product={product}
+          vulnerability={vulnerability}
+          mine={mine}
+          undisclosed={!!it.undisclosed}
+        />
 
         {/* Keyed on the claim, not on the row: the reasoning, the agreement
             and the conversation belong to the action that made the judgment. */}

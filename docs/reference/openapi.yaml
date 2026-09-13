@@ -2036,6 +2036,23 @@ components:
       required:
         - body
       type: object
+    Edit-issue-noteRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Edit-issue-noteRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        body:
+          description: What it should say now, in markdown
+          minLength: 1
+          type: string
+      required:
+        - body
+      type: object
     EmbargoedBody:
       additionalProperties: false
       properties:
@@ -3970,6 +3987,25 @@ components:
       required:
         - items
       type: object
+    ListBodyNoteBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyNoteBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/NoteBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+      type: object
     ListBodyOutboundBody:
       additionalProperties: false
       properties:
@@ -4602,6 +4638,69 @@ components:
       required:
         - category
         - text
+      type: object
+    Note-on-issueRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Note-on-issueRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        body:
+          description: What to say, in markdown
+          minLength: 1
+          type: string
+      required:
+        - body
+      type: object
+    NoteBody:
+      additionalProperties: false
+      properties:
+        body:
+          description: What it says, in markdown
+          type: string
+        edited_at:
+          description: When the author last changed it, where they have
+          type: string
+        id:
+          format: int64
+          type: integer
+        written_at:
+          type: string
+        written_by:
+          description: Who wrote it
+          type: string
+      required:
+        - id
+        - body
+        - written_by
+        - written_at
+      type: object
+    NoteWritten:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/NoteWritten.json
+          format: uri
+          readOnly: true
+          type: string
+        id:
+          format: int64
+          type: integer
+        not_notified:
+          description: Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - id
       type: object
     NotificationBody:
       additionalProperties: false
@@ -10338,6 +10437,89 @@ paths:
       x-openpsirt-requires:
         scope: any
         note: Answers only what you may see.
+  /v1/notes/{id}:
+    put:
+      description: |-
+        Replaces the text of a note. Only its author may do this: an edit another person could make is not a correction.
+
+        **What it said before is kept**, and read back with `GET /v1/notes/{id}/history`. A note is part of the record that goes public at disclosure, and a record whose earlier text is unrecoverable is readable rather than checkable.
+
+        The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+
+        **Requires:** public-triage or private-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
+      operationId: edit-issue-note
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Edit-issue-noteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteWritten"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Edit a note on an issue
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: Only the author may edit a note. The product is the note's own, not one in the path.
+  /v1/notes/{id}/history:
+    get:
+      description: |-
+        Every version of a note that has been replaced, oldest first. The note itself carries what it says now.
+
+        A note is part of the record that goes public at disclosure, so what it said before has to be recoverable: an edit that overwrites leaves a record somebody can read and nobody can check.
+
+        Answers only where you may read what the note is about — the same rule as reading the note itself, asked of the issue rather than of the note, because two rules for one question is one rule out of step.
+
+        **Requires:** any recognized credential. Answers only where you may read what the note is about, which is the note's own product and issue rather than anything in the path.
+      operationId: get-issue-note-history
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyWasSaidBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List earlier revisions of a note
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: any
+        note: Answers only where you may read what the note is about, which is the note's own product and issue rather than anything in the path.
   /v1/notifications:
     delete:
       description: |-
@@ -14095,6 +14277,103 @@ paths:
         any_of:
           - private-triage
         note: A second person agrees past the threshold.
+  /v1/products/{product}/issues/{vulnerability}/notes:
+    get:
+      description: |-
+        Returns the notes written about this issue in this product, oldest first, with who wrote each and when. A note that has been edited also carries when it was last changed.
+
+        A note records no judgment and changes nothing: not what ranks, not a deadline, not a triage line. It is context for whoever decides.
+
+        **It is about the issue in this product, not about one component.** A row in the findings list is one issue at one source package, and one issue is often several rows — so a note kept against a row would be written on one of them and hidden from the rest. What is about a judgment at a place is a comment on that claim instead.
+
+        **Requires:** any recognized credential. Answers where you may read a finding of this issue in this product, at its visibility — an issue with one undisclosed place here is undisclosed for this. Anywhere else it answers as an issue that is not there.
+      operationId: list-issue-notes
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The issue, by any name it is known under
+          in: path
+          name: vulnerability
+          required: true
+          schema:
+            description: The issue, by any name it is known under
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyNoteBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List notes on an issue in a product
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: any
+        note: Answers where you may read a finding of this issue in this product, at its visibility — an issue with one undisclosed place here is undisclosed for this. Anywhere else it answers as an issue that is not there.
+    post:
+      description: |-
+        Adds a markdown note about this issue in this product. It records no judgment: nothing about what ranks, what a deadline is, or what the product triages changes because somebody wrote one.
+
+        **This is the way to leave something for whoever decides without deciding.** A comment hangs off a claim, so before this the first person to say anything had to record a judgment in order to say it.
+
+        It reaches every build of the product and does not lapse when a version moves. Something true of one copy and not another — "we do not call that function in the vendored build" — is about a place, and belongs on the claim there.
+
+        A name written after an `@` is told, where that person may read what the note is about; the response lists the names that reached nobody.
+
+        The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+
+        **Requires:** public-triage or private-triage on the product
+      operationId: note-on-issue
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The issue, by any name it is known under
+          in: path
+          name: vulnerability
+          required: true
+          schema:
+            description: The issue, by any name it is known under
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Note-on-issueRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteWritten"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Add a note to an issue in a product
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
   /v1/products/{product}/issues/{vulnerability}/report:
     get:
       description: |-
