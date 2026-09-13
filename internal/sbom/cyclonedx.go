@@ -188,6 +188,23 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			return c.into(&described.Purl)
 		case "cpe":
 			return c.into(&described.CPE)
+		case "supplier":
+			// An object naming who supplied it. Read only where nothing has
+			// said yet, so the publisher below does not overwrite it.
+			return c.b.object(func(field string) error {
+				if field == "name" && described.Supplier == "" {
+					return c.into(&described.Supplier)
+				}
+				return c.b.skip()
+			})
+		case "publisher":
+			// A plain string, and the weaker of the two: a producer that
+			// states both means the supplier. Taken only where the supplier
+			// said nothing.
+			if described.Supplier != "" {
+				return c.b.skip()
+			}
+			return c.into(&described.Supplier)
 		case "pedigree":
 			return c.pedigree(&described, &carried)
 		case "components":

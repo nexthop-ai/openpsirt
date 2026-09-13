@@ -204,6 +204,16 @@ export function Component() {
                   <span className="hint">not known</span>
                 )}
               </dd>
+              <dt>Supplier</dt>
+              <dd>
+                {here.supplier ? (
+                  here.supplier
+                ) : (
+                  <span className="hint" title="The inventory did not say who supplied it">
+                    not stated
+                  </span>
+                )}
+              </dd>
               <dt>Newest known</dt>
               <dd>
                 {here.newest_version ? (
@@ -303,9 +313,8 @@ function Sits({
     `?stream=${encodeURIComponent(scope.stream)}&variant=${encodeURIComponent(scope.variant)}`;
 
   return (
-    <div className="card">
+    <div>
       <div className="screen-head" style={{ marginBottom: 10 }}>
-        <h3>Where it sits</h3>
         {builds.length > 1 && (
           <label className="hint" style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             <span>Build</span>
@@ -338,13 +347,13 @@ function Sits({
       ) : (
         <ol className="sits">
           <li>
-            <span className="step">Pulled in by</span>
+            <span className="step">Pulled in by{above.length > 0 ? ` · ${above.length}` : ""}</span>
             {around.isPending ? (
-              <span className="hint">Working it out…</span>
+              <span className="sub">Working it out…</span>
             ) : above.length === 0 ? (
-              <span className="hint">The build contains it directly.</span>
+              <span className="sub">The build contains it directly.</span>
             ) : (
-              <span>
+              <span className="nm">
                 {above.slice(0, 3).map((parent, i) => (
                   <span key={(parent.component ?? "") + i}>
                     {i > 0 && ", "}
@@ -353,9 +362,9 @@ function Sits({
                     </Link>
                   </span>
                 ))}
-                {above.length > 3 && <span className="hint"> and {above.length - 3} more</span>}
+                {above.length > 3 && <span className="sub"> and {above.length - 3} more</span>}
                 {above.length > 1 && (
-                  <span className="hint">
+                  <span className="sub">
                     {" "}
                     · reached {above.length} ways, not {above.length} copies
                   </span>
@@ -365,11 +374,11 @@ function Sits({
           </li>
 
           <li className="at">
-            <span className="step">This package</span>
-            <span>
-              <span className="id">{component}</span> <span className="hint">{here.version}</span>
+            <span className="step">This package{here.ecosystem ? ` · ${here.ecosystem}` : ""}</span>
+            <span className="nm id">
+              {component} <span className="hint">{here.version}</span>
             </span>
-            <span className="hint">
+            <span className="sub">
               {(here.issues ?? 0).toLocaleString()} open on it, at{" "}
               {(here.places ?? 0).toLocaleString()} {here.places === 1 ? "place" : "places"} under{" "}
               {(here.consumers ?? 0).toLocaleString()}{" "}
@@ -397,14 +406,16 @@ function Sits({
           </li>
 
           <li>
-            <span className="step">What it carries</span>
+            <span className="step">
+              What it carries{below.length > 0 ? ` · ${below.length.toLocaleString()}` : ""}
+            </span>
             {around.isPending ? (
-              <span className="hint">Working it out…</span>
+              <span className="sub">Working it out…</span>
             ) : below.length === 0 ? (
-              <span className="hint">Nothing — a leaf, so none of this is inherited.</span>
+              <span className="sub">Nothing — a leaf, so none of this is inherited.</span>
             ) : (
               <>
-                <span className="hint">
+                <span className="sub">
                   {below.length.toLocaleString()} packages, {carrying.length} with something open
                 </span>
                 {carrying.length > 0 && (

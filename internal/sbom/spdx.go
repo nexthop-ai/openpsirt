@@ -198,6 +198,18 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 			}
 			described.Version = sentinel(stated)
 			return nil
+		case "supplier", "originator":
+			// One string, prefixed with what kind of party it is:
+			// "Organization: Debian". The prefix is the format's and says
+			// nothing a reader wants, so the name after it is what is kept.
+			var stated string
+			if err := c.into(&stated); err != nil {
+				return err
+			}
+			if described.Supplier == "" {
+				described.Supplier = partyName(stated)
+			}
+			return nil
 		case "externalRefs":
 			return c.spdxExternalRefs(&described)
 		default:
@@ -396,4 +408,22 @@ func (c *reader) spdxRelate(from, kind, to string) error {
 		}
 	}
 	return nil
+}
+
+// partyName drops the kind a party is stated as, keeping who it is.
+//
+// The format spells a supplier "Organization: Debian" or "Person: somebody",
+// and one of the two words is a label rather than a name. "NOASSERTION" is the
+// format's way of saying nobody stated one, which is the same as absent.
+func partyName(stated string) string {
+	said := strings.TrimSpace(stated)
+	if said == "" || strings.EqualFold(said, "NOASSERTION") {
+		return ""
+	}
+	for _, kind := range []string{"Organization:", "Person:", "Tool:"} {
+		if rest, found := strings.CutPrefix(said, kind); found {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return said
 }

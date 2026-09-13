@@ -32,6 +32,7 @@ type PerBuildBody struct {
 	// work, and a number with nothing beside it says which is which.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
 	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited, which outranks everything else about it"`
+	Supplier   string         `json:"supplier,omitempty" doc:"Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
 	// What the ecosystem's index says is current, where one was asked.
 	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
 	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"When that version shipped, where the index said"`
@@ -120,7 +121,8 @@ func registerComponent(api huma.API, in Ingest) {
 				Purl: build.Purl, Ecosystem: graph.EcosystemOf(build.Purl),
 				Summary: build.Summary, ProjectURL: build.ProjectURL,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
-				Newest: build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
+				Supplier: build.Supplier,
+				Newest:   build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
 				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,

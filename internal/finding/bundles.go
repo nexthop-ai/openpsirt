@@ -528,6 +528,9 @@ type PerBuild struct {
 	// about a distribution package.
 	Summary    string
 	ProjectURL string
+	// Supplier is who the scan said supplied it, from the inventory rather
+	// than from an index.
+	Supplier string
 	// BySeverity is what is open here by how it was rated, so a count has a
 	// shape: forty issues and three criticals are different work.
 	BySeverity map[string]int
@@ -607,6 +610,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Purl        string     `bun:"purl"`
 		Summary     string     `bun:"summary"`
 		ProjectURL  string     `bun:"project_url"`
+		Supplier    string     `bun:"supplier"`
 		Newest      string     `bun:"latest_version"`
 		NewestAt    *time.Time `bun:"latest_released_at"`
 		FirstSeen   time.Time  `bun:"first_seen_at"`
@@ -667,6 +671,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr("c.purl AS purl").
 		ColumnExpr("COALESCE(c.summary, '') AS summary").
 		ColumnExpr("COALESCE(c.project_url, '') AS project_url").
+		ColumnExpr("COALESCE(c.supplier, '') AS supplier").
 		ColumnExpr("COALESCE(c.latest_version, '') AS latest_version").
 		ColumnExpr("c.latest_released_at AS latest_released_at").
 		ColumnExpr("c.first_seen_at AS first_seen_at").
@@ -713,7 +718,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
 			Version: row.Version, Purl: row.Purl,
 			Summary: row.Summary, ProjectURL: row.ProjectURL,
-			Newest: row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
+			Supplier: row.Supplier,
+			Newest:   row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
 			Exploited: row.Exploited > 0, Issues: row.Issues,
 			BySeverity: bands[[2]int64{row.TargetID, row.ComponentID}],
 			Consumers:  row.Consumers, Places: row.Places,

@@ -6907,6 +6907,8 @@ export interface components {
             stream: string;
             /** @description One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package */
             summary?: string;
+            /** @description Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it */
+            supplier?: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;
             /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets */

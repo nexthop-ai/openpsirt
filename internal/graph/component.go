@@ -84,6 +84,10 @@ type Component struct {
 	// distribution package. A screen shows what there is.
 	Summary    string `bun:"summary"`
 	ProjectURL string `bun:"project_url"`
+	// Supplier is who the scan said supplied it. From the inventory rather
+	// than from an index, and often absent: a producer states it for some of
+	// what it describes and not the rest.
+	Supplier string `bun:"supplier"`
 }
 
 // Described is a component as a scan describes it, before it has been matched
@@ -95,6 +99,11 @@ type Described struct {
 	Version         string
 	UpstreamName    string
 	UpstreamVersion string
+	// Supplier is who a producer says supplied the component — a
+	// distribution, a vendor, a project. Not part of identity: two producers
+	// describing one component name it differently or not at all, and an
+	// identity that moved with it would reset every decision attached.
+	Supplier string
 }
 
 // Identity returns the content-derived key for a described component.
@@ -302,6 +311,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			UpstreamName: d.UpstreamName, UpstreamVersion: d.UpstreamVersion,
 			UpstreamFolded: Folded(d.UpstreamName),
 			FoldKey:        d.FoldKey(),
+			Supplier:       d.Supplier,
 			FirstSeenAt:    now,
 		})
 	}

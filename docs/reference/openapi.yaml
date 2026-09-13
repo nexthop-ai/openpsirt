@@ -4964,6 +4964,9 @@ components:
         summary:
           description: One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package
           type: string
+        supplier:
+          description: Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it
+          type: string
         upgrade_to:
           description: The version somebody has committed to moving this build to
           type: string

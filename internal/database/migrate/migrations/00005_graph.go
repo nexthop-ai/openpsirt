@@ -116,6 +116,12 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 			-- stored.
 			"summary"            ` + t.free + ` NULL,
 			"project_url"        ` + t.free + ` NULL,
+			-- Who the producer said supplied it: a distribution, a vendor, a
+			-- project. From the inventory rather than from an index, and absent
+			-- for plenty of it — one producer states it for 759 of the 6,866
+			-- components it describes. Not part of identity, because two
+			-- producers name it differently or not at all.
+			"supplier"           ` + t.free + ` NULL,
 			CONSTRAINT "component_identity_unique" UNIQUE ("identity")
 		)` + t.suffix,
 
