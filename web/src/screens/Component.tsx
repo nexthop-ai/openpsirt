@@ -1,37 +1,53 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Holder, type Held } from "../ui/Holder";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Empty } from "../ui/Empty";
+import { Outward } from "../ui/Outward";
 import { on } from "../ui/when";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Pace } from "../ui/Charts";
+import { upstream } from "../ui/upstream";
 
-// One component, across the builds that carry it.
+// One component, and the one piece of work it is.
 //
-// **The screen that was missing.** The by-component view answers where the
-// weight is, and clicking a component opened a filtered list of its findings —
-// so a component could be read and never acted on. The act of upgrading one
-// therefore ended up on a screen of its own, keyed on version pairs, which put
-// the thing somebody does on a different page from the thing it is done to.
+// **Arranged on where it sits.** What can be done about a package is mostly a
+// function of its position: a leaf carries its own risk and is upgraded, and
+// something vendored in pre-built carries everything beneath it and moves only
+// when it does. So the graph leads — what pulls it in, the package, what it
+// carries — and the act hangs off that.
 //
-// **Answered per build, because the answer differs by build.** A stream
-// staying on a maintained older line and a stream that has moved on are
-// different work with different testing, and one target across both would be
-// wrong for one of them.
-// How many versions to move to are worth listing. A kernel offers twenty, and
-// the question somebody is answering is which one to take rather than what the
-// whole set is.
-const SHOWN = 4;
+// **A build is listed because it ships it**, not because something is open
+// against it. A package whose risk is all inherited still has a version, a
+// position, and things pulling it in.
+//
+// **One entry per version.** A build shipping a name at two versions holds two
+// components, and they are two pieces of code to decide about. The page is
+// about the one asked for and says what the others are.
+type Build = Body<"PerBuildBody">;
+
+// The separator inside a key naming one build. Not a character either name can
+// hold, so a key cannot be two builds.
+const APART = "\u0000";
+
+const keyOf = (row: { stream?: string; variant?: string }) =>
+  (row.stream ?? "") + APART + (row.variant ?? "");
+
+const findingsAt = (product: string, row: Build, component: string) =>
+  `/products/${encodeURIComponent(product)}` +
+  `/streams/${encodeURIComponent(row.stream ?? "")}` +
+  `/variants/${encodeURIComponent(row.variant ?? "")}/findings` +
+  `?component=${encodeURIComponent(component)}`;
 
 export function Component() {
   const { product = "", component = "" } = useParams();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+
   const builds = useQuery({
     queryKey: ["component", product, component],
     queryFn: async () =>
@@ -41,20 +57,421 @@ export function Component() {
         }),
       ),
   });
+  const rows = useMemo(() => builds.data?.items ?? [], [builds.data]);
 
+  // Which of them the page is about. The address names it, so a link from the
+  // tree or from a findings list arrives on what somebody was reading.
+  const stream = params.get("stream") ?? "";
+  const variant = params.get("variant") ?? "";
+  const version = params.get("version") ?? "";
+  const here = useMemo(() => {
+    const match = rows.find(
+      (row) =>
+        (!stream || row.stream === stream) &&
+        (!variant || row.variant === variant) &&
+        (!version || row.version === version),
+    );
+    // The worst of them where nothing was named, so the page opens on the build
+    // with something to answer rather than on whichever sorted first.
+    return match ?? [...rows].sort((a, b) => (b.issues ?? 0) - (a.issues ?? 0))[0];
+  }, [rows, stream, variant, version]);
+
+  // The versions this product ships the name at. More than one is two pieces of
+  // code, and the reader picks which.
+  const versions = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const row of rows) {
+      const at = row.version ?? "";
+      seen.set(at, (seen.get(at) ?? 0) + (row.issues ?? 0));
+    }
+    return [...seen.entries()].map(([at, issues]) => ({ at, issues }));
+  }, [rows]);
+
+  function go(next: Record<string, string>) {
+    const to = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(next)) to.set(key, value);
+    setParams(to);
+  }
+
+  if (builds.isPending) return <Loading />;
+  if (builds.isError) {
+    return <Failed error={builds.error} what="This component could not be read." />;
+  }
+  if (!here) {
+    return (
+      <>
+        <div className="screen-head">
+          <h2 className="id">{component}</h2>
+        </div>
+        <Empty
+          title="No build of this product ships it."
+          detail="The name is not one any scanned build carries."
+        />
+      </>
+    );
+  }
+
+  const sameVersion = rows.filter((row) => row.version === here.version);
+  const link = upstream(here.purl);
+
+  return (
+    <>
+      <div className="screen-head">
+        <h2 className="id">{component}</h2>
+        <p className="variants">
+          <span className="vchip id">{here.version}</span>
+          {here.ecosystem && <span className="vchip">{here.ecosystem}</span>}
+          <span className="vchip">{(here.issues ?? 0).toLocaleString()} open on it</span>
+          {here.due_at && <span className="vchip">due {on(here.due_at)}</span>}
+        </p>
+      </div>
+
+      {versions.length > 1 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <h3>Shipped at {versions.length} versions</h3>
+          <p className="reading" style={{ marginBottom: 8 }}>
+            Different code, decided separately.
+          </p>
+          <p className="variants">
+            {versions.map((each) => (
+              <button
+                key={each.at}
+                type="button"
+                className={each.at === here.version ? "vchip on" : "vchip"}
+                aria-pressed={each.at === here.version}
+                onClick={() => go({ version: each.at })}
+              >
+                <span className="id">{each.at}</span>{" "}
+                <span className="hint">{each.issues} open</span>
+              </button>
+            ))}
+          </p>
+        </div>
+      )}
+
+      <div className="detail">
+        <div>
+          <Sits
+            product={product}
+            component={component}
+            here={here}
+            builds={rows}
+            onBuild={(row) =>
+              go({
+                stream: row.stream ?? "",
+                variant: row.variant ?? "",
+                version: row.version ?? "",
+              })
+            }
+          />
+          <Upgrade product={product} component={component} here={here} covering={sameVersion} />
+        </div>
+
+        <div>
+          <div className="card">
+            <h3>What this package is</h3>
+            <dl className="facts">
+              <dt>Identifier</dt>
+              <dd className="id" style={{ wordBreak: "break-all" }}>
+                {here.purl || "—"}
+              </dd>
+              <dt>Read about it</dt>
+              <dd>
+                {link ? (
+                  <Outward href={link}>{link.replace(/^https:\/\//, "")}</Outward>
+                ) : (
+                  <span className="hint">no address for this ecosystem</span>
+                )}
+              </dd>
+              <dt>Upgrade scheduled</dt>
+              <dd>
+                {here.upgrade_to ? (
+                  <>
+                    <span className="id">{here.upgrade_to}</span>
+                    {here.committed_to && <span className="hint"> by {on(here.committed_to)}</span>}
+                  </>
+                ) : (
+                  <span className="hint">none</span>
+                )}
+              </dd>
+            </dl>
+            <p className="hint">The address is built from the identifier. Nothing is fetched.</p>
+          </div>
+
+          <Landed here={here} />
+        </div>
+      </div>
+
+      <Ships product={product} component={component} rows={rows} here={here} />
+
+      <History product={product} component={component} here={here} />
+    </>
+  );
+}
+
+// Where the package sits, drawn as the chain it sits in.
+//
+// Per build, because an edge is a fact about one: the same library is pulled in
+// by different things in different builds. The build comes from the rows rather
+// than being typed.
+function Sits({
+  product,
+  component,
+  here,
+  builds,
+  onBuild,
+}: {
+  product: string;
+  component: string;
+  here: Build;
+  builds: Build[];
+  onBuild: (row: Build) => void;
+}) {
+  const scope = { product, stream: here.stream ?? "", variant: here.variant ?? "" };
+  const around = useQuery({
+    queryKey: ["around", product, component, here.stream, here.variant, here.version],
+    queryFn: async () =>
+      unwrap(
+        await api.GET(
+          "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/around",
+          {
+            params: {
+              path: { ...scope, component },
+              query: here.version ? { version: here.version } : {},
+            },
+          },
+        ),
+      ),
+    retry: false,
+  });
+
+  const above = around.data?.above ?? [];
+  const below = around.data?.below ?? [];
+  const carrying = below.filter((each) => (each.findings ?? 0) > 0);
+  const buildAt =
+    `/products/${encodeURIComponent(product)}` +
+    `/streams/${encodeURIComponent(scope.stream)}` +
+    `/variants/${encodeURIComponent(scope.variant)}`;
+  const componentAt = (name: string) =>
+    `/products/${encodeURIComponent(product)}/components/${encodeURIComponent(name)}` +
+    `?stream=${encodeURIComponent(scope.stream)}&variant=${encodeURIComponent(scope.variant)}`;
+
+  return (
+    <div className="card">
+      <div className="screen-head" style={{ marginBottom: 10 }}>
+        <h3>Where it sits</h3>
+        {builds.length > 1 && (
+          <label className="hint" style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <span>Build</span>
+            <select
+              aria-label="Which build"
+              style={{ width: "auto" }}
+              value={keyOf(here) + APART + (here.version ?? "")}
+              onChange={(event) => {
+                const row = builds.find(
+                  (each) => keyOf(each) + APART + (each.version ?? "") === event.target.value,
+                );
+                if (row) onBuild(row);
+              }}
+            >
+              {builds.map((row) => (
+                <option
+                  key={keyOf(row) + row.version}
+                  value={keyOf(row) + APART + (row.version ?? "")}
+                >
+                  {row.stream} · {row.variant} · {row.version}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+
+      {around.isError ? (
+        <Failed error={around.error} what="Where it sits could not be read." />
+      ) : (
+        <ol className="sits">
+          <li>
+            <span className="step">Pulled in by</span>
+            {around.isPending ? (
+              <span className="hint">Working it out…</span>
+            ) : above.length === 0 ? (
+              <span className="hint">The build contains it directly.</span>
+            ) : (
+              <span>
+                {above.slice(0, 3).map((parent, i) => (
+                  <span key={(parent.component ?? "") + i}>
+                    {i > 0 && ", "}
+                    <Link className="id" to={componentAt(parent.component ?? "")}>
+                      {parent.component}
+                    </Link>
+                  </span>
+                ))}
+                {above.length > 3 && <span className="hint"> and {above.length - 3} more</span>}
+                {above.length > 1 && (
+                  <span className="hint">
+                    {" "}
+                    · reached {above.length} ways, not {above.length} copies
+                  </span>
+                )}
+              </span>
+            )}
+          </li>
+
+          <li className="at">
+            <span className="step">This package</span>
+            <span>
+              <span className="id">{component}</span> <span className="hint">{here.version}</span>
+            </span>
+            <span className="hint">
+              {(here.issues ?? 0).toLocaleString()} open on it, at{" "}
+              {(here.places ?? 0).toLocaleString()} {here.places === 1 ? "place" : "places"} under{" "}
+              {(here.consumers ?? 0).toLocaleString()}{" "}
+              {here.consumers === 1 ? "consumer" : "consumers"}
+            </span>
+          </li>
+
+          <li>
+            <span className="step">What it carries</span>
+            {around.isPending ? (
+              <span className="hint">Working it out…</span>
+            ) : below.length === 0 ? (
+              <span className="hint">Nothing — a leaf, so none of this is inherited.</span>
+            ) : (
+              <>
+                <span className="hint">
+                  {below.length.toLocaleString()} packages, {carrying.length} with something open
+                </span>
+                {carrying.length > 0 && (
+                  <ul className="branchlist">
+                    {carrying.slice(0, 5).map((each, i) => (
+                      <li key={(each.component ?? "") + i} className="branch">
+                        <Link className="id" to={componentAt(each.component ?? "")}>
+                          {each.component}
+                        </Link>{" "}
+                        <span className="hint">{each.version}</span>
+                        <span className="counts">
+                          <span className="n">{each.findings}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+            <Link className="linkish" to={buildAt + "/tree?at=" + encodeURIComponent(component)}>
+              Open in the tree →
+            </Link>
+          </li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
+// Where the fixes landed: each release the findings name, and what it fixed.
+//
+// Two counts, because they answer different questions. What a release fixed is
+// how many name that exact version — its own security content. What reaching it
+// closes counts every earlier fix too, which is what somebody choosing between
+// two versions asks, and it needs the ecosystem's ordering. Unranked, the two
+// are equal and the panel says so.
+function Landed({ here }: { here: Build }) {
+  const landed = here.upgrades ?? [];
+  const ordered = landed[0]?.ordered ?? false;
+  const total = landed.reduce((sum, each) => sum + (each.fixed_here ?? 0), 0);
+
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div className="screen-head" style={{ marginBottom: 8 }}>
+        <h3>Where the fixes landed</h3>
+        {landed.length > 0 && (
+          <span className="eyebrow" style={{ marginLeft: "auto" }}>
+            {landed.length} {landed.length === 1 ? "release" : "releases"}
+          </span>
+        )}
+      </div>
+
+      {landed.length === 0 ? (
+        <p className="hint">No version fixes any of what is open here.</p>
+      ) : (
+        <>
+          <div className="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Release</th>
+                  <th className="num" title="How many of what is open here that release fixed">
+                    Fixed here
+                  </th>
+                  {ordered && (
+                    <th
+                      className="num"
+                      title="Everything moving here closes, counting the earlier fixes too"
+                    >
+                      Closes
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {landed.map((each) => (
+                  <tr key={each.to}>
+                    <td className="id">{each.to}</td>
+                    <td className="num">{each.fixed_here}</td>
+                    {ordered && <td className="num">{each.reached}</td>}
+                  </tr>
+                ))}
+                <tr>
+                  <td className="hint">with a fix</td>
+                  <td className="num">
+                    <b>{total}</b>
+                  </td>
+                  {ordered && <td />}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="hint" style={{ marginTop: 8 }}>
+            {ordered
+              ? "Furthest along first. A later release carries the earlier fixes too."
+              : "Not ranked: these versions could not be put in order, so each count is what that release fixed itself."}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Promising an upgrade: the version, the releases it is for, the date, and who
+// carries it.
+//
+// **The releases are chosen here**, ticked to the ones shipping this version,
+// rather than in a column of the table below. The rest of the promise is written
+// here, and a control that summons a form from somewhere else is one nobody
+// finds.
+function Upgrade({
+  product,
+  component,
+  here,
+  covering,
+}: {
+  product: string;
+  component: string;
+  here: Build;
+  covering: Build[];
+}) {
   const queries = useQueryClient();
-  // Which builds this promise is for, the version it moves to, and when. One
-  // record per target version: ticking builds that need different versions is
-  // two promises, not one act with a version that is wrong for one of them.
-  const [chosen, setChosen] = useState<Set<string>>(new Set());
-  const [to, setTo] = useState("");
+  const landed = here.upgrades ?? [];
+  const [to, setTo] = useState(landed[0]?.to ?? "");
   const [by, setBy] = useState("");
   const [because, setBecause] = useState("");
-  // Who carries it. A team as readily as a person: moving a package is work a
-  // queue tracks rather than a judgment one person makes, and it is part of
-  // this act rather than a second one somebody has to remember.
   const [holder, setHolder] = useState<Held | null>(null);
   const [said, setSaid] = useState<string | null>(null);
+  // Every release shipping this version, because one bump moves all of them.
+  const [chosen, setChosen] = useState<Set<string>>(
+    () => new Set(covering.map((row) => keyOf(row))),
+  );
 
   const plan = useMutation({
     mutationFn: async () =>
@@ -68,7 +485,7 @@ export function Component() {
             ...(holder?.kind === "team" ? { team: holder.identity } : {}),
             ...(holder?.kind === "person" ? { person: holder.identity } : {}),
             builds: [...chosen].map((each) => {
-              const [stream, variant] = each.split("\u0000");
+              const [stream, variant] = each.split(APART);
               return { stream: stream ?? "", variant: variant ?? "" };
             }),
           },
@@ -79,15 +496,10 @@ export function Component() {
         `Recorded against ${done.decisions} ${done.decisions === 1 ? "place" : "places"}` +
           ` across ${done.issues} ${done.issues === 1 ? "issue" : "issues"}.` +
           (done.waiting
-            ? " It is past the earliest deadline it covers, so it waits for a second person."
+            ? " Past the earliest deadline it covers, so it waits."
             : " In force now.") +
-          (done.held
-            ? ` ${done.held} ${done.held === 1 ? "finding is" : "findings are"} now carried by ` +
-              `${holder?.name ?? "them"}.`
-            : ""),
+          (done.held ? ` Carried by ${holder?.name ?? "them"}.` : ""),
       );
-      setChosen(new Set());
-      setTo("");
       setBy("");
       setBecause("");
       setHolder(null);
@@ -97,386 +509,269 @@ export function Component() {
     },
   });
 
-  if (builds.isPending) return <Loading />;
-  if (builds.isError) {
-    return <Failed error={builds.error} what="This component could not be read." />;
+  if (said) {
+    return (
+      <div className="alert info" style={{ marginTop: 12 }}>
+        <strong>Recorded</strong>
+        <span>{said}</span>
+        <button type="button" className="linkish" onClick={() => setSaid(null)}>
+          Schedule another
+        </button>
+      </div>
+    );
   }
-  const rows = builds.data?.items ?? [];
 
-  return (
-    <>
-      <div className="screen-head">
-        <h2>{component}</h2>
-        <p>
-          What each build of {product} ships, what is open against it there, and where it could go.
-          Answered per build: a stream on a maintained older line and a stream that has moved on are
-          different work.
+  // Nothing to move to is a state rather than an empty form: the work is a
+  // judgment, and a form that cannot be filled in is one somebody tries anyway.
+  if (landed.length === 0) {
+    if ((here.issues ?? 0) === 0) return null;
+    return (
+      <div className="card" style={{ marginTop: 12 }}>
+        <h3>There is nothing to upgrade to</h3>
+        <p className="reading">
+          No version fixes any of the {here.issues} open here, so an upgrade would lapse. These need
+          a decision.
+        </p>
+        <p style={{ marginTop: 10 }}>
+          <Link className="btn" to={findingsAt(product, here, component)}>
+            Decide them together
+          </Link>
         </p>
       </div>
+    );
+  }
 
-      {rows.length === 0 ? (
-        <Empty
-          title="No build carries this with anything open against it."
-          detail="Either the name is not one this product ships, or nothing is open against it — which is the good case."
-        />
-      ) : (
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Build</th>
-                <th>Ships</th>
-                <th>Upgrade to</th>
-                <th className="num">Issues</th>
-                <th className="num">Consumers</th>
-                <th>Due</th>
-                <th>Planned</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={`${row.stream} ${row.variant}`} className="row">
-                  <td>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        aria-label={`Plan an upgrade for ${row.stream} ${row.variant}`}
-                        checked={chosen.has(`${row.stream}\u0000${row.variant}`)}
-                        onChange={(event) => {
-                          const key = `${row.stream}\u0000${row.variant}`;
-                          setChosen((was) => {
-                            const next = new Set(was);
-                            if (event.target.checked) next.add(key);
-                            else next.delete(key);
-                            return next;
-                          });
-                        }}
-                      />
-                      <span>
-                        <span className="id">{row.stream}</span>{" "}
-                        <span className="hint">{row.variant}</span>
-                      </span>
-                    </label>
-                  </td>
-                  <td className="id">{row.version}</td>
-                  {/* The few worth reading, not all of them. A kernel names
-                      thirteen versions and a column listing all thirteen is one
-                      nobody reads to the end of. Where they can be ordered the
-                      first is the one furthest along, and what it closes counts
-                      every earlier fix — so the leading row is the answer and
-                      the rest are the line behind it. */}
-                  <td>
-                    {(row.upgrades ?? []).length === 0 ? (
-                      <span className="hint">nothing to move to</span>
-                    ) : (
-                      <>
-                        {(row.upgrades ?? []).slice(0, SHOWN).map((up) => (
-                          <div key={up.to}>
-                            <span className="id">{up.to}</span>{" "}
-                            <span className="hint">
-                              {up.ordered ? `closes ${up.reached}` : `fixed ${up.fixed_here}`}
-                            </span>
-                          </div>
-                        ))}
-                        {(row.upgrades ?? []).length > SHOWN && (
-                          <div className="hint">and {(row.upgrades ?? []).length - SHOWN} more</div>
-                        )}
-                        {(row.upgrades ?? []).length > 0 && !row.upgrades?.[0]?.ordered && (
-                          <div
-                            className="hint"
-                            title="These versions could not be put in order, so each count is what that release fixed itself"
-                          >
-                            not ranked
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </td>
-                  <td className="num">
-                    {/* The way through to what is actually open here, which is
-                        what clicking the component used to do and still has
-                        to. */}
-                    <Link
-                      to={
-                        `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(row.stream ?? "")}` +
-                        `/variants/${encodeURIComponent(row.variant ?? "")}/findings` +
-                        `?component=${encodeURIComponent(component)}`
-                      }
-                    >
-                      {(row.issues ?? 0).toLocaleString()}
-                    </Link>
-                  </td>
-                  {/* The unit somebody acts in: one judgment covers the
-                      whole fold, and what varies underneath it is what pulls
-                      the package in. The place count is the title, being what
-                      the bulk cap is measured against and nothing a reader
-                      reconciles with anything else on the row. */}
-                  <td
-                    className="num"
-                    style={{ color: "var(--faint)" }}
-                    title={`${(row.places ?? 0).toLocaleString()} places underneath`}
-                  >
-                    {(row.consumers ?? 0).toLocaleString()}
-                  </td>
-                  <td className="hint">{row.due_at ? on(row.due_at) : "—"}</td>
-                  <td>
-                    {row.upgrade_to ? (
-                      <>
-                        <span className="id">{row.upgrade_to}</span>
-                        {row.committed_to && (
-                          <>
-                            {" "}
-                            <span className="hint">by {on(row.committed_to)}</span>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <span className="hint">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+  const ready = to.trim() !== "" && by !== "" && because.trim() !== "" && chosen.size > 0;
 
-      {rows.length > 0 && (
-        <Around
-          product={product}
-          component={component}
-          builds={rows.map((row) => ({ stream: row.stream ?? "", variant: row.variant ?? "" }))}
-          asked={{ stream: params.get("stream") ?? "", variant: params.get("variant") ?? "" }}
-        />
-      )}
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <h3>Schedule an upgrade</h3>
+      {plan.error != null && <Failed error={plan.error} what="That could not be recorded." />}
 
-      {said && (
-        <div className="alert info" style={{ margin: "10px 0" }}>
-          <strong>Recorded</strong>
-          <span>{said}</span>
-        </div>
-      )}
-
-      {chosen.size > 0 && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <h3>Plan an upgrade</h3>
-          <p className="reading" style={{ marginBottom: 8 }}>
-            Everything open against <b>{component}</b> in the{" "}
-            {chosen.size === 1 ? "release" : `${chosen.size} releases`} ticked above is recorded as
-            waiting on this upgrade. Moving to a version is a claim that it answers what is open on
-            the package — the next scan says which of it was true, and nothing here is ticked off by
-            hand. A date past the earliest deadline it covers needs a second person, because that
-            defers the worst thing in it.
-          </p>
-          {plan.error != null && <Failed error={plan.error} what="That could not be recorded." />}
-          <div className="filters">
-            <label className="field">
-              <span>Move to</span>
-              <input
-                {...notACredential}
-                type="text"
-                value={to}
-                placeholder="the version, as its packager writes it"
-                onChange={(event) => setTo(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Done by</span>
-              <input
-                {...notACredential}
-                type="date"
-                value={by}
-                onChange={(event) => setBy(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Carried by</span>
-              <Holder
-                product={product}
-                value={holder ? { identity: holder.identity, name: holder.name } : null}
-                onPick={setHolder}
-                placeholder="a person or a team"
-                none="No one yet"
-              />
-              <span className="hint">
-                A team queue stays unassigned until someone takes it. Covers every build of the
-                product.
-              </span>
-            </label>
-          </div>
-          <Editor
-            value={because}
-            onChange={setBecause}
-            placeholder="Why this is the answer here."
+      <div className="filters">
+        <label className="field">
+          <span>Upgrade to</span>
+          <input
+            {...notACredential}
+            type="text"
+            list="landed-versions"
+            value={to}
+            placeholder="the version, as its packager writes it"
+            onChange={(event) => setTo(event.target.value)}
           />
-          <div className="actions" style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              className="btn"
-              disabled={!to.trim() || !by || !because.trim() || plan.isPending}
-              onClick={() => plan.mutate()}
-            >
-              {plan.isPending ? "Recording…" : `Plan for ${chosen.size}`}
-            </button>
-            <button type="button" className="linkish" onClick={() => setChosen(new Set())}>
-              Clear
-            </button>
-          </div>
-        </div>
-      )}
+          {/* Offered, never required. The list is what the scanner named, and a
+              version it has not heard of is refused by the server rather than
+              by the control — which is what lets somebody name one newer than
+              anything reported. */}
+          <datalist id="landed-versions">
+            {landed.map((each) => (
+              <option key={each.to} value={each.to} />
+            ))}
+          </datalist>
+          <span className="hint">
+            {landed[0]?.ordered
+              ? `${landed[0]?.to} is furthest along and closes ${landed[0]?.reached}.`
+              : `${landed.length} named, in no order. Any version is accepted.`}
+          </span>
+        </label>
 
-      <p className="hint" style={{ marginTop: 10 }}>
-        Listed by how much each closes, not by version order. The deadline is the earliest open in
-        that build.
+        <label className="field">
+          <span>Done by</span>
+          <input
+            {...notACredential}
+            type="date"
+            value={by}
+            onChange={(event) => setBy(event.target.value)}
+          />
+          <span className="hint">On or before the earliest deadline, nobody else is needed.</span>
+        </label>
+
+        <label className="field">
+          <span>Carried by</span>
+          <Holder
+            product={product}
+            value={holder ? { identity: holder.identity, name: holder.name } : null}
+            onPick={setHolder}
+            placeholder="a person or a team"
+            none="No one yet"
+          />
+          <span className="hint">A team queue stays unassigned until someone takes it.</span>
+        </label>
+      </div>
+
+      <div className="field">
+        <span>Releases this is for</span>
+        <p className="variants">
+          {covering.map((row) => {
+            const key = keyOf(row);
+            const picked = chosen.has(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                className={picked ? "vchip on" : "vchip"}
+                aria-pressed={picked}
+                onClick={() =>
+                  setChosen((was) => {
+                    const next = new Set(was);
+                    if (picked) next.delete(key);
+                    else next.add(key);
+                    return next;
+                  })
+                }
+              >
+                {picked ? "✓ " : ""}
+                <span className="id">{row.stream}</span> <span className="hint">{row.variant}</span>
+              </button>
+            );
+          })}
+        </p>
+        <span className="hint">
+          Every release shipping {here.version}, because one bump moves all of them.
+        </span>
+      </div>
+
+      <Editor value={because} onChange={setBecause} placeholder="Why this is the answer here." />
+
+      <div className="actions" style={{ marginTop: 10 }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={!ready || plan.isPending}
+          onClick={() => plan.mutate()}
+        >
+          {plan.isPending ? "Recording…" : `Schedule for ${chosen.size}`}
+        </button>
+      </div>
+      <p className="hint" style={{ marginTop: 8 }}>
+        Covers everything open on the package. The next scan says what it closed.
       </p>
-    </>
+    </div>
   );
 }
 
-// Where this component sits in one build's graph, and what has happened to it
-// over twelve weeks.
-//
-// Per build, because an edge is a fact about one: the same library is pulled
-// in by different things in different builds. The table above lists them, so
-// the build is picked from that set rather than typed, and a link naming one
-// arrives on it.
-function Around({
+// What each release ships, and what is open against it there.
+function Ships({
   product,
   component,
-  builds,
-  asked,
+  rows,
+  here,
 }: {
   product: string;
   component: string;
-  builds: { stream: string; variant: string }[];
-  asked: { stream: string; variant: string };
+  rows: Build[];
+  here: Build;
 }) {
-  const named = builds.find((b) => b.stream === asked.stream && b.variant === asked.variant);
-  const [at, setAt] = useState(named ?? builds[0]);
-  const here = at ?? builds[0];
-  const scope = here ? { product, stream: here.stream, variant: here.variant } : null;
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div className="screen-head" style={{ marginBottom: 8 }}>
+        <h3>Where it ships</h3>
+        <span className="eyebrow" style={{ marginLeft: "auto" }}>
+          {rows.length} {rows.length === 1 ? "release" : "releases"}
+        </span>
+      </div>
+      <div className="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Release</th>
+              <th>Ships</th>
+              <th className="num">Open on it</th>
+              <th className="num">Consumers</th>
+              <th className="num">Places</th>
+              <th>Due</th>
+              <th>Upgrade scheduled</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={keyOf(row) + row.version}
+                className={
+                  keyOf(row) === keyOf(here) && row.version === here.version ? "row on" : "row"
+                }
+              >
+                <td>
+                  <span className="id">{row.stream}</span>{" "}
+                  <span className="hint">{row.variant}</span>
+                </td>
+                <td className="id">{row.version}</td>
+                <td className="num">
+                  <Link to={findingsAt(product, row, component)}>
+                    {(row.issues ?? 0).toLocaleString()}
+                  </Link>
+                </td>
+                <td className="num">{(row.consumers ?? 0).toLocaleString()}</td>
+                <td className="num" style={{ color: "var(--faint)" }}>
+                  {(row.places ?? 0).toLocaleString()}
+                </td>
+                <td className="hint">{row.due_at ? on(row.due_at) : "—"}</td>
+                <td>
+                  {row.upgrade_to ? (
+                    <>
+                      <span className="id">{row.upgrade_to}</span>
+                      {row.committed_to && <span className="hint"> by {on(row.committed_to)}</span>}
+                    </>
+                  ) : (
+                    <span className="hint">—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
-  const around = useQuery({
-    enabled: scope !== null,
-    queryKey: ["around", product, component, here?.stream, here?.variant],
-    queryFn: async () =>
-      unwrap(
-        await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/around",
-          { params: { path: { ...scope!, component } } },
-        ),
-      ),
-    retry: false,
-  });
+// Twelve weeks of what opened and closed at this package and under it.
+function History({
+  product,
+  component,
+  here,
+}: {
+  product: string;
+  component: string;
+  here: Build;
+}) {
   const trend = useQuery({
-    enabled: scope !== null,
-    queryKey: ["component-trend", product, component, here?.stream, here?.variant],
+    queryKey: ["component-trend", product, component, here.stream, here.variant],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/trend", {
-          params: { query: { ...scope!, beneath: component, weeks: 12 } },
+          params: {
+            query: {
+              product,
+              stream: here.stream ?? "",
+              variant: here.variant ?? "",
+              beneath: component,
+              weeks: 12,
+            },
+          },
         }),
       ),
     retry: false,
   });
-
-  if (!here) return null;
-  const above = around.data?.above ?? [];
-  const below = around.data?.below ?? [];
   const points = trend.data?.items ?? [];
-  const buildAt =
-    `/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(here.stream)}` +
-    `/variants/${encodeURIComponent(here.variant)}`;
-  const componentAt = (name: string) =>
-    `/products/${encodeURIComponent(product)}/components/${encodeURIComponent(name)}` +
-    `?stream=${encodeURIComponent(here.stream)}&variant=${encodeURIComponent(here.variant)}`;
+  const moved = points.some((each) => (each.opened ?? 0) > 0 || (each.resolved ?? 0) > 0);
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
-        <h3>In the graph</h3>
-        {builds.length > 1 && (
-          <label className="hint" style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-            <span>Build</span>
-            <select
-              aria-label="Which build"
-              style={{ width: "auto" }}
-              value={here.stream + "\u0000" + here.variant}
-              onChange={(event) => {
-                const [stream, variant] = event.target.value.split("\u0000");
-                setAt({ stream: stream ?? "", variant: variant ?? "" });
-              }}
-            >
-              {builds.map((b) => (
-                <option key={b.stream + b.variant} value={b.stream + "\u0000" + b.variant}>
-                  {b.stream} · {b.variant}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <h3>Twelve weeks</h3>
+        <span className="eyebrow" style={{ marginLeft: "auto" }}>
+          {here.stream} · {here.variant}
+        </span>
       </div>
-
-      {around.isError ? (
-        <Failed error={around.error} what="What sits around this could not be read." />
+      {trend.isError ? (
+        <p className="hint">Could not be read.</p>
+      ) : trend.isPending ? (
+        <Loading />
+      ) : !moved ? (
+        <p className="hint">Nothing opened or closed in twelve weeks.</p>
       ) : (
-        <div className="evidence">
-          <div className="evblock">
-            <h4>Pulled in by</h4>
-            {around.isPending ? (
-              <p className="hint">Working it out…</p>
-            ) : above.length === 0 ? (
-              <p className="hint">The build contains it directly.</p>
-            ) : (
-              <>
-                <ol className="refs">
-                  {above.map((parent, i) => (
-                    <li key={(parent.component ?? "") + i}>
-                      <Link className="id" to={componentAt(parent.component ?? "")}>
-                        {parent.component}
-                      </Link>
-                    </li>
-                  ))}
-                </ol>
-                {above.length > 1 && (
-                  <p className="hint">
-                    Reached {above.length} ways, not {above.length} copies.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
-          <div className="evblock">
-            <h4>Pulls in</h4>
-            <p className="hint">
-              {around.isPending
-                ? "Working it out…"
-                : below.length === 0
-                  ? "Nothing — it is a leaf."
-                  : below.length.toLocaleString() + " components"}
-            </p>
-            <p style={{ margin: "8px 0 0" }}>
-              <Link className="linkish" to={buildAt + "/tree?at=" + encodeURIComponent(component)}>
-                Open in the tree →
-              </Link>
-            </p>
-          </div>
-
-          <div className="evblock">
-            <h4>Twelve-week history</h4>
-            {trend.isError ? (
-              <p className="hint">Could not be read.</p>
-            ) : trend.isPending ? (
-              <p className="hint">Working it out…</p>
-            ) : points.length === 0 ? (
-              <p className="hint">Nothing opened or closed in twelve weeks.</p>
-            ) : (
-              <Pace points={points} />
-            )}
-          </div>
-        </div>
+        <Pace points={points} />
       )}
     </div>
   );

@@ -537,8 +537,19 @@ ships, what is open against it there, where it could go, the earliest deadline
 among what is open, and what has already been promised. The issue count is the
 way through to the findings list.
 
+**The screen is arranged on where the package sits**, because that is what
+decides what can be done about it. A leaf carries its own risk and is upgraded; a
+package vendored in pre-built carries everything beneath it and moves only when
+it does. So the graph leads — what pulls it in, the package, what it carries —
+and the act hangs off it.
+
 | Rule | |
 |---|---|
+| The position is drawn before the action | What is possible follows from where it sits, and the same two numbers read opposite ways at the two ends of a graph: nothing open on it and everything beneath means the package itself is the only lever |
+| Releases are picked inside the promise, ticked to the ones shipping this version | One bump moves every release at that version. Picked in a column of the table instead, the form appeared only once something was ticked, so the control was invisible until somebody guessed at it |
+| The version to move to is offered and never required | The list is what the scanner named; the server is what refuses one it has not heard of. So a version newer than anything reported can still be named, which is the case where an upgrade is ahead of the advisories |
+| Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a judgment. A form that cannot be filled in is one somebody fills in anyway |
+| More than one version is a choice, not a refusal | A name meaning two components is two pieces of code. The versions are offered with what is open at each, rather than the request being refused with an instruction to add a parameter |
 | A build is listed because it ships the component, not because something is open | The presence is a fact about the graph and the counts are joined onto it. Read off the findings instead, a package whose whole risk sits in what it pulls in — nothing on the package, everything underneath — answered with no builds, which reads as a name the product does not ship. That is the ordinary state of anything vendored in pre-built |
 | One row per version rather than per build | A build shipping a name at two versions holds two components, and they are two pieces of code to decide about separately. Collapsing them to the lowest version reported one and hid the other |
 | A deadline is absent where nothing is open, never zero | It is the earliest among what is open, so with nothing open there is no such date |
@@ -548,6 +559,7 @@ way through to the findings list.
 | Furthest along first where the versions can be ordered, unranked where they cannot | An ordering exists per ecosystem rather than in general, and one version a comparison refuses makes the whole list unrankable. Shown unranked the two counts are equal and the screen says so, rather than implying an order nothing established |
 | The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the bulk cap is measured against |
 | It carries where the component sits in the graph | What pulls it in, what it pulls in, and twelve weeks of what opened and closed under it. Somebody arriving from the tree asked a question about the graph, and answering it on a page they have to leave to reach is the same page drawn twice |
+| Where to read about the package is built from its identifier | An identifier already names the ecosystem and the name within it, and each ecosystem has one address where a package is read about. Nothing is fetched and nothing is stored — the same way the issue records are worked out. An ecosystem with no address offers none rather than a guess, and a name is encoded into the path because it came out of a scan file |
 | The graph is answered for one build, picked from the rows above | An edge is a fact about one build: the same library is pulled in by different things in different builds. A link naming a build arrives on it, so the tree opens the component on the graph somebody was already looking at |
 
 It is where an upgrade is promised, on the terms `DESIGN-triage.md` sets: the

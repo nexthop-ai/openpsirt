@@ -379,6 +379,81 @@ a.kpi:hover {
   flex-wrap: wrap;
   margin-bottom: 8px;
 }
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0 0 8px;
+  font-size: 12.5px;
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 11px;
+  padding-top: 2px;
+}
+.facts dd {
+  margin: 0;
+  min-width: 0;
+}
+
+/* Where a package sits, as the chain it sits in: what pulls it in, the package,
+   and what it carries. A rail down the left with a node per step, because the
+   thing being read is a position in a graph rather than three unrelated
+   panels. */
+.sits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sits > li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 14px 18px;
+  position: relative;
+  border-left: 2px solid var(--line-strong);
+  margin-left: 5px;
+}
+.sits > li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+.sits > li::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--pill);
+  border: 2px solid var(--line-strong);
+  background: var(--surface);
+}
+/* The package the screen is about, marked so the eye lands on it first. */
+.sits > li.at::before {
+  left: -8px;
+  top: 3px;
+  width: 13px;
+  height: 13px;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.sits .step {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--faint);
+  font-weight: 600;
+}
+.sits > li.at > span:nth-child(2) {
+  font-size: var(--step-1);
+}
+
+/* The row a screen is currently about, in a table listing several. */
+tr.row.on > td {
+  background: var(--accent-soft);
+}
+
 .judgment .facts {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -506,6 +581,22 @@ a.kpi:hover {
   border-color: var(--sev-high);
   color: var(--sev-high);
   background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  font-weight: 600;
+}
+/* A chip somebody picks with, and the one picked. It stays a chip: a button
+   brings its own font, border and background, and left alone it stood a head
+   taller than the chips beside it. */
+button.vchip {
+  font: inherit;
+  font-size: 10.5px;
+  background: none;
+  cursor: pointer;
+  line-height: 1.7;
+}
+.vchip.on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-weight: 600;
 }
 .variants {
