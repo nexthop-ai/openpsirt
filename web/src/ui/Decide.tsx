@@ -685,6 +685,10 @@ export function Decide({
         <div className="card">
           <h3>Triage</h3>
           {assigning}
+          {/* The form had the card's name until the card became Triage, which
+              is both questions. Named again, so the box somebody types a
+              judgment into says what it records. */}
+          <h4 className="deciding-head">Decision</h4>
           <div className="writing">
             {form}
             {aside}

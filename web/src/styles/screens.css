@@ -1498,22 +1498,13 @@ kbd.onbtn {
   border-color: var(--line-strong);
 }
 
-/* The rating sits inside the severity block, under the words it disagrees
-   with, so it is changed where it is read rather than from a pane of its own
-   further down. Ruled off, because it is the one control in a block that is
-   otherwise all evidence. */
+/* Reclassifying opens under the line that reports the rating, so the control
+   is where the thing it changes is read. Ruled off, because it is the one form
+   in a block that is otherwise all evidence. */
 .evblock .rating {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
-}
-.evblock .rating h5 {
-  margin: 0 0 6px;
-  font-size: var(--step--1);
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 /* The dependency path is a pane of its own under triage rather than a block in
@@ -1522,5 +1513,28 @@ kbd.onbtn {
 .pathblock h3 {
   margin: 0 0 8px;
   font-size: var(--step-1);
+  font-weight: 600;
+}
+
+/* Who holds a finding, as one row at the head of the triage pane. It was a
+   card with a heading and a hint on either side, around a dropdown. */
+.assignee {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.assignee .l {
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+/* The decision form's own name, under the assignee row in the triage pane. */
+.deciding-head {
+  margin: 0 0 8px;
+  font-size: var(--step-0);
   font-weight: 600;
 }

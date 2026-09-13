@@ -103,6 +103,7 @@ export function Finding() {
   function startFrom(from: (typeof prefill)["from"]) {
     setPrefill({ at: oneFinding, n: own.n + 1, from });
   }
+  const [reclassifying, setReclassifying] = useState(false);
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
   // The saved filter this was opened under, where it is one that prepares a
   // claim. The address names the filter rather than repeating what it says, so
@@ -587,6 +588,9 @@ export function Finding() {
               {it.vector}
             </p>
           )}
+          {/* The rating, and the control for it on the same line. It was a
+              pane of its own further down, which asked somebody reading a
+              severity to go and find the button for it. */}
           <p className="hint">
             {it.assessed ? (
               <>
@@ -597,16 +601,23 @@ export function Finding() {
                 Published <Severity word={it.severity} />
               </>
             )}
+            {places.some((p) => p.decision == null) && !reclassifying && (
+              <button
+                type="button"
+                className="linkish"
+                style={{ marginLeft: 8 }}
+                onClick={() => setReclassifying(true)}
+              >
+                Reclassify
+              </button>
+            )}
           </p>
-          {/* Changed where it is reported. It was a pane of its own further
-              down, which asked somebody reading the severity to go and find
-              the control for it. */}
-          {places.some((p) => p.decision == null) && (
+          {reclassifying && (
             <Assess
               product={product}
               vulnerability={vulnerability}
               published={it.severity ?? ""}
-              assessed={it.assessed ?? ""}
+              onClose={() => setReclassifying(false)}
             />
           )}
         </div>

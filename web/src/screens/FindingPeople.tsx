@@ -205,48 +205,43 @@ export function Assignee({
     },
   });
 
+  // One line: who holds it, and the one-click case beside the picker. It was
+  // a card of its own with a heading, a hint above and a hint below, for a
+  // control that is a dropdown.
   return (
-    <div className="card">
-      <h3>Assignee</h3>
-      {routedBy && (
-        <p
-          className="hint"
-          style={{ marginBottom: 8 }}
-          title="Taking it is picking up unassigned work"
-        >
-          Placed by <b>{routedBy}</b>
-        </p>
-      )}
-      {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <div style={{ minWidth: 240 }}>
-          <Holder
-            product={at.product}
-            undisclosed={undisclosed}
-            value={assigned ? { identity: assigned } : null}
-            disabled={hand.isPending}
-            onPick={(held) => hand.mutate(held)}
-          />
-        </div>
-        {/* Taking unowned work is a triager's own, and it is the common case.
-            The API always allowed it; there was no way to ask. */}
-        {me.data?.identity != null && assigned !== me.data.identity && (
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={hand.isPending}
-            onClick={() => hand.mutate({ kind: "person", identity: me.data!.identity, name: "" })}
-          >
-            {/* The same word the unassigned list's batch bar uses, because it
-                is the same act: taking work nobody holds. */}
-            Take this
-          </button>
-        )}
-        {hand.isPending && <span className="hint">Recording…</span>}
+    <div className="assignee">
+      <span
+        className="l"
+        title="Applies to every build with this component. Set it to nobody to unassign"
+      >
+        Assigned to
+      </span>
+      <div style={{ minWidth: 220 }}>
+        <Holder
+          product={at.product}
+          undisclosed={undisclosed}
+          value={assigned ? { identity: assigned } : null}
+          disabled={hand.isPending}
+          onPick={(held) => hand.mutate(held)}
+        />
       </div>
-      <p className="hint" style={{ margin: "8px 0 0" }} title="Set it to nobody to unassign">
-        Applies to every build with this component
-      </p>
+      {/* Assigning to yourself is the common case and the API always allowed
+          it; there was no way to ask. Named for what it does, because a button
+          reading "take this" beside a picker for anybody reads as the only
+          thing the control does. */}
+      {me.data?.identity != null && assigned !== me.data.identity && (
+        <button
+          type="button"
+          className="linkish"
+          disabled={hand.isPending}
+          onClick={() => hand.mutate({ kind: "person", identity: me.data!.identity, name: "" })}
+        >
+          Assign to me
+        </button>
+      )}
+      {routedBy && <span className="hint">by rule {routedBy}</span>}
+      {hand.isPending && <span className="hint">Saving…</span>}
+      {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
     </div>
   );
 }
