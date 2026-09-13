@@ -554,7 +554,7 @@ The finding is the working screen after a decision as well as before it.
 |---|---|
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
 | **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
-| **Under both** | The notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+| **Under both** | Triage — who is dealing with it and what this product rates it, as two rows of one pane rather than two panes, because both are things somebody sets on the finding rather than judgments about it; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
 
 The notes thread and the claim's comments are two threads, rendered near each
 other (REQ-29).
@@ -589,12 +589,17 @@ measurable: rendered from the demo the narrow column held severity 7.8, EPSS
 at 380 pixels, while the widest thing on the screen was an empty text area.
 Somebody weighs the evidence and then acts, and the page runs in that order.
 
-The references move down, with the timeline, the revisions and the comments.
-Eleven links between the facts and the form recreates the defect the
-side-by-side layout was built to fix, arriving by a different route: what is
-consulted elsewhere is read after the judgment rather than during it. What is
-neither evidence nor action — the timeline, the revisions, the comments, the
-holder, the fix targets, the assessment — was already there.
+The references sit above the VEX statements, at the head of what is read to
+decide. A write-up is what somebody triaging reads first, and a third party's
+claim about the finding is read against it rather than before it.
+
+They were below the form for a while, on the grounds that eleven links beside
+the action recreate the defect the side-by-side layout was built to fix. That
+holds for the whole block of them and not for the advisory somebody is about to
+judge from, which is consulted during the judgment rather than after it.
+
+What is neither evidence nor action — the timeline, the revisions, the
+comments, the holder, the fix targets, the assessment — stays below.
 
 A decision is made on the finding's own screen, and nowhere else (REQ-57,
 reversed). The list opened the decision form inside a row for a while, so a run

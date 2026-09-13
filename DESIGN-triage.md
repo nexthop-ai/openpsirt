@@ -1078,7 +1078,8 @@ promoting one.
 | At the grain somebody looks at | One issue, in one component, in one product. Not per place — a kernel flaw at sixty places is one thing somebody is marking — and not per build, because a tag is about the work rather than a release |
 | Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Marking what is already marked succeeds and keeps the first spelling |
 | Marking is triage | A tag changes what a filtered list answers. Somebody who may only read sees the marks and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
-| On the row, not only on the finding | The marks come back with each group, read for the whole page in one statement, and each is itself a filter |
+| On the row, not only on the finding | The tags come back with each group, read for the whole page in one statement, and each is itself a filter |
+| Called a tag everywhere a person reads one | The filter, the API and this document say tag; the finding screen said "mark", which is the same thing under a name nothing else uses |
 
 ## Rule-prepared claims
 

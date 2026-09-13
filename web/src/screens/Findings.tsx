@@ -940,7 +940,7 @@ export function Findings() {
                                   key={tag}
                                   type="button"
                                   className="mark"
-                                  title={`Everything marked ${tag}`}
+                                  title={`Everything tagged ${tag}`}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     set("tag", tag);

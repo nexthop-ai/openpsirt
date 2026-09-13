@@ -721,6 +721,17 @@ export function Finding() {
           />
         ))}
 
+        {/* Above the VEX statements, because a write-up is what somebody
+            deciding reads first and a third party's claim is read against it.
+            It sat below the form for a while, on the grounds that eleven links
+            beside the action recreate the defect the layout was built to fix —
+            which is true of the whole block of them and not of the advisory
+            somebody is about to judge from. */}
+        <div className="evidence">
+          <References advisory={it.advisory} refs={it.references ?? []} />
+          <LookItUp links={it.links ?? []} />
+        </div>
+
         {places.some((p) => p.decision == null) && (
           <>
             {/* Said when there is nothing, because the difference matters:
@@ -897,14 +908,6 @@ export function Finding() {
       </div>
 
       <div className="deciding">
-        {/* Eleven links between the facts and the form is the defect the old
-            layout was built to fix, arriving by a different route — so what
-            is read elsewhere is read below the act rather than beside it. */}
-        <div className="evidence">
-          <References advisory={it.advisory} refs={it.references ?? []} />
-          <LookItUp links={it.links ?? []} />
-        </div>
-
         {/* Keyed on the issue in this product, so it is here whether or not
             anybody has decided anything. It sits above the claim's own thread
             because it is the one somebody can write in before there is a
@@ -948,12 +951,15 @@ export function Finding() {
             for undisclosed readers and came back empty to anybody holding
             only public triage. Two fields on one object, one letter apart in
             meaning. */}
-        <Assignee
-          at={at}
-          assigned={it.assigned_to ?? ""}
-          undisclosed={!!it.undisclosed}
-          routedBy={it.routed_by ?? ""}
-        />
+        <div className="card">
+          <h3>Triage</h3>
+          <Assignee
+            at={at}
+            assigned={it.assigned_to ?? ""}
+            undisclosed={!!it.undisclosed}
+            routedBy={it.routed_by ?? ""}
+          />
+        </div>
 
         {/* Who has been let into this one case. Only where it is
             undisclosed: on a public finding the grant means nothing, because

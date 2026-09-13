@@ -206,8 +206,8 @@ export function Assignee({
   });
 
   return (
-    <div className="card">
-      <h3>Assignee</h3>
+    <div className="within">
+      <h4>Assignee</h4>
       {routedBy && (
         <p
           className="hint"
@@ -535,8 +535,8 @@ export function Marks({
           {mayMark && (
             <button
               type="button"
-              aria-label={`Take off ${tag}`}
-              title={`Take off ${tag}`}
+              aria-label={`Remove tag ${tag}`}
+              title={`Remove tag ${tag}`}
               disabled={busy}
               onClick={() => unmark.mutate(tag)}
             >
@@ -549,8 +549,8 @@ export function Marks({
         (adding ? (
           <span className="marking">
             <Suggest
-              id="mark-with"
-              label="Mark with"
+              id="tag-with"
+              label="Add a tag"
               value={typed}
               onChange={setTyped}
               onPick={(tag) => mark.mutate(tag)}
@@ -566,7 +566,7 @@ export function Marks({
               disabled={typed.trim() === "" || busy}
               onClick={() => mark.mutate(typed.trim())}
             >
-              Mark
+              Add
             </button>
             <button
               type="button"
@@ -581,11 +581,11 @@ export function Marks({
           </span>
         ) : (
           <button type="button" className="mark add" onClick={() => setAdding(true)}>
-            + Mark
+            + Tag
           </button>
         ))}
       {(mark.error != null || unmark.error != null) && (
-        <Failed error={mark.error ?? unmark.error} what="That mark did not change." />
+        <Failed error={mark.error ?? unmark.error} what="That tag did not change." />
       )}
     </div>
   );
