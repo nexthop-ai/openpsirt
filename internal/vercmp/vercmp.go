@@ -220,8 +220,40 @@ func semanticOrder(a, b string) (int, bool) {
 	case bPre == "":
 		return -1, true
 	default:
-		return sign(strings.Compare(aPre, bPre)), true
+		return preRelease(aPre, bPre), true
 	}
+}
+
+// preRelease compares two pre-release suffixes identifier by identifier.
+//
+// Compared as one string, "rc.10" sorts before "rc.2": the comparison stops at
+// the first digit and never sees that ten is more than two. So it is split on
+// the separator and each identifier compared on its own, numerically where both
+// are numbers — which is the only way a run of them orders.
+//
+// A numeric identifier ranks below an alphanumeric one, and a suffix that runs
+// out while matching ranks below the longer one it matched: "rc" before
+// "rc.1".
+func preRelease(a, b string) int {
+	at, bt := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(at) && i < len(bt); i++ {
+		x, y := at[i], bt[i]
+		switch {
+		case digits(x) && digits(y):
+			if c := compareNumeric(x, y); c != 0 {
+				return c
+			}
+		case digits(x):
+			return -1
+		case digits(y):
+			return 1
+		default:
+			if c := sign(strings.Compare(x, y)); c != 0 {
+				return c
+			}
+		}
+	}
+	return sign(len(at) - len(bt))
 }
 
 // splitSemantic pulls a version into numeric release parts and whatever

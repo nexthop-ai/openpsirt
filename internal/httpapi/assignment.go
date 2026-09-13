@@ -509,7 +509,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			"has left.",
 		Tags: []string{"Findings"},
 	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `query:"product" doc:"Limit to work held in one product, by name"`
+		Product string `query:"product" doc:"Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 	}) (*listOutput[HoldingBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {

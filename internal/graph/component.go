@@ -315,6 +315,14 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			FirstSeenAt:    now,
 		})
 	}
+	// What a later report knows and an earlier one did not. A component row is
+	// content-addressed and not edited, but a column nobody has filled in is
+	// not an edit: a producer stating a supplier where the producer that wrote
+	// the row stated none is the merge rule every other field here follows, and
+	// filling it in overwrites nothing.
+	if err := c.fillSuppliers(ctx, byIdentity, known); err != nil {
+		return nil, err
+	}
 	if len(missing) > 0 {
 		// **Two writers describing the same component are agreeing.** The
 		// read above is inside the caller's transaction, which satisfies the
@@ -584,3 +592,44 @@ func Folded(name string) string {
 // in this schema is bounded to: the widest a unique index stays inside on
 // every engine.
 const foldedWidth = 191
+
+// fillSuppliers writes a supplier onto rows that have none.
+//
+// Only where a report states one and the stored row does not, so a later report
+// fills in what an earlier one did not know and overwrites nothing — the rule
+// `DESIGN-findings.md` states for every other field two reports can disagree
+// about. Without it a component first interned through a producer that states no
+// supplier never gets one, however many later scans say who it is.
+//
+// Grouped by what the supplier is, so the number of statements is the number of
+// distinct suppliers in the scan rather than the number of components: a night's
+// apply issues enough statements already, and a real image names a few dozen
+// suppliers across thousands of rows.
+func (c *Components) fillSuppliers(ctx context.Context, described map[string]Described,
+	known map[string]int64) error {
+
+	byName := map[string][]string{}
+	for identity, d := range described {
+		said := strings.TrimSpace(d.Supplier)
+		if said == "" {
+			continue
+		}
+		// Only rows that already exist: one being written this moment carries
+		// its supplier on the insert.
+		if _, have := known[identity]; !have {
+			continue
+		}
+		byName[said] = append(byName[said], identity)
+	}
+	for said, identities := range byName {
+		_, err := c.db.NewUpdate().Model((*Component)(nil)).
+			Set("supplier = ?", said).
+			Where("identity IN (?)", bun.In(identities)).
+			Where(`"supplier" IS NULL OR "supplier" = ?`, "").
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("record who supplied %d components: %w", len(identities), err)
+		}
+	}
+	return nil
+}

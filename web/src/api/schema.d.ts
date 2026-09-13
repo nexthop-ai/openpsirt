@@ -2905,23 +2905,23 @@ export interface paths {
         };
         get?: never;
         /**
-         * Mark a finding with a word
+         * Tag a finding with a word
          * @description Puts a free-text tag on one issue in one component of this product.
          *
          *     **No fixed vocabulary**, because none has been earned yet. A tag that becomes universal is a signal that it should be promoted to a real concept — "waiting on vendor" is a state the tool would want to reason about rather than a string somebody typed.
          *
-         *     **One issue in one component of one product**, not one place and not one build: a kernel flaw at sixty places is one thing somebody is marking, and a tag is about the work rather than about a release.
+         *     **One issue in one component of one product**, not one place and not one build: a kernel flaw at sixty places is one thing somebody is tagging, and a tag is about the work rather than about a release.
          *
-         *     Matched without regard to capitals and shown back as it was typed. Marking what is already marked succeeds and keeps the first spelling.
+         *     Matched without regard to capitals and shown back as it was typed. Tagging what already carries the tag succeeds and keeps the first spelling.
          *
-         *     **Marking is triage**, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
+         *     **Tagging is triage**, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
          *
          *     **Requires:** public-triage or private-triage on the product
          */
         put: operations["tag-finding"];
         post?: never;
         /**
-         * Take a word off a finding
+         * Take a tag off a finding
          * @description Removes a tag. Taking off one that is not there succeeds and changes nothing.
          *
          *     **Requires:** public-triage or private-triage on the product
@@ -6885,6 +6885,11 @@ export interface components {
             first_seen: string;
             /**
              * Format: int64
+             * @description How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
+             */
+            fixable: number;
+            /**
+             * Format: int64
              * @description Distinct vulnerabilities open against it here
              */
             issues: number;
@@ -8738,7 +8743,7 @@ export interface operations {
     "list-holdings": {
         parameters: {
             query?: {
-                /** @description Limit to work held in one product, by name */
+                /** @description Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
                 product?: string;
             };
             header?: never;
@@ -13937,7 +13942,7 @@ export interface operations {
             query?: {
                 /** @description Return what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
-                /** @description Limit to claims made in one product, by name */
+                /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
                 product?: string;
                 limit?: number;
                 offset?: number;
@@ -13973,7 +13978,7 @@ export interface operations {
             query?: {
                 /** @description Write out what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
-                /** @description Limit to claims made in one product, by name */
+                /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
                 product?: string;
             };
             header?: never;

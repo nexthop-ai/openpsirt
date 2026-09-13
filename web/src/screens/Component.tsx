@@ -155,7 +155,17 @@ export function Component() {
                 type="button"
                 className={each.at === here.version ? "vchip on" : "vchip"}
                 aria-pressed={each.at === here.version}
-                onClick={() => go({ version: each.at })}
+                onClick={() => {
+                  // The build that ships it, because the two versions need not
+                  // be in the same one: keeping the old stream and variant
+                  // matches no row and falls back to whatever is worst.
+                  const row = rows.find((r) => (r.version ?? "") === each.at);
+                  go({
+                    version: each.at,
+                    stream: row?.stream ?? "",
+                    variant: row?.variant ?? "",
+                  });
+                }}
               >
                 <span className="id">{each.at}</span>{" "}
                 <span className="hint">{each.issues} open</span>
@@ -180,7 +190,16 @@ export function Component() {
               })
             }
           />
-          <Upgrade product={product} component={component} here={here} covering={sameVersion} />
+          {/* Keyed on the build and version, so choosing another one builds a
+              new form rather than keeping the version and releases the old one
+              opened with — which it would then submit. */}
+          <Upgrade
+            key={keyOf(here) + APART + (here.version ?? "")}
+            product={product}
+            component={component}
+            here={here}
+            covering={sameVersion}
+          />
         </div>
 
         <div>
@@ -226,9 +245,13 @@ export function Component() {
                 ) : (
                   <span
                     className="hint"
-                    title="No index is asked about a distribution package: the distribution is its maintainer, and an upstream release date says nothing about the software inside"
+                    title={
+                      here.ecosystem === "deb" || here.ecosystem === "rpm"
+                        ? "No index is asked about a distribution package: the distribution is its maintainer, and an upstream release date says nothing about the software inside"
+                        : "Nothing has answered for this one — an index this does not ask, a package no index knows, or asking turned off"
+                    }
                   >
-                    no index asked
+                    not known
                   </span>
                 )}
               </dd>
@@ -502,7 +525,7 @@ function Shape({ by, key_ = true }: { by?: Record<string, number>; key_?: boolea
 function Landed({ here }: { here: Build }) {
   const landed = here.upgrades ?? [];
   const ordered = landed[0]?.ordered ?? false;
-  const total = landed.reduce((sum, each) => sum + (each.fixed_here ?? 0), 0);
+  const total = here.fixable ?? 0;
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
@@ -673,9 +696,10 @@ function Upgrade({
   }
 
   const ready = to.trim() !== "" && by !== "" && because.trim() !== "" && chosen.size > 0;
-  // What a fix exists for, from the scanner rather than from any comparison:
-  // every issue naming a version, counted once.
-  const withFix = landed.reduce((sum, each) => sum + (each.fixed_here ?? 0), 0);
+  // Counted once per issue by the server. Summed from the per-version counts
+  // instead, an issue whose record names three versions counts three times and
+  // the total runs past what is open.
+  const withFix = here.fixable ?? 0;
   const noFix = Math.max(0, (here.issues ?? 0) - withFix);
 
   return (

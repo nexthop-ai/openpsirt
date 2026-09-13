@@ -107,12 +107,17 @@ which is the failure REQ-28 exists to prevent.
 
 ## Resolution
 
-An issue is resolved when every build somebody chose is clear. Progress is
-readable at any point: two of three clear, one outstanding (REQ-35).
+A commitment is answered by the next scan of the build it was made for, never by
+anybody marking it done (REQ-35). Each stands at landed, lapsed or planned, and
+those three are worked out on every read — nothing stores them, nothing refreshes
+them, and nothing has to be invalidated when a scan closes a finding.
 
-Worked out from the same list every time it is asked for. Nothing stores it,
-nothing refreshes it, and nothing has to be invalidated when a scan closes a
-finding.
+**A roll-up across the builds one issue was promised in is not built.** There was
+one, reading "two of three chosen releases are clear", and it was the only reader
+of a screen that offered a set of builds to tick with no version, no date and no
+reasoning attached; both went together. What remains answers per build, which is
+the grain a commitment is made at. Where an issue stands across several is read
+from the findings list, which has a row per build.
 
 ## Deadlines
 

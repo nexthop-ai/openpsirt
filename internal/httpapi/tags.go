@@ -12,14 +12,14 @@ import (
 
 // registerTags is the words people put on findings.
 //
-// **People mark work regardless.** With nowhere to put it they do it inside
+// **People tag work regardless.** With nowhere to put it they do it inside
 // the reasoning text, where nothing can filter on it and an approver reads it
 // as part of the argument.
 func registerTags(api huma.API, in Ingest) {
 	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
 		"/findings/{vulnerability}/components/{component}/tags/{tag}"
 
-	mark := func(add bool) func(ctx context.Context, input *struct {
+	tagging := func(add bool) func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
@@ -59,30 +59,30 @@ func registerTags(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "tag-finding", Method: http.MethodPut, Path: at,
-		Summary: "Mark a finding with a word",
+		Summary: "Tag a finding with a word",
 		Description: "Puts a free-text tag on one issue in one component of this product.\n\n" +
 			"**No fixed vocabulary**, because none has been earned yet. A tag that becomes " +
 			"universal is a signal that it should be promoted to a real concept — \"waiting on " +
 			"vendor\" is a state the tool would want to reason about rather than a string " +
 			"somebody typed.\n\n" +
 			"**One issue in one component of one product**, not one place and not one build: " +
-			"a kernel flaw at sixty places is one thing somebody is marking, and a tag is " +
+			"a kernel flaw at sixty places is one thing somebody is tagging, and a tag is " +
 			"about the work rather than about a release.\n\n" +
-			"Matched without regard to capitals and shown back as it was typed. Marking what " +
-			"is already marked succeeds and keeps the first spelling.\n\n" +
-			"**Marking is triage**, so it asks for the triage right: a tag changes what a " +
+			"Matched without regard to capitals and shown back as it was typed. Tagging what " +
+			"already carries the tag succeeds and keeps the first spelling.\n\n" +
+			"**Tagging is triage**, so it asks for the triage right: a tag changes what a " +
 			"filtered list answers, and somebody who may only read should not move work into " +
 			"or out of a saved filter.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, perProduct, "", triageRights()...), mark(true))
+	}, perProduct, "", triageRights()...), tagging(true))
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "untag-finding", Method: http.MethodDelete, Path: at,
-		Summary: "Take a word off a finding",
+		Summary: "Take a tag off a finding",
 		Description: "Removes a tag. Taking off one that is not there succeeds and changes " +
 			"nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, perProduct, "", triageRights()...), mark(false))
+	}, perProduct, "", triageRights()...), tagging(false))
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-tags", Method: http.MethodGet, Path: "/v1/products/{product}/tags",

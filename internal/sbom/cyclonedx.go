@@ -170,6 +170,11 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		ref       string
 		nested    []graph.Described
 		carried   []Suppression
+		// Who supplied it, stated two ways. Resolved after the object rather
+		// than during it, because a producer chooses the order of its own keys
+		// and which field wins must not.
+		supplier  string
+		publisher string
 	)
 	// Charged on the way in, before anything is held, for the reason the
 	// count itself records.
@@ -189,22 +194,19 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		case "cpe":
 			return c.into(&described.CPE)
 		case "supplier":
-			// An object naming who supplied it. Read only where nothing has
-			// said yet, so the publisher below does not overwrite it.
+			// An object naming who supplied it.
 			return c.b.object(func(field string) error {
-				if field == "name" && described.Supplier == "" {
-					return c.into(&described.Supplier)
+				if field == "name" {
+					return c.into(&supplier)
 				}
 				return c.b.skip()
 			})
 		case "publisher":
-			// A plain string, and the weaker of the two: a producer that
-			// states both means the supplier. Taken only where the supplier
-			// said nothing.
-			if described.Supplier != "" {
-				return c.b.skip()
-			}
-			return c.into(&described.Supplier)
+			// A plain string, and the weaker of the two. Kept aside rather
+			// than written straight in: which field wins must not depend on
+			// which one the producer happened to write first, and key order is
+			// the producer's choice.
+			return c.into(&publisher)
 		case "pedigree":
 			return c.pedigree(&described, &carried)
 		case "components":
@@ -223,6 +225,13 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	}
 	if err := described.Valid(); err != nil {
 		return graph.Described{}, "", nil, fmt.Errorf("%w, so it cannot be tracked", err)
+	}
+
+	// The supplier where a producer stated one, whatever order it wrote the two
+	// fields in. Resolved during the scan instead, whichever came first won.
+	described.Supplier = strings.TrimSpace(supplier)
+	if described.Supplier == "" {
+		described.Supplier = strings.TrimSpace(publisher)
 	}
 
 	// Where a pedigree said what this was built from, it stands: it is the

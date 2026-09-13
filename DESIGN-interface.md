@@ -799,8 +799,11 @@ adds:
 | **Lapsed decisions and deferrals that ran out sit underneath** | The row carries the decision and not the build it was made in, so reaffirming happens on the finding, where its locations are |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 
-The queue filters on mine and nothing else, so an approver holding several
-products reads one interleaved list. *Not built* — see the list at the end.
+The queue narrows to one product, which is what a figure on the home screen
+counts: the address carries the product it was counted for, and the line under
+the heading names it. The exports narrow the same way, so a file taken from a
+narrowed screen is the narrowed backlog. Nothing narrower is offered — a claim is
+decided in a product and no finer.
 
 ## The claim page
 
@@ -1383,7 +1386,7 @@ beside them.
 | | |
 |---|---|
 | **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
-| **Narrowing the review queue** | By product, by what kind of thing is waiting, by who proposed it, by age or by severity |
+| **Narrowing the review queue further than a product** | By what kind of thing is waiting, by who proposed it, by age or by severity. Narrowing by product is built, because a figure that counts one product has to open a list about that product |
 | **A deadline and an owner in the finding's header** | The row carries both; the header does not |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 

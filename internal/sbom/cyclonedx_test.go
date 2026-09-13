@@ -639,7 +639,7 @@ func TestTheComponentBoundHoldsWhenOnlyTheHeaderIsWanted(t *testing.T) {
 func TestWhoSuppliedAComponentIsKeptWithoutMovingIdentity(t *testing.T) {
 	// A bare name is not enough for a dependency of a dependency, and a
 	// producer often says who supplied it — one real image states it for 759
-	// of the 6,866 components it describes. It was read and dropped.
+	// of the 6,866 components it describes.
 	//
 	// It must not reach identity. Two producers describing one component name
 	// its supplier differently or not at all, so an identity that moved with it
@@ -655,10 +655,13 @@ func TestWhoSuppliedAComponentIsKeptWithoutMovingIdentity(t *testing.T) {
 			{"bom-ref":"c","name":"both","version":"1.0",
 			 "purl":"pkg:deb/debian/both@1.0","supplier":{"name":"Debian"},
 			 "publisher":"Somebody else"},
+			{"bom-ref":"e","name":"reversed","version":"1.0",
+			 "purl":"pkg:deb/debian/reversed@1.0","publisher":"Somebody else",
+			 "supplier":{"name":"Debian"}},
 			{"bom-ref":"d","name":"silent","version":"1.0",
 			 "purl":"pkg:deb/debian/silent@1.0"}
 		],
-		"dependencies":[{"ref":"root","dependsOn":["a","b","c","d"]}]
+		"dependencies":[{"ref":"root","dependsOn":["a","b","c","d","e"]}]
 	}`), sbom.Limits{})
 	if err != nil {
 		t.Fatal(err)
@@ -674,9 +677,15 @@ func TestWhoSuppliedAComponentIsKeptWithoutMovingIdentity(t *testing.T) {
 	if said["published"] != "Somebody" {
 		t.Errorf("with only a publisher the supplier is %q, want Somebody", said["published"])
 	}
-	// And the supplier wins where a producer states both.
+	// And the supplier wins where a producer states both, in either order: a
+	// producer chooses the order of its own keys and which field wins must not
+	// depend on it.
 	if said["both"] != "Debian" {
 		t.Errorf("stating both, the supplier is %q, want the supplier", said["both"])
+	}
+	if said["reversed"] != "Debian" {
+		t.Errorf("stating the publisher first, the supplier is %q, want the supplier",
+			said["reversed"])
 	}
 	// Absent is absent rather than a placeholder.
 	if said["silent"] != "" {

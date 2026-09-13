@@ -35,10 +35,11 @@ function withOnly(path: string, only: string): string {
   return `${path}${path.includes("?") ? "&" : "?"}only=${only}`;
 }
 
-// One home page, assembled from what this person holds. Four figures that
-// follow the scope, then the work — what is pending, what is in progress, what
-// lapsed — then the trends, then the system's own state . Somebody opening
-// this most days wants the size of the day before its contents.
+// One home page, assembled from what this person holds. Five figures that
+// follow the scope, each with what it would say without one beside it, then the
+// work — what is pending, what is in progress, what lapsed — then the trends,
+// then the system's own state. Somebody opening this most days wants the size of
+// the day before its contents.
 export function Home({ who }: { who: Who }) {
   const at = useScope();
   const scope = scopeQuery(at);
@@ -352,12 +353,6 @@ function Figures({
     queryFn: async () =>
       unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
   });
-  const allExploited = useQuery({
-    queryKey: ["home", "exploited", "all"],
-    enabled: widely,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/findings", { params: { query: { limit: 1, exploited: true } } })),
-  });
   const allLate = useQuery({
     queryKey: ["home", "running-out", "all"],
     enabled: widely,
@@ -400,6 +395,19 @@ function Figures({
     return <span className="d">{n.toLocaleString()} all products</span>;
   }
 
+  // The same, for a figure read out of a list the server caps. Printed exact, a
+  // capped list says there are fewer than there are — and a filtered part of it
+  // can read zero while the unfiltered whole is at the cap.
+  function everywhereAtLeast(n: number, capped: boolean): React.ReactNode {
+    if (!widely) return null;
+    return (
+      <span className="d">
+        {n.toLocaleString()}
+        {capped ? "+" : ""} all products
+      </span>
+    );
+  }
+
   return (
     <div className="kpis">
       <button type="button" className="kpi" onClick={() => navigate(findingsPath(at))}>
@@ -419,9 +427,11 @@ function Figures({
             <i style={{ background: "var(--sev-exploited)" }} /> Known exploited
           </span>
           <span className="n">{(exploited.data?.total ?? 0).toLocaleString()}</span>
-          {everywhere(allExploited.data?.total) ?? (
-            <span className="d">sorted above everything else</span>
-          )}
+          {/* No twin. The all-products figure off this endpoint counts a row
+              per product, issue and component, so one library's flaw in five
+              products reads as five against a scoped figure that reads one —
+              two units under one label. */}
+          <span className="d">sorted above everything else</span>
         </button>
       )}
       <button
@@ -439,7 +449,14 @@ function Figures({
           <i style={{ background: "var(--wait)" }} /> Pending your approval
         </span>
         <span className="n">{(queue.data?.total ?? 0).toLocaleString()}</span>
-        {everywhere(allQueue.data?.total) ?? <span className="d">waiting on a second person</span>}
+        {everywhere(allQueue.data?.total) ?? (
+          <span
+            className="d"
+            title="A claim is decided in a product and no finer, so this counts the whole product"
+          >
+            {at.stream || at.variant ? `all of ${at.product}` : "waiting on a second person"}
+          </span>
+        )}
       </button>
       {/* Into the list it counts, narrowed the same way: what is undecided
           and past its deadline. It pointed at the assignments screen, which
@@ -457,7 +474,10 @@ function Figures({
             ? `${OVERDUE_LIMIT.toLocaleString()}+`
             : overdue.length.toLocaleString()}
         </span>
-        {everywhere(allRunning.filter((row) => (row.days_left ?? 0) < 0).length) ?? (
+        {everywhereAtLeast(
+          allRunning.filter((row) => (row.days_left ?? 0) < 0).length,
+          allRunning.length >= OVERDUE_LIMIT,
+        ) ?? (
           <span className="d">
             {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
             deadline
@@ -477,7 +497,10 @@ function Figures({
           <i style={{ background: "var(--wait)" }} /> Due soon
         </span>
         <span className="n">{soon.length.toLocaleString()}</span>
-        {everywhere(allRunning.filter((row) => (row.days_left ?? 0) >= 0).length) ?? (
+        {everywhereAtLeast(
+          allRunning.filter((row) => (row.days_left ?? 0) >= 0).length,
+          allRunning.length >= OVERDUE_LIMIT,
+        ) ?? (
           <span className="d">
             {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
             {SOON_DAYS} days
@@ -529,7 +552,15 @@ function Pending() {
     <div className="panel">
       <header>
         <h3>Pending your approval</h3>
-        <span className="eyebrow" style={{ marginLeft: "auto" }}>
+        <span
+          className="eyebrow"
+          style={{ marginLeft: "auto" }}
+          title={
+            at.stream || at.variant
+              ? "A claim is decided in a product and no finer, so this counts the whole product"
+              : undefined
+          }
+        >
           {at.product
             ? `${(everywhere.data?.total ?? 0).toLocaleString()} all products`
             : "all products"}
@@ -585,7 +616,15 @@ function InProgress() {
     <div className="panel">
       <header>
         <h3>In progress</h3>
-        <span className="eyebrow" style={{ marginLeft: "auto" }}>
+        <span
+          className="eyebrow"
+          style={{ marginLeft: "auto" }}
+          title={
+            at.stream || at.variant
+              ? "Work is held per product and no finer, so this counts the whole product"
+              : undefined
+          }
+        >
           {at.product
             ? `${(everywhere.data?.items ?? [])
                 .reduce((sum, each) => sum + (each.open ?? 0), 0)

@@ -157,7 +157,7 @@ function Yours() {
                 className="branch"
                 style={{ paddingLeft: 10 + (row.depth ?? 0) * 18 }}
               >
-                <Link className="id" to={componentPage(at, row.component)}>
+                <Link className="id" to={componentPage(at, row.component) + buildQuery(at)}>
                   {row.component}
                 </Link>{" "}
                 <span className="hint">{row.version}</span>
@@ -195,7 +195,7 @@ function Yours() {
             <ul className="branchlist">
               {loose.map((row, i) => (
                 <li key={`${row.component}@${i}`} className="branch" style={{ paddingLeft: 10 }}>
-                  <Link className="id" to={componentPage(at, row.component)}>
+                  <Link className="id" to={componentPage(at, row.component) + buildQuery(at)}>
                     {row.component}
                   </Link>{" "}
                   <span className="hint">{row.version}</span>
@@ -328,15 +328,17 @@ function Whole() {
   // are two components — and the tree knows which one was clicked, so asking
   // without it turned every such component into one nobody could look at.
   function select(name: string, children = 0, version = "", ecosystem = "") {
-    setParams(
-      name
-        ? {
-            at: name,
-            ...(version ? { version } : {}),
-            ...(ecosystem ? { ecosystem } : {}),
-          }
-        : {},
-    );
+    // What was searched for survives the selection. Replaced wholesale, a hit
+    // cleared the search it was found through: the list went away, the tree
+    // redrew from the root, and the component clicked was not on screen.
+    const next = new URLSearchParams(params);
+    for (const key of ["at", "version", "ecosystem"]) next.delete(key);
+    if (name) {
+      next.set("at", name);
+      if (version) next.set("version", version);
+      if (ecosystem) next.set("ecosystem", ecosystem);
+    }
+    setParams(next);
     if (!name || children === 0) return;
     setOpened((prev) => {
       const next = new Set(prev);
@@ -415,7 +417,7 @@ function Whole() {
                   detail="Part of a name, ignoring case. Components not in this build will not appear."
                 />
               ) : (
-                <Matches found={found} focus={focus} onSelect={select} />
+                <Matches at={at} found={found} focus={focus} onSelect={select} />
               ))}
             {!searching && root && (
               <Branches
@@ -444,13 +446,16 @@ function Whole() {
 }
 
 // A search answers with a set of components rather than a position, so it is
-// drawn as a list and not as a tree with one branch. Selecting one moves the
-// pane to it, which is where "what pulls this in" is answered.
+// drawn as a list and not as a tree with one branch. Selecting one positions the
+// tree on it; the control beside it opens the component's own screen, which is
+// the same pair of acts a row in the tree offers.
 function Matches({
+  at,
   found,
   focus,
   onSelect,
 }: {
+  at: At;
   found: Node[];
   focus: string;
   onSelect: (name: string, children?: number, version?: string, ecosystem?: string) => void;
@@ -478,6 +483,19 @@ function Matches({
           >
             {node.beneath.toLocaleString()}
           </span>
+          {/* The same way through a tree row offers: what pulls it in, what it
+              pulls in and what is open against it, on the component's own
+              screen. Search is how anything is found in a build of thousands,
+              so a hit that cannot reach it is a dead end. */}
+          <Link
+            className="look"
+            title={`Everything about ${node.component}`}
+            aria-label={`Open ${node.component}`}
+            to={componentPage(at, node.component) + buildQuery(at)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            ⋯
+          </Link>
         </div>
       ))}
     </div>

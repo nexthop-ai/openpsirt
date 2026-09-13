@@ -4938,6 +4938,10 @@ components:
           description: When a scan of this deployment first reported the component
           format: date-time
           type: string
+        fixable:
+          description: How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
+          format: int64
+          type: integer
         issues:
           description: Distinct vulnerabilities open against it here
           format: int64
@@ -4987,6 +4991,7 @@ components:
         - variant
         - version
         - exploited
+        - fixable
         - first_seen
         - issues
         - consumers
@@ -7988,12 +7993,12 @@ paths:
         **Requires:** any recognized credential. Answers only what you may see.
       operationId: list-holdings
       parameters:
-        - description: Limit to work held in one product, by name
+        - description: Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
           explode: false
           in: query
           name: product
           schema:
-            description: Limit to work held in one product, by name
+            description: Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
             type: string
       responses:
         "200":
@@ -15867,7 +15872,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Take a word off a finding
+      summary: Take a tag off a finding
       tags:
         - Findings
       x-openpsirt-requires:
@@ -15881,11 +15886,11 @@ paths:
 
         **No fixed vocabulary**, because none has been earned yet. A tag that becomes universal is a signal that it should be promoted to a real concept — "waiting on vendor" is a state the tool would want to reason about rather than a string somebody typed.
 
-        **One issue in one component of one product**, not one place and not one build: a kernel flaw at sixty places is one thing somebody is marking, and a tag is about the work rather than about a release.
+        **One issue in one component of one product**, not one place and not one build: a kernel flaw at sixty places is one thing somebody is tagging, and a tag is about the work rather than about a release.
 
-        Matched without regard to capitals and shown back as it was typed. Marking what is already marked succeeds and keeps the first spelling.
+        Matched without regard to capitals and shown back as it was typed. Tagging what already carries the tag succeeds and keeps the first spelling.
 
-        **Marking is triage**, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
+        **Tagging is triage**, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
 
         **Requires:** public-triage or private-triage on the product
       operationId: tag-finding
@@ -15932,7 +15937,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Mark a finding with a word
+      summary: Tag a finding with a word
       tags:
         - Findings
       x-openpsirt-requires:
@@ -17183,12 +17188,12 @@ paths:
           schema:
             description: Return what you proposed and nobody has agreed to, instead of what is waiting on you
             type: boolean
-        - description: Limit to claims made in one product, by name
+        - description: Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
           explode: false
           in: query
           name: product
           schema:
-            description: Limit to claims made in one product, by name
+            description: Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
             type: string
         - explode: false
           in: query
@@ -17252,12 +17257,12 @@ paths:
           schema:
             description: Write out what you proposed and nobody has agreed to, instead of what is waiting on you
             type: boolean
-        - description: Limit to claims made in one product, by name
+        - description: Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
           explode: false
           in: query
           name: product
           schema:
-            description: Limit to claims made in one product, by name
+            description: Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
             type: string
       responses:
         "200":

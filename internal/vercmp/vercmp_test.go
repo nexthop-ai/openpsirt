@@ -58,6 +58,16 @@ func TestSemanticVersionsOrderAndAPreReleaseComesFirst(t *testing.T) {
 		// A pre-release is not yet the release it leads to.
 		{"1.27.0-rc.2", "1.27.0", -1},
 		{"1.27.0-rc.2", "1.27.0-rc.3", -1},
+		// Two digits. Compared as one string these invert, because the
+		// comparison stops at the first digit and never reaches the second.
+		{"1.27.0-rc.2", "1.27.0-rc.10", -1},
+		{"1.0.0-beta.9", "1.0.0-beta.10", -1},
+		{"1.0.0-2", "1.0.0-11", -1},
+		// A numeric identifier ranks below an alphanumeric one, and a suffix
+		// that runs out while matching ranks below the longer one.
+		{"1.0.0-1", "1.0.0-alpha", -1},
+		{"1.0.0-rc", "1.0.0-rc.1", -1},
+		{"1.0.0-alpha.1", "1.0.0-alpha.beta", -1},
 		// Build metadata says nothing about order.
 		{"v28.5.2+incompatible", "v28.5.2", 0},
 	} {

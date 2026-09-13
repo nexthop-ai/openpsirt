@@ -11,6 +11,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [The row a person reads](#the-row-a-person-reads)
 - [Issue identity](#issue-identity)
 - [What a report supplies](#what-a-report-supplies)
+- [Who supplied a component](#who-supplied-a-component)
 - [Merging later reports](#merging-later-reports)
 - [Derived addresses](#derived-addresses)
 - [What an index says](#what-an-index-says)
@@ -119,6 +120,21 @@ being parsed and thrown away.
 | Severity | Stored as a word, which is what ranks and what sets a deadline. A number is taken where the report carries one — the first rating stating both a score and its vector, worst claim winning. The vector travels with the number |
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered. It groups findings by the shape of the mistake rather than the package it landed in |
+
+## Who supplied a component
+
+An inventory often says who supplied a component — a distribution, a vendor, a
+project — and that is kept, because a bare name is not enough for a dependency of
+a dependency somebody has never heard of.
+
+| Rule | Reason |
+|---|---|
+| From the inventory, never from an index | It is what the producer of this build said, not what a registry says about a package in general. What an index says has its own section below and covers different fields |
+| Absent for most of it, and said so rather than filled in | Measured on a switch image: 759 of 6,866 components carry one. A screen states that nobody said rather than showing a blank |
+| Two ways of saying it, resolved after the whole description is read | One format states an object and a plainer string beside it, and the object wins where a producer fills in both. Resolved while reading, whichever key the producer happened to write first won — and key order is the producer's choice |
+| A party's kind is dropped, its name kept | The other format prefixes it — "Organization: Debian" — and one of the two words is a label rather than a name. The word that format uses for "nobody stated one" is treated as nobody having stated one |
+| Never part of identity | Two producers describing one component name its supplier differently or not at all, and an identity that moved with it would take every triage decision attached along with it |
+| A later report fills it in where the row has none | The rule the section below states for everything else two reports can disagree about. Written only on the insert instead, a component first seen through a producer that stated none never got one, however many later scans said who it was |
 
 ## Merging later reports
 

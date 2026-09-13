@@ -325,7 +325,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format  string `path:"format" enum:"csv,json"`
 		Mine    bool   `query:"mine" doc:"Write out what you proposed and nobody has agreed to, instead of what is waiting on you"`
-		Product string `query:"product" doc:"Limit to claims made in one product, by name"`
+		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 	}) (*huma.StreamResponse, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {

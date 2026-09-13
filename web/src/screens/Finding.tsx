@@ -525,8 +525,7 @@ export function Finding() {
 
       {/* Evidence on one side and the action on the other. The
           decision form used to sit below the description, the chains, the
-          holder, the fix targets, the assessment and the similar
-          decisions — about 1,550 pixels down a page running to 2,800, so
+          holder, the assessment and the similar decisions — about 1,550 pixels down a page running to 2,800, so
           on an ordinary screen the thing the page is for was three
           screens away. Neither is hidden to fix it: what is read in order
           to decide sits beside what decides it, which is the arrangement

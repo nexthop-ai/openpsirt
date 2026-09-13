@@ -253,7 +253,7 @@ func registerTriage(api huma.API, in Ingest) {
 		Tags: []string{"Triage"},
 	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Mine    bool   `query:"mine" doc:"Return what you proposed and nobody has agreed to, instead of what is waiting on you"`
-		Product string `query:"product" doc:"Limit to claims made in one product, by name"`
+		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset  int    `query:"offset" minimum:"0"`
 	}) (*QueueOutput, error) {

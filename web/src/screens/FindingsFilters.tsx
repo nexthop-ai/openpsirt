@@ -663,7 +663,7 @@ export function Filters({
         />
         <Words
           label="Tag"
-          hint="Words somebody marked findings with here. Any of them"
+          hint="Words somebody tagged findings with here. Any of them"
           words={all("tag")}
           onChange={(words) => setMany("tag", words)}
           offered={tags}

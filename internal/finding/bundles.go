@@ -537,6 +537,10 @@ type PerBuild struct {
 	// Exploited says whether any of them is known to be exploited, which
 	// outranks everything else about a row.
 	Exploited bool
+	// Fixable is how many of them any version fixes, counted once per issue.
+	// Summed from the per-version counts instead, an issue whose record names
+	// three versions is counted three times and the total exceeds what is open.
+	Fixable int
 	// Newest is what the ecosystem's index says is current and when it
 	// shipped, and FirstSeen when this deployment first saw the component.
 	Newest    string
@@ -615,6 +619,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		NewestAt    *time.Time `bun:"latest_released_at"`
 		FirstSeen   time.Time  `bun:"first_seen_at"`
 		Exploited   int        `bun:"exploited"`
+		Fixable     int        `bun:"fixable"`
 		Issues      int        `bun:"issues"`
 		Consumers   int        `bun:"consumers"`
 		Places      int        `bun:"places"`
@@ -635,6 +640,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr("COUNT(*) AS places").
 		ColumnExpr("MIN(f.due_at) AS due_at").
 		ColumnExpr("MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) AS exploited").
+		ColumnExpr("COUNT(DISTINCT CASE WHEN f.fixed_in IS NOT NULL AND f.fixed_in <> ''"+
+			" THEN f.vulnerability_id END) AS fixable").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -661,8 +668,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Join("JOIN target AS tg ON tg.id = n.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		Join("LEFT JOIN (?) AS op ON op.target_id = n.target_id AND op.component_id = n.component_id", open).
-		Join("LEFT JOIN (?) AS pl ON pl.target_id = n.target_id AND pl.component_id = n.component_id", pullers).
+		Join(`LEFT JOIN (?) AS "op" ON "op".target_id = n.target_id AND "op".component_id = n.component_id`, open).
+		Join(`LEFT JOIN (?) AS "pl" ON "pl".target_id = n.target_id AND "pl".component_id = n.component_id`, pullers).
 		ColumnExpr("n.target_id AS target_id").
 		ColumnExpr("n.component_id AS component_id").
 		ColumnExpr("st.name AS stream").
@@ -675,11 +682,12 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr("COALESCE(c.latest_version, '') AS latest_version").
 		ColumnExpr("c.latest_released_at AS latest_released_at").
 		ColumnExpr("c.first_seen_at AS first_seen_at").
-		ColumnExpr("COALESCE(op.exploited, 0) AS exploited").
-		ColumnExpr("COALESCE(op.issues, 0) AS issues").
-		ColumnExpr("COALESCE(op.places, 0) AS places").
-		ColumnExpr("op.due_at AS due_at").
-		ColumnExpr("COALESCE(pl.consumers, 1) AS consumers").
+		ColumnExpr(`COALESCE("op".exploited, 0) AS exploited`).
+		ColumnExpr(`COALESCE("op".fixable, 0) AS fixable`).
+		ColumnExpr(`COALESCE("op".issues, 0) AS issues`).
+		ColumnExpr(`COALESCE("op".places, 0) AS places`).
+		ColumnExpr(`"op".due_at AS due_at`).
+		ColumnExpr(`COALESCE("pl".consumers, 1) AS consumers`).
 		Where("n.target_id IN (?)", bun.List(targets)).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
@@ -720,12 +728,13 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 			Summary: row.Summary, ProjectURL: row.ProjectURL,
 			Supplier: row.Supplier,
 			Newest:   row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
-			Exploited: row.Exploited > 0, Issues: row.Issues,
+			Exploited: row.Exploited > 0, Fixable: row.Fixable, Issues: row.Issues,
 			BySeverity: bands[[2]int64{row.TargetID, row.ComponentID}],
 			Consumers:  row.Consumers, Places: row.Places,
-			DueAt: row.DueAt, Upgrades: upgrades[row.TargetID],
+			DueAt:    row.DueAt,
+			Upgrades: upgrades[[2]int64{row.TargetID, row.ComponentID}],
 		}
-		if said, ok := promised[row.TargetID]; ok {
+		if said, ok := promised[[2]int64{row.TargetID, row.ComponentID}]; ok {
 			build.CommittedTo, build.UpgradeTo = said.at, said.to
 		}
 		out = append(out, build)
@@ -747,13 +756,14 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 // where the ordering is unavailable the candidates carry equal counts and say
 // they are unranked rather than being ranked by the first.
 func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
-	visible []access.Visibility, name string) (map[int64][]Candidate, error) {
+	visible []access.Visibility, name string) (map[[2]int64][]Candidate, error) {
 
 	var rows []struct {
-		TargetID  int64  `bun:"target_id"`
-		Issue     int64  `bun:"vulnerability_id"`
-		FixedIn   string `bun:"fixed_in"`
-		Ecosystem string `bun:"purl"`
+		TargetID    int64  `bun:"target_id"`
+		ComponentID int64  `bun:"component_id"`
+		Issue       int64  `bun:"vulnerability_id"`
+		FixedIn     string `bun:"fixed_in"`
+		Ecosystem   string `bun:"purl"`
 	}
 	// One row per finding rather than a grouped count, because the grouping is
 	// per version and a version has to be read out of the string first.
@@ -761,10 +771,15 @@ func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 		TableExpr("finding AS f").
 		Join("JOIN component AS c ON c.id = f.component_id").
 		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("f.component_id AS component_id").
 		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("f.fixed_in AS fixed_in").
 		ColumnExpr("c.purl AS purl").
 		Where("f.target_id IN (?)", bun.List(targets)).
+		// Narrowed to the components the rows are about, because a row is one
+		// version: pooled per build, a build shipping one name at two versions
+		// offers each version the other's candidates and counts.
+		Where("f.component_id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("c.name = ?", name).
@@ -777,20 +792,21 @@ func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 
 	// What each build's findings name, one entry per issue so an issue counts
 	// once however many versions its fix names.
-	per := map[int64][]namedFix{}
-	scheme := map[int64]vercmp.Scheme{}
+	per := map[[2]int64][]namedFix{}
+	scheme := map[[2]int64]vercmp.Scheme{}
 	for _, row := range rows {
 		versions := versionsIn(row.FixedIn)
 		if len(versions) == 0 {
 			continue
 		}
-		per[row.TargetID] = append(per[row.TargetID], namedFix{issue: row.Issue, versions: versions})
-		scheme[row.TargetID] = vercmp.SchemeOf(graph.EcosystemOf(row.Ecosystem))
+		at := [2]int64{row.TargetID, row.ComponentID}
+		per[at] = append(per[at], namedFix{issue: row.Issue, versions: versions})
+		scheme[at] = vercmp.SchemeOf(graph.EcosystemOf(row.Ecosystem))
 	}
 
-	out := make(map[int64][]Candidate, len(per))
-	for target, found := range per {
-		out[target] = candidatesFrom(found, scheme[target])
+	out := make(map[[2]int64][]Candidate, len(per))
+	for at, found := range per {
+		out[at] = candidatesFrom(found, scheme[at])
 	}
 	return out, nil
 }
@@ -891,11 +907,17 @@ type promise struct {
 
 // promisedPerBuild is what has already been committed for this component in
 // each build, read off the decisions rather than a record beside them.
+//
+// Per version as well as per build, because a commitment is one fold moving and
+// a fold is keyed on the version in hand: a build shipping one name at two
+// versions has two of them, and keyed on the build alone each version reported
+// the other's promise.
 func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
-	visible []access.Visibility, name string) (map[int64]promise, error) {
+	visible []access.Visibility, name string) (map[[2]int64]promise, error) {
 
 	var rows []struct {
 		TargetID    int64      `bun:"target_id"`
+		ComponentID int64      `bun:"component_id"`
 		CommittedTo *time.Time `bun:"committed_to"`
 		UpgradeTo   string     `bun:"upgrade_to"`
 	}
@@ -916,6 +938,7 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 		// act is one argument, and the rows underneath say where it lands.
 		Join("JOIN claim AS cl ON cl.id = de.claim_id").
 		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("f.component_id AS component_id").
 		ColumnExpr("MAX(cl.committed_to) AS committed_to").
 		ColumnExpr("MIN(COALESCE(cl.upgrade_to, '')) AS upgrade_to").
 		Where("f.target_id IN (?)", bun.List(targets)).
@@ -924,14 +947,16 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 		Where("c.name = ?", name).
 		Where("cl.outcome = ?", "upgrade-needed").
 		Where("de.live_key IS NOT NULL").
-		GroupExpr("f.target_id").
+		GroupExpr("f.target_id, f.component_id").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already promised: %w", err)
 	}
-	out := make(map[int64]promise, len(rows))
+	out := make(map[[2]int64]promise, len(rows))
 	for _, row := range rows {
-		out[row.TargetID] = promise{at: row.CommittedTo, to: row.UpgradeTo}
+		out[[2]int64{row.TargetID, row.ComponentID}] = promise{
+			at: row.CommittedTo, to: row.UpgradeTo,
+		}
 	}
 	return out, nil
 }
