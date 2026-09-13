@@ -55,10 +55,14 @@ func registerComponent(api huma.API, in Ingest) {
 			"on a maintained older line and a stream that has moved on are different work " +
 			"with different testing, and one target across both would be wrong for one of " +
 			"them.\n\n" +
-			"**Where it could go is listed, never ordered.** Comparing two versions needs an " +
-			"ordering per ecosystem this does not have, so there is no nearest and no " +
-			"latest — what there is, is every version the scanner named as carrying a fix, " +
-			"and how many of what is open here that release fixed.\n\n" +
+			"**Where it could go carries two counts.** `fixed_here` is how many of what is " +
+			"open name that exact version as their fix, which is the release's own security " +
+			"content; `reached` is how many the upgrade closes altogether, counting " +
+			"everything fixed at or before it. The second is the one somebody choosing a " +
+			"version is asking about, and it needs the ecosystem's ordering: where that is " +
+			"not defined the two counts are equal, `ordered` is false, and the list is not " +
+			"ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts " +
+			"near the bottom while carrying every fix before it.\n\n" +
 			"**A build is listed because it ships the component**, not because something is " +
 			"open against it. A package carrying nothing of its own still answers with the " +
 			"version it ships and how many things pull it in, which is the ordinary case for " +
@@ -96,7 +100,8 @@ func registerComponent(api huma.API, in Ingest) {
 		for _, build := range builds {
 			upgrades := make([]UpgradeBody, 0, len(build.Upgrades))
 			for _, each := range build.Upgrades {
-				upgrades = append(upgrades, UpgradeBody{To: each.To, Issues: each.Issues})
+				upgrades = append(upgrades, UpgradeBody{To: each.To, FixedHere: each.FixedHere,
+					Reached: each.Reached, Ordered: each.Ordered})
 			}
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
 				Stream: build.Stream, Variant: build.Variant, Version: build.Version,

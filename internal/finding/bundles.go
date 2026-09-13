@@ -13,6 +13,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
 // Bundle is one upstream bump and everything it would close.
@@ -462,14 +464,17 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 	}
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
-		To          string `bun:"fixed_in"`
-		Issues      int    `bun:"issues"`
+		Issue       int64  `bun:"vulnerability_id"`
+		FixedIn     string `bun:"fixed_in"`
+		Purl        string `bun:"purl"`
 	}
 	query := s.db.NewSelect().
 		TableExpr("finding AS f").
+		Join("JOIN component AS c ON c.id = f.component_id").
 		ColumnExpr("f.component_id AS component_id").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		ColumnExpr("c.purl AS purl").
 		Where("f.component_id IN (?)", bun.List(ids)).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -479,14 +484,28 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 		// the population that needs a judgment rather than a bump.
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
-		GroupExpr("f.component_id, f.fixed_in").
-		OrderExpr("f.component_id, issues DESC, f.fixed_in")
+		// Grouped to one row per issue rather than per version string, because
+		// a version has to be read out of that string before it can be counted
+		// — and grouped rather than plain because the narrowing asks questions
+		// of the places under an issue, which are aggregates.
+		GroupExpr("f.component_id, f.vulnerability_id, f.fixed_in, c.purl")
 	if err := filter.narrow(query).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where each component could go: %w", err)
 	}
-	out := make(map[int64][]Candidate, len(ids))
+	per := map[int64][]namedFix{}
+	scheme := map[int64]vercmp.Scheme{}
 	for _, row := range rows {
-		out[row.ComponentID] = append(out[row.ComponentID], Candidate{To: row.To, Issues: row.Issues})
+		versions := versionsIn(row.FixedIn)
+		if len(versions) == 0 {
+			continue
+		}
+		per[row.ComponentID] = append(per[row.ComponentID],
+			namedFix{issue: row.Issue, versions: versions})
+		scheme[row.ComponentID] = vercmp.SchemeOf(graph.EcosystemOf(row.Purl))
+	}
+	out := make(map[int64][]Candidate, len(per))
+	for component, found := range per {
+		out[component] = candidatesFrom(found, scheme[component])
 	}
 	return out, nil
 }
@@ -671,37 +690,154 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 }
 
 // upgradesPerBuild is where a component could go, answered per build.
+//
+// **Grouped per version, not per string.** What a scanner records as the fix is
+// one field, and some ecosystems put several versions in it — "1.25.13, 1.26.6,
+// 1.27.0-rc.3" is one string naming three releases, any of which closes the
+// issue. Grouped on the string, one version lands in several groups and its own
+// coverage is reported nowhere.
+//
+// **And counted twice.** What a release fixed is what names it; what an upgrade
+// to it closes is that plus everything fixed before it. The second needs the
+// ecosystem's ordering and is the question somebody choosing a version asks, so
+// where the ordering is unavailable the candidates carry equal counts and say
+// they are unranked rather than being ranked by the first.
 func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 	visible []access.Visibility, name string) (map[int64][]Candidate, error) {
 
 	var rows []struct {
-		TargetID int64  `bun:"target_id"`
-		To       string `bun:"fixed_in"`
-		Issues   int    `bun:"issues"`
+		TargetID  int64  `bun:"target_id"`
+		Issue     int64  `bun:"vulnerability_id"`
+		FixedIn   string `bun:"fixed_in"`
+		Ecosystem string `bun:"purl"`
 	}
+	// One row per finding rather than a grouped count, because the grouping is
+	// per version and a version has to be read out of the string first.
 	err := s.db.NewSelect().
 		TableExpr("finding AS f").
 		Join("JOIN component AS c ON c.id = f.component_id").
 		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		ColumnExpr("c.purl AS purl").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("c.name = ?", name).
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
-		GroupExpr("f.target_id, f.fixed_in").
-		OrderExpr("f.target_id, issues DESC, f.fixed_in").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where a component could go in each build: %w", err)
 	}
-	out := make(map[int64][]Candidate, len(targets))
+
+	// What each build's findings name, one entry per issue so an issue counts
+	// once however many versions its fix names.
+	per := map[int64][]namedFix{}
+	scheme := map[int64]vercmp.Scheme{}
 	for _, row := range rows {
-		out[row.TargetID] = append(out[row.TargetID], Candidate{To: row.To, Issues: row.Issues})
+		versions := versionsIn(row.FixedIn)
+		if len(versions) == 0 {
+			continue
+		}
+		per[row.TargetID] = append(per[row.TargetID], namedFix{issue: row.Issue, versions: versions})
+		scheme[row.TargetID] = vercmp.SchemeOf(graph.EcosystemOf(row.Ecosystem))
+	}
+
+	out := make(map[int64][]Candidate, len(per))
+	for target, found := range per {
+		out[target] = candidatesFrom(found, scheme[target])
 	}
 	return out, nil
+}
+
+// namedFix is one issue and every version its fix names.
+type namedFix struct {
+	issue    int64
+	versions []string
+}
+
+// versionsIn reads the versions out of what a scanner recorded as the fix.
+//
+// Separated by commas, which is how the producers that name several spell it.
+// Anything empty is dropped rather than becoming a candidate nobody can move to.
+func versionsIn(fixedIn string) []string {
+	parts := strings.Split(fixedIn, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if v := strings.TrimSpace(part); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// candidatesFrom turns what the findings name into the versions a build could
+// move to, with what each release fixed and what reaching it would close.
+func candidatesFrom(found []namedFix, scheme vercmp.Scheme) []Candidate {
+	// Every version anybody named, in the order first seen so that an
+	// unorderable set still comes back the same way twice.
+	var versions []string
+	seen := map[string]bool{}
+	for _, one := range found {
+		for _, v := range one.versions {
+			if !seen[v] {
+				seen[v] = true
+				versions = append(versions, v)
+			}
+		}
+	}
+
+	// Ordered where these versions could actually be ordered, not merely where
+	// the ecosystem has an ordering. A runtime published through a language
+	// index and naming itself after its own toolchain has the scheme and not
+	// the spelling, and one version the comparison refuses makes the whole set
+	// unrankable — a list ordered except for the entry nobody could place is
+	// not ordered.
+	ordered := scheme != vercmp.Unordered
+	for _, v := range versions {
+		if _, ok := vercmp.Order(scheme, v, v); !ok {
+			ordered = false
+			break
+		}
+	}
+	if !ordered {
+		scheme = vercmp.Unordered
+	}
+	out := make([]Candidate, 0, len(versions))
+	for _, candidate := range versions {
+		here, reached := map[int64]bool{}, map[int64]bool{}
+		for _, one := range found {
+			for _, v := range one.versions {
+				if v == candidate {
+					here[one.issue] = true
+				}
+				if vercmp.Reaches(scheme, candidate, v) {
+					reached[one.issue] = true
+				}
+			}
+		}
+		out = append(out, Candidate{
+			To: candidate, FixedHere: len(here), Reached: len(reached), Ordered: ordered,
+		})
+	}
+
+	// Furthest along first where that can be said, so the version worth taking
+	// leads. Ranked on what a release fixed instead, the newest lands wherever
+	// its own count happens to put it, which on a maintained line is near the
+	// bottom.
+	sort.SliceStable(out, func(i, j int) bool {
+		if ordered {
+			if cmp, ok := vercmp.Order(scheme, out[i].To, out[j].To); ok && cmp != 0 {
+				return cmp > 0
+			}
+		}
+		if out[i].Reached != out[j].Reached {
+			return out[i].Reached > out[j].Reached
+		}
+		return out[i].To < out[j].To
+	})
+	return out
 }
 
 type promise struct {

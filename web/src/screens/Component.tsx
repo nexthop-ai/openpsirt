@@ -159,11 +159,12 @@ export function Component() {
                     </label>
                   </td>
                   <td className="id">{row.version}</td>
-                  {/* The few worth reading, not all of them. A kernel offers
-                      twenty versions to move to, and a column listing all
-                      twenty is one nobody reads to the end of — the useful
-                      fact is which one closes the most, and how much of the
-                      rest is left over. */}
+                  {/* The few worth reading, not all of them. A kernel names
+                      thirteen versions and a column listing all thirteen is one
+                      nobody reads to the end of. Where they can be ordered the
+                      first is the one furthest along, and what it closes counts
+                      every earlier fix — so the leading row is the answer and
+                      the rest are the line behind it. */}
                   <td>
                     {(row.upgrades ?? []).length === 0 ? (
                       <span className="hint">nothing to move to</span>
@@ -172,16 +173,22 @@ export function Component() {
                         {(row.upgrades ?? []).slice(0, SHOWN).map((up) => (
                           <div key={up.to}>
                             <span className="id">{up.to}</span>{" "}
-                            <span className="hint">closes {up.issues}</span>
+                            <span className="hint">
+                              {up.ordered ? `closes ${up.reached}` : `fixed ${up.fixed_here}`}
+                            </span>
                           </div>
                         ))}
                         {(row.upgrades ?? []).length > SHOWN && (
                           <div className="hint">
-                            and {(row.upgrades ?? []).length - SHOWN} more, closing{" "}
-                            {(row.upgrades ?? [])
-                              .slice(SHOWN)
-                              .reduce((sum, up) => sum + (up.issues ?? 0), 0)}{" "}
-                            between them
+                            and {(row.upgrades ?? []).length - SHOWN} more
+                          </div>
+                        )}
+                        {(row.upgrades ?? []).length > 0 && !row.upgrades?.[0]?.ordered && (
+                          <div
+                            className="hint"
+                            title="These versions could not be put in order, so each count is what that release fixed itself"
+                          >
+                            not ranked
                           </div>
                         )}
                       </>

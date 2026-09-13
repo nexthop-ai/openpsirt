@@ -234,16 +234,32 @@ func (s *Store) placesOf(ctx context.Context, targetID, componentID int64, issue
 	return everywhere, nil
 }
 
-// Candidate is a version that would close some of what is open against a
-// component, and how much of it.
+// Candidate is a version a component could go to, and how much reaching it
+// would close.
 //
 // This is the fix-bundle grouping read per component rather than as a list of
-// its own: a package at a version, and where it could go. It sat on a view of
-// its own, which put the version bump — the thing somebody acts on — on a
-// different screen from the package it belongs to.
+// its own: a package at a version, and where it could go.
+//
+// **Two counts, because they answer different questions.** `FixedHere` is how
+// many of what is open name this exact version as their fix, which is that
+// release's own security content. `Reached` is how many the upgrade would close
+// altogether, counting everything fixed at or before it — which is what
+// somebody choosing between two versions is asking, and which needs the
+// ecosystem's ordering. Where the ordering is unavailable the two are equal and
+// `Ordered` is false, so a list that cannot be ranked is not presented as
+// though it were.
 type Candidate struct {
-	To     string
-	Issues int
+	To string
+	// FixedHere is what this release fixed: the issues naming this exact
+	// version. Sorted on, this reads backwards — a quiet release late on a
+	// maintained line names two of its own while carrying every fix before it.
+	FixedHere int
+	// Reached is everything the upgrade closes, this release and every earlier
+	// one. Equal to FixedHere where nothing could be ordered.
+	Reached int
+	// Ordered says whether Reached means more than FixedHere, which is whether
+	// the candidates can be ranked at all.
+	Ordered bool
 }
 
 // ComponentGroup is one component at one version, with what is open against it

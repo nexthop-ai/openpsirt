@@ -1601,7 +1601,7 @@ export interface paths {
          *
          *     **Answered per build, because the answer differs by build.** A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them.
          *
-         *     **Where it could go is listed, never ordered.** Comparing two versions needs an ordering per ecosystem this does not have, so there is no nearest and no latest — what there is, is every version the scanner named as carrying a fix, and how many of what is open here that release fixed.
+         *     **Where it could go carries two counts.** `fixed_here` is how many of what is open name that exact version as their fix, which is the release's own security content; `reached` is how many the upgrade closes altogether, counting everything fixed at or before it. The second is the one somebody choosing a version is asking about, and it needs the ecosystem's ordering: where that is not defined the two counts are equal, `ordered` is false, and the list is not ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts near the bottom while carrying every fix before it.
          *
          *     **A build is listed because it ships the component**, not because something is open against it. A package carrying nothing of its own still answers with the version it ships and how many things pull it in, which is the ordinary case for anything vendored in pre-built.
          *
@@ -4907,7 +4907,7 @@ export interface components {
             places: number;
             /** @description The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary */
             source_package?: string;
-            /** @description Versions upstream released that would close some of what is open here, most-closing first. Listed rather than ordered: comparing two versions needs an ordering per ecosystem this does not have, so there is no nearest and no latest */
+            /** @description Versions upstream released that would close some of what is open here, furthest along first where the ecosystem defines an ordering and unranked where it does not */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
             /** @description What a fork was cut from, where one is known */
             upstream?: string;
@@ -8221,9 +8221,16 @@ export interface components {
         UpgradeBody: {
             /**
              * Format: int64
-             * @description How many distinct vulnerabilities open here it would close
+             * @description How many of what is open here name this exact version as their fix — that release's own security content
              */
-            issues: number;
+            fixed_here: number;
+            /** @description Whether these versions could be ordered at all. False means the list is not ranked and reached says no more than fixed_here */
+            ordered: boolean;
+            /**
+             * Format: int64
+             * @description How many moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered
+             */
+            reached: number;
             /** @description The version, as whoever packages the component wrote it */
             to: string;
         };

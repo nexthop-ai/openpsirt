@@ -16,6 +16,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
 - [Pending upgrades](#pending-upgrades)
+- [Ordering the versions a scanner named](#ordering-the-versions-a-scanner-named)
 - [Promise states](#promise-states)
 - [Build-declared suppressions](#build-declared-suppressions)
 - [External links](#external-links)
@@ -79,7 +80,7 @@ commitment's build. **Nothing is written onto findings.**
 | Changing the version a release is moving to is one row | It was keyed per issue *and* per component *and* per target version, so a change meant rewriting every row of it |
 | An issue published tonight is covered by this morning's commitment | With nobody acting. Under the old key it was not covered until somebody declared it too |
 | A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump, so a commitment recorded against one covers all of them |
-| No version comparison is involved | An upgrade covers everything open on the fold rather than only what records this version as its fix. Deciding otherwise needs a per-ecosystem ordering nothing here has, which no decision either requires or forbids |
+| No version comparison decides coverage | An upgrade covers everything open on the fold rather than only what records this version as its fix. What an ordering is used for is reading a set of candidates, never deciding what a commitment reaches |
 
 A build has one commitment per fold, enforced by the database rather than by a
 check somebody remembers. A release moves a package to one version; two rows
@@ -168,6 +169,35 @@ What each row reports is what is still open under it, counted from the findings
 rather than from anything written down: the distinct issues the bump would close
 here, and how many places those sit at. Nothing is declared done by hand — a
 build is clear when it stops holding them.
+
+## Ordering the versions a scanner named
+
+Where a component could go is every version the findings open against it name as
+their fix. Two counts are answered for each, because they are two questions.
+
+| Count | |
+|---|---|
+| What that release fixed | How many of what is open name that exact version. This is the release's own security content, and it is what the scanner said without any comparison |
+| What reaching it closes | That, plus everything fixed at or before it. This is the question somebody choosing between two versions asks, and it is the one that needs an ordering |
+
+Sorted on the first, the version worth taking sinks. Measured on the demo's
+kernel: of 168 open, 158 have a fix across 13 named releases, the 6.12.100-1
+release fixed 49, and the newest named, 6.12.107-1, fixed 2 while carrying every
+fix before it. A list ranked on what each release fixed puts the version that
+closes everything near the bottom.
+
+| Rule | Reason |
+|---|---|
+| An ordering is per ecosystem, and only where its algorithm is written down | A distribution's version comparison and dotted numeric releases are written here. Everything else is left unordered rather than approximated, because an ordering claimed before its algorithm exists is the confident wrong answer |
+| The spelling decides, not the ecosystem | A runtime published through a language index and naming itself after its own toolchain has the scheme and not the spelling. One version a comparison refuses leaves the whole set unranked: a list ordered except for the entry nobody could place is not ordered |
+| Unranked means the two counts are equal and say so | An exact match still counts. What is never done is inferring that one version reaches another, so nothing overstates what an upgrade would close |
+| Which scheme applies is read from the package identifier | Two ecosystems spell some versions identically and order them differently, so reading the shape of the string would order a package by whichever scheme its version happened to resemble |
+| The scanner already compared versions to match the finding | So refusing to compare does not make the tool comparison-free — it leaves it unable to rank what it has already been told. What is new here is saying which of the answers is furthest along, not deciding which findings apply |
+
+**A wrong order is worse than none**, which is why the refusal is part of the
+mechanism rather than a gap in it: the answer arrives as a recommendation
+somebody schedules a release around, and the scan that would catch it runs after
+the release.
 
 ## Promise states
 

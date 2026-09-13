@@ -253,7 +253,7 @@ export function ByComponent({
                         <div key={up.to}>
                           <span className="id">{up.to}</span>{" "}
                           <span className="hint">
-                            closes {up.issues}
+                            {up.ordered ? `closes ${up.reached}` : `fixed ${up.fixed_here}`}
                             {i === 0 && (row.upgrades ?? []).length > 2 && (
                               <> · {(row.upgrades ?? []).length - 2} more</>
                             )}

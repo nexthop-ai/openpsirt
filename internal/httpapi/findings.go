@@ -175,8 +175,13 @@ type FindingsOutput struct {
 
 // UpgradeBody is a version a component could move to, and what that would fix.
 type UpgradeBody struct {
-	To     string `json:"to" doc:"The version, as whoever packages the component wrote it"`
-	Issues int    `json:"issues" doc:"How many distinct vulnerabilities open here it would close"`
+	To string `json:"to" doc:"The version, as whoever packages the component wrote it"`
+	// Two counts, because they answer different questions and confusing them
+	// reads backwards: a quiet release late on a maintained line fixes two of
+	// its own while carrying every fix before it.
+	FixedHere int  `json:"fixed_here" doc:"How many of what is open here name this exact version as their fix — that release's own security content"`
+	Reached   int  `json:"reached" doc:"How many moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered"`
+	Ordered   bool `json:"ordered" doc:"Whether these versions could be ordered at all. False means the list is not ranked and reached says no more than fixed_here"`
 }
 
 // ComponentFindingBody is one component at one version, with what is open
@@ -198,7 +203,7 @@ type ComponentFindingBody struct {
 	Worst      string         `json:"worst,omitempty" enum:"critical,high,medium,low" doc:"The highest band among them. Absent where nothing here was rated"`
 	// Where this could go, which is what somebody reading a package is
 	// deciding about.
-	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Listed rather than ordered: comparing two versions needs an ordering per ecosystem this does not have, so there is no nearest and no latest"`
+	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, furthest along first where the ecosystem defines an ordering and unranked where it does not"`
 }
 
 // ComponentFindingsOutput is a page of what is open, by component.
@@ -536,7 +541,8 @@ func registerComponentFindings(api huma.API, in Ingest) {
 		for _, group := range groups {
 			upgrades := make([]UpgradeBody, 0, len(group.Upgrades))
 			for _, each := range group.Upgrades {
-				upgrades = append(upgrades, UpgradeBody{To: each.To, Issues: each.Issues})
+				upgrades = append(upgrades, UpgradeBody{To: each.To, FixedHere: each.FixedHere,
+					Reached: each.Reached, Ordered: each.Ordered})
 			}
 			out.Body.Items = append(out.Body.Items, ComponentFindingBody{
 				Component: group.Component, Version: group.Version, Upstream: group.Upstream,
