@@ -20,15 +20,20 @@ export function Assess({
   product,
   vulnerability,
   published,
+  assessed,
   onClose,
 }: {
   product: string;
   vulnerability: string;
   published: string;
+  assessed?: string;
   onClose: () => void;
 }) {
   const queries = useQueryClient();
-  const [severity, setSeverity] = useState<string>(published || "medium");
+  // What is standing, where anything is. Somebody opening this to reword the
+  // reasoning is not proposing a rating, and seeding from the published one
+  // makes saving the reasoning revert the rating without saying so.
+  const [severity, setSeverity] = useState<string>(assessed || published || "medium");
   const [reasoning, setReasoning] = useState("");
 
   const assess = useMutation({

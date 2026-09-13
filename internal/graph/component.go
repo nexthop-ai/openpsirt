@@ -624,7 +624,7 @@ func (c *Components) fillSuppliers(ctx context.Context, described map[string]Des
 	for said, identities := range byName {
 		_, err := c.db.NewUpdate().Model((*Component)(nil)).
 			Set("supplier = ?", said).
-			Where("identity IN (?)", bun.In(identities)).
+			Where("identity IN (?)", bun.List(identities)).
 			Where(`"supplier" IS NULL OR "supplier" = ?`, "").
 			Exec(ctx)
 		if err != nil {

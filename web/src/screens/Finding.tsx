@@ -616,6 +616,7 @@ export function Finding() {
               product={product}
               vulnerability={vulnerability}
               published={it.severity ?? ""}
+              assessed={it.assessed ?? ""}
               onClose={() => setReclassifying(false)}
             />
           )}
