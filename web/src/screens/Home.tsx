@@ -303,10 +303,11 @@ function Figures({
   // two figures for one word.
   const exploited = useQuery({
     queryKey: ["home", "exploited", scope],
-    // Answered for whatever is selected, like every other figure here . It was
-    // a whole build's alone while the list behind it was, and a tile that
-    // vanishes when somebody widens the scope reads as a tile that broke
-    // rather than one that declines.
+    // Answered for whatever is selected, like every figure here except the
+    // review queue, which has no product to narrow by and says so in its own
+    // label. It was a whole build's alone while the list behind it was, and a
+    // tile that vanishes when somebody widens the scope reads as a tile that
+    // broke rather than one that declines.
     enabled: !!at.product,
     queryFn: async () =>
       unwrap(
@@ -327,6 +328,32 @@ function Figures({
     queryKey: ["queue", "count"],
     queryFn: async () =>
       unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
+  });
+  // The same figures with the scope taken off, so a tile can show what the
+  // selection costs rather than leaving somebody to guess at it. Asked only
+  // where a scope narrows something: unscoped they would be the same number
+  // twice.
+  const widely = !!at.product;
+  const allOpen = useQuery({
+    queryKey: ["home", "trend", "all"],
+    enabled: widely,
+    queryFn: async () => unwrap(await api.GET("/v1/trend", { params: { query: { weeks: 12 } } })),
+  });
+  const allExploited = useQuery({
+    queryKey: ["home", "exploited", "all"],
+    enabled: widely,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/findings", { params: { query: { limit: 1, exploited: true } } })),
+  });
+  const allLate = useQuery({
+    queryKey: ["home", "running-out", "all"],
+    enabled: widely,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/running-out", {
+          params: { query: { days: SOON_DAYS, limit: OVERDUE_LIMIT } },
+        }),
+      ),
   });
   // Everything running out inside the window, read once: what is overdue is
   // the part of it that has already run out, so two tiles from one read
@@ -350,15 +377,24 @@ function Figures({
   // something about: overdue is a report and this is a working list.
   const soon = running.filter((row) => (row.days_left ?? 0) >= 0);
   const soonExploited = soon.filter((row) => row.exploited).length;
+  const allRunning = allLate.data?.items ?? [];
+  const allPoints = allOpen.data?.items ?? [];
+
+  // What the same figure is without the scope. Nothing where no scope is
+  // selected, because the two would be one number said twice.
+  function everywhere(n: number | undefined): React.ReactNode {
+    if (!widely || n === undefined) return null;
+    return <span className="d">{n.toLocaleString()} all products</span>;
+  }
 
   return (
     <div className="kpis">
       <button type="button" className="kpi" onClick={() => navigate(findingsPath(at))}>
         <span className="l">Open issues · {counting}</span>
         <span className="n">{openCount === undefined ? "—" : openCount.toLocaleString()}</span>
-        <span className="d">
-          one per vulnerability, by any identifier · findings count each issue per component
-        </span>
+        {everywhere(allPoints[allPoints.length - 1]?.open) ?? (
+          <span className="d">distinct issues, not findings</span>
+        )}
       </button>
       {!!at.product && (
         <button
@@ -370,7 +406,9 @@ function Figures({
             <i style={{ background: "var(--sev-exploited)" }} /> Known exploited
           </span>
           <span className="n">{(exploited.data?.total ?? 0).toLocaleString()}</span>
-          <span className="d">sorted above everything else</span>
+          {everywhere(allExploited.data?.total) ?? (
+            <span className="d">sorted above everything else</span>
+          )}
         </button>
       )}
       <button type="button" className="kpi" onClick={() => navigate("/review-queue")}>
@@ -378,7 +416,7 @@ function Figures({
           <i style={{ background: "var(--wait)" }} /> Pending your approval
         </span>
         <span className="n">{(queue.data?.total ?? 0).toLocaleString()}</span>
-        <span className="d">across every product you may approve on</span>
+        <span className="d">all products · never scoped</span>
       </button>
       {/* Into the list it counts, narrowed the same way: what is undecided
           and past its deadline. It pointed at the assignments screen, which
@@ -396,11 +434,13 @@ function Figures({
             ? `${OVERDUE_LIMIT.toLocaleString()}+`
             : overdue.length.toLocaleString()}
         </span>
-        <span className="d">
-          {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
-          deadline
-          {overdue.length >= OVERDUE_LIMIT ? " · at least" : ""}
-        </span>
+        {everywhere(allRunning.filter((row) => (row.days_left ?? 0) < 0).length) ?? (
+          <span className="d">
+            {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
+            deadline
+            {overdue.length >= OVERDUE_LIMIT ? " · at least" : ""}
+          </span>
+        )}
       </button>
       {/* The tile that is actually actionable. Overdue is a report about
           something that has already happened; this is the week somebody can
@@ -414,10 +454,12 @@ function Figures({
           <i style={{ background: "var(--wait)" }} /> Due soon
         </span>
         <span className="n">{soon.length.toLocaleString()}</span>
-        <span className="d">
-          {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
-          {SOON_DAYS} days
-        </span>
+        {everywhere(allRunning.filter((row) => (row.days_left ?? 0) >= 0).length) ?? (
+          <span className="d">
+            {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
+            {SOON_DAYS} days
+          </span>
+        )}
       </button>
     </div>
   );
@@ -460,7 +502,7 @@ function Pending() {
             follow the scope the head names, and says so rather than
             letting the head speak for it. */}
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          every product you may approve on
+          all products · never scoped
         </span>
         <span className="tally">{queue.data?.total ?? 0}</span>
       </header>
@@ -508,7 +550,7 @@ function InProgress() {
         {/* Holdings are counted per person across everything, not per
             product, so this does not follow the scope the head names. */}
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          every product
+          all products · never scoped
         </span>
         <span className={overdue > 0 ? "tally urgent" : "tally"}>{total.toLocaleString()}</span>
       </header>
@@ -560,15 +602,34 @@ function Lapsed() {
       ),
   });
 
+  // The same two with the scope taken off, so the panel can say what the
+  // product costs. Decisions narrow by product and no finer, so a stream or a
+  // variant in the scope changes nothing here.
+  const everywhereLapsed = useQuery({
+    queryKey: ["home", "lapsed", "all"],
+    enabled: !!at.product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/decisions", { params: { query: { state: "lapsed", limit: 1 } } })),
+  });
+  const everywhereExpired = useQuery({
+    queryKey: ["home", "expired", "all"],
+    enabled: !!at.product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/decisions", { params: { query: { expired: true, limit: 1 } } })),
+  });
+
   const lapsedTotal = lapsed.data?.total ?? 0;
   const expiredTotal = expired.data?.total ?? 0;
+  const allTotal = (everywhereLapsed.data?.total ?? 0) + (everywhereExpired.data?.total ?? 0);
 
   return (
     <div className="panel">
       <header>
         <h3>Lapsed decisions</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {at.product ? `${at.product}, every branch` : "every product"}
+          {at.product
+            ? `${at.product} · ${allTotal.toLocaleString()} all products`
+            : "all products"}
         </span>
         <span className={lapsedTotal + expiredTotal > 0 ? "tally urgent" : "tally"}>
           {(lapsedTotal + expiredTotal).toLocaleString()}
