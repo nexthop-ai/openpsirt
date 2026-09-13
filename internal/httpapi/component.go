@@ -24,7 +24,11 @@ type PerBuildBody struct {
 	// Purl is what an ecosystem and an upstream address are read out of.
 	Purl      string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
 	Ecosystem string `json:"ecosystem,omitempty" doc:"Which ecosystem the identifier names, read out of it rather than stored"`
-	Issues    int    `json:"issues" doc:"Distinct vulnerabilities open against it here"`
+	// What an ecosystem's index says the package is, where one was asked and
+	// answered. Absent is the ordinary case rather than a gap.
+	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
+	ProjectURL string `json:"project_url,omitempty" doc:"Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
+	Issues     int    `json:"issues" doc:"Distinct vulnerabilities open against it here"`
 	// Consumers is the unit somebody acts in: one judgment covers the whole
 	// fold, and what varies underneath it is what pulls the package in.
 	Consumers int `json:"consumers" doc:"How many things pull it in here"`
@@ -106,6 +110,7 @@ func registerComponent(api huma.API, in Ingest) {
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
 				Stream: build.Stream, Variant: build.Variant, Version: build.Version,
 				Purl: build.Purl, Ecosystem: graph.EcosystemOf(build.Purl),
+				Summary: build.Summary, ProjectURL: build.ProjectURL,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
 				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,

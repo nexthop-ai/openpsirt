@@ -176,17 +176,22 @@ export function Component() {
         <div>
           <div className="card">
             <h3>What this package is</h3>
+            {here.summary && <p className="reading">{here.summary}</p>}
             <dl className="facts">
               <dt>Identifier</dt>
               <dd className="id" style={{ wordBreak: "break-all" }}>
                 {here.purl || "—"}
               </dd>
-              <dt>Read about it</dt>
+              <dt>Project</dt>
               <dd>
-                {link ? (
+                {here.project_url ? (
+                  <Outward href={here.project_url}>
+                    {here.project_url.replace(/^https?:\/\//, "")}
+                  </Outward>
+                ) : link ? (
                   <Outward href={link}>{link.replace(/^https:\/\//, "")}</Outward>
                 ) : (
-                  <span className="hint">no address for this ecosystem</span>
+                  <span className="hint">not known</span>
                 )}
               </dd>
               <dt>Upgrade scheduled</dt>
@@ -201,7 +206,12 @@ export function Component() {
                 )}
               </dd>
             </dl>
-            <p className="hint">The address is built from the identifier. Nothing is fetched.</p>
+            <p className="hint">
+              {here.project_url
+                ? "As the ecosystem's index states it."
+                : "Built from the identifier, since no index stated one."}{" "}
+              Nothing is fetched from it.
+            </p>
           </div>
 
           <Landed here={here} />

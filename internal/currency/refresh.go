@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -353,6 +355,20 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		return nil
 	}
 	q = q.Set("latest_version = ?", latest.Version)
+	// What the index says the package is, and where it is developed. Both are
+	// somebody else's text arriving over the network and rendered to staff who
+	// hold the most access, so both are bounded and the address is judged
+	// before it is stored rather than only before it is drawn.
+	//
+	// Absent is normal and overwrites nothing: three of the four indexes serve
+	// a summary and the module proxy serves none, so a package with a version
+	// and no summary is the ordinary case rather than a half-written row.
+	if summary := clip(latest.Summary, MostSummary); summary != "" {
+		q = q.Set("summary = ?", summary)
+	}
+	if project := addressable(latest.Project); project != "" {
+		q = q.Set("project_url = ?", project)
+	}
 	if latest.Released.IsZero() {
 		q = q.Set("latest_released_at = NULL")
 	} else {
@@ -362,4 +378,40 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		return fmt.Errorf("record what upstream has released: %w", err)
 	}
 	return nil
+}
+
+// MostSummary bounds what an index's one-line summary may be.
+//
+// A label rather than a document. What some indexes call a description is a
+// whole README and this is not that field, but a publisher may still put a
+// paragraph in the summary, and a row of a table is not where a paragraph is
+// read. Cut on a rune boundary, because cutting a byte sequence in half makes
+// text no renderer can draw.
+const MostSummary = 300
+
+// clip shortens text to a bound, on a rune boundary, and trims what is left.
+func clip(text string, most int) string {
+	text = strings.Join(strings.Fields(text), " ")
+	if len([]rune(text)) <= most {
+		return text
+	}
+	return strings.TrimSpace(string([]rune(text)[:most]))
+}
+
+// addressable is an address from an index, judged before it is stored.
+//
+// The same two schemes anything else typed into this deployment may link to. An
+// index is a third party, and what it hands over goes into an `href`: a scheme
+// a browser acts on is not encoded output. Judged here as well as where it is
+// drawn, because a value that never should have been stored is one somebody
+// later reads out of the database by another route.
+func addressable(url string) string {
+	at := strings.TrimSpace(url)
+	if at == "" {
+		return ""
+	}
+	if err := markdown.Addressable(at); err != nil {
+		return ""
+	}
+	return at
 }

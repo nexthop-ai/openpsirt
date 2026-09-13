@@ -521,8 +521,14 @@ type PerBuild struct {
 	Version string
 	// Purl is the package identifier, which is where the ecosystem is read
 	// from and what an upstream address is built out of.
-	Purl     string
-	Upgrades []Candidate
+	Purl string
+	// Summary is one line saying what the package is, and ProjectURL where it
+	// is developed, both as an ecosystem's index stated them. Absent for
+	// plenty of components: one index serves no summary and none is asked
+	// about a distribution package.
+	Summary    string
+	ProjectURL string
+	Upgrades   []Candidate
 	// Issues is how many distinct vulnerabilities are open against it in this
 	// build, Consumers how many things pull it in there, and Places how many
 	// times those sit somewhere in it.
@@ -588,6 +594,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Variant     string     `bun:"variant"`
 		Version     string     `bun:"version"`
 		Purl        string     `bun:"purl"`
+		Summary     string     `bun:"summary"`
+		ProjectURL  string     `bun:"project_url"`
 		Issues      int        `bun:"issues"`
 		Consumers   int        `bun:"consumers"`
 		Places      int        `bun:"places"`
@@ -641,6 +649,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr("va.name AS variant").
 		ColumnExpr("c.version AS version").
 		ColumnExpr("c.purl AS purl").
+		ColumnExpr("COALESCE(c.summary, '') AS summary").
+		ColumnExpr("COALESCE(c.project_url, '') AS project_url").
 		ColumnExpr("COALESCE(op.issues, 0) AS issues").
 		ColumnExpr("COALESCE(op.places, 0) AS places").
 		ColumnExpr("op.due_at AS due_at").
@@ -677,7 +687,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	for _, row := range rows {
 		build := PerBuild{
 			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
-			Version: row.Version, Purl: row.Purl, Issues: row.Issues,
+			Version: row.Version, Purl: row.Purl,
+			Summary: row.Summary, ProjectURL: row.ProjectURL, Issues: row.Issues,
 			Consumers: row.Consumers, Places: row.Places,
 			DueAt: row.DueAt, Upgrades: upgrades[row.TargetID],
 		}

@@ -13,6 +13,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [What a report supplies](#what-a-report-supplies)
 - [Merging later reports](#merging-later-reports)
 - [Derived addresses](#derived-addresses)
+- [What an index says](#what-an-index-says)
 - [How a match was made](#how-a-match-was-made)
 - [Interning a component](#interning-a-component)
 - [Recorded flaws](#recorded-flaws)
@@ -169,6 +170,30 @@ The parser declared the related records as carrying an identifier and nothing
 else, so a kernel CVE whose upstream record lists eight `git.kernel.org` commits
 showed one tracker link and no patches. References from every identifier an
 issue answers to are kept, deduplicated against the matched record's own.
+
+## What an index says
+
+A bare name is not enough for a dependency of a dependency. Where an ecosystem
+publishes an index, what it says about a package is asked for alongside the
+newest version — one line saying what the package is, and where it is developed.
+
+| Rule | Reason |
+|---|---|
+| One line, never the long description | What some indexes call a description is the package's whole README, measured at 2,894 characters for one ordinary package. That is a document; a row of a table wants a label |
+| Absent is the ordinary case, not a gap | The module protocol for one ecosystem has no such field anywhere, and no index is asked about a distribution package, so a version with no summary beside it is normal. A screen shows what there is rather than a space where something failed |
+| The address the index states beats one worked out from the name | A publisher said where the project lives; a template guessed. Where the index says nothing, the name still yields one, so there is usually an address either way |
+| The project's own pages before its repository | Three of the indexes carry both and publishers fill in whichever they bothered with, so they are asked for in the order a reader wants rather than by picking one |
+| Bounded and judged before it is stored | Both arrive over the network from a third party and are rendered to staff holding the most access. The summary is cut to a label on a rune boundary, and the address is judged against the two schemes anything else here may link to — at storage as well as at rendering, because a value that should never have been stored is one somebody later reads out by another route (REQ-66 and REQ-69) |
+| An unusable half does not cost the rest | A refused address leaves the version and the summary recorded. One field a publisher filled in badly is not a reason to know nothing about the package |
+
+Asking is the same pass that asks for the newest version, so it costs no extra
+request: this is reading more of an answer already fetched. It is off unless a
+deployment turns it on, like everything else that reaches the network.
+
+**What no index gives is a distribution package's description.** Those live in a
+distribution's own package index, which is one file per release rather than one
+request per package — a different shape from the per-package asks here, and not
+built.
 
 ## How a match was made
 

@@ -4933,10 +4933,16 @@ components:
           description: How many times those sit somewhere in this build. What the bulk cap is measured against
           format: int64
           type: integer
+        project_url:
+          description: Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier
+          type: string
         purl:
           description: The package identifier this build ships it under
           type: string
         stream:
+          type: string
+        summary:
+          description: One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package
           type: string
         upgrade_to:
           description: The version somebody has committed to moving this build to

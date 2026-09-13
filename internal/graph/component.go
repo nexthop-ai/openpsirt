@@ -74,6 +74,16 @@ type Component struct {
 	LatestVersion    *string    `bun:"latest_version"`
 	LatestReleasedAt *time.Time `bun:"latest_released_at"`
 	LatestCheckedAt  *time.Time `bun:"latest_checked_at"`
+	// Summary is one line saying what the package is, for somebody reading a
+	// dependency of a dependency they have never heard of. ProjectURL is where
+	// the index says it is developed, which is better than an address worked
+	// out from the name because the publisher stated it.
+	//
+	// Both are absent for plenty of components and that is not a fault: one
+	// index serves no summary at all, and no index is asked about a
+	// distribution package. A screen shows what there is.
+	Summary    string `bun:"summary"`
+	ProjectURL string `bun:"project_url"`
 }
 
 // Described is a component as a scan describes it, before it has been matched

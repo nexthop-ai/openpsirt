@@ -6882,9 +6882,13 @@ export interface components {
              * @description How many times those sit somewhere in this build. What the bulk cap is measured against
              */
             places: number;
+            /** @description Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier */
+            project_url?: string;
             /** @description The package identifier this build ships it under */
             purl?: string;
             stream: string;
+            /** @description One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package */
+            summary?: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;
             /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets */
