@@ -243,10 +243,29 @@ the rest of these documents are — plainly, no contractions, and without naming
 variable, a key path, a function or a version of somebody else's specification.
 Reach for any of those and the row belongs in a design document instead.
 
-**Adding one is the owner's call.** A decision is a commitment the project is
-held to, and one that arrives as a side effect of building something is a
-commitment nobody made. Propose it; do not append it. Removing one is the same
-conversation in reverse.
+**Adding one is the owner's call, and nothing else is.** A decision is a
+commitment the project is held to, and one that arrives as a side effect of
+building something is a commitment nobody made. Propose it; do not append it.
+Removing one is the same conversation in reverse.
+
+**`REQUIREMENTS.md` is never edited while implementing something.** Not to
+record what was just built, not to add the row a new behavior seems to want, not
+to reword one that reads awkwardly next to the code. A change to that file is
+its own change, asked for on its own.
+
+**Agreement to build something is not agreement to record a decision.** They are
+different questions and the second is asked separately: "yes, do that" is a yes
+to the work. Adding a row needs a yes to the row — quote it, and wait. An owner
+who approves a feature and finds a commitment in the decisions table has been
+held to something they never agreed to, which is the whole failure this rule
+exists to stop.
+
+**Assume it is not a decision.** Most of what gets built is what a format, an
+engine, an ecosystem or a protocol requires, and nobody chose it — how one
+distribution orders its version strings is not a judgment anybody can disagree
+with. That goes in a design document, which is where how something works is
+recorded. Reach for the decisions table only where somebody could genuinely have
+chosen otherwise, and then still ask.
 
 ## Decision identifiers
 
