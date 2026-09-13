@@ -1601,9 +1601,13 @@ export interface paths {
          *
          *     **Answered per build, because the answer differs by build.** A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them.
          *
-         *     **Where it could go is listed, never ordered.** Comparing two versions needs an ordering per ecosystem this does not have, so there is no nearest and no latest — what there is, is every version the scanner named as carrying a fix, and how many issues each would close.
+         *     **Where it could go carries two counts.** `fixed_here` is how many of what is open name that exact version as their fix, which is the release's own security content; `reached` is how many the upgrade closes altogether, counting everything fixed at or before it. The second is the one somebody choosing a version is asking about, and it needs the ecosystem's ordering: where that is not defined the two counts are equal, `ordered` is false, and the list is not ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts near the bottom while carrying every fix before it.
          *
-         *     `due_at` is what a commitment about that build is gated against.
+         *     **A build is listed because it ships the component**, not because something is open against it. A package carrying nothing of its own still answers with the version it ships and how many things pull it in, which is the ordinary case for anything vendored in pre-built.
+         *
+         *     **One entry per version rather than per build.** A build shipping a name at two versions holds two components, and they are two different pieces of code to decide about.
+         *
+         *     `due_at` is what a commitment about that build is gated against, and is absent where nothing is open.
          *
          *     **Requires:** any recognized credential. Answers only what you may see.
          */
@@ -2866,44 +2870,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/fix-targets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List which builds this is to be fixed in
-         * @description Returns every build of the product that holds this issue, plus every build that once held it and no longer does — "gone from main, still present in 2.4 and 2.3". A build that was fixed and left out of the list would read identically to one that never shipped the component, and those are opposite answers.
-         *
-         *     **Nothing here is declared done.** A build is clear when it stops holding the issue, which the scans already say; a chosen build that still holds it after a scan has run is a missed target, and the scan is independent evidence against the claim. A build nobody chose reads as `undecided` rather than as outstanding work: nobody is made to answer the same question for six releases, but silence has to read as silence.
-         *
-         *     A release out of support is `retired` and carries no target — nothing on it will be fixed, so counting it as outstanding would fill this permanently.
-         *
-         *     **Requires:** any recognized credential. Answers only what you may see.
-         */
-        get: operations["list-fix-targets"];
-        /**
-         * Say which builds this will be fixed in
-         * @description Replaces the set of builds this issue is to be fixed in. Declared intent, not commits — nothing here watches a repository.
-         *
-         *     **A set, written whole.** Intent spans several releases and is decided in one sitting, so what is sent is what the answer now is; sending an empty list withdraws the plan. A build already chosen keeps the date it was chosen on, because rewriting the set to add one release would otherwise move every date in it to today.
-         *
-         *     **It covers the product, not the build in the path**, like assignment: the path says which finding is being looked at, and the plan belongs to the work it is part of.
-         *
-         *     A release out of support cannot be chosen, and naming one is refused rather than quietly dropped — dropping it leaves somebody believing a release is covered.
-         *
-         *     **Requires:** public-triage or private-triage on the product
-         */
-        put: operations["set-fix-targets"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/reach": {
         parameters: {
             query?: never;
@@ -2939,23 +2905,23 @@ export interface paths {
         };
         get?: never;
         /**
-         * Mark a finding with a word
+         * Tag a finding with a word
          * @description Puts a free-text tag on one issue in one component of this product.
          *
          *     **No fixed vocabulary**, because none has been earned yet. A tag that becomes universal is a signal that it should be promoted to a real concept — "waiting on vendor" is a state the tool would want to reason about rather than a string somebody typed.
          *
-         *     **One issue in one component of one product**, not one place and not one build: a kernel flaw at sixty places is one thing somebody is marking, and a tag is about the work rather than about a release.
+         *     **One issue in one component of one product**, not one place and not one build: a kernel flaw at sixty places is one thing somebody is tagging, and a tag is about the work rather than about a release.
          *
-         *     Matched without regard to capitals and shown back as it was typed. Marking what is already marked succeeds and keeps the first spelling.
+         *     Matched without regard to capitals and shown back as it was typed. Tagging what already carries the tag succeeds and keeps the first spelling.
          *
-         *     **Marking is triage**, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
+         *     **Tagging is triage**, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
          *
          *     **Requires:** public-triage or private-triage on the product
          */
         put: operations["tag-finding"];
         post?: never;
         /**
-         * Take a word off a finding
+         * Take a tag off a finding
          * @description Removes a tag. Taking off one that is not there succeeds and changes nothing.
          *
          *     **Requires:** public-triage or private-triage on the product
@@ -3555,7 +3521,7 @@ export interface paths {
          *
          *     **One row per claim**, the way the screen counts them — one proposer's action, however many decisions it wrote — with how much it covers and how old it is. A backlog is reported in claims because that is the unit somebody works through.
          *
-         *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question.
+         *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question, and `product` narrows it the way the screen does.
          *
          *     **Requires:** any recognized credential. Exports only what you may see.
          */
@@ -4941,7 +4907,7 @@ export interface components {
             places: number;
             /** @description The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary */
             source_package?: string;
-            /** @description Versions upstream released that would close some of what is open here, most-closing first. Listed rather than ordered: comparing two versions needs an ordering per ecosystem this does not have, so there is no nearest and no latest */
+            /** @description Versions upstream released that would close some of what is open here, furthest along first where the ecosystem defines an ordering and unranked where it does not */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
             /** @description What a fork was cut from, where one is known */
             upstream?: string;
@@ -5812,58 +5778,6 @@ export interface components {
             items: components["schemas"]["FindingBody"][] | null;
             /** Format: int64 */
             total: number;
-        };
-        FixBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/FixBody.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description How many of those no longer hold the issue
-             */
-            clear: number;
-            /**
-             * Format: int64
-             * @description Builds somebody said this would be fixed in
-             */
-            declared: number;
-            items: components["schemas"]["FixTargetBody"][] | null;
-            /**
-             * Format: int64
-             * @description How many were scanned since and still hold it
-             */
-            missed: number;
-            /** @description Every chosen build is clear, and at least one was chosen */
-            resolved: boolean;
-        };
-        FixInBody: {
-            /** @description Where the work is happening. Left out, whatever is recorded stays; sent empty, it is cleared */
-            elsewhere?: string;
-            stream: string;
-            variant: string;
-        };
-        FixTargetBody: {
-            /** @description When they said so */
-            declared_at?: string;
-            /** @description Who said it would be fixed here */
-            declared_by?: string;
-            /** @description Where the work is happening — a ticket or a change. Stored and never fetched */
-            elsewhere?: string;
-            /**
-             * Format: int64
-             * @description How many places the issue still sits at in this build
-             */
-            places: number;
-            /**
-             * @description Where this build stands
-             * @enum {string}
-             */
-            state: "missed" | "fixing" | "undecided" | "clear" | "gone" | "retired";
-            stream: string;
-            variant: string;
         };
         Generator: {
             /** Format: date-time */
@@ -6941,6 +6855,10 @@ export interface components {
             was: string;
         };
         PerBuildBody: {
+            /** @description What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count */
+            by_severity?: {
+                [key: string]: number;
+            };
             /**
              * Format: date-time
              * @description When the work promised here is due
@@ -6956,17 +6874,46 @@ export interface components {
              * @description The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees, because that defers the worst thing it covers
              */
             due_at?: string;
+            /** @description Which ecosystem the identifier names, read out of it rather than stored */
+            ecosystem?: string;
+            /** @description Whether any of what is open here is known to be exploited, which outranks everything else about it */
+            exploited: boolean;
+            /**
+             * Format: date-time
+             * @description When a scan of this deployment first reported the component
+             */
+            first_seen: string;
+            /**
+             * Format: int64
+             * @description How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
+             */
+            fixable: number;
             /**
              * Format: int64
              * @description Distinct vulnerabilities open against it here
              */
             issues: number;
             /**
+             * Format: date-time
+             * @description When that version shipped, where the index said
+             */
+            newest_released_at?: string;
+            /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
+            newest_version?: string;
+            /**
              * Format: int64
              * @description How many times those sit somewhere in this build. What the bulk cap is measured against
              */
             places: number;
+            /** @description Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier */
+            project_url?: string;
+            /** @description The package identifier this build ships it under */
+            purl?: string;
             stream: string;
+            /** @description One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package */
+            summary?: string;
+            /** @description Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it */
+            supplier?: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;
             /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets */
@@ -7057,8 +7004,6 @@ export interface components {
             components: string[] | null;
             /** @description When the commitment was made, which is what this release has been waiting since */
             declared_at: string;
-            /** @description Where the work is happening, where somebody said. Stored and never fetched */
-            elsewhere?: string;
             /** @description The bump's own key: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
             from: string;
@@ -7890,29 +7835,6 @@ export interface components {
             /** @description Include findings nobody owns */
             unassigned?: boolean;
         };
-        "Set-fix-targetsRequest": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Set-fix-targetsRequest.json
-             */
-            readonly $schema?: string;
-            /** @description The builds it will be fixed in. Empty withdraws the plan */
-            builds: components["schemas"]["FixInBody"][] | null;
-        };
-        "Set-fix-targetsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Set-fix-targetsResponse.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description Builds newly chosen by this request
-             */
-            declared: number;
-        };
         "Set-release-detailsRequest": {
             /**
              * Format: uri
@@ -8328,9 +8250,16 @@ export interface components {
         UpgradeBody: {
             /**
              * Format: int64
-             * @description How many distinct vulnerabilities open here it would close
+             * @description How many of what is open here name this exact version as their fix — that release's own security content
              */
-            issues: number;
+            fixed_here: number;
+            /** @description Whether these versions could be ordered at all. False means the list is not ranked and reached says no more than fixed_here */
+            ordered: boolean;
+            /**
+             * Format: int64
+             * @description How many moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered
+             */
+            reached: number;
             /** @description The version, as whoever packages the component wrote it */
             to: string;
         };
@@ -8813,7 +8742,10 @@ export interface operations {
     };
     "list-holdings": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
+                product?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -13104,80 +13036,6 @@ export interface operations {
             };
         };
     };
-    "list-fix-targets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                vulnerability: string;
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FixBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "set-fix-targets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                vulnerability: string;
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Set-fix-targetsRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Set-fix-targetsResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "get-finding-reach": {
         parameters: {
             query?: {
@@ -14084,6 +13942,8 @@ export interface operations {
             query?: {
                 /** @description Return what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
+                /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
+                product?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -14118,6 +13978,8 @@ export interface operations {
             query?: {
                 /** @description Write out what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
+                /** @description Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
+                product?: string;
             };
             header?: never;
             path: {

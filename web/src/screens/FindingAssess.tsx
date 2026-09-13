@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
-import { Severity } from "../ui/Severity";
 import { RATINGS } from "./FindingClaim";
 
 // Rating the issue itself, as against what was published.
@@ -14,25 +13,27 @@ import { RATINGS } from "./FindingClaim";
 // rather than about the place it was made from, so it holds in every build of
 // this product — and rating it milder waits for a second person.
 //
-// **It says which product it is about**, in every state. A row on this screen
-// sits beside a fold that may be one of eleven, and the rating is neither
-// about this component nor about every product: it is about this issue here.
-// Another product may rate the same issue differently and nothing carries
-// between them.
+// The form only. What it is about is the severity line it opens from, which
+// already names the rating and the product: repeating either here is the same
+// fact twice on one screen.
 export function Assess({
   product,
   vulnerability,
   published,
   assessed,
+  onClose,
 }: {
   product: string;
   vulnerability: string;
   published: string;
-  assessed: string;
+  assessed?: string;
+  onClose: () => void;
 }) {
   const queries = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [severity, setSeverity] = useState<string>(published || "medium");
+  // What is standing, where anything is. Somebody opening this to reword the
+  // reasoning is not proposing a rating, and seeding from the published one
+  // makes saving the reasoning revert the rating without saying so.
+  const [severity, setSeverity] = useState<string>(assessed || published || "medium");
   const [reasoning, setReasoning] = useState("");
 
   const assess = useMutation({
@@ -44,7 +45,7 @@ export function Assess({
         }),
       ),
     onSuccess: () => {
-      setOpen(false);
+      onClose();
       setReasoning("");
       void queries.invalidateQueries({ queryKey: ["finding"] });
     },
@@ -54,36 +55,8 @@ export function Assess({
     RATINGS.indexOf(severity as (typeof RATINGS)[number]) <
     RATINGS.indexOf((published || "medium") as (typeof RATINGS)[number]);
 
-  if (assessed) {
-    return (
-      <div className="assess">
-        <h3>Issue assessment</h3>
-        <p className="reading" style={{ margin: 0 }}>
-          Assessed <Severity word={assessed} />, published <Severity word={published} />. The
-          assessment orders it and sets its deadline in every build of {product}, and nowhere else.
-        </p>
-      </div>
-    );
-  }
-
-  if (!open) {
-    return (
-      <div className="assess">
-        <h3>Issue assessment</h3>
-        <p className="reading" style={{ margin: "0 0 8px" }}>
-          Published as <Severity word={published} />. A rating of yours holds in every build of{" "}
-          {product} — this issue here, not this component, and not other products.
-        </p>
-        <button type="button" className="linkish" onClick={() => setOpen(true)}>
-          Rate it differently in {product}
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="assess">
-      <h3>Issue assessment</h3>
+    <div className="rating">
       {assess.error != null && <Failed error={assess.error} what="That could not be recorded." />}
       <div className="ourview">
         <div className="pair">
@@ -107,9 +80,7 @@ export function Assess({
         </div>
       </div>
       <p className="hint" style={{ margin: "0 0 8px" }}>
-        {milder
-          ? `Milder than published, so a second person has to agree before it takes effect in ${product}.`
-          : `At or above what was published, so it takes effect in ${product} at once.`}
+        {milder ? "Milder than published. Needs a second person." : "Applies immediately."}
       </p>
       <div className="field" style={{ marginBottom: 8, maxWidth: "78ch" }}>
         <label htmlFor="why">Reasoning</label>
@@ -117,7 +88,7 @@ export function Assess({
           id="why"
           style={{ minHeight: 64 }}
           value={reasoning}
-          placeholder={`What makes the published rating wrong for this issue in ${product}?`}
+          placeholder="Why the published rating is wrong here"
           onChange={(event) => setReasoning(event.target.value)}
         />
       </div>
@@ -128,9 +99,9 @@ export function Assess({
           disabled={reasoning.trim() === "" || assess.isPending}
           onClick={() => assess.mutate()}
         >
-          Save assessment
+          Save
         </button>
-        <button type="button" className="btn quiet" onClick={() => setOpen(false)}>
+        <button type="button" className="btn quiet" onClick={onClose}>
           Cancel
         </button>
       </div>

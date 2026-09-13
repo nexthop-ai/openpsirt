@@ -2,7 +2,7 @@ import { ROLLED } from "../ui/severities";
 import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { Over, Pane, type At, type Node } from "./TreePane";
+import { type At, type Node } from "./treeshape";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -138,17 +138,15 @@ function Yours() {
       </div>
       <div className="card">
         <p className="reading" style={{ marginBottom: 10 }}>
-          The build&rsquo;s dependency graph seen upward from your own findings: from each component
-          you hold one on, up to the build itself. The numbers are yours — what hangs beneath a node
-          is your work, not what the build holds there. You read this product only through what you
-          have been handed, so descending a node is not offered.
+          Your findings, traced up to the build. Counts are your work only, not everything the build
+          holds there.
         </p>
         {mine.isPending && <Loading />}
         {mine.isError && <Failed error={mine.error} what="Your own work here could not be read." />}
         {!mine.isPending && !mine.isError && rows.length === 0 && (
           <Empty
             title="Nothing here is yours."
-            detail="This shows the chains your own findings sit on. Nothing in this build has been handed to you or to a team you are on."
+            detail="Nothing in this build is assigned to you or a team you are on."
           />
         )}
         {placed.length > 0 && (
@@ -159,7 +157,9 @@ function Yours() {
                 className="branch"
                 style={{ paddingLeft: 10 + (row.depth ?? 0) * 18 }}
               >
-                <span className="id">{row.component}</span>{" "}
+                <Link className="id" to={componentPage(at, row.component) + buildQuery(at)}>
+                  {row.component}
+                </Link>{" "}
                 <span className="hint">{row.version}</span>
                 {/* Both numbers open the list they count. A node saying
                     "5,650 beneath · 0 here" and going nowhere is the shape of
@@ -190,13 +190,14 @@ function Yours() {
           <>
             <h4 style={{ margin: "14px 0 4px" }}>Placed nowhere</h4>
             <p className="hint" style={{ marginTop: 0 }}>
-              The inventory listed these and said nothing about what pulls them in, so there is no
-              chain to show.
+              The inventory did not say what pulls these in.
             </p>
             <ul className="branchlist">
               {loose.map((row, i) => (
                 <li key={`${row.component}@${i}`} className="branch" style={{ paddingLeft: 10 }}>
-                  <span className="id">{row.component}</span>{" "}
+                  <Link className="id" to={componentPage(at, row.component) + buildQuery(at)}>
+                    {row.component}
+                  </Link>{" "}
                   <span className="hint">{row.version}</span>
                   <span className="counts">
                     <Link className="n" to={onComponent(at, row.component)}>
@@ -211,10 +212,7 @@ function Yours() {
         {mine.data && mine.data.complete === false && (
           <p className="alert" style={{ marginTop: 10 }}>
             <strong>Not all of it.</strong>
-            <span>
-              You hold work on more components than this draws, so the counts under-report. The
-              findings list carries all of it.
-            </span>
+            <span>Counts under-report. The findings list has all of it.</span>
           </p>
         )}
       </div>
@@ -296,16 +294,6 @@ function Whole() {
     })),
   });
 
-  // What is selected. The key matches the one above, so selecting a node that
-  // is already open costs nothing.
-  const version = params.get("version") ?? "";
-  const ecosystem = params.get("ecosystem") ?? "";
-  const selected = useQuery({
-    queryKey: aroundKey(at, focus, version, ecosystem),
-    queryFn: fetchAround(at, focus, version, ecosystem),
-    enabled: focus !== "",
-  });
-
   const below = useMemo(() => {
     const map = new Map<string, Node[] | undefined>();
     if (rootName) map.set(rootName, (top.data?.items ?? []) as Node[]);
@@ -340,15 +328,17 @@ function Whole() {
   // are two components — and the tree knows which one was clicked, so asking
   // without it turned every such component into one nobody could look at.
   function select(name: string, children = 0, version = "", ecosystem = "") {
-    setParams(
-      name
-        ? {
-            at: name,
-            ...(version ? { version } : {}),
-            ...(ecosystem ? { ecosystem } : {}),
-          }
-        : {},
-    );
+    // What was searched for survives the selection. Replaced wholesale, a hit
+    // cleared the search it was found through: the list went away, the tree
+    // redrew from the root, and the component clicked was not on screen.
+    const next = new URLSearchParams(params);
+    for (const key of ["at", "version", "ecosystem"]) next.delete(key);
+    if (name) {
+      next.set("at", name);
+      if (version) next.set("version", version);
+      if (ecosystem) next.set("ecosystem", ecosystem);
+    }
+    setParams(next);
     if (!name || children === 0) return;
     setOpened((prev) => {
       const next = new Set(prev);
@@ -403,9 +393,6 @@ function Whole() {
             Back to the tree
           </button>
         )}
-        <span className="found">
-          counts are distinct issues, cumulative: what is open beneath a node as well as on it
-        </span>
       </div>
 
       <div className="wholewidth">
@@ -427,13 +414,14 @@ function Whole() {
               (found.length === 0 ? (
                 <Empty
                   title={`Nothing here is called "${term}".`}
-                  detail="Matched on part of a name, ignoring case. A component that is in the inventory but not in this build will not appear."
+                  detail="Part of a name, ignoring case. Components not in this build will not appear."
                 />
               ) : (
-                <Matches found={found} focus={focus} onSelect={select} />
+                <Matches at={at} found={found} focus={focus} onSelect={select} />
               ))}
             {!searching && root && (
               <Branches
+                at={at}
                 root={root}
                 below={below}
                 opened={opened}
@@ -445,65 +433,29 @@ function Whole() {
                 onWiden={(name) => setWidened((prev) => new Set(prev).add(name))}
               />
             )}
-            <p className="hint" style={{ margin: "12px 0 0" }}>
-              {searching
-                ? "Matches anywhere in the build, most findings first. Selecting one shows what pulls it in."
-                : "Children load when a node is opened. The count on a node is the distinct issues open in everything under it, which is a smaller number than the findings list shows — that list has a row per issue and component, and one issue can sit in several."}
-            </p>
+            {searching && (
+              <p className="hint" style={{ margin: "12px 0 0" }}>
+                Most findings first
+              </p>
+            )}
           </div>
         </div>
       </div>
-
-      {/* What sits around one component, over the tree rather than beside it.
-          Beside it, the panel took a third of the width for something nobody
-          had asked for yet, and the tree — which is the screen — was left
-          drawing indented rows into what was left, so a name at depth six
-          wrapped. Asked for, it takes the width it needs and gives it back. */}
-      {focus !== "" && (
-        <Over onClose={() => select("")}>
-          <Pane
-            at={at}
-            focus={focus}
-            rootName={rootName}
-            above={(selected.data?.above ?? []) as Node[]}
-            belowCount={(selected.data?.below ?? []).length}
-            node={findNode(focus, root, below)}
-            pending={selected.isPending}
-            error={selected.isError ? selected.error : null}
-            version={version}
-            ecosystem={ecosystem}
-          />
-        </Over>
-      )}
     </div>
   );
 }
 
-// The node a name refers to, wherever it has already been read. The tree holds
-// every answer the pane needs except the count of what is under a component
-// nothing has opened yet, which is what the pane's own query is for.
-function findNode(
-  name: string,
-  root: Node | null,
-  below: Map<string, Node[] | undefined>,
-): Node | null {
-  if (!name) return null;
-  if (root && root.component === name) return root;
-  for (const kids of below.values()) {
-    const hit = kids?.find((k) => k.component === name);
-    if (hit) return hit;
-  }
-  return null;
-}
-
 // A search answers with a set of components rather than a position, so it is
-// drawn as a list and not as a tree with one branch. Selecting one moves the
-// pane to it, which is where "what pulls this in" is answered.
+// drawn as a list and not as a tree with one branch. Selecting one positions the
+// tree on it; the control beside it opens the component's own screen, which is
+// the same pair of acts a row in the tree offers.
 function Matches({
+  at,
   found,
   focus,
   onSelect,
 }: {
+  at: At;
   found: Node[];
   focus: string;
   onSelect: (name: string, children?: number, version?: string, ecosystem?: string) => void;
@@ -527,10 +479,23 @@ function Matches({
           <Strip by={node.beneath_by_severity} />
           <span
             className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
-            title={`${node.beneath.toLocaleString()} distinct issues open beneath this`}
+            title={`${node.beneath.toLocaleString()} distinct issues beneath this`}
           >
             {node.beneath.toLocaleString()}
           </span>
+          {/* The same way through a tree row offers: what pulls it in, what it
+              pulls in and what is open against it, on the component's own
+              screen. Search is how anything is found in a build of thousands,
+              so a hit that cannot reach it is a dead end. */}
+          <Link
+            className="look"
+            title={`Everything about ${node.component}`}
+            aria-label={`Open ${node.component}`}
+            to={componentPage(at, node.component) + buildQuery(at)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            ⋯
+          </Link>
         </div>
       ))}
     </div>
@@ -543,6 +508,23 @@ function Matches({
 // filter for it rather than a name match.
 function onComponent(at: At, component: string | undefined): string {
   return `${buildPath(at)}/findings?component=${encodeURIComponent(component ?? "")}`;
+}
+
+// The component's own screen: everything open against it across every build,
+// where it could go, and the act that moves it. Reachable from a finding and
+// from the findings list, and from here, which is where somebody looking at
+// the graph asks about a component.
+// Which build the tree is drawn for, so the component's screen opens on the
+// graph of the build somebody was looking at rather than the first one.
+function buildQuery(at: At): string {
+  return `?stream=${encodeURIComponent(at.stream)}` + `&variant=${encodeURIComponent(at.variant)}`;
+}
+
+function componentPage(at: At, component: string | undefined): string {
+  return (
+    `/products/${encodeURIComponent(at.product)}` +
+    `/components/${encodeURIComponent(component ?? "")}`
+  );
 }
 
 function beneathComponent(at: At, component: string | undefined): string {
@@ -560,6 +542,7 @@ function buildPath(at: At): string {
 // One flat list of indented rows rather than nested lists, so the rule down the
 // left stays a straight line whatever a branch does.
 function Branches({
+  at,
   root,
   below,
   opened,
@@ -570,6 +553,7 @@ function Branches({
   onSelect,
   onWiden,
 }: {
+  at: At;
   root: Node;
   below: Map<string, Node[] | undefined>;
   opened: Set<string>;
@@ -679,26 +663,24 @@ function Branches({
           className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
           title={
             node.children > 0
-              ? `${node.beneath.toLocaleString()} open in here, ${node.findings.toLocaleString()} against this component itself`
-              : undefined
+              ? `${node.beneath.toLocaleString()} distinct issues in here, ${node.findings.toLocaleString()} on this component`
+              : `${node.beneath.toLocaleString()} distinct issues`
           }
         >
           {node.beneath.toLocaleString()}
         </span>
-        {/* Everything else about this component, asked for rather than
-            standing open beside the tree. */}
-        <button
-          type="button"
+        {/* What pulls it in, what it pulls in, its history and what is open
+            against it, on the component's own screen. Drawn over the tree it
+            was a second copy of a page that already exists. */}
+        <Link
           className="look"
-          title={`What pulls ${name} in, what it pulls in, and what is open against it`}
-          aria-label={`Look at ${name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect(name, 0, node.version, node.ecosystem);
-          }}
+          title={`Everything about ${name}`}
+          aria-label={`Open ${name}`}
+          to={componentPage(at, name) + buildQuery(at)}
+          onClick={(event) => event.stopPropagation()}
         >
           ⋯
-        </button>
+        </Link>
       </div>,
     );
 

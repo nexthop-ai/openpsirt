@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -94,6 +95,8 @@ type stored struct {
 	Version  *string    `bun:"latest_version"`
 	Released *time.Time `bun:"latest_released_at"`
 	Checked  *time.Time `bun:"latest_checked_at"`
+	Summary  *string    `bun:"summary"`
+	Project  *string    `bun:"project_url"`
 }
 
 func read(t *testing.T, db *database.DB) map[string]stored {
@@ -102,6 +105,7 @@ func read(t *testing.T, db *database.DB) map[string]stored {
 	err := db.DB.NewSelect().
 		TableExpr("component AS c").
 		ColumnExpr("c.purl, c.latest_version, c.latest_released_at, c.latest_checked_at").
+		ColumnExpr("c.summary, c.project_url").
 		Scan(t.Context(), &rows)
 	if err != nil {
 		t.Fatalf("read components: %v", err)
@@ -542,6 +546,72 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 		if times := index.times(); times != 3 {
 			t.Errorf("the indexes were asked %d times about 3 components (%v), want 3",
 				times, index.asked)
+		}
+	})
+}
+
+// What an index says a package is, bounded, and where it says the package lives,
+// judged. Both arrive over the network from somebody else and are rendered to
+// staff who hold the most access.
+func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
+	each(t, func(t *testing.T, db *database.DB) {
+		long := strings.Repeat("a", currency.MostSummary+120)
+		r, _ := seed(t, db, []component{
+			{purl: "pkg:npm/kept@1.0.0"},
+			{purl: "pkg:npm/clipped@1.0.0"},
+			{purl: "pkg:npm/hostile@1.0.0"},
+		}, map[string]currency.Latest{
+			"kept": {
+				Version: "2.0.0", Summary: "  a   label   with   spaces  ",
+				Project: "https://example.test/kept",
+			},
+			// A publisher may put a paragraph in the one-line field, and a row
+			// of a table is not where a paragraph is read.
+			"clipped": {Version: "2.0.0", Summary: long},
+			// A scheme a browser acts on is not encoded output. An index is a
+			// third party like any other.
+			"hostile": {
+				Version: "2.0.0", Summary: "fine",
+				Project: "javascript:alert(document.domain)",
+			},
+		}, nil)
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		got := read(t, db)
+
+		kept := got["pkg:npm/kept@1.0.0"]
+		// Run together on one line, because a label is read in a row.
+		if kept.Summary == nil || *kept.Summary != "a label with spaces" {
+			t.Errorf("the summary is %v, want it collapsed to one line", kept.Summary)
+		}
+		if kept.Project == nil || *kept.Project != "https://example.test/kept" {
+			t.Errorf("the address is %v, want what the index said", kept.Project)
+		}
+
+		clipped := got["pkg:npm/clipped@1.0.0"]
+		if clipped.Summary == nil {
+			t.Fatal("a long summary was dropped rather than shortened")
+		}
+		if n := len([]rune(*clipped.Summary)); n > currency.MostSummary {
+			t.Errorf("the summary kept %d runes, more than the %d bound",
+				n, currency.MostSummary)
+		}
+
+		hostile := got["pkg:npm/hostile@1.0.0"]
+		// Nothing stored rather than the scheme: empty and absent are the same
+		// answer here, and which one a row holds depends on whether anything
+		// ever wrote the column.
+		if hostile.Project != nil && *hostile.Project != "" {
+			t.Errorf("a scheme a browser acts on was stored: %q", *hostile.Project)
+		}
+		// And the rest of the answer survived the refusal.
+		if hostile.Summary == nil || *hostile.Summary != "fine" {
+			t.Errorf("refusing the address lost the summary: %v", hostile.Summary)
+		}
+		// And refusing the address does not lose the rest of the answer.
+		if hostile.Version == nil || *hostile.Version != "2.0.0" {
+			t.Errorf("refusing the address lost the version: %v", hostile.Version)
 		}
 	})
 }

@@ -243,7 +243,7 @@ export function Streams() {
         error={declare.error}
         busy={declare.isPending || name.trim() === ""}
         ok={kind === "tag" ? "Add tag" : "Add branch"}
-        hint="A tag names the branch it was cut from, which is what lets a decision made on the branch carry into it rather than being made again. A new branch inherits most of its triage by matching — and once its first inventory arrives, its Inventories screen offers what it would carry over from another line, and which of it to take."
+        hint="Naming the branch a tag was cut from carries its decisions into the tag."
       >
         {/* The label wraps the input, as every other field here does. Beside
             it with no htmlFor and no id, a screen reader announced a text
@@ -289,9 +289,8 @@ export function Streams() {
                 asks what was cut from a branch, so a tag that never says
                 leaves the branch reporting that nothing has ever shipped. */}
             <p className="hint">
-              Release readiness compares a branch against the last release cut from it, so a tag
-              that names nothing leaves its branch reading as never released. It can be filled in
-              later by declaring the tag again with the branch named.
+              An unnamed tag leaves its branch reading as never released. Declare the tag again to
+              fill it in.
             </p>
           </div>
         )}

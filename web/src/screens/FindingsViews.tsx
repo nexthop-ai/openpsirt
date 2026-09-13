@@ -253,7 +253,7 @@ export function ByComponent({
                         <div key={up.to}>
                           <span className="id">{up.to}</span>{" "}
                           <span className="hint">
-                            closes {up.issues}
+                            {up.ordered ? `closes ${up.reached}` : `fixed ${up.fixed_here}`}
                             {i === 0 && (row.upgrades ?? []).length > 2 && (
                               <> · {(row.upgrades ?? []).length - 2} more</>
                             )}
@@ -379,11 +379,7 @@ export function ByBump({
     return (
       <Empty
         title="Nothing here has a version to move to."
-        detail={
-          "A bump is a version to move to, so a finding upstream has released nothing " +
-          "for is not in one. Everything matching is either fixed already or waiting on " +
-          "upstream."
-        }
+        detail={"Everything matching is either already fixed or waiting on upstream."}
       />
     );
   }

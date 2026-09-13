@@ -4,16 +4,13 @@
 // matched it, what the published references say, and who reported it. None of
 // it is a judgment; all of it is what somebody reads before making one.
 
-import { notACredential } from "../ui/noautofill";
 import { Fragment, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { on } from "../ui/when";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { linkable } from "../ui/addressable";
-import { Outward } from "../ui/Outward";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { intoTheTree, wayDown } from "./waydown";
@@ -57,8 +54,8 @@ export function Places({
   if (places.length === 0) return null;
   const shown = all ? places : places.slice(0, CHAINS);
   return (
-    <div className="evblock">
-      <h4>Dependency path</h4>
+    <div className="pathblock">
+      <h3>Dependency path</h3>
       <div className="tree">
         {shown.map((place, i) => {
           const { steps, rootless } = wayDown(place, version);
@@ -176,16 +173,13 @@ export function HowMatched({
     <div className="evblock">
       <h4>Match evidence</h4>
       {matched === "identifier" ? (
-        <p>
-          <b>Not confirmed by a packager.</b> Matched by comparing a published identifier against an
-          upstream version range. A distribution backports fixes without moving that version, so
-          this may already be fixed in <span className="id">{version}</span> — nobody has confirmed
-          either way.
+        <p title="Matched on a version range, not a packager advisory">
+          <b>Not confirmed by a packager.</b> May already be fixed in{" "}
+          <span className="id">{version}</span>.
         </p>
       ) : (
-        <p>
-          <b>Confirmed by a packager.</b> Matched through an advisory for this package's own
-          ecosystem, which counts the release number and names the release that carries the fix.
+        <p title="Matched through the package's own advisory">
+          <b>Confirmed by a packager.</b>
         </p>
       )}
       {/* The evidence for the judgment above rather than a second way of
@@ -204,10 +198,8 @@ export function HowMatched({
         </p>
       )}
       {from && (
-        <p className="hint">
-          The data behind it came from <Away url={from} />, which is not always where the issue is
-          written up: one issue reached through two ecosystems has two answers and the issue itself
-          can hold one.
+        <p className="hint" title="Where the match data came from">
+          Source <Away url={from} />
         </p>
       )}
     </div>
@@ -235,279 +227,6 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
       </ul>
       <p className="hint">Worked out from the identifiers, not supplied by the scanner.</p>
     </div>
-  );
-}
-
-// Who is dealing with this, and a way to change it.
-//
-// On the finding rather than only on the list of what nobody holds. Being able
-// to record a judgment about something and not to say who is dealing with it
-// is a strange half of the same job — and the screen somebody reads a finding
-// on is the one they are on when they decide it needs a person.
-//
-// It covers every build of the product holding this component, which is what
-// assigning means: the same code built several ways is one piece of work.
-// Which releases this is meant to be fixed in, and what the scans say became
-// of that.
-//
-// Nothing here is ticked off as done. A build clears when it stops holding the
-// issue, which the next scan of it answers; a build chosen and still holding
-// it after a scan has run is a missed target, and the scan is evidence against
-// the claim rather than a reminder. A build nobody chose says so rather than
-// sitting among the outstanding ones — nobody is made to answer the same
-// question for six releases, but silence has to read as silence. A link to
-// where the work is happening.
-//
-// **Shown as a link and edited in place.** It is a note rather than a field
-// somebody fills in on a form: most of the time there is nothing to say, and a
-// text box on every row would be a form that looks unfinished.
-//
-// Nothing is fetched from it, ever. What it points at is somebody else's
-// system, and a tool that fetched a link a person typed would be a request
-// forgery waiting for the first internal address.
-export function Elsewhere({
-  where,
-  busy,
-  onSet,
-}: {
-  where: string;
-  busy: boolean;
-  onSet: (where: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [typed, setTyped] = useState(where);
-
-  if (!editing) {
-    return (
-      <>
-        {" · "}
-        {/* Typed here rather than supplied by a scanner, and still a string
-            that becomes somewhere to click, so it is judged the same way a
-            scanner's reference is — by the component that does the judging,
-            rather than by each screen remembering to. */}
-        <Outward href={where}>where the work is →</Outward>{" "}
-        <button
-          type="button"
-          className="linkish"
-          disabled={busy}
-          onClick={() => {
-            setTyped(where);
-            setEditing(true);
-          }}
-        >
-          {where ? "change" : "link the work"}
-        </button>
-      </>
-    );
-  }
-  return (
-    <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}>
-      <input
-        {...notACredential}
-        type="text"
-        value={typed}
-        placeholder="a ticket, a change"
-        style={{ width: 220 }}
-        aria-label="Where the work is happening"
-        onChange={(event) => setTyped(event.target.value)}
-      />
-      <button
-        type="button"
-        className="linkish"
-        disabled={busy}
-        onClick={() => {
-          onSet(typed.trim());
-          setEditing(false);
-        }}
-      >
-        Save
-      </button>
-      <button type="button" className="linkish" onClick={() => setEditing(false)}>
-        Cancel
-      </button>
-    </span>
-  );
-}
-
-export function FixingIn({
-  at,
-}: {
-  at: {
-    product: string;
-    stream: string;
-    variant: string;
-    vulnerability: string;
-    component: string;
-  };
-}) {
-  const queries = useQueryClient();
-  const path =
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/fix-targets" as const;
-  const plan = useQuery({
-    queryKey: ["fix-targets", at],
-    queryFn: async () => unwrap(await api.GET(path, { params: { path: at } })),
-  });
-  const set = useMutation({
-    mutationFn: async (builds: { stream: string; variant: string; elsewhere?: string }[]) =>
-      unwrap(await api.PUT(path, { params: { path: at }, body: { builds } })),
-    onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["fix-targets"] });
-      void queries.invalidateQueries({ queryKey: ["finding"] });
-    },
-  });
-
-  const items = plan.data?.items ?? [];
-  if (plan.isPending) return null;
-
-  // The set is written whole, so a tick sends the whole list rather than one
-  // build: intent spans several releases and is decided in one sitting.
-  const chosen = items.filter(
-    (row) => row.state === "fixing" || row.state === "missed" || row.state === "clear",
-  );
-  const toggle = (row: { stream?: string; variant?: string; state?: string }) => {
-    const named = { stream: row.stream ?? "", variant: row.variant ?? "" };
-    const now = chosen.map((each) => ({ stream: each.stream ?? "", variant: each.variant ?? "" }));
-    const already = now.some(
-      (each) => each.stream === named.stream && each.variant === named.variant,
-    );
-    set.mutate(
-      already
-        ? now.filter((each) => !(each.stream === named.stream && each.variant === named.variant))
-        : [...now, named],
-    );
-  };
-
-  const declared = plan.data?.declared ?? 0;
-  const clear = plan.data?.clear ?? 0;
-  const missed = plan.data?.missed ?? 0;
-
-  return (
-    <div className="card">
-      <h3>Fixed in</h3>
-      {set.error != null && <Failed error={set.error} what="That could not be recorded." />}
-      {items.length === 0 ? (
-        <p className="hint" style={{ margin: 0 }}>
-          No build of this product holds this issue.
-        </p>
-      ) : (
-        <>
-          <p className="reading" style={{ marginBottom: 10 }}>
-            {declared === 0
-              ? "Nobody has said where this will be fixed."
-              : plan.data?.resolved
-                ? `Fixed in all ${declared} of the releases chosen.`
-                : `${clear} of ${declared} chosen ${clear === 1 ? "release is" : "releases are"} clear` +
-                  (missed > 0
-                    ? `, and ${missed} ${missed === 1 ? "was" : "were"} scanned since and still hold it.`
-                    : ".")}
-          </p>
-          <div className="tablewrap">
-            <table>
-              <thead>
-                <tr>
-                  <th />
-                  <th>Release</th>
-                  <th className="num">Open</th>
-                  <th>State</th>
-                  <th>Chosen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((row) => (
-                  <tr key={`${row.stream}/${row.variant}`}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        aria-label={`Fix this in ${row.stream} ${row.variant}`}
-                        checked={
-                          row.state === "fixing" || row.state === "missed" || row.state === "clear"
-                        }
-                        disabled={set.isPending || row.state === "retired" || row.state === "gone"}
-                        onChange={() => toggle(row)}
-                      />
-                    </td>
-                    <td>
-                      {row.stream} <span className="hint">{row.variant}</span>
-                    </td>
-                    {/* Zero is the answer that matters here: no place left
-                        open in this build is what fixing it looks like, and a
-                        dash reads as nothing measured. */}
-                    <td className="num">{row.places.toLocaleString()}</td>
-                    <td>
-                      <FixState state={row.state ?? ""} />
-                    </td>
-                    <td className="hint">
-                      {row.declared_by ? `${row.declared_by}, ${on(row.declared_at)}` : "—"}
-                      {/* Where the work is happening. Stored and
-                          never fetched: a link has no egress at all, which is
-                          what makes it available without a deployment first
-                          deciding to let anything out. */}
-                      {(row.state === "fixing" ||
-                        row.state === "missed" ||
-                        row.state === "clear") && (
-                        <Elsewhere
-                          where={row.elsewhere ?? ""}
-                          busy={set.isPending}
-                          onSet={(where) =>
-                            set.mutate(
-                              chosen.map((each) => ({
-                                stream: each.stream ?? "",
-                                variant: each.variant ?? "",
-                                ...(each.stream === row.stream && each.variant === row.variant
-                                  ? { elsewhere: where }
-                                  : {}),
-                              })),
-                            )
-                          }
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="hint" style={{ margin: "10px 0 0" }}>
-            Declared intent, not commits. A release clears when the next scan of it stops finding
-            the issue &mdash; nothing here is marked done by hand, and a release it has left says so
-            whether anybody planned it or not.
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Where one release stands, in one word.
-export function FixState({ state }: { state: string }) {
-  const label: Record<string, string> = {
-    missed: "Missed",
-    fixing: "Fixing",
-    undecided: "Not decided",
-    clear: "Clear",
-    gone: "Gone",
-    retired: "Out of support",
-  };
-  const means: Record<string, string> = {
-    missed: "Chosen, scanned since, and the issue is still there",
-    fixing: "Chosen, and no scan has looked since",
-    undecided: "Nobody has said whether it will be fixed here",
-    clear: "Chosen, and the issue is gone",
-    gone: "Nobody chose it, and the issue has left anyway",
-    retired: "Out of support, so nothing here is a target",
-  };
-  const cls: Record<string, string> = {
-    missed: "lapsed",
-    fixing: "waiting",
-    undecided: "open",
-    clear: "agreed",
-    gone: "agreed",
-    retired: "open",
-  };
-  return (
-    <span className={`state ${cls[state] ?? "open"}`} title={means[state]}>
-      {label[state] ?? state}
-    </span>
   );
 }
 
@@ -564,10 +283,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
       {told.isPending ? (
         <Loading />
       ) : !report ? (
-        <p className="reading">
-          Nobody outside is recorded as having reported this, which is what a flaw we found
-          ourselves looks like.
-        </p>
+        <p className="reading">No outside reporter recorded.</p>
       ) : (
         <>
           <p className="reading" style={{ marginBottom: 6 }}>
@@ -589,11 +305,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
           ) : (
             <div className="alert" style={{ margin: "6px 0 0" }}>
               <strong>Nobody has answered them.</strong>
-              <span>
-                Prompt acknowledgment is the part of coordinated disclosure a reporter judges, and
-                it is the step that costs nothing and is missed by being nobody&rsquo;s job. Send
-                them a note, then record it here.
-              </span>
+              <span>Send them a note, then record it here.</span>
               <button
                 type="button"
                 className="btn"
@@ -634,9 +346,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
           </button>
         </div>
         <span className="hint">
-          A CVE assigned after we minted our own. Nothing about the finding, the decisions or the
-          approvals moves — they are keyed on the issue rather than on what it is called — and the
-          issue is filed under the name a reader will look for.
+          A CVE assigned after we minted our own. Findings and decisions are unaffected.
         </span>
         {alsoKnown.error != null && (
           <Failed error={alsoKnown.error} what="That name could not be recorded." />

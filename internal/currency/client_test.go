@@ -229,3 +229,88 @@ func TestThePublicIndexesAreReachedThroughTheGuardedClient(t *testing.T) {
 		t.Error("the client has no timeout")
 	}
 }
+
+// What each index says a package is, and where it lives. A bare name is not
+// enough for a dependency of a dependency somebody has never heard of, and the
+// indexes already carry the answer.
+func TestWhatEachIndexSaysThePackageIsAndWhereItLives(t *testing.T) {
+	for _, each := range []struct {
+		ecosystem, name, body, summary, project string
+	}{
+		{
+			// The module protocol has no description anywhere, but the proxy
+			// states the origin — so a Go module carries an address and no
+			// summary, which is not a gap in the row.
+			"golang", "github.com/anchore/grype",
+			`{"Version":"v0.118.0","Time":"2026-08-27T18:40:29Z",
+			  "Origin":{"VCS":"git","URL":"https://github.com/anchore/grype"}}`,
+			"", "https://github.com/anchore/grype",
+		},
+		{
+			"npm", "lodash",
+			`{"dist-tags":{"latest":"4.17.21"},"time":{"4.17.21":"2026-02-20T00:00:00Z"},
+			  "description":"Lodash modular utilities.","homepage":"https://lodash.com/"}`,
+			"Lodash modular utilities.", "https://lodash.com/",
+		},
+		{
+			// The summary, never the description: in this index the second is
+			// the package's whole README.
+			"pypi", "requests",
+			`{"info":{"version":"2.32.3","summary":"Python HTTP for Humans.",
+			  "description":"a readme thousands of characters long",
+			  "project_urls":{"Source":"https://github.com/psf/requests"}},
+			  "urls":[{"upload_time_iso_8601":"2026-05-29T15:37:49.000000Z"}]}`,
+			"Python HTTP for Humans.", "https://github.com/psf/requests",
+		},
+		{
+			"cargo", "serde",
+			`{"crate":{"max_stable_version":"1.0.219","description":"A generic serialization framework",
+			  "homepage":"https://serde.rs","repository":"https://github.com/serde-rs/serde"},
+			  "versions":[{"num":"1.0.219","created_at":"2026-03-09T00:00:00Z"}]}`,
+			"A generic serialization framework", "https://serde.rs",
+		},
+	} {
+		a := serving(t, each.body)
+		latest, err := client(a).For(each.ecosystem).Latest(t.Context(), each.name)
+		if err != nil {
+			t.Errorf("%s: latest: %v", each.ecosystem, err)
+			continue
+		}
+		if latest.Summary != each.summary {
+			t.Errorf("%s said %q is %q, want %q", each.ecosystem, each.name,
+				latest.Summary, each.summary)
+		}
+		if latest.Project != each.project {
+			t.Errorf("%s put %q at %q, want %q", each.ecosystem, each.name,
+				latest.Project, each.project)
+		}
+	}
+}
+
+// Where a publisher filled in more than one address, the one a reader wants
+// leads: a project's own pages before its repository.
+func TestTheProjectsOwnPagesAreOfferedBeforeItsRepository(t *testing.T) {
+	a := serving(t, `{"crate":{"max_stable_version":"1.0.0",
+		"homepage":"https://serde.rs","repository":"https://github.com/serde-rs/serde"},
+		"versions":[{"num":"1.0.0","created_at":"2026-01-01T00:00:00Z"}]}`)
+	latest, err := client(a).For("cargo").Latest(t.Context(), "serde")
+	if err != nil {
+		t.Fatalf("latest: %v", err)
+	}
+	if latest.Project != "https://serde.rs" {
+		t.Errorf("project %q, want the homepage rather than the repository", latest.Project)
+	}
+
+	// And where only the repository is filled in, that is the answer rather
+	// than nothing.
+	b := serving(t, `{"crate":{"max_stable_version":"1.0.0",
+		"repository":"https://github.com/serde-rs/serde"},
+		"versions":[{"num":"1.0.0","created_at":"2026-01-01T00:00:00Z"}]}`)
+	only, err := client(b).For("cargo").Latest(t.Context(), "serde")
+	if err != nil {
+		t.Fatalf("latest: %v", err)
+	}
+	if only.Project != "https://github.com/serde-rs/serde" {
+		t.Errorf("project %q, want the repository", only.Project)
+	}
+}

@@ -82,9 +82,6 @@ func upUpgrade(ctx context.Context, tx *sql.Tx) error {
 			"claim_id"     ` + t.refNull + ` NULL,
 			"declared_by"  ` + t.ref + ` NOT NULL,
 			"declared_at"  ` + t.timestamp + ` NOT NULL,
-			-- Where the work is happening: a ticket, a change, a branch.
-			-- Stored and never fetched.
-			"elsewhere"    ` + t.free + ` NULL,
 			-- Reading a build's plan is how a release answers "what is this
 			-- waiting on", and the unique constraint leads with the build, so
 			-- it answers that lookup too. A second index on the build alone

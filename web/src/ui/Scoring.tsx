@@ -43,7 +43,7 @@ const METRICS: {
     help: "Whether anything beyond the attacker's control has to line up",
     values: [
       { value: "L", label: "Low — it works whenever they try" },
-      { value: "H", label: "High — it depends on conditions they cannot arrange" },
+      { value: "H", label: "High — depends on conditions they cannot arrange" },
     ],
   },
   {
@@ -163,8 +163,7 @@ export function Scoring({
     <div className="field">
       <span className="l">Score</span>
       <p className="hint" style={{ marginTop: 0 }}>
-        Optional. Leave it alone during early triage — a flaw can be recorded before anybody has
-        worked out how bad it is, and a score nobody calculated is worse than none.
+        Optional. Leave it during early triage.
       </p>
 
       <div className="actions" style={{ margin: "4px 0 8px" }}>
@@ -219,8 +218,7 @@ export function Scoring({
 
       {vector !== "" && (
         <p className="hint">
-          <code>{vector}</code> — the vector is what is stored and the score is worked out from it,
-          so the two cannot come to say different things.
+          <code>{vector}</code> — the vector is stored and the score is worked out from it.
         </p>
       )}
       {scored.isError && (

@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -207,6 +208,118 @@ func TestACollaboratorReachesTheNotesOnTheirOwnCase(t *testing.T) {
 		if got := asPerson(t, r, "outsider", http.MethodGet, other, ""); got.Code != http.StatusNotFound {
 			t.Errorf("the case grant reached an issue it does not name: %d %s",
 				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
+	// Home shows every figure the scope narrows beside its all-products twin,
+	// so the difference a selection makes is on screen. These two answered for
+	// every product whatever was selected, and the page said so in words
+	// instead — which describes an inconsistency rather than removing one.
+	//
+	// A product nobody holds answers as one nobody declared, like every other
+	// product a list narrows by.
+	twoReach(t, func(t *testing.T, r *reach) {
+		place := r.scanned(t)
+		// A claim waiting on somebody, and a finding somebody holds, both in
+		// `mine`. Without them every count is zero and a lost narrowing reads
+		// the same as a working one.
+		r.decided(t, place)
+		if got := asPerson(t, r, "assigner", http.MethodPut,
+			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"+
+				"/components/libnl-3-200/assignment",
+			`{"person":"triager"}`); got.Code >= 400 {
+			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
+		}
+
+		count := func(who, path string) int {
+			t.Helper()
+			got := asPerson(t, r, who, http.MethodGet, path, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s answered %d: %s", path, got.Code, got.Body.String())
+			}
+			var page struct {
+				Total int               `json:"total"`
+				Items []json.RawMessage `json:"items"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &page); err != nil {
+				t.Fatal(err)
+			}
+			if page.Total > 0 {
+				return page.Total
+			}
+			return len(page.Items)
+		}
+
+		// Holdings are read by somebody holding both products, so the other
+		// product's empty answer is a narrowing rather than a refusal.
+		if whole := count("estate-reader", "/v1/assignments"); whole == 0 {
+			t.Fatal("nobody holds anything, so narrowing holdings proves nothing")
+		}
+		if here := count("estate-reader", "/v1/assignments?product=mine"); here == 0 {
+			t.Error("narrowed to the product the work is in, holdings answered nothing")
+		}
+		if elsewhere := count("estate-reader", "/v1/assignments?product=theirs"); elsewhere != 0 {
+			t.Errorf("holdings in a product nobody holds work in answered %d", elsewhere)
+		}
+
+		// The queue is read by whoever may approve, which is a narrower thing
+		// than reading: an estate reader has nothing waiting on them however it
+		// is narrowed, so asserting through one proves nothing.
+		//
+		// What this half shows is that narrowing to the product holding the
+		// claim keeps it, and that a product the approver cannot act in is
+		// refused. It cannot show a claim being *excluded*, because the only
+		// approver here holds one product — that half is shown by the holdings
+		// above, which are read by somebody holding both and narrow the same
+		// way through the same resolver.
+		if whole := count("reviewer", "/v1/review-queue"); whole == 0 {
+			t.Fatal("nothing waits on the approver, so narrowing the queue proves nothing")
+		}
+		if here := count("reviewer", "/v1/review-queue?product=mine"); here == 0 {
+			t.Error("narrowed to the product the claim is in, the queue answered nothing")
+		}
+
+		// The file a narrowed screen offers is the narrowed backlog. Taken from
+		// a screen showing one product and answering for every product, a
+		// backlog report is about work the reader was not looking at.
+		exported := func(who, query string) int {
+			t.Helper()
+			got := asPerson(t, r, who, http.MethodGet, "/v1/review-queue.csv"+query, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("the queue export answered %d: %s", got.Code, got.Body.String())
+			}
+			return strings.Count(strings.TrimRight(got.Body.String(), "\n"), "\n")
+		}
+		// Asserted against a file that has rows to lose, so a narrowing that
+		// dropped everything and one that narrowed nothing are told apart.
+		if whole := exported("reviewer", ""); whole == 0 {
+			t.Fatal("the unnarrowed queue export is empty, so narrowing it proves nothing")
+		}
+		if here := exported("reviewer", "?product=mine"); here == 0 {
+			t.Error("narrowed to the product holding the claim, the export is empty")
+		}
+		// A product this approver holds nothing on is refused rather than
+		// silently written out whole — the same answer the list gives, because
+		// the name is resolved after the right to act is checked.
+		if got := asPerson(t, r, "reviewer", http.MethodGet,
+			"/v1/review-queue.csv?product=theirs", ""); got.Code != http.StatusNotFound {
+			t.Errorf("the export answered %d for a product the approver cannot act in", got.Code)
+		}
+		if got := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/review-queue.csv?product=nobodys", ""); got.Code != http.StatusNotFound {
+			t.Errorf("the export answered %d for an undeclared product", got.Code)
+		}
+
+		// And a product this reader holds nothing on is refused in the words an
+		// undeclared name gets, rather than silently answering for everything.
+		for _, path := range []string{"/v1/review-queue?product=nobodys",
+			"/v1/assignments?product=nobodys"} {
+			if got := asPerson(t, r, "triager", http.MethodGet, path, ""); got.Code != http.StatusNotFound {
+				t.Errorf("%s answered %d, want the words an undeclared product gets: %s",
+					path, got.Code, got.Body.String())
+			}
 		}
 	})
 }

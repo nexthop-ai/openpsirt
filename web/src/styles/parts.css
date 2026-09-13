@@ -379,6 +379,237 @@ a.kpi:hover {
   flex-wrap: wrap;
   margin-bottom: 8px;
 }
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0 0 8px;
+  font-size: 12.5px;
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 11px;
+  padding-top: 2px;
+}
+.facts dd {
+  margin: 0;
+  min-width: 0;
+}
+
+/* The one lifted thing on a screen: the act it exists for. Border and wash
+   rather than a shadow, because a shadow on one card among several reads as a
+   rendering accident and a tint reads as a choice. */
+.card.act {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+/* The same card where the act is refused rather than offered — no version
+   fixes any of this, so the work is a judgment. */
+.card.stuck {
+  border-color: color-mix(in oklab, var(--sev-high) 40%, transparent);
+  background: color-mix(in oklab, var(--sev-high) 7%, transparent);
+}
+
+/* The versions a build could move to, with what each closes beside it. A list
+   rather than the browser's own completion, because the counts are the reason
+   to pick one and a datalist shows nothing until somebody clicks in. */
+.tomove {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+.tomove > li {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.tomove > li:first-child {
+  border-top: 0;
+}
+.tomove > li.hint {
+  padding: 6px 9px;
+}
+.tomove button {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+}
+.tomove button:hover {
+  background: var(--raised);
+}
+.tomove button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.tomove .why {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-weight: 400;
+  text-align: right;
+}
+
+/* A pair of figures inside a panel rather than across a screen. */
+.kpis.tight {
+  gap: var(--gap-wide);
+  margin-bottom: var(--gap-wide);
+}
+
+/* Where a package sits, as the chain it sits in: what pulls it in, the package,
+   and what it carries. A rail down the left with a node per step, because the
+   thing being read is a position in a graph rather than three unrelated
+   panels. */
+.sits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sits > li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 14px 18px;
+  position: relative;
+  border-left: 2px solid var(--line-strong);
+  margin-left: 5px;
+}
+.sits > li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+.sits > li::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--pill);
+  border: 2px solid var(--line-strong);
+  background: var(--surface);
+}
+/* The package the screen is about, marked so the eye lands on it first. */
+.sits > li.at::before {
+  left: -8px;
+  top: 3px;
+  width: 13px;
+  height: 13px;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* The package the screen is about is marked by its node, not by its size. A
+   component name is as long as its packager made it — one kernel binary is
+   forty-six characters — so enlarging it takes the column and wraps to three
+   lines, which is worse than not marking it at all. */
+.sits .nm {
+  font-size: var(--step-0);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sits .eyebrow {
+  display: block;
+}
+.sits .sevbar {
+  margin-top: 7px;
+  max-width: 320px;
+}
+.sits .sub {
+  font-size: var(--step--1);
+  color: var(--faint);
+}
+
+/* What a count is made of, as one bar rather than a chip per band.
+   
+   Widths are the counts, so the shape is the answer: a bar that is mostly one
+   colour says where the weight is before any number is read. Chips of equal
+   width say only which bands are present, which is the fact a reader least
+   needs.
+   
+   The key is not optional. Two of the severity colours are close enough that a
+   colourblind reader cannot separate them — measured at a perceptual distance
+   of 9.6 where 15 is the floor — so the labels beside the bar are what carries
+   the identity, and the colour only reinforces it. */
+.sevbar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: var(--pill);
+  overflow: hidden;
+  background: var(--line);
+}
+.sevbar > i {
+  display: block;
+  min-width: 3px;
+}
+.sevbar > i.critical {
+  background: var(--sev-critical);
+}
+.sevbar > i.high {
+  background: var(--sev-high);
+}
+.sevbar > i.medium {
+  background: var(--sev-medium);
+}
+.sevbar > i.low {
+  background: var(--sev-low);
+}
+.sevbar > i.unrated {
+  background: var(--sev-unrated);
+}
+.sevkey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 7px;
+}
+.sevkey > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--step--1);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sevkey > span > i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+.sevkey > span > i.critical {
+  background: var(--sev-critical);
+}
+.sevkey > span > i.high {
+  background: var(--sev-high);
+}
+.sevkey > span > i.medium {
+  background: var(--sev-medium);
+}
+.sevkey > span > i.low {
+  background: var(--sev-low);
+}
+.sevkey > span > i.unrated {
+  background: var(--sev-unrated);
+}
+
+/* The row a screen is currently about, in a table listing several. */
+tr.row.on > td {
+  background: var(--accent-soft);
+}
+
 .judgment .facts {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -506,6 +737,35 @@ a.kpi:hover {
   border-color: var(--sev-high);
   color: var(--sev-high);
   background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  font-weight: 600;
+}
+/* A chip somebody picks with, and the one picked. It stays a chip: a button
+   brings its own font, border and background, and left alone it stood a head
+   taller than the chips beside it. */
+button.vchip {
+  font: inherit;
+  font-size: 10.5px;
+  background: none;
+  cursor: pointer;
+  line-height: 1.7;
+}
+/* A chip tinted by what it says rather than by where it sits: a count of
+   criticals and a deadline are read at a glance or not at all. */
+.vchip.bad {
+  border-color: var(--sev-critical);
+  color: var(--sev-critical);
+  background: color-mix(in oklab, var(--sev-critical) 10%, transparent);
+  font-weight: 600;
+}
+.vchip.ok {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: color-mix(in oklab, var(--ok) 10%, transparent);
+}
+.vchip.on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-weight: 600;
 }
 .variants {
@@ -696,6 +956,16 @@ a.kpi:hover {
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+/* A table inside something that is already a block of its own: rows laid out
+   in columns, with none of the edges that say "separate object". Bordered
+   inside a panel it reads as a panel within a panel, and a screen of those
+   flattens the hierarchy it was drawn to show. */
+.tablewrap.plain {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 table {
   border-collapse: collapse;
@@ -919,7 +1189,11 @@ button.edited {
 .suggestions li {
   margin: 0;
 }
-.suggestions .hint {
+/* The rows that are a message rather than a choice — "Looking…", nothing
+   matched. Only those, because the same class marks what a choice says about
+   itself beside its name: a block there drops that onto a second row and
+   stands every option in the list two rows tall. */
+.suggestions > li.hint {
   display: block;
   padding: 6px 8px;
 }

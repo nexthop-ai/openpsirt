@@ -197,7 +197,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject, up Upgr
 			}
 			committed[at.ComponentID] = true
 			n, err := findings.CommitWithin(ctx, tx, subject, up.ProductID,
-				at.ComponentID, up.To, &up.By, &claim.ID, wanted, retired, nil)
+				at.ComponentID, up.To, &up.By, &claim.ID, wanted, retired)
 			if err != nil {
 				return err
 			}

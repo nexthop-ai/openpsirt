@@ -141,17 +141,13 @@ export function Overview() {
                 <span className="l">Fixed</span>
                 <span className="n">{(pace.data?.fixed ?? 0).toLocaleString()}</span>
                 <span className="d">
-                  distinct issues that actually went away · a version that carried the issue with it
-                  is not a fix
+                  distinct issues that went away · a version carrying the issue forward is not a fix
                 </span>
               </Link>
               <Link className="kpi" to={`${findingsPath(at)}?opened_after=${windowStart(days)}`}>
                 <span className="l">Appeared</span>
                 <span className="n">{(pace.data?.opened ?? 0).toLocaleString()}</span>
-                <span className="d">
-                  distinct issues, in the same window and the same unit as fixed, so the two can be
-                  read against each other
-                </span>
+                <span className="d">distinct issues, same window and unit as fixed</span>
               </Link>
             </div>
 
@@ -236,9 +232,8 @@ export function Overview() {
               </table>
             </div>
             <p className="hint">
-              &ldquo;Nobody has said&rdquo; counts what carries no standing judgment: a claim
-              waiting for a second person is not an answer, because it suppresses nothing while it
-              waits.
+              &ldquo;Nobody has said&rdquo; counts what carries no standing judgment. A claim
+              waiting on a second person suppresses nothing.
             </p>
           </>
         )}
@@ -257,10 +252,8 @@ export function Overview() {
         ) : (
           <>
             <p className="reading">
-              Said three ways rather than as an average, because an average hides the case somebody
-              is asking about: ten decisions in a day and one in a quarter average to a fortnight,
-              which describes neither. The p90 is the longest of the nine in ten — a wait something
-              actually had, not an interpolated number nothing took.
+              Three figures rather than an average, which would describe neither a busy day nor a
+              slow quarter.
             </p>
             <div className="tablewrap">
               <table>
@@ -356,8 +349,7 @@ export function Overview() {
               </div>
             )}
             <p className="hint">
-              Agreements are dated by the agreement: an approver&rsquo;s week is the week they
-              approved in. Narrowed to what you may read, like every count here.
+              Dated by when the approval happened. Narrowed to what you may read.
             </p>
           </>
         )}
@@ -366,9 +358,8 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Repeated deferrals</h3>
         <p className="hint">
-          One item deferred three times is a judgment. Forty of them is a policy nobody wrote down,
-          and that is what this is for. Over the whole record rather than the window above: a
-          pattern of putting something off is not something a month can be read for.
+          One item deferred three times is a judgment; forty is an undocumented policy. Over the
+          whole record, not the window above.
         </p>
         {repeated.isError ? (
           <Failed error={repeated.error} what="Repeat deferrals could not be read." />
@@ -417,10 +408,9 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Dismissals</h3>
         <p className="hint">
-          Dismissals argued in this window that a second person agreed to, newest first. One row per
-          place, the way <Link to="/audit">the record</Link> lists them — a judgment covering forty
-          places is forty rows. All three dismissals are here: what they have in common is that
-          nothing was changed.
+          Approved dismissals in this window, newest first. One row per place, the way{" "}
+          <Link to="/audit">the record</Link> lists them, so a judgment covering forty places is
+          forty rows. All three dismissal outcomes are here.
         </p>
         {argued.isError ? (
           <Failed error={argued.error} what="What was argued away could not be read." />

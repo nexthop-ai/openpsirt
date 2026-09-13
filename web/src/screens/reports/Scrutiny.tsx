@@ -65,10 +65,7 @@ export function Scrutiny() {
           <section className="panel">
             <h3>What the control cannot do</h3>
             <p className="reading">
-              A proposer may never approve their own claim, and never the words of a revision they
-              wrote themselves; the agreement points at one revision, so editing the reasoning takes
-              it back. None of that can be waived, so nothing below is a list of people who broke a
-              rule. What is worth reading is where the rule did not apply, and where it applied in
+              Neither control can be waived. Read this for where they did not apply, or applied in
               form only.
             </p>
           </section>
@@ -81,8 +78,8 @@ export function Scrutiny() {
             {dismissed.length > 0 ? (
               <>
                 <p className="hint" style={{ marginTop: 0 }}>
-                  A dismissal hides risk and always needs a second person. Every row here is a
-                  control that did not hold — read them.
+                  Dismissals always need a second person. Every row here is a control that did not
+                  hold.
                 </p>
                 <div className="tablewrap">
                   <table>
@@ -119,19 +116,13 @@ export function Scrutiny() {
             ) : (
               <Empty
                 title="No dismissal stands on one person's say-so."
-                detail="Which is the answer this half exists to get. Every dismissal requires a second person, and this asks the record whether one is there rather than whether the rule exists."
+                detail="Every dismissal requires a second person. This checks the record."
               />
             )}
 
             <h4 style={{ marginTop: 16 }}>Where the rule did not apply</h4>
             <p className="hint">
-              A short deferral stands on its own, and so does an upgrade promised inside the
-              deadline the work already had. Both are deliberate: gating every routine act would put
-              the most ordinary judgment through a queue, which is how a queue stops being read. One
-              at a time this is triage. The pattern across a program is what nothing else shows, and
-              &ldquo;short&rdquo; is measured against everything the same finding has already been
-              put off for — otherwise the exception swallows the rule one twenty-nine-day deferral
-              at a time.
+              Short deferrals stand on their own, measured against the total already deferred.
             </p>
             {exempt.length === 0 ? (
               <p className="hint">Nothing stands on one person in this window.</p>
@@ -202,9 +193,7 @@ export function Scrutiny() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>Agreements given in bulk</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              An approver works at the unit the proposer acted at, so agreeing to a batch as one act
-              is the control working rather than a shortcut around it. A batch of two hundred is
-              still a different thing from a batch of two.
+              A batch is agreed as one act, so a batch of two hundred is not a batch of two.
             </p>
             {(got.data?.bulk ?? []).length === 0 ? (
               <p className="hint">Nothing was agreed to in bulk in this window.</p>
@@ -239,9 +228,7 @@ export function Scrutiny() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>Agreed to before, covering more now</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              A judgment reaches by matching, so a build appearing afterwards is covered with nobody
-              acting — and nobody having agreed to the larger number. What somebody consented to is
-              recorded when they consented; this is that against what the same claim reaches today.
+              Compares what was agreed against what the claim reaches now.
             </p>
             {(got.data?.grew ?? []).length === 0 ? (
               <p className="hint">Nothing covers more than it did when it was agreed to.</p>
@@ -282,9 +269,8 @@ export function Scrutiny() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>Standing from somebody who could not give it now</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              An approval is a fact about a moment, so it is right that these still stand — losing a
-              role does not un-say what somebody said. It is still the first list asked for after a
-              reorganization.
+              These still stand: losing a role does not undo an approval. Still the first list asked
+              for after a reorganization.
             </p>
             {(got.data?.lapsed ?? []).length === 0 ? (
               <p className="hint">Everyone whose agreement stands could still give it.</p>

@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -20,7 +21,24 @@ type PerBuildBody struct {
 	Stream  string `json:"stream"`
 	Variant string `json:"variant"`
 	Version string `json:"version" doc:"What this build ships"`
-	Issues  int    `json:"issues" doc:"Distinct vulnerabilities open against it here"`
+	// Purl is what an ecosystem and an upstream address are read out of.
+	Purl      string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
+	Ecosystem string `json:"ecosystem,omitempty" doc:"Which ecosystem the identifier names, read out of it rather than stored"`
+	// What an ecosystem's index says the package is, where one was asked and
+	// answered. Absent is the ordinary case rather than a gap.
+	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
+	ProjectURL string `json:"project_url,omitempty" doc:"Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
+	// A count has a shape. Forty issues and three criticals are different
+	// work, and a number with nothing beside it says which is which.
+	BySeverity map[string]int `json:"by_severity,omitempty" doc:"What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
+	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited, which outranks everything else about it"`
+	Fixable    int            `json:"fixable" doc:"How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
+	Supplier   string         `json:"supplier,omitempty" doc:"Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	// What the ecosystem's index says is current, where one was asked.
+	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
+	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"When that version shipped, where the index said"`
+	FirstSeen time.Time  `json:"first_seen" doc:"When a scan of this deployment first reported the component"`
+	Issues    int        `json:"issues" doc:"Distinct vulnerabilities open against it here"`
 	// Consumers is the unit somebody acts in: one judgment covers the whole
 	// fold, and what varies underneath it is what pulls the package in.
 	Consumers int `json:"consumers" doc:"How many things pull it in here"`
@@ -51,11 +69,23 @@ func registerComponent(api huma.API, in Ingest) {
 			"on a maintained older line and a stream that has moved on are different work " +
 			"with different testing, and one target across both would be wrong for one of " +
 			"them.\n\n" +
-			"**Where it could go is listed, never ordered.** Comparing two versions needs an " +
-			"ordering per ecosystem this does not have, so there is no nearest and no " +
-			"latest — what there is, is every version the scanner named as carrying a fix, " +
-			"and how many issues each would close.\n\n" +
-			"`due_at` is what a commitment about that build is gated against.",
+			"**Where it could go carries two counts.** `fixed_here` is how many of what is " +
+			"open name that exact version as their fix, which is the release's own security " +
+			"content; `reached` is how many the upgrade closes altogether, counting " +
+			"everything fixed at or before it. The second is the one somebody choosing a " +
+			"version is asking about, and it needs the ecosystem's ordering: where that is " +
+			"not defined the two counts are equal, `ordered` is false, and the list is not " +
+			"ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts " +
+			"near the bottom while carrying every fix before it.\n\n" +
+			"**A build is listed because it ships the component**, not because something is " +
+			"open against it. A package carrying nothing of its own still answers with the " +
+			"version it ships and how many things pull it in, which is the ordinary case for " +
+			"anything vendored in pre-built.\n\n" +
+			"**One entry per version rather than per build.** A build shipping a name at two " +
+			"versions holds two components, and they are two different pieces of code to " +
+			"decide about.\n\n" +
+			"`due_at` is what a commitment about that build is gated against, and is absent " +
+			"where nothing is open.",
 		Tags: []string{"Findings"},
 	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
@@ -84,10 +114,17 @@ func registerComponent(api huma.API, in Ingest) {
 		for _, build := range builds {
 			upgrades := make([]UpgradeBody, 0, len(build.Upgrades))
 			for _, each := range build.Upgrades {
-				upgrades = append(upgrades, UpgradeBody{To: each.To, Issues: each.Issues})
+				upgrades = append(upgrades, UpgradeBody{To: each.To, FixedHere: each.FixedHere,
+					Reached: each.Reached, Ordered: each.Ordered})
 			}
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
 				Stream: build.Stream, Variant: build.Variant, Version: build.Version,
+				Purl: build.Purl, Ecosystem: graph.EcosystemOf(build.Purl),
+				Summary: build.Summary, ProjectURL: build.ProjectURL,
+				BySeverity: build.BySeverity, Exploited: build.Exploited,
+				Fixable:  build.Fixable,
+				Supplier: build.Supplier,
+				Newest:   build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
 				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,

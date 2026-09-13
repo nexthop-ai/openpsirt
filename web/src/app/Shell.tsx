@@ -349,7 +349,7 @@ function Rail({
   quiet,
   end,
   needs = true,
-  why = "This screen is about one build — pick a product, a branch and a variant",
+  why = "Pick a product, a branch and a variant",
 }: {
   to: string;
   icon: string;
@@ -437,9 +437,7 @@ function Search({ at }: { at: Scoped }) {
     <form
       className="topsearch"
       title={
-        at.product
-          ? undefined
-          : "An issue by name goes to the issue, wherever it sits. Searching components needs a product picked"
+        at.product ? undefined : "Search an issue by name, or pick a product to search components"
       }
       onSubmit={(event) => {
         event.preventDefault();

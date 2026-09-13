@@ -70,7 +70,7 @@ export function Settings() {
     <>
       <div className="screen-head">
         <h2>Settings</h2>
-        <p>Deployment-wide. Applies to everyone.</p>
+        <p>Applies to everyone.</p>
       </div>
 
       {set.error != null && <Failed error={set.error} what="That could not be recorded." />}
@@ -82,9 +82,7 @@ export function Settings() {
             {deadlines.map(field)}
           </div>
           <p className="reading" style={{ marginTop: 10 }}>
-            Counted from when a finding was first seen, for what is undecided. Being exploited sets
-            its own clock, whatever the severity says; an unrated finding takes the medium window.
-            Being late is reported, never acted on.
+            Counted from when a finding was first seen. Exploited findings use their own window.
           </p>
         </div>
       )}
@@ -96,9 +94,7 @@ export function Settings() {
             {floor.map(field)}
           </div>
           <p className="reading" style={{ marginTop: 10 }}>
-            Every shared figure carries this and says so. A person may narrow their own screen
-            further, and that changes no number anybody else is shown. Below the line, nothing has a
-            deadline.
+            Applies to every shared figure. Below the line, nothing has a deadline.
           </p>
         </div>
       )}
@@ -110,9 +106,8 @@ export function Settings() {
             {threshold.map(field)}
           </div>
           <p className="reading" style={{ marginTop: 10 }}>
-            A deferral is measured against everything the finding has already been put off for, not
-            against the deferral being asked for. A bulk decision always needs a second person, and
-            is bounded.
+            Measured against the total already deferred. A bulk decision always needs a second
+            person, and is bounded.
           </p>
         </div>
       )}
@@ -122,10 +117,8 @@ export function Settings() {
           <h3>Stalled work reminders</h3>
           <div className="filters">{stale.map(field)}</div>
           <p className="reading" style={{ marginTop: 10 }}>
-            Nothing happening is the one thing no message about an act can report, so each of these
-            is derived rather than sent: a claim waiting on a second person, a claim sent back that
-            nobody has revised, a deferral running out, and work sitting in a team&rsquo;s queue.
-            Each clears when the thing finally happens.
+            Derived rather than sent, because nothing happening raises no event. Each clears when
+            the thing finally happens.
           </p>
         </div>
       )}
@@ -140,10 +133,7 @@ export function Settings() {
         </div>
       ))}
 
-      <p className="hint">
-        Defaults are a starting point, not a recommendation. Zero or a negative number is refused
-        rather than stored.
-      </p>
+      <p className="hint">Defaults, not recommendations. Zero or negative is refused.</p>
     </>
   );
 }

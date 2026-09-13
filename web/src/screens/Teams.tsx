@@ -74,7 +74,7 @@ export function Teams() {
     <>
       <div className="screen-head">
         <h2>Teams</h2>
-        <p>Who work arrives for, as a queue rather than as a person</p>
+        <p>Queues that work is assigned to</p>
         <AddButton label="Add team" onClick={() => setAdding(true)} />
       </div>
 
@@ -87,7 +87,7 @@ export function Teams() {
       {rows.length === 0 ? (
         <Empty
           title="No teams are recorded."
-          detail="A team is where work goes when it belongs to a group rather than to a person — and what an auto-assignment rule hands work to."
+          detail="Where work goes when it belongs to a group rather than a person."
         />
       ) : (
         <div className="tablewrap">
@@ -115,7 +115,7 @@ export function Teams() {
                   <td>
                     {(team.members ?? []).length === 0 ? (
                       <span style={{ color: "var(--faint)" }}>
-                        nobody — work routed here is held by nobody and seen by nobody
+                        nobody — work routed here stays unassigned
                       </span>
                     ) : (
                       <span className="variants">
@@ -183,7 +183,7 @@ export function Teams() {
         busy={declare.isPending}
         error={declare.error}
         ok="Add team"
-        hint="A team holds work. It grants nothing: who may read what is still decided per person on users and roles."
+        hint="Teams hold work. They grant no access."
         onSubmit={() => declare.mutate({ name, ...(shown ? { display_name: shown } : {}) })}
       >
         <Field
@@ -191,14 +191,14 @@ export function Teams() {
           value={name}
           onChange={setName}
           placeholder="platform"
-          hint="What a rule names it by. Matched without regard to capitals."
+          hint="What a rule names it by. Capitals do not matter."
         />
         <Field
           label="Shown as"
           value={shown}
           onChange={setShown}
           placeholder="Platform team"
-          hint="How it is spelled on screen. The name is used where this is empty."
+          hint="Shown on screen. Defaults to the name."
         />
       </Declare>
     </>

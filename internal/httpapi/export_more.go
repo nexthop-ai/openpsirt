@@ -319,13 +319,21 @@ func registerQueueExport(api huma.API, in Ingest) {
 			"through.\n\n" +
 			"Limited to what you may approve every row of, as the screen is, and your own " +
 			"claims are not in it. `mine=true` writes out what you proposed and nobody has " +
-			"agreed to, which is a different question.",
+			"agreed to, which is a different question, and `product` narrows it the way the " +
+			"screen does.",
 		Tags: []string{"Triage"},
 	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Format string `path:"format" enum:"csv,json"`
-		Mine   bool   `query:"mine" doc:"Write out what you proposed and nobody has agreed to, instead of what is waiting on you"`
+		Format  string `path:"format" enum:"csv,json"`
+		Mine    bool   `query:"mine" doc:"Write out what you proposed and nobody has agreed to, instead of what is waiting on you"`
+		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 	}) (*huma.StreamResponse, error) {
 		subject, store, err := triaging(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		// Narrowed the same way the list is, so a file taken from a narrowed
+		// screen is the narrowed backlog rather than the whole one.
+		within, err := narrowedTo(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -336,7 +344,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 				"previously approved", "deferred days", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				waiting, _, err := store.Queue(ctx, subject, input.Mine, limit, offset)
+				waiting, _, err := store.Queue(ctx, subject, input.Mine, within, limit, offset)
 				if err != nil {
 					return nil, err
 				}

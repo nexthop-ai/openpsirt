@@ -113,9 +113,8 @@ export function AffectedBuilds({
         </button>
       </h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        The whole answer, not a change to it. Adding a build opens a finding there; taking one out
-        closes its findings as <b>never affected</b>, which counts as no fix and appears in no
-        release note — so a reason is required whenever one comes out.
+        Send the full list, not a change to it. Removing a build closes its findings as
+        <b>never affected</b>, which needs a reason.
       </p>
       {!open ? null : builds.isPending || holds.isPending ? (
         <p className="hint">Reading what this is filed against…</p>
@@ -179,7 +178,7 @@ export function AffectedBuilds({
           </button>
           {picked.length === 0 && (
             <span className="hint" style={{ marginLeft: 8 }}>
-              A flaw affects at least one build. Nothing here closes a record.
+              Pick at least one build.
             </span>
           )}
         </>

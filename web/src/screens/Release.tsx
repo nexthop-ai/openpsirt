@@ -102,8 +102,7 @@ export function Release({ product, stream }: { product: string; stream: string }
       <section className="panel">
         <h3>What this is</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          The variants this release was actually built as — a subset of what the product declares,
-          because one introduced later has never been filed against it.
+          The variants this release was built as.
         </p>
         {variants.length === 0 ? (
           <Empty
@@ -163,8 +162,7 @@ export function Release({ product, stream }: { product: string; stream: string }
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>What is true of it now</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Open across every variant, by severity. A tag never changes, so none of this carries a
-          deadline and none of it is overdue — what is here is what shipped and is still open.
+          Open across every variant, by severity. Tags never change, so nothing here has a deadline.
         </p>
         {!settled ? (
           <p className="hint">…</p>
@@ -182,8 +180,8 @@ export function Release({ product, stream }: { product: string; stream: string }
                 <b>{bands.total.toLocaleString()}</b> open in all
               </div>
               <div className="hint">
-                Counted as issues at components, the unit every count here uses, added across the
-                variants above — so one flaw in two variants is two.
+                Issues at components, added across the variants above, so one flaw in two variants
+                counts twice.
               </div>
             </li>
           </ul>
@@ -195,9 +193,8 @@ export function Release({ product, stream }: { product: string; stream: string }
         {previous ? (
           <>
             <p className="hint" style={{ marginTop: 0 }}>
-              Against <b>{previous.name}</b>, the release before this one. What was fixed is what a
-              release note carries; what is newly present and what is still there are statements
-              about what the build contains, and the document for those is the VEX below.
+              Against <b>{previous.name}</b>, the release before this one. What is newly present and
+              what is still there are in the VEX below.
             </p>
             <Link
               to={
@@ -211,9 +208,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           </>
         ) : (
           <p className="hint" style={{ marginTop: 0 }}>
-            Nothing to compare against: no earlier release of this product has a day recorded, so
-            there is no "the one before this". Recording when a release went out is what orders
-            them.
+            No earlier release has a date recorded, so there is nothing to compare against.
           </p>
         )}
       </section>
@@ -241,8 +236,7 @@ export function Release({ product, stream }: { product: string; stream: string }
               )}
             </div>
             <div className="hint">
-              Every issue this release fixed since the one before it, worst first, as markdown that
-              goes straight in. Built on the comparison screen, where the pair is picked.
+              Every issue fixed since the previous release, worst first, as markdown.
             </div>
           </li>
           <li>
@@ -273,9 +267,8 @@ export function Release({ product, stream }: { product: string; stream: string }
                 </a>
               </div>
               <div className="hint">
-                What stands about the components this variant ships, as a customer&rsquo;s own
-                scanner reads it. Approved dismissals only, public findings only, and a deferral is
-                absent rather than published as anything.
+                For a customer&rsquo;s own scanner. Approved dismissals and public findings only,
+                and a deferral is absent rather than published as anything.
               </div>
             </li>
           ))}
@@ -285,9 +278,8 @@ export function Release({ product, stream }: { product: string; stream: string }
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>The record</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Every vulnerability known in a build of this release and what became of it, decided or
-          not, with no triage line applied. The complement of what was told to customers: that says
-          what we published, this says what was known.
+          Every vulnerability known in this release and what became of it, with no triage line
+          applied.
         </p>
         <ul className="files catalog">
           {variants.map((variant) => (

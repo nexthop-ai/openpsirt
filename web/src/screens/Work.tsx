@@ -258,13 +258,11 @@ function ByPerson({
         </table>
       </div>
       <p className="hint" style={{ marginTop: 10 }}>
-        <b>Open</b> counts things to answer &mdash; one issue in one component &mdash; and{" "}
-        <b>Findings</b> how many rows those cover across every build. One flaw in a kernel is one
-        decision and can be dozens of rows.
+        <b>Open</b> is one issue in one component. <b>Findings</b> is the rows those cover across
+        every build.
       </p>
       <p className="hint" style={{ marginTop: 10 }}>
-        Nothing tells the tool somebody has left, so giving their work back is an action rather than
-        something it discovers.
+        Reassign their work manually when somebody leaves.
       </p>
     </>
   );

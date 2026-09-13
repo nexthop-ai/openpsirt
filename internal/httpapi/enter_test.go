@@ -542,8 +542,6 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 		}{
 			{"the finding itself", http.MethodGet,
 				build + "/findings/%s/components/" + flaw.Component, ""},
-			{"its fix targets", http.MethodGet,
-				build + "/findings/%s/components/" + flaw.Component + "/fix-targets", ""},
 			{"a decision about it", http.MethodPost,
 				build + "/findings/%s/components/" + flaw.Component + "/decision",
 				`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",` +

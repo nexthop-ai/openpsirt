@@ -51,7 +51,11 @@ export function CarriedPatches({
   const total = carried.data?.total ?? 0;
 
   return (
-    <section className="panel" style={{ marginTop: 14 }}>
+    <section
+      className="panel"
+      style={{ marginTop: 14 }}
+      title="Fixes applied without a version change"
+    >
       <h3>
         <button
           type="button"
@@ -59,17 +63,10 @@ export function CarriedPatches({
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >
-          {open ? "▾" : "▸"} What this build says it deals with itself
+          {open ? "▾" : "▸"} Backported patches
         </button>
       </h3>
-      {!open ? (
-        <p className="hint">
-          Carried patches declaring what they fix, and statements the build sent alongside — with
-          the stretch of scans each was said over. A carried patch is the only way a backport can be
-          seen here: the fix is in the package, the version has not moved, and no comparison of
-          versions finds one.
-        </p>
-      ) : carried.isError ? (
+      {!open ? null : carried.isError ? (
         <Failed error={carried.error} what="What this build carries could not be read." />
       ) : (
         <>
@@ -87,16 +84,13 @@ export function CarriedPatches({
                 }}
               />
               <span className="hint">
-                Matched on what the claim says it is about rather than on a package this build still
-                carries — a claim naming something that has gone is exactly the row somebody asking
-                why a patch stopped working wants.
+                Matched on what the claim names, not on what the build still carries.
               </span>
             </label>
           </div>
           {rows.length === 0 ? (
             <p className="hint">
-              This build has argued about nothing of its own. Nothing derives these: they arrive
-              with the inventory, in a component&rsquo;s pedigree or in a document beside it.
+              Nothing declared. These arrive with the inventory, never derived.
             </p>
           ) : (
             <>

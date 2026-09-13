@@ -153,9 +153,8 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
                   in {row.product_name || row.product}.
                 </strong>
                 <span>
-                  Below what a product considers worth triaging, a finding is still recorded,
-                  counted and reportable — and it carries no deadline. You are agreeing that it is
-                  not work, rather than that it is later work.
+                  Still recorded and counted, but with no deadline. You are agreeing this is not
+                  work, rather than later work.
                 </span>
               </p>
             ) : (

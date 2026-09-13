@@ -8,7 +8,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
@@ -100,10 +99,9 @@ export function Collaborators({
       <h3>Collaborators</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
         {rows.length === 0
-          ? "Nobody has been brought in. Everybody who may read undisclosed work in this product already sees it."
+          ? "Nobody has been brought in."
           : `${rows.length} ${rows.length === 1 ? "person has" : "people have"} been brought in.`}{" "}
-        Being on a case grants this one issue here and nothing else of the product — reading it and
-        arguing about it, never agreeing to a claim about it.
+        Grants read and comment on this issue only. Cannot agree to claims.
       </p>
       {bring.error != null && <Failed error={bring.error} what="They could not be brought in." />}
       {take.error != null && <Failed error={take.error} what="They could not be taken off." />}
@@ -153,8 +151,7 @@ export function Collaborators({
         </button>
       </div>
       <p className="hint" style={{ marginTop: 8 }}>
-        They are told at once, and told which issue. Adding and removing somebody is an access
-        change and is in the administration record.
+        They are notified. Logged as an access change.
       </p>
     </div>
   );
@@ -180,7 +177,6 @@ export function Assignee({
   routedBy: string;
 }) {
   const queries = useQueryClient();
-  const me = useWho();
   const hand = useMutation({
     // A party, not a person: a team holds work exactly as somebody does , and
     // the picker offers both.
@@ -207,47 +203,29 @@ export function Assignee({
     },
   });
 
+  // One line: the label and the picker. A dropdown needs no heading and no
+  // paragraph around it, and taking it yourself is the picker's first option
+  // rather than a second control beside it.
   return (
-    <div className="card">
-      <h3>Assignee</h3>
-      {routedBy && (
-        <p className="hint" style={{ marginBottom: 8 }}>
-          Placed by the rule <b>{routedBy}</b>. Taking it is picking up work nobody holds, and the
-          rule will not take it back.
-        </p>
-      )}
-      {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <div style={{ minWidth: 240 }}>
-          <Holder
-            product={at.product}
-            undisclosed={undisclosed}
-            value={assigned ? { identity: assigned } : null}
-            disabled={hand.isPending}
-            onPick={(held) => hand.mutate(held)}
-          />
-        </div>
-        {/* Taking unowned work is a triager's own, and it is the common case.
-            The API always allowed it; there was no way to ask. */}
-        {me.data?.identity != null && assigned !== me.data.identity && (
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={hand.isPending}
-            onClick={() => hand.mutate({ kind: "person", identity: me.data!.identity, name: "" })}
-          >
-            {/* The same word the unassigned list's batch bar uses, because it
-                is the same act: taking work nobody holds. */}
-            Take this
-          </button>
-        )}
-        {hand.isPending && <span className="hint">Recording…</span>}
+    <div className="assignee">
+      <span
+        className="l"
+        title="Applies to every build with this component. Set it to nobody to unassign"
+      >
+        Assigned to
+      </span>
+      <div style={{ minWidth: 220 }}>
+        <Holder
+          product={at.product}
+          undisclosed={undisclosed}
+          value={assigned ? { identity: assigned } : null}
+          disabled={hand.isPending}
+          onPick={(held) => hand.mutate(held)}
+        />
       </div>
-      <p className="hint" style={{ margin: "8px 0 0" }}>
-        Covers every place this sits at, and every build of the product holding the same component —
-        the same code built several ways is one piece of work. Handing it back to nobody is the same
-        action.
-      </p>
+      {routedBy && <span className="hint">by rule {routedBy}</span>}
+      {hand.isPending && <span className="hint">Saving…</span>}
+      {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
     </div>
   );
 }
@@ -292,9 +270,8 @@ export function Resolve({
     <div className="card">
       <h3>Fixed here</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        Nothing else can close this. A scan is the authority on what it found and it never found
-        this, so it stays open until somebody says it is fixed in this build. Every place of it here
-        closes together, and <b>nothing reopens it</b>.
+        Scans never found this, so only you can close it. Closes every place here, and
+        <b>nothing reopens it</b>.
       </p>
       {close.error != null && <Failed error={close.error} what="That could not be closed." />}
       {!open ? (
@@ -317,9 +294,7 @@ export function Resolve({
               onChange={(event) => setBecause(event.target.value)}
               style={{ minHeight: 80 }}
             />
-            <span className="hint">
-              A closure with no reason is a record saying somebody closed it and nothing else.
-            </span>
+            <span className="hint">Required.</span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -427,10 +402,7 @@ export function Attachments({
                   onChange={(event) => setReason(event.target.value)}
                   placeholder="A credential was pasted into it"
                 />
-                <p className="hint">
-                  The file goes and the record stays, so the text that pointed at it says what
-                  happened rather than pointing at nothing.
-                </p>
+                <p className="hint">The file is deleted. The record of it stays.</p>
                 <div className="actions">
                   <button
                     type="button"
@@ -542,8 +514,8 @@ export function Marks({
           {mayMark && (
             <button
               type="button"
-              aria-label={`Take off ${tag}`}
-              title={`Take off ${tag}`}
+              aria-label={`Remove tag ${tag}`}
+              title={`Remove tag ${tag}`}
               disabled={busy}
               onClick={() => unmark.mutate(tag)}
             >
@@ -556,8 +528,8 @@ export function Marks({
         (adding ? (
           <span className="marking">
             <Suggest
-              id="mark-with"
-              label="Mark with"
+              id="tag-with"
+              label="Add a tag"
               value={typed}
               onChange={setTyped}
               onPick={(tag) => mark.mutate(tag)}
@@ -573,7 +545,7 @@ export function Marks({
               disabled={typed.trim() === "" || busy}
               onClick={() => mark.mutate(typed.trim())}
             >
-              Mark
+              Add
             </button>
             <button
               type="button"
@@ -588,11 +560,11 @@ export function Marks({
           </span>
         ) : (
           <button type="button" className="mark add" onClick={() => setAdding(true)}>
-            + Mark
+            + Tag
           </button>
         ))}
       {(mark.error != null || unmark.error != null) && (
-        <Failed error={mark.error ?? unmark.error} what="That mark did not change." />
+        <Failed error={mark.error ?? unmark.error} what="That tag did not change." />
       )}
     </div>
   );

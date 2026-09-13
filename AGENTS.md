@@ -177,10 +177,15 @@ neither buys the right to go stale.
 
 **A short-bump flag is inequality, never ordering.** Saying "this moved and is
 still not the version that fixes it" needs no version comparison. Adding one is
-a different project — per-ecosystem ordering for Debian epochs, RPM release
-segments, semantic versions and the ecosystems that follow none of them — and
-it buys a sharper sentence rather than a new signal. One "just add a compare
-function" is all it takes (REQ-21).
+per-ecosystem work — Debian epochs, RPM release segments, semantic versions, and
+the ecosystems that follow none of them — and an ordering that answers
+confidently for a pair it cannot actually order is worse than none, because the
+wrong answer is a recommendation somebody acts on.
+
+**No decision records this**, and two documents cited REQ-21 for it, which is
+about findings opening and closing as scans change. So it is a judgment rather
+than a commitment, and it is the owner's to revisit: nothing has been promised
+here either way.
 
 **A bulk write is bounded.** One action recording a judgment against many
 issues is deliberate and useful; one action writing an unbounded number of rows
@@ -238,10 +243,29 @@ the rest of these documents are — plainly, no contractions, and without naming
 variable, a key path, a function or a version of somebody else's specification.
 Reach for any of those and the row belongs in a design document instead.
 
-**Adding one is the owner's call.** A decision is a commitment the project is
-held to, and one that arrives as a side effect of building something is a
-commitment nobody made. Propose it; do not append it. Removing one is the same
-conversation in reverse.
+**Adding one is the owner's call, and nothing else is.** A decision is a
+commitment the project is held to, and one that arrives as a side effect of
+building something is a commitment nobody made. Propose it; do not append it.
+Removing one is the same conversation in reverse.
+
+**`REQUIREMENTS.md` is never edited while implementing something.** Not to
+record what was just built, not to add the row a new behavior seems to want, not
+to reword one that reads awkwardly next to the code. A change to that file is
+its own change, asked for on its own.
+
+**Agreement to build something is not agreement to record a decision.** They are
+different questions and the second is asked separately: "yes, do that" is a yes
+to the work. Adding a row needs a yes to the row — quote it, and wait. An owner
+who approves a feature and finds a commitment in the decisions table has been
+held to something they never agreed to, which is the whole failure this rule
+exists to stop.
+
+**Assume it is not a decision.** Most of what gets built is what a format, an
+engine, an ecosystem or a protocol requires, and nobody chose it — how one
+distribution orders its version strings is not a judgment anybody can disagree
+with. That goes in a design document, which is where how something works is
+recorded. Reach for the decisions table only where somebody could genuinely have
+chosen otherwise, and then still ask.
 
 ## Decision identifiers
 
@@ -291,6 +315,28 @@ moment the next change lands. Comment the current behavior and why. If
 something genuinely is missing, describe the missing behavior or the
 limitation — not when it will arrive.
 
+**A comment describes the code that is there, not the code that was.** "It was
+a card with a heading and two hints" and "the form had the card's name until
+the card became Triage" describe something a reader cannot see and will never
+see. The history belongs in the commit message, and where it is a decision, in
+a design document.
+
+The test is whether the sentence would still be true and useful if the code had
+always looked like this. Keep the constraint that forces the current shape —
+"a float compares differently again, and this has to sort in an index" — and
+the measurement behind it, because both are about what is there. Cut the
+narration of what stood there before.
+
+This is not the rule above about tense. A comment may say why a shape is
+necessary, including that the obvious alternative fails; what it may not do is
+tell the story of the edit that produced it.
+
+**The tree does not follow this yet.** Fifty-nine comment lines across
+forty-seven files still narrate what stood there before — "it was a select fed
+by the mentions endpoint", "what used to be a checkbox per place". They are
+correct about the code beside them and wrong about what a comment is for, and
+they are fixed as the files are touched rather than in a sweep of their own.
+
 **No ticket or tracker references in code, comments or documents.** A bare
 number is unactionable at the code and rots as work is split or superseded.
 Describe the behavior, reason or limitation instead, and keep issue linkage in
@@ -321,6 +367,23 @@ requires, and a decision identifier anywhere in either — which names a file
 nobody outside this repository has. Whether a paragraph is an explanation of
 the design or a thing a caller has to know is not checkable and stays a
 person's to decide.
+
+**Interface copy is labels, not prose**, on the same principle as the rule
+above: the reasoning belongs in the design documents, not on the screen. Cut
+before rewriting, because most of what a screen explains it already shows — a
+clickable row looks clickable, a column header names its column. What survives
+says what a thing is or what a control does, in a couple of words.
+Clarification goes on hover, on the thing it is about, and only where a reader
+would ask. Write it as plain spoken English for a technical reader, who knows
+what a CVE and a version range are and does not need the design justified to
+them.
+
+This is the one register here written to be skimmed rather than read, so it
+does not follow the house style the documents use — including the rule against
+contractions below, which is about text read years later. `DESIGN-interface.md`
+§ What a screen says holds the whole of it, with worked examples. Nothing gates
+any of it; the copy reached 6,700 words of explanation across 65 files once
+already.
 
 **American spelling, everywhere.** License, not licence. Catalog, normalize,
 behavior, color, authorize. It applies to prose, comments and identifiers
@@ -402,7 +465,27 @@ gets ticked without being read.
  later gates a merge without anybody editing the ruleset. What that costs is
  stated where it is defined: a workflow contributing no check run on the event
  cannot be distinguished from one that has not started, so **every workflow
- meant to gate a merge declares `merge_group:` alongside `pull_request:`**.
+   meant to gate a merge declares `merge_group:` alongside `pull_request:`**.
+
+### What a pull request says
+
+A description is read by somebody deciding whether to review now and by
+somebody working out later why the code looks like this. Both are in a hurry.
+
+| Rule | |
+|---|---|
+| **Short, and plain spoken English** | The register the interface uses, for the same reason: it is skimmed. `DESIGN-interface.md` § What a screen says has the whole of it |
+| **Lists, tables and examples before prose** | A before-and-after pair says what a paragraph about the change does not. A paragraph is for the one thing that is neither a list nor a table |
+| **Numbers where there are numbers** | "6,685 words down to 2,821" is checkable; "much less prose" is not. The same rule the decisions follow |
+| **A screenshot where the layout moved** | A reviewer cannot see a rearranged screen in a diff, and asking them to build the branch to find out is asking for a shallower review |
+| **What is left undone, said** | A branch that lands with something out of scope says so, rather than leaving the next person to discover it |
+
+**Nothing about how the change was produced.** No tool, no assistant, no
+session, no generated-by footer — not in the description, the title, the
+commits, the branch name, the code, or a review comment. It is the same rule as
+the co-author trailer above and for a stronger reason: the sign-off is a
+person's statement that they wrote it and stand behind it, and a note saying
+otherwise contradicts the one trailer that carries meaning here.
 
 ### Development workflow
 

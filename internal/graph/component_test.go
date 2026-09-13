@@ -169,3 +169,61 @@ func TestTwoWritersInterningOneComponentBothSucceed(t *testing.T) {
 		}
 	})
 }
+
+func TestALaterReportFillsInWhoSuppliedAComponent(t *testing.T) {
+	// Reports arrive in an order nobody controls, and one producer states a
+	// supplier where another states none. Written only on the insert that first
+	// interns a component, a component first seen through the quieter producer
+	// never got one however many later scans said who it was — and the screen
+	// read "not stated" permanently.
+	//
+	// The rule every other field two reports can disagree about already
+	// follows: a later one fills in what an earlier one did not know, and
+	// overwrites nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		quiet := graph.Described{
+			Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0",
+		}
+		components := graph.NewComponents(f.db.DB)
+		if _, err := components.Intern(ctx, []graph.Described{quiet}); err != nil {
+			t.Fatal(err)
+		}
+
+		said := quiet
+		said.Supplier = "Debian Curl Maintainers"
+		if _, err := components.Intern(ctx, []graph.Described{said}); err != nil {
+			t.Fatal(err)
+		}
+		if got := supplierOf(t, f, quiet.Identity()); got != "Debian Curl Maintainers" {
+			t.Errorf("after a report stating one, the supplier is %q", got)
+		}
+
+		// And nothing overwrites it: a third report naming somebody else leaves
+		// what is stored alone, or what is held would depend on which scan ran
+		// last.
+		other := quiet
+		other.Supplier = "Somebody else"
+		if _, err := components.Intern(ctx, []graph.Described{other}); err != nil {
+			t.Fatal(err)
+		}
+		if got := supplierOf(t, f, quiet.Identity()); got != "Debian Curl Maintainers" {
+			t.Errorf("a later report overwrote the supplier with %q", got)
+		}
+	})
+}
+
+// supplierOf reads back who a component is recorded as supplied by.
+func supplierOf(t *testing.T, f *fixture, identity string) string {
+	t.Helper()
+	var said string
+	err := f.db.DB.NewSelect().
+		TableExpr("component AS c").
+		ColumnExpr("COALESCE(c.supplier, '')").
+		Where("c.identity = ?", identity).
+		Scan(t.Context(), &said)
+	if err != nil {
+		t.Fatalf("read the supplier: %v", err)
+	}
+	return said
+}

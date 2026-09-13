@@ -13,3 +13,12 @@ docs
 # fails on a file replacing a directory — so the image built only on a machine
 # that had never built the interface.
 web/node_modules
+
+# Both are interface builds, and the image makes its own. Copied in, they are
+# not replaced: the web stage's output lands on top, and a chunk whose name
+# carries a content hash does not collide with the stale one beside it — so
+# every asset from every local build the developer ever ran stays in the
+# binary, reachable by address and referenced by nothing. Measured at 191 dead
+# files and 3.4 MB on one machine, and the binary embeds the directory whole.
+web/dist
+internal/webui/dist

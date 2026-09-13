@@ -445,7 +445,9 @@ type Holding struct {
 // against her here and as the single item it is in her own list. The larger
 // number is not even a worse version of the smaller one, because it moves with
 // how far a component fans out rather than with how much anybody has to do.
-func (s *Store) HeldBy(ctx context.Context, subject access.Subject) ([]Holding, error) {
+func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
+	productID int64) ([]Holding, error) {
+
 	products, all := subject.Products()
 	if subject.Kind != access.Person || (!all && len(products) == 0) {
 		return nil, nil
@@ -458,6 +460,12 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject) ([]Holding, 
 			Join("JOIN stream AS st ON st.id = tg.stream_id").
 			Where("f.closed_at IS NULL").
 			Where("f.assigned_to IS NOT NULL")
+		// One product where the caller named one, for a screen that is about
+		// one. Zero is every product, which is what the people screen asks
+		// for.
+		if productID != 0 {
+			query = query.Where("st.product_id = ?", productID)
+		}
 		if !all {
 			query = query.Where("st.product_id IN (?)", bun.List(products))
 		}

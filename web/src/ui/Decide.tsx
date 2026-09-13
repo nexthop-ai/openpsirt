@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -134,9 +134,13 @@ export function Decide({
   extending,
   prefill,
   undisclosed,
+  assigning,
 }: {
   at: At;
   places: Sitting[];
+  // Who is dealing with it, drawn at the head of the same pane. Triage is
+  // both questions: who is on it, and what was decided.
+  assigning?: ReactNode;
   // Whether the finding has been announced, which decides who may be offered
   // after an @ in the reasoning: naming somebody who cannot read it calls them
   // to something they will be refused.
@@ -302,7 +306,7 @@ export function Decide({
           variant: m.variant ?? "",
           version: m.version ?? "",
           places: (had?.places ?? 0) + (m.places ?? 0),
-          note: "Different code: the same issue at another version. Check that what the reasoning rests on exists there.",
+          note: "The same issue at another version. Check the reasoning still holds there.",
           tone: "warn",
         });
       }
@@ -434,10 +438,7 @@ export function Decide({
       <div className="card">
         <div>
           <h3 style={{ margin: "0 0 6px" }}>Decision</h3>
-          <p className="reading">
-            Every place this sits at has been decided. Revising one of those claims is done from the
-            claim itself.
-          </p>
+          <p className="reading">Every place has been decided. Revise from the claim itself.</p>
         </div>
       </div>
     );
@@ -453,7 +454,7 @@ export function Decide({
       {extending && (
         <div className="alert info" style={{ marginBottom: 12 }}>
           <strong>Extends decision #{extending.decisionId}</strong>
-          <span>The same argument, read once already. It still needs a second person.</span>
+          <span>The same argument, already read. Still needs a second person.</span>
         </div>
       )}
 
@@ -532,8 +533,8 @@ export function Decide({
             onChange={(event) => setMitigation(event.target.value)}
           />
           <span className="hint">
-            Nothing here watches configuration, so this claim will not lapse when the thing that
-            stops it is removed. Say what to go and check.
+            Nothing watches configuration, so this will not lapse if the mitigation is removed. Say
+            what to check.
           </span>
         </div>
       )}
@@ -549,9 +550,8 @@ export function Decide({
             onChange={(event) => setFixedVersion(event.target.value)}
           />
           <span className="hint">
-            A backported fix does not move the upstream version, so nothing here can see it. This is
-            what the next person checks against the packager's own record — it is recorded and never
-            compared against the version shipping.
+            Backported fixes do not move the upstream version, so nothing here sees them. Recorded
+            and never compared against the version shipping.
           </span>
         </div>
       )}
@@ -567,11 +567,8 @@ export function Decide({
             onChange={(event) => setLands(event.target.value)}
           />
           <span className="hint">
-            When the patch is carried into the build. Nothing is ticked off by hand afterwards: the
-            next inventory declares the patch it carries and says what it resolves, and the finding
-            closes because the scan stops reporting it. A date at or before the earliest deadline
-            this covers needs nobody; past it, a second person, because that is deferring the worst
-            thing in the set.
+            When the patch lands. On or before the earliest deadline this covers, nobody else is
+            needed.
           </span>
         </div>
       )}
@@ -666,10 +663,10 @@ export function Decide({
       <div className="tier auto" style={{ margin: 0 }}>
         <p className="said">
           {outcome === "affected"
-            ? "Affected needs no approval. It goes to remediation."
+            ? "No approval needed. Goes to remediation."
             : outcome === "deferred"
               ? days === null || until === ""
-                ? "Under the deferral threshold this stands on its own; over it, a second person."
+                ? "Under the threshold this stands alone. Over it, a second person."
                 : deferredDays(until) > days
                   ? `${deferredDays(until)} days is past the ${days}-day threshold, so a second ` +
                     "person has to agree."
@@ -685,7 +682,11 @@ export function Decide({
     <>
       {
         <div className="card">
-          <h3>Decision</h3>
+          <h3>Triage</h3>
+          {assigning}
+          {/* The pane is named for both questions, so the box somebody types
+              a judgment into carries its own name. */}
+          <h4 className="deciding-head">Decision</h4>
           <div className="writing">
             {form}
             {aside}

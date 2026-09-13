@@ -107,6 +107,21 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 			"latest_version"     ` + t.free + ` NULL,
 			"latest_released_at" ` + t.timestamp + ` NULL,
 			"latest_checked_at"  ` + t.timestamp + ` NULL,
+			-- What the index says the package is, and where it is developed.
+			-- Taken where an index serves them and absent where it does not,
+			-- which is the ordinary case rather than a half-written row: three
+			-- of the four serve a summary and the module proxy serves none,
+			-- while all four name an address. Both are somebody else's text, so
+			-- the summary is bounded and the address is judged before it is
+			-- stored.
+			"summary"            ` + t.free + ` NULL,
+			"project_url"        ` + t.free + ` NULL,
+			-- Who the producer said supplied it: a distribution, a vendor, a
+			-- project. From the inventory rather than from an index, and absent
+			-- for plenty of it — one producer states it for 759 of the 6,866
+			-- components it describes. Not part of identity, because two
+			-- producers name it differently or not at all.
+			"supplier"           ` + t.free + ` NULL,
 			CONSTRAINT "component_identity_unique" UNIQUE ("identity")
 		)` + t.suffix,
 

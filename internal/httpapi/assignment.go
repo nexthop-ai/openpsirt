@@ -508,12 +508,18 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			"a person who has gone is the problem — nothing tells this software that somebody " +
 			"has left.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, _ *struct{}) (*listOutput[HoldingBody], error) {
+	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `query:"product" doc:"Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
+	}) (*listOutput[HoldingBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		held, err := finding.NewStore(in.DB.DB).HeldBy(ctx, subject)
+		within, err := narrowedTo(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
+		}
+		held, err := finding.NewStore(in.DB.DB).HeldBy(ctx, subject, within)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who is holding what could not be read", err)
 		}

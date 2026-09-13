@@ -151,7 +151,7 @@ export function AutoAssignment() {
       ),
     onSuccess: () => {
       setSaid(
-        "Recorded. It is being applied to what is already open, which happens away from here" +
+        "Recorded. Applying to what is already open" +
           " — one rule can place thousands of findings.",
       );
       setName("");
@@ -169,7 +169,7 @@ export function AutoAssignment() {
         }),
       ),
     onSuccess: () => {
-      setSaid("Retired. What it already placed stays where it is.");
+      setSaid("Retired. What it placed stays assigned.");
       void queries.invalidateQueries({ queryKey: ["routing-rules"] });
     },
   });
@@ -180,10 +180,7 @@ export function AutoAssignment() {
     <>
       <div className="screen-head">
         <h2>Auto-assignment</h2>
-        <p>
-          Standing rules that hand work nobody holds to a team. The first rule that matches places
-          it, and a rule never takes something out of somebody&rsquo;s hands.
-        </p>
+        <p>Assigns unassigned work to a team. First match wins, and a rule never reassigns.</p>
         <label className="field" style={{ marginLeft: "auto" }}>
           <span>Product</span>
           <select
@@ -282,7 +279,7 @@ export function AutoAssignment() {
               <b>place in the tree</b> catches that component and everything under it, in every
               build. At least one is needed; giving both narrows the rule to what satisfies{" "}
               <em>both</em>, rather than either. <span className="id">*</span> matches any run of
-              characters in either, and what it catches is shown before you save it.
+              characters. Matches are shown before you save.
             </p>
             <div className="filters">
               <label className="field">

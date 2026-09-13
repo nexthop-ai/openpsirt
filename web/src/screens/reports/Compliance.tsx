@@ -50,7 +50,7 @@ export function Compliance() {
         <section className="panel">
           <Empty
             title="Pick a product."
-            detail="A rate has to be about one. What identifies a place carries no product, so correlating decisions without one would reach decisions made in every product of the deployment."
+            detail="A rate has to be about one product, because a place identity carries none."
           />
         </section>
       ) : rates.isPending ? (
@@ -75,8 +75,7 @@ export function Compliance() {
                 <span className="l">Deferred by decision</span>
                 <span className="n">{whole.deferred.toLocaleString()}</span>
                 <span className="d">
-                  still open, with somebody having moved the date deliberately and, past the
-                  threshold, with a second person agreeing. Neither met nor late
+                  still open, with the date deliberately moved. Neither met nor late
                 </span>
               </div>
               <Link
@@ -86,10 +85,7 @@ export function Compliance() {
               >
                 <span className="l">Plainly late</span>
                 <span className="n">{whole.overdue.toLocaleString()}</span>
-                <span className="d">
-                  still open, past the date, with nothing standing over it — the only part of this
-                  page that is somebody&rsquo;s to act on today
-                </span>
+                <span className="d">still open, past the date, with nothing standing over it</span>
               </Link>
             </div>
           </section>
@@ -97,11 +93,7 @@ export function Compliance() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>By severity</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              Every band is listed even where it is empty: a rate table with rows missing reads as
-              one that has been narrowed. Counted as issues at components, not once per place, and a
-              group is closed only when no place of it is still open. Only the whole-of-it figure
-              above opens a list: the findings list reads a severity as that band or worse, so a
-              link from one row here would open more than the row counts.
+              Issues at components. A group is closed only when no place of it is still open.
             </p>
             <div className="tablewrap">
               <table>
@@ -155,23 +147,20 @@ export function Compliance() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>What is not in these figures</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              A deadline is set by policy from a finding&rsquo;s urgency, and three populations
-              deliberately carry none. Nothing about them is late, because nothing about them was
-              ever due.
+              Three populations carry no deadline, so nothing about them can be late.
             </p>
             <ul className="files">
               <li>
-                <b>Below the line this product triages at.</b> Recorded, counted and reportable —
-                just not worked to a date.
+                <b>Below the line this product triages at.</b> Recorded and counted, but not worked
+                to a date.
               </li>
               <li>
-                <b>Findings in a tag.</b> A tag was built once and is what somebody received, so no
-                work lands in it whatever anybody decides.
+                <b>Findings in a tag.</b> Tags are built once, so no work lands in them.
               </li>
               <li>
                 <b>Findings in a release out of support.</b> That pile has a report of its own —{" "}
-                <Link to="/reports/releases-out-of-support">Releases out of support</Link> — because
-                it is absent from every figure built on a deadline, this one included.
+                <Link to="/reports/releases-out-of-support">Releases out of support</Link> — absent
+                from every figure built on a deadline.
               </li>
             </ul>
           </section>

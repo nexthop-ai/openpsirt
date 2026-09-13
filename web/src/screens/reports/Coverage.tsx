@@ -64,26 +64,20 @@ export function Coverage() {
                   {(live.length - quiet.length).toLocaleString()} of {live.length.toLocaleString()}
                 </span>
                 <span className="d">
-                  builds you can see that are still in support, counted whole rather than per
-                  product — a product with one live build and nine silent ones is not nine tenths
-                  covered
+                  builds still in support, counted whole rather than per product
                 </span>
               </div>
               <div className="kpi">
                 <span className="l">Gone quiet</span>
                 <span className="n">{quiet.length.toLocaleString()}</span>
                 <span className="d">
-                  nothing has arrived for longer than this deployment allows. Nothing failed —
-                  nothing came
+                  nothing has arrived for longer than this deployment allows
                 </span>
               </div>
               <div className="kpi">
                 <span className="l">Never scanned</span>
                 <span className="n">{never.length.toLocaleString()}</span>
-                <span className="d">
-                  declared here and never filed against, which is a different thing from a scan that
-                  stopped
-                </span>
+                <span className="d">declared and never filed against</span>
               </div>
             </div>
             <p className="hint" style={{ marginTop: 10 }}>

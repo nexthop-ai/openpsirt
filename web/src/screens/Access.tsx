@@ -148,8 +148,7 @@ export function Access({
             {names.length === 0 && (
               <tr>
                 <td colSpan={ROLES.length + 1} className="hint">
-                  No products are declared yet. A role held across every product covers the ones
-                  declared later, so it can be granted now.
+                  No products declared yet. An estate role covers ones added later.
                 </td>
               </tr>
             )}
@@ -172,12 +171,12 @@ export function Access({
                         title={
                           covered
                             ? has
-                              ? "Granted here and also across every product. Withdraw the estate grant first, then this one"
+                              ? "Also granted across every product. Withdraw that grant first"
                               : "Comes from the grant across every product. Withdraw it there"
                             : derived
-                              ? "Comes from a group in the identity provider. Withdraw it by changing the group"
+                              ? "From an identity provider group. Change the group to withdraw it"
                               : empty
-                                ? "On its own this reaches nothing — it is bounded by what they may read. Grant a read or triage role here as well"
+                                ? "Reaches nothing without a read or triage role here"
                                 : each.means
                         }
                         onChange={() =>
@@ -199,9 +198,8 @@ export function Access({
         </table>
       )}
       <p className="hint" style={{ marginTop: 6 }}>
-        A capability — approver, assigner — is bounded by what its holder may read, so granted on a
-        product where they hold no read or triage role it reaches nothing. Those cells are marked. A
-        role held across every product covers products declared later, and is withdrawn as one.
+        Approver and assigner only work where the holder can already read findings, and those cells
+        are marked.
       </p>
     </div>
   );

@@ -56,8 +56,11 @@ RUN go mod download
 
 COPY . .
 
-# Over whatever the build context carried, so the interface in the image is the
-# one just built rather than one left in a working tree.
+# The interface, which the build context no longer carries: both interface
+# build directories are excluded there, because copying one in and writing over
+# it does not replace it. A chunk's name carries a content hash, so a stale
+# chunk does not collide with the new one beside it — it survives, embedded and
+# reachable by address, referenced by nothing.
 COPY --from=web /web/dist/ ./internal/webui/dist/
 
 ARG VERSION=dev

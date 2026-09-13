@@ -131,7 +131,9 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 // rows. `mine` asks for exactly those instead: somebody wants to find what they
 // proposed and nobody has agreed to yet, and that is a different question from
 // what is waiting on them.
-func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, limit, offset int) ([]Waiting, int, error) {
+func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
+	productID int64, limit, offset int) ([]Waiting, int, error) {
+
 	limit = database.AList.Of(limit)
 
 	// The claims with a waiting row this person may act on, ordered by the
@@ -143,6 +145,12 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool, li
 			ColumnExpr("MAX(de.id) AS newest").
 			GroupExpr("de.claim_id")
 		q = approvableBy(waiting(q, s.now()), subject, "de")
+		// One product where the caller named one. A claim is decided in a
+		// product, so this narrows the same way every other list does — and
+		// zero is every product, which is what the queue screen asks for.
+		if productID != 0 {
+			q = q.Where("de.product_id = ?", productID)
+		}
 		// Whose claims. The same statement either way, so the count and the
 		// page cannot disagree about which question was asked.
 		if mine {

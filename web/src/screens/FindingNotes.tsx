@@ -62,9 +62,8 @@ export function Notes({
     <div className="card">
       <h3>Notes on this issue</h3>
       <p className="hint" style={{ margin: "0 0 10px" }}>
-        About <b>{vulnerability}</b> in <b>{product}</b> — every build of it, and no other product.
-        Not about this component: the same issue can sit on several rows here, and a note is on all
-        of them. Nothing about a note changes what ranks, a deadline, or what is triaged.
+        <b>{vulnerability}</b> in <b>{product}</b>, all builds. Not tied to a component, and changes
+        nothing.
       </p>
       {items.length > 0 && (
         <div className="thread">

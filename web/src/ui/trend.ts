@@ -41,15 +41,15 @@ export function settled<T extends Step>(points: T[]): T[] {
 // Which way the backlog is going, or that it is too early to say.
 export function paceReading(points: Step[]): string {
   const range = settled(points);
-  if (range.length < ENOUGH) return "Not enough history yet to say which way this is going.";
+  if (range.length < ENOUGH) return "Not enough history.";
   const outran = range.filter((p) => (p.opened ?? 0) > (p.resolved ?? 0)).length;
   const first = range[0]?.open ?? 0;
   const last = range[range.length - 1]?.open ?? 0;
   const moved = last - first;
   const direction = moved > 0 ? "growing" : moved < 0 ? "shrinking" : "flat";
-  return `Backlog ${direction}: new exceeded resolved in ${outran} of ${range.length} weeks; open ${
-    moved >= 0 ? "up" : "down"
-  } ${Math.abs(moved).toLocaleString()} across the range.`;
+  return `Backlog ${direction} · open ${moved >= 0 ? "up" : "down"} ${Math.abs(
+    moved,
+  ).toLocaleString()} · new exceeded resolved in ${outran} of ${range.length} weeks`;
 }
 
 // What the critical share did, over the same history.
@@ -58,6 +58,6 @@ export function mixReading(points: Step[]): string {
   if (range.length < ENOUGH) return "Not enough history yet.";
   const first = range[0]?.by_severity?.critical ?? 0;
   const last = range[range.length - 1]?.by_severity?.critical ?? 0;
-  if (first === last) return `Critical unchanged at ${last.toLocaleString()} across the range.`;
-  return `Critical went ${first.toLocaleString()} → ${last.toLocaleString()} across the range.`;
+  if (first === last) return `Critical unchanged at ${last.toLocaleString()}`;
+  return `Critical ${first.toLocaleString()} → ${last.toLocaleString()}`;
 }

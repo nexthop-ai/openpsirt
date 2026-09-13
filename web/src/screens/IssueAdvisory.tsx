@@ -100,10 +100,8 @@ export function IssueAdvisory({
         </h3>
       </header>
       <p className="reading">
-        A CSAF 2.0 document about this flaw in one of your products: what it is, and which releases
-        hold it and which no longer do. Generated, never published — nothing is sent anywhere from
-        here. A flaw in somebody else&rsquo;s component is refused, because a vendor advisory for
-        every upstream CVE in a dependency is not what an advisory is.
+        A CSAF 2.0 document: what the flaw is, and which releases hold it. Generated, never
+        published. Flaws in third-party components are refused.
       </p>
       {(gone.data?.items ?? []).length > 0 && (
         <p className="hint">
@@ -193,10 +191,8 @@ export function IssueAdvisory({
                 </button>
               </div>
               <p className="hint">
-                Recorded here, published by whoever publishes. What was sent on a date cannot be
-                worked out again once a release is added or a decision is revised, and without the
-                record a second document cannot be a revision — which is a thing a customer&rsquo;s
-                validator checks.
+                Recorded here, published elsewhere. What went out cannot be rebuilt later, and a
+                revision needs the record of the first.
               </p>
               {record.error != null && (
                 <Failed error={record.error} what="That could not be recorded." />
@@ -206,8 +202,7 @@ export function IssueAdvisory({
                   <strong>Recorded as version {issued.version}</strong>
                   <span>
                     Digest <span className="id">{issued.digest}</span>. A later draft that differs
-                    from this is how &ldquo;is what is published still what we generate&rdquo; gets
-                    an answer.
+                    shows the published document has gone stale.
                   </span>
                 </div>
               )}

@@ -91,7 +91,7 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 		// A tag is one frozen point and was not cut into anything, so there is
 		// no "since we shipped" for it. Said rather than answered with an
 		// empty comparison, which reads as a branch with nothing released.
-		out.Why = "a release is a fixed point, so there is nothing it was cut into"
+		out.Why = "a tag is a fixed point, so nothing was cut from it"
 		return out, nil
 	}
 
@@ -114,7 +114,7 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 		Limit(1).
 		Scan(ctx, &release)
 	if err != nil || release.StreamID == 0 {
-		out.Why = "nothing has been released from this branch and scanned here"
+		out.Why = "no scanned release from this branch"
 		return out, nil
 	}
 

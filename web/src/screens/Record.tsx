@@ -220,10 +220,8 @@ export function Record() {
       <div className="screen-head">
         <h2>Record a flaw</h2>
         <p>
-          A vulnerability in your own product — one no scanner reported, usually because nobody
-          outside knows about it yet. It is filed under an identifier this deployment mints, and
-          from there it is an ordinary finding: triaged, assigned, decided, on the same clock and in
-          the same reports.
+          A vulnerability no scanner reported. Filed under an identifier this deployment mints, then
+          triaged like any other finding.
         </p>
         {/* What was recorded here before. The screen that files one is where
             somebody asks whether it is already filed, and the answer was a
@@ -242,11 +240,7 @@ export function Record() {
 
       <div className="panel" style={{ maxWidth: "80ch" }}>
         <h3>Builds</h3>
-        <p className="hint">
-          A flaw is recorded against what one build ships, so all three are asked rather than
-          guessed. Filing it against a build nobody named is a record that says the wrong thing
-          quietly.
-        </p>
+        <p className="hint">A flaw is recorded against one build, so all three are required.</p>
         <div className="fields">
           <div className="field">
             <label htmlFor="rec-product">Product</label>
@@ -336,9 +330,7 @@ export function Record() {
             placeholder="The management socket answers a request before anyone has authenticated."
             mentions={mentioning(product, !disclosed)}
           />
-          <span className="hint">
-            In your own words. It is what a triager reads first and often all they read.
-          </span>
+          <span className="hint">What a triager reads first.</span>
         </div>
 
         <div className="field">
@@ -363,7 +355,7 @@ export function Record() {
           <span className="hint">
             The same words a scanner's findings carry, so this ranks and comes due beside them.
             {vector !== "" ? (
-              <> The vector below settles it, so there is nothing to choose here.</>
+              <> Set by the vector below.</>
             ) : (
               <>
                 {" "}
@@ -416,10 +408,7 @@ export function Record() {
         {choices.length > 0 && (
           <div className="alert">
             <strong>Which {component}?</strong>
-            <span>
-              This build ships that name as more than one component. Pick the one that carries it —
-              recording against whichever came first would file this against a version nobody named.
-            </span>
+            <span>Shipped as more than one component here. Pick the one that carries it.</span>
             <ul className="refs" style={{ marginTop: 8 }}>
               {choices.map((choice) => (
                 <li key={`${choice.version} ${choice.ecosystem ?? ""}`}>
@@ -449,9 +438,8 @@ export function Record() {
         <div className="field">
           <label htmlFor="rec-files">What proves it</label>
           <p className="hint" style={{ marginTop: 0 }}>
-            Optional. A test case, a capture, a screenshot — whatever somebody reproducing this
-            would want. They are stored against the issue and are as readable as it is, so an
-            undisclosed flaw&rsquo;s evidence is undisclosed too.
+            Optional. Readable by whoever can read the issue, so an undisclosed flaw&rsquo;s
+            evidence is undisclosed too.
           </p>
           <input
             id="rec-files"
@@ -495,20 +483,17 @@ export function Record() {
               here, unavailable now, or unavailable to you. */}
           {!mayHide && (
             <span className="hint">
-              You cannot record an undisclosed flaw on this product. That needs the private triage
-              role here; without it, what you record is public from the moment it is saved.
+              Recording an undisclosed flaw needs the private triage role here. Without it, this is
+              public once saved.
             </span>
           )}
           <span className="hint">
             {disclosed ? (
-              <>
-                Already disclosed, so it gets no embargo — a date on it would be a deadline for
-                something that has already happened.
-              </>
+              <>Already disclosed, so no embargo.</>
             ) : (
               <>
-                It starts undisclosed and gets a disclosure date. Reaching that date discloses
-                nothing: it escalates, and somebody decides.
+                Starts undisclosed with a disclosure date. Reaching it escalates rather than
+                publishes.
               </>
             )}
           </span>
@@ -522,8 +507,7 @@ export function Record() {
         <div className="field">
           <span className="l">Who told us</span>
           <span className="hint" style={{ marginBottom: 6 }}>
-            Optional, and only where somebody outside reported it. Without a reporter this is a flaw
-            we found ourselves, which is the other ordinary case.
+            Optional. Only where somebody outside reported it.
           </span>
           <div className="filters">
             <label className="field" style={{ margin: 0 }}>

@@ -13,6 +13,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
 // Bundle is one upstream bump and everything it would close.
@@ -462,14 +464,17 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 	}
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
-		To          string `bun:"fixed_in"`
-		Issues      int    `bun:"issues"`
+		Issue       int64  `bun:"vulnerability_id"`
+		FixedIn     string `bun:"fixed_in"`
+		Purl        string `bun:"purl"`
 	}
 	query := s.db.NewSelect().
 		TableExpr("finding AS f").
+		Join("JOIN component AS c ON c.id = f.component_id").
 		ColumnExpr("f.component_id AS component_id").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		ColumnExpr("c.purl AS purl").
 		Where("f.component_id IN (?)", bun.List(ids)).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -479,14 +484,28 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 		// the population that needs a judgment rather than a bump.
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
-		GroupExpr("f.component_id, f.fixed_in").
-		OrderExpr("f.component_id, issues DESC, f.fixed_in")
+		// Grouped to one row per issue rather than per version string, because
+		// a version has to be read out of that string before it can be counted
+		// — and grouped rather than plain because the narrowing asks questions
+		// of the places under an issue, which are aggregates.
+		GroupExpr("f.component_id, f.vulnerability_id, f.fixed_in, c.purl")
 	if err := filter.narrow(query).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where each component could go: %w", err)
 	}
-	out := make(map[int64][]Candidate, len(ids))
+	per := map[int64][]namedFix{}
+	scheme := map[int64]vercmp.Scheme{}
 	for _, row := range rows {
-		out[row.ComponentID] = append(out[row.ComponentID], Candidate{To: row.To, Issues: row.Issues})
+		versions := versionsIn(row.FixedIn)
+		if len(versions) == 0 {
+			continue
+		}
+		per[row.ComponentID] = append(per[row.ComponentID],
+			namedFix{issue: row.Issue, versions: versions})
+		scheme[row.ComponentID] = vercmp.SchemeOf(graph.EcosystemOf(row.Purl))
+	}
+	out := make(map[int64][]Candidate, len(per))
+	for component, found := range per {
+		out[component] = candidatesFrom(found, scheme[component])
 	}
 	return out, nil
 }
@@ -499,8 +518,35 @@ type PerBuild struct {
 	Variant  string
 	// Version is what this build ships, and Upgrades where it could go, each
 	// with how many issues that move would close here.
-	Version  string
-	Upgrades []Candidate
+	Version string
+	// Purl is the package identifier, which is where the ecosystem is read
+	// from and what an upstream address is built out of.
+	Purl string
+	// Summary is one line saying what the package is, and ProjectURL where it
+	// is developed, both as an ecosystem's index stated them. Absent for
+	// plenty of components: one index serves no summary and none is asked
+	// about a distribution package.
+	Summary    string
+	ProjectURL string
+	// Supplier is who the scan said supplied it, from the inventory rather
+	// than from an index.
+	Supplier string
+	// BySeverity is what is open here by how it was rated, so a count has a
+	// shape: forty issues and three criticals are different work.
+	BySeverity map[string]int
+	// Exploited says whether any of them is known to be exploited, which
+	// outranks everything else about a row.
+	Exploited bool
+	// Fixable is how many of them any version fixes, counted once per issue.
+	// Summed from the per-version counts instead, an issue whose record names
+	// three versions is counted three times and the total exceeds what is open.
+	Fixable int
+	// Newest is what the ecosystem's index says is current and when it
+	// shipped, and FirstSeen when this deployment first saw the component.
+	Newest    string
+	NewestAt  *time.Time
+	FirstSeen time.Time
+	Upgrades  []Candidate
 	// Issues is how many distinct vulnerabilities are open against it in this
 	// build, Consumers how many things pull it in there, and Places how many
 	// times those sit somewhere in it.
@@ -535,6 +581,19 @@ type PerBuild struct {
 // and that is the whole difficulty: a stream staying on 3.0.x and a stream on
 // 3.5.x are different work with different testing, and one target across both
 // would be wrong for one of them.
+//
+// **A build is listed because it ships the component, not because something is
+// open against it.** The presence comes from the graph and the counts are
+// joined onto it, so a package carrying nothing of its own still answers with
+// the version it ships and where it sits. Driven off the findings instead, a
+// vendored binary whose whole risk sits underneath it — nothing on the package,
+// everything in what it pulls in — answered with no builds at all, which reads
+// as a name the product does not ship.
+//
+// **One row per version, not per build.** A build shipping a name at two
+// versions holds two components, and they are two different pieces of code to
+// decide about; collapsing them to the lowest version reported one of them and
+// silently hid the other.
 func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope Scope,
 	component string) ([]PerBuild, error) {
 
@@ -552,37 +611,88 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Stream      string     `bun:"stream"`
 		Variant     string     `bun:"variant"`
 		Version     string     `bun:"version"`
+		Purl        string     `bun:"purl"`
+		Summary     string     `bun:"summary"`
+		ProjectURL  string     `bun:"project_url"`
+		Supplier    string     `bun:"supplier"`
+		Newest      string     `bun:"latest_version"`
+		NewestAt    *time.Time `bun:"latest_released_at"`
+		FirstSeen   time.Time  `bun:"first_seen_at"`
+		Exploited   int        `bun:"exploited"`
+		Fixable     int        `bun:"fixable"`
 		Issues      int        `bun:"issues"`
 		Consumers   int        `bun:"consumers"`
-		Direct      int        `bun:"direct"`
 		Places      int        `bun:"places"`
 		DueAt       *time.Time `bun:"due_at"`
 		ComponentID int64      `bun:"component_id"`
 	}
-	err = s.db.NewSelect().
+	// What is open against it, per build and component. A left join rather
+	// than the driving table: no findings is an answer, and it is the answer
+	// for every package that carries its risk underneath it rather than on
+	// itself. Narrowed by visibility here, where the counts are, because the
+	// presence of a component is readable to anybody who may read the build
+	// while what is open against it is not.
+	open := s.db.NewSelect().
 		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
 		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("va.name AS variant").
-		ColumnExpr("MIN(c.version) AS version").
-		ColumnExpr("MIN(f.component_id) AS component_id").
+		ColumnExpr("f.component_id AS component_id").
 		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
-		ColumnExpr("COUNT(DISTINCT f.consumer_id) AS consumers").
-		// A component nothing pulls in has no consumer to count distinctly,
-		// so the build itself is the one thing pulling it in.
-		ColumnExpr("COALESCE(SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END), 0) AS direct").
 		ColumnExpr("COUNT(*) AS places").
 		ColumnExpr("MIN(f.due_at) AS due_at").
+		ColumnExpr("MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) AS exploited").
+		ColumnExpr("COUNT(DISTINCT CASE WHEN f.fixed_in IS NOT NULL AND f.fixed_in <> ''"+
+			" THEN f.vulnerability_id END) AS fixable").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.target_id, f.component_id")
+
+	// How many things pull it in, from the graph rather than from the
+	// findings: it is a fact about the build, true whether or not anything is
+	// open. A component nothing pulls in is contained by the build itself,
+	// which counts as the one thing pulling it in.
+	pullers := s.db.NewSelect().
+		TableExpr("graph_edge AS e").
+		Join("JOIN graph_node AS ch ON ch.id = e.child_id").
+		ColumnExpr("ch.target_id AS target_id").
+		ColumnExpr("ch.component_id AS component_id").
+		ColumnExpr("COUNT(DISTINCT e.parent_id) AS consumers").
+		Where("e.target_id IN (?)", bun.List(targets)).
+		Where("e.closed_scan_id IS NULL").
+		Where("e.parent_id <> e.child_id").
+		GroupExpr("ch.target_id, ch.component_id")
+
+	err = s.db.NewSelect().
+		TableExpr("graph_node AS n").
+		Join("JOIN component AS c ON c.id = n.component_id").
+		Join("JOIN target AS tg ON tg.id = n.target_id").
+		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		Join("JOIN variant AS va ON va.id = tg.variant_id").
+		Join(`LEFT JOIN (?) AS "op" ON "op".target_id = n.target_id AND "op".component_id = n.component_id`, open).
+		Join(`LEFT JOIN (?) AS "pl" ON "pl".target_id = n.target_id AND "pl".component_id = n.component_id`, pullers).
+		ColumnExpr("n.target_id AS target_id").
+		ColumnExpr("n.component_id AS component_id").
+		ColumnExpr("st.name AS stream").
+		ColumnExpr("va.name AS variant").
+		ColumnExpr("c.version AS version").
+		ColumnExpr("c.purl AS purl").
+		ColumnExpr("COALESCE(c.summary, '') AS summary").
+		ColumnExpr("COALESCE(c.project_url, '') AS project_url").
+		ColumnExpr("COALESCE(c.supplier, '') AS supplier").
+		ColumnExpr("COALESCE(c.latest_version, '') AS latest_version").
+		ColumnExpr("c.latest_released_at AS latest_released_at").
+		ColumnExpr("c.first_seen_at AS first_seen_at").
+		ColumnExpr(`COALESCE("op".exploited, 0) AS exploited`).
+		ColumnExpr(`COALESCE("op".fixable, 0) AS fixable`).
+		ColumnExpr(`COALESCE("op".issues, 0) AS issues`).
+		ColumnExpr(`COALESCE("op".places, 0) AS places`).
+		ColumnExpr(`"op".due_at AS due_at`).
+		ColumnExpr(`COALESCE("pl".consumers, 1) AS consumers`).
+		Where("n.target_id IN (?)", bun.List(targets)).
+		Where("n.closed_scan_id IS NULL").
+		Where("n.is_root = ?", false).
 		Where("c.name = ?", name).
-		GroupExpr("f.target_id, st.name, va.name").
-		OrderExpr("st.name, va.name").
+		OrderExpr("st.name, va.name, c.version").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read a component across its builds: %w", err)
@@ -605,16 +715,26 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	if err != nil {
 		return nil, err
 	}
+	bands, err := s.bandsPerBuild(ctx, targets, visible, name)
+	if err != nil {
+		return nil, err
+	}
 
 	out := make([]PerBuild, 0, len(rows))
 	for _, row := range rows {
 		build := PerBuild{
 			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
-			Version: row.Version, Issues: row.Issues,
-			Consumers: pullersOf(row.Consumers, row.Direct), Places: row.Places,
-			DueAt: row.DueAt, Upgrades: upgrades[row.TargetID],
+			Version: row.Version, Purl: row.Purl,
+			Summary: row.Summary, ProjectURL: row.ProjectURL,
+			Supplier: row.Supplier,
+			Newest:   row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
+			Exploited: row.Exploited > 0, Fixable: row.Fixable, Issues: row.Issues,
+			BySeverity: bands[[2]int64{row.TargetID, row.ComponentID}],
+			Consumers:  row.Consumers, Places: row.Places,
+			DueAt:    row.DueAt,
+			Upgrades: upgrades[[2]int64{row.TargetID, row.ComponentID}],
 		}
-		if said, ok := promised[row.TargetID]; ok {
+		if said, ok := promised[[2]int64{row.TargetID, row.ComponentID}]; ok {
 			build.CommittedTo, build.UpgradeTo = said.at, said.to
 		}
 		out = append(out, build)
@@ -623,37 +743,161 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 }
 
 // upgradesPerBuild is where a component could go, answered per build.
+//
+// **Grouped per version, not per string.** What a scanner records as the fix is
+// one field, and some ecosystems put several versions in it — "1.25.13, 1.26.6,
+// 1.27.0-rc.3" is one string naming three releases, any of which closes the
+// issue. Grouped on the string, one version lands in several groups and its own
+// coverage is reported nowhere.
+//
+// **And counted twice.** What a release fixed is what names it; what an upgrade
+// to it closes is that plus everything fixed before it. The second needs the
+// ecosystem's ordering and is the question somebody choosing a version asks, so
+// where the ordering is unavailable the candidates carry equal counts and say
+// they are unranked rather than being ranked by the first.
 func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
-	visible []access.Visibility, name string) (map[int64][]Candidate, error) {
+	visible []access.Visibility, name string) (map[[2]int64][]Candidate, error) {
 
 	var rows []struct {
-		TargetID int64  `bun:"target_id"`
-		To       string `bun:"fixed_in"`
-		Issues   int    `bun:"issues"`
+		TargetID    int64  `bun:"target_id"`
+		ComponentID int64  `bun:"component_id"`
+		Issue       int64  `bun:"vulnerability_id"`
+		FixedIn     string `bun:"fixed_in"`
+		Ecosystem   string `bun:"purl"`
 	}
+	// One row per finding rather than a grouped count, because the grouping is
+	// per version and a version has to be read out of the string first.
 	err := s.db.NewSelect().
 		TableExpr("finding AS f").
 		Join("JOIN component AS c ON c.id = f.component_id").
 		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("f.component_id AS component_id").
+		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		ColumnExpr("c.purl AS purl").
 		Where("f.target_id IN (?)", bun.List(targets)).
+		// Narrowed to the components the rows are about, because a row is one
+		// version: pooled per build, a build shipping one name at two versions
+		// offers each version the other's candidates and counts.
+		Where("f.component_id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("c.name = ?", name).
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
-		GroupExpr("f.target_id, f.fixed_in").
-		OrderExpr("f.target_id, issues DESC, f.fixed_in").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where a component could go in each build: %w", err)
 	}
-	out := make(map[int64][]Candidate, len(targets))
+
+	// What each build's findings name, one entry per issue so an issue counts
+	// once however many versions its fix names.
+	per := map[[2]int64][]namedFix{}
+	scheme := map[[2]int64]vercmp.Scheme{}
 	for _, row := range rows {
-		out[row.TargetID] = append(out[row.TargetID], Candidate{To: row.To, Issues: row.Issues})
+		versions := versionsIn(row.FixedIn)
+		if len(versions) == 0 {
+			continue
+		}
+		at := [2]int64{row.TargetID, row.ComponentID}
+		per[at] = append(per[at], namedFix{issue: row.Issue, versions: versions})
+		scheme[at] = vercmp.SchemeOf(graph.EcosystemOf(row.Ecosystem))
+	}
+
+	out := make(map[[2]int64][]Candidate, len(per))
+	for at, found := range per {
+		out[at] = candidatesFrom(found, scheme[at])
 	}
 	return out, nil
+}
+
+// namedFix is one issue and every version its fix names.
+type namedFix struct {
+	issue    int64
+	versions []string
+}
+
+// versionsIn reads the versions out of what a scanner recorded as the fix.
+//
+// Separated by commas, which is how the producers that name several spell it.
+// Anything empty is dropped rather than becoming a candidate nobody can move to.
+func versionsIn(fixedIn string) []string {
+	parts := strings.Split(fixedIn, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if v := strings.TrimSpace(part); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// candidatesFrom turns what the findings name into the versions a build could
+// move to, with what each release fixed and what reaching it would close.
+func candidatesFrom(found []namedFix, scheme vercmp.Scheme) []Candidate {
+	// Every version anybody named, in the order first seen so that an
+	// unorderable set still comes back the same way twice.
+	var versions []string
+	seen := map[string]bool{}
+	for _, one := range found {
+		for _, v := range one.versions {
+			if !seen[v] {
+				seen[v] = true
+				versions = append(versions, v)
+			}
+		}
+	}
+
+	// Ordered where these versions could actually be ordered, not merely where
+	// the ecosystem has an ordering. A runtime published through a language
+	// index and naming itself after its own toolchain has the scheme and not
+	// the spelling, and one version the comparison refuses makes the whole set
+	// unrankable — a list ordered except for the entry nobody could place is
+	// not ordered.
+	ordered := scheme != vercmp.Unordered
+	for _, v := range versions {
+		if _, ok := vercmp.Order(scheme, v, v); !ok {
+			ordered = false
+			break
+		}
+	}
+	if !ordered {
+		scheme = vercmp.Unordered
+	}
+	out := make([]Candidate, 0, len(versions))
+	for _, candidate := range versions {
+		here, reached := map[int64]bool{}, map[int64]bool{}
+		for _, one := range found {
+			for _, v := range one.versions {
+				if v == candidate {
+					here[one.issue] = true
+				}
+				if vercmp.Reaches(scheme, candidate, v) {
+					reached[one.issue] = true
+				}
+			}
+		}
+		out = append(out, Candidate{
+			To: candidate, FixedHere: len(here), Reached: len(reached), Ordered: ordered,
+		})
+	}
+
+	// Furthest along first where that can be said, so the version worth taking
+	// leads. Ranked on what a release fixed instead, the newest lands wherever
+	// its own count happens to put it, which on a maintained line is near the
+	// bottom.
+	sort.SliceStable(out, func(i, j int) bool {
+		if ordered {
+			if cmp, ok := vercmp.Order(scheme, out[i].To, out[j].To); ok && cmp != 0 {
+				return cmp > 0
+			}
+		}
+		if out[i].Reached != out[j].Reached {
+			return out[i].Reached > out[j].Reached
+		}
+		return out[i].To < out[j].To
+	})
+	return out
 }
 
 type promise struct {
@@ -663,11 +907,17 @@ type promise struct {
 
 // promisedPerBuild is what has already been committed for this component in
 // each build, read off the decisions rather than a record beside them.
+//
+// Per version as well as per build, because a commitment is one fold moving and
+// a fold is keyed on the version in hand: a build shipping one name at two
+// versions has two of them, and keyed on the build alone each version reported
+// the other's promise.
 func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
-	visible []access.Visibility, name string) (map[int64]promise, error) {
+	visible []access.Visibility, name string) (map[[2]int64]promise, error) {
 
 	var rows []struct {
 		TargetID    int64      `bun:"target_id"`
+		ComponentID int64      `bun:"component_id"`
 		CommittedTo *time.Time `bun:"committed_to"`
 		UpgradeTo   string     `bun:"upgrade_to"`
 	}
@@ -688,6 +938,7 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 		// act is one argument, and the rows underneath say where it lands.
 		Join("JOIN claim AS cl ON cl.id = de.claim_id").
 		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("f.component_id AS component_id").
 		ColumnExpr("MAX(cl.committed_to) AS committed_to").
 		ColumnExpr("MIN(COALESCE(cl.upgrade_to, '')) AS upgrade_to").
 		Where("f.target_id IN (?)", bun.List(targets)).
@@ -696,14 +947,63 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 		Where("c.name = ?", name).
 		Where("cl.outcome = ?", "upgrade-needed").
 		Where("de.live_key IS NOT NULL").
-		GroupExpr("f.target_id").
+		GroupExpr("f.target_id, f.component_id").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already promised: %w", err)
 	}
-	out := make(map[int64]promise, len(rows))
+	out := make(map[[2]int64]promise, len(rows))
 	for _, row := range rows {
-		out[row.TargetID] = promise{at: row.CommittedTo, to: row.UpgradeTo}
+		out[[2]int64{row.TargetID, row.ComponentID}] = promise{
+			at: row.CommittedTo, to: row.UpgradeTo,
+		}
+	}
+	return out, nil
+}
+
+// bandsPerBuild is how what is open against a component was rated, per build.
+//
+// A count has a shape: forty issues and three criticals are different work, and
+// a number with no shape beside it tells somebody deciding what to read next
+// the opposite of what they need.
+//
+// Distinct issues, like the count beside it, so the parts sum to the whole
+// rather than to the number of places.
+func (s *Store) bandsPerBuild(ctx context.Context, targets []int64,
+	visible []access.Visibility, name string) (map[[2]int64]map[string]int, error) {
+
+	var rows []struct {
+		TargetID    int64  `bun:"target_id"`
+		ComponentID int64  `bun:"component_id"`
+		Band        string `bun:"band"`
+		Issues      int    `bun:"issues"`
+	}
+	err := s.db.NewSelect().
+		TableExpr("finding AS f").
+		Join("JOIN component AS c ON c.id = f.component_id").
+		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("f.component_id AS component_id").
+		ColumnExpr("COALESCE(v.severity, '') AS band").
+		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		Where("f.target_id IN (?)", bun.List(targets)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		Where("c.name = ?", name).
+		GroupExpr("f.target_id, f.component_id, COALESCE(v.severity, '')").
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read how what is open here was rated: %w", err)
+	}
+	out := map[[2]int64]map[string]int{}
+	for _, row := range rows {
+		// A scanner's "unknown" and no rating at all are the same state, and
+		// two entries for it is two names for one nothing.
+		at := [2]int64{row.TargetID, row.ComponentID}
+		if out[at] == nil {
+			out[at] = map[string]int{}
+		}
+		out[at][BandOf(row.Band)] += row.Issues
 	}
 	return out, nil
 }

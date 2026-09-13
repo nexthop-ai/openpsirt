@@ -70,13 +70,7 @@ export function Upgrades() {
             <strong>
               {late} {late === 1 ? "upgrade is" : "upgrades are"} past the date promised
             </strong>
-            <span>
-              The findings each one covers stay covered — answering them again one at a time is what
-              the promise was made instead of. What comes back is the upgrade, to whoever is
-              carrying it. A finding returns on its own only when the package moved and it did not
-              close, which happens without anybody doing anything: a decision is keyed on the
-              version it was made against.
-            </span>
+            <span>Findings stay covered. The upgrade goes back to whoever is carrying it.</span>
           </div>
         )}
       </div>
@@ -85,12 +79,8 @@ export function Upgrades() {
         <Empty
           title="Nothing is planned for this build."
           detail={
-            "This screen answers one question — which packages this build is waiting to " +
-            "move, and how much of each has landed — so it is empty until somebody plans " +
-            "an upgrade. That is done on a component's own screen: tick the releases it is " +
-            "for, name the version it moves to and the date it will be done. Nothing here " +
-            "is ticked off by hand afterwards; a piece of work has landed when the build " +
-            "stops holding it, which the scans already say."
+            "Plan one from a component's screen: pick the releases, the version to " +
+            "move to, and the date. Progress comes from the scans."
           }
         />
       ) : (

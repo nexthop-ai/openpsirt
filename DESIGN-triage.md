@@ -1074,11 +1074,12 @@ promoting one.
 
 | Rule | |
 |---|---|
-| What is in use is narrowed to findings the asker may read | A mark carries no visibility of its own, and free text typed while triaging an embargo says what the embargo is about: "waiting on the reporter" beside an undisclosed issue is the disclosure |
-| At the grain somebody looks at | One issue, in one component, in one product. Not per place — a kernel flaw at sixty places is one thing somebody is marking — and not per build, because a tag is about the work rather than a release |
-| Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Marking what is already marked succeeds and keeps the first spelling |
-| Marking is triage | A tag changes what a filtered list answers. Somebody who may only read sees the marks and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
-| On the row, not only on the finding | The marks come back with each group, read for the whole page in one statement, and each is itself a filter |
+| What is in use is narrowed to findings the asker may read | A tag carries no visibility of its own, and free text typed while triaging an embargo says what the embargo is about: "waiting on the reporter" beside an undisclosed issue is the disclosure |
+| At the grain somebody looks at | One issue, in one component, in one product. Not per place — a kernel flaw at sixty places is one thing somebody is tagging — and not per build, because a tag is about the work rather than a release |
+| Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Tagging what already carries the tag succeeds and keeps the first spelling |
+| Tagging is triage | A tag changes what a filtered list answers. Somebody who may only read sees the tags and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
+| On the row, not only on the finding | The tags come back with each group, read for the whole page in one statement, and each is itself a filter |
+| Called a tag everywhere, in every register | The screens, the filter, the API descriptions and this document. It was a tag in the filter and on the route while the finding screen, the API summaries and the rows above this one said "mark" — one thing under two names, which makes neither searchable |
 
 ## Rule-prepared claims
 

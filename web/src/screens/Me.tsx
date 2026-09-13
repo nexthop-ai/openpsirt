@@ -46,10 +46,7 @@ export function Me() {
       <div className="card">
         <h3>Your access</h3>
         {(me.reach ?? []).length === 0 ? (
-          <p className="reading">
-            Nothing yet. Access is granted in advance rather than by signing in, so an administrator
-            has to say what you may see.
-          </p>
+          <p className="reading">Nothing yet. An administrator grants access.</p>
         ) : (
           <div className="tablewrap">
             <table>
@@ -86,8 +83,7 @@ export function Me() {
           </div>
         )}
         <p className="hint" style={{ marginTop: 8 }}>
-          Shown as what you may do rather than as the roles behind it, because which roles allow
-          what is the server&rsquo;s rule and this is the same answer every screen asks it for.
+          Shown as what you may do, not the roles behind it.
         </p>
       </div>
 
@@ -138,18 +134,14 @@ function Digest({
     <div className="card">
       <h3>Notifications</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        A daily digest carries what nothing else told you: work that became yours without a message
-        — which is most of it once rules route work to a team — and, where you ask for it, findings
-        that opened since the last one and nobody has picked up.
+        A daily digest of work that became yours without a message, and optionally new unassigned
+        findings.
       </p>
       {set.error != null && <Failed error={set.error} what="That could not be changed." />}
       {!reachable ? (
         <p className="alert" style={{ margin: 0 }}>
           <strong>No address is recorded for you.</strong>
-          <span>
-            Nothing can be sent anywhere until an administrator records one, so the switch is not
-            offered rather than offered and ignored. The notification area inside here needs none.
-          </span>
+          <span>An administrator has to record one before anything can be sent.</span>
         </p>
       ) : (
         <div className="filters">
@@ -240,18 +232,14 @@ function Tokens() {
     <div className="card">
       <h3>Your tokens</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        For scripts of your own. A token is a live reference to you rather than a copy of what you
-        could do when it was made, so what it reaches shrinks the moment your roles do — and it
-        never carries more than you do. Narrow one to a single product where a script only needs
-        that much.
+        For your own scripts. A token carries your current roles and never more.
       </p>
 
       {minted && (
         <div className="alert info" style={{ marginBottom: 10 }}>
           <strong>Copy it now.</strong>
           <span>
-            <span className="id">{minted.secret}</span> — this is the only time it is shown. What is
-            stored is a digest, so a secret nobody copied is a token nobody can use.
+            <span className="id">{minted.secret}</span> — shown once. Only a hash is stored.
           </span>
           <button
             type="button"
@@ -388,9 +376,7 @@ function Tokens() {
         </button>
       </div>
       <p className="hint" style={{ marginTop: 8 }}>
-        Expiry is not optional and there is a ceiling an administrator sets. A credential that never
-        runs out is one nobody ever withdraws, and those are found when somebody leaves and nobody
-        knows what breaks if it is turned off.
+        Expiry is required, up to a ceiling an administrator sets.
       </p>
     </div>
   );

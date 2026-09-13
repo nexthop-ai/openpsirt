@@ -70,15 +70,20 @@ export function Queue() {
   // they were mixed in, which made the queue a list containing work the reader
   // cannot do, because approving your own is refused.
   const mine = params.get("mine") === "1";
+  // Which product, where the address names one. The figure on the home screen
+  // is narrowed by the scope picker and links here with it, so a queue that
+  // ignored it answered a different question from the number that was clicked.
+  const product = params.get("product") ?? "";
+  const within = product ? { product } : {};
   const queue = useQuery({
-    queryKey: ["queue", mine ? 0 : offset, mine],
+    queryKey: ["queue", mine ? 0 : offset, mine, product],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/review-queue", {
           // A page when it is the list being read, one row when it is only
           // the tab's count: both sides are asked for on every visit so a tab
           // carries its number without being opened.
-          params: { query: { limit: mine ? 1 : PAGE, offset: mine ? 0 : offset } },
+          params: { query: { limit: mine ? 1 : PAGE, offset: mine ? 0 : offset, ...within } },
         }),
       ),
   });
@@ -143,6 +148,12 @@ export function Queue() {
     return <Failed error={queue.error} what="The review queue could not be read." />;
   }
 
+  // What the export links ask for, so a file matches the screen it was taken
+  // from rather than being the whole backlog under a narrowed heading.
+  const exporting = new URLSearchParams();
+  if (mine) exporting.set("mine", "true");
+  if (product) exporting.set("product", product);
+  const asked = [...exporting].length > 0 ? "?" + exporting.toString() : "";
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);
   const seen = new Set<number>();
@@ -212,7 +223,14 @@ export function Queue() {
               {records > claims.length && (
                 <> · {records.toLocaleString()} records between those shown</>
               )}{" "}
-              · across every product you may approve on
+              {product ? (
+                <>
+                  {" "}
+                  · in <b>{product}</b>
+                </>
+              ) : (
+                <> · across every product you may approve on</>
+              )}
             </>
           )}
         </p>
@@ -220,10 +238,10 @@ export function Queue() {
             screen counts them, because that is the unit somebody works
             through — and reporting a backlog was copying this out by hand. */}
         <span style={{ marginLeft: "auto" }}>
-          <a className="btn quiet" href={`/v1/review-queue.csv${mine ? "?mine=true" : ""}`}>
+          <a className="btn quiet" href={`/v1/review-queue.csv${asked}`}>
             CSV
           </a>{" "}
-          <a className="btn quiet" href={`/v1/review-queue.json${mine ? "?mine=true" : ""}`}>
+          <a className="btn quiet" href={`/v1/review-queue.json${asked}`}>
             JSON
           </a>
         </span>
@@ -344,10 +362,7 @@ export function Queue() {
       {justDone && (
         <div className="alert info" style={{ marginBottom: 12 }}>
           <strong>Agreed to under &ldquo;{justDone}&rdquo;</strong>
-          <span>
-            Taking it back returns those claims to this queue. Nothing anybody wrote changes, and
-            each proposer is told.
-          </span>
+          <span>Returns those claims to this queue. Each proposer is notified.</span>
           <button
             type="button"
             className="linkish"
@@ -479,8 +494,8 @@ function Stopped({ row }: { row: Standing }) {
       </div>
       <p className="hint" style={{ margin: 0 }}>
         {lapsed
-          ? "The code moved out from under this judgment. Reaffirm it from the finding, with a fresh reason; no second person is needed."
-          : "The date this was put off until has passed, so it is open again."}
+          ? "The code moved. Reaffirm it from the finding with a fresh reason."
+          : "The deferral has expired."}
       </p>
       <div className="actions">
         <Link to={`/decisions/${it?.id}`} className="btn ghost">
@@ -833,8 +848,7 @@ function Card({
 
       {claim.deferredDays > 0 && claim.previouslyApproved && (
         <p style={{ margin: 0, fontSize: "var(--step--1)", color: "var(--sev-high)" }}>
-          Short is measured against everything this has already been put off for, not against the
-          days being asked.
+          Measured against the total already deferred, not the days being asked.
         </p>
       )}
 

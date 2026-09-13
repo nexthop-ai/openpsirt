@@ -136,8 +136,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
               <header>
                 <h5>Rows that do not match the rest</h5>
                 <span className="hint">
-                  Hold them back and they become a claim of yours, with the argument they were made
-                  under. Revise it to say what is different about them.
+                  Holding them back makes them a claim of yours. Revise it to say what differs.
                 </span>
               </header>
               <div className="tablewrap" style={{ boxShadow: "none" }}>

@@ -13,11 +13,10 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 
 - [Declaration, not completion](#declaration-not-completion)
 - [The unit](#the-unit)
-- [Request shape](#request-shape)
-- [Build states](#build-states)
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
 - [Pending upgrades](#pending-upgrades)
+- [Ordering the versions a scanner named](#ordering-the-versions-a-scanner-named)
 - [Promise states](#promise-states)
 - [Build-declared suppressions](#build-declared-suppressions)
 - [External links](#external-links)
@@ -31,12 +30,20 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 
 ## Declaration, not completion
 
-A fix is declared and never completed. Somebody states which releases they
-intend to fix an issue in; whether it arrived is answered by the next scan of
-each of those releases (REQ-35).
+A fix is declared and never completed. A judgment promising work states which
+releases it is for; whether the fix arrived is answered by the next scan of each
+of those releases (REQ-35).
 
-The stored row is the declaration and nothing else: which build, who said so, and
-when. There is no state column, no completed-at, and nothing to move along.
+The stored row is the declaration and nothing else: which build, which fold, who
+said so, and when. There is no state column, no completed-at, and nothing to
+move along.
+
+**A declaration arrives with the judgment that argued for it**, from the two
+outcomes that promise work — a bump, recorded against the component, and a
+backport, recorded against the issue. There is no way to record where a fix will
+land without saying what was decided: bare intent carried no version, no date
+and no reasoning, so nothing could lapse and nobody was asked to agree to it,
+which made it a promise in the shape of a record and not in its effect.
 
 The alternative — planned, in progress, done, moved by a person — is how every
 tracker works, and is wrong here because independent evidence already exists. A
@@ -73,7 +80,7 @@ commitment's build. **Nothing is written onto findings.**
 | Changing the version a release is moving to is one row | It was keyed per issue *and* per component *and* per target version, so a change meant rewriting every row of it |
 | An issue published tonight is covered by this morning's commitment | With nobody acting. Under the old key it was not covered until somebody declared it too |
 | A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump, so a commitment recorded against one covers all of them |
-| No version comparison is involved | An upgrade covers everything open on the fold rather than only what records this version as its fix. Deciding otherwise needs a per-ecosystem ordering nothing here has (REQ-21) |
+| No version comparison decides coverage | An upgrade covers everything open on the fold rather than only what records this version as its fix. What an ordering is used for is reading a set of candidates, never deciding what a commitment reaches |
 
 A build has one commitment per fold, enforced by the database rather than by a
 check somebody remembers. A release moves a package to one version; two rows
@@ -98,47 +105,19 @@ which is the failure REQ-28 exists to prevent.
 | A date already past is refused | It says the work will have happened before now |
 | The reasoning goes through the text policy | Every path that stores typed text runs it before storing, and this one reached the write through an inner act that did not |
 
-## Request shape
-
-The plan is a set, written whole (REQ-35). Intent spans several releases and is
-decided in one sitting, so a request states what the answer now is. An empty set
-withdraws it, through the same operation rather than a second one.
-
-| Rule | Reason |
-|---|---|
-| A build already in the plan keeps the date it was first chosen on | When somebody committed to a release is a fact about a moment. An edit saying nothing about the first release must not rewrite the record of what was promised when |
-| A build of another product is refused, and the whole request with it | A partly-applied plan leaves somebody believing a release is covered. A request can only name a release and a variant, resolved against the product in the path; the store's refusal covers callers naming a build by identifier |
-| Declaring is triage work | Being able to see a finding is not being able to plan the work on it |
-
-## Build states
-
-Every build of the product that has ever held the issue is listed, chosen or
-not, and so is every build that was chosen.
-
-| State | Chosen | Scan says | Meaning |
-|---|---|---|---|
-| missed | Yes | A finished scan since, still there | The claim has evidence against it |
-| fixing | Yes | No scan has looked since | |
-| clear | Yes | Gone | The one that worked |
-| gone | No | Gone anyway | |
-| undecided | No | Still there | Nobody has said whether it will be fixed here |
-| retired | — | — | Out of support, so it carries no target |
-
-| Rule | Reason |
-|---|---|
-| A build the issue has left is listed even though nobody planned it | This is the other half of "gone from main, still present in 2.4 and 2.3". Omitting it drops a fixed build from the list, which reads identically to a build that never shipped the component. It is not tickable |
-| Undecided is not a kind of outstanding | "Open because we chose not to fix it here" and "open because nobody thought about it" are different answers, and a list holding both loses the second |
-| A missed target needs a finished scan that ran after the claim | Without the "since", every declaration made between two nights would be flagged the moment it was written. A run still going may be about to report the issue |
-| A retired release is listed and not counted | Counting it as outstanding fills the figure permanently; counting it as delivered claims a fix nobody shipped. Choosing one already out of support is refused; one that retires after being chosen drops out of the counts and stays on the list |
-
 ## Resolution
 
-An issue is resolved when every build somebody chose is clear. Progress is
-readable at any point: two of three clear, one outstanding (REQ-35).
+A commitment is answered by the next scan of the build it was made for, never by
+anybody marking it done (REQ-35). Each stands at landed, lapsed or planned, and
+those three are worked out on every read — nothing stores them, nothing refreshes
+them, and nothing has to be invalidated when a scan closes a finding.
 
-Worked out from the same list every time it is asked for. Nothing stores it,
-nothing refreshes it, and nothing has to be invalidated when a scan closes a
-finding.
+**A roll-up across the builds one issue was promised in is not built.** There was
+one, reading "two of three chosen releases are clear", and it was the only reader
+of a screen that offered a set of builds to tick with no version, no date and no
+reasoning attached; both went together. What remains answers per build, which is
+the grain a commitment is made at. Where an issue stands across several is read
+from the findings list, which has a row per build.
 
 ## Deadlines
 
@@ -196,6 +175,35 @@ rather than from anything written down: the distinct issues the bump would close
 here, and how many places those sit at. Nothing is declared done by hand — a
 build is clear when it stops holding them.
 
+## Ordering the versions a scanner named
+
+Where a component could go is every version the findings open against it name as
+their fix. Two counts are answered for each, because they are two questions.
+
+| Count | |
+|---|---|
+| What that release fixed | How many of what is open name that exact version. This is the release's own security content, and it is what the scanner said without any comparison |
+| What reaching it closes | That, plus everything fixed at or before it. This is the question somebody choosing between two versions asks, and it is the one that needs an ordering |
+
+Sorted on the first, the version worth taking sinks. Measured on the demo's
+kernel: of 168 open, 158 have a fix across 13 named releases, the 6.12.100-1
+release fixed 49, and the newest named, 6.12.107-1, fixed 2 while carrying every
+fix before it. A list ranked on what each release fixed puts the version that
+closes everything near the bottom.
+
+| Rule | Reason |
+|---|---|
+| An ordering is per ecosystem, and only where its algorithm is written down | A distribution's version comparison and dotted numeric releases are written here. Everything else is left unordered rather than approximated, because an ordering claimed before its algorithm exists is the confident wrong answer |
+| The spelling decides, not the ecosystem | A runtime published through a language index and naming itself after its own toolchain has the scheme and not the spelling. One version a comparison refuses leaves the whole set unranked: a list ordered except for the entry nobody could place is not ordered |
+| Unranked means the two counts are equal and say so | An exact match still counts. What is never done is inferring that one version reaches another, so nothing overstates what an upgrade would close |
+| Which scheme applies is read from the package identifier | Two ecosystems spell some versions identically and order them differently, so reading the shape of the string would order a package by whichever scheme its version happened to resemble |
+| The scanner already compared versions to match the finding | So refusing to compare does not make the tool comparison-free — it leaves it unable to rank what it has already been told. What is new here is saying which of the answers is furthest along, not deciding which findings apply |
+
+**A wrong order is worse than none**, which is why the refusal is part of the
+mechanism rather than a gap in it: the answer arrives as a recommendation
+somebody schedules a release around, and the scan that would catch it runs after
+the release.
+
 ## Promise states
 
 Three states, derived on every read and set by nobody.
@@ -232,10 +240,11 @@ evidence.
 
 ## External links
 
-A fix target and a claim each carry a link to work happening elsewhere, and
-**nothing is sent to it** (REQ-36): the link is stored and read by people. What
-is not built is the tracker hand-off — opening or updating an item in whatever
-system that link points at.
+A claim carries a link to work happening elsewhere, and **nothing is sent to
+it** (REQ-36): the link is stored and read by people. One link per claim rather
+than one per release, because the conversation about a promise is one
+conversation. What is not built is the tracker hand-off — opening or updating an
+item in whatever system that link points at.
 
 The signed outbound request (REQ-46) is a different thing and it is built;
 `DESIGN-notifications.md` owns it, including the egress controls and the one
@@ -246,7 +255,7 @@ the deployment sat behind a document saying it did not exist.
 | Rule | Reason |
 |---|---|
 | Nothing fetches what a link points at | A tool that fetched an address a person typed is a request-forgery primitive. Stored as text, shown as a link, encoded on the way out |
-| Left out, a link stays; sent empty, it is cleared | A plan is written whole, so "said nothing" and "said it is nowhere" are different requests. A stale link sends somebody to a ticket that closed for a different reason |
+| Sent empty, it is cleared | A stale link sends somebody to a ticket that closed for a different reason |
 | Anybody who may argue about a claim may point it somewhere | A link is a note about where the conversation is rather than a judgment |
 
 Assigning notifies; planning does not (REQ-34). Somebody is told when work is put

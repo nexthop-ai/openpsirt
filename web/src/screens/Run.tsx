@@ -100,8 +100,7 @@ export function Run() {
           </div>
         </div>
         <p className="hint" style={{ marginTop: 8 }}>
-          Every finding this run opened records these, so work done on the strength of a
-          vulnerability database that was later corrected can be found again.
+          Recorded on every finding this run opened, so a corrected database can be traced back.
         </p>
       </div>
 
@@ -111,9 +110,7 @@ export function Run() {
       </div>
 
       <p className="hint" style={{ marginTop: 10 }}>
-        Counted as issues at components, which is what the findings list counts: a component reached
-        twenty ways carries the same issue twenty times. Worked out when this page is read, so it
-        moves as findings close and reopen.
+        Issues at components. Worked out when this page is read.
       </p>
     </div>
   );
@@ -144,7 +141,7 @@ function Shape({
       </p>
       {total === 0 ? (
         <p className="hint" style={{ margin: 0 }}>
-          Nothing. A rebuild that finds exactly what the last one found is the ordinary case.
+          Nothing changed.
         </p>
       ) : (
         <>

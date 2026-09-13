@@ -32,7 +32,7 @@ export function Catalog() {
       <section className="panel">
         <h3>Named reports</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Each answers one question, at whatever the picker above has selected, and prints.
+          Each answers one question, at the selection above.
         </p>
         <ul className="files catalog">
           {CATALOG.map((report) => {
@@ -61,8 +61,8 @@ export function Catalog() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Files</h3>
         <p className="hint">
-          Every other file is offered on the screen that answers for it, narrowed the way that
-          screen is narrowed. These two have no screen of their own.
+          Other files are offered on the screen that answers for them. These two have no screen of
+          their own.
         </p>
         <ul className="files catalog">
           <li>
@@ -71,11 +71,9 @@ export function Catalog() {
               <a href="/v1/running-out.json?days=30">JSON</a>
             </div>
             <div className="hint">
-              Open, undecided, and due inside the window, across every product you can read. Thirty
-              days by default; <span className="id">?days=</span> takes any number up to a year. A
-              deadline somebody has answered is not on it: a dismissal takes a finding off the clock
-              and a deferral replaces the deadline with its own date, so what is left is time
-              passing with nothing said.
+              Open, undecided and due inside the window. Thirty days by default;{" "}
+              <span className="id">?days=</span> takes any number up to a year. Answered deadlines
+              are excluded.
             </div>
           </li>
           {at.product && at.stream && at.variant ? (
@@ -88,9 +86,8 @@ export function Catalog() {
                 <a href={vexAt(at.product, at.stream, at.variant)}>OpenVEX</a>
               </div>
               <div className="hint">
-                What stands about the components that build ships, as a customer&rsquo;s own scanner
-                reads it. Approved dismissals only, public findings only, and a deferral is absent
-                rather than published as anything.
+                For a customer&rsquo;s own scanner. Approved dismissals and public findings only,
+                and a deferral is absent rather than published as anything.
               </div>
             </li>
           ) : (
@@ -99,9 +96,7 @@ export function Catalog() {
                 A <b>VEX document</b>
               </div>
               <div className="hint">
-                Pick a product, a branch or tag, and a variant above: what stands about a component
-                is a fact about one build, so there is no such document for a selection that spans
-                several.
+                Pick a product, a branch or tag, and a variant above. This document is per build.
               </div>
             </li>
           )}
@@ -120,8 +115,7 @@ export function Catalog() {
               <Link to="/findings">The findings list</Link>
             </div>
             <div className="hint">
-              A question with no name is asked where the filters live: narrow it there, look at what
-              it catches, and take the whole of it as a file — with or without a product picked.
+              For anything else, narrow the findings list and export it from there.
             </div>
           </li>
         </ul>

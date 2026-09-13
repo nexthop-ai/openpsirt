@@ -191,3 +191,21 @@ func issueHere(ctx context.Context, in Ingest, subject access.Subject,
 	}
 	return issue, nil
 }
+
+// narrowedTo resolves an optional product name a list narrows by.
+//
+// Empty is every product, which is what a list asks for when nothing is
+// selected. A name nobody holds answers as a name nobody has declared, for the
+// reason every other product lookup does.
+func narrowedTo(ctx context.Context, in Ingest, subject access.Subject,
+	name string) (int64, error) {
+
+	if name == "" {
+		return 0, nil
+	}
+	product, err := productNamed(ctx, in, subject, name)
+	if err != nil {
+		return 0, err
+	}
+	return product.ID, nil
+}

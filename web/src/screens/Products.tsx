@@ -84,10 +84,7 @@ export function Products({ who }: { who: Who }) {
     <>
       <div className="screen-head">
         <h2>Products</h2>
-        <p>
-          Everything a scan can be filed against has to be declared first — a pipeline with a typo
-          would otherwise invent a product that looks entirely genuine.
-        </p>
+        <p>Products are declared before scans can be filed against them.</p>
         {who.admin && <AddButton label="Add product" onClick={() => setAdding(true)} />}
       </div>
 
@@ -97,7 +94,7 @@ export function Products({ who }: { who: Who }) {
           detail={
             who.admin
               ? "Declare one before a build can file a scan against it."
-              : "Access is granted in advance, so an administrator grants a role before anything appears here."
+              : "An administrator grants a role before anything appears here."
           }
         />
       ) : (
@@ -201,14 +198,14 @@ export function Products({ who }: { who: Who }) {
         error={declare.error}
         busy={declare.isPending || name.trim() === ""}
         ok="Add product"
-        hint="Declared rather than created on first use. A pipeline with a typo in a product name would otherwise invent a product that looks entirely genuine, with its own findings and its own place in every report, while the real one appears to have stopped being scanned."
+        hint="Declared rather than created on first use, so a typo in a pipeline cannot invent a product."
       >
         <Field
           label="Name"
           value={name}
           onChange={setName}
           placeholder="sonic"
-          hint="How scans name it. Matched without regard to capitals; the spelling typed here is what is shown back."
+          hint="How scans name it. Capitals do not matter."
         />
         <Field
           label="Display name"

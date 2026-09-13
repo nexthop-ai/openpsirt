@@ -11,8 +11,10 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [The row a person reads](#the-row-a-person-reads)
 - [Issue identity](#issue-identity)
 - [What a report supplies](#what-a-report-supplies)
+- [Who supplied a component](#who-supplied-a-component)
 - [Merging later reports](#merging-later-reports)
 - [Derived addresses](#derived-addresses)
+- [What an index says](#what-an-index-says)
 - [How a match was made](#how-a-match-was-made)
 - [Interning a component](#interning-a-component)
 - [Recorded flaws](#recorded-flaws)
@@ -119,6 +121,21 @@ being parsed and thrown away.
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered. It groups findings by the shape of the mistake rather than the package it landed in |
 
+## Who supplied a component
+
+An inventory often says who supplied a component — a distribution, a vendor, a
+project — and that is kept, because a bare name is not enough for a dependency of
+a dependency somebody has never heard of.
+
+| Rule | Reason |
+|---|---|
+| From the inventory, never from an index | It is what the producer of this build said, not what a registry says about a package in general. What an index says has its own section below and covers different fields |
+| Absent for most of it, and said so rather than filled in | Measured on a switch image: 759 of 6,866 components carry one. A screen states that nobody said rather than showing a blank |
+| Two ways of saying it, resolved after the whole description is read | One format states an object and a plainer string beside it, and the object wins where a producer fills in both. Resolved while reading, whichever key the producer happened to write first won — and key order is the producer's choice |
+| A party's kind is dropped, its name kept | The other format prefixes it — "Organization: Debian" — and one of the two words is a label rather than a name. The word that format uses for "nobody stated one" is treated as nobody having stated one |
+| Never part of identity | Two producers describing one component name its supplier differently or not at all, and an identity that moved with it would take every triage decision attached along with it |
+| A later report fills it in where the row has none | The rule the section below states for everything else two reports can disagree about. Written only on the insert instead, a component first seen through a producer that stated none never got one, however many later scans said who it was |
+
 ## Merging later reports
 
 Reports disagree and arrive in an order nobody controls. A later one fills in
@@ -169,6 +186,30 @@ The parser declared the related records as carrying an identifier and nothing
 else, so a kernel CVE whose upstream record lists eight `git.kernel.org` commits
 showed one tracker link and no patches. References from every identifier an
 issue answers to are kept, deduplicated against the matched record's own.
+
+## What an index says
+
+A bare name is not enough for a dependency of a dependency. Where an ecosystem
+publishes an index, what it says about a package is asked for alongside the
+newest version — one line saying what the package is, and where it is developed.
+
+| Rule | Reason |
+|---|---|
+| One line, never the long description | What some indexes call a description is the package's whole README, measured at 2,894 characters for one ordinary package. That is a document; a row of a table wants a label |
+| Absent is the ordinary case, not a gap | The module protocol for one ecosystem has no such field anywhere, and no index is asked about a distribution package, so a version with no summary beside it is normal. A screen shows what there is rather than a space where something failed |
+| The address the index states beats one worked out from the name | A publisher said where the project lives; a template guessed. Where the index says nothing, the name still yields one, so there is usually an address either way |
+| The project's own pages before its repository | Three of the indexes carry both and publishers fill in whichever they bothered with, so they are asked for in the order a reader wants rather than by picking one |
+| Bounded and judged before it is stored | Both arrive over the network from a third party and are rendered to staff holding the most access. The summary is cut to a label on a rune boundary, and the address is judged against the two schemes anything else here may link to — at storage as well as at rendering, because a value that should never have been stored is one somebody later reads out by another route (REQ-66 and REQ-69) |
+| An unusable half does not cost the rest | A refused address leaves the version and the summary recorded. One field a publisher filled in badly is not a reason to know nothing about the package |
+
+Asking is the same pass that asks for the newest version, so it costs no extra
+request: this is reading more of an answer already fetched. It is off unless a
+deployment turns it on, like everything else that reaches the network.
+
+**What no index gives is a distribution package's description.** Those live in a
+distribution's own package index, which is one file per release rather than one
+request per package — a different shape from the per-package asks here, and not
+built.
 
 ## How a match was made
 

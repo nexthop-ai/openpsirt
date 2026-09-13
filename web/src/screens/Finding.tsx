@@ -9,7 +9,7 @@ import {
 } from "./FindingClaim";
 import { Assess } from "./FindingAssess";
 import { Notes } from "./FindingNotes";
-import { FixingIn, HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
+import { HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -103,6 +103,7 @@ export function Finding() {
   function startFrom(from: (typeof prefill)["from"]) {
     setPrefill({ at: oneFinding, n: own.n + 1, from });
   }
+  const [reclassifying, setReclassifying] = useState(false);
   const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
   // The saved filter this was opened under, where it is one that prepares a
   // claim. The address names the filter rather than repeating what it says, so
@@ -264,7 +265,7 @@ export function Finding() {
         <div className="card">
           <h3>Which {component}?</h3>
           <p className="reading" style={{ marginBottom: 10 }}>
-            This build ships that name at more than one version. Pick the one you mean.
+            Shipped at more than one version here.
           </p>
           <ul className="refs">
             {choices.map((choice) => (
@@ -524,8 +525,7 @@ export function Finding() {
 
       {/* Evidence on one side and the action on the other. The
           decision form used to sit below the description, the chains, the
-          holder, the fix targets, the assessment and the similar
-          decisions — about 1,550 pixels down a page running to 2,800, so
+          holder, the assessment and the similar decisions — about 1,550 pixels down a page running to 2,800, so
           on an ordinary screen the thing the page is for was three
           screens away. Neither is hidden to fix it: what is read in order
           to decide sits beside what decides it, which is the arrangement
@@ -587,18 +587,39 @@ export function Finding() {
               {it.vector}
             </p>
           )}
+          {/* The control sits on the line that reports the rating, so
+              somebody reading a severity does not have to go and find the
+              button for it. */}
           <p className="hint">
             {it.assessed ? (
               <>
                 Assessed <Severity word={it.assessed} /> · published <Severity word={it.severity} />
-                . {product} rates it, which orders it and sets its deadline here.
               </>
             ) : (
               <>
-                Published <Severity word={it.severity} />. Being exploited outranks the score.
+                Published <Severity word={it.severity} />
               </>
             )}
+            {places.some((p) => p.decision == null) && !reclassifying && (
+              <button
+                type="button"
+                className="linkish"
+                style={{ marginLeft: 8 }}
+                onClick={() => setReclassifying(true)}
+              >
+                Reclassify
+              </button>
+            )}
           </p>
+          {reclassifying && (
+            <Assess
+              product={product}
+              vulnerability={vulnerability}
+              published={it.severity ?? ""}
+              assessed={it.assessed ?? ""}
+              onClose={() => setReclassifying(false)}
+            />
+          )}
         </div>
 
         <HowMatched
@@ -664,11 +685,11 @@ export function Finding() {
             you dismissed on 3 March" after a feed is corrected. */}
         {(it.found_by || it.opened) && (
           <div className="evblock">
-            <h4>Scanner</h4>
+            <h4>First seen</h4>
             <p>
               {it.opened && (
                 <>
-                  First seen here <b>{it.opened}</b>
+                  <b>{it.opened}</b>
                   {it.found_by ? ", by " : "."}
                 </>
               )}
@@ -689,15 +710,13 @@ export function Finding() {
                 </>
               )}
             </p>
-            <p className="hint" style={{ margin: 0 }}>
-              {it.found_by
-                ? "The run that first said this, not the newest one — a later run finding the same thing does not reopen it. Which vulnerability database was in force is what a corrected feed makes worth having."
-                : "Recorded here by a person rather than reported by a scanner, so no run found it."}
-            </p>
+            {!it.found_by && (
+              <p className="hint" style={{ margin: 0 }}>
+                Entered by a person, not a scanner
+              </p>
+            )}
           </div>
         )}
-
-        <Places places={places} build={build} version={it.version} />
 
         {(it.aliases ?? []).length > 0 && (
           <div className="evblock">
@@ -722,6 +741,15 @@ export function Finding() {
           />
         ))}
 
+        {/* Above the VEX statements: a write-up is what somebody deciding
+            reads first, and a third party's claim is read against it. The
+            whole block of links belongs below the action, which is a different
+            question from the advisory the judgment rests on. */}
+        <div className="evidence">
+          <References advisory={it.advisory} refs={it.references ?? []} />
+          <LookItUp links={it.links ?? []} />
+        </div>
+
         {places.some((p) => p.decision == null) && (
           <>
             {/* Said when there is nothing, because the difference matters:
@@ -734,10 +762,8 @@ export function Finding() {
             {vex.length === 0 && (
               <div className="card">
                 <h3>VEX statements</h3>
-                <p className="reading">
-                  None. No VEX document uploaded here mentions this issue at this component — which
-                  is not the same as nobody having published one. An administrator uploads them;
-                  nothing here fetches them.
+                <p className="reading" title="Uploaded by an administrator, never fetched">
+                  No VEX statements uploaded
                 </p>
               </div>
             )}
@@ -746,10 +772,7 @@ export function Finding() {
               <div className="card">
                 <h3>VEX statements</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
-                  From a VEX document somebody uploaded here, published by a distribution or an
-                  upstream security team about this component. It is evidence and nothing more — it
-                  decides nothing here, and it is not counted anywhere. What it adds over the scan
-                  is the reasoning.
+                  Evidence only. Nothing here is decided or counted from it.
                 </p>
                 {vex.map((one, i) => (
                   <div key={`${one.publisher} ${i}`} className="prior">
@@ -795,8 +818,7 @@ export function Finding() {
                           Start from this
                         </button>
                         <span className="hint">
-                          Fills the form in. The judgment is still yours, and the record says you
-                          made it.
+                          Fills in the form. The decision is still yours.
                         </span>
                       </div>
                     )}
@@ -809,8 +831,7 @@ export function Finding() {
               <div className="card">
                 <h3>Approved decisions at this component</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
-                  The same component under the same consumer, with the same justification. Applying
-                  one extends its argument to this issue; it still needs a second person.
+                  Same component, same justification. Still needs a second person.
                 </p>
                 {similar.map((s) => (
                   <div key={s.decision_id} className="prior">
@@ -857,15 +878,15 @@ export function Finding() {
             {rule !== "" && rules.isError && (
               <div className="alert">
                 <strong>Your saved filter “{rule}” could not be read</strong>
-                <span>Nothing was filled in, and what you decide here is unaffected.</span>
+                <span>Nothing was filled in.</span>
               </div>
             )}
             {offered.lengthless && (
               <div className="alert">
                 <strong>“{rule}” prepares a deferral with no length</strong>
                 <span>
-                  Nothing was filled in. A deferral needs a date, and the length it is worked out
-                  from was never recorded — save the filter again to give it one.
+                  Nothing was filled in. The filter has no deferral length; save it again to set
+                  one.
                 </span>
               </div>
             )}
@@ -873,8 +894,7 @@ export function Finding() {
               <div className="alert info">
                 <strong>Filled in from “{rule}”</strong>
                 <span>
-                  Your saved filter prepares this claim. Nothing is proposed until you submit it,
-                  and it goes out as <b>your</b> claim for a second person to agree to.
+                  Nothing is proposed until you submit. It goes out as <b>your</b> claim.
                 </span>
                 <button
                   type="button"
@@ -891,6 +911,14 @@ export function Finding() {
                 at={{ ...at, version }}
                 places={places}
                 undisclosed={!!it.undisclosed}
+                assigning={
+                  <Assignee
+                    at={at}
+                    assigned={it.assigned_to ?? ""}
+                    undisclosed={!!it.undisclosed}
+                    routedBy={it.routed_by ?? ""}
+                  />
+                }
                 onDone={(r) => {
                   setRecorded(r);
                   startFrom(null);
@@ -906,14 +934,6 @@ export function Finding() {
       </div>
 
       <div className="deciding">
-        {/* Eleven links between the facts and the form is the defect the old
-            layout was built to fix, arriving by a different route — so what
-            is read elsewhere is read below the act rather than beside it. */}
-        <div className="evidence">
-          <References advisory={it.advisory} refs={it.references ?? []} />
-          <LookItUp links={it.links ?? []} />
-        </div>
-
         {/* Keyed on the issue in this product, so it is here whether or not
             anybody has decided anything. It sits above the claim's own thread
             because it is the one somebody can write in before there is a
@@ -957,12 +977,26 @@ export function Finding() {
             for undisclosed readers and came back empty to anybody holding
             only public triage. Two fields on one object, one letter apart in
             meaning. */}
-        <Assignee
-          at={at}
-          assigned={it.assigned_to ?? ""}
-          undisclosed={!!it.undisclosed}
-          routedBy={it.routed_by ?? ""}
-        />
+        {/* Only where the triage pane is not drawn. There it sits at the head
+            of the same pane, because triage is both questions — who is on it
+            and what was decided. Here there is nothing left to decide, and
+            reassigning a decided finding is still ordinary. */}
+        {!places.some((p) => p.decision == null) && (
+          <Assignee
+            at={at}
+            assigned={it.assigned_to ?? ""}
+            undisclosed={!!it.undisclosed}
+            routedBy={it.routed_by ?? ""}
+          />
+        )}
+
+        {/* Under triage, in a pane of its own. It is the longest block on the
+            screen and among the least often read: somebody deciding wants what
+            the issue is and what upstream did before they want the walk down
+            to it. */}
+        <div className="card">
+          <Places places={places} build={build} version={it.version} />
+        </div>
 
         {/* Who has been let into this one case. Only where it is
             undisclosed: on a public finding the grant means nothing, because
@@ -980,17 +1014,6 @@ export function Finding() {
         {it.recorded && <AffectedBuilds product={product} vulnerability={vulnerability} />}
 
         {it.recorded && <Resolve at={at} vulnerability={vulnerability} />}
-
-        <FixingIn at={at} />
-
-        {places.some((p) => p.decision == null) && (
-          <Assess
-            product={product}
-            vulnerability={vulnerability}
-            published={it.severity ?? ""}
-            assessed={it.assessed ?? ""}
-          />
-        )}
 
         {previous.length > 0 && (
           <PreviousCard

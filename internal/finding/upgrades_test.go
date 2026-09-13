@@ -5,6 +5,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
@@ -54,13 +55,22 @@ func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
 		if len(here.Upgrades) != 2 {
 			t.Fatalf("%d upgrades, want the two versions that fix something", len(here.Upgrades))
 		}
-		// Most-closing first, which is what somebody choosing between them is
-		// actually asking.
-		if here.Upgrades[0].To != "3.9.0" || here.Upgrades[0].Issues != 2 {
-			t.Errorf("first upgrade is %+v, want 3.9.0 closing two", here.Upgrades[0])
+		// Furthest along first, which is what somebody choosing between them is
+		// actually asking — and both counts, because they differ: 3.9.0 is
+		// named by two and reaching it also closes the one 3.8.0 fixed.
+		if here.Upgrades[0].To != "3.9.0" || here.Upgrades[0].FixedHere != 2 {
+			t.Errorf("first upgrade is %+v, want 3.9.0 fixing two of its own", here.Upgrades[0])
 		}
-		if here.Upgrades[1].To != "3.8.0" || here.Upgrades[1].Issues != 1 {
-			t.Errorf("second upgrade is %+v, want 3.8.0 closing one", here.Upgrades[1])
+		if here.Upgrades[0].Reached != 3 || !here.Upgrades[0].Ordered {
+			t.Errorf("moving to 3.9.0 reaches %d of 3 (ordered %t), want all three",
+				here.Upgrades[0].Reached, here.Upgrades[0].Ordered)
+		}
+		if here.Upgrades[1].To != "3.8.0" || here.Upgrades[1].FixedHere != 1 {
+			t.Errorf("second upgrade is %+v, want 3.8.0 fixing one of its own", here.Upgrades[1])
+		}
+		if here.Upgrades[1].Reached != 1 {
+			t.Errorf("moving to 3.8.0 reaches %d, want only what it fixed itself",
+				here.Upgrades[1].Reached)
 		}
 	})
 }
@@ -147,6 +157,169 @@ func TestWhatAPromisedUpgradeCoversIsDerivedRatherThanMarked(t *testing.T) {
 		}
 		if len(planned) != 0 {
 			t.Fatalf("%d planned before anything was promised", len(planned))
+		}
+	})
+}
+
+func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
+	// A component is in the inventory because the build ships it. Answered off
+	// the findings instead, anything carrying its risk underneath rather than
+	// on itself returned no builds at all — which reads as a name the product
+	// does not ship, and is the ordinary state of every pre-built binary
+	// vendored in whole.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		run := f.run(t)
+		// Against libnl alone, so its two consumers carry nothing of their own.
+		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+			{
+				Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: libnl,
+				FixState: finding.FixedUpstream, FixedIn: "3.9.0",
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+
+		builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), swss.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 {
+			t.Fatalf("%d builds carry a component with nothing open, want the one shipping it",
+				len(builds))
+		}
+		clean := builds[0]
+		if clean.Version != swss.Version {
+			t.Errorf("it ships %q, want %q", clean.Version, swss.Version)
+		}
+		if clean.Issues != 0 || clean.Places != 0 {
+			t.Errorf("%d issues at %d places against something nothing was reported on",
+				clean.Issues, clean.Places)
+		}
+		// A deadline is the earliest among what is open, so it is absent
+		// rather than zero where nothing is.
+		if clean.DueAt != nil {
+			t.Errorf("a deadline appeared with nothing open: %v", clean.DueAt)
+		}
+		// The identifier travels, because the ecosystem and an upstream
+		// address are both read out of it and neither is stored.
+		if clean.Purl != swss.Purl {
+			t.Errorf("the identifier is %q, want %q", clean.Purl, swss.Purl)
+		}
+		// Nothing pulls swss in, so the build itself is what carries it.
+		if clean.Consumers != 1 {
+			t.Errorf("%d things pull in a component the build contains directly, want one",
+				clean.Consumers)
+		}
+	})
+}
+
+func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
+	// Measured on the demo's kernel: of 168 open, the 6.12.100-1 release fixed
+	// 49 and the newest named, 6.12.107-1, fixed 2 — so ranked on what each
+	// release fixed, the version that closes everything sorts near the bottom
+	// and the picker recommends against itself.
+	//
+	// What each release fixed and what reaching it closes are two counts. The
+	// second needs the ecosystem's ordering, which is why it is answered here
+	// rather than left for somebody to work out from a list.
+	each(t, func(t *testing.T, f *fixture) {
+		fixedIn := func(id, to string) finding.Reported {
+			return finding.Reported{
+				Issue:     finding.Named{Identifier: id, Severity: "high"},
+				Component: libnl,
+				FixState:  finding.FixedUpstream, FixedIn: to,
+			}
+		}
+		f.shipped(t, twoConsumers())
+		run := f.run(t)
+		// Three fixed in an earlier release, one in the newest: the shape that
+		// reads backwards when the count is what sorts.
+		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+			fixedIn("CVE-2026-1", "3.8.0"),
+			fixedIn("CVE-2026-2", "3.8.0"),
+			fixedIn("CVE-2026-3", "3.8.0"),
+			fixedIn("CVE-2026-4", "3.9.0"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicTriage)
+		builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), libnl.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 {
+			t.Fatalf("%d builds carry it", len(builds))
+		}
+		up := builds[0].Upgrades
+		if len(up) != 2 {
+			t.Fatalf("%d versions to move to, want the two named: %+v", len(up), up)
+		}
+		// Furthest along first, though it fixed the fewest of its own.
+		if up[0].To != "3.9.0" {
+			t.Errorf("the list leads with %q, want the newest version named", up[0].To)
+		}
+		if up[0].FixedHere != 1 {
+			t.Errorf("3.9.0 fixed %d of its own, want one", up[0].FixedHere)
+		}
+		if up[0].Reached != 4 {
+			t.Errorf("moving to 3.9.0 reaches %d, want all four", up[0].Reached)
+		}
+		// And the earlier one reaches only what it fixed.
+		if up[1].To != "3.8.0" || up[1].Reached != 3 {
+			t.Errorf("second is %+v, want 3.8.0 reaching three", up[1])
+		}
+	})
+}
+
+func TestVersionsNobodyCanOrderAreNotRanked(t *testing.T) {
+	// A runtime naming itself after its own toolchain is the case in the demo:
+	// "go1.26.3" is not a version this orders, so reaching one says nothing
+	// about the others. Counted by exact match and reported as unranked, rather
+	// than ranked by a comparison that was refused.
+	each(t, func(t *testing.T, f *fixture) {
+		runtime := graph.Described{
+			Purl: "pkg:golang/stdlib@go1.26.3", Name: "stdlib", Version: "go1.26.3",
+		}
+		f.shipped(t, graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{root, runtime},
+			Dependencies: []graph.Dependency{{Parent: root, Child: runtime}},
+		})
+		run := f.run(t)
+		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+			{
+				Issue: finding.Named{Identifier: "CVE-2026-10", Severity: "high"}, Component: runtime,
+				FixState: finding.FixedUpstream, FixedIn: "go1.26.5",
+			},
+			{
+				Issue: finding.Named{Identifier: "CVE-2026-11", Severity: "high"}, Component: runtime,
+				FixState: finding.FixedUpstream, FixedIn: "go1.26.6",
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicTriage)
+		builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), runtime.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 {
+			t.Fatalf("%d builds carry it", len(builds))
+		}
+		for _, up := range builds[0].Upgrades {
+			if up.Ordered {
+				t.Errorf("%q was reported as ordered", up.To)
+			}
+			// Reaching one says nothing about the other, so both counts are
+			// what named it exactly.
+			if up.Reached != up.FixedHere || up.FixedHere != 1 {
+				t.Errorf("%q fixed %d and reaches %d, want one and one",
+					up.To, up.FixedHere, up.Reached)
+			}
 		}
 	})
 }

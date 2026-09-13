@@ -4,23 +4,23 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { notACredential } from "./noautofill";
+import { useWho } from "../app/session";
 
 // Who work is being handed to: a person or a team, found by typing.
 //
-// **It was a select fed by the mentions endpoint**, which answers who can
-// already *read* a finding. That is right for offering a name inside text and
-// wrong here twice over — a team cannot be mentioned in prose but is a
-// perfectly good holder of work, so no finding could be handed to a team from
-// the interface at all, though the API has taken one from the start.
+// Typed rather than chosen from everybody: a deployment with a hundred people
+// is a hundred options to scroll with no way to reach the one you want. The
+// narrowing is the server's, because a list capped before it is filtered would
+// leave out the name somebody typed and then report that nothing matched.
 //
-// **And a select is the wrong control at this size.** A deployment with a
-// hundred people is a hundred options to scroll, with no way to type toward
-// the one you want. The narrowing is the server's, because a list that is
-// capped before it is filtered would leave out the name somebody typed and
-// then report that nothing matched.
-//
-// Teams sort above people: there are few of them, and a picker that buries
+// Teams as well as people, because a team holds work exactly as a person does.
+// They sort above people: there are few of them, and a picker that buries
 // three teams under twenty-five names is one where the team is never found.
+//
+// Yourself first, because taking work is the common case and needs no more
+// right than reaching this control does. Read from who is signed in rather
+// than found among what the server answered, so it is offered whether or not
+// your own name is in the twenty-five that came back.
 
 export type Held = { kind: "person" | "team"; identity: string; name: string };
 
@@ -49,6 +49,7 @@ export function Holder({
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState(-1);
   const box = useRef<HTMLDivElement>(null);
+  const who = useWho();
   // Who holds it now, which the field states rather than suggests. It was the
   // placeholder: a held finding drew the holder's name in the grey a browser
   // paints text nobody has typed, so work somebody had taken read as an empty
@@ -87,6 +88,34 @@ export function Holder({
   });
   const offered = (found.data?.items ?? []) as Held[];
 
+  // Yourself, where you are a person: a credential is not a party work can be
+  // handed to. Not offered where you already hold it, because there is nothing
+  // to do, and dropped while what is typed does not match your own name, so
+  // typing narrows the whole list rather than all of it but one row.
+  const me = who.data;
+  const term = typed.trim().toLowerCase();
+  const yours: Held | null =
+    me?.kind === "person" && me.identity !== "" && value?.identity !== me.identity
+      ? { kind: "person", identity: me.identity, name: me.name || me.identity }
+      : null;
+  const you =
+    yours &&
+    (term === "" ||
+      yours.name.toLowerCase().includes(term) ||
+      yours.identity.toLowerCase().includes(term))
+      ? yours
+      : null;
+
+  // Every row the arrows walk, in the order they are drawn. Nobody is one of
+  // them: it is a choice like the others, and a row the keyboard could not
+  // reach was one somebody had to take a hand off the keys for. A null stands
+  // for it, which is what choosing it sends.
+  const rows: (Held | null)[] = [
+    ...(you ? [you] : []),
+    null,
+    ...offered.filter((held) => !(you && held.kind === "person" && held.identity === you.identity)),
+  ];
+
   function choose(held: Held | null) {
     onPick(held);
     setTyped("");
@@ -116,13 +145,13 @@ export function Holder({
           if (event.key === "ArrowDown") {
             event.preventDefault();
             setOpen(true);
-            setAt((was) => Math.min(offered.length - 1, was + 1));
+            setAt((was) => Math.min(rows.length - 1, was + 1));
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setAt((was) => Math.max(-1, was - 1));
-          } else if (event.key === "Enter" && at >= 0 && offered[at]) {
+          } else if (event.key === "Enter" && at >= 0 && at < rows.length) {
             event.preventDefault();
-            choose(offered[at]);
+            choose(rows[at] ?? null);
           } else if (event.key === "Escape") {
             close();
           }
@@ -130,30 +159,35 @@ export function Holder({
       />
       {open && (
         <ul className="suggestions" role="listbox">
-          <li>
-            <button type="button" onClick={() => choose(null)}>
-              {none}
-            </button>
-          </li>
-          {found.isFetching && offered.length === 0 && <li className="hint">Looking…</li>}
-          {!found.isFetching && offered.length === 0 && (
-            <li className="hint">Nobody here is called that.</li>
-          )}
-          {offered.map((held, i) => (
-            <li key={`${held.kind} ${held.identity}`} aria-selected={i === at} role="option">
+          {rows.map((held, i) => (
+            <li
+              key={held ? `${held.kind} ${held.identity}` : "nobody"}
+              aria-selected={i === at}
+              role="option"
+            >
               <button
                 type="button"
                 className={i === at ? "on" : undefined}
                 onClick={() => choose(held)}
               >
-                {held.name}
-                {/* Which of the two it is, because a team and a person share
-                    one name space and the difference decides who is told: a
-                    person is interrupted, a queue filling up is not. */}
-                <span className="hint"> {held.kind === "team" ? "team" : "person"}</span>
+                {held ? held.name : none}
+                {/* What it is, beside the name and not under it: a team and a
+                    person share one name space, and which of the two decides
+                    who is told — a person is interrupted, a queue filling up
+                    is not. */}
+                {held && (
+                  <span className="hint">
+                    {" "}
+                    {held === you ? "you" : held.kind === "team" ? "team" : "person"}
+                  </span>
+                )}
               </button>
             </li>
           ))}
+          {found.isFetching && offered.length === 0 && <li className="hint">Looking…</li>}
+          {!found.isFetching && offered.length === 0 && (
+            <li className="hint">Nobody here is called that.</li>
+          )}
         </ul>
       )}
     </div>

@@ -107,9 +107,9 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       }
     >
       <p className="reading" style={{ margin: "0 0 14px" }}>
-        The same endpoint a pipeline uses — two parts, <span className="mono">inventory</span> and{" "}
-        <span className="mono">suppressions</span> — for a build with no automation yet, or for
-        trying the tool on any SBOM to hand.
+        The same endpoint a pipeline uses: two parts, <span className="mono">inventory</span> and{" "}
+        <span className="mono">suppressions</span> — for a build with no automation, or to try any
+        SBOM.
       </p>
 
       {upload.error != null && <Failed error={upload.error} what="That could not be uploaded." />}
@@ -182,9 +182,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
             ))}
           </select>
         </div>
-        <span className="hint">
-          Must already be declared. An undeclared target is refused by name, never created.
-        </span>
+        <span className="hint">Must already be declared. Undeclared targets are refused.</span>
       </div>
 
       <div className="field">
@@ -208,10 +206,8 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
               </>
             ) : (
               <>
-                <b>Drop a CycloneDX or SPDX JSON file</b> (CycloneDX 1.4 to 1.7, SPDX 2.2 and 2.3,
-                SPDX 3.x; a major version this does not read is refused by name), or click to
-                choose. The file says which format it is. The scan runs here against the current
-                vulnerability database.
+                <b>Drop a CycloneDX or SPDX JSON file</b> (CycloneDX 1.4–1.7, SPDX 2.2, 2.3 and
+                3.x), or click to choose. The scan runs here.
               </>
             )}
           </span>
@@ -243,8 +239,8 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
               </>
             ) : (
               <>
-                OpenVEX documents — what the build already carries patches for, usually its
-                suppressions directory. Applied here, never re-decided.
+                OpenVEX documents, usually the build&rsquo;s suppressions directory. Applied here,
+                never re-decided.
               </>
             )}
           </span>
@@ -253,11 +249,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
       <div className="alert info">
         <strong>Accepted, then parsed</strong>
-        <span>
-          The upload is answered as soon as the files land; parsing and the scan run in the
-          background and the receipt says how far it got. A file older than what already stands for
-          this target is refused rather than replacing it.
-        </span>
+        <span>Answered as soon as the files land. Parsing and scanning run in the background.</span>
       </div>
     </Drawer>
   );

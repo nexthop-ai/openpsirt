@@ -161,7 +161,7 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		held, err := f.store.HeldBy(t.Context(), triager)
+		held, err := f.store.HeldBy(t.Context(), triager, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,7 +275,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 				t.Errorf("%s: %d rows are running out of time, want on the list: %v",
 					because, len(late), want)
 			}
-			held, err := f.store.HeldBy(ctx, triager)
+			held, err := f.store.HeldBy(ctx, triager, 0)
 			if err != nil {
 				t.Fatal(err)
 			}

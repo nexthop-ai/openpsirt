@@ -186,9 +186,7 @@ export function Review({
               <p>
                 Different code — <b>a different version</b>, not a different variant. Your reasoning
                 is about <span className="id">{plan.versionHere || "the version here"}</span>; tick
-                the ones it also holds for, and the same words are recorded there keyed to that
-                version, so each lapses on its own when it moves. Some of these sit in this same
-                build, which commonly ships one name at several versions.
+                the ones it also holds for. Each lapses on its own.
               </p>
               <ul className="revlist">
                 {plan.offered.map((o) => (
@@ -309,7 +307,7 @@ export function Review({
         )}
         {error != null && <Failed error={error} what="That could not be recorded." />}
         <p className="hint">
-          The approver sees this same summary, and the count is kept with the approval.
+          The approver sees this summary, and the count is kept with the approval.
         </p>
       </>
     );

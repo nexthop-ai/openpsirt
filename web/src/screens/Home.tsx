@@ -35,10 +35,11 @@ function withOnly(path: string, only: string): string {
   return `${path}${path.includes("?") ? "&" : "?"}only=${only}`;
 }
 
-// One home page, assembled from what this person holds. Four figures that
-// follow the scope, then the work — what is pending, what is in progress, what
-// lapsed — then the trends, then the system's own state . Somebody opening
-// this most days wants the size of the day before its contents.
+// One home page, assembled from what this person holds. Five figures that
+// follow the scope, each with what it would say without one beside it, then the
+// work — what is pending, what is in progress, what lapsed — then the trends,
+// then the system's own state. Somebody opening this most days wants the size of
+// the day before its contents.
 export function Home({ who }: { who: Who }) {
   const at = useScope();
   const scope = scopeQuery(at);
@@ -99,10 +100,8 @@ export function Home({ who }: { who: Who }) {
             <>
               <Releases points={releases.data?.items ?? []} />
               <p className="hint">
-                Each release as it stands against today&rsquo;s vulnerability data, not as of the
-                day it was cut &mdash; which is what re-scanning a shipped release is for. Rates are
-                not shown here: how much appeared between two releases is an artifact of how far
-                apart they were cut.
+                Each release against today&rsquo;s vulnerability data, not the day it was cut. No
+                rates: they depend on how far apart releases were cut.
               </p>
             </>
           ) : (
@@ -184,9 +183,7 @@ function Readiness({ at }: { at: Scoped }) {
         <header>
           <h3>Release readiness</h3>
         </header>
-        <p className="reading">
-          Pick a branch and a variant to compare it against the last release cut from it.
-        </p>
+        <p className="reading">Pick a branch and a variant to compare.</p>
       </div>
     );
   }
@@ -287,9 +284,13 @@ function reading(now: number, shipped: number, release: string): string {
   return `${now} critical now against ${shipped} in ${release} — ${shipped - now} fewer than last shipped.`;
 }
 
-// The four figures. Each names what it counts, because the picker narrows them
+// The five figures. Each names what it counts, because the picker narrows them
 // — a tile reading "all products" while a product is picked describes the one
 // thing it is not showing.
+//
+// Each carries what it would say without the scope, so the difference the
+// selection makes is on screen rather than inferred. Unscoped the twin is not
+// drawn: it would be the same number said twice.
 function Figures({
   counting,
   points,
@@ -307,10 +308,10 @@ function Figures({
   // two figures for one word.
   const exploited = useQuery({
     queryKey: ["home", "exploited", scope],
-    // Answered for whatever is selected, like every other figure here . It was
-    // a whole build's alone while the list behind it was, and a tile that
-    // vanishes when somebody widens the scope reads as a tile that broke
-    // rather than one that declines.
+    // Answered for whatever is selected, like every figure here. Drawn only
+    // where a product is picked, because the cross-product list counts a row
+    // per product as well — a tile that changed unit as the picker moved
+    // would quote two figures for one word.
     enabled: !!at.product,
     queryFn: async () =>
       unwrap(
@@ -328,9 +329,39 @@ function Figures({
       ),
   });
   const queue = useQuery({
-    queryKey: ["queue", "count"],
+    queryKey: ["queue", "count", scope],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/review-queue", {
+          params: { query: { limit: 1, ...(at.product ? { product: at.product } : {}) } },
+        }),
+      ),
+  });
+  // The same figures with the scope taken off, so a tile can show what the
+  // selection costs rather than leaving somebody to guess at it. Asked only
+  // where a scope narrows something: unscoped they would be the same number
+  // twice.
+  const widely = !!at.product;
+  const allOpen = useQuery({
+    queryKey: ["home", "trend", "all"],
+    enabled: widely,
+    queryFn: async () => unwrap(await api.GET("/v1/trend", { params: { query: { weeks: 12 } } })),
+  });
+  const allQueue = useQuery({
+    queryKey: ["queue", "count", "all"],
+    enabled: widely,
     queryFn: async () =>
       unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
+  });
+  const allLate = useQuery({
+    queryKey: ["home", "running-out", "all"],
+    enabled: widely,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/running-out", {
+          params: { query: { days: SOON_DAYS, limit: OVERDUE_LIMIT } },
+        }),
+      ),
   });
   // Everything running out inside the window, read once: what is overdue is
   // the part of it that has already run out, so two tiles from one read
@@ -354,15 +385,37 @@ function Figures({
   // something about: overdue is a report and this is a working list.
   const soon = running.filter((row) => (row.days_left ?? 0) >= 0);
   const soonExploited = soon.filter((row) => row.exploited).length;
+  const allRunning = allLate.data?.items ?? [];
+  const allPoints = allOpen.data?.items ?? [];
+
+  // What the same figure is without the scope. Nothing where no scope is
+  // selected, because the two would be one number said twice.
+  function everywhere(n: number | undefined): React.ReactNode {
+    if (!widely || n === undefined) return null;
+    return <span className="d">{n.toLocaleString()} all products</span>;
+  }
+
+  // The same, for a figure read out of a list the server caps. Printed exact, a
+  // capped list says there are fewer than there are — and a filtered part of it
+  // can read zero while the unfiltered whole is at the cap.
+  function everywhereAtLeast(n: number, capped: boolean): React.ReactNode {
+    if (!widely) return null;
+    return (
+      <span className="d">
+        {n.toLocaleString()}
+        {capped ? "+" : ""} all products
+      </span>
+    );
+  }
 
   return (
     <div className="kpis">
       <button type="button" className="kpi" onClick={() => navigate(findingsPath(at))}>
         <span className="l">Open issues · {counting}</span>
         <span className="n">{openCount === undefined ? "—" : openCount.toLocaleString()}</span>
-        <span className="d">
-          one per vulnerability, by any identifier · findings count each issue per component
-        </span>
+        {everywhere(allPoints[allPoints.length - 1]?.open) ?? (
+          <span className="d">distinct issues, not findings</span>
+        )}
       </button>
       {!!at.product && (
         <button
@@ -374,15 +427,36 @@ function Figures({
             <i style={{ background: "var(--sev-exploited)" }} /> Known exploited
           </span>
           <span className="n">{(exploited.data?.total ?? 0).toLocaleString()}</span>
+          {/* No twin. The all-products figure off this endpoint counts a row
+              per product, issue and component, so one library's flaw in five
+              products reads as five against a scoped figure that reads one —
+              two units under one label. */}
           <span className="d">sorted above everything else</span>
         </button>
       )}
-      <button type="button" className="kpi" onClick={() => navigate("/review-queue")}>
+      <button
+        type="button"
+        className="kpi"
+        onClick={() =>
+          navigate(
+            at.product
+              ? `/review-queue?product=${encodeURIComponent(at.product)}`
+              : "/review-queue",
+          )
+        }
+      >
         <span className="l">
           <i style={{ background: "var(--wait)" }} /> Pending your approval
         </span>
         <span className="n">{(queue.data?.total ?? 0).toLocaleString()}</span>
-        <span className="d">across every product you may approve on</span>
+        {everywhere(allQueue.data?.total) ?? (
+          <span
+            className="d"
+            title="A claim is decided in a product and no finer, so this counts the whole product"
+          >
+            {at.stream || at.variant ? `all of ${at.product}` : "waiting on a second person"}
+          </span>
+        )}
       </button>
       {/* Into the list it counts, narrowed the same way: what is undecided
           and past its deadline. It pointed at the assignments screen, which
@@ -400,11 +474,16 @@ function Figures({
             ? `${OVERDUE_LIMIT.toLocaleString()}+`
             : overdue.length.toLocaleString()}
         </span>
-        <span className="d">
-          {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
-          deadline
-          {overdue.length >= OVERDUE_LIMIT ? " · at least" : ""}
-        </span>
+        {everywhereAtLeast(
+          allRunning.filter((row) => (row.days_left ?? 0) < 0).length,
+          allRunning.length >= OVERDUE_LIMIT,
+        ) ?? (
+          <span className="d">
+            {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
+            deadline
+            {overdue.length >= OVERDUE_LIMIT ? " · at least" : ""}
+          </span>
+        )}
       </button>
       {/* The tile that is actually actionable. Overdue is a report about
           something that has already happened; this is the week somebody can
@@ -418,10 +497,15 @@ function Figures({
           <i style={{ background: "var(--wait)" }} /> Due soon
         </span>
         <span className="n">{soon.length.toLocaleString()}</span>
-        <span className="d">
-          {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
-          {SOON_DAYS} days
-        </span>
+        {everywhereAtLeast(
+          allRunning.filter((row) => (row.days_left ?? 0) >= 0).length,
+          allRunning.length >= OVERDUE_LIMIT,
+        ) ?? (
+          <span className="d">
+            {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
+            {SOON_DAYS} days
+          </span>
+        )}
       </button>
     </div>
   );
@@ -449,10 +533,18 @@ function holdings(who: Who): string {
 }
 
 function Pending() {
+  const at = useScope();
+  const product = at.product ? { product: at.product } : {};
   const queue = useQuery({
-    queryKey: ["queue", "home"],
+    queryKey: ["queue", "home", product],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 3 } } })),
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 3, ...product } } })),
+  });
+  const everywhere = useQuery({
+    queryKey: ["queue", "home", "all"],
+    enabled: !!at.product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
   });
   const items = queue.data?.items ?? [];
 
@@ -460,11 +552,18 @@ function Pending() {
     <div className="panel">
       <header>
         <h3>Pending your approval</h3>
-        {/* The queue is not narrowed by product, so this panel does not
-            follow the scope the head names, and says so rather than
-            letting the head speak for it. */}
-        <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          every product you may approve on
+        <span
+          className="eyebrow"
+          style={{ marginLeft: "auto" }}
+          title={
+            at.stream || at.variant
+              ? "A claim is decided in a product and no finer, so this counts the whole product"
+              : undefined
+          }
+        >
+          {at.product
+            ? `${(everywhere.data?.total ?? 0).toLocaleString()} all products`
+            : "all products"}
         </span>
         <span className="tally">{queue.data?.total ?? 0}</span>
       </header>
@@ -497,9 +596,17 @@ function Pending() {
 // What each person holds. Nothing lists what one person holds — only how much
 // each person holds — so this is everybody rather than you.
 function InProgress() {
+  const at = useScope();
+  const product = at.product ? { product: at.product } : {};
   const held = useQuery({
-    queryKey: ["home", "holdings"],
-    queryFn: async () => unwrap(await api.GET("/v1/assignments", {})),
+    queryKey: ["home", "holdings", product],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/assignments", { params: { query: { ...product } } })),
+  });
+  const everywhere = useQuery({
+    queryKey: ["home", "holdings", "all"],
+    enabled: !!at.product,
+    queryFn: async () => unwrap(await api.GET("/v1/assignments", { params: { query: {} } })),
   });
   const mine = held.data?.items ?? [];
   const total = mine.reduce((sum, each) => sum + (each.open ?? 0), 0);
@@ -509,10 +616,20 @@ function InProgress() {
     <div className="panel">
       <header>
         <h3>In progress</h3>
-        {/* Holdings are counted per person across everything, not per
-            product, so this does not follow the scope the head names. */}
-        <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          every product
+        <span
+          className="eyebrow"
+          style={{ marginLeft: "auto" }}
+          title={
+            at.stream || at.variant
+              ? "Work is held per product and no finer, so this counts the whole product"
+              : undefined
+          }
+        >
+          {at.product
+            ? `${(everywhere.data?.items ?? [])
+                .reduce((sum, each) => sum + (each.open ?? 0), 0)
+                .toLocaleString()} all products`
+            : "all products"}
         </span>
         <span className={overdue > 0 ? "tally urgent" : "tally"}>{total.toLocaleString()}</span>
       </header>
@@ -564,15 +681,32 @@ function Lapsed() {
       ),
   });
 
+  // The same two with the scope taken off, so the panel can say what the
+  // product costs. Decisions narrow by product and no finer, so a stream or a
+  // variant in the scope changes nothing here.
+  const everywhereLapsed = useQuery({
+    queryKey: ["home", "lapsed", "all"],
+    enabled: !!at.product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/decisions", { params: { query: { state: "lapsed", limit: 1 } } })),
+  });
+  const everywhereExpired = useQuery({
+    queryKey: ["home", "expired", "all"],
+    enabled: !!at.product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/decisions", { params: { query: { expired: true, limit: 1 } } })),
+  });
+
   const lapsedTotal = lapsed.data?.total ?? 0;
   const expiredTotal = expired.data?.total ?? 0;
+  const allTotal = (everywhereLapsed.data?.total ?? 0) + (everywhereExpired.data?.total ?? 0);
 
   return (
     <div className="panel">
       <header>
         <h3>Lapsed decisions</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {at.product ? `${at.product}, every branch` : "every product"}
+          {at.product ? `${allTotal.toLocaleString()} all products` : "all products"}
         </span>
         <span className={lapsedTotal + expiredTotal > 0 ? "tally urgent" : "tally"}>
           {(lapsedTotal + expiredTotal).toLocaleString()}

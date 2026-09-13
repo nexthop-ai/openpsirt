@@ -46,7 +46,7 @@ export function Disclosing() {
       setSaid(
         asked.in_force
           ? `The date moved to ${until}.`
-          : `Recorded. It moves nothing until a second person agrees, because of how far` +
+          : `Recorded. Nothing moves until a second person agrees, because of how far` +
               ` this embargo has already been moved.`,
       );
       setAsking(null);
@@ -69,10 +69,7 @@ export function Disclosing() {
         <h2>
           Disclosing <span className="n">{items.length}</span>
         </h2>
-        <p>
-          Embargoes running out, soonest first, with what has already run out at the top. Reaching a
-          date discloses nothing by itself — it is a decision somebody makes.
-        </p>
+        <p>Embargoes running out, soonest first. Reaching a date discloses nothing on its own.</p>
         <label className="field" style={{ marginLeft: "auto" }}>
           <span>Within</span>
           <select value={String(days)} onChange={(event) => setDays(Number(event.target.value))}>
@@ -92,10 +89,7 @@ export function Disclosing() {
       {past > 0 && (
         <div className="alert" style={{ marginBottom: 12 }}>
           <strong>{past} past its date</strong>
-          <span>
-            The date has arrived and nothing has been decided. Nothing has been published: it is
-            waiting for somebody to say what happens.
-          </span>
+          <span>The date has passed with no decision. Nothing has been published.</span>
         </div>
       )}
 
@@ -164,8 +158,7 @@ export function Disclosing() {
                       {asking === key && (
                         <div style={{ marginTop: 8 }}>
                           <p className="hint">
-                            A date only ever moves later: bringing one forward is disclosing sooner,
-                            which is a different act. Past a threshold this needs a second person,
+                            Dates only move later. Past a threshold this needs a second person,
                             measured against everything this embargo has already been moved by.
                           </p>
                           <label className="field">

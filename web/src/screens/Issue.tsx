@@ -45,10 +45,7 @@ export function Issue() {
             <span className="id">{vulnerability}</span>
           </h2>
         </div>
-        <Empty
-          title="Nothing you can see carries this."
-          detail="Either nothing here has it, or it sits only in products you hold nothing on — which are the same answer on purpose."
-        />
+        <Empty title="Nothing you can see carries this." detail="Nothing you can read holds it." />
       </>
     );
   }
@@ -92,8 +89,7 @@ export function Issue() {
 
       {(it?.aliases ?? []).length > 0 && (
         <p className="hint" style={{ marginBottom: 10 }}>
-          Also known as <span className="id">{(it?.aliases ?? []).join(" · ")}</span>. A name
-          assigned later is another name for the same issue; nothing keyed on it moved.
+          Also known as <span className="id">{(it?.aliases ?? []).join(" · ")}</span>
         </p>
       )}
 

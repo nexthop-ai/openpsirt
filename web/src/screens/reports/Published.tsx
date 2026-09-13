@@ -59,7 +59,7 @@ export function Published() {
         <section className="panel">
           <Empty
             title="Nothing has been published in this window."
-            detail="An advisory is about a flaw in our own product, recorded here by hand. Known issues in third-party components are tracked and fixed rather than published about."
+            detail="Advisories cover flaws in our own products. Third-party components are tracked, not published about."
           />
         </section>
       ) : (
@@ -69,11 +69,8 @@ export function Published() {
             {revisions > 0 && `, ${revisions.toLocaleString()} of them a revision`}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Newest first. A revision is an advisory that had already gone out and was published
-            again — the entry a period is usually read for. The digest is what the document hashed
-            to when it went out: the published document belongs to whoever published it, and this is
-            what makes &ldquo;is what is out still what we would generate&rdquo; a question with an
-            answer.
+            Newest first. A revision is an advisory published again. The digest lets a later draft
+            be compared against what went out.
           </p>
           <div className="tablewrap">
             <table>

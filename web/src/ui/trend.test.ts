@@ -14,9 +14,7 @@ describe("what the trend panels say", () => {
     // weeks; open up 5,803 across the range" and "Critical went 0 → 389" —
     // both arithmetically correct, and both describing the first scan landing
     // rather than anything about the estate.
-    expect(paceReading(justSwitchedOn)).toBe(
-      "Not enough history yet to say which way this is going.",
-    );
+    expect(paceReading(justSwitchedOn)).toBe("Not enough history.");
     expect(mixReading(justSwitchedOn)).toBe("Not enough history yet.");
   });
 
@@ -41,7 +39,7 @@ describe("what the trend panels say", () => {
     expect(said).toContain("Backlog shrinking");
     expect(said).toContain("of 4 weeks");
     expect(said).toContain("down 30");
-    expect(mixReading(points)).toBe("Critical went 10 → 6 across the range.");
+    expect(mixReading(points)).toBe("Critical 10 → 6");
   });
 
   it("keeps an empty week that falls inside the history", () => {

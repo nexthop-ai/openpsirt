@@ -50,6 +50,7 @@ end rather than left to be found by clicking.
 - [Reports, settings, inheritance](#reports-settings-inheritance)
 - [Showing the ordering signals](#showing-the-ordering-signals)
 - [Units, dates and copy](#units-dates-and-copy)
+- [What a screen says](#what-a-screen-says)
 - [Interface-wide rules](#interface-wide-rules)
 - [The initial load](#the-initial-load)
 - [Running it locally](#running-it-locally)
@@ -357,6 +358,7 @@ three date bounds having no control at all.
 | The count is read from the address | The one place that knows what every filter is called |
 | Filtering is the server's, not the browser's | A list narrowed after it arrives is narrowed within one page of it, so "hide the kernel" would hide it from the twenty rows already fetched and from nothing else |
 | The common ones stay one click away | Severity, exploited and fix-available. Package kind, what holds a thing, and how far it has been decided sit in a panel that opens, with how many are on written on the control while it is shut |
+| The panel is shut until somebody opens it, whatever the address narrows by | It is most of a screen. Opened because a filter is set, a link to a narrowed list covers the rows somebody followed it to read — and it says nothing the chips above the list do not already say, each of which removes its own filter when clicked |
 
 Exploited and fix-available are two flags, not one parameter holding one of two
 words — otherwise "exploited, and a fix exists", the first population anybody
@@ -530,17 +532,35 @@ fold, so packages built from one source are one row.
 
 ## The component screen
 
-A component has **a row per build that carries it**, with what that build ships,
-what is open against it there, where it could go, the earliest deadline among what
-is open, and what has already been promised. The issue count is the way through
-to the findings list. Before this, clicking a component opened a filtered list of
-its findings and nothing else, so a component could be read and never acted on.
+A component has **a row per version each build carries**, with what that build
+ships, what is open against it there, where it could go, the earliest deadline
+among what is open, and what has already been promised. The issue count is the
+way through to the findings list.
+
+**The screen is arranged on where the package sits**, because that is what
+decides what can be done about it. A leaf carries its own risk and is upgraded; a
+package vendored in pre-built carries everything beneath it and moves only when
+it does. So the graph leads — what pulls it in, the package, what it carries —
+and the act hangs off it.
 
 | Rule | |
 |---|---|
+| The position is drawn before the action | What is possible follows from where it sits, and the same two numbers read opposite ways at the two ends of a graph: nothing open on it and everything beneath means the package itself is the only lever |
+| Releases are picked inside the promise, ticked to the ones shipping this version | One bump moves every release at that version. Picked in a column of the table instead, the form appeared only once something was ticked, so the control was invisible until somebody guessed at it |
+| The version to move to is offered and never required | The list is what the scanner named; the server is what refuses one it has not heard of. So a version newer than anything reported can still be named, which is the case where an upgrade is ahead of the advisories |
+| Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a judgment. A form that cannot be filled in is one somebody fills in anyway |
+| More than one version is a choice, not a refusal | A name meaning two components is two pieces of code. The versions are offered with what is open at each, rather than the request being refused with an instruction to add a parameter |
+| A build is listed because it ships the component, not because something is open | The presence is a fact about the graph and the counts are joined onto it. Read off the findings instead, a package whose whole risk sits in what it pulls in — nothing on the package, everything underneath — answered with no builds, which reads as a name the product does not ship. That is the ordinary state of anything vendored in pre-built |
+| One row per version rather than per build | A build shipping a name at two versions holds two components, and they are two pieces of code to decide about separately. Collapsing them to the lowest version reported one and hid the other |
+| A deadline is absent where nothing is open, never zero | It is the earliest among what is open, so with nothing open there is no such date |
+| The package identifier travels with the row | The ecosystem is read out of it and so is an upstream address, and neither is stored. Nothing is fetched from either |
 | Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
-| Where it could go is listed, never ordered | Telling which of two versions comes first needs an ordering per ecosystem this does not have, so what is offered is every version the scanner named as carrying a fix, most-closing first. "Nearest" is not a question this can answer |
+| Where it could go carries two counts | What a release fixed is how many of what is open name that exact version; what reaching it closes is that plus everything fixed before it. Sorted on the first, the version worth taking sinks: measured on the demo's kernel, the release that closes all 158 fixed 2 of its own and the one that fixed 49 leads |
+| Furthest along first where the versions can be ordered, unranked where they cannot | An ordering exists per ecosystem rather than in general, and one version a comparison refuses makes the whole list unrankable. Shown unranked the two counts are equal and the screen says so, rather than implying an order nothing established |
 | The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the bulk cap is measured against |
+| It carries where the component sits in the graph | What pulls it in, what it pulls in, and twelve weeks of what opened and closed under it. Somebody arriving from the tree asked a question about the graph, and answering it on a page they have to leave to reach is the same page drawn twice |
+| Where to read about the package is built from its identifier | An identifier already names the ecosystem and the name within it, and each ecosystem has one address where a package is read about. Nothing is fetched and nothing is stored — the same way the issue records are worked out. An ecosystem with no address offers none rather than a guess, and a name is encoded into the path because it came out of a scan file |
+| The graph is answered for one build, picked from the rows above | An edge is a fact about one build: the same library is pulled in by different things in different builds. A link naming a build arrives on it, so the tree opens the component on the graph somebody was already looking at |
 
 It is where an upgrade is promised, on the terms `DESIGN-triage.md` sets: the
 releases it is for, the version, the date, the reason, and who carries it.
@@ -553,7 +573,7 @@ The finding is the working screen after a decision as well as before it.
 |---|---|
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
 | **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
-| **Under both** | The notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
 
 The notes thread and the claim's comments are two threads, rendered near each
 other (REQ-29).
@@ -588,12 +608,32 @@ measurable: rendered from the demo the narrow column held severity 7.8, EPSS
 at 380 pixels, while the widest thing on the screen was an empty text area.
 Somebody weighs the evidence and then acts, and the page runs in that order.
 
-The references move down, with the timeline, the revisions and the comments.
-Eleven links between the facts and the form recreates the defect the
-side-by-side layout was built to fix, arriving by a different route: what is
-consulted elsewhere is read after the judgment rather than during it. What is
-neither evidence nor action — the timeline, the revisions, the comments, the
-holder, the fix targets, the assessment — was already there.
+Triage is one pane and both questions: who is dealing with it, and what was
+decided. They were two panes with a screen between them. Where nothing is left
+to decide the form is not drawn and the assignee stands alone, because
+reassigning a decided finding is ordinary.
+
+The rating sits inside the severity block, under the words it disagrees with,
+so it is changed where it is read. It was a pane of its own further down, which
+asked somebody reading a severity to go and find the control for it.
+
+The references sit above the VEX statements, at the head of what is read to
+decide. A write-up is what somebody triaging reads first, and a third party's
+claim about the finding is read against it rather than before it.
+
+They were below the form for a while, on the grounds that eleven links beside
+the action recreate the defect the side-by-side layout was built to fix. That
+holds for the whole block of them and not for the advisory somebody is about to
+judge from, which is consulted during the judgment rather than after it.
+
+What is neither evidence nor action — the timeline, the revisions, the
+comments, the holder, the assessment — stays below.
+
+Where a fix will land is not on this screen. It is settled by the judgment that
+promises the work, and the releases it is for are named there; a pane of its own
+offered the same set with no version, no date and no reasoning attached, which
+is a plan nothing could chase. What became of it is read from the release and
+from the build's list of what it is waiting on.
 
 A decision is made on the finding's own screen, and nowhere else (REQ-57,
 reversed). The list opened the decision form inside a row for a while, so a run
@@ -723,7 +763,9 @@ expects two. **One recursive statement for the row's whole set of children**:
 | A node says what its number is made of, as a short strip of the bands | Five thousand beneath a node says nothing about whether any of it matters. Rolled up in the statement that already counts the subtree, so the bands sum back to the total |
 | The node counts open their lists | A node saying "5,650 beneath · 0 here" and going nowhere is a figure nobody can act on from where they read it |
 | The count is every open issue, answered or not | A dismissal does not subtract from it. Written down because "what is open here" and "what is still to answer here" are both reasonable readings and the screen gives the first |
-| The marker that opens a row is a button | It was a span with a click handler, so every node past the first level was unreachable without a pointer, on the screen whose whole purpose is walking down |
+| The marker that opens a row is a button | A span with a click handler leaves every node past the first level unreachable without a pointer, on the screen whose whole purpose is walking down |
+| A component's name opens the component | The tree is where somebody asks about a component, and its own screen answers it. The node name is a button, because selecting is how the tree is walked, so the link is the row's own control and the names in the two lists beside the tree |
+| There is no pane over the tree | What sat in it — what pulls a component in, what it pulls in, its history, what is open against it — is the component's screen. Drawn over the tree it was a second copy of a page that already existed, and the page was the thinner of the two |
 
 Ordering on the cumulative count reverses an earlier decision worth keeping in
 view. Ordered on the row's own count the tree opened as an alphabetical list of
@@ -757,8 +799,11 @@ adds:
 | **Lapsed decisions and deferrals that ran out sit underneath** | The row carries the decision and not the build it was made in, so reaffirming happens on the finding, where its locations are |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 
-The queue filters on mine and nothing else, so an approver holding several
-products reads one interleaved list. *Not built* — see the list at the end.
+The queue narrows to one product, which is what a figure on the home screen
+counts: the address carries the product it was counted for, and the line under
+the heading names it. The exports narrow the same way, so a file taken from a
+narrowed screen is the narrowed backlog. Nothing narrower is offered — a claim is
+decided in a product and no finer.
 
 ## The claim page
 
@@ -1202,6 +1247,40 @@ history before a direction is claimed, because three points is one change plus a
 confirmation. The panels still draw — the chart shows what there is and claims
 nothing; only the sentence is held back.
 
+## What a screen says
+
+Screen copy is labels and values. The reasoning behind a screen belongs in this
+document, not on it.
+
+| Rule | |
+|---|---|
+| **Cut before rewriting** | Most of what a screen explains, it already shows. A clickable row looks clickable, a column header names its column, a version on a row says the row is not a repeat |
+| **Nouns and intents** | What survives says what a thing is, or what a control does, in a couple of words. A reader working a list does not read sentences |
+| **Clarification where it is needed, not everywhere** | A note on every panel is noise that hides the one note that matters |
+| **Help on hover** | A tooltip carries what a reader may want and nobody needs standing on the screen. It sits on the thing it is about and appears only when it applies: a rule about exploited findings does not belong on a finding that is not exploited |
+| **Plain spoken English** | The way one engineer tells another. Not literary, not mannered, no sentence that has to be read twice |
+| **Professional, for technical users** | The reader knows what a CVE, a VEX document and a version range are. Nothing is reassured, justified or explained down to them |
+
+Screen copy is the one register here that is written to be skimmed rather than
+read, which is why it does not follow the house style the documents use. The
+same fact is written one way in this document and another on a screen.
+
+| On the screen | In this document |
+|---|---|
+| No VEX statements uploaded | An empty panel reads as "nobody has an opinion about this", and what it means is that no document saying so has been uploaded here |
+| Planned fixes. Cleared by the next scan | A release clears when the next scan of it stops finding the issue, so nothing is marked done by hand |
+| Applies to every build with this component | The same code built several ways is one piece of work |
+
+Measured before the sweep that applied this: **262 standing strings, about
+6,700 words**, across 65 of the interface's files — 69 of them on the screens
+somebody opens every day. The copy had drifted into explaining the design to
+the reader, which is what a design document is for.
+
+**Contractions.** The rule against them covers the durable documents, which are
+read years later by somebody deciding whether a decision still holds. Screen
+copy is not one of those and is written as spoken. In practice it rarely needs
+one: plain and short gets there without.
+
 ## Interface-wide rules
 
 A screen works on a phone, and that is a requirement rather than an enhancement
@@ -1307,7 +1386,7 @@ beside them.
 | | |
 |---|---|
 | **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
-| **Narrowing the review queue** | By product, by what kind of thing is waiting, by who proposed it, by age or by severity |
+| **Narrowing the review queue further than a product** | By what kind of thing is waiting, by who proposed it, by age or by severity. Narrowing by product is built, because a figure that counts one product has to open a list about that product |
 | **A deadline and an owner in the finding's header** | The row carries both; the header does not |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 

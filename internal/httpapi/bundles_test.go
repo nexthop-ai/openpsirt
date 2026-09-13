@@ -479,15 +479,11 @@ func TestAnUpgradeIsOneDecisionPerPlaceHoweverManyBuildsShipIt(t *testing.T) {
 	})
 }
 
-func TestABuildHasOneCommitmentPerFoldAndItMoves(t *testing.T) {
-	// A release moves a package to one version. It was keyed per issue and
-	// per component and per target version, so two bumps of one package to two
-	// different versions were two rows and a coordinator read a plan that said
-	// both — and changing which version a release was moving to meant
-	// rewriting every row of it.
-	//
-	// Now it is one row per build and fold, and changing it is changing that
-	// row. What it covers follows, because coverage is a match rather than a
+func TestABuildHasOneCommitmentPerFold(t *testing.T) {
+	// A release moves a package to one version, so a build carries one
+	// commitment per fold however many binaries that source package ships and
+	// whatever version each finding names as its fix. What the commitment
+	// covers follows from the fold, because coverage is a match rather than a
 	// list.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedSiblings(t)
@@ -502,16 +498,15 @@ func TestABuildHasOneCommitmentPerFoldAndItMoves(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/streams/master/variants/broadcom/findings/%s/components/%s/fix-targets"
-		for _, each := range []struct{ issue, component string }{
-			{"CVE-2026-CURL1", "libcurl4t64"},
-			{"CVE-2026-CURL2", "libcurl3t64"},
-		} {
-			if got := asPerson(t, r, "triager", http.MethodPut,
-				fmt.Sprintf(at, each.issue, each.component),
-				`{"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code >= 300 {
-				t.Fatalf("declaring a fix answered %d: %s", got.Code, got.Body.String())
-			}
+		// One bump, declared against one of the two binaries. The other is
+		// the same source package, so nothing is declared against it.
+		ahead := time.Now().UTC().AddDate(0, 0, 1).Format(time.DateOnly)
+		if got := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/components/libcurl4t64/upgrade",
+			`{"to":"8.6.0-1","by":"`+ahead+`",`+
+				`"reasoning":"Taking the 8.6.0 bump in the next build.",`+
+				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 
 		var plan struct {

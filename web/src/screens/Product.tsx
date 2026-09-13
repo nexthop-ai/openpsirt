@@ -118,7 +118,7 @@ export function Product() {
                             {" "}
                             <span
                               className="vchip"
-                              title="This release is out of support. Nothing is going to be fixed here, so nothing is late and a quiet build is expected rather than a fault"
+                              title="Out of support. Nothing here is late, and a quiet build is expected"
                             >
                               out of support
                             </span>
@@ -180,9 +180,8 @@ export function Product() {
           </div>
         )}
         <p className="hint" style={{ marginTop: 8 }}>
-          Counted as issues at components, which is what the findings list counts: a component
-          reached twenty ways carries the same issue twenty times. <b>Undecided</b> means no place
-          has a decision; <b>decided</b> means every place is answered by one that stands.
+          Issues at components, the same unit the findings list uses. <b>Undecided</b> means no
+          place has a decision; <b>decided</b> means every place is answered by one that stands.
         </p>
       </div>
     </div>

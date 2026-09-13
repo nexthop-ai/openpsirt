@@ -32,7 +32,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
-// Latest is the newest version of a package, and when it shipped.
+// Latest is the newest version of a package, and what the index says about it.
 type Latest struct {
 	Version string
 	// Released is when that version shipped. Zero where the index gives a
@@ -40,6 +40,19 @@ type Latest struct {
 	// date of zero, and the caller stores nothing rather than storing the
 	// beginning of time.
 	Released time.Time
+	// Summary is one line saying what the package is, for somebody reading a
+	// dependency of a dependency they have never heard of. Taken where the
+	// index serves one and absent where it does not, which is normal rather
+	// than a fault: the module proxy has no such field at all.
+	//
+	// One line, never the long description. What some indexes call the
+	// description is a whole README — measured at 2,894 characters for one
+	// ordinary package — which is a document rather than a label.
+	Summary string
+	// Project is where the package is developed, as the index says rather than
+	// as an address worked out from the name. Absent where the index does not
+	// say, in which case a caller can still build one from the identifier.
+	Project string
 }
 
 // Asker looks up one ecosystem.
@@ -186,6 +199,13 @@ func (g goProxy) Latest(ctx context.Context, name string) (Latest, error) {
 	var answer struct {
 		Version string    `json:"Version"`
 		Time    time.Time `json:"Time"`
+		// Where the module is developed, which the proxy states and nothing
+		// else here has to work out. There is no description anywhere in the
+		// protocol — not in this answer and not in a go.mod — so a Go module
+		// carries an address and no summary.
+		Origin struct {
+			URL string `json:"URL"`
+		} `json:"Origin"`
 	}
 	// Escaped per segment, like every other asker here. This was the one that
 	// interpolated the name raw, and a package identifier is somebody else's
@@ -200,7 +220,9 @@ func (g goProxy) Latest(ctx context.Context, name string) (Latest, error) {
 	if answer.Version == "" {
 		return Latest{}, ErrUnknown
 	}
-	return Latest{Version: answer.Version, Released: answer.Time}, nil
+	return Latest{
+		Version: answer.Version, Released: answer.Time, Project: answer.Origin.URL,
+	}, nil
 }
 
 // escapePath escapes each segment of a module path, keeping the separators
@@ -235,8 +257,13 @@ type npmRegistry struct{ c *Client }
 
 func (n npmRegistry) Latest(ctx context.Context, name string) (Latest, error) {
 	var answer struct {
-		DistTags map[string]string `json:"dist-tags"`
-		Time     map[string]string `json:"time"`
+		DistTags    map[string]string `json:"dist-tags"`
+		Time        map[string]string `json:"time"`
+		Description string            `json:"description"`
+		Homepage    string            `json:"homepage"`
+		Repository  struct {
+			URL string `json:"url"`
+		} `json:"repository"`
 	}
 	// A scoped name keeps its slash escaped. "@types/node" is one package
 	// rather than a package inside a directory, and unescaping it asks the
@@ -269,7 +296,11 @@ func (n npmRegistry) Latest(ctx context.Context, name string) (Latest, error) {
 	if version == "" {
 		return Latest{}, ErrUnknown
 	}
-	return Latest{Version: version, Released: parseTime(answer.Time[version])}, nil
+	return Latest{
+		Version: version, Released: parseTime(answer.Time[version]),
+		Summary: answer.Description,
+		Project: firstOf(answer.Homepage, answer.Repository.URL),
+	}, nil
 }
 
 func (n npmRegistry) abbreviated(ctx context.Context, at string) (string, error) {
@@ -292,6 +323,11 @@ func (p pyPI) Latest(ctx context.Context, name string) (Latest, error) {
 	var answer struct {
 		Info struct {
 			Version string `json:"version"`
+			// The one-line summary. Deliberately not "description", which in
+			// this index is the package's whole README.
+			Summary  string            `json:"summary"`
+			HomePage string            `json:"home_page"`
+			URLs     map[string]string `json:"project_urls"`
 		} `json:"info"`
 		URLs []struct {
 			Uploaded string `json:"upload_time_iso_8601"`
@@ -306,7 +342,13 @@ func (p pyPI) Latest(ctx context.Context, name string) (Latest, error) {
 	}
 	// The earliest file of the newest release, because a release is dated by
 	// when it appeared rather than by when somebody added another wheel to it.
-	latest := Latest{Version: answer.Info.Version}
+	latest := Latest{
+		Version: answer.Info.Version, Summary: answer.Info.Summary,
+		// Whichever the project stated, in the order somebody reading about it
+		// would want: its own pages before its repository.
+		Project: firstOf(answer.Info.HomePage, answer.Info.URLs["Homepage"],
+			answer.Info.URLs["Source"], answer.Info.URLs["Repository"]),
+	}
 	for _, file := range answer.URLs {
 		at := parseTime(file.Uploaded)
 		if at.IsZero() {
@@ -324,8 +366,11 @@ type cratesIO struct{ c *Client }
 func (r cratesIO) Latest(ctx context.Context, name string) (Latest, error) {
 	var answer struct {
 		Crate struct {
-			MaxStable string `json:"max_stable_version"`
-			MaxAny    string `json:"max_version"`
+			MaxStable   string `json:"max_stable_version"`
+			MaxAny      string `json:"max_version"`
+			Description string `json:"description"`
+			Homepage    string `json:"homepage"`
+			Repository  string `json:"repository"`
 		} `json:"crate"`
 		Versions []struct {
 			Num     string `json:"num"`
@@ -346,7 +391,10 @@ func (r cratesIO) Latest(ctx context.Context, name string) (Latest, error) {
 	if version == "" {
 		return Latest{}, ErrUnknown
 	}
-	latest := Latest{Version: version}
+	latest := Latest{
+		Version: version, Summary: answer.Crate.Description,
+		Project: firstOf(answer.Crate.Homepage, answer.Crate.Repository),
+	}
 	for _, each := range answer.Versions {
 		if each.Num == version {
 			latest.Released = parseTime(each.Created)
@@ -354,6 +402,20 @@ func (r cratesIO) Latest(ctx context.Context, name string) (Latest, error) {
 		}
 	}
 	return latest, nil
+}
+
+// firstOf is the first of several fields an index might have filled in.
+//
+// Three of the four state where a project lives in more than one place and fill
+// in whichever the publisher bothered with, so the caller asks for them in the
+// order a reader would want rather than picking one and hoping.
+func firstOf(said ...string) string {
+	for _, each := range said {
+		if at := strings.TrimSpace(each); at != "" {
+			return at
+		}
+	}
+	return ""
 }
 
 // parseTime reads the shapes these indexes use, and gives up quietly.
