@@ -341,7 +341,9 @@ function Sits({
       ) : (
         <ol className="sits">
           <li>
-            <span className="step">Pulled in by{above.length > 0 ? ` · ${above.length}` : ""}</span>
+            <span className="eyebrow">
+              Pulled in by{above.length > 0 ? ` · ${above.length}` : ""}
+            </span>
             {around.isPending ? (
               <span className="sub">Working it out…</span>
             ) : above.length === 0 ? (
@@ -368,7 +370,9 @@ function Sits({
           </li>
 
           <li className="at">
-            <span className="step">This package{here.ecosystem ? ` · ${here.ecosystem}` : ""}</span>
+            <span className="eyebrow">
+              This package{here.ecosystem ? ` · ${here.ecosystem}` : ""}
+            </span>
             <span className="nm id">
               {component} <span className="hint">{here.version}</span>
             </span>
@@ -384,23 +388,11 @@ function Sits({
                 </>
               )}
             </span>
-            {Object.keys(here.by_severity ?? {}).length > 0 && (
-              <span className="strip">
-                {ROLLED.filter((band) => (here.by_severity ?? {})[band]).map((band) => (
-                  <span
-                    key={band}
-                    className={`band ${band}`}
-                    title={`${(here.by_severity ?? {})[band]} ${band}`}
-                  >
-                    {(here.by_severity ?? {})[band]}
-                  </span>
-                ))}
-              </span>
-            )}
+            <Shape by={here.by_severity} />
           </li>
 
           <li>
-            <span className="step">
+            <span className="eyebrow">
               What it carries{below.length > 0 ? ` · ${below.length.toLocaleString()}` : ""}
             </span>
             {around.isPending ? (
@@ -437,22 +429,8 @@ function Sits({
                                 ? (each.beneath ?? 0).toLocaleString()
                                 : ""}
                             </td>
-                            <td style={{ width: "34%" }}>
-                              {Object.keys(each.beneath_by_severity ?? {}).length > 0 && (
-                                <span className="strip">
-                                  {ROLLED.filter(
-                                    (band) => (each.beneath_by_severity ?? {})[band],
-                                  ).map((band) => (
-                                    <span
-                                      key={band}
-                                      className={`band ${band}`}
-                                      title={`${(each.beneath_by_severity ?? {})[band]} ${band}`}
-                                    >
-                                      {(each.beneath_by_severity ?? {})[band]}
-                                    </span>
-                                  ))}
-                                </span>
-                              )}
+                            <td style={{ width: "30%" }}>
+                              <Shape by={each.beneath_by_severity} key_={false} />
                             </td>
                           </tr>
                         ))}
@@ -476,6 +454,41 @@ function Sits({
         </ol>
       )}
     </div>
+  );
+}
+
+// What a count is made of, as one bar whose widths are the counts.
+//
+// The shape is the answer: a bar that is mostly one colour says where the weight
+// is before a number is read, which a chip per band at a fixed width does not.
+//
+// **The key carries the identity, not the colour.** Two of the severity colours
+// are close enough that a colourblind reader cannot separate them, so the labels
+// are what says which band is which and the colour reinforces it. Where a row is
+// one line the key is dropped and the title carries it, because five legends
+// down a table say the same thing five times.
+function Shape({ by, key_ = true }: { by?: Record<string, number>; key_?: boolean }) {
+  const there = ROLLED.filter((band) => (by ?? {})[band]);
+  if (there.length === 0) return null;
+  const said = there.map((band) => `${(by ?? {})[band]} ${band}`).join(" · ");
+  return (
+    <>
+      <span className="sevbar" role="img" aria-label={said} title={key_ ? undefined : said}>
+        {there.map((band) => (
+          <i key={band} className={band} style={{ flex: (by ?? {})[band] }} />
+        ))}
+      </span>
+      {key_ && (
+        <span className="sevkey">
+          {there.map((band) => (
+            <span key={band}>
+              <i className={band} />
+              {(by ?? {})[band]} {band}
+            </span>
+          ))}
+        </span>
+      )}
+    </>
   );
 }
 

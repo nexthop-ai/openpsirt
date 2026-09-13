@@ -509,13 +509,7 @@ a.kpi:hover {
   border-color: var(--accent);
   background: var(--accent);
 }
-.sits .step {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--faint);
-  font-weight: 600;
-}
+
 /* The package the screen is about is marked by its node, not by its size. A
    component name is as long as its packager made it — one kernel binary is
    forty-six characters — so enlarging it takes the column and wraps to three
@@ -525,9 +519,90 @@ a.kpi:hover {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.sits .eyebrow {
+  display: block;
+}
+.sits .sevbar {
+  margin-top: 7px;
+  max-width: 320px;
+}
 .sits .sub {
   font-size: var(--step--1);
   color: var(--faint);
+}
+
+/* What a count is made of, as one bar rather than a chip per band.
+   
+   Widths are the counts, so the shape is the answer: a bar that is mostly one
+   colour says where the weight is before any number is read. Chips of equal
+   width say only which bands are present, which is the fact a reader least
+   needs.
+   
+   The key is not optional. Two of the severity colours are close enough that a
+   colourblind reader cannot separate them — measured at a perceptual distance
+   of 9.6 where 15 is the floor — so the labels beside the bar are what carries
+   the identity, and the colour only reinforces it. */
+.sevbar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: var(--pill);
+  overflow: hidden;
+  background: var(--line);
+}
+.sevbar > i {
+  display: block;
+  min-width: 3px;
+}
+.sevbar > i.critical {
+  background: var(--sev-critical);
+}
+.sevbar > i.high {
+  background: var(--sev-high);
+}
+.sevbar > i.medium {
+  background: var(--sev-medium);
+}
+.sevbar > i.low {
+  background: var(--sev-low);
+}
+.sevbar > i.unrated {
+  background: var(--sev-unrated);
+}
+.sevkey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 7px;
+}
+.sevkey > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--step--1);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sevkey > span > i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+.sevkey > span > i.critical {
+  background: var(--sev-critical);
+}
+.sevkey > span > i.high {
+  background: var(--sev-high);
+}
+.sevkey > span > i.medium {
+  background: var(--sev-medium);
+}
+.sevkey > span > i.low {
+  background: var(--sev-low);
+}
+.sevkey > span > i.unrated {
+  background: var(--sev-unrated);
 }
 
 /* The row a screen is currently about, in a table listing several. */
