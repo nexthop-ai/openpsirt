@@ -57,8 +57,8 @@ export function Places({
   if (places.length === 0) return null;
   const shown = all ? places : places.slice(0, CHAINS);
   return (
-    <div className="evblock">
-      <h4>Dependency path</h4>
+    <div className="pathblock">
+      <h3>Dependency path</h3>
       <div className="tree">
         {shown.map((place, i) => {
           const { steps, rootless } = wayDown(place, version);

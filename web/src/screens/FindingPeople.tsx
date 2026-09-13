@@ -206,8 +206,8 @@ export function Assignee({
   });
 
   return (
-    <div className="within">
-      <h4>Assignee</h4>
+    <div className="card">
+      <h3>Assignee</h3>
       {routedBy && (
         <p
           className="hint"

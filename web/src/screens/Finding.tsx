@@ -598,6 +598,17 @@ export function Finding() {
               </>
             )}
           </p>
+          {/* Changed where it is reported. It was a pane of its own further
+              down, which asked somebody reading the severity to go and find
+              the control for it. */}
+          {places.some((p) => p.decision == null) && (
+            <Assess
+              product={product}
+              vulnerability={vulnerability}
+              published={it.severity ?? ""}
+              assessed={it.assessed ?? ""}
+            />
+          )}
         </div>
 
         <HowMatched
@@ -695,8 +706,6 @@ export function Finding() {
             )}
           </div>
         )}
-
-        <Places places={places} build={build} version={it.version} />
 
         {(it.aliases ?? []).length > 0 && (
           <div className="evblock">
@@ -893,6 +902,14 @@ export function Finding() {
                 at={{ ...at, version }}
                 places={places}
                 undisclosed={!!it.undisclosed}
+                assigning={
+                  <Assignee
+                    at={at}
+                    assigned={it.assigned_to ?? ""}
+                    undisclosed={!!it.undisclosed}
+                    routedBy={it.routed_by ?? ""}
+                  />
+                }
                 onDone={(r) => {
                   setRecorded(r);
                   startFrom(null);
@@ -951,14 +968,25 @@ export function Finding() {
             for undisclosed readers and came back empty to anybody holding
             only public triage. Two fields on one object, one letter apart in
             meaning. */}
-        <div className="card">
-          <h3>Triage</h3>
+        {/* Only where the triage pane is not drawn. There it sits at the head
+            of the same pane, because triage is both questions — who is on it
+            and what was decided. Here there is nothing left to decide, and
+            reassigning a decided finding is still ordinary. */}
+        {!places.some((p) => p.decision == null) && (
           <Assignee
             at={at}
             assigned={it.assigned_to ?? ""}
             undisclosed={!!it.undisclosed}
             routedBy={it.routed_by ?? ""}
           />
+        )}
+
+        {/* Under triage, in a pane of its own. It is the longest block on the
+            screen and among the least often read: somebody deciding wants what
+            the issue is and what upstream did before they want the walk down
+            to it. */}
+        <div className="card">
+          <Places places={places} build={build} version={it.version} />
         </div>
 
         {/* Who has been let into this one case. Only where it is
@@ -979,15 +1007,6 @@ export function Finding() {
         {it.recorded && <Resolve at={at} vulnerability={vulnerability} />}
 
         <FixingIn at={at} />
-
-        {places.some((p) => p.decision == null) && (
-          <Assess
-            product={product}
-            vulnerability={vulnerability}
-            published={it.severity ?? ""}
-            assessed={it.assessed ?? ""}
-          />
-        )}
 
         {previous.length > 0 && (
           <PreviousCard

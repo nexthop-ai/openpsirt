@@ -554,7 +554,7 @@ The finding is the working screen after a decision as well as before it.
 |---|---|
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
 | **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
-| **Under both** | Triage — who is dealing with it and what this product rates it, as two rows of one pane rather than two panes, because both are things somebody sets on the finding rather than judgments about it; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
 
 The notes thread and the claim's comments are two threads, rendered near each
 other (REQ-29).
@@ -588,6 +588,15 @@ measurable: rendered from the demo the narrow column held severity 7.8, EPSS
 0.999, CWE-1288, "yes — exploited", the CVSS vector and eleven references, read
 at 380 pixels, while the widest thing on the screen was an empty text area.
 Somebody weighs the evidence and then acts, and the page runs in that order.
+
+Triage is one pane and both questions: who is dealing with it, and what was
+decided. They were two panes with a screen between them. Where nothing is left
+to decide the form is not drawn and the assignee stands alone, because
+reassigning a decided finding is ordinary.
+
+The rating sits inside the severity block, under the words it disagrees with,
+so it is changed where it is read. It was a pane of its own further down, which
+asked somebody reading a severity to go and find the control for it.
 
 The references sit above the VEX statements, at the head of what is read to
 decide. A write-up is what somebody triaging reads first, and a third party's

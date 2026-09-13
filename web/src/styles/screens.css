@@ -1498,16 +1498,29 @@ kbd.onbtn {
   border-color: var(--line-strong);
 }
 
-/* Two things somebody sets on a finding — who is dealing with it, and what
-   this product rates it — as rows of one pane rather than two panes. They were
-   separate cards, which read as two unrelated decisions. */
-.within + .within {
-  margin-top: 14px;
-  padding-top: 14px;
+/* The rating sits inside the severity block, under the words it disagrees
+   with, so it is changed where it is read rather than from a pane of its own
+   further down. Ruled off, because it is the one control in a block that is
+   otherwise all evidence. */
+.evblock .rating {
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
 }
-.within h4 {
+.evblock .rating h5 {
   margin: 0 0 6px;
-  font-size: var(--step-0);
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* The dependency path is a pane of its own under triage rather than a block in
+   the evidence column: it is the longest thing on the screen and among the
+   least often read, so it sits below what somebody deciding reads first. */
+.pathblock h3 {
+  margin: 0 0 8px;
+  font-size: var(--step-1);
   font-weight: 600;
 }

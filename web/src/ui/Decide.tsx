@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -134,9 +134,14 @@ export function Decide({
   extending,
   prefill,
   undisclosed,
+  assigning,
 }: {
   at: At;
   places: Sitting[];
+  // Who is dealing with it, drawn at the head of the same pane. Triage is
+  // both questions — who is on it and what was decided — and they were two
+  // panes with a screen between them.
+  assigning?: ReactNode;
   // Whether the finding has been announced, which decides who may be offered
   // after an @ in the reasoning: naming somebody who cannot read it calls them
   // to something they will be refused.
@@ -678,7 +683,8 @@ export function Decide({
     <>
       {
         <div className="card">
-          <h3>Decision</h3>
+          <h3>Triage</h3>
+          {assigning}
           <div className="writing">
             {form}
             {aside}

@@ -56,8 +56,8 @@ export function Assess({
 
   if (assessed) {
     return (
-      <div className="within">
-        <h4>Rating</h4>
+      <div className="rating">
+        <h5>Our rating</h5>
         <p className="reading" style={{ margin: 0 }}>
           Assessed <Severity word={assessed} />, published <Severity word={published} />. The
           assessment orders it and sets its deadline in every build of {product}, and nowhere else.
@@ -68,8 +68,8 @@ export function Assess({
 
   if (!open) {
     return (
-      <div className="within">
-        <h4>Rating</h4>
+      <div className="rating">
+        <h5>Our rating</h5>
         <p className="reading" style={{ margin: "0 0 8px" }}>
           Published as <Severity word={published} />. A rating of yours holds in every build of{" "}
           {product} — this issue here, not this component, and not other products.
@@ -82,8 +82,8 @@ export function Assess({
   }
 
   return (
-    <div className="within">
-      <h4>Rating</h4>
+    <div className="rating">
+      <h5>Our rating</h5>
       {assess.error != null && <Failed error={assess.error} what="That could not be recorded." />}
       <div className="ourview">
         <div className="pair">
