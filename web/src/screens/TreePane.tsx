@@ -129,7 +129,18 @@ export function Pane({
   return (
     <div>
       <div className="card">
-        <h3>{focus}</h3>
+        <h3>
+          {focus === rootName ? (
+            focus
+          ) : (
+            <Link
+              to={`/products/${encodeURIComponent(at.product)}/components/${encodeURIComponent(focus)}`}
+              title={`Everything open against ${focus}, across every build`}
+            >
+              {focus}
+            </Link>
+          )}
+        </h3>
         {node && (
           <p className="hint" style={{ margin: "0 0 10px" }}>
             <span className="id">{node.version}</span>
@@ -214,6 +225,12 @@ export function Pane({
                       Findings under it →
                     </Link>
                   )}
+                  <Link
+                    to={`/products/${encodeURIComponent(at.product)}/components/${encodeURIComponent(focus)}`}
+                    className="linkish"
+                  >
+                    This component, every build →
+                  </Link>
                 </>
               )}
             </p>

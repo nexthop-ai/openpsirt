@@ -157,7 +157,9 @@ function Yours() {
                 className="branch"
                 style={{ paddingLeft: 10 + (row.depth ?? 0) * 18 }}
               >
-                <span className="id">{row.component}</span>{" "}
+                <Link className="id" to={componentPage(at, row.component)}>
+                  {row.component}
+                </Link>{" "}
                 <span className="hint">{row.version}</span>
                 {/* Both numbers open the list they count. A node saying
                     "5,650 beneath · 0 here" and going nowhere is the shape of
@@ -193,7 +195,9 @@ function Yours() {
             <ul className="branchlist">
               {loose.map((row, i) => (
                 <li key={`${row.component}@${i}`} className="branch" style={{ paddingLeft: 10 }}>
-                  <span className="id">{row.component}</span>{" "}
+                  <Link className="id" to={componentPage(at, row.component)}>
+                    {row.component}
+                  </Link>{" "}
                   <span className="hint">{row.version}</span>
                   <span className="counts">
                     <Link className="n" to={onComponent(at, row.component)}>
@@ -536,6 +540,17 @@ function onComponent(at: At, component: string | undefined): string {
   return `${buildPath(at)}/findings?component=${encodeURIComponent(component ?? "")}`;
 }
 
+// The component's own screen: everything open against it across every build,
+// where it could go, and the act that moves it. Reachable from a finding and
+// from the findings list, and from here, which is where somebody looking at
+// the graph asks about a component.
+function componentPage(at: At, component: string | undefined): string {
+  return (
+    `/products/${encodeURIComponent(at.product)}` +
+    `/components/${encodeURIComponent(component ?? "")}`
+  );
+}
+
 function beneathComponent(at: At, component: string | undefined): string {
   return `${buildPath(at)}/findings?beneath=${encodeURIComponent(component ?? "")}`;
 }
@@ -670,8 +685,8 @@ function Branches({
           className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
           title={
             node.children > 0
-              ? `${node.beneath.toLocaleString()} distinct issues open in here, ${node.findings.toLocaleString()} against this component itself. Distinct issues, so lower than the findings list, which has a row per issue and component`
-              : `${node.beneath.toLocaleString()} distinct issues open here`
+              ? `${node.beneath.toLocaleString()} distinct issues in here, ${node.findings.toLocaleString()} on this component`
+              : `${node.beneath.toLocaleString()} distinct issues`
           }
         >
           {node.beneath.toLocaleString()}

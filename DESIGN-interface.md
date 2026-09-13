@@ -738,7 +738,8 @@ expects two. **One recursive statement for the row's whole set of children**:
 | A node says what its number is made of, as a short strip of the bands | Five thousand beneath a node says nothing about whether any of it matters. Rolled up in the statement that already counts the subtree, so the bands sum back to the total |
 | The node counts open their lists | A node saying "5,650 beneath · 0 here" and going nowhere is a figure nobody can act on from where they read it |
 | The count is every open issue, answered or not | A dismissal does not subtract from it. Written down because "what is open here" and "what is still to answer here" are both reasonable readings and the screen gives the first |
-| The marker that opens a row is a button | It was a span with a click handler, so every node past the first level was unreachable without a pointer, on the screen whose whole purpose is walking down |
+| The marker that opens a row is a button | A span with a click handler leaves every node past the first level unreachable without a pointer, on the screen whose whole purpose is walking down |
+| A component's name opens the component | The tree is where somebody asks about a component, and its own screen is what is open against it across every build, where it could go, and the act that moves it. The node name in the tree is a button because selecting is how the tree is walked, so the link is on the pane's heading and beside the two findings links in it |
 
 Ordering on the cumulative count reverses an earlier decision worth keeping in
 view. Ordered on the row's own count the tree opened as an alphabetical list of
