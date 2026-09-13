@@ -179,9 +179,7 @@ export function Component() {
                           </div>
                         ))}
                         {(row.upgrades ?? []).length > SHOWN && (
-                          <div className="hint">
-                            and {(row.upgrades ?? []).length - SHOWN} more
-                          </div>
+                          <div className="hint">and {(row.upgrades ?? []).length - SHOWN} more</div>
                         )}
                         {(row.upgrades ?? []).length > 0 && !row.upgrades?.[0]?.ordered && (
                           <div
