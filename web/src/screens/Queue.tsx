@@ -70,15 +70,20 @@ export function Queue() {
   // they were mixed in, which made the queue a list containing work the reader
   // cannot do, because approving your own is refused.
   const mine = params.get("mine") === "1";
+  // Which product, where the address names one. The figure on the home screen
+  // is narrowed by the scope picker and links here with it, so a queue that
+  // ignored it answered a different question from the number that was clicked.
+  const product = params.get("product") ?? "";
+  const within = product ? { product } : {};
   const queue = useQuery({
-    queryKey: ["queue", mine ? 0 : offset, mine],
+    queryKey: ["queue", mine ? 0 : offset, mine, product],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/review-queue", {
           // A page when it is the list being read, one row when it is only
           // the tab's count: both sides are asked for on every visit so a tab
           // carries its number without being opened.
-          params: { query: { limit: mine ? 1 : PAGE, offset: mine ? 0 : offset } },
+          params: { query: { limit: mine ? 1 : PAGE, offset: mine ? 0 : offset, ...within } },
         }),
       ),
   });
@@ -143,6 +148,12 @@ export function Queue() {
     return <Failed error={queue.error} what="The review queue could not be read." />;
   }
 
+  // What the export links ask for, so a file matches the screen it was taken
+  // from rather than being the whole backlog under a narrowed heading.
+  const exporting = new URLSearchParams();
+  if (mine) exporting.set("mine", "true");
+  if (product) exporting.set("product", product);
+  const asked = [...exporting].length > 0 ? "?" + exporting.toString() : "";
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);
   const seen = new Set<number>();
@@ -212,7 +223,14 @@ export function Queue() {
               {records > claims.length && (
                 <> · {records.toLocaleString()} records between those shown</>
               )}{" "}
-              · across every product you may approve on
+              {product ? (
+                <>
+                  {" "}
+                  · in <b>{product}</b>
+                </>
+              ) : (
+                <> · across every product you may approve on</>
+              )}
             </>
           )}
         </p>
@@ -220,10 +238,10 @@ export function Queue() {
             screen counts them, because that is the unit somebody works
             through — and reporting a backlog was copying this out by hand. */}
         <span style={{ marginLeft: "auto" }}>
-          <a className="btn quiet" href={`/v1/review-queue.csv${mine ? "?mine=true" : ""}`}>
+          <a className="btn quiet" href={`/v1/review-queue.csv${asked}`}>
             CSV
           </a>{" "}
-          <a className="btn quiet" href={`/v1/review-queue.json${mine ? "?mine=true" : ""}`}>
+          <a className="btn quiet" href={`/v1/review-queue.json${asked}`}>
             JSON
           </a>
         </span>

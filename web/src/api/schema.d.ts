@@ -3521,7 +3521,7 @@ export interface paths {
          *
          *     **One row per claim**, the way the screen counts them — one proposer's action, however many decisions it wrote — with how much it covers and how old it is. A backlog is reported in claims because that is the unit somebody works through.
          *
-         *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question.
+         *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question, and `product` narrows it the way the screen does.
          *
          *     **Requires:** any recognized credential. Exports only what you may see.
          */
@@ -13949,6 +13949,8 @@ export interface operations {
             query?: {
                 /** @description Write out what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
+                /** @description Limit to claims made in one product, by name */
+                product?: string;
             };
             header?: never;
             path: {

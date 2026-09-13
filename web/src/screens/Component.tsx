@@ -121,7 +121,13 @@ export function Component() {
         <p className="variants">
           <span className="vchip id">{here.version}</span>
           {here.ecosystem && <span className="vchip">{here.ecosystem}</span>}
-          <span className="vchip">{(here.issues ?? 0).toLocaleString()} open on it</span>
+          {(here.issues ?? 0) > 0 ? (
+            <Link className="vchip" to={findingsAt(product, here, component)}>
+              {(here.issues ?? 0).toLocaleString()} open on it →
+            </Link>
+          ) : (
+            <span className="vchip">nothing open on it</span>
+          )}
           {here.due_at && <span className="vchip">due {on(here.due_at)}</span>}
         </p>
       </div>
@@ -328,6 +334,12 @@ function Sits({
               {(here.places ?? 0).toLocaleString()} {here.places === 1 ? "place" : "places"} under{" "}
               {(here.consumers ?? 0).toLocaleString()}{" "}
               {here.consumers === 1 ? "consumer" : "consumers"}
+              {(here.issues ?? 0) > 0 && (
+                <>
+                  {" · "}
+                  <Link to={findingsAt(product, here, component)}>Read them →</Link>
+                </>
+              )}
             </span>
           </li>
 
