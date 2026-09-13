@@ -416,22 +416,62 @@ function Sits({
             ) : (
               <>
                 <span className="sub">
-                  {below.length.toLocaleString()} packages, {carrying.length} with something open
+                  {below.length.toLocaleString()} packages, {carrying.length} with something open ·{" "}
+                  {(below.length - carrying.length).toLocaleString()} carry nothing
                 </span>
                 {carrying.length > 0 && (
-                  <ul className="branchlist">
-                    {carrying.slice(0, 5).map((each, i) => (
-                      <li key={(each.component ?? "") + i} className="branch">
-                        <Link className="id" to={componentAt(each.component ?? "")}>
-                          {each.component}
-                        </Link>{" "}
-                        <span className="hint">{each.version}</span>
-                        <span className="counts">
-                          <span className="n">{each.findings}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="tablewrap plain">
+                    <table>
+                      <tbody>
+                        {carrying.slice(0, SHOWN).map((each, i) => (
+                          <tr key={(each.component ?? "") + i}>
+                            <td>
+                              <Link className="id" to={componentAt(each.component ?? "")}>
+                                {each.component}
+                              </Link>{" "}
+                              <span className="hint">{each.version}</span>
+                            </td>
+                            {/* What is open at the package itself, and what its
+                                own subtree holds — a container carries none of
+                                its own, so the second is what says whether the
+                                branch is worth opening. */}
+                            <td className="num">
+                              <Link to={componentAt(each.component ?? "")}>{each.findings}</Link>
+                            </td>
+                            <td className="num" style={{ color: "var(--faint)" }}>
+                              {(each.beneath ?? 0) > (each.findings ?? 0)
+                                ? (each.beneath ?? 0).toLocaleString()
+                                : ""}
+                            </td>
+                            <td style={{ width: "34%" }}>
+                              {Object.keys(each.beneath_by_severity ?? {}).length > 0 && (
+                                <span className="strip">
+                                  {ROLLED.filter(
+                                    (band) => (each.beneath_by_severity ?? {})[band],
+                                  ).map((band) => (
+                                    <span
+                                      key={band}
+                                      className={`band ${band}`}
+                                      title={`${(each.beneath_by_severity ?? {})[band]} ${band}`}
+                                    >
+                                      {(each.beneath_by_severity ?? {})[band]}
+                                    </span>
+                                  ))}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {carrying.length > SHOWN && (
+                          <tr>
+                            <td className="hint" colSpan={4}>
+                              and {carrying.length - SHOWN} more carrying something
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </>
             )}

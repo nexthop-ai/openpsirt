@@ -467,98 +467,67 @@ a.kpi:hover {
   margin-bottom: var(--gap-wide);
 }
 
-/* Where a package sits, drawn as the chain it sits in: what pulls it in, the
-   package, and what it carries.
-   
-   A rail of its own rather than a border on the text, so the wire between two
-   nodes grows with whatever the step holds and the last node ends the line
-   instead of it running past into nothing. The package the screen is about
-   takes a filled node and a larger name, because a position is read by finding
-   yourself in it first. */
+/* Where a package sits, as the chain it sits in: what pulls it in, the package,
+   and what it carries. A rail down the left with a node per step, because the
+   thing being read is a position in a graph rather than three unrelated
+   panels. */
 .sits {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
 }
 .sits > li {
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
-  grid-auto-rows: min-content;
-  column-gap: 12px;
-  padding-bottom: var(--gap-room);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 14px 18px;
+  position: relative;
+  border-left: 2px solid var(--line-strong);
+  margin-left: 5px;
 }
 .sits > li:last-child {
+  border-left-color: transparent;
   padding-bottom: 0;
 }
-/* The rail: a node, then a wire filling whatever is left of the step. */
 .sits > li::before {
   content: "";
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: center;
+  position: absolute;
+  left: -6px;
+  top: 4px;
   width: 9px;
   height: 9px;
-  margin-top: 4px;
   border-radius: var(--pill);
   border: 2px solid var(--line-strong);
   background: var(--surface);
 }
-.sits > li::after {
-  content: "";
-  grid-column: 1;
-  grid-row: 2 / -1;
-  justify-self: center;
-  width: 2px;
-  background: var(--line-strong);
-  margin: 3px 0 -18px;
-}
-.sits > li:last-child::after {
-  background: none;
-}
-.sits > li > * {
-  grid-column: 2;
-}
-/* The package the screen is about. */
+/* The package the screen is about, marked so the eye lands on it first. */
 .sits > li.at::before {
+  left: -8px;
+  top: 3px;
   width: 13px;
   height: 13px;
-  margin-top: 2px;
   border-color: var(--accent);
   background: var(--accent);
 }
 .sits .step {
-  font-size: 10px;
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   color: var(--faint);
   font-weight: 600;
 }
+/* The package the screen is about is marked by its node, not by its size. A
+   component name is as long as its packager made it — one kernel binary is
+   forty-six characters — so enlarging it takes the column and wraps to three
+   lines, which is worse than not marking it at all. */
 .sits .nm {
   font-size: var(--step-0);
-  margin-top: 1px;
-}
-.sits > li.at .nm {
-  font-size: var(--step-2);
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  word-break: break-all;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .sits .sub {
   font-size: var(--step--1);
   color: var(--faint);
-  margin-top: 2px;
-}
-.sits .strip {
-  margin-top: 6px;
-}
-.sits .branchlist {
-  margin: 7px 0 0;
-}
-.sits .linkish {
-  margin-top: 7px;
-  align-self: start;
 }
 
 /* The row a screen is currently about, in a table listing several. */
@@ -912,6 +881,16 @@ button.vchip {
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+/* A table inside something that is already a block of its own: rows laid out
+   in columns, with none of the edges that say "separate object". Bordered
+   inside a panel it reads as a panel within a panel, and a screen of those
+   flattens the hierarchy it was drawn to show. */
+.tablewrap.plain {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 table {
   border-collapse: collapse;
