@@ -219,13 +219,13 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 	//
 	// A product nobody holds answers as one nobody declared, like every other
 	// product a list narrows by.
-		twoReach(t, func(t *testing.T, r *reach) {
+	twoReach(t, func(t *testing.T, r *reach) {
 		place := r.scanned(t)
 		// A claim waiting on somebody, and a finding somebody holds, both in
 		// `mine`. Without them every count is zero and a lost narrowing reads
 		// the same as a working one.
 		r.decided(t, place)
-				if got := asPerson(t, r, "assigner", http.MethodPut,
+		if got := asPerson(t, r, "assigner", http.MethodPut,
 			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"+
 				"/components/libnl-3-200/assignment",
 			`{"person":"triager"}`); got.Code >= 400 {
@@ -257,7 +257,7 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 			{"holdings", "/v1/assignments", "/v1/assignments?product=mine",
 				"/v1/assignments?product=theirs"},
 		} {
-						// Read by somebody holding every product, so the other product's
+			// Read by somebody holding every product, so the other product's
 			// empty answer is a narrowing rather than a refusal.
 			whole := count("estate-reader", each.all)
 			here := count("estate-reader", each.mine)
