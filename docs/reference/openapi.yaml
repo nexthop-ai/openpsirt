@@ -8072,6 +8072,14 @@ paths:
 
         **Requires:** any recognized credential. Answers only what you may see.
       operationId: list-holdings
+      parameters:
+        - description: Limit to work held in one product, by name
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to work held in one product, by name
+            type: string
       responses:
         "200":
           content:
@@ -17377,6 +17385,13 @@ paths:
           schema:
             description: Return what you proposed and nobody has agreed to, instead of what is waiting on you
             type: boolean
+        - description: Limit to claims made in one product, by name
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to claims made in one product, by name
+            type: string
         - explode: false
           in: query
           name: limit

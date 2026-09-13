@@ -348,7 +348,7 @@ func TestRevisingTheReasoningTakesBackTheApproval(t *testing.T) {
 		if standing != nil {
 			t.Fatalf("revised words suppressed the finding before anybody agreed: %+v", standing)
 		}
-		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 10, 0)
+		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 0, 10, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -499,7 +499,7 @@ func TestABulkApprovalIsUndoneAsABatch(t *testing.T) {
 		if standing, _ := f.store.Applying(ctx, at); standing != nil {
 			t.Errorf("an undone approval still suppresses the finding: %+v", standing)
 		}
-		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 10, 0)
+		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 0, 10, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -805,7 +805,7 @@ func TestSendingAClaimBackTakesItOutOfTheQueueUntilItIsAnswered(t *testing.T) {
 		ctx := t.Context()
 		claimed := f.claims(t, f.at())
 
-		if waiting, _, _ := f.store.Queue(ctx, f.reviewer, false, 10, 0); len(waiting) != 1 {
+		if waiting, _, _ := f.store.Queue(ctx, f.reviewer, false, 0, 10, 0); len(waiting) != 1 {
 			t.Fatalf("%d claims are waiting before it is sent back", len(waiting))
 		}
 
@@ -818,7 +818,7 @@ func TestSendingAClaimBackTakesItOutOfTheQueueUntilItIsAnswered(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if waiting, _, _ := f.store.Queue(ctx, f.reviewer, false, 10, 0); len(waiting) != 0 {
+		if waiting, _, _ := f.store.Queue(ctx, f.reviewer, false, 0, 10, 0); len(waiting) != 0 {
 			t.Errorf("%d claims still wait on an approver after being sent back", len(waiting))
 		}
 		// The reason is where the author will read it.
@@ -850,7 +850,7 @@ func TestAnsweringWhatWasAskedPutsItBackInTheQueue(t *testing.T) {
 			"Checked against the build script at line 40, which pins the ciphers."); err != nil {
 			t.Fatal(err)
 		}
-		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 10, 0)
+		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 0, 10, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

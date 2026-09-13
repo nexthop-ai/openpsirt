@@ -8813,7 +8813,10 @@ export interface operations {
     };
     "list-holdings": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Limit to work held in one product, by name */
+                product?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -14084,6 +14087,8 @@ export interface operations {
             query?: {
                 /** @description Return what you proposed and nobody has agreed to, instead of what is waiting on you */
                 mine?: boolean;
+                /** @description Limit to claims made in one product, by name */
+                product?: string;
                 limit?: number;
                 offset?: number;
             };

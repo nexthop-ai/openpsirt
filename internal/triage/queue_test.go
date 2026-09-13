@@ -15,7 +15,7 @@ func TestTheQueueCarriesWhatAnApproverNeedsToJudge(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.claims(t, f.at())
 
-		waiting, total, err := f.store.Queue(t.Context(), f.reviewer, false, 50, 0)
+		waiting, total, err := f.store.Queue(t.Context(), f.reviewer, false, 0, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +44,7 @@ func TestSomethingComingBackSaysSo(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 50, 0)
+		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 0, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,7 +66,7 @@ func TestAQueueShowsOnlyWorkTheReaderCanDo(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.claims(t, f.at())
 
-		waiting, total, err := f.store.Queue(t.Context(), f.onlooker, false, 50, 0)
+		waiting, total, err := f.store.Queue(t.Context(), f.onlooker, false, 0, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -188,12 +188,12 @@ func TestTheQueueLeavesOutWhatYouCannotApprove(t *testing.T) {
 		f.claims(t, f.at())
 
 		// The proposer sees nothing waiting on them.
-		if _, total, err := f.store.Queue(ctx, f.triager, false, 50, 0); err != nil || total != 0 {
+		if _, total, err := f.store.Queue(ctx, f.triager, false, 0, 50, 0); err != nil || total != 0 {
 			t.Errorf("the proposer was shown their own claim: %d (%v)", total, err)
 		}
 		// Somebody else sees it, so the check above is not passing on an
 		// empty queue.
-		if _, total, err := f.store.Queue(ctx, f.reviewer, false, 50, 0); err != nil || total != 1 {
+		if _, total, err := f.store.Queue(ctx, f.reviewer, false, 0, 50, 0); err != nil || total != 1 {
 			t.Errorf("a claim waiting for a second person was not shown to one: %d (%v)", total, err)
 		}
 	})
@@ -208,7 +208,7 @@ func TestYourOwnWaitingClaimsAreTheirOwnQuestion(t *testing.T) {
 		ctx := t.Context()
 		f.claims(t, f.at())
 
-		mine, total, err := f.store.Queue(ctx, f.triager, true, 50, 0)
+		mine, total, err := f.store.Queue(ctx, f.triager, true, 0, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -216,7 +216,7 @@ func TestYourOwnWaitingClaimsAreTheirOwnQuestion(t *testing.T) {
 			t.Fatalf("the proposer found %d of their own waiting claims, want 1", total)
 		}
 		// And somebody else's own list does not contain it.
-		if _, total, err := f.store.Queue(ctx, f.reviewer, true, 50, 0); err != nil || total != 0 {
+		if _, total, err := f.store.Queue(ctx, f.reviewer, true, 0, 50, 0); err != nil || total != 0 {
 			t.Errorf("a claim appeared among somebody else's own: %d (%v)", total, err)
 		}
 	})

@@ -283,9 +283,13 @@ function reading(now: number, shipped: number, release: string): string {
   return `${now} critical now against ${shipped} in ${release} — ${shipped - now} fewer than last shipped.`;
 }
 
-// The four figures. Each names what it counts, because the picker narrows them
+// The five figures. Each names what it counts, because the picker narrows them
 // — a tile reading "all products" while a product is picked describes the one
 // thing it is not showing.
+//
+// Each carries what it would say without the scope, so the difference the
+// selection makes is on screen rather than inferred. Unscoped the twin is not
+// drawn: it would be the same number said twice.
 function Figures({
   counting,
   points,
@@ -325,9 +329,13 @@ function Figures({
       ),
   });
   const queue = useQuery({
-    queryKey: ["queue", "count"],
+    queryKey: ["queue", "count", scope],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
+      unwrap(
+        await api.GET("/v1/review-queue", {
+          params: { query: { limit: 1, ...(at.product ? { product: at.product } : {}) } },
+        }),
+      ),
   });
   // The same figures with the scope taken off, so a tile can show what the
   // selection costs rather than leaving somebody to guess at it. Asked only
@@ -338,6 +346,12 @@ function Figures({
     queryKey: ["home", "trend", "all"],
     enabled: widely,
     queryFn: async () => unwrap(await api.GET("/v1/trend", { params: { query: { weeks: 12 } } })),
+  });
+  const allQueue = useQuery({
+    queryKey: ["queue", "count", "all"],
+    enabled: widely,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
   });
   const allExploited = useQuery({
     queryKey: ["home", "exploited", "all"],
@@ -411,12 +425,22 @@ function Figures({
           )}
         </button>
       )}
-      <button type="button" className="kpi" onClick={() => navigate("/review-queue")}>
+      <button
+        type="button"
+        className="kpi"
+        onClick={() =>
+          navigate(
+            at.product
+              ? `/review-queue?product=${encodeURIComponent(at.product)}`
+              : "/review-queue",
+          )
+        }
+      >
         <span className="l">
           <i style={{ background: "var(--wait)" }} /> Pending your approval
         </span>
         <span className="n">{(queue.data?.total ?? 0).toLocaleString()}</span>
-        <span className="d">all products · never scoped</span>
+        {everywhere(allQueue.data?.total) ?? <span className="d">waiting on a second person</span>}
       </button>
       {/* Into the list it counts, narrowed the same way: what is undecided
           and past its deadline. It pointed at the assignments screen, which
@@ -487,10 +511,18 @@ function holdings(who: Who): string {
 }
 
 function Pending() {
+  const at = useScope();
+  const product = at.product ? { product: at.product } : {};
   const queue = useQuery({
-    queryKey: ["queue", "home"],
+    queryKey: ["queue", "home", product],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 3 } } })),
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 3, ...product } } })),
+  });
+  const everywhere = useQuery({
+    queryKey: ["queue", "home", "all"],
+    enabled: !!at.product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
   });
   const items = queue.data?.items ?? [];
 
@@ -498,11 +530,10 @@ function Pending() {
     <div className="panel">
       <header>
         <h3>Pending your approval</h3>
-        {/* The queue is not narrowed by product, so this panel does not
-            follow the scope the head names, and says so rather than
-            letting the head speak for it. */}
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          all products · never scoped
+          {at.product
+            ? `${(everywhere.data?.total ?? 0).toLocaleString()} all products`
+            : "all products"}
         </span>
         <span className="tally">{queue.data?.total ?? 0}</span>
       </header>
@@ -535,9 +566,17 @@ function Pending() {
 // What each person holds. Nothing lists what one person holds — only how much
 // each person holds — so this is everybody rather than you.
 function InProgress() {
+  const at = useScope();
+  const product = at.product ? { product: at.product } : {};
   const held = useQuery({
-    queryKey: ["home", "holdings"],
-    queryFn: async () => unwrap(await api.GET("/v1/assignments", {})),
+    queryKey: ["home", "holdings", product],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/assignments", { params: { query: { ...product } } })),
+  });
+  const everywhere = useQuery({
+    queryKey: ["home", "holdings", "all"],
+    enabled: !!at.product,
+    queryFn: async () => unwrap(await api.GET("/v1/assignments", { params: { query: {} } })),
   });
   const mine = held.data?.items ?? [];
   const total = mine.reduce((sum, each) => sum + (each.open ?? 0), 0);
@@ -547,10 +586,12 @@ function InProgress() {
     <div className="panel">
       <header>
         <h3>In progress</h3>
-        {/* Holdings are counted per person across everything, not per
-            product, so this does not follow the scope the head names. */}
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          all products · never scoped
+          {at.product
+            ? `${(everywhere.data?.items ?? [])
+                .reduce((sum, each) => sum + (each.open ?? 0), 0)
+                .toLocaleString()} all products`
+            : "all products"}
         </span>
         <span className={overdue > 0 ? "tally urgent" : "tally"}>{total.toLocaleString()}</span>
       </header>
@@ -627,9 +668,7 @@ function Lapsed() {
       <header>
         <h3>Lapsed decisions</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {at.product
-            ? `${at.product} · ${allTotal.toLocaleString()} all products`
-            : "all products"}
+          {at.product ? `${allTotal.toLocaleString()} all products` : "all products"}
         </span>
         <span className={lapsedTotal + expiredTotal > 0 ? "tally urgent" : "tally"}>
           {(lapsedTotal + expiredTotal).toLocaleString()}

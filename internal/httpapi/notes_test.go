@@ -210,3 +210,76 @@ func TestACollaboratorReachesTheNotesOnTheirOwnCase(t *testing.T) {
 		}
 	})
 }
+
+func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
+	// Home shows every figure the scope narrows beside its all-products twin,
+	// so the difference a selection makes is on screen. These two answered for
+	// every product whatever was selected, and the page said so in words
+	// instead — which describes an inconsistency rather than removing one.
+	//
+	// A product nobody holds answers as one nobody declared, like every other
+	// product a list narrows by.
+		twoReach(t, func(t *testing.T, r *reach) {
+		place := r.scanned(t)
+		// A claim waiting on somebody, and a finding somebody holds, both in
+		// `mine`. Without them every count is zero and a lost narrowing reads
+		// the same as a working one.
+		r.decided(t, place)
+				if got := asPerson(t, r, "assigner", http.MethodPut,
+			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"+
+				"/components/libnl-3-200/assignment",
+			`{"person":"triager"}`); got.Code >= 400 {
+			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
+		}
+
+		count := func(who, path string) int {
+			t.Helper()
+			got := asPerson(t, r, who, http.MethodGet, path, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s answered %d: %s", path, got.Code, got.Body.String())
+			}
+			var page struct {
+				Total int               `json:"total"`
+				Items []json.RawMessage `json:"items"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &page); err != nil {
+				t.Fatal(err)
+			}
+			if page.Total > 0 {
+				return page.Total
+			}
+			return len(page.Items)
+		}
+
+		for _, each := range []struct{ what, all, mine, theirs string }{
+			{"review queue", "/v1/review-queue", "/v1/review-queue?product=mine",
+				"/v1/review-queue?product=theirs"},
+			{"holdings", "/v1/assignments", "/v1/assignments?product=mine",
+				"/v1/assignments?product=theirs"},
+		} {
+						// Read by somebody holding every product, so the other product's
+			// empty answer is a narrowing rather than a refusal.
+			whole := count("estate-reader", each.all)
+			here := count("estate-reader", each.mine)
+			elsewhere := count("estate-reader", each.theirs)
+			if elsewhere != 0 {
+				t.Errorf("%s in a product with no findings answered %d, want none",
+					each.what, elsewhere)
+			}
+			if here > whole {
+				t.Errorf("%s narrowed to one product answered %d, more than the %d it "+
+					"answers for every product", each.what, here, whole)
+			}
+		}
+
+		// And a product this reader holds nothing on is refused in the words an
+		// undeclared name gets, rather than silently answering for everything.
+		for _, path := range []string{"/v1/review-queue?product=nobodys",
+			"/v1/assignments?product=nobodys"} {
+			if got := asPerson(t, r, "triager", http.MethodGet, path, ""); got.Code != http.StatusNotFound {
+				t.Errorf("%s answered %d, want the words an undeclared product gets: %s",
+					path, got.Code, got.Body.String())
+			}
+		}
+	})
+}

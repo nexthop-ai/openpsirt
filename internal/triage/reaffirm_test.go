@@ -184,7 +184,7 @@ func TestALapsedClaimNobodyAgreedToIsNotPreAgreed(t *testing.T) {
 		if standing, _ := f.store.Applying(ctx, moved); standing != nil {
 			t.Error("a claim waiting for a second person is already suppressing the finding")
 		}
-		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 50, 0)
+		waiting, _, err := f.store.Queue(ctx, f.reviewer, false, 0, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
