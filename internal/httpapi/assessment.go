@@ -180,7 +180,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		return &struct{}{}, nil
 	})
 
-	huma.Register(api, answering(huma.Operation{
+	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-assessments", Method: http.MethodGet,
 		Path:    "/v1/assessments",
 		Summary: "List issue assessments",
@@ -196,8 +196,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		Tags: []string{"Triage"},
 	}, anySubject, "Narrowed to issues you may read a finding of in the product the rating "+
 		"belongs to. A rating is about one product, and an issue this deployment minted for a "+
-		"flaw nobody has announced is not public knowledge.",
-		triageRights()...), func(ctx context.Context, input *struct {
+		"flaw nobody has announced is not public knowledge."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		State   string `query:"state" enum:"proposed,live,withdrawn" doc:"Limit to one state"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`

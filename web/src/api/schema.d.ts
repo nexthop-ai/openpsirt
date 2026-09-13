@@ -125,7 +125,7 @@ export interface paths {
          *
          *     A claim carries the severity recorded against its issue, so claims about findings you cannot read are absent rather than refused.
          *
-         *     **Requires:** public-triage or private-triage. What you hold decides what comes back rather than whether you may ask. Narrowed to issues you may read a finding of in the product the rating belongs to. A rating is about one product, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
+         *     **Requires:** any recognized credential. Narrowed to issues you may read a finding of in the product the rating belongs to. A rating is about one product, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
          */
         get: operations["list-assessments"];
         put?: never;
