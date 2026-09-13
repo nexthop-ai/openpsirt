@@ -475,14 +475,10 @@ func findingRef(described map[int64]triage.Described, decisionID int64) *Finding
 	if !ok {
 		return nil
 	}
-	severity := d.Issue.Severity
-	if d.Issue.AssessedSeverity != nil && *d.Issue.AssessedSeverity != "" {
-		severity = *d.Issue.AssessedSeverity
-	}
 	body := &FindingRefBody{
 		Product: d.Product, Stream: d.Stream, Variant: d.Variant,
 		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
-		Severity: severity, Exploited: d.Issue.Exploited,
+		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,
 		FixState: d.FixState, FixedIn: d.FixedIn,
 		Description: excerpt(d.Issue.Description, 400),
 		Owner:       d.Owner, Parent: d.Parent,

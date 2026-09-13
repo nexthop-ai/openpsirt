@@ -93,12 +93,26 @@ func (f *fixture) anotherBranch(t *testing.T, stream string) int64 {
 
 func (f *fixture) buildOfKind(t *testing.T, stream string, kind catalog.Kind) int64 {
 	t.Helper()
+	return f.buildOfKindIn(t, f.productID, stream, kind)
+}
+
+// anotherBranchOf is anotherBranch in a product other than the fixture's own,
+// for the checks about what reaches one product and not another.
+func (f *fixture) anotherBranchOf(t *testing.T, productID int64, stream string) int64 {
+	t.Helper()
+	return f.buildOfKindIn(t, productID, stream, catalog.Branch)
+}
+
+func (f *fixture) buildOfKindIn(t *testing.T, productID int64, stream string,
+	kind catalog.Kind) int64 {
+
+	t.Helper()
 	cat := catalog.NewStore(f.db.DB)
-	declared, err := cat.DeclareStream(t.Context(), f.productID, stream, kind, nil)
+	declared, err := cat.DeclareStream(t.Context(), productID, stream, kind, nil)
 	if err != nil {
 		t.Fatalf("declare %s: %v", stream, err)
 	}
-	variant, err := cat.VariantByName(t.Context(), f.productID, "broadcom")
+	variant, err := cat.VariantByName(t.Context(), productID, "broadcom")
 	if err != nil {
 		t.Fatalf("variant: %v", err)
 	}

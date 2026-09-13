@@ -1,10 +1,14 @@
 package notify
 
-import "github.com/uptrace/bun"
+import (
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+)
 
 // A finding with the names a message has to say.
 //
-// Both conditions about findings start from the same seven tables and name the
+// Both conditions about findings start from the same eight tables and name the
 // same seven columns: what a person is told has to say which product, which
 // build, which component and which issue, because a notification is read
 // somewhere the row is not. The two copies were the same lines in two files,
@@ -21,7 +25,11 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		Join("JOIN variant AS va ON va.id = tg.variant_id").
 		Join("JOIN product AS p ON p.id = st.product_id").
 		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id")
+		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		// And whatever the row's own product rates the issue. Every watch
+		// spans products, and a rating belongs to one — so what an alert
+		// calls critical is what the product it is about calls critical.
+		Join(finding.RatedFor(finding.RatedOnStream))
 	if consumer {
 		q = q.Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id")
 	}

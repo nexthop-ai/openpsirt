@@ -119,11 +119,13 @@ export interface paths {
         };
         /**
          * List issue assessments
-         * @description Every claim about an issue you may be told about, or those in one state. The ones waiting are milder ratings somebody has proposed and nobody has agreed to yet, which are the ones not yet affecting anything.
+         * @description Every claim about an issue you may be told about, or those in one state, or those belonging to one product. The ones waiting are milder ratings somebody has proposed and nobody has agreed to yet, which are the ones not yet affecting anything.
+         *
+         *     A rating belongs to one product, so a row says which. Two products may rate the same issue differently and both rows appear, each narrowed by what you may read in its own product.
          *
          *     A claim carries the severity recorded against its issue, so claims about findings you cannot read are absent rather than refused.
          *
-         *     **Requires:** any recognized credential. Narrowed to issues you may read a finding of somewhere. A rating is about an issue rather than a product, but an issue this deployment minted for a flaw nobody has announced is not public knowledge.
+         *     **Requires:** any recognized credential. Narrowed to issues you may read a finding of in the product the rating belongs to. A rating is about one product, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
          */
         get: operations["list-assessments"];
         put?: never;
@@ -146,9 +148,11 @@ export interface paths {
         post?: never;
         /**
          * Withdraw an assessment, and take the published rating back
-         * @description The rating in force returns to the published one, and everything that reads it — where a finding sits in the list, how long it has, whether it is above the line a product triages — follows it back.
+         * @description The rating in force in that product returns to the published one, and everything that reads it — where a finding sits in the list, how long it has, whether it is above the line the product triages — follows it back. No other product is touched.
          *
-         *     **Requires:** public-triage or private-triage on any product
+         *     Asked of triage **on the product the rating belongs to**: taking a rating back is making one.
+         *
+         *     **Requires:** public-triage or private-triage on the product. The product is the rating's own, not one in the path.
          */
         delete: operations["withdraw-assessment"];
         options?: never;
@@ -169,7 +173,9 @@ export interface paths {
          * Approve a rating assessment
          * @description Only a milder rating waits for this. Somebody other than whoever proposed it, for the same reason every other second person here is somebody else: a control one person can complete alone is not a control.
          *
-         *     **Requires:** approver or public-triage or private-triage on any product. The proposer may not approve their own.
+         *     The second person holds their role **on the product the rating belongs to**. Agreeing is what puts a milder rating into force, so it moves that product's deadlines and its triage line; a rating in a product you hold nothing on answers as one that is not there.
+         *
+         *     **Requires:** approver or public-triage or private-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
          */
         post: operations["agree-assessment"];
         delete?: never;
@@ -892,32 +898,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/issues/{vulnerability}/assessment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record what we think of an issue, as against what was published
-         * @description Recorded against the **issue**, not against a place. A published rating being wrong, or a report being disputed, is one statement about the vulnerability — true wherever it appears, including in products it has not reached yet, and it does not stop being true because somebody rebuilt something.
-         *
-         *     It changes the order, which is what makes it worth having rather than a note nobody acts on. Rating something **worse** than published takes effect at once: nobody needs protecting from being told something is worse than the world says. Rating it **milder** waits for a second person, because that is the direction that hides things — and it hides more than a position in a list. Severity sets the deadline, so calling a high a low pushes its deadline out by months, and where a product has said what is worth triaging at all, a downgrade below that line takes the finding off the working list and off any clock entirely.
-         *
-         *     The published rating is never overwritten. Ours is what ranks; the world's stays beside it, because a rating of ours shown where the world's goes reads as the world's.
-         *
-         *     **Requires:** public-triage or private-triage on any product
-         */
-        post: operations["assess-issue"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/keys": {
         parameters: {
             query?: never;
@@ -1020,6 +1000,58 @@ export interface paths {
          *     **Requires:** any recognized credential. Answers only what you may see.
          */
         get: operations["list-my-claims"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit a note on an issue
+         * @description Replaces the text of a note. Only its author may do this: an edit another person could make is not a correction.
+         *
+         *     **What it said before is kept**, and read back with `GET /v1/notes/{id}/history`. A note is part of the record that goes public at disclosure, and a record whose earlier text is unrecoverable is readable rather than checkable.
+         *
+         *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+         *
+         *     **Requires:** public-triage or private-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
+         */
+        put: operations["edit-issue-note"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notes/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List earlier revisions of a note
+         * @description Every version of a note that has been replaced, oldest first. The note itself carries what it says now.
+         *
+         *     A note is part of the record that goes public at disclosure, so what it said before has to be recoverable: an edit that overwrites leaves a record somebody can read and nobody can check.
+         *
+         *     Answers only where you may read what the note is about — the same rule as reading the note itself, asked of the issue rather than of the note, because two rules for one question is one rule out of step.
+         *
+         *     **Requires:** any recognized credential. Answers only where you may read what the note is about, which is the note's own product and issue rather than anything in the path.
+         */
+        get: operations["get-issue-note-history"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1920,6 +1952,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/issues/{vulnerability}/assessment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what a product thinks of an issue, as against what was published
+         * @description Recorded against the **issue**, not against a place, and against **one product**. A published rating being wrong, or a report being disputed, is one statement about the vulnerability in this product — true in every build of it, including builds it has not reached yet, and it does not stop being true because somebody rebuilt something.
+         *
+         *     It belongs to a product because a rating is a judgment about how a component is used, and two products do not use one the same way: one may ship the vulnerable configuration and another may not. Two products may record different ratings of the same issue, and neither reaches the other. A product nobody has rated the issue in reads the published rating.
+         *
+         *     It changes the order, which is what makes it worth having rather than a note nobody acts on. Rating something **worse** than published takes effect at once: nobody needs protecting from being told something is worse than the world says. Rating it **milder** waits for a second person, because that is the direction that hides things — and it hides more than a position in a list. Severity sets the deadline, so calling a high a low pushes its deadline out by months, and where a product has said what is worth triaging at all, a downgrade below that line takes the finding off the working list and off any clock entirely.
+         *
+         *     The published rating is never overwritten. The product's is what ranks there; the world's stays beside it, because a rating of ours shown where the world's goes reads as the world's.
+         *
+         *     **Requires:** public-triage or private-triage on the product
+         */
+        post: operations["assess-issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/issues/{vulnerability}/attachments": {
         parameters: {
             query?: never;
@@ -2078,6 +2138,46 @@ export interface paths {
          *     **Requires:** private-triage on the product. A second person agrees past the threshold.
          */
         post: operations["extend-disclosure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/issues/{vulnerability}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List notes on an issue in a product
+         * @description Returns the notes written about this issue in this product, oldest first, with who wrote each and when. A note that has been edited also carries when it was last changed.
+         *
+         *     A note records no judgment and changes nothing: not what ranks, not a deadline, not a triage line. It is context for whoever decides.
+         *
+         *     **It is about the issue in this product, not about one component.** A row in the findings list is one issue at one source package, and one issue is often several rows — so a note kept against a row would be written on one of them and hidden from the rest. What is about a judgment at a place is a comment on that claim instead.
+         *
+         *     **Requires:** any recognized credential. Answers where you may read a finding of this issue in this product, at its visibility — an issue with one undisclosed place here is undisclosed for this. Anywhere else it answers as an issue that is not there.
+         */
+        get: operations["list-issue-notes"];
+        put?: never;
+        /**
+         * Add a note to an issue in a product
+         * @description Adds a markdown note about this issue in this product. It records no judgment: nothing about what ranks, what a deadline is, or what the product triages changes because somebody wrote one.
+         *
+         *     **This is the way to leave something for whoever decides without deciding.** A comment hangs off a claim; a note does not, so nothing has to be judged before anything can be said.
+         *
+         *     It reaches every build of the product and does not lapse when a version moves. Something true of one copy and not another — "we do not call that function in the vendored build" — is about a place, and belongs on the claim there.
+         *
+         *     A name written after an `@` is told, where that person may read what the note is about; the response lists the names that reached nobody.
+         *
+         *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+         *
+         *     **Requires:** public-triage or private-triage on the product
+         */
+        post: operations["note-on-issue"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4236,36 +4336,30 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             id?: number;
-            /**
-             * Format: int64
-             * @description How many products those sit in
-             */
-            in_products?: number;
             /** @description You made this rating, so you may not be the one who agrees */
             mine?: boolean;
             /** @description Whether a second person has to agree before it takes effect */
             needs_approval?: boolean;
             /**
              * Format: int64
-             * @description How many of them this rating would put below their product's triage line, where they stop being work and carry no deadline
+             * @description How many of them this rating would put below the product's triage line, where they stop being work and carry no deadline
              */
             off_the_list?: number;
             /**
              * Format: int64
-             * @description How many products that happens in
-             */
-            off_the_list_in_products?: number;
-            /**
-             * Format: int64
-             * @description Open findings of this issue you can see
+             * @description Open findings of this issue you can see in this product
              */
             open?: number;
+            /** @description The product this rating belongs to, by the name an address takes */
+            product?: string;
+            /** @description How that product is spelled on screen */
+            product_name?: string;
             /** @description What was published when this was made, kept so a reader can see what we disagreed with */
             published?: string;
             /** @description Why. It outlives the version it was made about, so the next person needs the argument */
             reasoning: string;
             /**
-             * @description What we rate it
+             * @description What this product rates it
              * @enum {string}
              */
             severity: "low" | "medium" | "high" | "critical";
@@ -5259,6 +5353,16 @@ export interface components {
              * @example https://example.com/schemas/Edit-commentRequest.json
              */
             readonly $schema?: string;
+            body: string;
+        };
+        "Edit-issue-noteRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Edit-issue-noteRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What it should say now, in markdown */
             body: string;
         };
         EmbargoedBody: {
@@ -6310,6 +6414,15 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["MentionableBody"][] | null;
         };
+        ListBodyNoteBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyNoteBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["NoteBody"][] | null;
+        };
         ListBodyOutboundBody: {
             /**
              * Format: uri
@@ -6622,6 +6735,39 @@ export interface components {
             category: string;
             text: string;
             title?: string;
+        };
+        "Note-on-issueRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Note-on-issueRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to say, in markdown */
+            body: string;
+        };
+        NoteBody: {
+            /** @description What it says, in markdown */
+            body: string;
+            /** @description When the author last changed it, where they have */
+            edited_at?: string;
+            /** Format: int64 */
+            id: number;
+            written_at: string;
+            /** @description Who wrote it */
+            written_by: string;
+        };
+        NoteWritten: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/NoteWritten.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which */
+            not_notified?: string[] | null;
         };
         NotificationBody: {
             /** @description What a condition is about. Absent for an event */
@@ -8573,6 +8719,8 @@ export interface operations {
     "list-assessments": {
         parameters: {
             query?: {
+                /** @description Limit to one product, by name */
+                product?: string;
                 /** @description Limit to one state */
                 state?: "proposed" | "live" | "withdrawn";
                 limit?: number;
@@ -9790,42 +9938,6 @@ export interface operations {
             };
         };
     };
-    "assess-issue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssessmentBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssessmentBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "list-keys": {
         parameters: {
             query?: never;
@@ -9968,6 +10080,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BecameOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "edit-issue-note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Edit-issue-noteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteWritten"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-issue-note-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyWasSaidBody"];
                 };
             };
             /** @description Error */
@@ -11562,6 +11740,43 @@ export interface operations {
             };
         };
     };
+    "assess-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssessmentBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-attachments": {
         parameters: {
             query?: never;
@@ -11821,6 +12036,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExtensionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-issue-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyNoteBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "note-on-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Note-on-issueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteWritten"];
                 };
             };
             /** @description Error */

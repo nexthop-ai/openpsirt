@@ -60,7 +60,7 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 		// worse than no sweep: the numbers it checks are the only evidence
 		// it is still looking at the API, and a class emptying is invisible
 		// in one total.
-		var onProduct, deployment, anywhere, notAGate, narrowed, noValue int
+		var onProduct, deployment, notAGate, narrowed, noValue int
 		for path, item := range r.api.OpenAPI().Paths {
 			for method, op := range operations(item) {
 				want, ok := op.Extensions[requiresExtensionName]
@@ -84,11 +84,10 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 				// Who is a stranger to this operation depends on what it
 				// asks for. The scope was read as "a scope alone is
 				// satisfied by anybody holding anything", which is true of
-				// the credential scopes and false of the two that name a
+				// the credential scopes and false of the ones that name a
 				// standing nobody holds by default — so every
-				// administrator-only operation and every any-product one
-				// went unswept, which is most of the ones a mistake would
-				// be worst on.
+				// administrator-only operation went unswept, which is most
+				// of the ones a mistake would be worst on.
 				var who string
 				switch {
 				case needs.Scope == "product" && len(needs.AnyOf) > 0:
@@ -100,11 +99,6 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 					// administer the deployment. A subject who reaches
 					// nothing would be refused before the gate was consulted.
 					who = "reader"
-				case needs.Scope == "any-product":
-					anywhere++
-					// Somebody recognized who holds no role on any product,
-					// which is what this scope asks for.
-					who = "nothing"
 				default:
 					notAGate++
 					continue
@@ -136,14 +130,10 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 			t.Errorf("only %d operations are gated on administering the deployment: "+
 				"this sweep is not walking them", deployment)
 		}
-		if anywhere < 3 {
-			t.Errorf("only %d operations are gated on a role anywhere: "+
-				"this sweep is not walking them", anywhere)
-		}
-		t.Logf("swept %d on a product, %d deployment-wide, %d on any product "+
+		t.Logf("swept %d on a product, %d deployment-wide "+
 			"(%d ask only for a credential, %d are narrowed rather than gated, "+
 			"%d have no value here)",
-			onProduct, deployment, anywhere, notAGate, narrowed, noValue)
+			onProduct, deployment, notAGate, narrowed, noValue)
 	})
 }
 

@@ -72,14 +72,27 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
+		// Which product this build belongs to, read before anything is
+		// ranked. A rating belongs to a product, so what ranks here is
+		// this product's rating and not a word somebody working on
+		// another one wrote.
+		productID, err := productOf(ctx, tx, targetID)
+		if err != nil {
+			return err
+		}
 		// What is on record about each issue: the rating in force —
-		// ours where somebody has made one, the published one
-		// otherwise — and the signals that rank it. What a finding is
-		// ordered, admitted and clocked by has to be what every later
-		// reading uses, or a finding opened after an assessment
+		// this product's where somebody here has made one, the
+		// published one otherwise — and the signals that rank it. What
+		// a finding is ordered, admitted and clocked by has to be what
+		// every later reading uses, or a finding opened after a rating
 		// arrives on the published word's deadline while the ones
-		// beside it sit on ours.
-		ratings, err := ratingsInForce(ctx, tx, vulnerabilities)
+		// beside it sit on the product's.
+		//
+		// Read at this moment rather than copied onto the finding, so a
+		// place that newly pulls a library in tomorrow picks the
+		// product's rating up without anything having to remember to
+		// go and fetch it.
+		ratings, err := ratingsInForce(ctx, tx, productID, vulnerabilities)
 		if err != nil {
 			return err
 		}
@@ -139,10 +152,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// holding both means one of them is lying — within a year the
 		// overdue figure would be thousands of things nobody ever
 		// intended to look at.
-		productID, err := productOf(ctx, tx, targetID)
-		if err != nil {
-			return err
-		}
 		floor, err := FloorFor(ctx, tx, productID)
 		if err != nil {
 			return err
@@ -469,14 +478,20 @@ func ranking(held, found Finding) (moved, reclocked bool) {
 // applied, and that is the point of it. A report is one source's account of
 // one moment: it may omit that something is being exploited, or carry a score
 // lower than a report last week gave. What is stored is the worst anybody has
-// claimed, moving only toward worse, plus the rating of ours where somebody
-// has made one — so the issue is the one place that knows everything known
-// about it, and ranking from anywhere else makes the order depend on which
-// scan ran last.
+// claimed, moving only toward worse, plus this product's rating where somebody
+// here has made one — so the issue is the one place that knows everything
+// known about it, and ranking from anywhere else makes the order depend on
+// which scan ran last.
+//
+// The rating is this build's product's. Another product's rating of the same
+// issue reaches nothing here, which is what makes two products able to hold
+// different ones.
 //
 // Interning has already folded this report into the row, so what comes back
 // includes whatever this report knew that the row did not.
-func ratingsInForce(ctx context.Context, tx bun.IDB, interned map[string]int64) (map[int64]Rating, error) {
+func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
+	interned map[string]int64) (map[int64]Rating, error) {
+
 	ids := make([]int64, 0, len(interned))
 	seen := map[int64]bool{}
 	for _, id := range interned {
@@ -508,9 +523,10 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, interned map[string]int64) 
 		}
 		err := tx.NewSelect().
 			TableExpr("vulnerability AS v").
+			Join(RatedHere, productID).
 			ColumnExpr("v.id AS id").
 			ColumnExpr("COALESCE(v.severity, ?) AS published", "").
-			ColumnExpr("COALESCE(v.assessed_severity, ?) AS assessed", "").
+			ColumnExpr("COALESCE(ir.severity, ?) AS assessed", "").
 			ColumnExpr("v.exploited AS exploited").
 			ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 			ColumnExpr("COALESCE(v.likelihood_ppm, 0) AS likelihood_ppm").

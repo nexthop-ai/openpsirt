@@ -63,6 +63,14 @@ func noSuchIssue() error {
 	return huma.Error404NotFound("no issue is known by that name")
 }
 
+// noSuchNote is what a note that is not there answers, and what an issue this
+// product cannot reach answers, and what a name nobody has filed answers.
+// Three questions, one sentence: told apart, a note route becomes a way to
+// walk identifiers.
+func noSuchNote() error {
+	return huma.Error404NotFound("no note is recorded there")
+}
+
 func noSuchAssessment() error {
 	return huma.Error404NotFound("no assessment is recorded there")
 }

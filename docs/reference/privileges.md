@@ -116,13 +116,16 @@ is the correct answer rather than a check that was skipped.
 **Every gate is swept, at every scope.** A test walks the operations the server
 registers and asks each gated one as somebody it excludes: for a role on a
 product, somebody holding none of those roles; for an administrator gate,
-somebody holding a role and not administering; for a role on any product,
-somebody holding none anywhere. A 2xx fails it.
+somebody holding a role and not administering. A 2xx fails it.
 
-It counts each of the three classes separately and refuses to pass on a class
+It counts each of the two classes separately and refuses to pass on a class
 that has emptied. It swept only the first for a long time, which left the
-thirty-seven administrator gates and the three any-product ones walked by
-nothing — the ones a mistake would be worst on.
+administrator gates walked by nothing — the ones a mistake would be worst on.
+
+There was a third class, for a role held on any product at all rather than on
+the one a request names. The only operations in it were the ones that record a
+rating, and a rating belongs to a product (REQ-29), so the scope went with the
+shape that needed it.
 
 That is a floor rather than a proof the check is the right one, and the rest is
 the authorization tests and review. It reads the operations rather than this

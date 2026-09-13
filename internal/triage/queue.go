@@ -312,14 +312,19 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ClaimID         int64 `bun:"claim_id"`
 		VulnerabilityID int64 `bun:"vulnerability_id"`
 		DecisionID      int64 `bun:"decision_id"`
+		// Which product the claim was made in. A rating belongs to a product,
+		// so an outlier is picked out against what *this* product rates these
+		// issues rather than against a word somebody in another one chose.
+		ProductID int64 `bun:"product_id"`
 	}
 	if err := s.db.NewSelect().
 		TableExpr("decision AS de").
 		ColumnExpr("de.claim_id AS claim_id").
 		ColumnExpr("de.vulnerability_id AS vulnerability_id").
 		ColumnExpr("MIN(de.id) AS decision_id").
+		ColumnExpr("de.product_id AS product_id").
 		Where("de.claim_id IN (?)", bun.List(claimIDs)).
-		GroupExpr("de.claim_id, de.vulnerability_id").
+		GroupExpr("de.claim_id, de.vulnerability_id, de.product_id").
 		Scan(ctx, &heads); err != nil {
 		return nil, fmt.Errorf("read what a bulk claim covers: %w", err)
 	}
@@ -327,9 +332,13 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		return out, nil
 	}
 	issueIDs := make([]int64, 0, len(heads))
+	productIDs := make([]int64, 0, len(heads))
 	covers := map[int64]map[int64]int64{}
+	within := map[int64]int64{}
 	for _, head := range heads {
 		issueIDs = append(issueIDs, head.VulnerabilityID)
+		productIDs = append(productIDs, head.ProductID)
+		within[head.ClaimID] = head.ProductID
 		if covers[head.ClaimID] == nil {
 			covers[head.ClaimID] = map[int64]int64{}
 		}
@@ -344,6 +353,10 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	byIssue := make(map[int64]finding.Vulnerability, len(issues))
 	for _, issue := range issues {
 		byIssue[issue.ID] = issue
+	}
+	rated, err := finding.RatingsIn(ctx, s.db, productIDs, issueIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	// Where a fix is known, from the open findings the claim's rows are
@@ -389,14 +402,16 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	}
 
 	for _, claim := range claims {
-		out[claim.ID] = outliersOf(claim, covers[claim.ID], byIssue, fixedIn[claim.ID])
+		out[claim.ID] = outliersOf(claim, within[claim.ID], covers[claim.ID], byIssue,
+			rated, fixedIn[claim.ID])
 	}
 	return out, nil
 }
 
 // outliersOf picks, from the issues one bulk claim covers, the rows that do
 // not look like the rest.
-func outliersOf(claim Claim, decisionOf map[int64]int64, byIssue map[int64]finding.Vulnerability,
+func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
+	byIssue map[int64]finding.Vulnerability, rated map[finding.RatedKey]string,
 	fixedIn map[int64]string) *Outliers {
 
 	term := narrowingTerm(orEmpty(claim.SelectedBy))
@@ -414,10 +429,11 @@ func outliersOf(claim Claim, decisionOf map[int64]int64, byIssue map[int64]findi
 		if !known {
 			continue
 		}
-		word := issue.Severity
-		if issue.AssessedSeverity != nil && *issue.AssessedSeverity != "" {
-			word = *issue.AssessedSeverity
-		}
+		// This product's rating where it has one, the published word
+		// otherwise — the rule every list follows, asked of the product the
+		// claim was made in.
+		word := issue.RatedIn(rated[finding.RatedKey{ProductID: productID,
+			VulnerabilityID: issue.ID}]).InForce()
 		if word == "" && issue.ScoreCenti != nil {
 			word = finding.SeverityWord(*issue.ScoreCenti)
 		}

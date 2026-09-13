@@ -7,6 +7,8 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Severity, Exploited } from "../ui/Severity";
 import { IssueAdvisory } from "./IssueAdvisory";
+import { IssueNotes } from "./FindingNotes";
+import { useWho } from "../app/session";
 
 // One issue, everywhere it sits.
 //
@@ -20,6 +22,9 @@ import { IssueAdvisory } from "./IssueAdvisory";
 // is one piece of work with a count.
 export function Issue() {
   const { vulnerability = "" } = useParams();
+  const who = useWho();
+  const mine = (writtenBy: string) =>
+    !!who.data && (writtenBy === who.data.identity || writtenBy === who.data.name);
   const found = useQuery({
     queryKey: ["issue", vulnerability],
     queryFn: async () =>
@@ -53,15 +58,23 @@ export function Issue() {
   // The products carrying it, once each and in the order they appear. The
   // advisory is a statement about one product, and this issue may sit in
   // several.
+  // Whether anything of it is still undisclosed there is folded in per
+  // product, because one undisclosed place makes the whole of it undisclosed
+  // for anybody deciding what may be said about it.
   const products = Array.from(
     rows
       .reduce((seen, row) => {
         const name = row.product ?? "";
-        if (name && !seen.has(name)) seen.set(name, row.product_name || name);
+        if (!name) return seen;
+        const held = seen.get(name);
+        seen.set(name, {
+          called: held?.called || row.product_name || name,
+          undisclosed: !!held?.undisclosed || !!row.undisclosed,
+        });
         return seen;
-      }, new Map<string, string>())
+      }, new Map<string, { called: string; undisclosed: boolean }>())
       .entries(),
-  ).map(([name, called]) => ({ name, called }));
+  ).map(([name, held]) => ({ name, ...held }));
   return (
     <>
       <div className="screen-head">
@@ -97,6 +110,13 @@ export function Issue() {
           document. */}
       {products.length > 0 && (
         <IssueAdvisory vulnerability={it?.vulnerability ?? ""} products={products} />
+      )}
+
+      {/* What people have written about this issue, a product at a time. The
+          thread is here whether or not anybody has decided anything, which is
+          the whole of what separates it from a claim's comments. */}
+      {products.length > 0 && (
+        <IssueNotes vulnerability={it?.vulnerability ?? ""} products={products} mine={mine} />
       )}
 
       {rows.length === 0 ? (

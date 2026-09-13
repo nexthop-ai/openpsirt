@@ -280,7 +280,7 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		// critical on the product's list and low on the one above it — the
 		// list somebody arrives at before they have picked a product.
 		f.recorded(t, 1, "someone")
-		if _, err := f.store.Assess(t.Context(), f.holding(t, access.PublicTriage),
+		if _, err := f.store.Assess(t.Context(), f.holding(t, access.PublicTriage), f.productID,
 			f.issue(t, "CVE-2026-9"), "critical",
 			"Reachable from the network in how we ship it."); err != nil {
 			t.Fatal(err)

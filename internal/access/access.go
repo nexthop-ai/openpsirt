@@ -422,12 +422,17 @@ func (s Subject) Sees(productID int64) bool {
 // HoldsAnywhere reports whether this subject holds one of these roles on any
 // product at all.
 //
-// For the judgments that are not about a product. An assessment is a claim
-// about an issue rather than about a place, so there is no product to hold a
-// role on — and the alternative that stood here was "any person signed in",
-// which is not an authorization rule. Somebody who triages anywhere is
-// somebody this deployment already trusts to argue about severities; somebody
-// who triages nowhere is not.
+// **A coarse check made before a name in a request is resolved**, never the
+// whole of an authorization. Where the thing being acted on is named by an
+// identifier alone — a rating, by its own number — the product it belongs to
+// is not known until the row is read, and reading it first for somebody
+// holding nothing anywhere would let them walk identifiers. So this runs
+// first, and the question about the right product runs after the row is in
+// hand and answers in the words a row that is not there gets.
+//
+// It is not a rule on its own. Every judgment here belongs to a product,
+// including a rating (REQ-29), and "holds the role somewhere" is not "may act
+// on this".
 //
 // An administrator holds nothing here they were not granted, as in Holds .
 func (s Subject) HoldsAnywhere(roles ...Role) bool {

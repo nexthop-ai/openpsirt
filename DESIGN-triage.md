@@ -41,6 +41,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Lapse marking](#lapse-marking)
 - [Re-affirmation](#re-affirmation)
 - [Comments and reasoning](#comments-and-reasoning)
+- [Notes on an issue](#notes-on-an-issue)
 - [VEX statements as evidence](#vex-statements-as-evidence)
 - [Dates still to come](#dates-still-to-come)
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
@@ -586,37 +587,50 @@ loose somewhere else.
 
 ## Issue assessments
 
-A published rating can be wrong for us: the score assumes a configuration we do
-not ship, or the world has not rated it and it is being treated as a medium by
-default.
+A published rating can be wrong for a product: the score assumes a
+configuration it does not ship, or the world has not rated it and it is being
+treated as a medium by default.
 
-The claim is about the issue, not about a place. A rating being wrong is one
-statement about the vulnerability: true wherever it appears, true in products it
-has not reached yet, and it does not stop being true because somebody rebuilt.
-Keyed to a place it would be repeated at each one and would lapse on a version
-change that had nothing to do with it.
+The claim is about the issue, not about a place, and it belongs to one product
+(REQ-29). Keyed to a place it would be repeated at each one and would lapse on
+a version change that had nothing to do with it. Keyed to nothing at all it was
+one statement for the whole deployment, which is the shape this replaced.
 
 | Rule | |
 |---|---|
-| Making one asks for triage anywhere (REQ-29) | There is no product to hold a role on |
-| Every act on a claim asks whether the person may read a finding of this issue, in any product, at its visibility (REQ-43) | The claim carries the severity recorded against the issue and the argument somebody wrote about it, so a row about an embargoed flaw is that flaw's disclosure. A refusal answers exactly as a name nobody has ever used, and a claim that fails it is absent from the list rather than refused |
-| An issue that sits at no build here is exempt | It is nobody's secret, and refusing it would take away the half of REQ-29 that reaches products an issue has not met yet |
-| The counts beside a waiting claim stop at the products the reader holds | Narrowing on visibility alone admits every disclosed finding in the deployment, so an approver holding one product was told how many findings the issue has elsewhere — a count of what somebody else ships |
+| A rating belongs to one product and reaches every build of it (REQ-29) | A rating is a judgment about how a component is used, and two products do not use one the same way: one may ship the vulnerable configuration and another may not |
+| Two products may hold different live ratings of one issue | Neither reaches the other. A single rating refused the second team any rating at all |
+| Nothing inherits | A product nobody has rated the issue in reads the published rating until somebody on that team looks. A rating arriving from a product a team cannot see is what this shape removes, so it is not reintroduced as a default |
+| Making one, agreeing to one and taking one back ask for the role **on that product** (REQ-29, REQ-42) | A rating sets the deadline and can push a finding below the line the product triages at. Asked anywhere, somebody holding one product moved both in a product they cannot see |
+| Every act on a claim asks whether the person may read a finding of this issue **in that product**, at its visibility (REQ-43) | The claim carries the severity recorded against the issue and the argument somebody wrote about it, so a row about an embargoed flaw is that flaw's disclosure. A refusal answers exactly as a name nobody has ever used, and a claim that fails it is absent from the list rather than refused |
+| An issue that sits at no build anywhere may still be rated | It is nobody's secret: there is no finding for a rating to disclose. It is what lets a product get ahead of an issue it knows is coming |
+| The counts beside a waiting claim stop at what the reader may see, inside the rating's own product | Narrowing on visibility alone admits every disclosed finding in the deployment, so an approver holding one product was told how many findings the issue has elsewhere — a count of what somebody else ships |
 | Rating something worse takes effect at once | Nobody needs protecting from being told something is worse than the world says |
-| Rating it milder waits for a second person | Severity sets the deadline, and where a product has said what is worth triaging, a downgrade below that line takes the finding off the working list and off any clock |
-| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; ours is what ranks, what the triage line compares and what sets the deadline |
-| A claim in force is written onto the issue as the rating in force | Everything that ranks, filters or clocks reads that one value with the published rating as its fallback, rather than each reader joining the claim and folding it its own way. Findings already open are reordered and re-clocked when it lands |
+| Rating it milder waits for a second person, on that product | Severity sets the deadline, and where the product has said what is worth triaging, a downgrade below that line takes the finding off the working list and off any clock |
+| Milder is judged against the **published** rating | What needs a second person is hiding something the world called bad. Judged against whatever the product holds now, the next step down would go through unwatched |
+| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; the product's is what ranks, what its triage line compares and what sets its deadline |
+| A claim in force is written as the rating in force for that product | Everything that ranks, filters or clocks reads that one row with the published rating as its fallback, rather than each reader joining the claim and folding it its own way. The product's open findings are reordered and re-clocked when it lands, and no other product's are |
+| A finding opened later picks the product's rating up | The applying path reads the rating for the build's product at the moment it opens findings. A copy written onto each finding would carry it only where something remembered to fetch it |
+
+### What a per-product rating gives up
+
+Stated so it is decided rather than discovered.
+
+| | |
+|---|---|
+| A rating reaching products the issue has not met yet | A deployment-wide rating got ahead of an issue before it arrived anywhere. Each product now rates for itself, and an issue arriving somewhere new arrives unrated |
+| One place to say a published score is simply wrong | A score that assumes the wrong configuration is wrong the same way in three products, and three teams say so separately. That is the cost of the products that genuinely differ being able to differ |
 
 ### What agreeing removes
 
 Agreeing to "look at this in ninety days instead of seven" and agreeing to
-"nobody will look at this" are not the same act. Which one it is depends on where
-the rating lands, so the claim carries how many open findings the rating would
-take off a working list, and in how many products.
+"nobody will look at this" are not the same act. Which one it is depends on
+where the rating lands, so the claim carries how many open findings the rating
+would take off a working list.
 
 | | |
 |---|---|
-| Counted per product | A line lives on a product and an assessment is about an issue. One issue can be above the line in one product and below it in another, so the honest form is a count rather than a yes |
+| Counted in the rating's own product | That is everywhere the rating reaches. A count spanning products would describe work this decision does not touch |
 | What is already below the line is not counted | Agreeing takes it off nothing |
 | Narrowed to what the reader may see | That understates the effect for them, which is the right way for it to be wrong: the alternative discloses a count of undisclosed work |
 | Worked out only for the claims that are waiting | Answering it for every historical claim would cost a query each to say nothing |
@@ -912,7 +926,45 @@ above.
 | Who may read it is asked of the claim, not of the comment | Asking twice is one question with two answers waiting to disagree |
 | Nobody else may edit somebody's words | An edit anybody could make is a forgery with a timestamp |
 | Being allowed near the claim is settled before anything about the comment is said back (REQ-42) | The row has to be read first, because the claim it hangs off cannot be known otherwise, but no answer turns on what was in it until the asker has been let in. Refusing on authorship first made "that is not your comment" and "there is no such comment" two different answers, so anybody holding triage anywhere could walk the identifiers |
-| Every field somebody types into runs through the same policy before storage | The reasoning, a revision of it, and a comment. `DESIGN-text.md` says what that policy is |
+| Every field somebody types into runs through the same policy before storage | The reasoning, a revision of it, a comment and a note. `DESIGN-text.md` says what that policy is |
+
+## Notes on an issue
+
+A note is what somebody wants whoever decides to know, written without
+recording a judgment (REQ-29). It changes nothing: not what ranks, not a
+deadline, not what the product triages.
+
+**There was nowhere to put one.** A comment hangs off a claim and the box for
+one appears only where a claim already exists, so the first person to say
+anything had to record a judgment in order to say it. Assignment carries no
+message either: it takes a person or a team and nothing else.
+
+| Rule | |
+|---|---|
+| Keyed on the issue and the product, like a rating (REQ-29) | A row in the findings list is one issue at one source package, and one issue is often several rows: 786 of 5,840 open issues on the seeded image, the worst at eleven, across one library at several versions and the standard library. A note kept against a row would be written on one of eleven and hidden from the other ten |
+| It reaches every build of the product and does not lapse when a version moves | It is about the issue here rather than about a version of something |
+| Reading asks whether the reader may read a finding of that issue in that product, at its visibility (REQ-43) | The same rule every other read of the record follows. A product the reader holds nothing on answers as an issue that is not there |
+| Writing asks for triage on that product at the same visibility | Saying something on the record about work is part of arguing about it. Reading the product is not |
+| One undisclosed place makes the whole thread undisclosed | A note is one thread for the issue, so it cannot be public for some of its places and private for others, and the stricter direction is the safe one. It is the rule the finding screen already applies to what may be said |
+| Only the author may change one, and what it said before is kept | A note goes public at disclosure with the rest of the record, and a record whose earlier text is unrecoverable is readable rather than checkable. Both writes go together, for the reason a comment's do |
+| A name written after an `@` is told, where that person may read what the note is about | The same rule and the same query a comment's mentions use. A name that reached nobody is reported without saying why |
+
+### Two records, not one
+
+| | Hangs off | Is about |
+|---|---|---|
+| A comment | A claim | The argument somebody made, at one place |
+| A note | An issue in a product | The issue here, however many rows it sits on |
+
+They are not merged, and cannot be. A claim is keyed on a place and a note on
+an issue, so one record cannot hold both — and the claim's record stays exactly
+what people wrote about the claim, which is what lets an approval point at one
+revision of a justification (REQ-28). Two threads are rendered near each other
+instead.
+
+**Something true of one copy and not another is a comment, not a note.** "We do
+not call that function in the vendored build" is about a judgment at a place,
+and it has a home there already.
 
 ## VEX statements as evidence
 

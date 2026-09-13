@@ -52,17 +52,12 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- between them had LOWER() on the indexed side — which made the
 			-- statement filter scan this whole table once per statement.
 			"identifier_folded" ` + t.name + ` NOT NULL,
+			-- What the world says. What we say instead belongs to one
+			-- product and lives in "issue_rating", because a rating is a
+			-- judgment about how a component is used and two products do
+			-- not use one the same way. A row here has no product, so it
+			-- has nowhere to hold that.
 			"severity"      ` + t.kind + ` NULL,
-			-- What we say instead, where somebody here has assessed it.
-			--
-			-- The published rating is never overwritten: a rating of ours
-			-- shown where the world's goes reads as the world's, and the
-			-- first person to check against the public record finds a
-			-- discrepancy nobody declared. Everything that ranks, filters or
-			-- clocks reads this with the published one as its fallback,
-			-- through one expression — every identity and expiry bug here
-			-- came from letting one fact into two rules.
-			"assessed_severity" ` + t.kind + ` NULL,
 			-- What somebody triaging needs in front of them. There may be
 			-- thousands of these and very few people, so a finding that
 			-- carries its own evidence is the difference between a queue that

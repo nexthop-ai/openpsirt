@@ -105,6 +105,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		Join(`JOIN component AS c ON c.id = f.component_id`).
 		Join(`LEFT JOIN component AS uc ON uc.id = f.consumer_id`).
 		Join(`JOIN vulnerability AS v ON v.id = f.vulnerability_id`).
+		Join(RatedHere, productID).
 		ColumnExpr("f.visibility AS visibility").
 		// The upstream version where one is stated, and the
 		// component's own where none is. Most packages are not forks
@@ -131,7 +132,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
 		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		// The deadline, because a promise to act is gated against the earliest
 		// one among what the act covers. Read from the rows rather than
@@ -294,8 +295,11 @@ type placeRow struct {
 	ComponentUpstream string     `bun:"component_upstream"`
 	ConsumerUpstream  string     `bun:"consumer_upstream"`
 	Published         string     `bun:"published_severity"`
-	Assessed          string     `bun:"assessed_severity"`
-	ScoreCenti        int        `bun:"score_centi"`
+	// Assessed is what this place's own product rates the issue, empty where
+	// it rates it nothing. Another product's rating is not read here: the
+	// judgment being made is this product's.
+	Assessed   string `bun:"rated_here"`
+	ScoreCenti int    `bun:"score_centi"`
 	// OnTag as an integer rather than a boolean: the four engines spell a
 	// boolean three ways, and a CASE returning 1 or 0 reads the same on all of
 	// them.
@@ -381,6 +385,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		Join(`JOIN component AS c ON c.id = f.component_id`).
 		Join(`LEFT JOIN component AS uc ON uc.id = f.consumer_id`).
 		Join(`JOIN vulnerability AS v ON v.id = f.vulnerability_id`).
+		Join(RatedHere, productID).
 		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("f.component_id AS component_id").
 		ColumnExpr("f.target_id AS target_id").
@@ -394,7 +399,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
 		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
 		ColumnExpr("f.due_at AS due_at").
@@ -507,6 +512,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		Join(`JOIN component AS c ON c.id = f.component_id`).
 		Join(`LEFT JOIN component AS uc ON uc.id = f.consumer_id`).
 		Join(`JOIN vulnerability AS v ON v.id = f.vulnerability_id`).
+		Join(RatedHere, productID).
 		ColumnExpr("f.place_identity AS place_identity").
 		ColumnExpr("COALESCE(uc.name, '') AS consumer").
 		ColumnExpr("f.visibility AS visibility").
@@ -517,7 +523,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
 		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
 		// The deadline each place carries, for the reason PlaceFor reads it.

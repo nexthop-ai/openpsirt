@@ -8,14 +8,25 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// AssessmentBody is what we think of an issue, as against what was published.
+// AssessmentBody is what one product thinks of an issue, as against what was
+// published.
 type AssessmentBody struct {
 	ID            int64  `json:"id,omitempty"`
 	Vulnerability string `json:"vulnerability,omitempty" doc:"The issue this is about"`
-	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"What we rate it"`
+	// Product is whose rating it is. Carried on every row because two
+	// products may rate one issue differently, so a rating shown without one
+	// is a word nobody can act on.
+	//
+	// The name an address takes, never the spelling shown on screen — the
+	// same field on both operations has to mean the same thing, and this is
+	// the one a client feeds back to the filter beside it.
+	Product       string `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
+	ProductName   string `json:"product_name,omitempty" doc:"How that product is spelled on screen"`
+	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"What this product rates it"`
 	Published     string `json:"published,omitempty" doc:"What was published when this was made, kept so a reader can see what we disagreed with"`
 	Reasoning     string `json:"reasoning" minLength:"1" doc:"Why. It outlives the version it was made about, so the next person needs the argument"`
 	State         string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
@@ -24,15 +35,14 @@ type AssessmentBody struct {
 	// that are waiting for somebody to agree. Absent on the rest: it is a
 	// question about a decision nobody has taken yet, and answering it for
 	// every historical claim would cost a query each to say nothing.
-	Open int `json:"open,omitempty" doc:"Open findings of this issue you can see"`
-	// InProducts is how many products those sit in. An assessment is about an
-	// issue and a line is per product, so what it does depends on where.
-	InProducts int `json:"in_products,omitempty" doc:"How many products those sit in"`
+	//
+	// Counted inside the rating's own product, because that is everywhere the
+	// rating reaches.
+	Open int `json:"open,omitempty" doc:"Open findings of this issue you can see in this product"`
 	// OffTheList is the number an approver is really being asked about: these
 	// stop being work rather than becoming later work, and lose their deadline
 	// with it.
-	OffTheList          int `json:"off_the_list,omitempty" doc:"How many of them this rating would put below their product's triage line, where they stop being work and carry no deadline"`
-	OffTheListInProduct int `json:"off_the_list_in_products,omitempty" doc:"How many products that happens in"`
+	OffTheList int `json:"off_the_list,omitempty" doc:"How many of them this rating would put below the product's triage line, where they stop being work and carry no deadline"`
 	// Mine says you made this one, so you may not be the second person. The
 	// server refuses it either way; carried so a screen can say why rather
 	// than offering a button that answers 422 — which is what the embargo
@@ -43,13 +53,18 @@ type AssessmentBody struct {
 func registerAssessment(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "assess-issue", Method: http.MethodPost,
-		Path:    "/v1/issues/{vulnerability}/assessment",
-		Summary: "Record what we think of an issue, as against what was published",
-		Description: "Recorded against the **issue**, not against a place. A published rating " +
-			"being wrong, or a report being disputed, is one statement about the " +
-			"vulnerability — true wherever it appears, including in products it has not " +
-			"reached yet, and it does not stop being true because somebody rebuilt " +
-			"something.\n\n" +
+		Path:    "/v1/products/{product}/issues/{vulnerability}/assessment",
+		Summary: "Record what a product thinks of an issue, as against what was published",
+		Description: "Recorded against the **issue**, not against a place, and against **one " +
+			"product**. A published rating being wrong, or a report being disputed, is one " +
+			"statement about the vulnerability in this product — true in every build of it, " +
+			"including builds it has not reached yet, and it does not stop being true " +
+			"because somebody rebuilt something.\n\n" +
+			"It belongs to a product because a rating is a judgment about how a component " +
+			"is used, and two products do not use one the same way: one may ship the " +
+			"vulnerable configuration and another may not. Two products may record " +
+			"different ratings of the same issue, and neither reaches the other. A product " +
+			"nobody has rated the issue in reads the published rating.\n\n" +
 			"It changes the order, which is what makes it worth having rather than a note " +
 			"nobody acts on. Rating something **worse** than published takes effect at " +
 			"once: nobody needs protecting from being told something is worse than the " +
@@ -59,11 +74,12 @@ func registerAssessment(api huma.API, in Ingest) {
 			"out by months, and where a product has said what is worth triaging at all, a " +
 			"downgrade below that line takes the finding off the working list and off any " +
 			"clock entirely.\n\n" +
-			"The published rating is never overwritten. Ours is what ranks; the world's " +
-			"stays beside it, because a rating of ours shown where the world's goes reads " +
-			"as the world's.",
+			"The published rating is never overwritten. The product's is what ranks there; " +
+			"the world's stays beside it, because a rating of ours shown where the world's " +
+			"goes reads as the world's.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
-	}, anyProduct, "", triageRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
+		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Body          AssessmentBody
 	}) (*struct{ Body AssessmentBody }, error) {
@@ -71,16 +87,20 @@ func registerAssessment(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		// Before the name is resolved. Refusing afterwards answers "is
-		// this issue known here" for anybody with an account.
-		if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
+		product, err := productNamed(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
+		}
+		// Before the issue name is resolved. Refusing afterwards answers "is
+		// this issue known here" for anybody who may read the product.
+		if !subject.Triages(access.Public, product.ID) {
 			return nil, huma.Error403Forbidden("not authorized")
 		}
 		issue, err := finding.NewVulnerabilities(in.DB.DB).ByName(ctx, input.Vulnerability)
 		if err != nil {
 			return nil, noSuchIssue()
 		}
-		claim, err := finding.NewStore(in.DB.DB).Assess(ctx, subject, issue,
+		claim, err := finding.NewStore(in.DB.DB).Assess(ctx, subject, product.ID, issue,
 			input.Body.Severity, input.Body.Reasoning)
 		if err != nil {
 			// Exactly what an unused name answers. An issue somebody may not
@@ -91,12 +111,14 @@ func registerAssessment(api huma.API, in Ingest) {
 			}
 			if errors.Is(err, finding.ErrAlreadyAssessed) {
 				return nil, huma.Error409Conflict(
-					"something is already claimed about this issue — withdraw that before " +
-						"recording another, so there is one answer rather than two")
+					"this product already claims something about this issue — withdraw that " +
+						"before recording another, so there is one answer rather than two")
 			}
 			return nil, asked(in.Logger, err)
 		}
-		return &struct{ Body AssessmentBody }{Body: assessmentBody(*claim, input.Vulnerability, subject.ID)}, nil
+		body := assessmentBody(*claim, input.Vulnerability, subject.ID)
+		body.Product, body.ProductName = product.Name, product.DisplayName
+		return &struct{ Body AssessmentBody }{Body: body}, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -105,9 +127,14 @@ func registerAssessment(api huma.API, in Ingest) {
 		Summary: "Approve a rating assessment",
 		Description: "Only a milder rating waits for this. Somebody other than whoever " +
 			"proposed it, for the same reason every other second person here is somebody " +
-			"else: a control one person can complete alone is not a control.",
+			"else: a control one person can complete alone is not a control.\n\n" +
+			"The second person holds their role **on the product the rating belongs to**. " +
+			"Agreeing is what puts a milder rating into force, so it moves that product's " +
+			"deadlines and its triage line; a rating in a product you hold nothing on " +
+			"answers as one that is not there.",
 		Tags: []string{"Triage"},
-	}, anyProduct, "The proposer may not approve their own.", approveRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "The proposer may not approve their own. The product is the rating's own, "+
+		"not one in the path.", approveRights()...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{ Body AssessmentBody }, error) {
 		subject, _, err := triaging(ctx, in)
@@ -131,11 +158,15 @@ func registerAssessment(api huma.API, in Ingest) {
 		OperationID: "withdraw-assessment", Method: http.MethodDelete,
 		Path:    "/v1/assessments/{id}",
 		Summary: "Withdraw an assessment, and take the published rating back",
-		Description: "The rating in force returns to the published one, and everything that " +
-			"reads it — where a finding sits in the list, how long it has, whether it is " +
-			"above the line a product triages — follows it back.",
+		Description: "The rating in force in that product returns to the published one, and " +
+			"everything that reads it — where a finding sits in the list, how long it has, " +
+			"whether it is above the line the product triages — follows it back. No other " +
+			"product is touched.\n\n" +
+			"Asked of triage **on the product the rating belongs to**: taking a rating back " +
+			"is making one.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
-	}, anyProduct, "", triageRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "The product is the rating's own, not one in the path.",
+		triageRights()...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
 		subject, _, err := triaging(ctx, in)
@@ -159,31 +190,57 @@ func registerAssessment(api huma.API, in Ingest) {
 		Path:    "/v1/assessments",
 		Summary: "List issue assessments",
 		Description: "Every claim about an issue you may be told about, or those in one " +
-			"state. The ones waiting are milder ratings somebody has proposed and nobody " +
-			"has agreed to yet, which are the ones not yet affecting anything.\n\n" +
+			"state, or those belonging to one product. The ones waiting are milder ratings " +
+			"somebody has proposed and nobody has agreed to yet, which are the ones not yet " +
+			"affecting anything.\n\n" +
+			"A rating belongs to one product, so a row says which. Two products may rate the " +
+			"same issue differently and both rows appear, each narrowed by what you may read " +
+			"in its own product.\n\n" +
 			"A claim carries the severity recorded against its issue, so claims about " +
 			"findings you cannot read are absent rather than refused.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Narrowed to issues you may read a finding of somewhere. A rating is about "+
-		"an issue rather than a product, but an issue this deployment minted for a flaw "+
-		"nobody has announced is not public knowledge."), func(ctx context.Context, input *struct {
-		State string `query:"state" enum:"proposed,live,withdrawn" doc:"Limit to one state"`
-		Limit int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
+	}, anySubject, "Narrowed to issues you may read a finding of in the product the rating "+
+		"belongs to. A rating is about one product, and an issue this deployment minted for a "+
+		"flaw nobody has announced is not public knowledge."), func(ctx context.Context, input *struct {
+		Product string `query:"product" doc:"Limit to one product, by name"`
+		State   string `query:"state" enum:"proposed,live,withdrawn" doc:"Limit to one state"`
+		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
 	}) (*listOutput[AssessmentBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		claims, named, err := finding.NewStore(in.DB.DB).Assessments(ctx, subject,
-			input.State, input.Limit)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "what we have said could not be read", err)
+		// Resolved before anything is read, and refused in the words an
+		// undeclared name gets: a product somebody holds nothing on does not
+		// exist as far as they are concerned.
+		within := int64(0)
+		if input.Product != "" {
+			product, err := productNamed(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			within = product.ID
 		}
 		store := finding.NewStore(in.DB.DB)
+		claims, named, err := store.Assessments(ctx, subject, within, input.State, input.Limit)
+		if err != nil {
+			if errors.Is(err, access.ErrDenied) {
+				return nil, noSuchProduct()
+			}
+			return nil, wentWrong(in.Logger, "what we have said could not be read", err)
+		}
+		// What each rating's product is called, read once for the page rather
+		// than per row.
+		products, shown, err := productsNamed(ctx, in, claims)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "what these ratings belong to could not be read", err)
+		}
 		out := &listOutput[AssessmentBody]{}
 		out.Body.Items = make([]AssessmentBody, 0, len(claims))
 		for _, claim := range claims {
 			body := assessmentBody(claim, named[claim.VulnerabilityID], subject.ID)
+			body.Product = products[claim.ProductID]
+			body.ProductName = shown[claim.ProductID]
 			// Only for the ones somebody is being asked to agree to. It is a
 			// question about a decision not yet taken, and a query each for
 			// every historical claim would buy nothing.
@@ -198,8 +255,7 @@ func registerAssessment(api huma.API, in Ingest) {
 				if err != nil {
 					return nil, wentWrong(in.Logger, "what agreeing would do could not be worked out", err)
 				}
-				body.Open, body.InProducts = would.Findings, would.Products
-				body.OffTheList, body.OffTheListInProduct = would.OffTheList, would.ProductsAffected
+				body.Open, body.OffTheList = would.Findings, would.OffTheList
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
@@ -214,4 +270,44 @@ func assessmentBody(a finding.Assessment, identifier string, asking int64) Asses
 		State: a.State, NeedsApproval: a.NeedsApproval,
 		Mine: a.ProposedBy == asking,
 	}
+}
+
+// productsNamed is the name each of these ratings' products goes by.
+//
+// One lookup for the page. A rating belongs to a product and the row has to
+// say which, because two products may rate one issue differently and a word
+// with no product beside it is not actionable.
+//
+// The name rather than the display name, because that is what the field means
+// on the operation that records a rating and what the filter beside this one
+// takes. One field spelled two ways by two operations hands a client "SONiC"
+// where "sonic" was wanted.
+func productsNamed(ctx context.Context, in Ingest,
+	claims []finding.Assessment) (called, shown map[int64]string, err error) {
+
+	if len(claims) == 0 {
+		return map[int64]string{}, map[int64]string{}, nil
+	}
+	ids := make([]int64, 0, len(claims))
+	for _, claim := range claims {
+		ids = append(ids, claim.ProductID)
+	}
+	products := catalog.NewStore(in.DB.DB)
+	if called, err = products.ProductsCalled(ctx, ids); err != nil {
+		return nil, nil, err
+	}
+	shown, err = products.ProductNames(ctx, ids)
+	return called, shown, err
+}
+
+// productNamed resolves a product name the caller supplied, refusing one they
+// hold nothing on in the words an undeclared name gets.
+func productNamed(ctx context.Context, in Ingest, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
+	if err != nil || !subject.Sees(product.ID) {
+		return nil, noSuchProduct()
+	}
+	return product, nil
 }

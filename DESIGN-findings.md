@@ -534,13 +534,19 @@ at the top, which on a real image is the kernel.
 It is worked out from what is on record about the issue, not from the report
 being applied. A report is one source's account of one moment: it may omit that
 something is being exploited, or carry a score lower than last week's. What the
-issue holds is the worst anybody has claimed, moving only toward worse, plus a
-rating of ours where somebody has made one.
+issue holds is the worst anybody has claimed, moving only toward worse.
+
+**The fourth signal, the rating, belongs to a product** (REQ-29). Three of the
+four are properties of the issue and reach every product holding it; the rating
+is the product's own where somebody there has made one and the published word
+otherwise, so the same issue can sit at two different places in two products'
+lists. A finding opened later reads it at the moment it opens, rather than
+carrying a copy something has to remember to refresh.
 
 And it is rewritten wherever the issue is open, not only in the build being
-scanned. Three of the four signals are properties of the issue, so a nightly
-branch scan raising one of them left every other build carrying a number worked
-out from a world that had moved — a known-exploited issue in a shipped tag below
+scanned — once per product holding it, each against that product's rating. A
+nightly branch scan raising one of the issue's signals left every other build
+carrying a number worked out from a world that had moved — a known-exploited issue in a shipped tag below
 the triage line, answering no exploited filter, on no exploited clock, at the
 bottom of the list, until somebody rescanned that tag, which for a tag is never.
 

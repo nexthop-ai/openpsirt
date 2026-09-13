@@ -240,13 +240,8 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 
 	evidence := &Evidence{
 		Vulnerability: issue.Identifier, Severity: issue.Severity,
-		Assessed: func() string {
-			if issue.AssessedSeverity == nil {
-				return ""
-			}
-			return *issue.AssessedSeverity
-		}(),
-		Vector: issue.Vector, Exploited: issue.Exploited,
+		Assessed: issue.Rated,
+		Vector:   issue.Vector, Exploited: issue.Exploited,
 		Description: issue.Description, Advisory: issue.Advisory,
 		References: references,
 		Component:  component.Name, Version: component.Version,
@@ -509,6 +504,14 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	if err := s.db.NewSelect().Model(&issue).Where("id = ?", vulnerabilityID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this issue is: %w", err)
 	}
+	// What this product rates it, where somebody here has rated it. The screen
+	// is inside one product, so it shows that product's rating and not another
+	// team's.
+	rated, err := RatingIn(ctx, s.db, productID, vulnerabilityID)
+	if err != nil {
+		return nil, err
+	}
+	issue = issue.RatedIn(rated)
 	var component graph.Component
 	if err := s.db.NewSelect().Model(&component).Where("id = ?", componentID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this component is: %w", err)

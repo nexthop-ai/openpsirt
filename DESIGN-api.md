@@ -268,9 +268,9 @@ Recorded because the conclusion is the deliverable.
   swept.
 - **The gate sweep is a floor, not a proof.** A refusal for the wrong reason
   passes it, and it says nothing about what a narrowed operation puts in its
-  answer. It walks all three gated scopes and counts them apart, because it
-  walked one of the three for a long time and the two it skipped were the
-  thirty-seven administrator gates and the three any-product ones.
+  answer. It walks both gated scopes and counts them apart, because it walked
+  one of the two for a long time and the one it skipped was the administrator
+  gates.
 - **A note states something the scope does not, or is omitted.** Three said the
   opposite of the value beside them, the worst being an operation answered
   without a credential that declared it required one.

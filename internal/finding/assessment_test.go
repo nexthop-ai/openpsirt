@@ -28,7 +28,7 @@ func TestRatingSomethingWorseTakesEffectAtOnce(t *testing.T) {
 
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
-		claim, err := f.store.Assess(t.Context(), who, f.issue(t, "CVE-2026-RAISE"),
+		claim, err := f.store.Assess(t.Context(), who, f.productID, f.issue(t, "CVE-2026-RAISE"),
 			"critical", "Reachable from the network in how we ship it.")
 		if err != nil {
 			t.Fatal(err)
@@ -67,7 +67,7 @@ func TestRatingSomethingMilderWaitsForSomebodyElse(t *testing.T) {
 
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
-		claim, err := f.store.Assess(t.Context(), who, f.issue(t, "CVE-2026-LOWER"),
+		claim, err := f.store.Assess(t.Context(), who, f.productID, f.issue(t, "CVE-2026-LOWER"),
 			"low", "The affected feature is compiled out of our build.")
 		if err != nil {
 			t.Fatal(err)
@@ -97,12 +97,16 @@ func TestRatingSomethingMilderWaitsForSomebodyElse(t *testing.T) {
 	})
 }
 
-func TestRatingAnIssueAsksForTriageSomewhere(t *testing.T) {
-	// A rating is not about a product, which is why it stood on nothing
-	// more than being a person: there was no product to hold a role on.
-	// That is not an authorization rule. A rating moves deadlines and can
-	// take a finding off the working list entirely, in every product at
-	// once, so it asks for triage somewhere.
+func TestReadingAProductDoesNotCarryRatingAnIssueInIt(t *testing.T) {
+	// Reading is not arguing. A rating moves this product's deadlines and can
+	// take its findings off its working list entirely, and being able to read
+	// what it ships is not a reason to be trusted with either — nor is being
+	// signed in, which is what stood here before there was a product to hold a
+	// role on at all.
+	//
+	// Which product the role has to be held on is pinned by
+	// TestRatingAProductAsksForTriageOnThatProduct; this pins that a role is
+	// needed at all.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -114,13 +118,13 @@ func TestRatingAnIssueAsksForTriageSomewhere(t *testing.T) {
 		f.recorded(t, 1, "someone")
 		// Signed in, granted reading and nothing else.
 		onlooker := f.holding(t, access.PublicRead)
-		if _, err := f.store.Assess(t.Context(), onlooker, id, "low", "Looks fine to me."); err == nil {
+		if _, err := f.store.Assess(t.Context(), onlooker, f.productID, id, "low", "Looks fine to me."); err == nil {
 			t.Error("somebody who triages nothing rated an issue")
 		}
 
 		// Made by somebody who may, so there is a live claim to act on.
 		triager := f.holding(t, access.PublicTriage)
-		claim, err := f.store.Assess(t.Context(), triager, id, "low", "Compiled out of our build.")
+		claim, err := f.store.Assess(t.Context(), triager, f.productID, id, "low", "Compiled out of our build.")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +153,7 @@ func TestWithdrawingTakesThePublishedRatingBack(t *testing.T) {
 
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
-		claim, err := f.store.Assess(t.Context(), who, f.issue(t, "CVE-2026-BACK"),
+		claim, err := f.store.Assess(t.Context(), who, f.productID, f.issue(t, "CVE-2026-BACK"),
 			"critical", "Worse than published.")
 		if err != nil {
 			t.Fatal(err)
@@ -181,10 +185,10 @@ func TestOneClaimStandsPerIssue(t *testing.T) {
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
 		id := f.issue(t, "CVE-2026-ONCE")
-		if _, err := f.store.Assess(t.Context(), who, id, "high", "Worse."); err != nil {
+		if _, err := f.store.Assess(t.Context(), who, f.productID, id, "high", "Worse."); err != nil {
 			t.Fatal(err)
 		}
-		second, err := f.store.Assess(t.Context(), who, id, "critical", "Worse again.")
+		second, err := f.store.Assess(t.Context(), who, f.productID, id, "critical", "Worse again.")
 		if !errors.Is(err, finding.ErrAlreadyAssessed) {
 			t.Errorf("a second claim about one issue got %v (%+v), want ErrAlreadyAssessed", err, second)
 		}
@@ -208,14 +212,14 @@ func TestAWithdrawnAssessmentDoesNotStandInTheWayOfAFreshOne(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		id := f.issue(t, "CVE-2026-AGAIN")
 
-		first, err := f.store.Assess(t.Context(), who, id, "high", "Worse.")
+		first, err := f.store.Assess(t.Context(), who, f.productID, id, "high", "Worse.")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.Withdraw(t.Context(), who, first.ID); err != nil {
 			t.Fatal(err)
 		}
-		again, err := f.store.Assess(t.Context(), who, id, "critical", "Worse than that.")
+		again, err := f.store.Assess(t.Context(), who, f.productID, id, "critical", "Worse than that.")
 		if err != nil {
 			t.Fatalf("a withdrawn claim blocked a fresh one: %v", err)
 		}
@@ -257,7 +261,7 @@ func TestTwoAssessmentsProposedAtOnceLeaveOneStanding(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				<-start
-				_, results[i] = f.store.Assess(t.Context(), who, id, "high", "Worse.")
+				_, results[i] = f.store.Assess(t.Context(), who, f.productID, id, "high", "Worse.")
 			}()
 		}
 		close(start)
@@ -314,7 +318,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		id := f.issue(t, "CVE-2026-CROSS")
 
 		// Milder, but still above the line: later work, not no work.
-		claim, err := f.store.Assess(ctx, who, id, "medium", "Not as bad as published.")
+		claim, err := f.store.Assess(ctx, who, f.productID, id, "medium", "Not as bad as published.")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -322,8 +326,8 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if would.Findings != 2 || would.Products != 1 {
-			t.Errorf("agreeing was measured against %+v, want two findings in one product", would)
+		if would.Findings != 2 {
+			t.Errorf("agreeing was measured against %+v, want two findings", would)
 		}
 		if would.OffTheList > 0 {
 			t.Errorf("a downgrade that stays above the line reported %d off the list",
@@ -334,7 +338,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		if err := f.store.Withdraw(ctx, who, claim.ID); err != nil {
 			t.Fatal(err)
 		}
-		crossing, err := f.store.Assess(ctx, who, id, "low", "Not worth an afternoon.")
+		crossing, err := f.store.Assess(ctx, who, f.productID, id, "low", "Not worth an afternoon.")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -345,9 +349,8 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		if would.OffTheList == 0 {
 			t.Fatal("a downgrade below the line reported nothing coming off it")
 		}
-		if would.OffTheList != 2 || would.ProductsAffected != 1 {
-			t.Errorf("it takes %d findings off the list in %d products, want 2 in 1",
-				would.OffTheList, would.ProductsAffected)
+		if would.OffTheList != 2 {
+			t.Errorf("it takes %d findings off the list, want 2", would.OffTheList)
 		}
 	})
 }
@@ -381,7 +384,7 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
-		claim, err := f.store.Assess(ctx, who, f.issue(t, "CVE-2026-QUIET"),
+		claim, err := f.store.Assess(ctx, who, f.productID, f.issue(t, "CVE-2026-QUIET"),
 			"low", "Not worth an afternoon.")
 		if err != nil {
 			t.Fatal(err)
@@ -406,15 +409,12 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 	})
 }
 
-func TestWhatAgreeingWouldDoCountsWhatCrossesTheLineAndNotWhatIsAlreadyBelow(t *testing.T) {
+func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 	// The number an approver is weighing is what *this* rating takes off a
-	// working list. A finding already below its product's line is not taken
-	// off anything by agreeing, and counting it would inflate what somebody is
-	// being asked to weigh — which is the one number in front of them.
-	//
-	// Products differ in what they can afford to ignore, so one issue can sit
-	// above the line in one product and below it in another. That is the case
-	// that tells the two counts apart.
+	// working list, and a rating reaches one product. Findings of the same
+	// issue in another product are untouched by agreeing, so counting them
+	// would inflate the one number in front of somebody — and would describe
+	// work this decision does not touch.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		products := catalog.NewStore(f.db.DB)
@@ -431,14 +431,14 @@ func TestWhatAgreeingWouldDoCountsWhatCrossesTheLineAndNotWhatIsAlreadyBelow(t *
 			t.Fatal(err)
 		}
 
-		// And another that triages from critical, where the same high is
-		// already off the list before anybody says anything.
-		strict := f.inAnotherProduct(t, "strict-product")
-		if err := products.SetTriageFloor(ctx, f.productOf(t, strict), "critical"); err != nil {
+		// And another shipping the same thing, which this rating does not
+		// reach.
+		elsewhere := f.inAnotherProduct(t, "strict-product")
+		if err := products.SetTriageFloor(ctx, f.productOf(t, elsewhere), "medium"); err != nil {
 			t.Fatal(err)
 		}
-		f.shippedTo(t, strict, twoConsumers())
-		if _, err := f.store.Apply(ctx, strict, f.runOn(t, strict),
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
@@ -446,11 +446,11 @@ func TestWhatAgreeingWouldDoCountsWhatCrossesTheLineAndNotWhatIsAlreadyBelow(t *
 		f.recorded(t, 1, "someone")
 		// Granted on both products rather than an administrator: since
 		// an administrator stopped reading by administering
-		// administering is not reading, and what this measures is a
-		// count across the products somebody actually holds.
-		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, strict)},
+		// administering is not reading, and what this measures is that
+		// holding both still counts only one.
+		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
 			access.PrivateTriage)
-		claim, err := f.store.Assess(ctx, who, f.issue(t, "CVE-2026-BOTH"),
+		claim, err := f.store.Assess(ctx, who, f.productID, f.issue(t, "CVE-2026-BOTH"),
 			"low", "Not worth an afternoon.")
 		if err != nil {
 			t.Fatal(err)
@@ -460,13 +460,27 @@ func TestWhatAgreeingWouldDoCountsWhatCrossesTheLineAndNotWhatIsAlreadyBelow(t *
 		if err != nil {
 			t.Fatal(err)
 		}
-		if would.Findings != 4 || would.Products != 2 {
-			t.Fatalf("measured against %+v, want four findings across two products", would)
+		if would.Findings != 2 {
+			t.Fatalf("measured against %+v, want the two findings in the rating's own product",
+				would)
 		}
-		if would.OffTheList != 2 || would.ProductsAffected != 1 {
-			t.Errorf("agreeing takes %d findings off the list in %d products, want 2 in 1 — "+
-				"the two in the product that already hid them are not taken off anything",
-				would.OffTheList, would.ProductsAffected)
+		if would.OffTheList != 2 {
+			t.Errorf("agreeing takes %d findings off the list, want 2 — the two in the other "+
+				"product are not reached by this rating at all", would.OffTheList)
+		}
+
+		// And agreeing leaves the other product exactly where it was.
+		if _, err := f.store.Assess(ctx, f.holdingIn(t,
+			[]int64{f.productID, f.productOf(t, elsewhere)}, access.PrivateTriage),
+			f.productOf(t, elsewhere), f.issue(t, "CVE-2026-BOTH"), "critical",
+			"We ship the vulnerable configuration."); err != nil {
+			t.Fatal(err)
+		}
+		if _, rated := f.ratings(t, "CVE-2026-BOTH"); rated != "" {
+			t.Errorf("the other product's rating reached this one as %q", rated)
+		}
+		if _, rated := f.ratingsIn(t, f.productOf(t, elsewhere), "CVE-2026-BOTH"); rated != "critical" {
+			t.Errorf("the other product rates it %q, want critical", rated)
 		}
 	})
 }
@@ -485,7 +499,7 @@ func TestAnUndisclosedFlawCannotBeRatedByName(t *testing.T) {
 		// Triage on this very product, and no reading of undisclosed work.
 		f.recorded(t, 1, "someone")
 		public := f.holding(t, access.PublicTriage)
-		_, err := f.store.Assess(t.Context(), public, hidden, "low", "Probe.")
+		_, err := f.store.Assess(t.Context(), public, f.productID, hidden, "low", "Probe.")
 		if !errors.Is(err, finding.ErrUnknownIssue) {
 			t.Errorf("rating an undisclosed flaw gave %v, want the answer an unused name gives", err)
 		}
@@ -505,7 +519,7 @@ func TestAClaimAboutAnUndisclosedFlawIsNotListed(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		keeper := f.planner(t, access.PrivateTriage)
 		hidden := f.embargoed(t, keeper)
-		if _, err := f.store.Assess(t.Context(), keeper, hidden, "critical",
+		if _, err := f.store.Assess(t.Context(), keeper, f.productID, hidden, "critical",
 			"Worse than it looks."); err != nil {
 			t.Fatal(err)
 		}
@@ -513,7 +527,7 @@ func TestAClaimAboutAnUndisclosedFlawIsNotListed(t *testing.T) {
 		f.recorded(t, keeper.ID+1, "onlooker")
 		reader := f.holding(t, access.PublicRead)
 		reader.ID = keeper.ID + 1
-		claims, _, err := f.store.Assessments(t.Context(), reader, "", 50)
+		claims, _, err := f.store.Assessments(t.Context(), reader, 0, "", 50)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -525,7 +539,7 @@ func TestAClaimAboutAnUndisclosedFlawIsNotListed(t *testing.T) {
 
 		// Whoever may read it still sees it, or the narrowing has hidden the
 		// claim from the person who made it.
-		mine, _, err := f.store.Assessments(t.Context(), keeper, "", 50)
+		mine, _, err := f.store.Assessments(t.Context(), keeper, 0, "", 50)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -549,7 +563,7 @@ func TestAgreeingAndWithdrawingAnswerAsThoughTheClaimWereAbsent(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		keeper := f.planner(t, access.PrivateTriage)
 		hidden := f.embargoed(t, keeper)
-		claim, err := f.store.Assess(t.Context(), keeper, hidden, "low",
+		claim, err := f.store.Assess(t.Context(), keeper, f.productID, hidden, "low",
 			"Not reachable in how we ship it.")
 		if err != nil {
 			t.Fatal(err)
@@ -579,20 +593,29 @@ func TestAgreeingAndWithdrawingAnswerAsThoughTheClaimWereAbsent(t *testing.T) {
 	})
 }
 
-func TestRatingAnIssueThatReachesNothingIsStillAllowed(t *testing.T) {
-	// The forward-looking half of recording an opinion against the issue:
-	// it reaches products the issue has not met yet. An issue that
-	// sits at no build here is nobody's secret, so narrowing must not take
-	// this away.
+func TestAnIssueThisProductDoesNotCarryCannotBeRatedInIt(t *testing.T) {
+	// A rating belongs to a product and says how a component is used there,
+	// so an issue the product does not carry is not its to rate. Getting ahead
+	// of an issue before it arrives was the deployment-wide shape's, and
+	// DESIGN-triage.md records it as given up.
+	//
+	// Refused in the words a name nobody has used gets, so the route cannot be
+	// walked to find out which issues a product ships. And refused by every
+	// act on a rating alike: recording one that could then never be withdrawn,
+	// agreed to or listed would be the same capability half-built.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		unreached := f.interned(t, "CVE-2026-NOWHERE")
 
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
-		if _, err := f.store.Assess(t.Context(), who, unreached, "critical",
-			"Rated before it arrives here."); err != nil {
-			t.Fatalf("rating an issue that reaches nothing was refused: %v", err)
+		if _, err := f.store.Assess(t.Context(), who, f.productID, unreached, "critical",
+			"Rated before it arrives here."); !errors.Is(err, finding.ErrUnknownIssue) {
+			t.Errorf("rating an issue this product does not carry answered %v, want the words "+
+				"a name nobody has used gets", err)
+		}
+		if f.liveAssessments(t, unreached) != 0 {
+			t.Error("a rating landed on an issue this product does not carry")
 		}
 	})
 }
@@ -621,7 +644,7 @@ func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
 
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
-		claim, err := f.store.Assess(t.Context(), who, f.issue(t, "CVE-2026-BOTH"),
+		claim, err := f.store.Assess(t.Context(), who, f.productID, f.issue(t, "CVE-2026-BOTH"),
 			"low", "Compiled out of our build.")
 		if err != nil {
 			t.Fatal(err)
@@ -631,9 +654,203 @@ func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if would.Products != 1 {
-			t.Errorf("an approver holding one product was told this issue sits in %d, want 1",
-				would.Products)
+		if would.Findings != 1 {
+			t.Errorf("an approver holding one product was told this rating covers %d findings,"+
+				" want the one in that product — the other product's is neither reached by it"+
+				" nor theirs to be told about", would.Findings)
+		}
+	})
+}
+
+func TestRatingAProductAsksForTriageOnThatProduct(t *testing.T) {
+	// The hole this closed. A rating sets the deadline and can push a finding
+	// below the line a product triages at, and it used to ask for triage
+	// *anywhere* — so somebody holding one product moved both in a product
+	// they cannot see, and nothing in the request named the product at all.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		bad := found("CVE-2026-ELSE", swss)
+		bad.Issue.Severity = "high"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		id := f.issue(t, "CVE-2026-ELSE")
+
+		// Triage on the other product, and reading alone on this one — enough
+		// to be told the issue is here, and not enough to move what it costs.
+		theirs := access.NewPerson(1, "someone", false, map[int64][]access.Role{
+			f.productOf(t, elsewhere): {access.PublicTriage},
+			f.productID:               {access.PublicRead},
+		}, 101)
+		if _, err := f.store.Assess(ctx, theirs, f.productID, id, "critical",
+			"Reachable in how they ship it."); !errors.Is(err, access.ErrDenied) {
+			t.Fatalf("triage on another product recorded a rating here: %v", err)
+		}
+		if _, rated := f.ratings(t, "CVE-2026-ELSE"); rated != "" {
+			t.Errorf("the rating landed anyway, as %q", rated)
+		}
+
+		// And the same person rates their own product, which is the half that
+		// has to keep working.
+		if _, err := f.store.Assess(ctx, theirs, f.productOf(t, elsewhere), id, "critical",
+			"Reachable in how we ship it."); err != nil {
+			t.Fatalf("triage on a product could not rate an issue in it: %v", err)
+		}
+	})
+}
+
+func TestAgreeingToARatingAsksForTheRoleOnItsOwnProduct(t *testing.T) {
+	// The other half of the same hole. Agreeing is what puts a milder rating
+	// into force, so it moves that product's deadlines and its triage line —
+	// and a role held somewhere else buys nothing here. Refused in the words a
+	// rating that is not there gets, because "you may not agree to this" about
+	// a product somebody holds nothing on says the rating is there.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		bad := found("CVE-2026-AGREE", swss)
+		bad.Issue.Severity = "high"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		f.recorded(t, 2, "somebody")
+
+		here := access.NewPerson(1, "someone", false,
+			map[int64][]access.Role{f.productID: {access.PublicTriage}}, 101)
+		claim, err := f.store.Assess(ctx, here, f.productID, f.issue(t, "CVE-2026-AGREE"),
+			"low", "Not worth an afternoon.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !claim.NeedsApproval {
+			t.Fatal("a milder rating needed nobody, so this tests nothing")
+		}
+
+		// Somebody who approves in another product, and reads this one.
+		theirs := access.NewPerson(2, "somebody", false, map[int64][]access.Role{
+			f.productOf(t, elsewhere): {access.Approver, access.PublicTriage},
+			f.productID:               {access.PublicRead},
+		}, 101)
+		if _, err := f.store.Agree(ctx, theirs, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
+			t.Fatalf("an approver of another product agreed to this one's rating: %v", err)
+		}
+		if _, rated := f.ratings(t, "CVE-2026-AGREE"); rated != "" {
+			t.Errorf("the rating came into force anyway, as %q", rated)
+		}
+
+		// And withdrawing is the same question asked the other way round.
+		if err := f.store.Withdraw(ctx, theirs, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
+			t.Errorf("a triager of another product withdrew this one's rating: %v", err)
+		}
+	})
+}
+
+func TestTwoProductsHoldDifferentRatingsOfOneIssue(t *testing.T) {
+	// Impossible before: one live claim per issue meant the first product to
+	// record one took the answer for everybody, and the second team was told
+	// the issue was already assessed. A rating is a judgment about how a
+	// component is used, and two products do not use one the same way.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		bad := found("CVE-2026-TWO", swss)
+		bad.Issue.Severity = "medium"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		id := f.issue(t, "CVE-2026-TWO")
+		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
+			access.PublicTriage)
+
+		if _, err := f.store.Assess(ctx, who, f.productID, id, "critical",
+			"We ship the vulnerable configuration."); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Assess(ctx, who, f.productOf(t, elsewhere), id, "high",
+			"We ship it, but not reachable from outside."); err != nil {
+			t.Fatalf("a second product could not record its own rating: %v", err)
+		}
+
+		if _, rated := f.ratings(t, "CVE-2026-TWO"); rated != "critical" {
+			t.Errorf("this product rates it %q, want critical", rated)
+		}
+		if _, rated := f.ratingsIn(t, f.productOf(t, elsewhere), "CVE-2026-TWO"); rated != "high" {
+			t.Errorf("the other product rates it %q, want high", rated)
+		}
+		// And the published word is untouched by either.
+		if published, _ := f.ratings(t, "CVE-2026-TWO"); published != "medium" {
+			t.Errorf("the published rating became %q", published)
+		}
+	})
+}
+
+func TestAProductWithNoRatingOfItsOwnReadsThePublishedOne(t *testing.T) {
+	// Nothing inherits. A rating arriving in a product from a team that cannot
+	// see it is exactly what a per-product rating removes, so it is not
+	// reintroduced as a default: a product nobody has looked at reads what the
+	// world says until somebody there does.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mild := found("CVE-2026-NONE", libnl)
+		mild.Issue.Severity = "low"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
+			access.PublicTriage)
+		if _, err := f.store.Assess(ctx, who, f.productID, f.issue(t, "CVE-2026-NONE"),
+			"critical", "Reachable in how we ship it."); err != nil {
+			t.Fatal(err)
+		}
+
+		// The list in the product that rated it, and the list in the one that
+		// did not, asked the same way.
+		rated, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{MinSeverity: "high"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rated) != 1 || rated[0].Severity != "critical" {
+			t.Fatalf("the product that rated it lists %d rows: %+v", len(rated), rated)
+		}
+		otherID := f.productOf(t, elsewhere)
+		theirs, _, err := f.store.Groups(ctx, who, finding.Scope{ProductID: &otherID}, 50, 0,
+			finding.Filter{MinSeverity: "high"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(theirs) != 0 {
+			t.Errorf("a rating made in one product raised a finding in another: %+v", theirs)
 		}
 	})
 }

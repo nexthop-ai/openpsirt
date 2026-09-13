@@ -305,48 +305,18 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 // keeps it portable — no engine agrees on how to add days to a timestamp — and
 // it is a handful of statements rather than hundreds of thousands.
 func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
-	// The distinct moments something opened, off the findings themselves.
-	// This walked the runs and joined back for the timestamp, which asked the
-	// question in terms of the thing that usually answers it rather than the
-	// thing that always does: a finding a person opened has no run, so its
-	// deadline was never rewritten when the policy changed.
+	// A product at a time, because severity sets the deadline and a rating
+	// belongs to a product: the same issue rated critical in one product and
+	// left at the published low in another is two deadlines, and one statement
+	// spanning both would write whichever the join happened to reach.
 	//
-	// The same cardinality either way — every finding a run opened carries
-	// that run's start — so this is one table fewer rather than more rows.
-	var opened []time.Time
-	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		ColumnExpr("f.opened_at").
-		Where("f.closed_at IS NULL").
-		GroupExpr("f.opened_at").
-		Scan(ctx, &opened)
+	// The product is also what the moments below are read for. A scan run
+	// belongs to one build and a build to one product, so the moments a
+	// product's findings opened at are its own — the loop costs one pass over
+	// the same rows rather than a pass per product over all of them.
+	products, err := s.everyProduct(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("read when what is still open was opened: %w", err)
-	}
-
-	// Bands as predicates on the rating, in the same order For() decides them,
-	// so a finding lands in exactly one.
-	type band struct {
-		window time.Duration
-		where  func(*bun.UpdateQuery) *bun.UpdateQuery
-	}
-	rated := func(words ...string) func(*bun.UpdateQuery) *bun.UpdateQuery {
-		return func(q *bun.UpdateQuery) *bun.UpdateQuery {
-			return q.Where("urgency_exploited = ?", false).
-				Where(`vulnerability_id IN (SELECT id FROM "vulnerability" AS v WHERE `+
-					BandExpr+` IN (?))`, bun.List(words))
-		}
-	}
-	bands := []band{
-		{windows.Exploited, func(q *bun.UpdateQuery) *bun.UpdateQuery {
-			return q.Where("urgency_exploited = ?", true)
-		}},
-		{windows.Critical, rated("critical")},
-		{windows.High, rated("high")},
-		{windows.Low, rated("low")},
-		// Everything else: medium, and anything nobody rated — folded the
-		// same way by Band, because unknown is not harmless.
-		{windows.Medium, rated("medium")},
+		return 0, err
 	}
 
 	// Written in slices of the identifier range rather than as one statement
@@ -364,29 +334,88 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	}
 
 	changed := 0
-	for _, at := range opened {
-		for _, each := range bands {
-			due := at.Add(each.window)
-			for from := int64(0); from <= highest; from += recomputeSlice {
-				query := s.db.NewUpdate().
-					Model((*Finding)(nil)).
-					Set("due_at = ?", due).
-					Where("id > ?", from).
-					Where("id <= ?", from+recomputeSlice).
-					Where("opened_at = ?", at).
-					Where("closed_at IS NULL")
-				result, err := each.where(query).Exec(ctx)
-				if err != nil {
-					return changed, fmt.Errorf("rewrite deadlines: %w", err)
-				}
-				if n, err := result.RowsAffected(); err == nil {
-					changed += int(n)
-				}
-				// Cancellation is honored between slices rather than only at
-				// the end, so shutting down during a rewrite stops promptly
-				// and leaves the rest for the next scan or the next edit.
-				if err := ctx.Err(); err != nil {
-					return changed, err
+	for _, productID := range products {
+		// The distinct moments something opened in this product, off the
+		// findings themselves. This walked the runs and joined back for the
+		// timestamp, which asked the question in terms of the thing that
+		// usually answers it rather than the thing that always does: a
+		// finding a person opened has no run, so its deadline was never
+		// rewritten when the policy changed.
+		//
+		// The same cardinality either way — every finding a run opened
+		// carries that run's start — so this is one table fewer rather than
+		// more rows.
+		var opened []time.Time
+		err := s.db.NewSelect().
+			TableExpr("finding AS f").
+			Join("JOIN target AS tg ON tg.id = f.target_id").
+			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			ColumnExpr("f.opened_at").
+			Where("f.closed_at IS NULL").
+			Where("st.product_id = ?", productID).
+			GroupExpr("f.opened_at").
+			Scan(ctx, &opened)
+		if err != nil {
+			return changed, fmt.Errorf("read when what is still open was opened: %w", err)
+		}
+		if len(opened) == 0 {
+			continue
+		}
+
+		// Bands as predicates on the rating, in the same order For() decides
+		// them, so a finding lands in exactly one. The rating compared is
+		// this product's where it has made one, which is what the bound
+		// identifier in the join carries.
+		type band struct {
+			window time.Duration
+			where  func(*bun.UpdateQuery) *bun.UpdateQuery
+		}
+		rated := func(words ...string) func(*bun.UpdateQuery) *bun.UpdateQuery {
+			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
+				return q.Where("urgency_exploited = ?", false).
+					Where(`vulnerability_id IN (SELECT v.id FROM "vulnerability" AS v `+
+						RatedHere+` WHERE `+BandExpr+` IN (?))`,
+						productID, bun.List(words))
+			}
+		}
+		bands := []band{
+			{windows.Exploited, func(q *bun.UpdateQuery) *bun.UpdateQuery {
+				return q.Where("urgency_exploited = ?", true)
+			}},
+			{windows.Critical, rated("critical")},
+			{windows.High, rated("high")},
+			{windows.Low, rated("low")},
+			// Everything else: medium, and anything nobody rated — folded the
+			// same way by Band, because unknown is not harmless.
+			{windows.Medium, rated("medium")},
+		}
+
+		for _, at := range opened {
+			for _, each := range bands {
+				due := at.Add(each.window)
+				for from := int64(0); from <= highest; from += recomputeSlice {
+					query := s.db.NewUpdate().
+						Model((*Finding)(nil)).
+						Set("due_at = ?", due).
+						Where("id > ?", from).
+						Where("id <= ?", from+recomputeSlice).
+						Where("opened_at = ?", at).
+						Where("closed_at IS NULL").
+						Where(inThisProduct, productID)
+					result, err := each.where(query).Exec(ctx)
+					if err != nil {
+						return changed, fmt.Errorf("rewrite deadlines: %w", err)
+					}
+					if n, err := result.RowsAffected(); err == nil {
+						changed += int(n)
+					}
+					// Cancellation is honored between slices rather than only
+					// at the end, so shutting down during a rewrite stops
+					// promptly and leaves the rest for the next scan or the
+					// next edit.
+					if err := ctx.Err(); err != nil {
+						return changed, err
+					}
 				}
 			}
 		}
@@ -504,13 +533,9 @@ func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (
 // clearBelowFloor removes the deadline from open findings their product does
 // not consider worth triaging.
 func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
-	var products []int64
-	err := s.db.NewSelect().
-		TableExpr("product AS p").
-		ColumnExpr("p.id").
-		Scan(ctx, &products)
+	products, err := s.everyProduct(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("read which products there are: %w", err)
+		return 0, err
 	}
 
 	cleared := 0
@@ -532,11 +557,9 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 			Where("closed_at IS NULL").
 			Where("due_at IS NOT NULL").
 			Where("urgency_exploited = ?", false).
-			Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-				JOIN "stream" AS st ON st.id = tg.stream_id
-				WHERE st.product_id = ?)`, productID).
-			Where(`vulnerability_id NOT IN (SELECT id FROM "vulnerability" AS v
-				WHERE `+BandExpr+` IN (?))`, bun.List(words)).
+			Where(inThisProduct, productID).
+			Where(`vulnerability_id NOT IN (SELECT v.id FROM "vulnerability" AS v `+
+				RatedHere+` WHERE `+BandExpr+` IN (?))`, productID, bun.List(words)).
 			Exec(ctx)
 		if err != nil {
 			return cleared, fmt.Errorf("take the deadline off what is below the line: %w", err)
@@ -554,3 +577,20 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 // of them holds the connection long. Twenty thousand rows is well under a
 // second on every engine here.
 const recomputeSlice = 20_000
+
+// everyProduct is the identifiers of every product, in a stable order.
+//
+// Both passes that rewrite deadlines walk products, because both compare a
+// rating and a rating belongs to one. Read through one place so the two cannot
+// come to disagree about what the set is.
+func (s *Store) everyProduct(ctx context.Context) ([]int64, error) {
+	var products []int64
+	if err := s.db.NewSelect().
+		TableExpr("product AS p").
+		ColumnExpr("p.id").
+		OrderExpr("p.id").
+		Scan(ctx, &products); err != nil {
+		return nil, fmt.Errorf("read which products there are: %w", err)
+	}
+	return products, nil
+}

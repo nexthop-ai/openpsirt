@@ -11,6 +11,23 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
+// mentionTarget is what a piece of text is about, for deciding who may be told
+// they were named in it.
+//
+// The four things that decide it, rather than the row one of the callers
+// happens to hold. A mention in a claim's comment is about a place and a
+// mention in an issue's note is about an issue in a product, and both ask the
+// same question: who among the names typed may read the thing being written
+// about, at its visibility.
+type mentionTarget struct {
+	ProductID       int64
+	VulnerabilityID int64
+	Visibility      access.Visibility
+	// About is what the notification calls the thing, in a few words: the
+	// start of a place identity for a claim, the issue's name for a note.
+	About string
+}
+
 // mentionCap bounds how many people one piece of text can call for.
 //
 // A justification naming forty people is not a question for any of them, and
@@ -55,8 +72,12 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 		in.Logger.WarnContext(ctx, "could not tell who was named", "error", err)
 		return nil
 	}
-	dropped, err := mentioned(ctx, in, subject, &rows[0], body,
-		fmt.Sprintf("/claims/%d", claimID))
+	dropped, err := mentioned(ctx, in, subject, mentionTarget{
+		ProductID:       rows[0].ProductID,
+		VulnerabilityID: rows[0].VulnerabilityID,
+		Visibility:      rows[0].Visibility,
+		About:           rows[0].PlaceIdentity[:min(8, len(rows[0].PlaceIdentity))],
+	}, body, fmt.Sprintf("/claims/%d", claimID))
 	if err != nil {
 		in.Logger.WarnContext(ctx, "could not tell who was named", "error", err)
 	}
@@ -92,10 +113,10 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 // comment rejected because one name in it was wrong loses the paragraph to fix
 // a word.
 func mentioned(ctx context.Context, in Ingest, subject access.Subject,
-	decision *triage.Decision, body, link string) ([]string, error) {
+	about mentionTarget, body, link string) ([]string, error) {
 
 	names := markdown.Mentions(body)
-	if len(names) == 0 || decision == nil {
+	if len(names) == 0 || about.ProductID == 0 {
 		return nil, nil
 	}
 	if len(names) > mentionCap {
@@ -109,7 +130,7 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	// list, which answered from the alphabetically-first hundred readers and
 	// silently reached nobody for anyone sorting past them.
 	readers, err := access.NewStore(in.DB.DB).ReadersNamed(ctx, subject,
-		decision.ProductID, decision.Visibility, names)
+		about.ProductID, about.Visibility, names)
 	if err != nil {
 		return nil, fmt.Errorf("read who may be told: %w", err)
 	}
@@ -137,15 +158,15 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 		if err := notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
 			PersonID: who, Kind: notify.Mentioned,
 			Body: fmt.Sprintf("%s named you in a note on %s.",
-				whoever(subject), decision.PlaceIdentity[:min(8, len(decision.PlaceIdentity))]),
+				whoever(subject), about.About),
 			Link:     link,
-			Private:  decision.Visibility == access.Private,
-			Concerns: notify.Concerning(decision.ProductID, decision.VulnerabilityID, 0),
+			Private:  about.Visibility == access.Private,
+			Concerns: notify.Concerning(about.ProductID, about.VulnerabilityID, 0),
 			// The same two as columns. Concerns is a string a digest
 			// matches on; these are what a read narrows by, and a
 			// narrowing cannot rest on a shape another pass invented.
-			ProductID:       &decision.ProductID,
-			VulnerabilityID: &decision.VulnerabilityID,
+			ProductID:       &about.ProductID,
+			VulnerabilityID: &about.VulnerabilityID,
 		}); err != nil {
 			return dropped, fmt.Errorf("tell %d they were named: %w", who, err)
 		}

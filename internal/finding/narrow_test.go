@@ -829,13 +829,9 @@ func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Rated critical here, which is what the floor and the clock already
-		// read.
-		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
-			Set("assessed_severity = ?", "critical").
-			Where("identifier = ?", "CVE-2026-1").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		// Rated critical by this product, which is what the floor and the
+		// clock already read.
+		f.rate(t, f.productID, "CVE-2026-1", "critical")
 
 		who := f.holding(t, access.PublicRead)
 		groups, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
@@ -860,6 +856,71 @@ func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
 		if len(shouted) != len(groups) {
 			t.Errorf("asking for \"High\" found %d groups and \"high\" found %d",
 				len(shouted), len(groups))
+		}
+	})
+}
+
+func TestTheBundleAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) {
+	// The rating is read through one expression and the product it is read for
+	// is carried on the filter, set where the selection is resolved. These two
+	// lists reach that expression through helpers of their own, so a chain
+	// that lost the product would answer with the published word — silently,
+	// and only on that list. The findings list has its own check above.
+	//
+	// **Two products, rating it in opposite directions**, because a join that
+	// merely exists is not the thing at risk: the compiler catches a missing
+	// one on all four engines, and what it cannot catch is one bound to the
+	// wrong product. With only this product rating it, a swapped binding reads
+	// as no rating and looks the same as a lost one.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mild := found("CVE-2026-EVERY", libnl)
+		mild.Issue.Severity = "medium"
+		mild.FixState, mild.FixedIn = finding.FixedUpstream, "3.9.0"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		// This product raises it past the line; the other drops it below.
+		// Either binding read the other way round gives the wrong answer, and
+		// they give opposite wrong answers.
+		f.rate(t, f.productID, "CVE-2026-EVERY", "critical")
+		f.rate(t, f.productOf(t, elsewhere), "CVE-2026-EVERY", "low")
+
+		otherID := f.productOf(t, elsewhere)
+		theirs := finding.Scope{ProductID: &otherID}
+		who := f.holdingIn(t, []int64{f.productID, otherID}, access.PublicRead)
+		high := finding.Filter{MinSeverity: "high"}
+
+		found := func(scope finding.Scope) (int, int) {
+			t.Helper()
+			bundles, _, err := f.store.Bundles(ctx, who, scope, 50, 0, high)
+			if err != nil {
+				t.Fatal(err)
+			}
+			components, _, err := f.store.ComponentGroups(ctx, who, scope, 50, 0, high)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return len(bundles), len(components)
+		}
+
+		if bundles, components := found(f.scope); bundles != 1 || components != 1 {
+			t.Errorf("in the product that rated it critical the lists found %d bundles and %d "+
+				"components, want one of each — they are reading the other product's rating "+
+				"or none", bundles, components)
+		}
+		if bundles, components := found(theirs); bundles != 0 || components != 0 {
+			t.Errorf("in the product that rated it low the lists found %d bundles and %d "+
+				"components, want none — they are reading this product's rating", bundles,
+				components)
 		}
 	})
 }

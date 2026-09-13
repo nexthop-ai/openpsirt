@@ -396,23 +396,38 @@ every call site.
 
 ## Judgments about an issue
 
-A rating of an issue is a claim about the issue, true wherever it appears
-(REQ-29), so there is no product to hold a role on. What stood in that gap was
-"is signed in", which is not an authorization rule.
+A rating of an issue belongs to one product and reaches every build of it
+(REQ-29). The role is held on that product, like every other act that changes
+what a product's people work on.
 
-These ask for the role anywhere. Recording a rating and taking one back ask for
-triage on some product; agreeing to a milder one asks for that or the approver
-capability. A rating sets the deadline and can push a finding below the line a
-product triages at, in every product at once.
+| Act | Asks for |
+|---|---|
+| Recording a rating | Triage on the product named in the request |
+| Taking one back | Triage on the product the rating belongs to |
+| Agreeing to a milder one | That, or the approver capability, on the product the rating belongs to |
 
-The role anywhere is not the whole of it: the issue has to be one the person may
-be told about. "Anywhere" answers which right is asked for, not which issues it
-may be exercised on, and on its own it reads "an issue is public knowledge" —
-true of a CVE and false of an identifier this deployment minted. So each act
-also asks whether the subject may read a finding of that issue somewhere, at its
-visibility. An issue that sits at no build here is exempt. A refusal is spelled
-as an unused name, and an unreadable claim is left out of a list rather than
-refused.
+A rating sets the deadline and can push a finding below the line that product
+triages at. Asked anywhere, somebody holding one product moved both in a
+product they cannot see — and a second team was refused any rating of their
+own, because one live rating stood for the deployment.
+
+The role is not the whole of it: the issue has to be one the person may be told
+about **in that product**. A role answers which right is asked for, not which
+issues it may be exercised on, and on its own it reads "an issue is public
+knowledge" — true of a CVE and false of an identifier this deployment minted.
+So each act also asks whether the subject may read a finding of that issue in
+that product, at its visibility. An issue that sits at no build anywhere is
+exempt, because there is no finding for a rating to disclose. A refusal is
+spelled as an unused name, and an unreadable claim is left out of a list rather
+than refused.
+
+The two identifiers in the request are resolved in that order. The product is
+resolved and the role checked before the issue name is looked at, so a name
+nobody has used and a name naming an undisclosed flaw answer alike (REQ-42).
+For agreeing and withdrawing, the rating's identifier is the only name in the
+request: a coarse check that the caller holds the role somewhere runs before it
+is resolved, and the product-specific check runs afterwards and answers in the
+words a rating that is not there gets.
 
 A mention that reached nobody is reported as such. Mentioning somebody who
 cannot read the finding is accepted, nobody is told, and whoever wrote it is
@@ -430,6 +445,21 @@ What somebody is told asks for reading it. A notification names the issue, the
 component and the build, and is stored as written, so there is no visibility
 filter downstream that could repair it. The check is at the visibility of the
 finding, not of the product.
+
+### Notes on an issue
+
+A note records no judgment, and it is read and written under the rule the
+rating beside it follows: the product, and the issue's visibility in it
+(REQ-29, REQ-43).
+
+| Rule | |
+|---|---|
+| Reading asks whether the reader may read a finding of that issue in that product | A product the reader holds nothing on answers as an issue that is not there, in the words an unused name gets |
+| Writing asks for triage on that product, at the same visibility | Saying something on the record about work is part of arguing about it, and reading the product is not |
+| A collaborator brought into one case may read and write on that issue | The pair they were brought in on is the whole of what they reach, and a note about it is inside that pair |
+| An issue with one undisclosed place in that product is undisclosed for the whole thread | A note is one thread for the issue, so it cannot be public for some of its places and private for others. The stricter direction is the safe one |
+| Only the author may change one | An edit anybody could make is a forgery with a timestamp |
+| A mention in a note reaches only people who may read what it is about | The same query the editor's picker uses, so a mention cannot tell somebody that an issue exists in a product they may not open |
 
 ## Subject kinds
 
