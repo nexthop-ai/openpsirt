@@ -310,6 +310,21 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 			t.Fatal(err)
 		}
 
+		// The same shape holding triage rather than reading, so that "holds
+		// the role everywhere" and "may act on this issue here" can be told
+		// apart: an issue a product does not carry is not one anybody rates
+		// through it, however widely they are trusted.
+		estateTriage, err := rights.Ensure(ctx, "wide-triager", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.Claim(ctx, estateTriage.ID, "wide-triager"); err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantEstateRole(ctx, estateTriage.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+
 		// Somebody who exists and was granted nothing at all.
 		ungranted, err := rights.Ensure(ctx, "nothing", "", false)
 		if err != nil {

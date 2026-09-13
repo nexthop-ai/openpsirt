@@ -247,3 +247,54 @@ function EditNote({
     </div>
   );
 }
+
+// The same thread, on the screen that spans products.
+//
+// **A product at a time**, because a note belongs to one and this screen shows
+// an issue wherever it sits. One thread merging what several teams wrote would
+// be the deployment-wide record a per-product note exists to avoid — and a
+// reader could not tell which product any line of it was about.
+export function IssueNotes({
+  vulnerability,
+  products,
+  mine,
+}: {
+  vulnerability: string;
+  // The products carrying this issue, as the rows give them: the name to ask
+  // with, what to call it on screen, and whether anything of it here is still
+  // undisclosed.
+  products: { name: string; called: string; undisclosed: boolean }[];
+  mine: (who: string) => boolean;
+}) {
+  const [product, setProduct] = useState(products[0]?.name ?? "");
+  const chosen = products.find((each) => each.name === product) ?? products[0];
+  if (!chosen) return null;
+
+  return (
+    <>
+      {products.length > 1 && (
+        <div className="field" style={{ margin: "12px 0 0", maxWidth: "40ch" }}>
+          <label htmlFor="notes-product">Notes for</label>
+          <select
+            id="notes-product"
+            value={product}
+            onChange={(event) => setProduct(event.target.value)}
+          >
+            {products.map((each) => (
+              <option key={each.name} value={each.name}>
+                {each.called}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <Notes
+        key={chosen.name}
+        product={chosen.name}
+        vulnerability={vulnerability}
+        mine={mine}
+        undisclosed={chosen.undisclosed}
+      />
+    </>
+  );
+}

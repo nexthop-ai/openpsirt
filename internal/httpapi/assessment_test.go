@@ -69,3 +69,57 @@ func TestARatingSaysWhetherItIsYourOwn(t *testing.T) {
 		}
 	})
 }
+
+func TestRatingAnIssueAsksForTriageOnTheProductInThePath(t *testing.T) {
+	// The endpoint half of the rule the store holds. A rating moves that
+	// product's deadlines and its triage line, so the role is asked for on the
+	// product the path names — and a product somebody holds nothing on answers
+	// as one that is not declared, before the issue name is looked at.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		const rating = `{"severity":"critical","reasoning":"Reachable in how we ship it."}`
+		const here = "/v1/products/mine/issues/CVE-2026-9999/assessment"
+		const there = "/v1/products/theirs/issues/CVE-2026-9999/assessment"
+
+		for _, each := range []struct {
+			who  string
+			path string
+			want int
+		}{
+			// Triage on the product named, which is what it asks for.
+			{"triager", here, http.StatusCreated},
+			// Reading it is not enough.
+			{"reader", here, http.StatusForbidden},
+			{"private", here, http.StatusForbidden},
+			// The capability with no triage right under it.
+			{"approver", here, http.StatusNotFound},
+			// Triage somewhere else, which used to be enough for anywhere.
+			{"triager", there, http.StatusNotFound},
+			{"", here, http.StatusUnauthorized},
+		} {
+			got := asPerson(t, r, each.who, http.MethodPost, each.path, rating)
+			if got.Code != each.want {
+				t.Errorf("%q rating through %s answered %d, want %d: %s",
+					each.who, each.path, got.Code, each.want, got.Body.String())
+			}
+		}
+	})
+}
+
+func TestAnIssueNotInThisProductCannotBeRatedThroughIt(t *testing.T) {
+	// A name nobody has used and a name for an issue this product does not
+	// carry answer alike, so a rating route cannot be walked to find out which
+	// issues a product ships.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		const rating = `{"severity":"critical","reasoning":"Reachable in how we ship it."}`
+		for _, name := range []string{"CVE-2026-9999", "CVE-2026-0000"} {
+			got := asPerson(t, r, "wide-triager", http.MethodPost,
+				"/v1/products/theirs/issues/"+name+"/assessment", rating)
+			if got.Code != http.StatusNotFound {
+				t.Errorf("rating %s in a product that does not carry it answered %d, want the "+
+					"words an unused name gets: %s", name, got.Code, got.Body.String())
+			}
+		}
+	})
+}

@@ -369,3 +369,86 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 		}
 	})
 }
+
+func TestANewFindingIsOrderedByItsOwnProductsRating(t *testing.T) {
+	// The one copy of the rating that remains. A finding's urgency is stored
+	// so a list can sort on it without joining four signals for every row, and
+	// the applying path is what writes it — so it is the thing most likely to
+	// go stale now that the rating it is worked out from belongs to a product.
+	//
+	// Two halves, and both matter. A place that newly pulls the library in
+	// here has to arrive at the rating this product made, and a place that
+	// newly pulls it in next door has to arrive at the published one.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mild := found("CVE-2026-ORDER", swss)
+		mild.Issue.Severity = "low"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		published := f.urgencyIn(t, elsewhere, "CVE-2026-ORDER")
+
+		f.recorded(t, 1, "someone")
+		who := f.holding(t, access.PublicTriage)
+		if _, err := f.store.Assess(ctx, who, f.productID, f.issue(t, "CVE-2026-ORDER"),
+			"critical", "Reachable from the network in how we ship it."); err != nil {
+			t.Fatal(err)
+		}
+		rated := f.urgencyIn(t, f.target, "CVE-2026-ORDER")
+		if rated <= published {
+			t.Fatalf("the rating did not move the order: %d against %d", rated, published)
+		}
+
+		// The same issue turns up in a build of each product that has not seen
+		// it before, which is the path that reads the rating at the moment it
+		// opens a finding.
+		here := f.anotherBranch(t, "2.4.0")
+		f.shippedTo(t, here, twoConsumers())
+		if _, err := f.store.Apply(ctx, here, f.runOn(t, here),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.urgencyIn(t, here, "CVE-2026-ORDER"); got != rated {
+			t.Errorf("a finding opened after the rating sits at %d, want the %d the ones "+
+				"beside it sit at", got, rated)
+		}
+
+		// And in the product that rated nothing, where the published word is
+		// still the answer.
+		theirs := f.anotherBranchOf(t, f.productOf(t, elsewhere), "2.4.0")
+		f.shippedTo(t, theirs, twoConsumers())
+		if _, err := f.store.Apply(ctx, theirs, f.runOn(t, theirs),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.urgencyIn(t, theirs, "CVE-2026-ORDER"); got != published {
+			t.Errorf("a finding opened in a product that rated nothing sits at %d, want the %d "+
+				"the published word gives — a rating made next door reached it", got, published)
+		}
+	})
+}
+
+// urgencyIn is where an issue sits in the order, in one build.
+func (f *fixture) urgencyIn(t *testing.T, target int64, identifier string) int64 {
+	t.Helper()
+	var rank int64
+	err := f.db.DB.NewSelect().
+		TableExpr("finding AS f").
+		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		ColumnExpr("MAX(f.urgency)").
+		Where("v.identifier = ?", identifier).
+		Where("f.target_id = ?", target).
+		Where("f.closed_at IS NULL").
+		Scan(t.Context(), &rank)
+	if err != nil {
+		t.Fatalf("read where %s sits in build %d: %v", identifier, target, err)
+	}
+	return rank
+}
