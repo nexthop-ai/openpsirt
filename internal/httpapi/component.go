@@ -28,7 +28,15 @@ type PerBuildBody struct {
 	// answered. Absent is the ordinary case rather than a gap.
 	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
 	ProjectURL string `json:"project_url,omitempty" doc:"Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
-	Issues     int    `json:"issues" doc:"Distinct vulnerabilities open against it here"`
+	// A count has a shape. Forty issues and three criticals are different
+	// work, and a number with nothing beside it says which is which.
+	BySeverity map[string]int `json:"by_severity,omitempty" doc:"What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
+	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited, which outranks everything else about it"`
+	// What the ecosystem's index says is current, where one was asked.
+	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
+	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"When that version shipped, where the index said"`
+	FirstSeen time.Time  `json:"first_seen" doc:"When a scan of this deployment first reported the component"`
+	Issues    int        `json:"issues" doc:"Distinct vulnerabilities open against it here"`
 	// Consumers is the unit somebody acts in: one judgment covers the whole
 	// fold, and what varies underneath it is what pulls the package in.
 	Consumers int `json:"consumers" doc:"How many things pull it in here"`
@@ -111,6 +119,8 @@ func registerComponent(api huma.API, in Ingest) {
 				Stream: build.Stream, Variant: build.Variant, Version: build.Version,
 				Purl: build.Purl, Ecosystem: graph.EcosystemOf(build.Purl),
 				Summary: build.Summary, ProjectURL: build.ProjectURL,
+				BySeverity: build.BySeverity, Exploited: build.Exploited,
+				Newest: build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
 				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,

@@ -528,7 +528,18 @@ type PerBuild struct {
 	// about a distribution package.
 	Summary    string
 	ProjectURL string
-	Upgrades   []Candidate
+	// BySeverity is what is open here by how it was rated, so a count has a
+	// shape: forty issues and three criticals are different work.
+	BySeverity map[string]int
+	// Exploited says whether any of them is known to be exploited, which
+	// outranks everything else about a row.
+	Exploited bool
+	// Newest is what the ecosystem's index says is current and when it
+	// shipped, and FirstSeen when this deployment first saw the component.
+	Newest    string
+	NewestAt  *time.Time
+	FirstSeen time.Time
+	Upgrades  []Candidate
 	// Issues is how many distinct vulnerabilities are open against it in this
 	// build, Consumers how many things pull it in there, and Places how many
 	// times those sit somewhere in it.
@@ -596,6 +607,10 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Purl        string     `bun:"purl"`
 		Summary     string     `bun:"summary"`
 		ProjectURL  string     `bun:"project_url"`
+		Newest      string     `bun:"latest_version"`
+		NewestAt    *time.Time `bun:"latest_released_at"`
+		FirstSeen   time.Time  `bun:"first_seen_at"`
+		Exploited   int        `bun:"exploited"`
 		Issues      int        `bun:"issues"`
 		Consumers   int        `bun:"consumers"`
 		Places      int        `bun:"places"`
@@ -615,6 +630,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
 		ColumnExpr("COUNT(*) AS places").
 		ColumnExpr("MIN(f.due_at) AS due_at").
+		ColumnExpr("MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) AS exploited").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -651,6 +667,10 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr("c.purl AS purl").
 		ColumnExpr("COALESCE(c.summary, '') AS summary").
 		ColumnExpr("COALESCE(c.project_url, '') AS project_url").
+		ColumnExpr("COALESCE(c.latest_version, '') AS latest_version").
+		ColumnExpr("c.latest_released_at AS latest_released_at").
+		ColumnExpr("c.first_seen_at AS first_seen_at").
+		ColumnExpr("COALESCE(op.exploited, 0) AS exploited").
 		ColumnExpr("COALESCE(op.issues, 0) AS issues").
 		ColumnExpr("COALESCE(op.places, 0) AS places").
 		ColumnExpr("op.due_at AS due_at").
@@ -682,14 +702,21 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	if err != nil {
 		return nil, err
 	}
+	bands, err := s.bandsPerBuild(ctx, targets, visible, name)
+	if err != nil {
+		return nil, err
+	}
 
 	out := make([]PerBuild, 0, len(rows))
 	for _, row := range rows {
 		build := PerBuild{
 			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
 			Version: row.Version, Purl: row.Purl,
-			Summary: row.Summary, ProjectURL: row.ProjectURL, Issues: row.Issues,
-			Consumers: row.Consumers, Places: row.Places,
+			Summary: row.Summary, ProjectURL: row.ProjectURL,
+			Newest: row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
+			Exploited: row.Exploited > 0, Issues: row.Issues,
+			BySeverity: bands[[2]int64{row.TargetID, row.ComponentID}],
+			Consumers:  row.Consumers, Places: row.Places,
 			DueAt: row.DueAt, Upgrades: upgrades[row.TargetID],
 		}
 		if said, ok := promised[row.TargetID]; ok {
@@ -899,6 +926,53 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 	out := make(map[int64]promise, len(rows))
 	for _, row := range rows {
 		out[row.TargetID] = promise{at: row.CommittedTo, to: row.UpgradeTo}
+	}
+	return out, nil
+}
+
+// bandsPerBuild is how what is open against a component was rated, per build.
+//
+// A count has a shape: forty issues and three criticals are different work, and
+// a number with no shape beside it tells somebody deciding what to read next
+// the opposite of what they need.
+//
+// Distinct issues, like the count beside it, so the parts sum to the whole
+// rather than to the number of places.
+func (s *Store) bandsPerBuild(ctx context.Context, targets []int64,
+	visible []access.Visibility, name string) (map[[2]int64]map[string]int, error) {
+
+	var rows []struct {
+		TargetID    int64  `bun:"target_id"`
+		ComponentID int64  `bun:"component_id"`
+		Band        string `bun:"band"`
+		Issues      int    `bun:"issues"`
+	}
+	err := s.db.NewSelect().
+		TableExpr("finding AS f").
+		Join("JOIN component AS c ON c.id = f.component_id").
+		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("f.component_id AS component_id").
+		ColumnExpr("COALESCE(v.severity, '') AS band").
+		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		Where("f.target_id IN (?)", bun.List(targets)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		Where("c.name = ?", name).
+		GroupExpr("f.target_id, f.component_id, COALESCE(v.severity, '')").
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read how what is open here was rated: %w", err)
+	}
+	out := map[[2]int64]map[string]int{}
+	for _, row := range rows {
+		// A scanner's "unknown" and no rating at all are the same state, and
+		// two entries for it is two names for one nothing.
+		at := [2]int64{row.TargetID, row.ComponentID}
+		if out[at] == nil {
+			out[at] = map[string]int{}
+		}
+		out[at][BandOf(row.Band)] += row.Issues
 	}
 	return out, nil
 }

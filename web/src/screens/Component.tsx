@@ -13,6 +13,8 @@ import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Pace } from "../ui/Charts";
 import { upstream } from "../ui/upstream";
+import { ROLLED } from "../ui/severities";
+import { Severity } from "../ui/Severity";
 
 // One component, and the one piece of work it is.
 //
@@ -34,6 +36,10 @@ type Build = Body<"PerBuildBody">;
 // The separator inside a key naming one build. Not a character either name can
 // hold, so a key cannot be two builds.
 const APART = "\u0000";
+
+// How many versions to offer before the rest are a count. A kernel names
+// twenty, and the question is which to take rather than what the whole set is.
+const SHOWN = 5;
 
 const keyOf = (row: { stream?: string; variant?: string }) =>
   (row.stream ?? "") + APART + (row.variant ?? "");
@@ -113,6 +119,8 @@ export function Component() {
 
   const sameVersion = rows.filter((row) => row.version === here.version);
   const link = upstream(here.purl);
+  // The bands are declared worst first, so the first one present is the worst.
+  const worst = ROLLED.find((band) => (here.by_severity ?? {})[band]);
 
   return (
     <>
@@ -126,9 +134,11 @@ export function Component() {
               {(here.issues ?? 0).toLocaleString()} open on it →
             </Link>
           ) : (
-            <span className="vchip">nothing open on it</span>
+            <span className="vchip ok">nothing open on it</span>
           )}
-          {here.due_at && <span className="vchip">due {on(here.due_at)}</span>}
+          {here.exploited && <span className="vchip bad">known exploited</span>}
+          {worst && <Severity word={worst} />}
+          {here.due_at && <span className="vchip differs">due {on(here.due_at)}</span>}
         </p>
       </div>
 
@@ -194,6 +204,26 @@ export function Component() {
                   <span className="hint">not known</span>
                 )}
               </dd>
+              <dt>Newest known</dt>
+              <dd>
+                {here.newest_version ? (
+                  <>
+                    <span className="id">{here.newest_version}</span>
+                    {here.newest_released_at && (
+                      <span className="hint"> · {on(here.newest_released_at)}</span>
+                    )}
+                  </>
+                ) : (
+                  <span
+                    className="hint"
+                    title="No index is asked about a distribution package: the distribution is its maintainer, and an upstream release date says nothing about the software inside"
+                  >
+                    no index asked
+                  </span>
+                )}
+              </dd>
+              <dt>First seen</dt>
+              <dd className="hint">{here.first_seen ? on(here.first_seen) : "—"}</dd>
               <dt>Upgrade scheduled</dt>
               <dd>
                 {here.upgrade_to ? (
@@ -351,6 +381,19 @@ function Sits({
                 </>
               )}
             </span>
+            {Object.keys(here.by_severity ?? {}).length > 0 && (
+              <span className="strip">
+                {ROLLED.filter((band) => (here.by_severity ?? {})[band]).map((band) => (
+                  <span
+                    key={band}
+                    className={`band ${band}`}
+                    title={`${(here.by_severity ?? {})[band]} ${band}`}
+                  >
+                    {(here.by_severity ?? {})[band]}
+                  </span>
+                ))}
+              </span>
+            )}
           </li>
 
           <li>
@@ -548,7 +591,7 @@ function Upgrade({
   if (landed.length === 0) {
     if ((here.issues ?? 0) === 0) return null;
     return (
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card stuck" style={{ marginTop: 12 }}>
         <h3>There is nothing to upgrade to</h3>
         <p className="reading">
           No version fixes any of the {here.issues} open here, so an upgrade would lapse. These need
@@ -564,38 +607,78 @@ function Upgrade({
   }
 
   const ready = to.trim() !== "" && by !== "" && because.trim() !== "" && chosen.size > 0;
+  // What a fix exists for, from the scanner rather than from any comparison:
+  // every issue naming a version, counted once.
+  const withFix = landed.reduce((sum, each) => sum + (each.fixed_here ?? 0), 0);
+  const noFix = Math.max(0, (here.issues ?? 0) - withFix);
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
+    <div className="card act" style={{ marginTop: 12 }}>
       <h3>Schedule an upgrade</h3>
       {plan.error != null && <Failed error={plan.error} what="That could not be recorded." />}
 
+      {/* The pair that needs no version comparison, from the scanner's own
+          word on whether a fix exists at all. Read first, because the half no
+          upgrade closes is the half that still needs a judgment after the work
+          ships. */}
+      <div className="kpis tight">
+        <span className="kpi">
+          <span className="l">A fix exists for</span>
+          <span className="n">{withFix.toLocaleString()}</span>
+          <span className="d">of the {(here.issues ?? 0).toLocaleString()} open here</span>
+        </span>
+        <span className="kpi">
+          <span className="l">No version fixes</span>
+          <span className="n">{noFix.toLocaleString()}</span>
+          <span className="d">a judgment rather than an upgrade</span>
+        </span>
+      </div>
+
       <div className="filters">
-        <label className="field">
+        <div className="field">
           <span>Upgrade to</span>
           <input
             {...notACredential}
             type="text"
-            list="landed-versions"
             value={to}
             placeholder="the version, as its packager writes it"
             onChange={(event) => setTo(event.target.value)}
           />
-          {/* Offered, never required. The list is what the scanner named, and a
-              version it has not heard of is refused by the server rather than
-              by the control — which is what lets somebody name one newer than
-              anything reported. */}
-          <datalist id="landed-versions">
-            {landed.map((each) => (
-              <option key={each.to} value={each.to} />
+          {/* What each candidate would close, beside it. Offered in a list
+              rather than a datalist, because the counts are the reason to pick
+              one and a datalist shows nothing until somebody clicks into the
+              box. Offered, never required: the server is what refuses a version
+              it has not heard of, which is what lets somebody name one newer
+              than anything reported. */}
+          <ul className="tomove">
+            {landed.slice(0, SHOWN).map((each, i) => (
+              <li key={each.to}>
+                <button
+                  type="button"
+                  className={each.to === to ? "on" : undefined}
+                  aria-pressed={each.to === to}
+                  onClick={() => setTo(each.to)}
+                >
+                  <span className="id">{each.to}</span>
+                  <span className="why">
+                    {each.ordered
+                      ? `closes ${(each.reached ?? 0).toLocaleString()}`
+                      : `fixed ${(each.fixed_here ?? 0).toLocaleString()} of its own`}
+                    {i === 0 && each.ordered && " · furthest along"}
+                  </span>
+                </button>
+              </li>
             ))}
-          </datalist>
+            {landed.length > SHOWN && (
+              <li className="hint">{landed.length - SHOWN} more, in the table beside this</li>
+            )}
+          </ul>
           <span className="hint">
             {landed[0]?.ordered
-              ? `${landed[0]?.to} is furthest along and closes ${landed[0]?.reached}.`
-              : `${landed.length} named, in no order. Any version is accepted.`}
+              ? "A later release carries the earlier fixes, so the first closes the most."
+              : "These could not be put in order, so each count is what that release fixed itself."}
           </span>
-        </label>
+        </div>
 
         <label className="field">
           <span>Done by</span>

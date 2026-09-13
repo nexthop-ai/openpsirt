@@ -6855,6 +6855,10 @@ export interface components {
             was: string;
         };
         PerBuildBody: {
+            /** @description What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count */
+            by_severity?: {
+                [key: string]: number;
+            };
             /**
              * Format: date-time
              * @description When the work promised here is due
@@ -6872,11 +6876,25 @@ export interface components {
             due_at?: string;
             /** @description Which ecosystem the identifier names, read out of it rather than stored */
             ecosystem?: string;
+            /** @description Whether any of what is open here is known to be exploited, which outranks everything else about it */
+            exploited: boolean;
+            /**
+             * Format: date-time
+             * @description When a scan of this deployment first reported the component
+             */
+            first_seen: string;
             /**
              * Format: int64
              * @description Distinct vulnerabilities open against it here
              */
             issues: number;
+            /**
+             * Format: date-time
+             * @description When that version shipped, where the index said
+             */
+            newest_released_at?: string;
+            /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
+            newest_version?: string;
             /**
              * Format: int64
              * @description How many times those sit somewhere in this build. What the bulk cap is measured against

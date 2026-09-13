@@ -4910,6 +4910,12 @@ components:
     PerBuildBody:
       additionalProperties: false
       properties:
+        by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count
+          type: object
         committed_to:
           description: When the work promised here is due
           format: date-time
@@ -4925,10 +4931,24 @@ components:
         ecosystem:
           description: Which ecosystem the identifier names, read out of it rather than stored
           type: string
+        exploited:
+          description: Whether any of what is open here is known to be exploited, which outranks everything else about it
+          type: boolean
+        first_seen:
+          description: When a scan of this deployment first reported the component
+          format: date-time
+          type: string
         issues:
           description: Distinct vulnerabilities open against it here
           format: int64
           type: integer
+        newest_released_at:
+          description: When that version shipped, where the index said
+          format: date-time
+          type: string
+        newest_version:
+          description: The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package
+          type: string
         places:
           description: How many times those sit somewhere in this build. What the bulk cap is measured against
           format: int64
@@ -4963,6 +4983,8 @@ components:
         - stream
         - variant
         - version
+        - exploited
+        - first_seen
         - issues
         - consumers
         - places
