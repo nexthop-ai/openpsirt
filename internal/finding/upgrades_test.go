@@ -150,3 +150,57 @@ func TestWhatAPromisedUpgradeCoversIsDerivedRatherThanMarked(t *testing.T) {
 		}
 	})
 }
+
+func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
+	// A component is in the inventory because the build ships it. Answered off
+	// the findings instead, anything carrying its risk underneath rather than
+	// on itself returned no builds at all — which reads as a name the product
+	// does not ship, and is the ordinary state of every pre-built binary
+	// vendored in whole.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		run := f.run(t)
+		// Against libnl alone, so its two consumers carry nothing of their own.
+		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+			{
+				Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: libnl,
+				FixState: finding.FixedUpstream, FixedIn: "3.9.0",
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+
+		builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), swss.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 {
+			t.Fatalf("%d builds carry a component with nothing open, want the one shipping it",
+				len(builds))
+		}
+		clean := builds[0]
+		if clean.Version != swss.Version {
+			t.Errorf("it ships %q, want %q", clean.Version, swss.Version)
+		}
+		if clean.Issues != 0 || clean.Places != 0 {
+			t.Errorf("%d issues at %d places against something nothing was reported on",
+				clean.Issues, clean.Places)
+		}
+		// A deadline is the earliest among what is open, so it is absent
+		// rather than zero where nothing is.
+		if clean.DueAt != nil {
+			t.Errorf("a deadline appeared with nothing open: %v", clean.DueAt)
+		}
+		// The identifier travels, because the ecosystem and an upstream
+		// address are both read out of it and neither is stored.
+		if clean.Purl != swss.Purl {
+			t.Errorf("the identifier is %q, want %q", clean.Purl, swss.Purl)
+		}
+		// Nothing pulls swss in, so the build itself is what carries it.
+		if clean.Consumers != 1 {
+			t.Errorf("%d things pull in a component the build contains directly, want one",
+				clean.Consumers)
+		}
+	})
+}

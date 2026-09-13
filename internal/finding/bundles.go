@@ -499,7 +499,10 @@ type PerBuild struct {
 	Variant  string
 	// Version is what this build ships, and Upgrades where it could go, each
 	// with how many issues that move would close here.
-	Version  string
+	Version string
+	// Purl is the package identifier, which is where the ecosystem is read
+	// from and what an upstream address is built out of.
+	Purl     string
 	Upgrades []Candidate
 	// Issues is how many distinct vulnerabilities are open against it in this
 	// build, Consumers how many things pull it in there, and Places how many
@@ -535,6 +538,19 @@ type PerBuild struct {
 // and that is the whole difficulty: a stream staying on 3.0.x and a stream on
 // 3.5.x are different work with different testing, and one target across both
 // would be wrong for one of them.
+//
+// **A build is listed because it ships the component, not because something is
+// open against it.** The presence comes from the graph and the counts are
+// joined onto it, so a package carrying nothing of its own still answers with
+// the version it ships and where it sits. Driven off the findings instead, a
+// vendored binary whose whole risk sits underneath it — nothing on the package,
+// everything in what it pulls in — answered with no builds at all, which reads
+// as a name the product does not ship.
+//
+// **One row per version, not per build.** A build shipping a name at two
+// versions holds two components, and they are two different pieces of code to
+// decide about; collapsing them to the lowest version reported one of them and
+// silently hid the other.
 func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope Scope,
 	component string) ([]PerBuild, error) {
 
@@ -552,37 +568,69 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Stream      string     `bun:"stream"`
 		Variant     string     `bun:"variant"`
 		Version     string     `bun:"version"`
+		Purl        string     `bun:"purl"`
 		Issues      int        `bun:"issues"`
 		Consumers   int        `bun:"consumers"`
-		Direct      int        `bun:"direct"`
 		Places      int        `bun:"places"`
 		DueAt       *time.Time `bun:"due_at"`
 		ComponentID int64      `bun:"component_id"`
 	}
-	err = s.db.NewSelect().
+	// What is open against it, per build and component. A left join rather
+	// than the driving table: no findings is an answer, and it is the answer
+	// for every package that carries its risk underneath it rather than on
+	// itself. Narrowed by visibility here, where the counts are, because the
+	// presence of a component is readable to anybody who may read the build
+	// while what is open against it is not.
+	open := s.db.NewSelect().
 		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
 		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("va.name AS variant").
-		ColumnExpr("MIN(c.version) AS version").
-		ColumnExpr("MIN(f.component_id) AS component_id").
+		ColumnExpr("f.component_id AS component_id").
 		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
-		ColumnExpr("COUNT(DISTINCT f.consumer_id) AS consumers").
-		// A component nothing pulls in has no consumer to count distinctly,
-		// so the build itself is the one thing pulling it in.
-		ColumnExpr("COALESCE(SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END), 0) AS direct").
 		ColumnExpr("COUNT(*) AS places").
 		ColumnExpr("MIN(f.due_at) AS due_at").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.target_id, f.component_id")
+
+	// How many things pull it in, from the graph rather than from the
+	// findings: it is a fact about the build, true whether or not anything is
+	// open. A component nothing pulls in is contained by the build itself,
+	// which counts as the one thing pulling it in.
+	pullers := s.db.NewSelect().
+		TableExpr("graph_edge AS e").
+		Join("JOIN graph_node AS ch ON ch.id = e.child_id").
+		ColumnExpr("ch.target_id AS target_id").
+		ColumnExpr("ch.component_id AS component_id").
+		ColumnExpr("COUNT(DISTINCT e.parent_id) AS consumers").
+		Where("e.target_id IN (?)", bun.List(targets)).
+		Where("e.closed_scan_id IS NULL").
+		Where("e.parent_id <> e.child_id").
+		GroupExpr("ch.target_id, ch.component_id")
+
+	err = s.db.NewSelect().
+		TableExpr("graph_node AS n").
+		Join("JOIN component AS c ON c.id = n.component_id").
+		Join("JOIN target AS tg ON tg.id = n.target_id").
+		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		Join("JOIN variant AS va ON va.id = tg.variant_id").
+		Join("LEFT JOIN (?) AS op ON op.target_id = n.target_id AND op.component_id = n.component_id", open).
+		Join("LEFT JOIN (?) AS pl ON pl.target_id = n.target_id AND pl.component_id = n.component_id", pullers).
+		ColumnExpr("n.target_id AS target_id").
+		ColumnExpr("n.component_id AS component_id").
+		ColumnExpr("st.name AS stream").
+		ColumnExpr("va.name AS variant").
+		ColumnExpr("c.version AS version").
+		ColumnExpr("c.purl AS purl").
+		ColumnExpr("COALESCE(op.issues, 0) AS issues").
+		ColumnExpr("COALESCE(op.places, 0) AS places").
+		ColumnExpr("op.due_at AS due_at").
+		ColumnExpr("COALESCE(pl.consumers, 1) AS consumers").
+		Where("n.target_id IN (?)", bun.List(targets)).
+		Where("n.closed_scan_id IS NULL").
+		Where("n.is_root = ?", false).
 		Where("c.name = ?", name).
-		GroupExpr("f.target_id, st.name, va.name").
-		OrderExpr("st.name, va.name").
+		OrderExpr("st.name, va.name, c.version").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read a component across its builds: %w", err)
@@ -610,8 +658,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	for _, row := range rows {
 		build := PerBuild{
 			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
-			Version: row.Version, Issues: row.Issues,
-			Consumers: pullersOf(row.Consumers, row.Direct), Places: row.Places,
+			Version: row.Version, Purl: row.Purl, Issues: row.Issues,
+			Consumers: row.Consumers, Places: row.Places,
 			DueAt: row.DueAt, Upgrades: upgrades[row.TargetID],
 		}
 		if said, ok := promised[row.TargetID]; ok {

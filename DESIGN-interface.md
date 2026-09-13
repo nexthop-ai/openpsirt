@@ -358,6 +358,7 @@ three date bounds having no control at all.
 | The count is read from the address | The one place that knows what every filter is called |
 | Filtering is the server's, not the browser's | A list narrowed after it arrives is narrowed within one page of it, so "hide the kernel" would hide it from the twenty rows already fetched and from nothing else |
 | The common ones stay one click away | Severity, exploited and fix-available. Package kind, what holds a thing, and how far it has been decided sit in a panel that opens, with how many are on written on the control while it is shut |
+| The panel is shut until somebody opens it, whatever the address narrows by | It is most of a screen. Opened because a filter is set, a link to a narrowed list covers the rows somebody followed it to read — and it says nothing the chips above the list do not already say, each of which removes its own filter when clicked |
 
 Exploited and fix-available are two flags, not one parameter holding one of two
 words — otherwise "exploited, and a fix exists", the first population anybody
@@ -531,14 +532,17 @@ fold, so packages built from one source are one row.
 
 ## The component screen
 
-A component has **a row per build that carries it**, with what that build ships,
-what is open against it there, where it could go, the earliest deadline among what
-is open, and what has already been promised. The issue count is the way through
-to the findings list. Before this, clicking a component opened a filtered list of
-its findings and nothing else, so a component could be read and never acted on.
+A component has **a row per version each build carries**, with what that build
+ships, what is open against it there, where it could go, the earliest deadline
+among what is open, and what has already been promised. The issue count is the
+way through to the findings list.
 
 | Rule | |
 |---|---|
+| A build is listed because it ships the component, not because something is open | The presence is a fact about the graph and the counts are joined onto it. Read off the findings instead, a package whose whole risk sits in what it pulls in — nothing on the package, everything underneath — answered with no builds, which reads as a name the product does not ship. That is the ordinary state of anything vendored in pre-built |
+| One row per version rather than per build | A build shipping a name at two versions holds two components, and they are two pieces of code to decide about separately. Collapsing them to the lowest version reported one and hid the other |
+| A deadline is absent where nothing is open, never zero | It is the earliest among what is open, so with nothing open there is no such date |
+| The package identifier travels with the row | The ecosystem is read out of it and so is an upstream address, and neither is stored. Nothing is fetched from either |
 | Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
 | Where it could go is listed, never ordered | Telling which of two versions comes first needs an ordering per ecosystem this does not have, so what is offered is every version the scanner named as carrying a fix, most-closing first. "Nearest" is not a question this can answer |
 | The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the bulk cap is measured against |

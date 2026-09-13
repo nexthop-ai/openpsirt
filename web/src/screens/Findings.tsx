@@ -157,11 +157,11 @@ export function Findings() {
   // visible, removable and travels with a link like any other filter.
   const asked = useMemo(() => asAsked(params, view), [params, view]);
   const advanced = activeFilters(asked).length;
-  // Opened because the reader narrowed something, which is not the same as
-  // the list being narrowed: the by-issue default would otherwise open the
-  // panel on every visit, saying "there is something to look at here" about
-  // the one filter nobody set.
-  const [more, setMore] = useState(activeFilters(params).length > 0);
+  // Closed until somebody opens it. The panel is most of a screen, and what is
+  // narrowed is already stated above the list as a chip per filter that removes
+  // itself when clicked — so opening it because a filter is set covers the rows
+  // somebody followed a link to read, to say what the chips say already.
+  const [more, setMore] = useState(false);
   const [peeking, setPeeking] = useState<string | null>(null);
   // What is selected, by what a row *is* rather than by where it sits: the
   // list is read again after every decision and after every page, and an index

@@ -1601,9 +1601,13 @@ export interface paths {
          *
          *     **Answered per build, because the answer differs by build.** A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them.
          *
-         *     **Where it could go is listed, never ordered.** Comparing two versions needs an ordering per ecosystem this does not have, so there is no nearest and no latest — what there is, is every version the scanner named as carrying a fix, and how many issues each would close.
+         *     **Where it could go is listed, never ordered.** Comparing two versions needs an ordering per ecosystem this does not have, so there is no nearest and no latest — what there is, is every version the scanner named as carrying a fix, and how many of what is open here that release fixed.
          *
-         *     `due_at` is what a commitment about that build is gated against.
+         *     **A build is listed because it ships the component**, not because something is open against it. A package carrying nothing of its own still answers with the version it ships and how many things pull it in, which is the ordinary case for anything vendored in pre-built.
+         *
+         *     **One entry per version rather than per build.** A build shipping a name at two versions holds two components, and they are two different pieces of code to decide about.
+         *
+         *     `due_at` is what a commitment about that build is gated against, and is absent where nothing is open.
          *
          *     **Requires:** any recognized credential. Answers only what you may see.
          */
@@ -6866,6 +6870,8 @@ export interface components {
              * @description The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees, because that defers the worst thing it covers
              */
             due_at?: string;
+            /** @description Which ecosystem the identifier names, read out of it rather than stored */
+            ecosystem?: string;
             /**
              * Format: int64
              * @description Distinct vulnerabilities open against it here
@@ -6876,6 +6882,8 @@ export interface components {
              * @description How many times those sit somewhere in this build. What the bulk cap is measured against
              */
             places: number;
+            /** @description The package identifier this build ships it under */
+            purl?: string;
             stream: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;

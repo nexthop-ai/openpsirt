@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -20,7 +21,10 @@ type PerBuildBody struct {
 	Stream  string `json:"stream"`
 	Variant string `json:"variant"`
 	Version string `json:"version" doc:"What this build ships"`
-	Issues  int    `json:"issues" doc:"Distinct vulnerabilities open against it here"`
+	// Purl is what an ecosystem and an upstream address are read out of.
+	Purl      string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
+	Ecosystem string `json:"ecosystem,omitempty" doc:"Which ecosystem the identifier names, read out of it rather than stored"`
+	Issues    int    `json:"issues" doc:"Distinct vulnerabilities open against it here"`
 	// Consumers is the unit somebody acts in: one judgment covers the whole
 	// fold, and what varies underneath it is what pulls the package in.
 	Consumers int `json:"consumers" doc:"How many things pull it in here"`
@@ -54,8 +58,16 @@ func registerComponent(api huma.API, in Ingest) {
 			"**Where it could go is listed, never ordered.** Comparing two versions needs an " +
 			"ordering per ecosystem this does not have, so there is no nearest and no " +
 			"latest — what there is, is every version the scanner named as carrying a fix, " +
-			"and how many issues each would close.\n\n" +
-			"`due_at` is what a commitment about that build is gated against.",
+			"and how many of what is open here that release fixed.\n\n" +
+			"**A build is listed because it ships the component**, not because something is " +
+			"open against it. A package carrying nothing of its own still answers with the " +
+			"version it ships and how many things pull it in, which is the ordinary case for " +
+			"anything vendored in pre-built.\n\n" +
+			"**One entry per version rather than per build.** A build shipping a name at two " +
+			"versions holds two components, and they are two different pieces of code to " +
+			"decide about.\n\n" +
+			"`due_at` is what a commitment about that build is gated against, and is absent " +
+			"where nothing is open.",
 		Tags: []string{"Findings"},
 	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
@@ -88,6 +100,7 @@ func registerComponent(api huma.API, in Ingest) {
 			}
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
 				Stream: build.Stream, Variant: build.Variant, Version: build.Version,
+				Purl: build.Purl, Ecosystem: graph.EcosystemOf(build.Purl),
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
 				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,
