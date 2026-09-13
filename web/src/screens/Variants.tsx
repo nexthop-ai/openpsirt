@@ -78,8 +78,8 @@ export function Variants() {
       <div className="alert info" style={{ marginBottom: 14 }}>
         <strong>A variant is a different way of building the same source</strong>
         <span>
-          A different CPU architecture, operating system, chip or board, or a build that exists only
-          for testing. Not a different release — a new version of the product is a branch or a tag.
+          A different architecture, OS, chip or board, or a test-only build. Not a release: those
+          are branches and tags.
         </span>
       </div>
 
@@ -88,7 +88,7 @@ export function Variants() {
           title={stream ? "Nothing has been scanned here." : "No variant is declared."}
           detail={
             stream
-              ? "A variant appears under a release once a build has filed a scan against it."
+              ? "Appears under a release once a scan is filed against it."
               : "Declare one before a build can file a scan against it."
           }
         />
@@ -148,7 +148,7 @@ export function Variants() {
         error={declare.error}
         busy={declare.isPending || name.trim() === ""}
         ok="Add variant"
-        hint="Declared once per product rather than per release. Somebody made to retype it will eventually retype it differently, and win, windows and win32 across three releases are three sets of findings with nothing saying they belong together."
+        hint="Declared once per product, not per release, so win, windows and win32 do not become three variants."
       >
         {/* The label wraps the input, as every other field here does. Beside
             it with no htmlFor and no id, a screen reader announced a text
@@ -162,7 +162,7 @@ export function Variants() {
           value={name}
           onChange={setName}
           placeholder="broadcom"
-          hint="What the build is targeting — the chip, the architecture, the OS"
+          hint="What the build targets: chip, architecture or OS"
         />
         <div className="field">
           <label htmlFor="declare-facing">Ships to customers</label>

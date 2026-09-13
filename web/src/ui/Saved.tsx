@@ -275,9 +275,8 @@ export function Saved({
                     proposed its own claims would leave the approver as the
                     only human judgment on them, and would put a configuration
                     file where a name belongs in the record. */}
-                This proposes nothing by itself. Picking the filter fills the decision form with
-                these words, and <b>you</b> submit the claim as your own for a second person to
-                agree to — so the record says who made it.
+                Proposes nothing. Picking the filter fills the decision form, and <b>you</b> you
+                submit the claim as your own.
               </p>
             </>
           )}

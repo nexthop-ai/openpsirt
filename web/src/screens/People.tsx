@@ -119,7 +119,7 @@ export function People() {
     <>
       <div className="screen-head">
         <h2>Users and roles</h2>
-        <p>Who can see what, and who can decide about it</p>
+        <p>Who can read and decide what</p>
         <AddButton label="Add user" onClick={() => setAdding(true)} />
       </div>
 
@@ -190,7 +190,7 @@ export function People() {
                           {person.sees_nothing && (
                             <span
                               className="vchip nothing"
-                              title="A capability is bounded by what its holder may read, so on its own it grants nothing. Grant a read role as well."
+                              title="A capability grants nothing on its own. Grant a read role as well."
                             >
                               sees nothing
                             </span>
@@ -247,7 +247,7 @@ export function People() {
                         disabled={derived}
                         title={
                           derived
-                            ? "Roles come from groups in this deployment, so granting one here would be overwritten"
+                            ? "Roles come from provider groups and would be overwritten"
                             : "Every product against every capability, as a grid"
                         }
                         onClick={() =>
@@ -292,9 +292,8 @@ export function People() {
                               })
                             }
                           />
-                          Administers this deployment — people, roles, credentials, settings and the
-                          catalog. Reading and triaging a product are granted below like anybody
-                          else&apos;s.
+                          Administers people, roles, credentials, settings and the catalog. Product
+                          access is granted below.
                         </label>
                         {administer.error != null && (
                           <Failed error={administer.error} what="That could not be changed." />
@@ -333,10 +332,7 @@ export function People() {
       {derived && (
         <div className="alert" style={{ marginTop: 12 }}>
           <strong>Roles come from groups in this deployment</strong>
-          <span>
-            What somebody holds is derived from the groups their provider reports, so granting one
-            here would be overwritten. Change the bindings below instead.
-          </span>
+          <span>Roles come from provider groups. Change the bindings below instead.</span>
         </div>
       )}
 
@@ -392,14 +388,14 @@ export function People() {
         error={record.error}
         busy={identity.trim() === "" || record.isPending}
         ok="Add user"
-        hint="No account is ever created automatically. Being named here grants a role — they still sign in through a configured provider like anybody else."
+        hint="Accounts are never created automatically. They still sign in through a provider."
       >
         <Field
           label="Identity from the sign-in provider"
           value={identity}
           onChange={setIdentity}
           placeholder="ashwin@example.com"
-          hint="Exactly as your provider gives it. Capitals matter here. A trusted proxy asserting the same name is the same person."
+          hint="Exactly as your provider gives it. Capitals matter."
         />
       </Declare>
     </>
@@ -479,8 +475,8 @@ function Credentials() {
     <div className="card" style={{ marginTop: 16 }}>
       <h3>API keys and tokens</h3>
       <p className="reading" style={{ margin: "0 0 12px" }}>
-        A build pipeline uploads with a key scoped to what it may send to. A person can hold tokens
-        for their own scripts, which never carry more than the person does.
+        Pipeline keys are scoped to what they may send. Personal tokens never carry more than the
+        person does.
       </p>
 
       {withdrawKey.error != null && (
@@ -590,8 +586,7 @@ function Credentials() {
         <div className="alert info" style={{ marginTop: 10 }}>
           <strong>Copy it now.</strong>
           <span>
-            <span className="id">{issued.secret}</span> — this is the only time it is shown. What is
-            stored is a digest, so a secret nobody copied is a key nobody can use.
+            <span className="id">{issued.secret}</span> — shown once. Only a hash is stored.
           </span>
           <button
             type="button"
@@ -605,7 +600,7 @@ function Credentials() {
       )}
 
       <p className="reading" style={{ marginTop: 10 }}>
-        A secret is shown once when it is made and never again. What is stored is a hash.
+        Shown once. Only a hash is stored.
       </p>
 
       <button type="button" className="btn" onClick={() => setIssuing(true)}>
@@ -620,14 +615,14 @@ function Credentials() {
         error={issueKey.error}
         busy={keyName.trim() === "" || keyProduct === "" || issueKey.isPending}
         ok="Create key"
-        hint="For a build pipeline to upload with. It belongs to no person, may only send scans, and can read back only what it sent."
+        hint="For a build pipeline. Sends scans, reads back only what it sent."
       >
         <Field
           label="Called"
           value={keyName}
           onChange={setKeyName}
           placeholder="nightly-sonic"
-          hint="What an upload records as its sender, and what you withdraw by. It has to be unique."
+          hint="Recorded as the sender. Must be unique."
         />
         <label className="field">
           <span>Product</span>
@@ -639,21 +634,21 @@ function Credentials() {
               </option>
             ))}
           </select>
-          <span className="hint">Always required. A key is scoped to one product.</span>
+          <span className="hint">Required. A key covers one product.</span>
         </label>
         <Field
           label="Branch or tag"
           value={keyStream}
           onChange={setKeyStream}
           placeholder="master"
-          hint="Optional. Leave it empty and the key may send for any branch or tag."
+          hint="Optional. Empty means any branch or tag."
         />
         <Field
           label="Variant"
           value={keyVariant}
           onChange={setKeyVariant}
           placeholder="broadcom"
-          hint="Optional. Leave it empty and the key may send for any variant."
+          hint="Optional. Empty means any variant."
         />
       </Declare>
     </div>

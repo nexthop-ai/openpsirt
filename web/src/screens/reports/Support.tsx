@@ -45,18 +45,13 @@ export function Support() {
             {(ended.data?.open ?? 0).toLocaleString()} open
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Counted as issues at components rather than once per place, which is how every
-            release-level count here is counted. The list a figure opens can show slightly fewer
-            rows, because it folds sibling packages built from one source into one. None of it
-            carries a deadline: past end-of-life the deadline comes off every open finding, so none
-            of this is overdue or due soon and none of it is in any figure built on either. Nothing
-            is hidden — the findings and the history stay, and stay reportable. What ended is what
-            is expected of us.
+            Issues at components, not once per place. Past end-of-life nothing carries a deadline,
+            so none of this is overdue.
           </p>
           {rows.length === 0 ? (
             <Empty
               title="Nothing is out of support."
-              detail="A release appears here once its end-of-life date has passed, or its product's has and it has not stated one of its own."
+              detail="Appears once the release end-of-life date has passed, or the product's has and it states none of its own."
             />
           ) : (
             <>

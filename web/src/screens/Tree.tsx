@@ -146,7 +146,7 @@ function Yours() {
         {!mine.isPending && !mine.isError && rows.length === 0 && (
           <Empty
             title="Nothing here is yours."
-            detail="This shows the chains your own findings sit on. Nothing in this build has been handed to you or to a team you are on."
+            detail="Nothing in this build is assigned to you or a team you are on."
           />
         )}
         {placed.length > 0 && (
@@ -418,7 +418,7 @@ function Whole() {
               (found.length === 0 ? (
                 <Empty
                   title={`Nothing here is called "${term}".`}
-                  detail="Matched on part of a name, ignoring case. A component that is in the inventory but not in this build will not appear."
+                  detail="Part of a name, ignoring case. Components not in this build will not appear."
                 />
               ) : (
                 <Matches found={found} focus={focus} onSelect={select} />
@@ -518,7 +518,7 @@ function Matches({
           <Strip by={node.beneath_by_severity} />
           <span
             className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
-            title={`${node.beneath.toLocaleString()} distinct issues open beneath this. Distinct issues, so lower than the findings list, which has a row per issue and component`}
+            title={`${node.beneath.toLocaleString()} distinct issues beneath this`}
           >
             {node.beneath.toLocaleString()}
           </span>

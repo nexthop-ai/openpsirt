@@ -84,16 +84,13 @@ export function CarriedPatches({
                 }}
               />
               <span className="hint">
-                Matched on what the claim says it is about rather than on a package this build still
-                carries — a claim naming something that has gone is exactly the row somebody asking
-                why a patch stopped working wants.
+                Matched on what the claim names, not on what the build still carries.
               </span>
             </label>
           </div>
           {rows.length === 0 ? (
             <p className="hint">
-              This build has argued about nothing of its own. Nothing derives these: they arrive
-              with the inventory, in a component&rsquo;s pedigree or in a document beside it.
+              Nothing declared. These arrive with the inventory, never derived.
             </p>
           ) : (
             <>

@@ -166,7 +166,7 @@ export function Scope() {
             className="opt"
             aria-current={!product ? "true" : undefined}
             disabled={whole}
-            title={whole ? "This screen is about one build, so it needs all three" : undefined}
+            title={whole ? "Pick all three" : undefined}
             onClick={() => pickProduct("")}
           >
             Every product
@@ -258,8 +258,7 @@ export function Scope() {
         </div>
 
         <p className="hint" style={{ gridColumn: "1 / -1" }}>
-          A variant appears once a build has filed a scan against it, so a release that predates one
-          does not list it. Choosing one takes you to its findings.
+          Variants appear once a scan is filed against them.
         </p>
       </div>
     </div>

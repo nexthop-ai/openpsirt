@@ -1062,7 +1062,7 @@ export function Findings() {
                                 {row.matched === "identifier" && (
                                   <div
                                     className="hint"
-                                    title="Matched by comparing a published identifier against an upstream version range. A distribution backports fixes without moving that version, so this may already be fixed here — nobody has confirmed either way."
+                                    title="Matched on a version range, not a packager advisory. May already be fixed here."
                                   >
                                     not confirmed
                                   </div>

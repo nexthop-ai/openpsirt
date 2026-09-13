@@ -75,8 +75,7 @@ export function ReasonEditor({
           <div className="alert" style={{ marginBottom: 10 }}>
             <strong>Revising the reasoning withdraws the approval</strong>
             <span>
-              The earlier words stay readable in the revision history, and the claim returns to the
-              review queue marked as previously approved.
+              The earlier text stays in the revision history. The claim returns to the queue.
             </span>
           </div>
           <Editor

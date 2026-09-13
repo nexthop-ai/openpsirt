@@ -131,15 +131,13 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
         <div className="alert" style={{ marginBottom: 12 }}>
           <strong>Sent back{claim.when && <> on {on(claim.when)}</>}</strong>
           <span>
-            Back with whoever wrote it, and out of the review queue until it is revised. The reason
-            given is in the comments.
+            Returned to the author, out of the queue until revised. The reason is in the comments.
           </span>
         </div>
       )}
       {claim.previously_approved && (
         <p className="hint" style={{ margin: "0 0 10px" }}>
-          Agreed to before and back again — revised under the approval, or the code moved. Whoever
-          reads it next is re-reading rather than meeting it.
+          Agreed to before: revised under the approval, or the code moved.
         </p>
       )}
       <div className="dgrid">
@@ -204,9 +202,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
             <span className="hint">extends an approved claim</span>
           )}
           {claim.claim.kind === "returned" && (
-            <span className="hint">
-              rows set aside from a larger claim, carrying the argument they were made under
-            </span>
+            <span className="hint">rows set aside from a larger claim</span>
           )}
           {claim.claim.selected_by && (
             <span className="hint">narrowed by: {claim.claim.selected_by}</span>
@@ -386,8 +382,8 @@ function Answer({
             Send it back
           </button>
           <span className="consequence">
-            Agreeing puts this in force everywhere it reaches. Sending it back returns it to whoever
-            wrote it, out of the queue until they revise it.
+            Agreeing puts this in force everywhere it reaches. Sending it back returns it to the
+            author.
           </span>
         </div>
       ) : (
@@ -453,8 +449,7 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
         </span>
       </header>
       <p className="hint" style={{ margin: "0 0 10px" }}>
-        Hold them back and they become a claim of yours, with the argument they were made under.
-        Revise it to say what is different about them.
+        Holding them back makes them a claim of yours. Revise it to say what differs.
       </p>
       <div className="tablewrap" style={{ boxShadow: "none" }}>
         <table>

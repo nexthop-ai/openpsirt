@@ -65,9 +65,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
 
   return (
     <section className="panel" style={{ marginTop: 14 }}>
-      <h3 title="Carried from another release line">
-        Inherited decisions
-      </h3>
+      <h3 title="Carried from another release line">Inherited decisions</h3>
 
       <div className="field" style={{ maxWidth: "40ch" }}>
         <label htmlFor="carry-from">Carry from</label>
@@ -152,8 +150,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
               Carry {picked.size > 0 ? picked.size : ""} for review
             </button>
             <span className="hint">
-              Each arrives waiting for a second person. The version moved, which is what made the
-              old judgment stop applying.
+              Each needs a second person. The version moved, so the old judgment stopped applying.
             </span>
           </div>
         </>

@@ -85,8 +85,7 @@ export function Person() {
             have left" it reads as a contradiction unless it says which. */}
         {who.deactivated_at && (
           <p className="hint" style={{ marginTop: 0 }}>
-            In force means the grant still stands, not that they can use it: they are refused before
-            any of this is read.
+            The grant stands. They are still refused at sign-in.
           </p>
         )}
         {who.holds?.length ? (
@@ -95,9 +94,8 @@ export function Person() {
                 none at all, and the list alone cannot say which. */}
             {who.sees_nothing && (
               <p className="hint" style={{ marginTop: 0 }}>
-                Every role in force here is a capability, and a capability is bounded by what its
-                holder may read — so none of them reaches a product and they see nothing. Holding
-                roles that grant nothing is not the same as holding none.
+                Only capabilities, which need a read or triage role to do anything. This person sees
+                nothing.
               </p>
             )}
             <div className="tablewrap">
@@ -134,8 +132,7 @@ export function Person() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Their part in the record</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          An agreement taken back is counted apart from one that stands: it is not somebody who
-          agrees.
+          Withdrawn agreements are counted separately.
         </p>
         <ul className="files catalog">
           <li>
@@ -158,10 +155,7 @@ export function Person() {
             <div>
               <b>{record.withdrawn.toLocaleString()}</b> agreements taken back
             </div>
-            <div className="hint">
-              Counted apart. What the rubber-stamp report asks across a program, asked about one
-              person.
-            </div>
+            <div className="hint">Counted separately.</div>
           </li>
         </ul>
       </section>
@@ -218,10 +212,8 @@ export function Person() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>What they were told</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Everything sent to them, including what they have acknowledged and what has since cleared:
-          the question is what was sent, not what is waiting. Not narrowed by what they may read now
-          — a line about an undisclosed finding, sent while they held the role that reached it, is
-          what this is for.
+          Everything sent, including what they have read and what has cleared. Not narrowed by what
+          they may read now.
         </p>
         {who.told?.length ? (
           <>
@@ -267,16 +259,13 @@ export function Person() {
         <section className="panel" style={{ marginTop: 14 }}>
           <h3>When they leave</h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            An identity provider never tells us an account was disabled, and somebody who has left
-            never signs in again — so nothing detects it, and the account stays live holding
-            whatever it held. Recording it here refuses them at every way in from the next request
-            onward, ends their sessions, and hands back what they were dealing with.
+            Providers do not report disabled accounts, so mark departures here. Refuses them from
+            the next request, ends their sessions, and unassigns their work.
           </p>
           <p className="hint">
-            Not a deletion, and their roles are left alone: what somebody held is part of why the
-            record reads as it does, so bringing them back does not mean granting again.
+            Not a deletion. Roles are kept, so reinstating does not mean granting again.
           </p>
-          {leaving.isError && <p className="hint">That could not be recorded. Nothing changed.</p>}
+          {leaving.isError && <p className="hint">That could not be recorded.</p>}
           <button type="button" onClick={() => leaving.mutate(true)} disabled={leaving.isPending}>
             Record that they have left
           </button>

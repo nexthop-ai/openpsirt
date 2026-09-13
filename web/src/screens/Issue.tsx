@@ -45,10 +45,7 @@ export function Issue() {
             <span className="id">{vulnerability}</span>
           </h2>
         </div>
-        <Empty
-          title="Nothing you can see carries this."
-          detail="Either nothing here has it, or it sits only in products you hold nothing on — which are the same answer on purpose."
-        />
+        <Empty title="Nothing you can see carries this." detail="Nothing you can read holds it." />
       </>
     );
   }

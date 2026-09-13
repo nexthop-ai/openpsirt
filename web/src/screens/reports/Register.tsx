@@ -78,11 +78,9 @@ export function Register() {
             {total.toLocaleString()} {total === 1 ? "row" : "rows"}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            One row per issue and place, unfolded — a register is read against what shipped, and
-            what shipped is places. Everything the build is known to carry is here, decided or not
-            and open or closed: <b>no triage line is applied</b>, which is what makes it something
-            to rely on. The whole of it as a file — <a href={fileAt(where, "csv")}>CSV</a> ·{" "}
-            <a href={fileAt(where, "json")}>JSON</a>.
+            One row per issue and place, unfolded. Everything the build carries, decided or not and
+            open or closed: <b>no triage line is applied</b>. The whole of it as a file —{" "}
+            <a href={fileAt(where, "csv")}>CSV</a> · <a href={fileAt(where, "json")}>JSON</a>.
           </p>
           {rows.length === 0 ? (
             <Empty

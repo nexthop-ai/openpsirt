@@ -135,9 +135,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
             {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
           </p>
           {resuming && (
-            <p className="text-center text-sm text-[var(--muted)]">
-              Anything you had typed is kept, and you will come back to it.
-            </p>
+            <p className="text-center text-sm text-[var(--muted)]">Anything you typed is kept.</p>
           )}
         </div>
 

@@ -177,7 +177,7 @@ export function Compare() {
             something embargoed should be a deliberate act rather than a paste
             nobody checked. */}
         <p className="reading" style={{ marginBottom: 12 }}>
-          Public findings only, unless you say otherwise — this ends up in a public document.
+          Public findings only, unless you say otherwise.
         </p>
 
         {!ready ? (
@@ -316,7 +316,7 @@ function Columns({
         kind="was-fixed"
         title="Fixed"
         rows={fixed}
-        note="Each says why it went. Superseded means the version moved and the issue came with it."
+        note="Superseded means the version moved and took the issue with it."
       />
       <Column kind="newly" title="Introduced" rows={newly} />
       <Column

@@ -62,8 +62,7 @@ export function Weaknesses({
     <div className="field">
       <label htmlFor="cwe-typed">What kind of flaw</label>
       <p className="hint" style={{ marginTop: 0 }}>
-        Optional, and more than one is fine. It is what makes a set of findings comparable to
-        anything outside this deployment.
+        Optional. More than one is fine.
       </p>
 
       {chosen.length > 0 && (
@@ -107,10 +106,7 @@ export function Weaknesses({
           </option>
         ))}
       </datalist>
-      <span className="hint">
-        Anything may be typed — the suggestions are the ones that come up most, not the only ones
-        allowed.
-      </span>
+      <span className="hint">Anything may be typed. These are the most common.</span>
     </div>
   );
 }

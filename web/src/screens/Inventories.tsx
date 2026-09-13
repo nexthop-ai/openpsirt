@@ -79,7 +79,7 @@ export function Inventories() {
           </strong>
           <span>
             {build.last_received_at
-              ? "Nothing has failed — nothing has arrived. A build that stops being scanned looks healthy, because no new findings appear against it."
+              ? "Nothing has arrived. A build that stops being scanned looks healthy."
               : `Declared ${build.quiet_days} days ago, and nothing has ever been filed against it.`}
           </span>
         </div>
@@ -366,7 +366,7 @@ function Placed({ components, placed }: { components?: number; placed?: number }
       className={none ? "state lapsed" : undefined}
       title={
         none
-          ? "Nothing in this inventory says what pulls anything in, so the dependency tree " +
+          ? "This inventory lists no dependencies, so the tree " +
             "for this build is empty and no finding can say why it is here."
           : `${placed.toLocaleString()} of ${components.toLocaleString()} components are placed in the graph`
       }

@@ -176,10 +176,7 @@ export function Audit() {
         <h2>
           The record <span className="n">{total.toLocaleString()}</span>
         </h2>
-        <p>
-          Every judgment made, with who made it, who agreed, and when. What the findings list
-          answers is what is open; this answers what was decided and on whose say-so.
-        </p>
+        <p>Every judgment made, with who made it, who agreed, and when.</p>
         <span style={{ marginLeft: "auto" }} className="noprint">
           {/* The same answer as a file, narrowed the same way. An
               auditor is given a document rather than a screen, and this was
@@ -281,23 +278,19 @@ export function Audit() {
           }
           detail={
             alone && onlyDismissals
-              ? "Which is the answer this report exists to get. Every dismissal requires a second person, and this asks the record whether one is there rather than whether the rule exists."
-              : "Widen the dates, or clear the filters — a period with nothing decided in it is also an answer."
+              ? "Every dismissal requires a second person. This checks the record."
+              : "Widen the dates, or clear the filters."
           }
         />
       ) : (
         <>
           {alone && onlyDismissals && (
-            <p className="hint">
-              Each of these is a dismissal no second person has a standing agreement on, which the
-              rules do not allow. Read them.
-            </p>
+            <p className="hint">Dismissals with no standing second approval. Read them.</p>
           )}
           {alone && !onlyDismissals && (
             <p className="hint">
-              Judgments one person made. Most of these are meant to be — an outcome that hides
-              nothing needs no second person, and a short deferral stands on its own. Narrow to a
-              dismissal for the answer that should be empty.
+              Judgments one person made. Most are allowed. Narrow to a dismissal for the answer that
+              should be empty.
             </p>
           )}
           {rows.map((row) => (
@@ -347,8 +340,7 @@ function Administered() {
     <div style={{ marginTop: 24 }}>
       <h3>Change history</h3>
       <p className="hint">
-        Settings, roles, support dates, credentials, accounts and teams — who changed each, and what
-        it held before. Three of these rewrite what the record above says.
+        Settings, roles, support dates, credentials, accounts and teams, with what each held before.
       </p>
       <div className="tablewrap">
         <table>

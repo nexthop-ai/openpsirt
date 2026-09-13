@@ -99,10 +99,8 @@ export function Home({ who }: { who: Who }) {
             <>
               <Releases points={releases.data?.items ?? []} />
               <p className="hint">
-                Each release as it stands against today&rsquo;s vulnerability data, not as of the
-                day it was cut &mdash; which is what re-scanning a shipped release is for. Rates are
-                not shown here: how much appeared between two releases is an artifact of how far
-                apart they were cut.
+                Each release against today&rsquo;s vulnerability data, not the day it was cut. No
+                rates: they depend on how far apart releases were cut.
               </p>
             </>
           ) : (
@@ -184,9 +182,7 @@ function Readiness({ at }: { at: Scoped }) {
         <header>
           <h3>Release readiness</h3>
         </header>
-        <p className="reading">
-          Pick a branch and a variant to compare it against the last release cut from it.
-        </p>
+        <p className="reading">Pick a branch and a variant to compare.</p>
       </div>
     );
   }

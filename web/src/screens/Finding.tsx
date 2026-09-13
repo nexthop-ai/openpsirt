@@ -856,8 +856,8 @@ export function Finding() {
               <div className="alert">
                 <strong>“{rule}” prepares a deferral with no length</strong>
                 <span>
-                  Nothing was filled in. A deferral needs a date, and the length it is worked out
-                  from was never recorded — save the filter again to give it one.
+                  Nothing was filled in. The filter has no deferral length; save it again to set
+                  one.
                 </span>
               </div>
             )}
