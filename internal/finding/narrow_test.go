@@ -860,6 +860,63 @@ func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
 	})
 }
 
+func TestEveryListThatFiltersOnSeverityReadsTheSameProductsRating(t *testing.T) {
+	// The rating is read through one expression and the product it is read for
+	// is carried on the filter, set where the selection is resolved. Every
+	// list that narrows on severity goes through its own helpers to get there,
+	// so a chain that lost the product would answer with the published word —
+	// silently, and only on that list.
+	//
+	// A rating this product raised, and a filter that admits the row only if
+	// the rating is the one being read.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mild := found("CVE-2026-EVERY", libnl)
+		mild.Issue.Severity = "low"
+		mild.FixState, mild.FixedIn = finding.FixedUpstream, "3.9.0"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		high := finding.Filter{MinSeverity: "high"}
+
+		// Before the rating, nothing is above the line on any of them.
+		bundles, _, err := f.store.Bundles(ctx, who, f.scope, 50, 0, high)
+		if err != nil {
+			t.Fatal(err)
+		}
+		components, _, err := f.store.ComponentGroups(ctx, who, f.scope, 50, 0, high)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bundles) != 0 || len(components) != 0 {
+			t.Fatalf("a low issue answered a high filter: %d bundles, %d components",
+				len(bundles), len(components))
+		}
+
+		f.rate(t, f.productID, "CVE-2026-EVERY", "critical")
+
+		bundles, _, err = f.store.Bundles(ctx, who, f.scope, 50, 0, high)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bundles) != 1 {
+			t.Errorf("the bundles list found %d rows after this product rated it critical, "+
+				"want the one — it is reading somebody else's rating or none", len(bundles))
+		}
+		components, _, err = f.store.ComponentGroups(ctx, who, f.scope, 50, 0, high)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(components) != 1 {
+			t.Errorf("the by-component list found %d rows after this product rated it "+
+				"critical, want the one", len(components))
+		}
+	})
+}
+
 // The filter that finds what is with its author, and the count the row draws
 // it from, are one question.
 //
