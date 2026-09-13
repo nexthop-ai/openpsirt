@@ -648,3 +648,196 @@ func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
 		}
 	})
 }
+
+func TestRatingAProductAsksForTriageOnThatProduct(t *testing.T) {
+	// The hole this closed. A rating sets the deadline and can push a finding
+	// below the line a product triages at, and it used to ask for triage
+	// *anywhere* — so somebody holding one product moved both in a product
+	// they cannot see, and nothing in the request named the product at all.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		bad := found("CVE-2026-ELSE", swss)
+		bad.Issue.Severity = "high"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		id := f.issue(t, "CVE-2026-ELSE")
+
+		// Triage on the other product, and reading alone on this one — enough
+		// to be told the issue is here, and not enough to move what it costs.
+		theirs := access.NewPerson(1, "someone", false, map[int64][]access.Role{
+			f.productOf(t, elsewhere): {access.PublicTriage},
+			f.productID:               {access.PublicRead},
+		}, 101)
+		if _, err := f.store.Assess(ctx, theirs, f.productID, id, "critical",
+			"Reachable in how they ship it."); !errors.Is(err, access.ErrDenied) {
+			t.Fatalf("triage on another product recorded a rating here: %v", err)
+		}
+		if _, rated := f.ratings(t, "CVE-2026-ELSE"); rated != "" {
+			t.Errorf("the rating landed anyway, as %q", rated)
+		}
+
+		// And the same person rates their own product, which is the half that
+		// has to keep working.
+		if _, err := f.store.Assess(ctx, theirs, f.productOf(t, elsewhere), id, "critical",
+			"Reachable in how we ship it."); err != nil {
+			t.Fatalf("triage on a product could not rate an issue in it: %v", err)
+		}
+	})
+}
+
+func TestAgreeingToARatingAsksForTheRoleOnItsOwnProduct(t *testing.T) {
+	// The other half of the same hole. Agreeing is what puts a milder rating
+	// into force, so it moves that product's deadlines and its triage line —
+	// and a role held somewhere else buys nothing here. Refused in the words a
+	// rating that is not there gets, because "you may not agree to this" about
+	// a product somebody holds nothing on says the rating is there.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		bad := found("CVE-2026-AGREE", swss)
+		bad.Issue.Severity = "high"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		f.recorded(t, 2, "somebody")
+
+		here := access.NewPerson(1, "someone", false,
+			map[int64][]access.Role{f.productID: {access.PublicTriage}}, 101)
+		claim, err := f.store.Assess(ctx, here, f.productID, f.issue(t, "CVE-2026-AGREE"),
+			"low", "Not worth an afternoon.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !claim.NeedsApproval {
+			t.Fatal("a milder rating needed nobody, so this tests nothing")
+		}
+
+		// Somebody who approves in another product, and reads this one.
+		theirs := access.NewPerson(2, "somebody", false, map[int64][]access.Role{
+			f.productOf(t, elsewhere): {access.Approver, access.PublicTriage},
+			f.productID:               {access.PublicRead},
+		}, 101)
+		if _, err := f.store.Agree(ctx, theirs, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
+			t.Fatalf("an approver of another product agreed to this one's rating: %v", err)
+		}
+		if _, rated := f.ratings(t, "CVE-2026-AGREE"); rated != "" {
+			t.Errorf("the rating came into force anyway, as %q", rated)
+		}
+
+		// And withdrawing is the same question asked the other way round.
+		if err := f.store.Withdraw(ctx, theirs, claim.ID); !errors.Is(err, finding.ErrNoSuchAssessment) {
+			t.Errorf("a triager of another product withdrew this one's rating: %v", err)
+		}
+	})
+}
+
+func TestTwoProductsHoldDifferentRatingsOfOneIssue(t *testing.T) {
+	// Impossible before: one live claim per issue meant the first product to
+	// record one took the answer for everybody, and the second team was told
+	// the issue was already assessed. A rating is a judgment about how a
+	// component is used, and two products do not use one the same way.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		bad := found("CVE-2026-TWO", swss)
+		bad.Issue.Severity = "medium"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{bad}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		id := f.issue(t, "CVE-2026-TWO")
+		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
+			access.PublicTriage)
+
+		if _, err := f.store.Assess(ctx, who, f.productID, id, "critical",
+			"We ship the vulnerable configuration."); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Assess(ctx, who, f.productOf(t, elsewhere), id, "high",
+			"We ship it, but not reachable from outside."); err != nil {
+			t.Fatalf("a second product could not record its own rating: %v", err)
+		}
+
+		if _, rated := f.ratings(t, "CVE-2026-TWO"); rated != "critical" {
+			t.Errorf("this product rates it %q, want critical", rated)
+		}
+		if _, rated := f.ratingsIn(t, f.productOf(t, elsewhere), "CVE-2026-TWO"); rated != "high" {
+			t.Errorf("the other product rates it %q, want high", rated)
+		}
+		// And the published word is untouched by either.
+		if published, _ := f.ratings(t, "CVE-2026-TWO"); published != "medium" {
+			t.Errorf("the published rating became %q", published)
+		}
+	})
+}
+
+func TestAProductWithNoRatingOfItsOwnReadsThePublishedOne(t *testing.T) {
+	// Nothing inherits. A rating arriving in a product from a team that cannot
+	// see it is exactly what a per-product rating removes, so it is not
+	// reintroduced as a default: a product nobody has looked at reads what the
+	// world says until somebody there does.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mild := found("CVE-2026-NONE", libnl)
+		mild.Issue.Severity = "low"
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.inAnotherProduct(t, "other-product")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{mild}); err != nil {
+			t.Fatal(err)
+		}
+		f.recorded(t, 1, "someone")
+		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
+			access.PublicTriage)
+		if _, err := f.store.Assess(ctx, who, f.productID, f.issue(t, "CVE-2026-NONE"),
+			"critical", "Reachable in how we ship it."); err != nil {
+			t.Fatal(err)
+		}
+
+		// The list in the product that rated it, and the list in the one that
+		// did not, asked the same way.
+		rated, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{MinSeverity: "high"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rated) != 1 || rated[0].Severity != "critical" {
+			t.Fatalf("the product that rated it lists %d rows: %+v", len(rated), rated)
+		}
+		otherID := f.productOf(t, elsewhere)
+		theirs, _, err := f.store.Groups(ctx, who, finding.Scope{ProductID: &otherID}, 50, 0,
+			finding.Filter{MinSeverity: "high"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(theirs) != 0 {
+			t.Errorf("a rating made in one product raised a finding in another: %+v", theirs)
+		}
+	})
+}
