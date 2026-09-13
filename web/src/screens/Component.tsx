@@ -246,12 +246,6 @@ export function Component() {
                 )}
               </dd>
             </dl>
-            <p className="hint">
-              {here.project_url
-                ? "As the ecosystem's index states it."
-                : "Built from the identifier, since no index stated one."}{" "}
-              Nothing is fetched from it.
-            </p>
           </div>
 
           <Landed here={here} />
@@ -412,7 +406,7 @@ function Sits({
             {around.isPending ? (
               <span className="sub">Working it out…</span>
             ) : below.length === 0 ? (
-              <span className="sub">Nothing — a leaf, so none of this is inherited.</span>
+              <span className="sub">Nothing — a leaf</span>
             ) : (
               <>
                 <span className="sub">
@@ -509,7 +503,7 @@ function Landed({ here }: { here: Build }) {
       </div>
 
       {landed.length === 0 ? (
-        <p className="hint">No version fixes any of what is open here.</p>
+        <p className="hint">Nothing fixes what is open here.</p>
       ) : (
         <>
           <div className="tablewrap">
@@ -548,10 +542,16 @@ function Landed({ here }: { here: Build }) {
               </tbody>
             </table>
           </div>
-          <p className="hint" style={{ marginTop: 8 }}>
-            {ordered
-              ? "Furthest along first. A later release carries the earlier fixes too."
-              : "Not ranked: these versions could not be put in order, so each count is what that release fixed itself."}
+          <p
+            className="hint"
+            style={{ marginTop: 8 }}
+            title={
+              ordered
+                ? "A later release carries the earlier fixes too."
+                : "Each count is what that release fixed itself, because these versions could not be put in order."
+            }
+          >
+            {ordered ? "Furthest along first" : "Not ranked"}
           </p>
         </>
       )}
@@ -644,9 +644,11 @@ function Upgrade({
     return (
       <div className="card stuck" style={{ marginTop: 12 }}>
         <h3>There is nothing to upgrade to</h3>
-        <p className="reading">
-          No version fixes any of the {here.issues} open here, so an upgrade would lapse. These need
-          a decision.
+        <p
+          className="reading"
+          title="An upgrade to any version the scanner named would lapse, because none of them fixes this"
+        >
+          Nothing fixes the {here.issues} open here.
         </p>
         <p style={{ marginTop: 10 }}>
           <Link className="btn" to={findingsAt(product, here, component)}>
@@ -724,10 +726,15 @@ function Upgrade({
               <li className="hint">{landed.length - SHOWN} more, in the table beside this</li>
             )}
           </ul>
-          <span className="hint">
-            {landed[0]?.ordered
-              ? "A later release carries the earlier fixes, so the first closes the most."
-              : "These could not be put in order, so each count is what that release fixed itself."}
+          <span
+            className="hint"
+            title={
+              landed[0]?.ordered
+                ? "A later release carries the earlier fixes too, so the first closes the most."
+                : "Each count is what that release fixed itself, because these versions could not be put in order."
+            }
+          >
+            {landed[0]?.ordered ? "Furthest along first" : "Not ranked"}
           </span>
         </div>
 
@@ -739,7 +746,12 @@ function Upgrade({
             value={by}
             onChange={(event) => setBy(event.target.value)}
           />
-          <span className="hint">On or before the earliest deadline, nobody else is needed.</span>
+          <span
+            className="hint"
+            title="On or before the earliest deadline this covers, it stands without a second person"
+          >
+            nobody else needed on or before the deadline
+          </span>
         </label>
 
         <label className="field">
@@ -751,7 +763,12 @@ function Upgrade({
             placeholder="a person or a team"
             none="No one yet"
           />
-          <span className="hint">A team queue stays unassigned until someone takes it.</span>
+          <span
+            className="hint"
+            title="A team queue stays unassigned until somebody on it takes the work"
+          >
+            a person or a team
+          </span>
         </label>
       </div>
 
@@ -782,9 +799,6 @@ function Upgrade({
             );
           })}
         </p>
-        <span className="hint">
-          Every release shipping {here.version}, because one bump moves all of them.
-        </span>
       </div>
 
       <Editor value={because} onChange={setBecause} placeholder="Why this is the answer here." />
@@ -799,9 +813,6 @@ function Upgrade({
           {plan.isPending ? "Recording…" : `Schedule for ${chosen.size}`}
         </button>
       </div>
-      <p className="hint" style={{ marginTop: 8 }}>
-        Covers everything open on the package. The next scan says what it closed.
-      </p>
     </div>
   );
 }
