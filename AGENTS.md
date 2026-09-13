@@ -419,7 +419,27 @@ gets ticked without being read.
  later gates a merge without anybody editing the ruleset. What that costs is
  stated where it is defined: a workflow contributing no check run on the event
  cannot be distinguished from one that has not started, so **every workflow
- meant to gate a merge declares `merge_group:` alongside `pull_request:`**.
+   meant to gate a merge declares `merge_group:` alongside `pull_request:`**.
+
+### What a pull request says
+
+A description is read by somebody deciding whether to review now and by
+somebody working out later why the code looks like this. Both are in a hurry.
+
+| Rule | |
+|---|---|
+| **Short, and plain spoken English** | The register the interface uses, for the same reason: it is skimmed. `DESIGN-interface.md` § What a screen says has the whole of it |
+| **Lists, tables and examples before prose** | A before-and-after pair says what a paragraph about the change does not. A paragraph is for the one thing that is neither a list nor a table |
+| **Numbers where there are numbers** | "6,685 words down to 2,821" is checkable; "much less prose" is not. The same rule the decisions follow |
+| **A screenshot where the layout moved** | A reviewer cannot see a rearranged screen in a diff, and asking them to build the branch to find out is asking for a shallower review |
+| **What is left undone, said** | A branch that lands with something out of scope says so, rather than leaving the next person to discover it |
+
+**Nothing about how the change was produced.** No tool, no assistant, no
+session, no generated-by footer — not in the description, the title, the
+commits, the branch name, the code, or a review comment. It is the same rule as
+the co-author trailer above and for a stronger reason: the sign-off is a
+person's statement that they wrote it and stand behind it, and a note saying
+otherwise contradicts the one trailer that carries meaning here.
 
 ### Development workflow
 
