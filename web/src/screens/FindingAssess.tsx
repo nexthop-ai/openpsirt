@@ -11,13 +11,21 @@ import { RATINGS } from "./FindingClaim";
 //
 // The finding screen is four readings of the record, split by the question
 // each answers. This is the one form among them: a claim about the issue
-// rather than about the place it was made from, so it holds wherever the issue
-// appears — and rating it milder waits for a second person.
+// rather than about the place it was made from, so it holds in every build of
+// this product — and rating it milder waits for a second person.
+//
+// **It says which product it is about**, in every state. A row on this screen
+// sits beside a fold that may be one of eleven, and the rating is neither
+// about this component nor about every product: it is about this issue here.
+// Another product may rate the same issue differently and nothing carries
+// between them.
 export function Assess({
+  product,
   vulnerability,
   published,
   assessed,
 }: {
+  product: string;
   vulnerability: string;
   published: string;
   assessed: string;
@@ -30,8 +38,8 @@ export function Assess({
   const assess = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.POST("/v1/issues/{vulnerability}/assessment", {
-          params: { path: { vulnerability } },
+        await api.POST("/v1/products/{product}/issues/{vulnerability}/assessment", {
+          params: { path: { product, vulnerability } },
           body: { severity: severity as (typeof RATINGS)[number], reasoning },
         }),
       ),
@@ -52,7 +60,7 @@ export function Assess({
         <h3>Issue assessment</h3>
         <p className="reading" style={{ margin: 0 }}>
           Assessed <Severity word={assessed} />, published <Severity word={published} />. The
-          assessment orders it and sets its deadline everywhere this issue appears.
+          assessment orders it and sets its deadline in every build of {product}, and nowhere else.
         </p>
       </div>
     );
@@ -63,11 +71,11 @@ export function Assess({
       <div className="assess">
         <h3>Issue assessment</h3>
         <p className="reading" style={{ margin: "0 0 8px" }}>
-          Published as <Severity word={published} />. A rating of ours holds wherever the issue
-          appears.
+          Published as <Severity word={published} />. A rating of yours holds in every build of{" "}
+          {product} — this issue here, not this component, and not other products.
         </p>
         <button type="button" className="linkish" onClick={() => setOpen(true)}>
-          Rate it differently
+          Rate it differently in {product}
         </button>
       </div>
     );
@@ -100,8 +108,8 @@ export function Assess({
       </div>
       <p className="hint" style={{ margin: "0 0 8px" }}>
         {milder
-          ? "Milder than published, so a second person has to agree before it takes effect."
-          : "At or above what was published, so it takes effect at once."}
+          ? `Milder than published, so a second person has to agree before it takes effect in ${product}.`
+          : `At or above what was published, so it takes effect in ${product} at once.`}
       </p>
       <div className="field" style={{ marginBottom: 8, maxWidth: "78ch" }}>
         <label htmlFor="why">Reasoning</label>
@@ -109,7 +117,7 @@ export function Assess({
           id="why"
           style={{ minHeight: 64 }}
           value={reasoning}
-          placeholder="What makes the published rating wrong for this issue, anywhere it appears?"
+          placeholder={`What makes the published rating wrong for this issue in ${product}?`}
           onChange={(event) => setReasoning(event.target.value)}
         />
       </div>

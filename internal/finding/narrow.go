@@ -394,15 +394,25 @@ func (f Filter) severities() []string {
 // smaller than it is.
 func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if words := f.severities(); len(words) > 0 {
-		// The rating in force, not the published one. Being able to say a
-		// published rating is wrong is pointless if the filter then ignores
+		// The rating in force here, not the published one. Being able to say
+		// a published rating is wrong is pointless if the filter then ignores
 		// us: a finding reassessed from low to critical had its urgency and
 		// its deadline moved and then disappeared from the list it was now
 		// at the top of. The same expression the floor and the deadline
 		// compare, so the three cannot come to disagree.
-		q = q.Where("f.vulnerability_id IN (?)",
-			q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
-				Where(EffectiveSeverityExpr+" IN (?)", bun.List(words)))
+		if f.Across {
+			// A list spanning products joins each row's own product's rating
+			// already, so the condition is asked of the row. Asked as a set
+			// of issues there is no one set: an issue rated critical in one
+			// product and low in another belongs to both answers.
+			q = q.Where(EffectiveSeverityExpr+" IN (?)", bun.List(words))
+		} else {
+			q = q.Where("f.vulnerability_id IN (?)",
+				q.NewSelect().TableExpr("vulnerability AS v").
+					Join(RatedHere, f.ProductID).
+					Column("v.id").
+					Where(EffectiveSeverityExpr+" IN (?)", bun.List(words)))
+		}
 	}
 	if f.Exploited {
 		// Read off the urgency rather than the flag beside it. A place known
@@ -490,12 +500,19 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// applied one at a time. Applied one at a time they would AND, and "mine
 	// or nobody's" would be a list of nothing.
 	q = f.heldBy(q)
-	// What we said about the issue, as against what was published. A rating of
-	// ours is the record of a priority somebody changed here.
+	// What this product said about the issue, as against what was published. A
+	// rating of its own is the record of a priority somebody changed here —
+	// and a rating another product made is not, which is why the set is keyed
+	// on the product rather than on the issue alone.
 	if f.Reassessed {
-		q = q.Where("f.vulnerability_id IN (?)",
-			q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
-				Where("v.assessed_severity IS NOT NULL"))
+		if f.Across {
+			q = q.Where("ir.severity IS NOT NULL")
+		} else {
+			q = q.Where("f.vulnerability_id IN (?)",
+				q.NewSelect().TableExpr(`"issue_rating" AS ir`).
+					Column("ir.vulnerability_id").
+					Where("ir.product_id = ?", f.ProductID))
+		}
 	}
 	// What an uploaded VEX document says about this, matched the way a
 	// finding's own screen matches it: on the component's name and on every
@@ -800,7 +817,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	// The same query, with the line inverted rather than removed.
 	below := filter
 	below.Floor = Floor{}
-	_, visible, targets, err := s.inScope(ctx, subject, scope, &below)
+	productID, visible, targets, err := s.inScope(ctx, subject, scope, &below)
 	if err != nil {
 		return 0, err
 	}
@@ -820,7 +837,9 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		// beneath the line. Both read the way Floor.narrow reads them.
 		counted = counted.Where("f.urgency < ?", int64(exploitedBand)).
 			Where("f.vulnerability_id IN (?)",
-				counted.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
+				counted.NewSelect().TableExpr("vulnerability AS v").
+					Join(RatedHere, productID).
+					Column("v.id").
 					Where(BandExpr+" NOT IN (?)", bun.List(words)))
 	}
 	n, err := s.db.NewSelect().

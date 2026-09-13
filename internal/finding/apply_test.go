@@ -193,7 +193,7 @@ func TestANewFindingIsClockedByTheRatingInForce(t *testing.T) {
 		}
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
-		if _, err := f.store.Assess(t.Context(), who, f.issue(t, "CVE-2026-RAISE"),
+		if _, err := f.store.Assess(t.Context(), who, f.productID, f.issue(t, "CVE-2026-RAISE"),
 			"critical", "Reachable from the network in how we ship it."); err != nil {
 			t.Fatal(err)
 		}

@@ -590,7 +590,7 @@ export function Finding() {
             {it.assessed ? (
               <>
                 Assessed <Severity word={it.assessed} /> · published <Severity word={it.severity} />
-                . The assessment orders it and sets its deadline.
+                . {product} rates it, which orders it and sets its deadline here.
               </>
             ) : (
               <>
@@ -970,6 +970,7 @@ export function Finding() {
 
         {places.some((p) => p.decision == null) && (
           <Assess
+            product={product}
             vulnerability={vulnerability}
             published={it.severity ?? ""}
             assessed={it.assessed ?? ""}

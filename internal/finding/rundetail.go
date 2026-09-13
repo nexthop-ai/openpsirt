@@ -108,6 +108,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			Distinct().
 			TableExpr("finding AS f").
 			Join(`JOIN "vulnerability" AS v ON v.id = f.vulnerability_id`).
+			Join(RatedHere, productID).
 			ColumnExpr(BandExpr+" AS band").
 			ColumnExpr("f.vulnerability_id AS vulnerability_id").
 			ColumnExpr("f.component_id AS component_id").

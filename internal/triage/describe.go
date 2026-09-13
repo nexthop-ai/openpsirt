@@ -46,6 +46,7 @@ type describedRow struct {
 	ClaimID     int64  `bun:"claim_id"`
 	Exact       int    `bun:"exact"`
 	TargetID    int64  `bun:"target_id"`
+	ProductID   int64  `bun:"product_id"`
 	Product     string `bun:"product"`
 	ProductName string `bun:"product_name"`
 	Stream      string `bun:"stream"`
@@ -112,6 +113,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 			" AND COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr+
 			" THEN 1 ELSE 0 END AS exact").
 		ColumnExpr("f.target_id AS target_id").
+		ColumnExpr("de.product_id AS product_id").
 		ColumnExpr("pr.display_name AS product").
 		ColumnExpr("pr.name AS product_name").
 		ColumnExpr("st.display_name AS stream").
@@ -165,6 +167,18 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	byIssue := make(map[int64]finding.Vulnerability, len(issues))
 	for _, issue := range issues {
 		byIssue[issue.ID] = issue
+	}
+	// What each decision's own product rates its issue. A rating belongs to a
+	// product, and these rows span them — a queue of decisions is not one
+	// product's — so the word a card shows is the one the product the
+	// decision was made in holds.
+	withinProducts := make([]int64, 0, len(chosen))
+	for _, row := range chosen {
+		withinProducts = append(withinProducts, row.ProductID)
+	}
+	rated, err := finding.RatingsIn(ctx, s.db, withinProducts, wanted)
+	if err != nil {
+		return nil, err
 	}
 
 	// How many places the issue sits at in that component in that build, and
@@ -281,7 +295,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 			Variant: row.Variant, VariantName: row.VariantName,
 			Component: row.Component, Version: row.Version,
 			FixState: row.FixState, FixedIn: row.FixedIn,
-			Issue:   byIssue[row.Issue],
+			Issue: byIssue[row.Issue].RatedIn(
+				rated[finding.RatedKey{ProductID: row.ProductID, VulnerabilityID: row.Issue}]),
 			Places:  places[triple{row.TargetID, row.Issue, row.ComponentID}],
 			Decided: decided[claimed{row.ClaimID, row.TargetID, row.Issue, row.ComponentID}],
 		}

@@ -23,10 +23,6 @@ const (
 	perProduct = "product"
 	// deploymentWide is administrator, which is not held per product.
 	deploymentWide = "deployment"
-	// anyProduct is a role held on any product at all, for the few acts
-	// that are not about a product: a rating is a claim about an issue, so
-	// there is no product to hold a role on.
-	anyProduct = "any-product"
 	// anySubject is any credential this deployment recognizes. It still
 	// answers only what that subject may see.
 	anySubject = "any"
@@ -85,8 +81,6 @@ func (r requires) said() string {
 	switch r.Scope {
 	case perProduct:
 		what += " on the product"
-	case anyProduct:
-		what += " on any product"
 	case deploymentWide:
 		if len(r.AnyOf) > 0 {
 			what += ", deployment-wide"

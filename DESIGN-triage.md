@@ -586,37 +586,50 @@ loose somewhere else.
 
 ## Issue assessments
 
-A published rating can be wrong for us: the score assumes a configuration we do
-not ship, or the world has not rated it and it is being treated as a medium by
-default.
+A published rating can be wrong for a product: the score assumes a
+configuration it does not ship, or the world has not rated it and it is being
+treated as a medium by default.
 
-The claim is about the issue, not about a place. A rating being wrong is one
-statement about the vulnerability: true wherever it appears, true in products it
-has not reached yet, and it does not stop being true because somebody rebuilt.
-Keyed to a place it would be repeated at each one and would lapse on a version
-change that had nothing to do with it.
+The claim is about the issue, not about a place, and it belongs to one product
+(REQ-29). Keyed to a place it would be repeated at each one and would lapse on
+a version change that had nothing to do with it. Keyed to nothing at all it was
+one statement for the whole deployment, which is the shape this replaced.
 
 | Rule | |
 |---|---|
-| Making one asks for triage anywhere (REQ-29) | There is no product to hold a role on |
-| Every act on a claim asks whether the person may read a finding of this issue, in any product, at its visibility (REQ-43) | The claim carries the severity recorded against the issue and the argument somebody wrote about it, so a row about an embargoed flaw is that flaw's disclosure. A refusal answers exactly as a name nobody has ever used, and a claim that fails it is absent from the list rather than refused |
-| An issue that sits at no build here is exempt | It is nobody's secret, and refusing it would take away the half of REQ-29 that reaches products an issue has not met yet |
-| The counts beside a waiting claim stop at the products the reader holds | Narrowing on visibility alone admits every disclosed finding in the deployment, so an approver holding one product was told how many findings the issue has elsewhere — a count of what somebody else ships |
+| A rating belongs to one product and reaches every build of it (REQ-29) | A rating is a judgment about how a component is used, and two products do not use one the same way: one may ship the vulnerable configuration and another may not |
+| Two products may hold different live ratings of one issue | Neither reaches the other. A single rating refused the second team any rating at all |
+| Nothing inherits | A product nobody has rated the issue in reads the published rating until somebody on that team looks. A rating arriving from a product a team cannot see is what this shape removes, so it is not reintroduced as a default |
+| Making one, agreeing to one and taking one back ask for the role **on that product** (REQ-29, REQ-42) | A rating sets the deadline and can push a finding below the line the product triages at. Asked anywhere, somebody holding one product moved both in a product they cannot see |
+| Every act on a claim asks whether the person may read a finding of this issue **in that product**, at its visibility (REQ-43) | The claim carries the severity recorded against the issue and the argument somebody wrote about it, so a row about an embargoed flaw is that flaw's disclosure. A refusal answers exactly as a name nobody has ever used, and a claim that fails it is absent from the list rather than refused |
+| An issue that sits at no build anywhere may still be rated | It is nobody's secret: there is no finding for a rating to disclose. It is what lets a product get ahead of an issue it knows is coming |
+| The counts beside a waiting claim stop at what the reader may see, inside the rating's own product | Narrowing on visibility alone admits every disclosed finding in the deployment, so an approver holding one product was told how many findings the issue has elsewhere — a count of what somebody else ships |
 | Rating something worse takes effect at once | Nobody needs protecting from being told something is worse than the world says |
-| Rating it milder waits for a second person | Severity sets the deadline, and where a product has said what is worth triaging, a downgrade below that line takes the finding off the working list and off any clock |
-| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; ours is what ranks, what the triage line compares and what sets the deadline |
-| A claim in force is written onto the issue as the rating in force | Everything that ranks, filters or clocks reads that one value with the published rating as its fallback, rather than each reader joining the claim and folding it its own way. Findings already open are reordered and re-clocked when it lands |
+| Rating it milder waits for a second person, on that product | Severity sets the deadline, and where the product has said what is worth triaging, a downgrade below that line takes the finding off the working list and off any clock |
+| Milder is judged against the **published** rating | What needs a second person is hiding something the world called bad. Judged against whatever the product holds now, the next step down would go through unwatched |
+| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; the product's is what ranks, what its triage line compares and what sets its deadline |
+| A claim in force is written as the rating in force for that product | Everything that ranks, filters or clocks reads that one row with the published rating as its fallback, rather than each reader joining the claim and folding it its own way. The product's open findings are reordered and re-clocked when it lands, and no other product's are |
+| A finding opened later picks the product's rating up | The applying path reads the rating for the build's product at the moment it opens findings. A copy written onto each finding would carry it only where something remembered to fetch it |
+
+### What a per-product rating gives up
+
+Stated so it is decided rather than discovered.
+
+| | |
+|---|---|
+| A rating reaching products the issue has not met yet | A deployment-wide rating got ahead of an issue before it arrived anywhere. Each product now rates for itself, and an issue arriving somewhere new arrives unrated |
+| One place to say a published score is simply wrong | A score that assumes the wrong configuration is wrong the same way in three products, and three teams say so separately. That is the cost of the products that genuinely differ being able to differ |
 
 ### What agreeing removes
 
 Agreeing to "look at this in ninety days instead of seven" and agreeing to
-"nobody will look at this" are not the same act. Which one it is depends on where
-the rating lands, so the claim carries how many open findings the rating would
-take off a working list, and in how many products.
+"nobody will look at this" are not the same act. Which one it is depends on
+where the rating lands, so the claim carries how many open findings the rating
+would take off a working list.
 
 | | |
 |---|---|
-| Counted per product | A line lives on a product and an assessment is about an issue. One issue can be above the line in one product and below it in another, so the honest form is a count rather than a yes |
+| Counted in the rating's own product | That is everywhere the rating reaches. A count spanning products would describe work this decision does not touch |
 | What is already below the line is not counted | Agreeing takes it off nothing |
 | Narrowed to what the reader may see | That understates the effect for them, which is the right way for it to be wrong: the alternative discloses a count of undisclosed work |
 | Worked out only for the claims that are waiting | Answering it for every historical claim would cost a query each to say nothing |

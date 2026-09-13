@@ -351,7 +351,9 @@ func (f *fixture) assessment(t *testing.T, id int64) finding.Assessment {
 	return held
 }
 
-// liveAssessments counts the claims still standing about an issue.
+// liveAssessments counts the claims still standing about an issue, in every
+// product at once. A rating belongs to a product, so more than one standing
+// claim is the ordinary answer where two products have both rated it.
 func (f *fixture) liveAssessments(t *testing.T, vulnerabilityID int64) int {
 	t.Helper()
 	n, err := f.db.DB.NewSelect().Model((*finding.Assessment)(nil)).

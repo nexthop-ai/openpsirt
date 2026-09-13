@@ -64,7 +64,12 @@ func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
 	return catalog.NewStore(db).ProductOf(ctx, targetID)
 }
 
-// issuesNamed reads what these issues are called and how bad they are said to be.
+// issuesNamed reads what these issues are called and how bad they were
+// published to be.
+//
+// The published rating only. What a product says instead belongs to the
+// product, so it is read alongside by whoever knows which product is being
+// asked about and put on the copy the row shows (RatedIn).
 func issuesNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]Vulnerability, error) {
 	held := map[int64]Vulnerability{}
 	if len(ids) == 0 {
@@ -75,12 +80,7 @@ func issuesNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]Vulner
 		// The description too, for the one line the row shows of it. One
 		// lookup for the page either way, and the row is already being read
 		// for the identifier beside it.
-		// The rating of ours as well as the published one. The word on the
-		// row and the word the floor and the deadline compare have to be the
-		// same word: shown as published, a finding somebody reassessed read
-		// as the rating that was overruled, and the reason given for having
-		// no deadline was worked out from it.
-		Column("id", "identifier", "severity", "assessed_severity", "description").
+		Column("id", "identifier", "severity", "description").
 		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}

@@ -119,11 +119,13 @@ export interface paths {
         };
         /**
          * List issue assessments
-         * @description Every claim about an issue you may be told about, or those in one state. The ones waiting are milder ratings somebody has proposed and nobody has agreed to yet, which are the ones not yet affecting anything.
+         * @description Every claim about an issue you may be told about, or those in one state, or those belonging to one product. The ones waiting are milder ratings somebody has proposed and nobody has agreed to yet, which are the ones not yet affecting anything.
+         *
+         *     A rating belongs to one product, so a row says which. Two products may rate the same issue differently and both rows appear, each narrowed by what you may read in its own product.
          *
          *     A claim carries the severity recorded against its issue, so claims about findings you cannot read are absent rather than refused.
          *
-         *     **Requires:** any recognized credential. Narrowed to issues you may read a finding of somewhere. A rating is about an issue rather than a product, but an issue this deployment minted for a flaw nobody has announced is not public knowledge.
+         *     **Requires:** public-triage or private-triage. What you hold decides what comes back rather than whether you may ask. Narrowed to issues you may read a finding of in the product the rating belongs to. A rating is about one product, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
          */
         get: operations["list-assessments"];
         put?: never;
@@ -146,9 +148,11 @@ export interface paths {
         post?: never;
         /**
          * Withdraw an assessment, and take the published rating back
-         * @description The rating in force returns to the published one, and everything that reads it — where a finding sits in the list, how long it has, whether it is above the line a product triages — follows it back.
+         * @description The rating in force in that product returns to the published one, and everything that reads it — where a finding sits in the list, how long it has, whether it is above the line the product triages — follows it back. No other product is touched.
          *
-         *     **Requires:** public-triage or private-triage on any product
+         *     Asked of triage **on the product the rating belongs to**: taking a rating back is making one.
+         *
+         *     **Requires:** public-triage or private-triage on the product. The product is the rating's own, not one in the path.
          */
         delete: operations["withdraw-assessment"];
         options?: never;
@@ -169,7 +173,9 @@ export interface paths {
          * Approve a rating assessment
          * @description Only a milder rating waits for this. Somebody other than whoever proposed it, for the same reason every other second person here is somebody else: a control one person can complete alone is not a control.
          *
-         *     **Requires:** approver or public-triage or private-triage on any product. The proposer may not approve their own.
+         *     The second person holds their role **on the product the rating belongs to**. Agreeing is what puts a milder rating into force, so it moves that product's deadlines and its triage line; a rating in a product you hold nothing on answers as one that is not there.
+         *
+         *     **Requires:** approver or public-triage or private-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
          */
         post: operations["agree-assessment"];
         delete?: never;
@@ -886,32 +892,6 @@ export interface paths {
         get: operations["get-issue"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/issues/{vulnerability}/assessment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record what we think of an issue, as against what was published
-         * @description Recorded against the **issue**, not against a place. A published rating being wrong, or a report being disputed, is one statement about the vulnerability — true wherever it appears, including in products it has not reached yet, and it does not stop being true because somebody rebuilt something.
-         *
-         *     It changes the order, which is what makes it worth having rather than a note nobody acts on. Rating something **worse** than published takes effect at once: nobody needs protecting from being told something is worse than the world says. Rating it **milder** waits for a second person, because that is the direction that hides things — and it hides more than a position in a list. Severity sets the deadline, so calling a high a low pushes its deadline out by months, and where a product has said what is worth triaging at all, a downgrade below that line takes the finding off the working list and off any clock entirely.
-         *
-         *     The published rating is never overwritten. Ours is what ranks; the world's stays beside it, because a rating of ours shown where the world's goes reads as the world's.
-         *
-         *     **Requires:** public-triage or private-triage on any product
-         */
-        post: operations["assess-issue"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1914,6 +1894,34 @@ export interface paths {
          */
         put: operations["add-alias"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/issues/{vulnerability}/assessment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record what a product thinks of an issue, as against what was published
+         * @description Recorded against the **issue**, not against a place, and against **one product**. A published rating being wrong, or a report being disputed, is one statement about the vulnerability in this product — true in every build of it, including builds it has not reached yet, and it does not stop being true because somebody rebuilt something.
+         *
+         *     It belongs to a product because a rating is a judgment about how a component is used, and two products do not use one the same way: one may ship the vulnerable configuration and another may not. Two products may record different ratings of the same issue, and neither reaches the other. A product nobody has rated the issue in reads the published rating.
+         *
+         *     It changes the order, which is what makes it worth having rather than a note nobody acts on. Rating something **worse** than published takes effect at once: nobody needs protecting from being told something is worse than the world says. Rating it **milder** waits for a second person, because that is the direction that hides things — and it hides more than a position in a list. Severity sets the deadline, so calling a high a low pushes its deadline out by months, and where a product has said what is worth triaging at all, a downgrade below that line takes the finding off the working list and off any clock entirely.
+         *
+         *     The published rating is never overwritten. The product's is what ranks there; the world's stays beside it, because a rating of ours shown where the world's goes reads as the world's.
+         *
+         *     **Requires:** public-triage or private-triage on the product
+         */
+        post: operations["assess-issue"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4236,36 +4244,28 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             id?: number;
-            /**
-             * Format: int64
-             * @description How many products those sit in
-             */
-            in_products?: number;
             /** @description You made this rating, so you may not be the one who agrees */
             mine?: boolean;
             /** @description Whether a second person has to agree before it takes effect */
             needs_approval?: boolean;
             /**
              * Format: int64
-             * @description How many of them this rating would put below their product's triage line, where they stop being work and carry no deadline
+             * @description How many of them this rating would put below the product's triage line, where they stop being work and carry no deadline
              */
             off_the_list?: number;
             /**
              * Format: int64
-             * @description How many products that happens in
-             */
-            off_the_list_in_products?: number;
-            /**
-             * Format: int64
-             * @description Open findings of this issue you can see
+             * @description Open findings of this issue you can see in this product
              */
             open?: number;
+            /** @description The product this rating belongs to */
+            product?: string;
             /** @description What was published when this was made, kept so a reader can see what we disagreed with */
             published?: string;
             /** @description Why. It outlives the version it was made about, so the next person needs the argument */
             reasoning: string;
             /**
-             * @description What we rate it
+             * @description What this product rates it
              * @enum {string}
              */
             severity: "low" | "medium" | "high" | "critical";
@@ -8573,6 +8573,8 @@ export interface operations {
     "list-assessments": {
         parameters: {
             query?: {
+                /** @description Limit to one product, by name */
+                product?: string;
                 /** @description Limit to one state */
                 state?: "proposed" | "live" | "withdrawn";
                 limit?: number;
@@ -9777,42 +9779,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IssueOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "assess-issue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssessmentBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssessmentBody"];
                 };
             };
             /** @description Error */
@@ -11550,6 +11516,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "assess-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssessmentBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentBody"];
+                };
             };
             /** @description Error */
             default: {

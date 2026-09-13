@@ -109,6 +109,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join("JOIN target AS tg ON tg.id = f.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		Join(RatedFor("st.product_id")).
 		ColumnExpr(BandExpr+" AS band").
 		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("MAX(f.closed_at) AS closed_at").

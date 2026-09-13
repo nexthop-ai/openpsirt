@@ -101,11 +101,11 @@ func TestARatingMadeHereAlsoSendsItBackForFullApproval(t *testing.T) {
 		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
 			t.Fatal(err)
 		}
-		// Rated here rather than by the world, which is the case the
-		// published score cannot see.
-		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
-			Set("assessed_severity = ?", "critical").
-			Where("id = ?", f.issue).Exec(ctx); err != nil {
+		// Rated by this product rather than by the world, which is the case
+		// the published score cannot see.
+		if _, err := f.db.DB.NewInsert().Model(&finding.IssueRating{
+			VulnerabilityID: f.issue, ProductID: f.product, Severity: "critical",
+		}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 

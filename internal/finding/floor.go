@@ -96,17 +96,23 @@ func BandOf(word string) string {
 // working list *and* off any clock, which is the opposite of what an unknown
 // rating should cause. Every bug in this project's identity and expiry rules
 // came from letting one fact into two rules; this is that lesson arriving in a
-// third place. Ours where we have stated one, the published one otherwise:
-// being able to say a published rating is wrong is pointless if everything
-// that ranks and filters then ignores us.
+// third place. This product's where it has stated one, the published one
+// otherwise: being able to say a published rating is wrong is pointless if
+// everything that ranks and filters then ignores us.
+//
+// Read off the rating joined by RatedFor, so a query using this joins that
+// too and says which product it is asking about. A statement that reads the
+// expression without the join does not compile on any of the four engines,
+// which is the failure being chosen — the alternative is a query that silently
+// answers for the wrong product.
 const BandExpr = `CASE
-	WHEN COALESCE(v.assessed_severity, v.severity, '') = 'critical' THEN 'critical'
-	WHEN COALESCE(v.assessed_severity, v.severity, '') = 'high' THEN 'high'
-	WHEN COALESCE(v.assessed_severity, v.severity, '') IN ('low', 'negligible', 'none') THEN 'low'
+	WHEN COALESCE(ir.severity, v.severity, '') = 'critical' THEN 'critical'
+	WHEN COALESCE(ir.severity, v.severity, '') = 'high' THEN 'high'
+	WHEN COALESCE(ir.severity, v.severity, '') IN ('low', 'negligible', 'none') THEN 'low'
 	ELSE 'medium' END`
 
-// EffectiveSeverityExpr is the rating in force, as a word.
-const EffectiveSeverityExpr = `COALESCE(v.assessed_severity, v.severity, '')`
+// EffectiveSeverityExpr is the rating in force in one product, as a word.
+const EffectiveSeverityExpr = `COALESCE(ir.severity, v.severity, '')`
 
 // Band folds a severity word the same way BandExpr does.
 func Band(severity string) string {
@@ -139,6 +145,11 @@ type Floor struct {
 	// looking at, which is the difference between a number somebody chose and
 	// one nobody noticed.
 	FromProduct bool
+	// ProductID is whose line this is, and whose rating the line compares
+	// against. Both halves belong to one product: the word is the product's
+	// decision about what is worth an afternoon, and what it is compared to is
+	// the product's own rating of the issue where it has made one.
+	ProductID int64
 }
 
 // Hides reports whether the line keeps anything out at all.
@@ -158,13 +169,14 @@ func (f Floor) admits() []string {
 	return nil
 }
 
-// narrow keeps only what the line admits, on a query that joins vulnerability
-// AS v.
+// narrow keeps only what the line admits.
 //
-// Compared against the rating the deployment holds, which is ours where we
-// have made one and the published one otherwise — being able to say a
-// published rating is wrong is pointless if the line then ignores us (the line
-// a deployment triages at, a downgrade needing a second person).
+// Compared against the rating this product holds, which is its own where
+// somebody there has made one and the published one otherwise — being able to
+// say a published rating is wrong is pointless if the line then ignores us
+// (the line a deployment triages at, a downgrade needing a second person). The
+// line and the rating are both the product's, which is why the identifier
+// travels with the word.
 func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if words := f.admits(); len(words) > 0 {
 		// Never below the line if somebody is using it. A line is a
@@ -184,7 +196,9 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("f.urgency >= ?", int64(exploitedBand)).
 				WhereOr("f.vulnerability_id IN (?)",
-					q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
+					q.NewSelect().TableExpr("vulnerability AS v").
+						Join(RatedHere, f.ProductID).
+						Column("v.id").
 						Where(BandExpr+" IN (?)", bun.List(words)))
 		})
 	}
@@ -224,14 +238,14 @@ func FloorFor(ctx context.Context, db bun.IDB, productID int64) (Floor, error) {
 		return Floor{}, fmt.Errorf("read what this product triages: %w", err)
 	}
 	if stated.Floor != nil && *stated.Floor != "" {
-		return Floor{Word: *stated.Floor, FromProduct: true}, nil
+		return Floor{Word: *stated.Floor, FromProduct: true, ProductID: productID}, nil
 	}
 	word, set, err := setting.NewStore(db).Get(ctx, setting.TriageFloor)
 	if err != nil {
 		return Floor{}, err
 	}
 	if !set || word == "" {
-		return Floor{Word: NoFloor}, nil
+		return Floor{Word: NoFloor, ProductID: productID}, nil
 	}
-	return Floor{Word: word}, nil
+	return Floor{Word: word, ProductID: productID}, nil
 }

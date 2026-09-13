@@ -164,7 +164,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	// between — or a retry running against a database that has moved — carried
 	// the old agreement forward on the strength of a figure that is gone. The
 	// docstring above already said everything it turns on is read in here.
-	severityNow, err := s.severityOf(ctx, previous.VulnerabilityID)
+	severityNow, err := s.severityOf(ctx, previous.ProductID, previous.VulnerabilityID)
 	if err != nil {
 		return nil, err
 	}
@@ -215,9 +215,10 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 
 // severityOf is how bad an issue is judged to be now, in hundredths.
 //
-// The rating in force where somebody has assessed it, and the published one
+// This product's rating where somebody here has made one, and the published one
 // where nobody has, worked out by the project's one rule for the number rather
-// than read off a column.
+// than read off a column. The product is the one the decision was made in: a
+// rating another team holds is not evidence about this claim.
 //
 // It read `score_centi` alone, which is the published score and nothing else:
 // an assessment writes the word and never that column, so an issue published
@@ -225,7 +226,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 // Zero against zero is "no worse than when it was agreed to", so a dismissal
 // agreed once was re-affirmed with nobody else after somebody had rated the
 // issue critical — which is the one thing this comparison exists to catch.
-func (s *Store) severityOf(ctx context.Context, vulnerabilityID int64) (int, error) {
+func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64) (int, error) {
 	var issue struct {
 		Published  string `bun:"published"`
 		Assessed   string `bun:"assessed"`
@@ -233,8 +234,9 @@ func (s *Store) severityOf(ctx context.Context, vulnerabilityID int64) (int, err
 	}
 	if err := s.db.NewSelect().
 		TableExpr("vulnerability AS v").
+		Join(finding.RatedHere, productID).
 		ColumnExpr("COALESCE(v.severity, '') AS published").
-		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed").
+		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		Where("v.id = ?", vulnerabilityID).Scan(ctx, &issue); err != nil {
 		return 0, fmt.Errorf("read how bad this is now: %w", err)

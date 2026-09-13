@@ -66,6 +66,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		Join("JOIN variant AS va ON va.id = tg.variant_id").
 		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		Join(RatedHere, productID).
 		ColumnExpr("st.name AS stream").
 		ColumnExpr("st.kind AS kind").
 		ColumnExpr("va.name AS variant").

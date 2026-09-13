@@ -102,6 +102,11 @@ export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[]
 // being work rather than becoming later work, and they carry no deadline at
 // all. Those are two different things to agree to, and an approver was shown
 // neither.
+//
+// **Each row names its product**, because a rating belongs to one and two
+// products may rate the same issue differently. A row saying only "CVE-… low"
+// is a word an approver cannot act on: what they are agreeing to is a deadline
+// and a triage line in one named place.
 export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
   const queries = useQueryClient();
   const agree = useMutation({
@@ -118,7 +123,8 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
         <h2>Ratings awaiting approval</h2>
         <p>
           {waiting.length.toLocaleString()} · somebody says an issue is milder than the world does.
-          A rating of ours holds wherever the issue appears, so it waits for a second person.
+          A rating holds in every build of the product it was made for, so it waits for a second
+          person.
         </p>
       </div>
       {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
@@ -131,19 +137,19 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
                 <Severity word={row.published ?? ""} /> → <Severity word={row.severity ?? ""} />
               </span>
             </div>
+            <p className="hint" style={{ margin: "0 0 6px" }}>
+              In <b>{row.product}</b> — and nowhere else.
+            </p>
             <p className="reading">{row.reasoning}</p>
             <p className="hint">
               {(row.open ?? 0).toLocaleString()} open{" "}
-              {(row.open ?? 0) === 1 ? "finding" : "findings"} you can see, in{" "}
-              {(row.in_products ?? 0).toLocaleString()}{" "}
-              {(row.in_products ?? 0) === 1 ? "product" : "products"}.
+              {(row.open ?? 0) === 1 ? "finding" : "findings"} you can see in {row.product}.
             </p>
             {(row.off_the_list ?? 0) > 0 ? (
               <p className="alert" style={{ margin: "6px 0 0" }}>
                 <strong>
                   This takes {(row.off_the_list ?? 0).toLocaleString()} of them off the working list
-                  in {(row.off_the_list_in_products ?? 0).toLocaleString()}{" "}
-                  {(row.off_the_list_in_products ?? 0) === 1 ? "product" : "products"}.
+                  in {row.product}.
                 </strong>
                 <span>
                   Below what a product considers worth triaging, a finding is still recorded,
@@ -153,8 +159,8 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
               </p>
             ) : (
               <p className="hint" style={{ margin: "6px 0 0" }}>
-                Still above what every product here triages from, so this makes them later work
-                rather than no work.
+                Still above what {row.product} triages from, so this makes them later work rather
+                than no work.
               </p>
             )}
             <div className="cardfoot">
@@ -169,7 +175,7 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
                 title={
                   row.mine
                     ? "You made this rating. The person who proposes may not be the one who agrees"
-                    : "Agree, and put the rating in force"
+                    : `Agree, and put the rating in force in ${row.product ?? "this product"}`
                 }
                 onClick={() => agree.mutate(row.id ?? 0)}
               >

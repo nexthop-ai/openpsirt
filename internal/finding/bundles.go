@@ -80,7 +80,7 @@ type Bundle struct {
 func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int, filter Filter) ([]Bundle, int, error) {
 
-	_, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
+	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -106,9 +106,9 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	// the line and the deadline fold them, so an unrated issue is a medium
 	// here as it is everywhere else.
 	const worst = `MAX(CASE
-		WHEN COALESCE(v.assessed_severity, v.severity, '') = 'critical' THEN 4
-		WHEN COALESCE(v.assessed_severity, v.severity, '') = 'high' THEN 3
-		WHEN COALESCE(v.assessed_severity, v.severity, '') IN ('low', 'negligible', 'none') THEN 1
+		WHEN ` + EffectiveSeverityExpr + ` = 'critical' THEN 4
+		WHEN ` + EffectiveSeverityExpr + ` = 'high' THEN 3
+		WHEN ` + EffectiveSeverityExpr + ` IN ('low', 'negligible', 'none') THEN 1
 		ELSE 2 END)`
 
 	bundled := func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -116,6 +116,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 			TableExpr("finding AS f").
 			Join("JOIN component AS c ON c.id = f.component_id").
 			Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+			Join(RatedHere, productID).
 			Where("f.target_id IN (?)", bun.List(targets)).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible)).

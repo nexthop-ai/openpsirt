@@ -87,6 +87,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	group := s.db.NewSelect().
 		TableExpr("finding AS f").
 		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		Join(RatedHere, productID).
 		ColumnExpr(BandExpr+" AS band").
 		ColumnExpr("SUM(CASE WHEN f.closed_at IS NOT NULL AND f.due_at IS NOT NULL "+
 			"THEN 1 ELSE 0 END) AS judged").

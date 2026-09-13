@@ -142,6 +142,7 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 		Join("JOIN target AS tg ON tg.id = f.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		Join(RatedHere, productID).
 		ColumnExpr(BandExpr+" AS band").
 		ColumnExpr("f.vulnerability_id AS vulnerability_id").
 		ColumnExpr("f.component_id AS component_id").

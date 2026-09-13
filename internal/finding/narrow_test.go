@@ -829,13 +829,9 @@ func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Rated critical here, which is what the floor and the clock already
-		// read.
-		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
-			Set("assessed_severity = ?", "critical").
-			Where("identifier = ?", "CVE-2026-1").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		// Rated critical by this product, which is what the floor and the
+		// clock already read.
+		f.rate(t, f.productID, "CVE-2026-1", "critical")
 
 		who := f.holding(t, access.PublicRead)
 		groups, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,

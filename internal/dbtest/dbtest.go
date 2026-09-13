@@ -555,8 +555,10 @@ var tables = []string{
 	// Before person, which it points at, and after everything above, which
 	// points at it.
 	"claim",
-	// Before person and vulnerability, which it points at.
+	// Before person, product and vulnerability, which it points at.
 	"assessment",
+	// Before product and vulnerability, both of which it points at.
+	"issue_rating",
 	"personal_token",
 	"person_identity",
 	"group_admin",

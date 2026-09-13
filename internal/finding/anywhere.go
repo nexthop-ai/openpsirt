@@ -140,6 +140,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// the rating has to be compared in the statement rather than
 			// turned into a list of admitted words before it.
 			Join(`JOIN "vulnerability" AS v ON v.id = f.vulnerability_id`).
+			// And whatever the row's own product rates it, for the same
+			// reason: a rating belongs to a product, so a list spanning them
+			// reads each row's against the product that row is in.
+			Join(RatedFor("st.product_id")).
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
@@ -282,6 +286,14 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, 0, err
 	}
+	// What each of the page's products rates each of its issues. Keyed on the
+	// pair, because this list spans products and one issue may be rated
+	// differently in two of them — which is the whole reason a rating belongs
+	// to a product.
+	rated, err := RatingsIn(ctx, s.db, within, issues)
+	if err != nil {
+		return nil, 0, err
+	}
 	shipped, err := componentsNamed(ctx, s.db, components)
 	if err != nil {
 		return nil, 0, err
@@ -312,11 +324,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		// outer level, so the embedded row's copy of it is never filled.
 		shape := row.decorated
 		shape.VulnerabilityID, shape.ComponentID = head.VulnerabilityID, head.ComponentID
-		group := groupFrom(shape, named, shipped,
+		group := groupFrom(shape, named, rated, shipped,
 			// The line this row's own product states, or the deployment's
-			// where it states none. One word chosen for a page that spans
-			// products would answer for none of them.
-			Floor{Word: deployment})
+			// where it states none, and the product whose rating it is
+			// compared against. One word chosen for a page that spans
+			// products would answer for none of them, and neither would one
+			// rating.
+			Floor{Word: deployment, ProductID: head.ProductID})
 		group.Product, group.ProductName = row.Product, row.ProductName
 		// One build of possibly several, so a row has somewhere to link to and
 		// an action has a build to name. What says there are others is the

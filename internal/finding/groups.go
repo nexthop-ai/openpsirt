@@ -243,6 +243,11 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	}
 	// Set here rather than trusted from the caller, for the reason above.
 	filter.ProductID = productID
+	// And the line's, which is the same identifier for the same reason: the
+	// word a line states and the rating it compares against are both this
+	// product's decisions, and a caller free to state either would be choosing
+	// whose rating its findings are judged by.
+	filter.Floor.ProductID = productID
 	// Who "mine" means, from the subject rather than from the request, and
 	// their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
@@ -342,6 +347,13 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	if err != nil {
 		return nil, 0, err
 	}
+	// What this product rates them, where it rates them anything. One
+	// statement for the page, like the two lookups above: the rating belongs
+	// to the product and the page is inside one, so the pair is known here.
+	rated, err := RatingsIn(ctx, s.db, []int64{productID}, issues)
+	if err != nil {
+		return nil, 0, err
+	}
 	shipped, err := componentsNamed(ctx, s.db, components)
 	if err != nil {
 		return nil, 0, err
@@ -389,7 +401,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 
 	groups := make([]Group, 0, len(rows))
 	for _, row := range rows {
-		group := groupFrom(row, named, shipped, filter.Floor)
+		group := groupFrom(row, named, rated, shipped, filter.Floor)
 		group.Tags = marks[markKey{row.VulnerabilityID, row.ComponentID}]
 		if oneBuild {
 			// How many distinct ways down there are: the consumers this
@@ -442,7 +454,10 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 // What each list adds afterwards is what differs between them: the way down,
 // for a list of one build; the product and the build to link to, for a list
 // that spans them.
-func groupFrom(row decorated, named map[int64]Vulnerability,
+// Which product's rating a row reads is the line's, because the two are one
+// product's: the word the line states and the word it is compared against are
+// both decisions that team made.
+func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]string,
 	shipped map[int64]graph.Component, floor Floor) Group {
 
 	group := Group{
@@ -459,6 +474,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability,
 		DiscloseAt:  row.DiscloseAt,
 	}
 	if issue, held := named[row.VulnerabilityID]; held {
+		issue = issue.RatedIn(rated[RatedKey{floor.ProductID, row.VulnerabilityID}])
 		group.Vulnerability, group.Severity = issue.Identifier, issue.InForce()
 		// The one line of the issue's own words the row shows. Two lists of
 		// the same rows, one of which says what the issue is: fifty rows

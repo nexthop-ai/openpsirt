@@ -499,20 +499,40 @@ func (f *fixture) urgency(t *testing.T, identifier string) int64 {
 // ratings reads what was published about an issue and what we say instead.
 func (f *fixture) ratings(t *testing.T, identifier string) (string, string) {
 	t.Helper()
+	return f.ratingsIn(t, f.productID, identifier)
+}
+
+// ratingsIn is ratings for a product named rather than the fixture's own,
+// which is what a check about two products holding different ratings needs.
+func (f *fixture) ratingsIn(t *testing.T, productID int64, identifier string) (string, string) {
+	t.Helper()
 	var row struct {
 		Published string `bun:"published"`
 		Assessed  string `bun:"assessed"`
 	}
 	err := f.db.DB.NewSelect().
 		TableExpr("vulnerability AS v").
+		Join(finding.RatedHere, productID).
 		ColumnExpr("COALESCE(v.severity, '') AS published").
-		ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed").
+		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &row)
 	if err != nil {
 		t.Fatalf("read the ratings for %s: %v", identifier, err)
 	}
 	return row.Published, row.Assessed
+}
+
+// rate writes a rating in force for one product, without going through the
+// claim that would ordinarily put it there. What a test taking this route is
+// checking is what a reader does with a rating rather than how one is made.
+func (f *fixture) rate(t *testing.T, productID int64, identifier, severity string) {
+	t.Helper()
+	if _, err := f.db.DB.NewInsert().Model(&finding.IssueRating{
+		VulnerabilityID: f.issue(t, identifier), ProductID: productID, Severity: severity,
+	}).Exec(t.Context()); err != nil {
+		t.Fatalf("rate %s in product %d: %v", identifier, productID, err)
+	}
 }
 
 // issue resolves an identifier to what it is stored as.

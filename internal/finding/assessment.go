@@ -13,18 +13,29 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// Assessment is what we think of an issue, as against what was published.
+// Assessment is what one product thinks of an issue, as against what was
+// published.
 //
 // Against the issue rather than against a place: a published rating being
-// wrong is one statement about the vulnerability, true wherever it appears and
-// in products it has not reached yet, and it does not stop being true because
-// somebody rebuilt something.
+// wrong is one statement about the vulnerability wherever it appears in this
+// product, including in builds it has not reached yet, and it does not stop
+// being true because somebody rebuilt something.
+//
+// Against one product rather than against the deployment: a rating is a
+// judgment about how a component is used, and two products do not use one the
+// same way. One product may ship the vulnerable configuration and another may
+// not, and then it is not one fact.
 type Assessment struct {
 	bun.BaseModel `bun:"table:assessment,alias:asm"`
 
-	ID              int64  `bun:"id,pk,autoincrement"`
-	VulnerabilityID int64  `bun:"vulnerability_id,notnull"`
-	Severity        string `bun:"severity,notnull"`
+	ID              int64 `bun:"id,pk,autoincrement"`
+	VulnerabilityID int64 `bun:"vulnerability_id,notnull"`
+	// ProductID is whose rating this is. Recording, agreeing to and
+	// withdrawing one all ask for triage on this product: a rating sets the
+	// deadline and can push a finding below the line the product triages at,
+	// so somebody who cannot see the product has no business moving either.
+	ProductID int64  `bun:"product_id,notnull"`
+	Severity  string `bun:"severity,notnull"`
 	// Published is what the world said when this was made, kept so a reader
 	// can see what we were disagreeing with rather than inferring it from a
 	// feed that has since moved on.
@@ -37,10 +48,11 @@ type Assessment struct {
 	DecidedBy     *int64     `bun:"decided_by"`
 	DecidedAt     *time.Time `bun:"decided_at"`
 	// LiveVulnerabilityID is the issue this is a claim about while it is
-	// still a live claim, and null once it is withdrawn. Under a unique
-	// constraint that is what enforces one live claim per issue in the
-	// database rather than in a check — nulls do not collide, so any
-	// number of withdrawn claims sit beside the live one.
+	// still a live claim, and null once it is withdrawn. Paired with the
+	// product under a unique constraint, that is what enforces one live
+	// claim per issue and product in the database rather than in a check —
+	// nulls do not collide, so any number of withdrawn claims sit beside
+	// the live one.
 	LiveVulnerabilityID *int64 `bun:"live_vulnerability_id"`
 }
 
@@ -51,15 +63,16 @@ const (
 	AssessmentWithdrawn = "withdrawn"
 )
 
-// ErrAlreadyAssessed is returned where a claim already stands about an issue.
-var ErrAlreadyAssessed = errors.New("this issue is already assessed")
+// ErrAlreadyAssessed is returned where a claim already stands about an issue
+// in this product. Another product's claim is not in the way of one.
+var ErrAlreadyAssessed = errors.New("this issue is already assessed in this product")
 
 // ErrNoSuchAssessment is returned where a claim is missing or is about an
 // issue this subject may not be told about. One error for both, because
 // telling them apart is what turns a claim identifier into a directory.
 var ErrNoSuchAssessment = errors.New("no assessment is recorded there")
 
-// Assess records what somebody thinks of an issue.
+// Assess records what one product thinks of an issue.
 //
 // Rating something **worse** than published takes effect at once: nobody needs
 // protecting from being told something is worse than the world says. Rating it
@@ -70,18 +83,22 @@ var ErrNoSuchAssessment = errors.New("no assessment is recorded there")
 // downgrade below that line takes the finding off the working list and off any
 // clock entirely. That is the same shape as every other act
 // that hides risk, and it is gated the same way.
-func (s *Store) Assess(ctx context.Context, subject access.Subject, vulnerabilityID int64,
-	severity, reasoning string) (*Assessment, error) {
+//
+// Asked of triage **on this product**. A rating moves this product's deadlines
+// and can take its findings off its working list, and holding a role somewhere
+// else is not a reason to be trusted with either — which is what a single
+// deployment-wide rating let anybody with triage anywhere do.
+func (s *Store) Assess(ctx context.Context, subject access.Subject,
+	productID, vulnerabilityID int64, severity, reasoning string) (*Assessment, error) {
 
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return nil, errors.New("an assessment is recorded as made by whoever made it")
 	}
-	// Triage somewhere, rather than merely being signed in. A rating here
-	// moves deadlines and can take a finding off the working list
-	// altogether, in every product at once, and being able to read one
-	// product is not a reason to be trusted with that.
-	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
-		return nil, access.Denied("say what we think of an issue")
+	// Triage on this product, rather than triage somewhere. Asked before
+	// anything in the request is resolved, so a product somebody holds
+	// nothing on refuses in the same words whether or not the issue is there.
+	if !subject.Triages(access.Public, productID) {
+		return nil, access.Denied("say what this product thinks of an issue")
 	}
 	severity = strings.TrimSpace(strings.ToLower(severity))
 	if Band(severity) != severity || severity == "" {
@@ -91,7 +108,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject, vulnerabilit
 	if strings.TrimSpace(reasoning) == "" {
 		return nil, errors.New(
 			"say why. An assessment outlives the version it was made about and reaches " +
-				"products it has not met yet, so the next person needs the argument")
+				"every build of this product, so the next person needs the argument")
 	}
 
 	var recorded *Assessment
@@ -99,7 +116,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject, vulnerabilit
 		// Inside the transaction, because a retry re-runs this closure
 		// against a database that has moved and an authorization
 		// answered against the old one describes a world that is gone.
-		told, err := mayBeToldOf(ctx, tx, subject, vulnerabilityID)
+		told, err := mayRateHere(ctx, tx, subject, productID, vulnerabilityID)
 		if err != nil {
 			return err
 		}
@@ -122,11 +139,17 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject, vulnerabilit
 		// Compared on the folded band rather than the raw word, so that
 		// disagreeing with an unrated issue is judged against the medium it
 		// is already treated as rather than against nothing.
+		//
+		// Compared against the published rating rather than against whatever
+		// this product holds now: what needs a second person is hiding
+		// something the world called bad, and a product that already rated it
+		// milder would otherwise let the next step down through unwatched.
 		milder := rank(severity) < rank(Band(issue.Published))
 		now := s.now().UTC().Truncate(time.Microsecond)
 		live := vulnerabilityID
 		recorded = &Assessment{
 			VulnerabilityID: vulnerabilityID,
+			ProductID:       productID,
 			Severity:        severity,
 			Published:       issue.Published,
 			Reasoning:       reasoning,
@@ -135,9 +158,9 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject, vulnerabilit
 			ProposedBy:      subject.ID,
 			ProposedAt:      now,
 			// Held from the moment it is proposed. A claim waiting for a
-			// second person is still a claim standing about this issue, so a
-			// rival one is refused while it waits rather than only once it is
-			// in force.
+			// second person is still a claim standing about this issue here,
+			// so a rival one in this product is refused while it waits rather
+			// than only once it is in force. Another product's is not a rival.
 			LiveVulnerabilityID: &live,
 		}
 		if !milder {
@@ -146,17 +169,17 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject, vulnerabilit
 		}
 		if _, err := tx.NewInsert().Model(recorded).Exec(ctx); err != nil {
 			if database.IsDuplicate(err) {
-				// The unique constraint over the live issue
-				// refused it, which is the only thing that
-				// could: two proposals arriving together both
-				// walk through any check made before the write
-				// .
+				// The unique constraint over the live issue and
+				// product refused it, which is the only thing
+				// that could: two proposals arriving together
+				// both walk through any check made before the
+				// write.
 				return ErrAlreadyAssessed
 			}
 			return fmt.Errorf("record what we think of this: %w", err)
 		}
 		if recorded.State == AssessmentLive {
-			return liveRating(ctx, tx, vulnerabilityID, severity)
+			return liveRating(ctx, tx, productID, vulnerabilityID, severity)
 		}
 		return nil
 	})
@@ -166,17 +189,50 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject, vulnerabilit
 	return recorded, nil
 }
 
+// mayRateHere reports whether this subject may record a rating about this
+// issue in this product.
+//
+// The issue in this product, where they may read a finding of it; or an issue
+// that has reached nothing at all, which is a flaw somebody entered here
+// before any scan found it and which no rating can disclose, because there is
+// no finding for a rating to say anything about.
+//
+// Both halves matter. Without the first, naming an identifier this deployment
+// minted for an unannounced flaw handed back the severity recorded against it.
+// Without the second, a product could not get ahead of an issue it knows is
+// coming.
+func mayRateHere(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID, vulnerabilityID int64) (bool, error) {
+
+	told, err := mayBeToldOfHere(ctx, db, subject, productID, vulnerabilityID)
+	if err != nil || told {
+		return told, err
+	}
+	anywhere, err := db.NewSelect().Model((*Finding)(nil)).
+		Where("vulnerability_id = ?", vulnerabilityID).Count(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether this issue reaches anything: %w", err)
+	}
+	return anywhere == 0, nil
+}
+
 // Agree puts a milder assessment into force.
 //
 // Somebody other than whoever proposed it, for the same reason every other
 // second person here is somebody else: a control one person can complete alone
 // is not a control.
+//
+// The second person holds their role **on the product the rating belongs to**.
+// Agreeing is what puts a milder rating into force, so it moves that product's
+// deadlines and its triage line, and a role held elsewhere buys nothing here.
 func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*Assessment, error) {
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return nil, errors.New("agreeing is something a person does")
 	}
-	// The same people who may agree to a decision, and for the same
-	// reason: agreeing is what puts a milder rating into force.
+	// Asked before the identifier is resolved, so somebody holding nothing
+	// anywhere cannot walk claim identifiers. The narrower question — the
+	// role on this claim's own product — is asked below, once the claim is in
+	// hand, and it answers in the same words as a claim that is not there.
 	if !subject.HoldsAnywhere(access.Approver, access.PublicTriage, access.PrivateTriage) {
 		return nil, access.Denied("agree to a rating")
 	}
@@ -188,7 +244,14 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 			// recorded answer alike, so an identifier cannot be walked.
 			return ErrNoSuchAssessment
 		}
-		told, err := mayBeToldOf(ctx, tx, subject, claim.VulnerabilityID)
+		// The role on the claim's own product. Refused in the words a missing
+		// claim gets rather than as a denial: "you may not agree to this"
+		// about a product somebody holds nothing on says the claim is there.
+		if !subject.Holds(access.Approver, claim.ProductID) &&
+			!subject.Triages(access.Public, claim.ProductID) {
+			return ErrNoSuchAssessment
+		}
+		told, err := mayBeToldOfHere(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)
 		if err != nil {
 			return err
 		}
@@ -212,7 +275,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 			return fmt.Errorf("agree to the claim: %w", err)
 		}
 		agreed = claim
-		return liveRating(ctx, tx, claim.VulnerabilityID, claim.Severity)
+		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, claim.Severity)
 	})
 	if err != nil {
 		return nil, err
@@ -221,12 +284,15 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 }
 
 // Withdraw takes an assessment out of force, and the published rating back.
+//
+// Asked of triage on the claim's own product, because taking a rating back is
+// making one: the published severity returns in that product, and everything
+// reading it follows.
 func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) error {
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return errors.New("withdrawing is something a person does")
 	}
-	// Taking a rating back is making one: the published severity returns,
-	// and everything reading it follows.
+	// Before the identifier is resolved, for the reason Agree gives.
 	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
 		return access.Denied("take a rating back")
 	}
@@ -235,7 +301,10 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
 			return ErrNoSuchAssessment
 		}
-		told, err := mayBeToldOf(ctx, tx, subject, claim.VulnerabilityID)
+		if !subject.Triages(access.Public, claim.ProductID) {
+			return ErrNoSuchAssessment
+		}
+		told, err := mayBeToldOfHere(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)
 		if err != nil {
 			return err
 		}
@@ -257,34 +326,56 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw the claim: %w", err)
 		}
-		return liveRating(ctx, tx, claim.VulnerabilityID, "")
+		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, "")
 	})
 }
 
-// liveRating writes the rating in force onto the issue, or clears it.
+// liveRating writes the rating in force for one product, or clears it.
 //
-// One column read through one expression, rather than a join everything has to
+// One row read through one expression, rather than a join everything has to
 // remember: what ranks, what the line compares, and what sets the deadline all
 // read the same fact, and this project's bugs have all come from letting one
 // fact into two rules.
-func liveRating(ctx context.Context, tx bun.Tx, vulnerabilityID int64, severity string) error {
-	q := tx.NewUpdate().
-		Table("vulnerability").
-		Where("id = ?", vulnerabilityID)
+//
+// The row's presence is the whole of "this product rates it differently", so
+// clearing a rating deletes it rather than writing an empty word — a row
+// holding nothing would read as a rating of nothing in every expression that
+// coalesces onto the published one.
+func liveRating(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
+	severity string) error {
+
 	if severity == "" {
-		q = q.Set("assessed_severity = NULL")
+		if _, err := tx.NewDelete().Model((*IssueRating)(nil)).
+			Where("vulnerability_id = ?", vulnerabilityID).
+			Where("product_id = ?", productID).Exec(ctx); err != nil {
+			return fmt.Errorf("take the rating out of force: %w", err)
+		}
 	} else {
-		q = q.Set("assessed_severity = ?", severity)
+		// Written as an insert that falls back to an update rather than as
+		// whatever each engine spells "upsert": the four do not agree on the
+		// spelling, and the pair is under a unique constraint, so the write
+		// that loses the race is the one that updates.
+		rating := &IssueRating{
+			VulnerabilityID: vulnerabilityID, ProductID: productID, Severity: severity,
+		}
+		_, err := tx.NewInsert().Model(rating).Exec(ctx)
+		if database.IsDuplicate(err) {
+			_, err = tx.NewUpdate().Model((*IssueRating)(nil)).
+				Set("severity = ?", severity).
+				Where("vulnerability_id = ?", vulnerabilityID).
+				Where("product_id = ?", productID).Exec(ctx)
+		}
+		if err != nil {
+			return fmt.Errorf("put the rating in force: %w", err)
+		}
 	}
-	if _, err := q.Exec(ctx); err != nil {
-		return fmt.Errorf("put the rating in force: %w", err)
-	}
-	// The rating in force decides where these sit and how long they have,
-	// so both follow it.
-	if err := rerank(ctx, tx, vulnerabilityID, severity); err != nil {
+	// The rating in force decides where this product's findings sit and how
+	// long they have, so both follow it — and only this product's, because
+	// nothing else read this rating.
+	if err := rerank(ctx, tx, productID, vulnerabilityID, severity); err != nil {
 		return err
 	}
-	return redue(ctx, tx, vulnerabilityID)
+	return redue(ctx, tx, productID, vulnerabilityID)
 }
 
 // rank orders the four words that rank. Anything else folds to medium first,
@@ -309,7 +400,13 @@ func rank(word string) int {
 // spelled again as SQL — the mapping is one fact and this project's bugs have
 // all come from letting one fact into two rules. What the statement carries is
 // the number that fact produced.
-func rerank(ctx context.Context, tx bun.Tx, vulnerabilityID int64, assessed string) error {
+//
+// Written for one product, because the rating it was worked out from is one
+// product's. The same issue in another product keeps the order its own rating
+// gives it.
+func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
+	assessed string) error {
+
 	var issue struct {
 		Severity   string `bun:"severity"`
 		ScoreCenti int    `bun:"score_centi"`
@@ -346,6 +443,11 @@ func rerank(ctx context.Context, tx bun.Tx, vulnerabilityID int64, assessed stri
 			int64(exploitedBand), int64(shippedBand), int64(rest)).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("closed_at IS NULL").
+		// This product's findings alone. The number being written was worked
+		// out from this product's rating, and writing it over another
+		// product's rows is the deployment-wide rating arriving by the back
+		// door.
+		Where(inThisProduct, productID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("move this issue in the order: %w", err)
@@ -358,7 +460,9 @@ func rerank(ctx context.Context, tx bun.Tx, vulnerabilityID int64, assessed stri
 //
 // **Three of the four signals the order is worked out from are properties of
 // the issue** — known exploitation, exploitation likelihood, and the score —
-// and a report raises them for the issue wherever it appears. The order is
+// and a report raises them for the issue wherever it appears. The fourth, the
+// rating, belongs to a product, so the order is worked out once per product
+// holding the issue rather than once for the deployment. The order is
 // stored per finding and was rewritten only for the build being scanned, so
 // every other build kept a number computed from a world that had moved: a
 // known-exploited issue in a shipped tag sat below the triage line, answered
@@ -388,13 +492,11 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 	}
 	for _, id := range issues {
 		var issue struct {
-			Exploited bool   `bun:"exploited"`
-			Assessed  string `bun:"assessed"`
+			Exploited bool `bun:"exploited"`
 		}
 		if err := tx.NewSelect().
 			TableExpr("vulnerability AS v").
 			ColumnExpr("COALESCE(v.exploited, ?) AS exploited", false).
-			ColumnExpr("COALESCE(v.assessed_severity, '') AS assessed").
 			Where("v.id = ?", id).Scan(ctx, &issue); err != nil {
 			return fmt.Errorf("read what is known about this issue: %w", err)
 		}
@@ -427,28 +529,50 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 			}
 		}
 
-		// The order itself, from the rating in force and the flags each row
-		// now carries.
-		if err := rerank(ctx, tx, id, issue.Assessed); err != nil {
+		// The order itself, product by product, from each one's own rating
+		// and the flags each row now carries. The signal that moved is the
+		// issue's and reaches every product holding it; what it is combined
+		// with is that product's rating, so the same report leaves two
+		// products ordering the issue differently — which is the point of a
+		// rating belonging to one.
+		products, err := productsHolding(ctx, tx, id)
+		if err != nil {
 			return err
+		}
+		for _, productID := range products {
+			assessed, err := RatingIn(ctx, tx, productID, id)
+			if err != nil {
+				return err
+			}
+			if err := rerank(ctx, tx, productID, id, assessed); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-// redue rewrites the deadline on an issue's open findings.
+// redue rewrites the deadline on an issue's open findings in one product.
 //
-// Severity sets how long something may stay open, so a rating of ours that did
-// not reach the deadline would leave a finding shown as one thing and clocked
-// as another — a third answer nobody chose. And where the rating drops below
-// what a product triages, the deadline goes entirely, because below that line
+// Severity sets how long something may stay open, so a rating that did not
+// reach the deadline would leave a finding shown as one thing and clocked as
+// another — a third answer nobody chose. And where the rating drops below what
+// the product triages, the deadline goes entirely, because below that line
 // nothing is on a clock.
+//
+// One product, because the rating that moved is one product's and the line it
+// is compared against is the same product's. Another product's findings of the
+// same issue keep the clock their own rating gives them.
 //
 // Written per group rather than per finding: a deadline is a run's start plus
 // a fixed number of days, so every finding of one issue opened by one run,
-// rated the same way, in one product, lands on the same instant.
-func redue(ctx context.Context, tx bun.Tx, vulnerabilityID int64) error {
+// rated the same way, in this product, lands on the same instant.
+func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) error {
 	windows, err := LoadWindows(ctx, tx)
+	if err != nil {
+		return err
+	}
+	floor, err := FloorFor(ctx, tx, productID)
 	if err != nil {
 		return err
 	}
@@ -460,7 +584,6 @@ func redue(ctx context.Context, tx bun.Tx, vulnerabilityID int64) error {
 	var groups []struct {
 		Exploited bool      `bun:"exploited"`
 		OpenedAt  time.Time `bun:"opened_at"`
-		ProductID int64     `bun:"product_id"`
 		Severity  string    `bun:"severity"`
 	}
 	err = tx.NewSelect().
@@ -468,39 +591,27 @@ func redue(ctx context.Context, tx bun.Tx, vulnerabilityID int64) error {
 		Join("JOIN target AS tg ON tg.id = f.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		Join(RatedHere, productID).
 		ColumnExpr("f.urgency_exploited AS exploited").
 		ColumnExpr("f.opened_at AS opened_at").
-		ColumnExpr("st.product_id AS product_id").
 		ColumnExpr(EffectiveSeverityExpr+" AS severity").
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
-		GroupExpr("f.urgency_exploited, f.opened_at, st.product_id, "+
-			EffectiveSeverityExpr).
+		Where("st.product_id = ?", productID).
+		GroupExpr("f.urgency_exploited, f.opened_at, "+EffectiveSeverityExpr).
 		Scan(ctx, &groups)
 	if err != nil {
 		return fmt.Errorf("read what this issue is open against: %w", err)
 	}
 
-	floors := map[int64]Floor{}
 	for _, group := range groups {
-		floor, held := floors[group.ProductID]
-		if !held {
-			floor, err = FloorFor(ctx, tx, group.ProductID)
-			if err != nil {
-				return err
-			}
-			floors[group.ProductID] = floor
-		}
-
 		q := tx.NewUpdate().
 			Model((*Finding)(nil)).
 			Where("vulnerability_id = ?", vulnerabilityID).
 			Where("closed_at IS NULL").
 			Where("urgency_exploited = ?", group.Exploited).
 			Where("opened_at = ?", group.OpenedAt).
-			Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-				JOIN "stream" AS st ON st.id = tg.stream_id
-				WHERE st.product_id = ?)`, group.ProductID)
+			Where(inThisProduct, productID)
 		if floor.Admits(group.Exploited, group.Severity) {
 			q = q.Set("due_at = ?", group.OpenedAt.Add(windows.For(group.Exploited, group.Severity)))
 		} else {
@@ -515,16 +626,28 @@ func redue(ctx context.Context, tx bun.Tx, vulnerabilityID int64) error {
 
 // Assessments lists what has been said about issues, newest first.
 //
-// Narrowed to the issues the reader may be told about, which is the same rule
-// the counts beside each row already followed. A claim carries the severity
-// recorded against the issue and the argument somebody wrote about it, so a
-// row about an undisclosed flaw is that flaw's disclosure — reached by a route
-// that reads as a list of opinions rather than as a finding.
-func (s *Store) Assessments(ctx context.Context, subject access.Subject, state string,
-	limit int) ([]Assessment, map[int64]string, error) {
+// Narrowed to the issues the reader may be told about **in the product the
+// claim belongs to**, which is the same rule the counts beside each row
+// already followed. A claim carries the severity recorded against the issue
+// and the argument somebody wrote about it, so a row about an undisclosed flaw
+// is that flaw's disclosure — reached by a route that reads as a list of
+// opinions rather than as a finding. Correlated by product as well as by
+// issue, because the same issue read in one product says nothing about whether
+// it may be read in another.
+//
+// Narrowed to one product where the caller names one, which is how the screen
+// reaches a product's own ratings.
+func (s *Store) Assessments(ctx context.Context, subject access.Subject, productID int64,
+	state string, limit int) ([]Assessment, map[int64]string, error) {
 
 	if subject.Kind != access.Person {
 		return nil, nil, nil
+	}
+	if productID != 0 && !subject.Sees(productID) {
+		// A product somebody holds nothing on does not exist as far as they
+		// are concerned, and an empty list is a different statement from a
+		// refusal.
+		return nil, nil, access.Denied(fmt.Sprintf("read ratings in product %d", productID))
 	}
 	limit = database.AList.Of(limit)
 	q := s.db.NewSelect().Model((*Assessment)(nil)).
@@ -533,22 +656,26 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, state s
 	if state != "" {
 		q = q.Where("state = ?", state)
 	}
+	if productID != 0 {
+		q = q.Where("asm.product_id = ?", productID)
+	}
 	products, all := subject.Products()
 	if !all {
-		// The row-by-row form of mayBeToldOf: a claim is shown where its issue
-		// reaches something the reader may read, or reaches nothing at all.
+		if len(products) == 0 {
+			return nil, map[int64]string{}, nil
+		}
+		// The row-by-row form of mayBeToldOfHere: a claim is shown where its
+		// issue reaches something the reader may read in the claim's own
+		// product.
 		readable := onlyReadable(s.db.NewSelect().
 			ColumnExpr("1").
 			TableExpr("finding AS f").
 			Join("JOIN target AS tg ON tg.id = f.target_id").
 			Join("JOIN stream AS st ON st.id = tg.stream_id").
-			Where("f.vulnerability_id = asm.vulnerability_id"),
+			Where("f.vulnerability_id = asm.vulnerability_id").
+			Where("st.product_id = asm.product_id"),
 			subject, products, all)
-		anywhere := s.db.NewSelect().
-			ColumnExpr("1").
-			TableExpr("finding AS reach").
-			Where("reach.vulnerability_id = asm.vulnerability_id")
-		q = q.Where("(EXISTS (?) OR NOT EXISTS (?))", readable, anywhere)
+		q = q.Where("EXISTS (?)", readable)
 	}
 	var claims []Assessment
 	if err := q.Scan(ctx, &claims); err != nil {
@@ -583,30 +710,31 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, state s
 // kind: the finding stops being work rather than becoming later work, and it
 // loses its deadline entirely. Those are two different things to
 // agree to, and an approver was told neither.
+//
+// Counted inside the rating's own product. A rating reaches nothing outside
+// it, so a count that spanned products would describe work this decision does
+// not touch.
 type Consequence struct {
-	// Findings is how many open findings of this issue the reader may see.
-	// Named so the two numbers below are read against something rather than
-	// being counts of an unstated whole.
+	// Findings is how many open findings of this issue the reader may see in
+	// the rating's product. Named so the number below is read against
+	// something rather than being a count of an unstated whole.
 	Findings int
-	// Products is how many products those sit in. An assessment is about an
-	// issue and a line is per product, so "below the line" has as many answers
-	// as there are products holding the issue.
-	Products int
 	// OffTheList is how many of those findings the proposed rating would put
-	// below their product's line — where they stop being work rather than
+	// below the product's line — where they stop being work rather than
 	// becoming later work.
 	OffTheList int
-	// ProductsAffected is how many products that happens in.
-	ProductsAffected int
 }
 
 // WhatAgreeingWouldDo works out what putting a proposed rating in force would
 // take off a working list.
 //
 // Asked of what the reader may see, like everything else here: an approver who
-// cannot see a product is not told how many of its findings this would hide.
+// cannot see what a finding says is not told how many of them this would hide.
 // That understates the effect for them, which is the right way for it to be
 // wrong — the alternative discloses a count of undisclosed work.
+//
+// Asked inside the rating's own product, because that is everywhere the rating
+// reaches.
 func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	assessmentID int64) (Consequence, error) {
 
@@ -621,8 +749,9 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	// Enforced here as well as on the list that reaches it, because this
 	// is the layer that answers and a caller that arrived another way
 	// would otherwise be told the shape of an issue it may not be told
-	// about.
-	told, err := mayBeToldOf(ctx, s.db, subject, claim.VulnerabilityID)
+	// about. Asked of the claim's own product, which is the only place this
+	// rating reaches.
+	told, err := mayBeToldOfHere(ctx, s.db, subject, claim.ProductID, claim.VulnerabilityID)
 	if err != nil {
 		return Consequence{}, err
 	}
@@ -635,11 +764,15 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		return Consequence{}, nil
 	}
 
-	// Grouped rather than row by row: what decides the answer is the product,
-	// whether the finding is exploited and what it is rated now, and a build
-	// carries thousands of findings of one issue.
+	floor, err := FloorFor(ctx, s.db, claim.ProductID)
+	if err != nil {
+		return Consequence{}, err
+	}
+
+	// Grouped rather than row by row: what decides the answer is whether the
+	// finding is exploited and what it is rated now, and a build carries
+	// thousands of findings of one issue.
 	var rows []struct {
-		ProductID int64  `bun:"product_id"`
 		Exploited bool   `bun:"exploited"`
 		Severity  string `bun:"severity"`
 		Open      int    `bun:"open"`
@@ -649,50 +782,33 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		Join("JOIN target AS tg ON tg.id = f.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
 		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		ColumnExpr("st.product_id AS product_id").
+		Join(RatedHere, claim.ProductID).
 		ColumnExpr("f.urgency_exploited AS exploited").
 		ColumnExpr(EffectiveSeverityExpr+" AS severity").
 		ColumnExpr("COUNT(*) AS open").
 		Where("f.vulnerability_id = ?", claim.VulnerabilityID).
 		Where("f.closed_at IS NULL").
-		GroupExpr("st.product_id, f.urgency_exploited, " + EffectiveSeverityExpr)
-	// Both halves. The visibility half alone admits every disclosed finding in
-	// the deployment, so an approver holding one product was told how many
-	// findings this issue has in products they hold nothing on — and how many
-	// products those are, which is a count of what somebody else ships.
+		Where("st.product_id = ?", claim.ProductID).
+		GroupExpr("f.urgency_exploited, " + EffectiveSeverityExpr)
+	// The visibility half as well as the product. The visibility half alone
+	// admits every disclosed finding in the deployment, so an approver holding
+	// one product was told how many findings this issue has in products they
+	// hold nothing on.
 	q = onlyReadable(q, subject, products, all)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return Consequence{}, fmt.Errorf("read what this issue is open against: %w", err)
 	}
 
 	held := Consequence{}
-	floors := map[int64]Floor{}
-	affected := map[int64]bool{}
-	seen := map[int64]bool{}
 	for _, row := range rows {
 		held.Findings += row.Open
-		if !seen[row.ProductID] {
-			seen[row.ProductID] = true
-			held.Products++
-		}
-		floor, known := floors[row.ProductID]
-		if !known {
-			var err error
-			floor, err = FloorFor(ctx, s.db, row.ProductID)
-			if err != nil {
-				return Consequence{}, err
-			}
-			floors[row.ProductID] = floor
-		}
 		// Only what the line admits today and would not admit after. A finding
 		// already below it is not taken off anything by this, and saying it
 		// was would inflate the number an approver is being asked to weigh.
 		if floor.Admits(row.Exploited, row.Severity) &&
 			!floor.Admits(row.Exploited, claim.Severity) {
 			held.OffTheList += row.Open
-			affected[row.ProductID] = true
 		}
 	}
-	held.ProductsAffected = len(affected)
 	return held, nil
 }

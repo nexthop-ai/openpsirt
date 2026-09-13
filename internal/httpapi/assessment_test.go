@@ -17,7 +17,7 @@ func TestARatingSaysWhetherItIsYourOwn(t *testing.T) {
 		r.scanned(t)
 		// Milder than what was published, which is the direction that waits.
 		made := asPerson(t, r, "triager", http.MethodPost,
-			"/v1/issues/CVE-2026-9999/assessment",
+			"/v1/products/mine/issues/CVE-2026-9999/assessment",
 			`{"severity":"low","reasoning":"Not reachable in how we build it."}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("recording a rating answered %d: %s", made.Code, made.Body.String())
