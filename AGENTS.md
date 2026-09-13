@@ -177,10 +177,15 @@ neither buys the right to go stale.
 
 **A short-bump flag is inequality, never ordering.** Saying "this moved and is
 still not the version that fixes it" needs no version comparison. Adding one is
-a different project — per-ecosystem ordering for Debian epochs, RPM release
-segments, semantic versions and the ecosystems that follow none of them — and
-it buys a sharper sentence rather than a new signal. One "just add a compare
-function" is all it takes (REQ-21).
+per-ecosystem work — Debian epochs, RPM release segments, semantic versions, and
+the ecosystems that follow none of them — and an ordering that answers
+confidently for a pair it cannot actually order is worse than none, because the
+wrong answer is a recommendation somebody acts on.
+
+**No decision records this**, and two documents cited REQ-21 for it, which is
+about findings opening and closing as scans change. So it is a judgment rather
+than a commitment, and it is the owner's to revisit: nothing has been promised
+here either way.
 
 **A bulk write is bounded.** One action recording a judgment against many
 issues is deliberate and useful; one action writing an unbounded number of rows

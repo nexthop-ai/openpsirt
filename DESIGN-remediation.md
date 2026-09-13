@@ -79,7 +79,7 @@ commitment's build. **Nothing is written onto findings.**
 | Changing the version a release is moving to is one row | It was keyed per issue *and* per component *and* per target version, so a change meant rewriting every row of it |
 | An issue published tonight is covered by this morning's commitment | With nobody acting. Under the old key it was not covered until somebody declared it too |
 | A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump, so a commitment recorded against one covers all of them |
-| No version comparison is involved | An upgrade covers everything open on the fold rather than only what records this version as its fix. Deciding otherwise needs a per-ecosystem ordering nothing here has (REQ-21) |
+| No version comparison is involved | An upgrade covers everything open on the fold rather than only what records this version as its fix. Deciding otherwise needs a per-ecosystem ordering nothing here has, which no decision either requires or forbids |
 
 A build has one commitment per fold, enforced by the database rather than by a
 check somebody remembers. A release moves a package to one version; two rows
