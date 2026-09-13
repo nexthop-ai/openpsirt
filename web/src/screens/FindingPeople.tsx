@@ -205,9 +205,8 @@ export function Assignee({
     },
   });
 
-  // One line: who holds it, and the one-click case beside the picker. It was
-  // a card of its own with a heading, a hint above and a hint below, for a
-  // control that is a dropdown.
+  // One line: who holds it, and the one-click case beside the picker. A
+  // dropdown needs no heading and no paragraph around it.
   return (
     <div className="assignee">
       <span
@@ -225,10 +224,10 @@ export function Assignee({
           onPick={(held) => hand.mutate(held)}
         />
       </div>
-      {/* Assigning to yourself is the common case and the API always allowed
-          it; there was no way to ask. Named for what it does, because a button
-          reading "take this" beside a picker for anybody reads as the only
-          thing the control does. */}
+      {/* Assigning to yourself is the common case, so it is one click beside
+          the picker rather than two. Named for what it does: beside a picker
+          that assigns to anybody, a vaguer word reads as the only thing the
+          control does. */}
       {me.data?.identity != null && assigned !== me.data.identity && (
         <button
           type="button"

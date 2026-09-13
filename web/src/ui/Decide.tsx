@@ -139,8 +139,7 @@ export function Decide({
   at: At;
   places: Sitting[];
   // Who is dealing with it, drawn at the head of the same pane. Triage is
-  // both questions — who is on it and what was decided — and they were two
-  // panes with a screen between them.
+  // both questions: who is on it, and what was decided.
   assigning?: ReactNode;
   // Whether the finding has been announced, which decides who may be offered
   // after an @ in the reasoning: naming somebody who cannot read it calls them
@@ -685,9 +684,8 @@ export function Decide({
         <div className="card">
           <h3>Triage</h3>
           {assigning}
-          {/* The form had the card's name until the card became Triage, which
-              is both questions. Named again, so the box somebody types a
-              judgment into says what it records. */}
+          {/* The pane is named for both questions, so the box somebody types
+              a judgment into carries its own name. */}
           <h4 className="deciding-head">Decision</h4>
           <div className="writing">
             {form}

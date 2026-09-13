@@ -307,11 +307,10 @@ function Figures({
   // two figures for one word.
   const exploited = useQuery({
     queryKey: ["home", "exploited", scope],
-    // Answered for whatever is selected, like every figure here except the
-    // review queue, which has no product to narrow by and says so in its own
-    // label. It was a whole build's alone while the list behind it was, and a
-    // tile that vanishes when somebody widens the scope reads as a tile that
-    // broke rather than one that declines.
+    // Answered for whatever is selected, like every figure here. Drawn only
+    // where a product is picked, because the cross-product list counts a row
+    // per product as well — a tile that changed unit as the picker moved
+    // would quote two figures for one word.
     enabled: !!at.product,
     queryFn: async () =>
       unwrap(

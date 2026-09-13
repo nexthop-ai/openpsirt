@@ -588,9 +588,9 @@ export function Finding() {
               {it.vector}
             </p>
           )}
-          {/* The rating, and the control for it on the same line. It was a
-              pane of its own further down, which asked somebody reading a
-              severity to go and find the button for it. */}
+          {/* The control sits on the line that reports the rating, so
+              somebody reading a severity does not have to go and find the
+              button for it. */}
           <p className="hint">
             {it.assessed ? (
               <>
@@ -741,12 +741,10 @@ export function Finding() {
           />
         ))}
 
-        {/* Above the VEX statements, because a write-up is what somebody
-            deciding reads first and a third party's claim is read against it.
-            It sat below the form for a while, on the grounds that eleven links
-            beside the action recreate the defect the layout was built to fix —
-            which is true of the whole block of them and not of the advisory
-            somebody is about to judge from. */}
+        {/* Above the VEX statements: a write-up is what somebody deciding
+            reads first, and a third party's claim is read against it. The
+            whole block of links belongs below the action, which is a different
+            question from the advisory the judgment rests on. */}
         <div className="evidence">
           <References advisory={it.advisory} refs={it.references ?? []} />
           <LookItUp links={it.links ?? []} />

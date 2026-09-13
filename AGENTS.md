@@ -291,6 +291,28 @@ moment the next change lands. Comment the current behavior and why. If
 something genuinely is missing, describe the missing behavior or the
 limitation — not when it will arrive.
 
+**A comment describes the code that is there, not the code that was.** "It was
+a card with a heading and two hints" and "the form had the card's name until
+the card became Triage" describe something a reader cannot see and will never
+see. The history belongs in the commit message, and where it is a decision, in
+a design document.
+
+The test is whether the sentence would still be true and useful if the code had
+always looked like this. Keep the constraint that forces the current shape —
+"a float compares differently again, and this has to sort in an index" — and
+the measurement behind it, because both are about what is there. Cut the
+narration of what stood there before.
+
+This is not the rule above about tense. A comment may say why a shape is
+necessary, including that the obvious alternative fails; what it may not do is
+tell the story of the edit that produced it.
+
+**The tree does not follow this yet.** Fifty-nine comment lines across
+forty-seven files still narrate what stood there before — "it was a select fed
+by the mentions endpoint", "what used to be a checkbox per place". They are
+correct about the code beside them and wrong about what a comment is for, and
+they are fixed as the files are touched rather than in a sweep of their own.
+
 **No ticket or tracker references in code, comments or documents.** A bare
 number is unactionable at the code and rots as work is split or superseded.
 Describe the behavior, reason or limitation instead, and keep issue linkage in
