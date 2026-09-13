@@ -138,18 +138,19 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
               </span>
             </div>
             <p className="hint" style={{ margin: "0 0 6px" }}>
-              In <b>{row.product}</b> — and nowhere else.
+              In <b>{row.product_name || row.product}</b> — and nowhere else.
             </p>
             <p className="reading">{row.reasoning}</p>
             <p className="hint">
               {(row.open ?? 0).toLocaleString()} open{" "}
-              {(row.open ?? 0) === 1 ? "finding" : "findings"} you can see in {row.product}.
+              {(row.open ?? 0) === 1 ? "finding" : "findings"} you can see in{" "}
+              {row.product_name || row.product}.
             </p>
             {(row.off_the_list ?? 0) > 0 ? (
               <p className="alert" style={{ margin: "6px 0 0" }}>
                 <strong>
                   This takes {(row.off_the_list ?? 0).toLocaleString()} of them off the working list
-                  in {row.product}.
+                  in {row.product_name || row.product}.
                 </strong>
                 <span>
                   Below what a product considers worth triaging, a finding is still recorded,
@@ -159,8 +160,8 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
               </p>
             ) : (
               <p className="hint" style={{ margin: "6px 0 0" }}>
-                Still above what {row.product} triages from, so this makes them later work rather
-                than no work.
+                Still above what {row.product_name || row.product} triages from, so this makes them
+                later work rather than no work.
               </p>
             )}
             <div className="cardfoot">
@@ -175,7 +176,7 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
                 title={
                   row.mine
                     ? "You made this rating. The person who proposes may not be the one who agrees"
-                    : `Agree, and put the rating in force in ${row.product ?? "this product"}`
+                    : `Agree, and put the rating in force in ${row.product_name || row.product || "this product"}`
                 }
                 onClick={() => agree.mutate(row.id ?? 0)}
               >

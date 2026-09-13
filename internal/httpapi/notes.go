@@ -11,6 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -48,7 +49,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		product, issue, err := noteAbout(ctx, in, subject, input.Product, input.Vulnerability)
+		product, issue, _, err := noteAbout(ctx, in, subject, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
@@ -67,8 +68,8 @@ func registerIssueNotes(api huma.API, in Ingest) {
 			"judgment: nothing about what ranks, what a deadline is, or what the product " +
 			"triages changes because somebody wrote one.\n\n" +
 			"**This is the way to leave something for whoever decides without deciding.** A " +
-			"comment hangs off a claim, so before this the first person to say anything had " +
-			"to record a judgment in order to say it.\n\n" +
+			"comment hangs off a claim; a note does not, so nothing has to be judged before " +
+			"anything can be said.\n\n" +
 			"It reaches every build of the product and does not lapse when a version moves. " +
 			"Something true of one copy and not another — \"we do not call that function in " +
 			"the vendored build\" — is about a place, and belongs on the claim there.\n\n" +
@@ -88,7 +89,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		product, issue, err := noteAbout(ctx, in, subject, input.Product, input.Vulnerability)
+		product, issue, filed, err := noteAbout(ctx, in, subject, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +99,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		}
 		out := &struct{ Body NoteWritten }{}
 		out.Body.ID = note.ID
-		out.Body.NotNotified = tellNamed(ctx, in, subject, store, *note, input.Vulnerability)
+		out.Body.NotNotified = tellNamed(ctx, in, subject, store, *note, filed)
 		return out, nil
 	})
 
@@ -193,24 +194,64 @@ type NoteWritten struct {
 	NotNotified []string `json:"not_notified,omitempty" doc:"Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which"`
 }
 
-// noteAbout resolves the product and the issue a request names.
+// noteAbout resolves the product and the issue a request names, and what the
+// issue is filed under here.
 //
 // The product first, and the issue only afterwards. Resolving the issue first
 // and refusing after would answer "is this issue known here" for anybody with
 // an account, which is what authorizing before resolving a name forbids
 // (REQ-42).
+//
+// **A name nobody has filed answers exactly as one this product cannot reach.**
+// Answered apart, anybody holding read on a single product could tell the two
+// apart and walk identifiers — including ones this deployment minted for a
+// flaw nobody has announced. It is the same collapse recording a rating makes,
+// and for the same reason.
+//
+// The identifier comes back as the issue is filed under here rather than as it
+// was typed. A note may be reached through any name the issue answers to, and
+// a notification naming whichever alias the writer happened to use says a
+// different thing about the same note depending on who wrote it.
 func noteAbout(ctx context.Context, in Ingest, subject access.Subject,
-	product, vulnerability string) (int64, int64, error) {
+	product, vulnerability string) (int64, int64, string, error) {
 
-	named, err := productNamed(ctx, in, subject, product)
+	named, err := productForIssue(ctx, in, subject, product)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, "", err
 	}
-	issue, err := finding.NewVulnerabilities(in.DB.DB).ByName(ctx, vulnerability)
+	issues := finding.NewVulnerabilities(in.DB.DB)
+	issue, err := issues.ByName(ctx, vulnerability)
 	if err != nil {
-		return 0, 0, noSuchIssue()
+		return 0, 0, "", noSuchNote()
 	}
-	return named.ID, issue, nil
+	filed, err := issues.NamesByID(ctx, []int64{issue})
+	if err != nil {
+		return 0, 0, "", wentWrong(in.Logger, "the issue could not be read", err)
+	}
+	return named.ID, issue, filed[issue], nil
+}
+
+// productForIssue resolves a product for a route that is about one issue in
+// it.
+//
+// Wider than productNamed by the case grants: somebody brought into one case
+// holds nothing on the product and may still act on the issue they were
+// brought in on, so refusing to resolve the product would refuse them the one
+// thing they were granted while telling them nothing they did not already
+// know. Every read past this still asks about the issue, which is where the
+// case grant is honored again. It is the rule the catalog already applies when
+// it resolves a build for somebody on a case.
+func productForIssue(ctx context.Context, in Ingest, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
+	if err != nil {
+		return nil, noSuchProduct()
+	}
+	if !subject.Sees(product.ID) && len(subject.Cases(product.ID)) == 0 {
+		return nil, noSuchProduct()
+	}
+	return product, nil
 }
 
 // notesOut renders a thread, naming its authors in one lookup.
@@ -256,7 +297,11 @@ func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *tr
 	dropped, err := mentioned(ctx, in, subject, mentionTarget{
 		ProductID: note.ProductID, VulnerabilityID: note.VulnerabilityID,
 		Visibility: visibility, About: identifier,
-	}, note.Body, fmt.Sprintf("/notes/%d", note.ID))
+		// The issue's own screen, which is where the thread is read. A
+		// note carries no address of its own: it is one line of a thread
+		// about an issue in a product, and there is no screen showing one
+		// by itself for a link to point at.
+	}, note.Body, fmt.Sprintf("/issues/%s", identifier))
 	if err != nil {
 		in.Logger.WarnContext(ctx, "could not tell who was named", "error", err)
 	}
@@ -270,7 +315,7 @@ func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *tr
 func refusedNote(logger *slog.Logger, err error) error {
 	switch {
 	case errors.Is(err, triage.ErrNoSuchNote):
-		return huma.Error404NotFound("no note is recorded there")
+		return noSuchNote()
 	case errors.Is(err, access.ErrDenied):
 		return huma.Error403Forbidden("not authorized")
 	}

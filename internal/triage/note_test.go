@@ -3,9 +3,11 @@ package triage_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -244,4 +246,79 @@ func (f *fixture) granted(t *testing.T, identity string, productID int64,
 		t.Fatal(err)
 	}
 	return resolved
+}
+
+func TestSomebodyBroughtOntoACaseReachesItsNotes(t *testing.T) {
+	// A collaborator holds nothing on the product and is brought in on one
+	// issue in it. The pair they were brought in on is the whole of what they
+	// reach — and a note about that issue is inside the pair, so refusing it
+	// would refuse them the one thing they were granted.
+	//
+	// The product's name has to resolve for them too. Refusing there would
+	// refuse them the grant while telling them nothing they did not already
+	// know: what they were told about names a product.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.sits(t, access.Private)
+		rights := access.NewStore(f.db.DB)
+		person, err := rights.Ensure(ctx, "collaborator", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.AddToCase(ctx, f.product, f.issue, person.ID, f.proposer); err != nil {
+			t.Fatal(err)
+		}
+		brought, err := rights.Resolve(ctx, "collaborator")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if brought.Sees(f.product) {
+			t.Fatal("the collaborator holds the product outright, so this tests nothing")
+		}
+
+		note, err := f.store.NoteOn(ctx, brought, f.product, f.issue,
+			"We saw this in our own build last month.")
+		if err != nil {
+			t.Fatalf("somebody brought onto the case could not write a note on it: %v", err)
+		}
+		if _, err := f.store.Notes(ctx, brought, f.product, f.issue); err != nil {
+			t.Fatalf("somebody brought onto the case could not read its notes: %v", err)
+		}
+		if _, err := f.store.RewordNote(ctx, brought, note.ID, "Corrected."); err != nil {
+			t.Fatalf("somebody brought onto the case could not change their own note: %v", err)
+		}
+
+		// And nothing else of the product. Another issue there is one they
+		// were not brought in on.
+		other := f.anotherIssue(t, "CVE-2026-2")
+		if _, err := f.store.Notes(ctx, brought, f.product, other); !errors.Is(err, triage.ErrNoSuchNote) {
+			t.Errorf("the case grant reached an issue it does not name: %v", err)
+		}
+	})
+}
+
+// anotherIssue interns a second issue and opens it at a place in the fixture's
+// product, so a case grant has something it does not cover to be refused on.
+func (f *fixture) anotherIssue(t *testing.T, identifier string) int64 {
+	t.Helper()
+	ctx := t.Context()
+	interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+		{Identifier: identifier, Severity: "high"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := interned[identifier]
+	in := f.build(t, f.product, "202505")
+	row := &finding.Finding{
+		TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: id,
+		Visibility: access.Public, ComponentID: f.component(t, "libbaz", "1.0"),
+		PlaceIdentity: "place-of-libbaz",
+		LastChangedAt: time.Now().Truncate(time.Microsecond),
+		OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
+	}
+	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return id
 }

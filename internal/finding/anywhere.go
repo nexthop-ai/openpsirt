@@ -143,7 +143,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// And whatever the row's own product rates it, for the same
 			// reason: a rating belongs to a product, so a list spanning them
 			// reads each row's against the product that row is in.
-			Join(RatedFor("st.product_id")).
+			Join(RatedFor(RatedOnStream)).
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.

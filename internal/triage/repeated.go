@@ -80,7 +80,7 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 		// The report is per product already, and a rating belongs to one — so
 		// the word beside a repeated deferral is the word the team doing the
 		// deferring holds.
-		Join(finding.RatedFor("de.product_id")).
+		Join(finding.RatedFor(finding.RatedOnDecision)).
 		// The argument, which is where the outcome and the date live.
 		Join(`JOIN "claim" AS cl ON cl.id = de.claim_id`).
 		// Grouped on the product's identifier and the issue's, with the names

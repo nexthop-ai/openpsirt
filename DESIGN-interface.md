@@ -553,7 +553,27 @@ The finding is the working screen after a decision as well as before it.
 |---|---|
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
 | **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
-| **Under both** | One activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+| **Under both** | The notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+
+The notes thread and the claim's comments are two threads, rendered near each
+other (REQ-29).
+
+| | Shown | Says |
+|---|---|---|
+| Notes | Always | What it is about, in words: this issue in this product, every build of it, and no other product. Read beside a row that may be one of several the same issue sits on, so "not this component" is the part a reader has to be told |
+| Comments | Only where a claim exists | What was said about the argument somebody made, at this place |
+
+The notes thread is the one somebody can write in before anybody has decided
+anything, which is why it is not gated on a claim. Nothing about writing one
+changes what ranks, a deadline, or what the product triages, and it says so
+beside the button.
+
+**The issue screen carries the same thread, a product at a time.** That screen
+shows an issue wherever it sits, and a note belongs to one product — so one
+thread merging what several teams wrote would be the deployment-wide record a
+per-product note exists to avoid, and a reader could not tell which product any
+line of it was about. A product is picked where the issue sits in more than
+one.
 
 The description leads, at full width (REQ-60, as amended). The rule that put the
 action first is still the defect it fixes — the form had been three screens down

@@ -161,3 +161,52 @@ func TestOnlyTheAuthorEditsANoteThroughTheApi(t *testing.T) {
 		}
 	})
 }
+
+func TestACollaboratorReachesTheNotesOnTheirOwnCase(t *testing.T) {
+	// A collaborator holds nothing on the product and is brought in on one
+	// issue in it. The route has to resolve the product's name for them —
+	// refusing there would refuse them the one thing they were granted while
+	// telling them nothing they did not already know — and then the issue is
+	// where the grant is honored again.
+	//
+	// Without this the case arms in the note store are unreachable and the
+	// design document promises access the routes refuse.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+		notes := "/v1/products/mine/issues/" + embargoed + "/notes"
+
+		// The outsider holds a role on the other product and nothing on this
+		// one, so this product does not resolve for them at all yet. Somebody
+		// granted nothing anywhere is refused at the door, which is why the
+		// case is put on a person who holds something somewhere else.
+		if got := asPerson(t, r, "outsider", http.MethodGet, notes, ""); got.Code != http.StatusNotFound {
+			t.Fatalf("somebody holding nothing on this product reached the thread with %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing somebody in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		if got := asPerson(t, r, "outsider", http.MethodGet, notes, ""); got.Code != http.StatusOK {
+			t.Fatalf("a collaborator cannot read the notes on the case they are on: %d %s",
+				got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "outsider", http.MethodPost, notes,
+			`{"body":"We saw this in our own build last month."}`); got.Code != http.StatusCreated {
+			t.Fatalf("a collaborator cannot write a note on the case they are on: %d %s",
+				got.Code, got.Body.String())
+		}
+
+		// And nothing else of the product: the scanned issue is one they were
+		// not brought in on.
+		other := "/v1/products/mine/issues/CVE-2026-9999/notes"
+		if got := asPerson(t, r, "outsider", http.MethodGet, other, ""); got.Code != http.StatusNotFound {
+			t.Errorf("the case grant reached an issue it does not name: %d %s",
+				got.Code, got.Body.String())
+		}
+	})
+}

@@ -116,7 +116,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 		// Inside the transaction, because a retry re-runs this closure
 		// against a database that has moved and an authorization
 		// answered against the old one describes a world that is gone.
-		told, err := mayRateHere(ctx, tx, subject, productID, vulnerabilityID)
+		told, err := MayBeToldOfWithin(ctx, tx, subject, productID, vulnerabilityID)
 		if err != nil {
 			return err
 		}
@@ -189,33 +189,6 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 	return recorded, nil
 }
 
-// mayRateHere reports whether this subject may record a rating about this
-// issue in this product.
-//
-// The issue in this product, where they may read a finding of it; or an issue
-// that has reached nothing at all, which is a flaw somebody entered here
-// before any scan found it and which no rating can disclose, because there is
-// no finding for a rating to say anything about.
-//
-// Both halves matter. Without the first, naming an identifier this deployment
-// minted for an unannounced flaw handed back the severity recorded against it.
-// Without the second, a product could not get ahead of an issue it knows is
-// coming.
-func mayRateHere(ctx context.Context, db bun.IDB, subject access.Subject,
-	productID, vulnerabilityID int64) (bool, error) {
-
-	told, err := mayBeToldOfHere(ctx, db, subject, productID, vulnerabilityID)
-	if err != nil || told {
-		return told, err
-	}
-	anywhere, err := db.NewSelect().Model((*Finding)(nil)).
-		Where("vulnerability_id = ?", vulnerabilityID).Count(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read whether this issue reaches anything: %w", err)
-	}
-	return anywhere == 0, nil
-}
-
 // Agree puts a milder assessment into force.
 //
 // Somebody other than whoever proposed it, for the same reason every other
@@ -251,7 +224,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 			!subject.Triages(access.Public, claim.ProductID) {
 			return ErrNoSuchAssessment
 		}
-		told, err := mayBeToldOfHere(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)
+		told, err := MayBeToldOfWithin(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)
 		if err != nil {
 			return err
 		}
@@ -304,7 +277,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		if !subject.Triages(access.Public, claim.ProductID) {
 			return ErrNoSuchAssessment
 		}
-		told, err := mayBeToldOfHere(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)
+		told, err := MayBeToldOfWithin(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)
 		if err != nil {
 			return err
 		}
@@ -351,19 +324,33 @@ func liveRating(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64
 			return fmt.Errorf("take the rating out of force: %w", err)
 		}
 	} else {
-		// Written as an insert that falls back to an update rather than as
-		// whatever each engine spells "upsert": the four do not agree on the
-		// spelling, and the pair is under a unique constraint, so the write
-		// that loses the race is the one that updates.
-		rating := &IssueRating{
-			VulnerabilityID: vulnerabilityID, ProductID: productID, Severity: severity,
+		// Read, then written, rather than written and caught: the four engines
+		// spell "upsert" four ways, and no statement in this transaction is
+		// allowed to fail, because PostgreSQL leaves a transaction aborted
+		// after one and every statement after it in the same transaction
+		// fails too. The two other answers to this question here — recording
+		// a setting, adding somebody to a team — are the same shape for the
+		// same reason.
+		//
+		// Both halves in one transaction, so what the read saw is what the
+		// write writes against. The whole closure is retried, so a rival
+		// writer between the two re-runs it rather than being missed.
+		held, err := tx.NewSelect().Model((*IssueRating)(nil)).
+			Where("vulnerability_id = ?", vulnerabilityID).
+			Where("product_id = ?", productID).Count(ctx)
+		if err != nil {
+			return fmt.Errorf("read what this product rates it now: %w", err)
 		}
-		_, err := tx.NewInsert().Model(rating).Exec(ctx)
-		if database.IsDuplicate(err) {
+		if held > 0 {
 			_, err = tx.NewUpdate().Model((*IssueRating)(nil)).
 				Set("severity = ?", severity).
 				Where("vulnerability_id = ?", vulnerabilityID).
 				Where("product_id = ?", productID).Exec(ctx)
+		} else {
+			_, err = tx.NewInsert().Model(&IssueRating{
+				VulnerabilityID: vulnerabilityID, ProductID: productID,
+				Severity: severity,
+			}).Exec(ctx)
 		}
 		if err != nil {
 			return fmt.Errorf("put the rating in force: %w", err)
@@ -539,12 +526,17 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 		if err != nil {
 			return err
 		}
+		// What each of them rates it, in one statement rather than one per
+		// product. The batched read is what RatingsIn is for, and a
+		// deployment with a dozen products would otherwise ask twelve
+		// questions to answer one.
+		rated, err := RatingsIn(ctx, tx, products, []int64{id})
+		if err != nil {
+			return err
+		}
 		for _, productID := range products {
-			assessed, err := RatingIn(ctx, tx, productID, id)
-			if err != nil {
-				return err
-			}
-			if err := rerank(ctx, tx, productID, id, assessed); err != nil {
+			if err := rerank(ctx, tx, productID, id,
+				rated[RatedKey{ProductID: productID, VulnerabilityID: id}]); err != nil {
 				return err
 			}
 		}
@@ -751,7 +743,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	// would otherwise be told the shape of an issue it may not be told
 	// about. Asked of the claim's own product, which is the only place this
 	// rating reaches.
-	told, err := mayBeToldOfHere(ctx, s.db, subject, claim.ProductID, claim.VulnerabilityID)
+	told, err := MayBeToldOfWithin(ctx, s.db, subject, claim.ProductID, claim.VulnerabilityID)
 	if err != nil {
 		return Consequence{}, err
 	}

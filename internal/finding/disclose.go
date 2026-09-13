@@ -90,7 +90,7 @@ func (s *Store) Disclosing(ctx context.Context, subject access.Subject, scope Sc
 		Join("JOIN product AS p ON p.id = st.product_id").
 		Join("JOIN component AS c ON c.id = f.component_id").
 		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		Join(RatedFor("st.product_id")).
+		Join(RatedFor(RatedOnStream)).
 		ColumnExpr("v.identifier AS vulnerability").
 		ColumnExpr("v.description AS summary").
 		ColumnExpr(EffectiveSeverityExpr+" AS severity").

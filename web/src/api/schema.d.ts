@@ -2167,7 +2167,7 @@ export interface paths {
          * Add a note to an issue in a product
          * @description Adds a markdown note about this issue in this product. It records no judgment: nothing about what ranks, what a deadline is, or what the product triages changes because somebody wrote one.
          *
-         *     **This is the way to leave something for whoever decides without deciding.** A comment hangs off a claim, so before this the first person to say anything had to record a judgment in order to say it.
+         *     **This is the way to leave something for whoever decides without deciding.** A comment hangs off a claim; a note does not, so nothing has to be judged before anything can be said.
          *
          *     It reaches every build of the product and does not lapse when a version moves. Something true of one copy and not another — "we do not call that function in the vendored build" — is about a place, and belongs on the claim there.
          *
@@ -4350,8 +4350,10 @@ export interface components {
              * @description Open findings of this issue you can see in this product
              */
             open?: number;
-            /** @description The product this rating belongs to */
+            /** @description The product this rating belongs to, by the name an address takes */
             product?: string;
+            /** @description How that product is spelled on screen */
+            product_name?: string;
             /** @description What was published when this was made, kept so a reader can see what we disagreed with */
             published?: string;
             /** @description Why. It outlives the version it was made about, so the next person needs the argument */

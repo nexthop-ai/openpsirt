@@ -29,7 +29,7 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		// And whatever the row's own product rates the issue. Every watch
 		// spans products, and a rating belongs to one — so what an alert
 		// calls critical is what the product it is about calls critical.
-		Join(finding.RatedFor("st.product_id"))
+		Join(finding.RatedFor(finding.RatedOnStream))
 	if consumer {
 		q = q.Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id")
 	}

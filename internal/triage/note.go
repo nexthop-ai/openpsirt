@@ -120,23 +120,6 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return nil, ErrNoSuchNote
 	}
-	note := new(IssueNote)
-	if err := s.db.NewSelect().Model(note).Where("id = ?", noteID).Scan(ctx); err != nil {
-		return nil, ErrNoSuchNote
-	}
-	told, at, err := s.noteReach(ctx, subject, note.ProductID, note.VulnerabilityID)
-	if err != nil {
-		return nil, err
-	}
-	if !told {
-		return nil, ErrNoSuchNote
-	}
-	if !subject.Triages(at, note.ProductID) && !subject.OnCase(note.ProductID, note.VulnerabilityID) {
-		return nil, access.Denied("change a note about an issue here")
-	}
-	if note.WrittenBy != subject.ID {
-		return nil, errors.New("only the person who wrote a note may change it")
-	}
 	if strings.TrimSpace(body) == "" {
 		return nil, errors.New("a note has to say something")
 	}
@@ -144,16 +127,40 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 		return nil, err
 	}
 
+	note := new(IssueNote)
 	edited := s.now().Truncate(time.Microsecond)
-	// What it said before, kept, and both writes together. Written apart, an
-	// edit that succeeded and a history write that did not would leave the
-	// record saying a note was changed and nothing saying from what — which is
-	// worse than keeping no history, because it looks like one.
+	// Everything this decides on is read inside the transaction that writes.
+	// A retry re-runs the closure against a database that has moved, so a
+	// value fetched before it began describes a world that is gone — and one
+	// of those values is whether the asker may be here at all.
+	//
+	// What it said before is kept in the same transaction for a second
+	// reason: written apart, an edit that succeeded beside a history write
+	// that did not would leave the record saying a note was changed and
+	// nothing saying from what, which is worse than keeping no history
+	// because it looks like one.
 	db, ok := s.db.(*bun.DB)
 	if !ok {
 		return nil, errors.New("this store is already inside a transaction")
 	}
 	if err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+		if err := tx.NewSelect().Model(note).Where("id = ?", noteID).Scan(ctx); err != nil {
+			return ErrNoSuchNote
+		}
+		told, at, err := noteReach(ctx, tx, subject, note.ProductID, note.VulnerabilityID)
+		if err != nil {
+			return err
+		}
+		if !told {
+			return ErrNoSuchNote
+		}
+		if !subject.Triages(at, note.ProductID) &&
+			!subject.OnCase(note.ProductID, note.VulnerabilityID) {
+			return access.Denied("change a note about an issue here")
+		}
+		if note.WrittenBy != subject.ID {
+			return errors.New("only the person who wrote a note may change it")
+		}
 		// The ordinal is read inside the transaction, so two edits at once
 		// cannot be handed the same number: the unique index refuses the
 		// second, and the loser retries against a database that has moved.
@@ -253,7 +260,13 @@ func (s *Store) EarlierNote(ctx context.Context, subject access.Subject,
 func (s *Store) NoteVisibility(ctx context.Context, productID,
 	vulnerabilityID int64) (access.Visibility, error) {
 
-	hidden, err := s.db.NewSelect().
+	return noteVisibility(ctx, s.db, productID, vulnerabilityID)
+}
+
+func noteVisibility(ctx context.Context, db bun.IDB, productID,
+	vulnerabilityID int64) (access.Visibility, error) {
+
+	hidden, err := db.NewSelect().
 		TableExpr("finding AS f").
 		Join("JOIN target AS tg ON tg.id = f.target_id").
 		Join("JOIN stream AS st ON st.id = tg.stream_id").
@@ -287,16 +300,20 @@ func (s *Store) NoteVisibility(ctx context.Context, productID,
 func (s *Store) noteReach(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64) (bool, access.Visibility, error) {
 
-	// Through the pool. A note is written and read on the way in and out of a
-	// handler, never inside a transaction somebody else opened.
-	pool, ok := s.db.(*bun.DB)
-	if !ok {
-		return false, access.Public, errors.New("notes are not read inside a transaction")
-	}
-	told, err := finding.NewStore(pool).MayBeToldOfIn(ctx, subject, productID, vulnerabilityID)
+	return noteReach(ctx, s.db, subject, productID, vulnerabilityID)
+}
+
+// noteReach against a handle the caller chooses, so that the write below can
+// ask it from inside its own transaction: a retry re-runs the closure against
+// a database that has moved, and an authorization answered outside describes a
+// world that is gone.
+func noteReach(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID, vulnerabilityID int64) (bool, access.Visibility, error) {
+
+	told, err := finding.MayBeToldOfWithin(ctx, db, subject, productID, vulnerabilityID)
 	if err != nil || !told {
 		return false, access.Public, err
 	}
-	at, err := s.NoteVisibility(ctx, productID, vulnerabilityID)
+	at, err := noteVisibility(ctx, db, productID, vulnerabilityID)
 	return err == nil, at, err
 }

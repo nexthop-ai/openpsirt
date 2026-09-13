@@ -114,9 +114,10 @@ behind every line of it.
 - **An approver works at the unit the proposer acted at**, approves, sends back
  or undoes a batch as one act, and an approval points at one revision of the
  justification — editing the text withdraws it
-- **An opinion about the issue itself** is recorded against the issue, applies
- wherever it appears including products it has not reached, and does not lapse
- when a version moves
+- **What is recorded against an issue** — a rating that disagrees with the
+ published one, or a note for whoever decides — belongs to one product, applies
+ to every build of it, and does not lapse when a version moves. Two products may
+ record different things about the same issue
 - **A third party's judgment is evidence, never a decision.** The build's
  suppressions and a supplier's VEX are shown and offered as a prefill
 - **A deployment says what it considers worth triaging** and a product may say

@@ -845,8 +845,33 @@ func (s *Store) ExistingTarget(ctx context.Context, streamID, variantID int64) (
 	return target, nil
 }
 
-// ProductNames resolves products to their names, for showing which product a
-// row is about.
+// ProductsCalled is the name each of these products goes by, as an address
+// takes it.
+//
+// Beside ProductNames, which answers the display name. The two are different
+// questions, and a caller wanting one and handed the other gets a word that
+// does not resolve.
+//
+// Batched for the reason ProductNames is, and stated there.
+func (s *Store) ProductsCalled(ctx context.Context, ids []int64) (map[int64]string, error) {
+	called := map[int64]string{}
+	if len(ids) == 0 {
+		return called, nil
+	}
+	var products []Product
+	if err := s.db.NewSelect().Model(&products).
+		Column("id", "name").
+		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what these products are called: %w", err)
+	}
+	for _, product := range products {
+		called[product.ID] = product.Name
+	}
+	return called, nil
+}
+
+// ProductNames resolves products to their display names, for showing which
+// product a row is about.
 //
 // Batched for the same reason people are: the lists that need it are long, and
 // a query per row is how a page of fifty becomes fifty-one round trips.

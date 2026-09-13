@@ -132,7 +132,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
 		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(ir.severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		// The deadline, because a promise to act is gated against the earliest
 		// one among what the act covers. Read from the rows rather than
@@ -298,7 +298,7 @@ type placeRow struct {
 	// Assessed is what this place's own product rates the issue, empty where
 	// it rates it nothing. Another product's rating is not read here: the
 	// judgment being made is this product's.
-	Assessed   string `bun:"assessed_severity"`
+	Assessed   string `bun:"rated_here"`
 	ScoreCenti int    `bun:"score_centi"`
 	// OnTag as an integer rather than a boolean: the four engines spell a
 	// boolean three ways, and a CASE returning 1 or 0 reads the same on all of
@@ -399,7 +399,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
 		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(ir.severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
 		ColumnExpr("f.due_at AS due_at").
@@ -523,7 +523,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
 		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(ir.severity, '') AS assessed_severity").
+		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
 		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
 		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
 		// The deadline each place carries, for the reason PlaceFor reads it.

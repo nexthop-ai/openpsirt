@@ -97,12 +97,16 @@ func TestRatingSomethingMilderWaitsForSomebodyElse(t *testing.T) {
 	})
 }
 
-func TestRatingAnIssueAsksForTriageSomewhere(t *testing.T) {
-	// A rating is not about a product, which is why it stood on nothing
-	// more than being a person: there was no product to hold a role on.
-	// That is not an authorization rule. A rating moves deadlines and can
-	// take a finding off the working list entirely, in every product at
-	// once, so it asks for triage somewhere.
+func TestReadingAProductDoesNotCarryRatingAnIssueInIt(t *testing.T) {
+	// Reading is not arguing. A rating moves this product's deadlines and can
+	// take its findings off its working list entirely, and being able to read
+	// what it ships is not a reason to be trusted with either — nor is being
+	// signed in, which is what stood here before there was a product to hold a
+	// role on at all.
+	//
+	// Which product the role has to be held on is pinned by
+	// TestRatingAProductAsksForTriageOnThatProduct; this pins that a role is
+	// needed at all.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -589,11 +593,16 @@ func TestAgreeingAndWithdrawingAnswerAsThoughTheClaimWereAbsent(t *testing.T) {
 	})
 }
 
-func TestRatingAnIssueThatReachesNothingIsStillAllowed(t *testing.T) {
-	// The forward-looking half of recording an opinion against the issue:
-	// it reaches products the issue has not met yet. An issue that
-	// sits at no build here is nobody's secret, so narrowing must not take
-	// this away.
+func TestAnIssueThisProductDoesNotCarryCannotBeRatedInIt(t *testing.T) {
+	// A rating belongs to a product and says how a component is used there,
+	// so an issue the product does not carry is not its to rate. Getting ahead
+	// of an issue before it arrives was the deployment-wide shape's, and
+	// DESIGN-triage.md records it as given up.
+	//
+	// Refused in the words a name nobody has used gets, so the route cannot be
+	// walked to find out which issues a product ships. And refused by every
+	// act on a rating alike: recording one that could then never be withdrawn,
+	// agreed to or listed would be the same capability half-built.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		unreached := f.interned(t, "CVE-2026-NOWHERE")
@@ -601,8 +610,12 @@ func TestRatingAnIssueThatReachesNothingIsStillAllowed(t *testing.T) {
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage)
 		if _, err := f.store.Assess(t.Context(), who, f.productID, unreached, "critical",
-			"Rated before it arrives here."); err != nil {
-			t.Fatalf("rating an issue that reaches nothing was refused: %v", err)
+			"Rated before it arrives here."); !errors.Is(err, finding.ErrUnknownIssue) {
+			t.Errorf("rating an issue this product does not carry answered %v, want the words "+
+				"a name nobody has used gets", err)
+		}
+		if f.liveAssessments(t, unreached) != 0 {
+			t.Error("a rating landed on an issue this product does not carry")
 		}
 	})
 }

@@ -60,15 +60,15 @@ var ErrUnknownIssue = errors.New("no issue is known by that name")
 func (s *Store) MayBeToldOfIn(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64) (bool, error) {
 
-	return mayBeToldOfHere(ctx, s.db, subject, productID, vulnerabilityID)
+	return MayBeToldOfWithin(ctx, s.db, subject, productID, vulnerabilityID)
 }
 
-// mayBeToldOfHere is MayBeToldOfIn against a handle the caller chooses, so
+// MayBeToldOfWithin is MayBeToldOfIn against a handle the caller chooses, so
 // that a transaction asks it from inside itself.
 //
 // A retry re-runs its closure against a database that has moved, so an
 // authorization answered outside describes a world that is gone.
-func mayBeToldOfHere(ctx context.Context, db bun.IDB, subject access.Subject,
+func MayBeToldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 	productID, vulnerabilityID int64) (bool, error) {
 
 	if subject.Kind != access.Person {

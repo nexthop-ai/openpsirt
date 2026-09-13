@@ -20,7 +20,12 @@ type AssessmentBody struct {
 	// Product is whose rating it is. Carried on every row because two
 	// products may rate one issue differently, so a rating shown without one
 	// is a word nobody can act on.
-	Product       string `json:"product,omitempty" doc:"The product this rating belongs to"`
+	//
+	// The name an address takes, never the spelling shown on screen — the
+	// same field on both operations has to mean the same thing, and this is
+	// the one a client feeds back to the filter beside it.
+	Product       string `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
+	ProductName   string `json:"product_name,omitempty" doc:"How that product is spelled on screen"`
 	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"What this product rates it"`
 	Published     string `json:"published,omitempty" doc:"What was published when this was made, kept so a reader can see what we disagreed with"`
 	Reasoning     string `json:"reasoning" minLength:"1" doc:"Why. It outlives the version it was made about, so the next person needs the argument"`
@@ -112,7 +117,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			return nil, asked(in.Logger, err)
 		}
 		body := assessmentBody(*claim, input.Vulnerability, subject.ID)
-		body.Product = input.Product
+		body.Product, body.ProductName = product.Name, product.DisplayName
 		return &struct{ Body AssessmentBody }{Body: body}, nil
 	})
 
@@ -226,7 +231,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		}
 		// What each rating's product is called, read once for the page rather
 		// than per row.
-		products, err := productsNamed(ctx, in, claims)
+		products, shown, err := productsNamed(ctx, in, claims)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what these ratings belong to could not be read", err)
 		}
@@ -235,6 +240,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		for _, claim := range claims {
 			body := assessmentBody(claim, named[claim.VulnerabilityID], subject.ID)
 			body.Product = products[claim.ProductID]
+			body.ProductName = shown[claim.ProductID]
 			// Only for the ones somebody is being asked to agree to. It is a
 			// question about a decision not yet taken, and a query each for
 			// every historical claim would buy nothing.
@@ -266,21 +272,32 @@ func assessmentBody(a finding.Assessment, identifier string, asking int64) Asses
 	}
 }
 
-// productsNamed is what each of these ratings' products is called.
+// productsNamed is the name each of these ratings' products goes by.
 //
 // One lookup for the page. A rating belongs to a product and the row has to
 // say which, because two products may rate one issue differently and a word
 // with no product beside it is not actionable.
-func productsNamed(ctx context.Context, in Ingest, claims []finding.Assessment) (map[int64]string, error) {
-	named := map[int64]string{}
+//
+// The name rather than the display name, because that is what the field means
+// on the operation that records a rating and what the filter beside this one
+// takes. One field spelled two ways by two operations hands a client "SONiC"
+// where "sonic" was wanted.
+func productsNamed(ctx context.Context, in Ingest,
+	claims []finding.Assessment) (called, shown map[int64]string, err error) {
+
 	if len(claims) == 0 {
-		return named, nil
+		return map[int64]string{}, map[int64]string{}, nil
 	}
 	ids := make([]int64, 0, len(claims))
 	for _, claim := range claims {
 		ids = append(ids, claim.ProductID)
 	}
-	return catalog.NewStore(in.DB.DB).ProductNames(ctx, ids)
+	products := catalog.NewStore(in.DB.DB)
+	if called, err = products.ProductsCalled(ctx, ids); err != nil {
+		return nil, nil, err
+	}
+	shown, err = products.ProductNames(ctx, ids)
+	return called, shown, err
 }
 
 // productNamed resolves a product name the caller supplied, refusing one they
