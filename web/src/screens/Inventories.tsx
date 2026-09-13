@@ -58,8 +58,7 @@ export function Inventories() {
       <div className="screen-head">
         <h2>Inventories</h2>
         <p>
-          {product} · {stream} · {variant} — what each build uploaded and what the scan of it found
-          · newest first
+          {product} · {stream} · {variant}· newest first
         </p>
         <span style={{ marginLeft: "auto" }}>
           <button type="button" className="btn" onClick={() => setUploading(true)}>
@@ -150,7 +149,7 @@ export function Inventories() {
                       <div
                         className="hint"
                         style={{ marginTop: 4 }}
-                        title="What the scanner said while succeeding. It qualifies what the run found rather than saying it found nothing"
+                        title="A warning from a scan that still succeeded"
                       >
                         ⚠ {scan.caution}
                       </div>
@@ -217,11 +216,9 @@ export function Inventories() {
 
       {measured && (
         <div className="card" style={{ marginTop: 16 }}>
-          <h3>Scanner</h3>
-          <p className="reading" style={{ margin: "0 0 10px" }}>
-            Every inventory is scanned here, on a schedule, by the same scanner against the same
-            database — so counts compare between products. Each finding records what produced it.
-          </p>
+          <h3 title="Every inventory is scanned here, on a schedule, by the same scanner against the same database, so counts compare between products">
+            Scanner
+          </h3>
           <div className="scores">
             <div className="score">
               <span className="n">{measured.scanner ?? "—"}</span>

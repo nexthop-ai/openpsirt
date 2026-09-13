@@ -176,16 +176,13 @@ export function HowMatched({
     <div className="evblock">
       <h4>Match evidence</h4>
       {matched === "identifier" ? (
-        <p>
-          <b>Not confirmed by a packager.</b> Matched by comparing a published identifier against an
-          upstream version range. A distribution backports fixes without moving that version, so
-          this may already be fixed in <span className="id">{version}</span> — nobody has confirmed
-          either way.
+        <p title="Matched on a version range, not a packager advisory">
+          <b>Not confirmed by a packager.</b> May already be fixed in{" "}
+          <span className="id">{version}</span>.
         </p>
       ) : (
-        <p>
-          <b>Confirmed by a packager.</b> Matched through an advisory for this package's own
-          ecosystem, which counts the release number and names the release that carries the fix.
+        <p title="Matched through the package's own advisory">
+          <b>Confirmed by a packager.</b>
         </p>
       )}
       {/* The evidence for the judgment above rather than a second way of
@@ -204,10 +201,8 @@ export function HowMatched({
         </p>
       )}
       {from && (
-        <p className="hint">
-          The data behind it came from <Away url={from} />, which is not always where the issue is
-          written up: one issue reached through two ecosystems has two answers and the issue itself
-          can hold one.
+        <p className="hint" title="Where the match data came from">
+          Source <Away url={from} />
         </p>
       )}
     </div>
@@ -467,10 +462,12 @@ export function FixingIn({
               </tbody>
             </table>
           </div>
-          <p className="hint" style={{ margin: "10px 0 0" }}>
-            Declared intent, not commits. A release clears when the next scan of it stops finding
-            the issue &mdash; nothing here is marked done by hand, and a release it has left says so
-            whether anybody planned it or not.
+          <p
+            className="hint"
+            style={{ margin: "10px 0 0" }}
+            title="Cleared by the next scan, never by hand"
+          >
+            Planned fixes. Cleared by the next scan
           </p>
         </>
       )}
@@ -564,10 +561,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
       {told.isPending ? (
         <Loading />
       ) : !report ? (
-        <p className="reading">
-          Nobody outside is recorded as having reported this, which is what a flaw we found
-          ourselves looks like.
-        </p>
+        <p className="reading">No outside reporter recorded.</p>
       ) : (
         <>
           <p className="reading" style={{ marginBottom: 6 }}>
@@ -589,11 +583,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
           ) : (
             <div className="alert" style={{ margin: "6px 0 0" }}>
               <strong>Nobody has answered them.</strong>
-              <span>
-                Prompt acknowledgment is the part of coordinated disclosure a reporter judges, and
-                it is the step that costs nothing and is missed by being nobody&rsquo;s job. Send
-                them a note, then record it here.
-              </span>
+              <span>Send them a note, then record it here.</span>
               <button
                 type="button"
                 className="btn"
@@ -634,9 +624,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
           </button>
         </div>
         <span className="hint">
-          A CVE assigned after we minted our own. Nothing about the finding, the decisions or the
-          approvals moves — they are keyed on the issue rather than on what it is called — and the
-          issue is filed under the name a reader will look for.
+          A CVE assigned after we minted our own. Findings and decisions are unaffected.
         </span>
         {alsoKnown.error != null && (
           <Failed error={alsoKnown.error} what="That name could not be recorded." />

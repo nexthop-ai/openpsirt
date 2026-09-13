@@ -283,9 +283,8 @@ export function Component() {
                 none="No one yet"
               />
               <span className="hint">
-                A team is a queue rather than a holding: it stays unheld until somebody on it takes
-                it. Everything the promise covers is handed over in the same act, across every build
-                of the product — the promise is per release and who is doing the work is not.
+                A team queue stays unassigned until someone takes it. Covers every build of the
+                product.
               </span>
             </label>
           </div>
@@ -311,11 +310,8 @@ export function Component() {
       )}
 
       <p className="hint" style={{ marginTop: 10 }}>
-        Where it could go is listed rather than ordered: telling which of two versions comes first
-        needs an ordering per ecosystem this does not have, so the one that closes the most is
-        offered first and &ldquo;nearest&rdquo; is not a question this can answer. The deadline is
-        the earliest among what is open in that build, and it is what a commitment there is measured
-        against.
+        Listed by how much each closes, not by version order. The deadline is the earliest open in
+        that build.
       </p>
     </>
   );

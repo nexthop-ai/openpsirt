@@ -316,10 +316,9 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="field">
+    <label className="field" title={hint}>
       <span>{label}</span>
       {children}
-      {hint && <span className="hint">{hint}</span>}
     </label>
   );
 }
@@ -445,7 +444,7 @@ export function Filters({
         />
         <Flag
           label="Include below the triage line"
-          hint="What this product does not consider worth triaging. Always recorded and counted; this asks to see it"
+          hint="Always recorded and counted"
           on={at("below") === "yes"}
           onChange={(on) => set("below", on ? "yes" : "")}
         />
@@ -454,7 +453,7 @@ export function Filters({
       <Group legend="Upstream fix">
         <Choices
           label="Fix status"
-          hint="What upstream has done. No fix released and will not fix are the rows that need a judgment rather than a version bump, and they are one question asked together"
+          hint="What upstream has done"
           chosen={all("fix_state")}
           options={FIX_STATES}
           onChange={(chosen) => setMany("fix_state", chosen)}
@@ -470,7 +469,7 @@ export function Filters({
         />
         <Flag
           label="Not confirmed by a packager"
-          hint="Matched by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the version, so these are neither confirmed nor refuted"
+          hint="Matched on a version range, not a packager advisory"
           on={at("unconfirmed") === "1"}
           onChange={(on) => flag("unconfirmed", on)}
         />
@@ -482,21 +481,21 @@ export function Filters({
             whichever is used the other says the same thing. */}
         <Choices
           label="Decision state"
-          hint="Undecided and pending approval together are everything nobody has finished with"
+          hint="Anything unfinished"
           chosen={all("state")}
           options={STATES}
           onChange={(chosen) => setMany("state", chosen)}
         />
         <Choices
           label="Decision outcome"
-          hint="Which judgment stands, which the state cannot say"
+          hint="The outcome that stands"
           chosen={all("outcome")}
           options={OUTCOMES}
           onChange={(chosen) => setMany("outcome", chosen)}
         />
         <Choices
           label="Assigned to"
-          hint="Mine and whatever nobody has picked up is one question about a morning"
+          hint="Mine and unassigned together"
           chosen={all("assigned")}
           options={ASSIGNED}
           onChange={(chosen) => setMany("assigned", chosen)}
@@ -510,7 +509,7 @@ export function Filters({
             promise puts what it covered back with nothing to clean up. */}
         <Pick
           label="Planned upgrade"
-          hint="Work a promised upgrade already answers. The by-issue list leaves it out unless asked, because deciding it again one finding at a time is what the promise was made instead of"
+          hint="Findings a promised upgrade already covers"
           value={at("planned") || "either"}
           options={PLANNED}
           onChange={(value) => set("planned", value)}
@@ -525,21 +524,21 @@ export function Filters({
       <Group legend="Origin">
         <Pick
           label="Recorded by"
-          hint="A flaw entered by hand is the only kind a person may close by hand"
+          hint="Only manually entered flaws can be closed by hand"
           value={at("recorded") === "1" ? "manual" : ""}
           options={ORIGINS}
           onChange={(value) => set("recorded", value === "manual" ? "1" : "")}
         />
         <Words
           label="VEX publisher"
-          hint="Who published the document it came from. Any of them; Enter adds one"
+          hint="Publisher of the VEX document. Enter adds one"
           placeholder="debian"
           words={all("vex_publisher")}
           onChange={(words) => setMany("vex_publisher", words)}
         />
         <Choices
           label="VEX status"
-          hint="In the format's own vocabulary. With a publisher, both must hold"
+          hint="VEX status. With a publisher, both must match"
           chosen={all("vex_status")}
           options={VEX_STATUS}
           onChange={(chosen) => setMany("vex_status", chosen)}
@@ -554,7 +553,7 @@ export function Filters({
       <Group legend="Release">
         <Choices
           label="Release kind"
-          hint="A tag was built once and is what somebody received; no work lands in it"
+          hint="Tags are built once, so no work lands in them"
           anything="Branches and tags"
           chosen={all("on")}
           options={RELEASES}
@@ -562,7 +561,7 @@ export function Filters({
         />
         <Choices
           label="Support"
-          hint="The release's own end-of-life date, or the product's where it states none"
+          hint="End-of-life date, from the release or the product"
           anything="Whatever its support"
           chosen={all("support")}
           options={SUPPORT}
@@ -575,7 +574,7 @@ export function Filters({
       <Group legend="Component">
         <Words
           label="Component name"
-          hint="The exact package name, at any version. Any of them; Enter adds one"
+          hint="Exact package name, any version. Enter adds one"
           placeholder="openssl"
           words={all("component")}
           onChange={(words) => setMany("component", words)}
@@ -603,7 +602,7 @@ export function Filters({
           onChange={(on) => set("under_build", on ? "yes" : "")}
         />
         {oneBuild && (
-          <Field label="At or under" hint="This component and everything beneath it in the tree">
+          <Field label="At or under" hint="The component and everything beneath it">
             <input
               {...notACredential}
               type="text"
@@ -622,7 +621,7 @@ export function Filters({
           options={DEADLINES}
           onChange={(value) => set("running", value)}
         />
-        <Field label="Open for at least" hint="Days, counted from when it was first seen here">
+        <Field label="Open for at least" hint="Days since first seen">
           <input
             {...notACredential}
             type="number"
@@ -645,10 +644,7 @@ export function Filters({
             onChange={(event) => set("proposed_after", event.target.value)}
           />
         </Field>
-        <Field
-          label="Closed after"
-          hint="Closed rows sit outside this list, so asking changes what the list is about rather than narrowing it"
-        >
+        <Field label="Closed after" hint="Includes closed findings">
           <input
             type="date"
             value={at("closed_after")}

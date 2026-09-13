@@ -152,7 +152,7 @@ export function Together() {
           Narrow
         </button>
         <span className="hint" style={{ alignSelf: "center" }}>
-          Text matching on the description — a way to find candidates, not a judgment about them
+          Text match on the description
         </span>
       </form>
 
@@ -372,8 +372,7 @@ function Claim({
               className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
             />
             <span className="mt-1 block text-[var(--muted)]">
-              One version for every issue in this claim. A distribution's backport is the case this
-              is for — where they differ, this is not one claim.
+              One version for every issue here. If they differ, this is not one claim.
             </span>
           </label>
         )}

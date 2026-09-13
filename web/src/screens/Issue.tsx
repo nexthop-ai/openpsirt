@@ -92,8 +92,7 @@ export function Issue() {
 
       {(it?.aliases ?? []).length > 0 && (
         <p className="hint" style={{ marginBottom: 10 }}>
-          Also known as <span className="id">{(it?.aliases ?? []).join(" · ")}</span>. A name
-          assigned later is another name for the same issue; nothing keyed on it moved.
+          Also known as <span className="id">{(it?.aliases ?? []).join(" · ")}</span>
         </p>
       )}
 

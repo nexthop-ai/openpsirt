@@ -379,11 +379,7 @@ export function ByBump({
     return (
       <Empty
         title="Nothing here has a version to move to."
-        detail={
-          "A bump is a version to move to, so a finding upstream has released nothing " +
-          "for is not in one. Everything matching is either fixed already or waiting on " +
-          "upstream."
-        }
+        detail={"Everything matching is either already fixed or waiting on upstream."}
       />
     );
   }

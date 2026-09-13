@@ -578,11 +578,8 @@ export function Findings() {
             title="Show the whole build again"
             onClick={() => set("beneath", "")}
           >
-            {beneath} ×
+            Under {beneath} ×
           </button>
-          <span className="hint">
-            This component and everything under it in the dependency tree.
-          </span>
         </div>
       )}
     </>
@@ -594,8 +591,7 @@ export function Findings() {
         <div className="screen-head">
           <h2>Findings</h2>
           <p>
-            {product} · {stream || "every branch"} · {variant || "every variant"} — one row per
-            upstream bump, so you can see what one upgrade would clear before deciding what to read.
+            {product} · {stream || "every branch"} · {variant || "every variant"}
           </p>
         </div>
         {controls}
@@ -627,8 +623,7 @@ export function Findings() {
         <div className="screen-head">
           <h2>Findings</h2>
           <p>
-            {product} · {stream || "every branch"} · {variant || "every variant"} — one row per
-            component, so you can see where the weight is before deciding what to read.
+            {product} · {stream || "every branch"} · {variant || "every variant"}
           </p>
         </div>
         {controls}
@@ -667,17 +662,6 @@ export function Findings() {
     return <Failed error={findings.error} what="The findings could not be read." />;
   }
 
-  // Names carried at more than one version on this page. They read as repeats
-  // and are not: a build that vendors a library twice ships two of it.
-  const seen = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const versions = seen.get(row.component ?? "") ?? new Set<string>();
-    versions.add(row.version ?? "");
-    seen.set(row.component ?? "", versions);
-  }
-  const sameName = new Set(
-    [...seen.entries()].filter(([, versions]) => versions.size > 1).map(([name]) => name),
-  );
   // What is on this page, in the same key the selection uses.
   const shownKeys = rows.map(
     (row) => `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`,
@@ -737,26 +721,16 @@ export function Findings() {
         </h2>
         <p>
           {spanning ? (
-            <>
-              Every product you can read — one row per issue and component, however many places it
-              sits at. Each product&rsquo;s own triage line still applies, and the minimum severity
-              here raises it rather than lowering it.
-            </>
+            <>Every product you can read</>
           ) : (
             <>
-              {product} · {stream || "every branch"} · {variant || "every variant"} — one row per
-              issue and component, however many places it sits at.
+              {product} · {stream || "every branch"} · {variant || "every variant"}
             </>
           )}
         </p>
       </div>
 
       {controls}
-
-      <p className="hint" style={{ margin: "0 0 8px" }}>
-        Ordered by urgency: exploited, then customer-facing, then severity, then EPSS. Click a row
-        to open the finding; the plus previews it in place without going there.
-      </p>
 
       {handFailed > 0 && (
         <p className="alert" role="status">
@@ -770,10 +744,7 @@ export function Findings() {
           <span>
             <b>{picked.size.toLocaleString()} selected</b>
           </span>
-          <span className="hint">
-            across every page you have picked from — the list is read again after each decision, so
-            a selection is by what a row is rather than where it sits
-          </span>
+          <span className="hint">across pages</span>
           {/* The bound the deployment sets on one action, said here rather
               than met one refusal at a time: handing over is a request per
               row, so an unbounded selection is one click turning into as many
@@ -810,19 +781,8 @@ export function Findings() {
         </div>
       )}
 
-      {sameName.size > 0 && (
-        <p className="hint" style={{ margin: "0 0 8px" }}>
-          {sameName.size === 1 ? "One component appears" : `${sameName.size} components appear`} at
-          more than one version on this page. Those rows are not repeats — a build that vendors a
-          library twice carries two of it.
-        </p>
-      )}
-
       {rows.length === 0 ? (
-        <Empty
-          title="Nothing matches what you are looking at."
-          detail="Everything here is below the floor you set, or outside the filter."
-        />
+        <Empty title="Nothing matches these filters." />
       ) : (
         <div className="findings">
           <div className="tablewrap">
@@ -1144,11 +1104,7 @@ export function Findings() {
                             return (
                               <span
                                 className={says.tone === "none" ? "hint" : `due ${says.tone}`}
-                                title={
-                                  says.tone === "none"
-                                    ? "Nothing here is late, because nothing here is on a clock"
-                                    : `Due ${row.due}`
-                                }
+                                title={says.tone === "none" ? "No deadline" : `Due ${row.due}`}
                               >
                                 {says.text}
                               </span>
@@ -1227,11 +1183,9 @@ export function Findings() {
           {(line.hidden ?? 0) > 0 && !below && (
             <>
               {" "}
-              · {(line.hidden ?? 0).toLocaleString()} more are below what this product triages (
-              {line.floor}). They are still recorded and still counted.
+              · {(line.hidden ?? 0).toLocaleString()} below the {line.floor} line
             </>
           )}
-          {below && <> · showing what is below the line as well as above it.</>}
         </span>
         {(line.hidden ?? 0) > 0 && !below && (
           <button type="button" className="linkish" onClick={() => set("below", "yes")}>

@@ -50,6 +50,7 @@ end rather than left to be found by clicking.
 - [Reports, settings, inheritance](#reports-settings-inheritance)
 - [Showing the ordering signals](#showing-the-ordering-signals)
 - [Units, dates and copy](#units-dates-and-copy)
+- [What a screen says](#what-a-screen-says)
 - [Interface-wide rules](#interface-wide-rules)
 - [The initial load](#the-initial-load)
 - [Running it locally](#running-it-locally)
@@ -1201,6 +1202,40 @@ history is real; a leading one is only the absence of us. Four steps of real
 history before a direction is claimed, because three points is one change plus a
 confirmation. The panels still draw — the chart shows what there is and claims
 nothing; only the sentence is held back.
+
+## What a screen says
+
+Screen copy is labels and values. The reasoning behind a screen belongs in this
+document, not on it.
+
+| Rule | |
+|---|---|
+| **Cut before rewriting** | Most of what a screen explains, it already shows. A clickable row looks clickable, a column header names its column, a version on a row says the row is not a repeat |
+| **Nouns and intents** | What survives says what a thing is, or what a control does, in a couple of words. A reader working a list does not read sentences |
+| **Clarification where it is needed, not everywhere** | A note on every panel is noise that hides the one note that matters |
+| **Help on hover** | A tooltip carries what a reader may want and nobody needs standing on the screen. It sits on the thing it is about and appears only when it applies: a rule about exploited findings does not belong on a finding that is not exploited |
+| **Plain spoken English** | The way one engineer tells another. Not literary, not mannered, no sentence that has to be read twice |
+| **Professional, for technical users** | The reader knows what a CVE, a VEX document and a version range are. Nothing is reassured, justified or explained down to them |
+
+Screen copy is the one register here that is written to be skimmed rather than
+read, which is why it does not follow the house style the documents use. The
+same fact is written one way in this document and another on a screen.
+
+| On the screen | In this document |
+|---|---|
+| No VEX statements uploaded | An empty panel reads as "nobody has an opinion about this", and what it means is that no document saying so has been uploaded here |
+| Planned fixes. Cleared by the next scan | A release clears when the next scan of it stops finding the issue, so nothing is marked done by hand |
+| Applies to every build with this component | The same code built several ways is one piece of work |
+
+Measured before the sweep that applied this: **262 standing strings, about
+6,700 words**, across 65 of the interface's files — 69 of them on the screens
+somebody opens every day. The copy had drifted into explaining the design to
+the reader, which is what a design document is for.
+
+**Contractions.** The rule against them covers the durable documents, which are
+read years later by somebody deciding whether a decision still holds. Screen
+copy is not one of those and is written as spoken. In practice it rarely needs
+one: plain and short gets there without.
 
 ## Interface-wide rules
 

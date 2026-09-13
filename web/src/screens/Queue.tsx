@@ -344,10 +344,7 @@ export function Queue() {
       {justDone && (
         <div className="alert info" style={{ marginBottom: 12 }}>
           <strong>Agreed to under &ldquo;{justDone}&rdquo;</strong>
-          <span>
-            Taking it back returns those claims to this queue. Nothing anybody wrote changes, and
-            each proposer is told.
-          </span>
+          <span>Returns those claims to this queue. Each proposer is notified.</span>
           <button
             type="button"
             className="linkish"
@@ -479,8 +476,8 @@ function Stopped({ row }: { row: Standing }) {
       </div>
       <p className="hint" style={{ margin: 0 }}>
         {lapsed
-          ? "The code moved out from under this judgment. Reaffirm it from the finding, with a fresh reason; no second person is needed."
-          : "The date this was put off until has passed, so it is open again."}
+          ? "The code moved. Reaffirm it from the finding with a fresh reason."
+          : "The deferral has expired."}
       </p>
       <div className="actions">
         <Link to={`/decisions/${it?.id}`} className="btn ghost">
@@ -833,8 +830,7 @@ function Card({
 
       {claim.deferredDays > 0 && claim.previouslyApproved && (
         <p style={{ margin: 0, fontSize: "var(--step--1)", color: "var(--sev-high)" }}>
-          Short is measured against everything this has already been put off for, not against the
-          days being asked.
+          Measured against the total already deferred, not the days being asked.
         </p>
       )}
 

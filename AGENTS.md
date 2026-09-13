@@ -322,6 +322,23 @@ nobody outside this repository has. Whether a paragraph is an explanation of
 the design or a thing a caller has to know is not checkable and stays a
 person's to decide.
 
+**Interface copy is labels, not prose**, on the same principle as the rule
+above: the reasoning belongs in the design documents, not on the screen. Cut
+before rewriting, because most of what a screen explains it already shows — a
+clickable row looks clickable, a column header names its column. What survives
+says what a thing is or what a control does, in a couple of words.
+Clarification goes on hover, on the thing it is about, and only where a reader
+would ask. Write it as plain spoken English for a technical reader, who knows
+what a CVE and a version range are and does not need the design justified to
+them.
+
+This is the one register here written to be skimmed rather than read, so it
+does not follow the house style the documents use — including the rule against
+contractions below, which is about text read years later. `DESIGN-interface.md`
+§ What a screen says holds the whole of it, with worked examples. Nothing gates
+any of it; the copy reached 6,700 words of explanation across 65 files once
+already.
+
 **American spelling, everywhere.** License, not licence. Catalog, normalize,
 behavior, color, authorize. It applies to prose, comments and identifiers
 alike — a codebase that spells one word two ways makes both unsearchable, and

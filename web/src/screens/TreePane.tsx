@@ -102,10 +102,7 @@ export function Pane({
       <div>
         <div className="card">
           <h3>No component selected</h3>
-          <p className="reading">
-            Pick a component on the left to see its dependents, its dependencies, and what is open
-            against it.
-          </p>
+          <p className="reading">Pick a component on the left.</p>
         </div>
       </div>
     );
@@ -308,9 +305,8 @@ function History({
         <>
           <Pace points={points} />
           <p className="hint">
-            Open, new and resolved for this component and everything under it, counted as distinct
-            issues. A drop with no version moving is a patch the build started carrying: one that
-            names what it resolves closes the finding where it is, without the package moving.
+            Distinct issues for this component and everything under it. A drop without a version
+            change means a backported patch.
           </p>
         </>
       )}

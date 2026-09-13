@@ -108,8 +108,8 @@ export function Assess({
       </div>
       <p className="hint" style={{ margin: "0 0 8px" }}>
         {milder
-          ? `Milder than published, so a second person has to agree before it takes effect in ${product}.`
-          : `At or above what was published, so it takes effect in ${product} at once.`}
+          ? `Milder than published. Needs a second person before it applies in ${product}.`
+          : `Applies in ${product} immediately.`}
       </p>
       <div className="field" style={{ marginBottom: 8, maxWidth: "78ch" }}>
         <label htmlFor="why">Reasoning</label>

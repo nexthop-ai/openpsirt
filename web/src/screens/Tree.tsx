@@ -138,10 +138,8 @@ function Yours() {
       </div>
       <div className="card">
         <p className="reading" style={{ marginBottom: 10 }}>
-          The build&rsquo;s dependency graph seen upward from your own findings: from each component
-          you hold one on, up to the build itself. The numbers are yours — what hangs beneath a node
-          is your work, not what the build holds there. You read this product only through what you
-          have been handed, so descending a node is not offered.
+          Your findings, traced up to the build. Counts are your work only, not everything the build
+          holds there.
         </p>
         {mine.isPending && <Loading />}
         {mine.isError && <Failed error={mine.error} what="Your own work here could not be read." />}
@@ -190,8 +188,7 @@ function Yours() {
           <>
             <h4 style={{ margin: "14px 0 4px" }}>Placed nowhere</h4>
             <p className="hint" style={{ marginTop: 0 }}>
-              The inventory listed these and said nothing about what pulls them in, so there is no
-              chain to show.
+              The inventory did not say what pulls these in.
             </p>
             <ul className="branchlist">
               {loose.map((row, i) => (
@@ -211,10 +208,7 @@ function Yours() {
         {mine.data && mine.data.complete === false && (
           <p className="alert" style={{ marginTop: 10 }}>
             <strong>Not all of it.</strong>
-            <span>
-              You hold work on more components than this draws, so the counts under-report. The
-              findings list carries all of it.
-            </span>
+            <span>Counts under-report. The findings list has all of it.</span>
           </p>
         )}
       </div>
@@ -403,9 +397,6 @@ function Whole() {
             Back to the tree
           </button>
         )}
-        <span className="found">
-          counts are distinct issues, cumulative: what is open beneath a node as well as on it
-        </span>
       </div>
 
       <div className="wholewidth">
@@ -445,11 +436,11 @@ function Whole() {
                 onWiden={(name) => setWidened((prev) => new Set(prev).add(name))}
               />
             )}
-            <p className="hint" style={{ margin: "12px 0 0" }}>
-              {searching
-                ? "Matches anywhere in the build, most findings first. Selecting one shows what pulls it in."
-                : "Children load when a node is opened. The count on a node is the distinct issues open in everything under it, which is a smaller number than the findings list shows — that list has a row per issue and component, and one issue can sit in several."}
-            </p>
+            {searching && (
+              <p className="hint" style={{ margin: "12px 0 0" }}>
+                Most findings first
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -527,7 +518,7 @@ function Matches({
           <Strip by={node.beneath_by_severity} />
           <span
             className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
-            title={`${node.beneath.toLocaleString()} distinct issues open beneath this`}
+            title={`${node.beneath.toLocaleString()} distinct issues open beneath this. Distinct issues, so lower than the findings list, which has a row per issue and component`}
           >
             {node.beneath.toLocaleString()}
           </span>
@@ -679,8 +670,8 @@ function Branches({
           className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
           title={
             node.children > 0
-              ? `${node.beneath.toLocaleString()} open in here, ${node.findings.toLocaleString()} against this component itself`
-              : undefined
+              ? `${node.beneath.toLocaleString()} distinct issues open in here, ${node.findings.toLocaleString()} against this component itself. Distinct issues, so lower than the findings list, which has a row per issue and component`
+              : `${node.beneath.toLocaleString()} distinct issues open here`
           }
         >
           {node.beneath.toLocaleString()}

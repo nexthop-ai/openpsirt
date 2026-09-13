@@ -264,7 +264,7 @@ export function Finding() {
         <div className="card">
           <h3>Which {component}?</h3>
           <p className="reading" style={{ marginBottom: 10 }}>
-            This build ships that name at more than one version. Pick the one you mean.
+            Shipped at more than one version here.
           </p>
           <ul className="refs">
             {choices.map((choice) => (
@@ -591,11 +591,10 @@ export function Finding() {
             {it.assessed ? (
               <>
                 Assessed <Severity word={it.assessed} /> · published <Severity word={it.severity} />
-                . {product} rates it, which orders it and sets its deadline here.
               </>
             ) : (
               <>
-                Published <Severity word={it.severity} />. Being exploited outranks the score.
+                Published <Severity word={it.severity} />
               </>
             )}
           </p>
@@ -664,11 +663,11 @@ export function Finding() {
             you dismissed on 3 March" after a feed is corrected. */}
         {(it.found_by || it.opened) && (
           <div className="evblock">
-            <h4>Scanner</h4>
+            <h4>First seen</h4>
             <p>
               {it.opened && (
                 <>
-                  First seen here <b>{it.opened}</b>
+                  <b>{it.opened}</b>
                   {it.found_by ? ", by " : "."}
                 </>
               )}
@@ -689,11 +688,11 @@ export function Finding() {
                 </>
               )}
             </p>
-            <p className="hint" style={{ margin: 0 }}>
-              {it.found_by
-                ? "The run that first said this, not the newest one — a later run finding the same thing does not reopen it. Which vulnerability database was in force is what a corrected feed makes worth having."
-                : "Recorded here by a person rather than reported by a scanner, so no run found it."}
-            </p>
+            {!it.found_by && (
+              <p className="hint" style={{ margin: 0 }}>
+                Entered by a person, not a scanner
+              </p>
+            )}
           </div>
         )}
 
@@ -734,10 +733,8 @@ export function Finding() {
             {vex.length === 0 && (
               <div className="card">
                 <h3>VEX statements</h3>
-                <p className="reading">
-                  None. No VEX document uploaded here mentions this issue at this component — which
-                  is not the same as nobody having published one. An administrator uploads them;
-                  nothing here fetches them.
+                <p className="reading" title="Uploaded by an administrator, never fetched">
+                  No VEX statements uploaded
                 </p>
               </div>
             )}
@@ -746,10 +743,7 @@ export function Finding() {
               <div className="card">
                 <h3>VEX statements</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
-                  From a VEX document somebody uploaded here, published by a distribution or an
-                  upstream security team about this component. It is evidence and nothing more — it
-                  decides nothing here, and it is not counted anywhere. What it adds over the scan
-                  is the reasoning.
+                  Evidence only. Nothing here is decided or counted from it.
                 </p>
                 {vex.map((one, i) => (
                   <div key={`${one.publisher} ${i}`} className="prior">
@@ -795,8 +789,7 @@ export function Finding() {
                           Start from this
                         </button>
                         <span className="hint">
-                          Fills the form in. The judgment is still yours, and the record says you
-                          made it.
+                          Fills in the form. The decision is still yours.
                         </span>
                       </div>
                     )}
@@ -809,8 +802,7 @@ export function Finding() {
               <div className="card">
                 <h3>Approved decisions at this component</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
-                  The same component under the same consumer, with the same justification. Applying
-                  one extends its argument to this issue; it still needs a second person.
+                  Same component, same justification. Still needs a second person.
                 </p>
                 {similar.map((s) => (
                   <div key={s.decision_id} className="prior">
@@ -857,7 +849,7 @@ export function Finding() {
             {rule !== "" && rules.isError && (
               <div className="alert">
                 <strong>Your saved filter “{rule}” could not be read</strong>
-                <span>Nothing was filled in, and what you decide here is unaffected.</span>
+                <span>Nothing was filled in.</span>
               </div>
             )}
             {offered.lengthless && (
@@ -873,8 +865,7 @@ export function Finding() {
               <div className="alert info">
                 <strong>Filled in from “{rule}”</strong>
                 <span>
-                  Your saved filter prepares this claim. Nothing is proposed until you submit it,
-                  and it goes out as <b>your</b> claim for a second person to agree to.
+                  Nothing is proposed until you submit. It goes out as <b>your</b> claim.
                 </span>
                 <button
                   type="button"

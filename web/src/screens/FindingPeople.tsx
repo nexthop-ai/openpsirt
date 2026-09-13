@@ -100,10 +100,9 @@ export function Collaborators({
       <h3>Collaborators</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
         {rows.length === 0
-          ? "Nobody has been brought in. Everybody who may read undisclosed work in this product already sees it."
+          ? "Nobody has been brought in."
           : `${rows.length} ${rows.length === 1 ? "person has" : "people have"} been brought in.`}{" "}
-        Being on a case grants this one issue here and nothing else of the product — reading it and
-        arguing about it, never agreeing to a claim about it.
+        Grants read and comment on this issue only. Cannot agree to claims.
       </p>
       {bring.error != null && <Failed error={bring.error} what="They could not be brought in." />}
       {take.error != null && <Failed error={take.error} what="They could not be taken off." />}
@@ -153,8 +152,7 @@ export function Collaborators({
         </button>
       </div>
       <p className="hint" style={{ marginTop: 8 }}>
-        They are told at once, and told which issue. Adding and removing somebody is an access
-        change and is in the administration record.
+        They are notified. Logged as an access change.
       </p>
     </div>
   );
@@ -211,9 +209,12 @@ export function Assignee({
     <div className="card">
       <h3>Assignee</h3>
       {routedBy && (
-        <p className="hint" style={{ marginBottom: 8 }}>
-          Placed by the rule <b>{routedBy}</b>. Taking it is picking up work nobody holds, and the
-          rule will not take it back.
+        <p
+          className="hint"
+          style={{ marginBottom: 8 }}
+          title="Taking it is picking up unassigned work"
+        >
+          Placed by <b>{routedBy}</b>
         </p>
       )}
       {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
@@ -243,10 +244,8 @@ export function Assignee({
         )}
         {hand.isPending && <span className="hint">Recording…</span>}
       </div>
-      <p className="hint" style={{ margin: "8px 0 0" }}>
-        Covers every place this sits at, and every build of the product holding the same component —
-        the same code built several ways is one piece of work. Handing it back to nobody is the same
-        action.
+      <p className="hint" style={{ margin: "8px 0 0" }} title="Set it to nobody to unassign">
+        Applies to every build with this component
       </p>
     </div>
   );
@@ -292,9 +291,8 @@ export function Resolve({
     <div className="card">
       <h3>Fixed here</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        Nothing else can close this. A scan is the authority on what it found and it never found
-        this, so it stays open until somebody says it is fixed in this build. Every place of it here
-        closes together, and <b>nothing reopens it</b>.
+        Scans never found this, so only you can close it. Closes every place here, and
+        <b>nothing reopens it</b>.
       </p>
       {close.error != null && <Failed error={close.error} what="That could not be closed." />}
       {!open ? (
@@ -317,9 +315,7 @@ export function Resolve({
               onChange={(event) => setBecause(event.target.value)}
               style={{ minHeight: 80 }}
             />
-            <span className="hint">
-              A closure with no reason is a record saying somebody closed it and nothing else.
-            </span>
+            <span className="hint">Required.</span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -427,10 +423,7 @@ export function Attachments({
                   onChange={(event) => setReason(event.target.value)}
                   placeholder="A credential was pasted into it"
                 />
-                <p className="hint">
-                  The file goes and the record stays, so the text that pointed at it says what
-                  happened rather than pointing at nothing.
-                </p>
+                <p className="hint">The file is deleted. The record of it stays.</p>
                 <div className="actions">
                   <button
                     type="button"

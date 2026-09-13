@@ -291,7 +291,7 @@ export function Standing({
           className="linkish"
           onClick={() => {
             const where = window.prompt(
-              "Where is this being worked on? A ticket, a thread, a change. Nothing is ever sent to it.",
+              "Where is this being worked on? A ticket, a thread, a change.",
               summary?.elsewhere ?? "",
             );
             if (where !== null) point.mutate(where.trim());
@@ -464,8 +464,7 @@ export function Revisions({ claimId }: { claimId: number }) {
         })}
       </div>
       <p className="hint" style={{ margin: "10px 0 0" }}>
-        Every revision is kept. An approval names the revision it was given for, and revising
-        withdraws it.
+        Approvals name a revision. Revising withdraws the approval.
       </p>
     </div>
   );
@@ -708,8 +707,7 @@ export function PreviousCard({
     <div className="card">
       <h3>Previous decisions at this place</h3>
       <p className="hint" style={{ margin: "0 0 10px" }}>
-        A decision that lapsed or was withdrawn covers nothing, and is kept: what was argued last
-        time is offered back rather than thrown away.
+        Lapsed and withdrawn decisions cover nothing. Kept so you can reuse the reasoning.
       </p>
       <div className="priors">
         {items.map((d) => (
