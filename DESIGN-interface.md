@@ -542,6 +542,8 @@ its findings and nothing else, so a component could be read and never acted on.
 | Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
 | Where it could go is listed, never ordered | Telling which of two versions comes first needs an ordering per ecosystem this does not have, so what is offered is every version the scanner named as carrying a fix, most-closing first. "Nearest" is not a question this can answer |
 | The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the bulk cap is measured against |
+| It carries where the component sits in the graph | What pulls it in, what it pulls in, and twelve weeks of what opened and closed under it. Somebody arriving from the tree asked a question about the graph, and answering it on a page they have to leave to reach is the same page drawn twice |
+| The graph is answered for one build, picked from the rows above | An edge is a fact about one build: the same library is pulled in by different things in different builds. A link naming a build arrives on it, so the tree opens the component on the graph somebody was already looking at |
 
 It is where an upgrade is promised, on the terms `DESIGN-triage.md` sets: the
 releases it is for, the version, the date, the reason, and who carries it.
@@ -739,7 +741,8 @@ expects two. **One recursive statement for the row's whole set of children**:
 | The node counts open their lists | A node saying "5,650 beneath · 0 here" and going nowhere is a figure nobody can act on from where they read it |
 | The count is every open issue, answered or not | A dismissal does not subtract from it. Written down because "what is open here" and "what is still to answer here" are both reasonable readings and the screen gives the first |
 | The marker that opens a row is a button | A span with a click handler leaves every node past the first level unreachable without a pointer, on the screen whose whole purpose is walking down |
-| A component's name opens the component | The tree is where somebody asks about a component, and its own screen is what is open against it across every build, where it could go, and the act that moves it. The node name in the tree is a button because selecting is how the tree is walked, so the link is on the pane's heading and beside the two findings links in it |
+| A component's name opens the component | The tree is where somebody asks about a component, and its own screen answers it. The node name is a button, because selecting is how the tree is walked, so the link is the row's own control and the names in the two lists beside the tree |
+| There is no pane over the tree | What sat in it — what pulls a component in, what it pulls in, its history, what is open against it — is the component's screen. Drawn over the tree it was a second copy of a page that already existed, and the page was the thinner of the two |
 
 Ordering on the cumulative count reverses an earlier decision worth keeping in
 view. Ordered on the row's own count the tree opened as an alphabetical list of

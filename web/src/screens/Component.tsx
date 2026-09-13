@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Holder, type Held } from "../ui/Holder";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -10,6 +10,7 @@ import { Empty } from "../ui/Empty";
 import { on } from "../ui/when";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
+import { Pace } from "../ui/Charts";
 
 // One component, across the builds that carry it.
 //
@@ -30,6 +31,7 @@ const SHOWN = 4;
 
 export function Component() {
   const { product = "", component = "" } = useParams();
+  const [params] = useSearchParams();
   const builds = useQuery({
     queryKey: ["component", product, component],
     queryFn: async () =>
@@ -234,6 +236,15 @@ export function Component() {
         </div>
       )}
 
+      {rows.length > 0 && (
+        <Around
+          product={product}
+          component={component}
+          builds={rows.map((row) => ({ stream: row.stream ?? "", variant: row.variant ?? "" }))}
+          asked={{ stream: params.get("stream") ?? "", variant: params.get("variant") ?? "" }}
+        />
+      )}
+
       {said && (
         <div className="alert info" style={{ margin: "10px 0" }}>
           <strong>Recorded</strong>
@@ -314,5 +325,154 @@ export function Component() {
         that build.
       </p>
     </>
+  );
+}
+
+// Where this component sits in one build's graph, and what has happened to it
+// over twelve weeks.
+//
+// Per build, because an edge is a fact about one: the same library is pulled
+// in by different things in different builds. The table above lists them, so
+// the build is picked from that set rather than typed, and a link naming one
+// arrives on it.
+function Around({
+  product,
+  component,
+  builds,
+  asked,
+}: {
+  product: string;
+  component: string;
+  builds: { stream: string; variant: string }[];
+  asked: { stream: string; variant: string };
+}) {
+  const named = builds.find((b) => b.stream === asked.stream && b.variant === asked.variant);
+  const [at, setAt] = useState(named ?? builds[0]);
+  const here = at ?? builds[0];
+  const scope = here ? { product, stream: here.stream, variant: here.variant } : null;
+
+  const around = useQuery({
+    enabled: scope !== null,
+    queryKey: ["around", product, component, here?.stream, here?.variant],
+    queryFn: async () =>
+      unwrap(
+        await api.GET(
+          "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/around",
+          { params: { path: { ...scope!, component } } },
+        ),
+      ),
+    retry: false,
+  });
+  const trend = useQuery({
+    enabled: scope !== null,
+    queryKey: ["component-trend", product, component, here?.stream, here?.variant],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/trend", {
+          params: { query: { ...scope!, beneath: component, weeks: 12 } },
+        }),
+      ),
+    retry: false,
+  });
+
+  if (!here) return null;
+  const above = around.data?.above ?? [];
+  const below = around.data?.below ?? [];
+  const points = trend.data?.items ?? [];
+  const buildAt =
+    `/products/${encodeURIComponent(product)}` +
+    `/streams/${encodeURIComponent(here.stream)}` +
+    `/variants/${encodeURIComponent(here.variant)}`;
+  const componentAt = (name: string) =>
+    `/products/${encodeURIComponent(product)}/components/${encodeURIComponent(name)}` +
+    `?stream=${encodeURIComponent(here.stream)}&variant=${encodeURIComponent(here.variant)}`;
+
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div className="screen-head" style={{ marginBottom: 8 }}>
+        <h3>In the graph</h3>
+        {builds.length > 1 && (
+          <label className="hint" style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <span>Build</span>
+            <select
+              aria-label="Which build"
+              style={{ width: "auto" }}
+              value={here.stream + "\u0000" + here.variant}
+              onChange={(event) => {
+                const [stream, variant] = event.target.value.split("\u0000");
+                setAt({ stream: stream ?? "", variant: variant ?? "" });
+              }}
+            >
+              {builds.map((b) => (
+                <option key={b.stream + b.variant} value={b.stream + "\u0000" + b.variant}>
+                  {b.stream} · {b.variant}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+
+      {around.isError ? (
+        <Failed error={around.error} what="What sits around this could not be read." />
+      ) : (
+        <div className="evidence">
+          <div className="evblock">
+            <h4>Pulled in by</h4>
+            {around.isPending ? (
+              <p className="hint">Working it out…</p>
+            ) : above.length === 0 ? (
+              <p className="hint">The build contains it directly.</p>
+            ) : (
+              <>
+                <ol className="refs">
+                  {above.map((parent, i) => (
+                    <li key={(parent.component ?? "") + i}>
+                      <Link className="id" to={componentAt(parent.component ?? "")}>
+                        {parent.component}
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+                {above.length > 1 && (
+                  <p className="hint">
+                    Reached {above.length} ways, not {above.length} copies.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="evblock">
+            <h4>Pulls in</h4>
+            <p className="hint">
+              {around.isPending
+                ? "Working it out…"
+                : below.length === 0
+                  ? "Nothing — it is a leaf."
+                  : below.length.toLocaleString() + " components"}
+            </p>
+            <p style={{ margin: "8px 0 0" }}>
+              <Link className="linkish" to={buildAt + "/tree?at=" + encodeURIComponent(component)}>
+                Open in the tree →
+              </Link>
+            </p>
+          </div>
+
+          <div className="evblock">
+            <h4>Twelve-week history</h4>
+            {trend.isError ? (
+              <p className="hint">Could not be read.</p>
+            ) : trend.isPending ? (
+              <p className="hint">Working it out…</p>
+            ) : points.length === 0 ? (
+              <p className="hint">Nothing opened or closed in twelve weeks.</p>
+            ) : (
+              <Pace points={points} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

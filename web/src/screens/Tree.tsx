@@ -2,7 +2,7 @@ import { ROLLED } from "../ui/severities";
 import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { Over, Pane, type At, type Node } from "./TreePane";
+import { type At, type Node } from "./treeshape";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -294,16 +294,6 @@ function Whole() {
     })),
   });
 
-  // What is selected. The key matches the one above, so selecting a node that
-  // is already open costs nothing.
-  const version = params.get("version") ?? "";
-  const ecosystem = params.get("ecosystem") ?? "";
-  const selected = useQuery({
-    queryKey: aroundKey(at, focus, version, ecosystem),
-    queryFn: fetchAround(at, focus, version, ecosystem),
-    enabled: focus !== "",
-  });
-
   const below = useMemo(() => {
     const map = new Map<string, Node[] | undefined>();
     if (rootName) map.set(rootName, (top.data?.items ?? []) as Node[]);
@@ -429,6 +419,7 @@ function Whole() {
               ))}
             {!searching && root && (
               <Branches
+                at={at}
                 root={root}
                 below={below}
                 opened={opened}
@@ -448,47 +439,8 @@ function Whole() {
           </div>
         </div>
       </div>
-
-      {/* What sits around one component, over the tree rather than beside it.
-          Beside it, the panel took a third of the width for something nobody
-          had asked for yet, and the tree — which is the screen — was left
-          drawing indented rows into what was left, so a name at depth six
-          wrapped. Asked for, it takes the width it needs and gives it back. */}
-      {focus !== "" && (
-        <Over onClose={() => select("")}>
-          <Pane
-            at={at}
-            focus={focus}
-            rootName={rootName}
-            above={(selected.data?.above ?? []) as Node[]}
-            belowCount={(selected.data?.below ?? []).length}
-            node={findNode(focus, root, below)}
-            pending={selected.isPending}
-            error={selected.isError ? selected.error : null}
-            version={version}
-            ecosystem={ecosystem}
-          />
-        </Over>
-      )}
     </div>
   );
-}
-
-// The node a name refers to, wherever it has already been read. The tree holds
-// every answer the pane needs except the count of what is under a component
-// nothing has opened yet, which is what the pane's own query is for.
-function findNode(
-  name: string,
-  root: Node | null,
-  below: Map<string, Node[] | undefined>,
-): Node | null {
-  if (!name) return null;
-  if (root && root.component === name) return root;
-  for (const kids of below.values()) {
-    const hit = kids?.find((k) => k.component === name);
-    if (hit) return hit;
-  }
-  return null;
 }
 
 // A search answers with a set of components rather than a position, so it is
@@ -544,6 +496,12 @@ function onComponent(at: At, component: string | undefined): string {
 // where it could go, and the act that moves it. Reachable from a finding and
 // from the findings list, and from here, which is where somebody looking at
 // the graph asks about a component.
+// Which build the tree is drawn for, so the component's screen opens on the
+// graph of the build somebody was looking at rather than the first one.
+function buildQuery(at: At): string {
+  return `?stream=${encodeURIComponent(at.stream)}` + `&variant=${encodeURIComponent(at.variant)}`;
+}
+
 function componentPage(at: At, component: string | undefined): string {
   return (
     `/products/${encodeURIComponent(at.product)}` +
@@ -566,6 +524,7 @@ function buildPath(at: At): string {
 // One flat list of indented rows rather than nested lists, so the rule down the
 // left stays a straight line whatever a branch does.
 function Branches({
+  at,
   root,
   below,
   opened,
@@ -576,6 +535,7 @@ function Branches({
   onSelect,
   onWiden,
 }: {
+  at: At;
   root: Node;
   below: Map<string, Node[] | undefined>;
   opened: Set<string>;
@@ -691,20 +651,18 @@ function Branches({
         >
           {node.beneath.toLocaleString()}
         </span>
-        {/* Everything else about this component, asked for rather than
-            standing open beside the tree. */}
-        <button
-          type="button"
+        {/* What pulls it in, what it pulls in, its history and what is open
+            against it, on the component's own screen. Drawn over the tree it
+            was a second copy of a page that already exists. */}
+        <Link
           className="look"
-          title={`What pulls ${name} in, what it pulls in, and what is open against it`}
-          aria-label={`Look at ${name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect(name, 0, node.version, node.ecosystem);
-          }}
+          title={`Everything about ${name}`}
+          aria-label={`Open ${name}`}
+          to={componentPage(at, name) + buildQuery(at)}
+          onClick={(event) => event.stopPropagation()}
         >
           ⋯
-        </button>
+        </Link>
       </div>,
     );
 

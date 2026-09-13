@@ -1449,55 +1449,6 @@ kbd.onbtn {
   display: block;
 }
 
-/* Something over the screen rather than beside it: what is known about one
-   component, when somebody asks for it.
-
-   Named for the panel it holds rather than for the word "over", because a bare
-   one-word class is also a modifier somebody writes beside another class: a
-   `due over` chip carried this rule as well as its own, and a text label two
-   words wide became a fixed, full-screen, half-black overlay that swallowed
-   every click on the screen behind it. */
-.overpane {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgb(0 0 0 / 45%);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 6vh 16px 16px;
-  overflow-y: auto;
-}
-.overbox {
-  position: relative;
-  width: min(720px, 100%);
-  max-height: 88vh;
-  overflow-y: auto;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  background: var(--surface);
-}
-.overshut {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 1;
-  appearance: none;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
-  border-radius: var(--pill);
-  width: 26px;
-  height: 26px;
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-}
-.overshut:hover {
-  color: var(--ink);
-  border-color: var(--line-strong);
-}
-
 /* Reclassifying opens under the line that reports the rating, so the control
    is where the thing it changes is read. Ruled off, because it is the one form
    in a block that is otherwise all evidence. */
