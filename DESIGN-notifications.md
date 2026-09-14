@@ -245,7 +245,7 @@ anything.
 | The in-application area is not held to this | Reaching a notification there means holding a credential and passing the visibility check. A message cannot re-check its reader: it sits on a mail server this deployment does not run, in an inbox, on a lock screen, and in whatever it is forwarded to |
 | A disclosed finding is not held to this | The identifier, component, version and build are in the message, because that is what makes it worth opening, and none of it is anything a vulnerability database does not already publish |
 | The line is the finding's own visibility | The same field every query narrows by, so a message cannot disagree with what the screen would show the same person |
-| The address is part of what must say nothing | A path carrying the identifier and the component announces both to every server the message crosses. A private message carries the deployment's front door, and the notification area behind it says which thing and where |
+| The address is part of what must say nothing | A path carrying the identifier and the component announces both to every server the message crosses. A private message carries the deployment's front door, and the notification area behind it says which thing and where. It travels with the composed message rather than being built per channel, because an address built a second time is built without this rule |
 
 Narrowing the recipients and emptying the body are different controls: the first
 stops it reaching somebody who should not know, the second stops it being
@@ -342,7 +342,7 @@ request-forgery primitive unless governed (REQ-69):
 |---|---|
 | Every request is signed over the timestamp and the body | A receiver can distinguish one of ours from one anybody could make, and cannot be handed yesterday's again. The timestamp is inside the signature |
 | The signing secret is stored recoverably | Every other credential is hashed because it authenticates somebody to this deployment; this one authenticates this deployment to somebody else. No endpoint returns it |
-| What it carries is what the channel rules already allow | Composed by the same code that composes a mail. A rule enforced in two places is enforced in one and a half |
+| What it carries is what the channel rules already allow | Composed by the same code that composes a mail, the address included. A rule enforced in two places is enforced in one and a half, and the address is the part a channel would otherwise build for itself |
 | Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event has no such identity and is tracked by its own |
 | The claim is staked before the request is made | A row with no sent-at stops a second replica, or the next sweep, sending the same thing while the first is in flight |
 

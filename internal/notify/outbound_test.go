@@ -14,8 +14,10 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
@@ -131,6 +133,105 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 		}
 		if saw.requests != 1 {
 			t.Errorf("the destination received %d requests in total", saw.requests)
+		}
+	})
+}
+
+// A webhook body is composed by the same code that composes a mail, so the
+// no-detail rule reaches it — including the address, which travels in a field
+// of its own where a receiver reads it without opening the text.
+//
+// The address was the half that did not hold: the body was composed with the
+// rule applied and the link was then rebuilt from the row beside it, so a
+// deployment with one destination configured announced the identifier, the
+// product, the stream, the variant and the component to every server the
+// request crossed.
+func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if err := schema.Up(ctx, db, quiet); err != nil {
+			t.Fatalf("migrate: %v", err)
+		}
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "SONIC-2026-7002", Severity: "critical"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := ids["SONIC-2026-7002"]
+
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, "chat", notify.Everything,
+			server.URL, "a-shared-secret-long-enough", who.ID); err != nil {
+			t.Fatal(err)
+		}
+		// The shape a disclosure notice takes: every part of what it is about
+		// is in the path.
+		const where = "/products/sonic/streams/master/variants/broadcom" +
+			"/findings/SONIC-2026-7002/components/swss"
+		if err := store.Tell(ctx, notify.Telling{
+			PersonID: who.ID, Kind: notify.DisclosureDue,
+			Body: "SONIC-2026-7002 in swss reached its date",
+			Link: where, Private: true,
+			ProductID: &product.ID, VulnerabilityID: &issue,
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		if sent, failed, err := signal.Once(ctx); err != nil || sent != 1 || failed != 0 {
+			t.Fatalf("signalling sent %d and failed %d (%v)", sent, failed, err)
+		}
+		if saw.requests != 1 {
+			t.Fatalf("the destination received %d requests", saw.requests)
+		}
+
+		// Whole-body, not field by field: the rule is about what crosses the
+		// wire, and a field added later is covered by this and not by a check
+		// on the fields somebody thought of.
+		body := saw.bodies[0]
+		for _, leaked := range []string{
+			"SONIC-2026-7002", "sonic", "master", "broadcom", "swss", "/findings/",
+		} {
+			if strings.Contains(body, leaked) {
+				t.Errorf("the request carries %q, which is the announcement it exists to avoid:\n%s",
+					leaked, body)
+			}
+		}
+
+		// And it still says there is something, with the way in. A message
+		// carrying nothing at all is one nobody acts on.
+		var carried struct {
+			Kind    string `json:"kind"`
+			Subject string `json:"subject"`
+			Link    string `json:"link"`
+			Private bool   `json:"undisclosed"`
+		}
+		if err := json.Unmarshal([]byte(body), &carried); err != nil {
+			t.Fatal(err)
+		}
+		if carried.Link != "https://openpsirt.example/" {
+			t.Errorf("the address is %q, want the front door", carried.Link)
+		}
+		if !carried.Private || carried.Subject == "" {
+			t.Errorf("the body reads as %+v, which does not say there is something", carried)
 		}
 	})
 }

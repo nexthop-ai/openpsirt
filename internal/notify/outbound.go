@@ -254,8 +254,13 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 		Private bool   `json:"undisclosed,omitempty"`
 		At      string `json:"at"`
 	}{
+		// Compose decides what an address may say, and a private
+		// notification gets the front door rather than the finding. Building
+		// one here from the row instead would announce the identifier and the
+		// component to every server the request crosses, which is the whole of
+		// what the composed body was careful about.
 		Kind: string(row.Kind), Subject: message.Subject, Text: message.Text,
-		Link: link(s.baseURL, row.Link), Private: row.Private,
+		Link: message.Link, Private: row.Private,
 		At: row.CreatedAt.UTC().Format(time.RFC3339),
 	})
 	if err != nil {
