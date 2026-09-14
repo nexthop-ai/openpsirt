@@ -74,10 +74,10 @@ func standsAs(product string, state decisionState) string {
 	// neither. Every join here is the subquery's own and the only thing read
 	// from outside it is the row's identifier, which is the shape the state
 	// filter's derived table already uses on all four engines.
-	return `EXISTS (SELECT 1 FROM "finding" AS f2
-			JOIN "component" AS c ON c.id = f2.component_id
-			LEFT JOIN "component" AS uc ON uc.id = f2.consumer_id
-			JOIN "decision" AS de ON de.vulnerability_id = f2.vulnerability_id
+	return `EXISTS (SELECT 1 FROM "finding" AS "f2"
+			JOIN "component" AS "c" ON c.id = f2.component_id
+			LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id
+			JOIN "decision" AS "de" ON de.vulnerability_id = f2.vulnerability_id
 			  AND de.place_identity = f2.place_identity
 			WHERE f2.id = f.id
 			  AND de.product_id = ` + product + `
@@ -86,10 +86,16 @@ func standsAs(product string, state decisionState) string {
 
 // decidedAs is the one spelling of the count, for the states above and for
 // the one question HowItStands asks that none of them covers.
+//
+// The alias is quoted here rather than carried already quoted, because a name
+// assembled from two literals is the one shape the gate over invented names
+// cannot see — it reads string literals, and there is no literal holding this
+// name. Quoting it at the joint is what puts it back inside a rule something
+// checks.
 func decidedAs(product string, state decisionState) string {
-	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS de
+	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de"
 			WHERE de.product_id = ` + product + `
 			  AND de.vulnerability_id = f.vulnerability_id
 			  AND de.place_identity = f.place_identity
-			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS ` + state.alias
+			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`
 }

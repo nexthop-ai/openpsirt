@@ -241,6 +241,25 @@ func Within(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) e
 	}
 }
 
+// Handle returns the pooled handle behind db, and false when db is a
+// transaction.
+//
+// The same two spellings Within names, for the callers that need the handle
+// rather than a closure: a store deciding whether it may open a transaction of
+// its own. This package's handle embeds a *bun.DB rather than being one, so an
+// assertion for *bun.DB alone is failed by the very handle Open returns — it
+// compiles, and the store then refuses every write as though it were already
+// inside somebody's transaction.
+func Handle(db bun.IDB) (*bun.DB, bool) {
+	switch handle := db.(type) {
+	case *DB:
+		return handle.DB, true
+	case *bun.DB:
+		return handle, true
+	}
+	return nil, false
+}
+
 // FromEngine reports whether an error came from the database rather than from
 // the caller having asked for something impossible.
 //

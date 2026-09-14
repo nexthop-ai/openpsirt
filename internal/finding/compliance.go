@@ -68,8 +68,8 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	// carries none — without it a deferral made in another product that ships
 	// the same component would answer here.
 	standing, held := InForce()
-	deferred := `EXISTS (SELECT 1 FROM "decision" AS de
-		JOIN "claim" AS cl ON cl.id = de.claim_id
+	deferred := `EXISTS (SELECT 1 FROM "decision" AS "de"
+		JOIN "claim" AS "cl" ON cl.id = de.claim_id
 		WHERE de.product_id = ?
 		  AND de.vulnerability_id = f.vulnerability_id
 		  AND de.place_identity = f.place_identity

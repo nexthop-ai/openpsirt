@@ -32,16 +32,16 @@ const depth = 64
 // nothing crossing the wire.
 func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 	return bun.NewRawQuery(db, `WITH RECURSIVE "down" AS (
-		SELECT n.id AS node, 0 AS depth
-		FROM "graph_node" AS n
+		SELECT n.id AS "node", 0 AS "depth"
+		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id = ?
 		UNION
 		SELECT e.child_id, d.depth + 1
-		FROM "down" AS d CROSS JOIN "graph_edge" AS e
+		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
 		  AND d.depth < ? AND e.parent_id <> e.child_id
 	)
-	SELECT DISTINCT n.component_id FROM "down" AS d JOIN "graph_node" AS n ON n.id = d.node`,
+	SELECT DISTINCT n.component_id FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node`,
 		targetID, componentID, targetID, depth)
 }
 

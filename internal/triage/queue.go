@@ -613,10 +613,10 @@ func waiting(query *bun.SelectQuery, now time.Time) *bun.SelectQuery {
 	// date are. An EXISTS rather than a join, because this narrows queries
 	// that already group and count over the decision and a join would multiply
 	// nothing here but would have to be repeated at every caller.
-	ranOut := `EXISTS (SELECT 1 FROM "claim" AS wc WHERE wc.id = de.claim_id
+	ranOut := `EXISTS (SELECT 1 FROM "claim" AS "wc" WHERE wc.id = de.claim_id
 		AND wc.outcome = ? AND wc.deferred_until IS NOT NULL AND wc.deferred_until <= ?)`
 	// The promise that came due, asked the same way of the same table.
-	cameDue := `EXISTS (SELECT 1 FROM "claim" AS wp WHERE wp.id = de.claim_id
+	cameDue := `EXISTS (SELECT 1 FROM "claim" AS "wp" WHERE wp.id = de.claim_id
 		AND wp.outcome IN (?) AND wp.committed_to IS NOT NULL AND wp.committed_to <= ?)`
 	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.

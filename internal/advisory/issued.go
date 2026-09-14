@@ -72,9 +72,9 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	// where a visibility lives — an issuance carries none of its own, and
 	// reading one as public because it has no visibility column is how an
 	// undisclosed flaw would be announced by the report about announcements.
-	visible := `EXISTS (SELECT 1 FROM "finding" AS f
-		JOIN "target" AS t ON t.id = f.target_id
-		JOIN "stream" AS st ON st.id = t.stream_id
+	visible := `EXISTS (SELECT 1 FROM "finding" AS "f"
+		JOIN "target" AS "t" ON t.id = f.target_id
+		JOIN "stream" AS "st" ON st.id = t.stream_id
 		WHERE st.product_id = ai.product_id
 		  AND f.vulnerability_id = ai.vulnerability_id
 		  AND f.kind = ?`

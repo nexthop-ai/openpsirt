@@ -761,17 +761,17 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		// LOWERon the issue's side the plan scanned the whole
 		// vulnerability table, and the whole alias table, once per
 		// statement.
-		pairs := `(SELECT ss.product_id AS product_id, vc.id AS component_id,
-			vv.id AS vulnerability_id
-			FROM "vex_statement" AS ss
-			JOIN "component" AS vc ON vc.name_folded = ss.component
-			JOIN "vulnerability" AS vv ON vv.identifier_folded = ss.vulnerability
+		pairs := `(SELECT ss.product_id AS "product_id", vc.id AS "component_id",
+			vv.id AS "vulnerability_id"
+			FROM "vex_statement" AS "ss"
+			JOIN "component" AS "vc" ON vc.name_folded = ss.component
+			JOIN "vulnerability" AS "vv" ON vv.identifier_folded = ss.vulnerability
 			WHERE ` + narrowing + `
 			UNION
 			SELECT ss.product_id, vc.id, vl.vulnerability_id
-			FROM "vex_statement" AS ss
-			JOIN "component" AS vc ON vc.name_folded = ss.component
-			JOIN "vulnerability_alias" AS vl ON vl.identifier_folded = ss.vulnerability
+			FROM "vex_statement" AS "ss"
+			JOIN "component" AS "vc" ON vc.name_folded = ss.component
+			JOIN "vulnerability_alias" AS "vl" ON vl.identifier_folded = ss.vulnerability
 			WHERE ` + narrowing + `)`
 
 		where, args := f.product()

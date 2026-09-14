@@ -21,6 +21,13 @@
 // It found 1,418 of them against 34 already quoted, so no reader could tell
 // which was the convention.
 //
+// **What it still cannot see is a name that is not in a literal.** An alias
+// assembled from two pieces — `"… AS " + state.alias` — is invisible to
+// anything reading source as text, and there is no parser here for four
+// dialects. That is the safe direction for a check that fails a build, and it
+// is why the all-clear says "in a literal" rather than claiming the rule
+// outright. The schema test that reads the live database is the other half.
+//
 // The data-definition half below is the other way round and stays that way.
 // Those names are declared rather than invented, the migrations are where they
 // are declared, and the question there is whether a declared name collides
@@ -57,6 +64,19 @@ import (
 // pair of quotes.
 var invented = regexp.MustCompile(`(?i)\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
 
+// statement recognizes a string literal as SQL wherever it is written.
+//
+// Reading only the arguments of the builder's own methods missed every query
+// held in a const, returned by a helper, or handed to the raw-query
+// constructor — about thirty bare names, while the gate printed an all-clear.
+// Where a query lives is not what makes it a query.
+//
+// `FROM "` or `JOIN "` is the marker because every table in this schema is
+// quoted, so it appears in SQL and not in prose. Matching the bare keywords
+// instead reported sixty-odd English sentences: an API description saying "as
+// a" after the word "from" is not an alias.
+var statement = regexp.MustCompile(`(?i)\b(?:FROM|JOIN)\s+"`)
+
 // declared matches a bare schema identifier in data-definition language.
 //
 // **Only inside the migrations**, where every string is DDL by construction,
@@ -91,7 +111,7 @@ var aliased = regexp.MustCompile(`\balias:([A-Za-z_][A-Za-z0-9_]*)`)
 var writing = map[string]bool{
 	"TableExpr": true, "ColumnExpr": true, "GroupExpr": true, "OrderExpr": true,
 	"Having": true, "Where": true, "Join": true, "JoinOn": true,
-	"WhereOr": true, "Raw": true, "NewRaw": true, "Exec": true,
+	"WhereOr": true, "Raw": true, "NewRaw": true, "NewRawQuery": true, "Exec": true,
 	"ExecContext": true, "QueryContext": true, "Set": true,
 }
 
@@ -136,6 +156,31 @@ func main() {
 		// is full of the same words — and with the SQL comments inside those
 		// strings taken off first, for the same reason.
 		definitions := strings.Contains(path, "database/migrate/migrations/")
+		// Every SQL literal, wherever it is written. A pass of its own, and
+		// first, so the walk below can tell whether a literal it reaches has
+		// already been read as a statement in its own right — a node is
+		// visited before its children, so one walk could not.
+		seen := map[int]bool{}
+		ast.Inspect(file, func(node ast.Node) bool {
+			lit, ok := node.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			text, err := strconv.Unquote(lit.Value)
+			if err != nil {
+				text = lit.Value
+			}
+			if !statement.MatchString(withoutSQLComments(text)) {
+				return true
+			}
+			at := fset.Position(lit.Pos()).Line
+			seen[at] = true
+			for _, match := range invented.FindAllStringSubmatch(withoutSQLComments(text), -1) {
+				bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
+			}
+			return true
+		})
+
 		ast.Inspect(file, func(node ast.Node) bool {
 			if definitions {
 				if lit, ok := node.(*ast.BasicLit); ok && lit.Kind == token.STRING {
@@ -181,6 +226,9 @@ func main() {
 				if !ok {
 					continue
 				}
+				if seen[at] {
+					continue // already read as a statement in its own right
+				}
 				for _, match := range invented.FindAllStringSubmatch(text, -1) {
 					bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
 				}
@@ -195,9 +243,9 @@ func main() {
 	}
 
 	if len(bad) == 0 {
-		fmt.Printf("every name a query invents is quoted, and no name a migration declares "+
-			"collides with a word any of the four engines reserves (%d words checked)\n",
-			len(reservedWords))
+		fmt.Printf("every name a query invents in a literal is quoted, and no name a "+
+			"migration declares collides with a word any of the four engines reserves "+
+			"(%d words checked)\n", len(reservedWords))
 		return
 	}
 	sort.Slice(bad, func(i, j int) bool {

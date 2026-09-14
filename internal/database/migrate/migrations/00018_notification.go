@@ -3,7 +3,6 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
 )
@@ -151,20 +150,12 @@ func upNotification(ctx context.Context, tx *sql.Tx) error {
 		`CREATE UNIQUE INDEX "notification_condition_idx"
 			ON "notification" ("person_id", "kind", "about_open")`,
 	}
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", stmt, err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downNotification(ctx context.Context, tx *sql.Tx) error {
 	// The table goes and its indexes go with it. Dropping them first is what
 	// broke two rollbacks already: MySQL and MariaDB refuse to drop an index a
 	// foreign key is using to enforce itself.
-	if _, err := tx.ExecContext(ctx, `DROP TABLE "notification"`); err != nil {
-		return fmt.Errorf("drop notification: %w", err)
-	}
-	return nil
+	return dropTables(ctx, tx, "notification")
 }

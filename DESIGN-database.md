@@ -37,12 +37,17 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 | SQLite | Development and testing only | 3.35 |
 
 A floor is a release series: the oldest series this application's queries and
-schema are written against, and the oldest upstream publishes fixes for at all.
-It is not a statement about the server in front of it. Upstream publishes per
+schema are written against. **It is not a statement that upstream still
+publishes fixes for that series** — MySQL 8.0 and MariaDB 10.6 are both past
+upstream end of life and are still admitted, because raising a floor refuses
+deployments that start today and that is a decision rather than upkeep.
+
+Nor is it a statement about the server in front of it. Upstream publishes per
 patch release, and which patch release an operator runs is a property of that
 deployment — a floor admitting the series admits every unpatched release in it.
 So this is a compatibility floor, and keeping a deployment current is the
-operator's, which the documentation says rather than implying it is handled.
+operator's responsibility, which this document says rather than implying it is
+handled.
 
 The release number carries a patch level anyway, because servers report one and
 a comparison that discards it cannot tell two releases of a series apart.
@@ -169,14 +174,29 @@ sources, read from their file names, which is the same rule the migration
 library applies to them.
 
 **Version zero means nothing is applied, and nothing else.** The bookkeeping
-table is probed before the version is read, so a read-only inspection does not
-create it — and an absent table arrives as an error rather than an empty
-result, so every other failure read as an empty database. `migrate status`
-printed version 0 for a fully populated database whose credentials could not
-read that one table, and the reasonable thing to do about "nothing is applied"
-is to migrate. A failed probe is followed by a trivial one: a database that
-answers the second was reachable and the table is genuinely absent; one that
-answers neither could not be read, and says so.
+table is looked for before the version is read, so a read-only inspection does
+not create it. Selecting from the table to find out answers three questions at
+once and cannot tell them apart — it is not there, this credential may not read
+it, or the database is unreachable — and all three read as the first, so
+`migrate status` printed version 0 for a fully populated database whose
+credentials omitted that one table. The reasonable thing to do about "nothing
+is applied" is to migrate it.
+
+The catalog is asked instead, which answers only the question being put to it.
+
+| Engine | Asked | Tells an absent table from an unreadable one |
+|---|---|---|
+| PostgreSQL | `pg_class` | Yes |
+| MySQL, MariaDB | The information schema | No |
+| SQLite | `sqlite_master` | There are no privileges to have |
+
+PostgreSQL is asked through `pg_class` rather than its information schema
+because every information schema here is filtered by privilege: a role with no
+rights on a table does not see the table listed, which is the same conflation
+again. `pg_class` is readable by any role. MySQL and MariaDB offer no
+unfiltered catalog, so on those two the two cases stay indistinguishable —
+bounded by what runs next, which is the version query or a migration, both of
+which fail with the engine's own permission message rather than silently.
 
 Migrations are written in Go rather than SQL files, because they branch on the
 engine. A timestamp column has no portable spelling: PostgreSQL has no
@@ -250,10 +270,10 @@ inside.** The handle is capped at a single connection — the file has one write
 — so a lock held on a pinned connection would be holding the only connection
 the migration needs. What stood instead was the assumption that SQLite is only
 ever used by one process, enforced by one chart template while the binary
-accepts a SQLite URL with a warning. Six processes against one file: one
-migrated and three failed, on the migration library's own bookkeeping. Nothing
-was corrupted and the schema ended correct, so what the lock buys is the other
-five waiting and finding the work already done.
+accepts a SQLite URL with a warning. Four processes against one file with no
+lock: one migrated and three failed, on the migration library's own
+bookkeeping. Nothing was corrupted and the schema ended correct, so what the
+lock buys is those three waiting and finding the work already done.
 
 The operating system's own advisory locking rather than a lock file written and
 removed by hand, because the kernel drops it when a process ends however it
@@ -274,7 +294,7 @@ in turn.
 The bound is a session setting, and it is unwound before the connection goes
 back — on every path, including the failing ones. Left set, one pooled
 connection carries a five-minute bound while the others carry the server
-default, and the same query afterwards either waits or is cancelled depending
+default, and the same query afterwards either waits or is canceled depending
 on which connection the pool hands out.
 
 ## Identifier quoting
@@ -332,11 +352,22 @@ The list of reserved words stays, for the other half. A name a migration
 ran — and the question there is whether it collides with a word one of them
 reserves, which is what a list of those words answers.
 
+Where a query is written is not what makes it a query. Reading only the
+arguments of the query builder's own methods left every statement held in a
+constant, returned from a helper or handed to the raw-query constructor
+unchecked — thirty-eight bare names, under an all-clear. Every string literal
+that looks like a statement is read now, and `FROM "` or `JOIN "` is what
+marks one: every table here is quoted, so that appears in SQL and not in
+prose, where matching the bare keywords reported sixty-odd English sentences.
+
+**A name that is not in a literal is still invisible**, because there is no
+parser here for four dialects — an alias assembled from two pieces is the
+shape, and the one that existed is now quoted at its joint. That is the safe
+direction for a check that fails a build, and it is why the gate says every
+name *in a literal* rather than claiming the rule outright.
+
 The schema is also read back from the database and checked there, on the same
-principle as the index test: what matters is what an operator ends up with. The
-source-reading gate is blind to a name built by concatenation, which is the
-safe direction for a check that fails a build and not a reason to have only
-that check.
+principle as the index test: what matters is what an operator ends up with.
 
 The check reads source as text, because SQL is inside the strings and there is no
 parser here for four dialects. That makes it blind to an alias built by

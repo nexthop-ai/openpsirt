@@ -16,18 +16,10 @@ import (
 //
 // The statements themselves stay where they are and are not shared. They are
 // the migration — the tables, the columns and the comments explaining why each
-// one is shaped as it is — and there is nothing repeated about them. What was
-// repeated is the four lines before and the six lines after: asking the
-// context which engine this is, refusing an engine with no spellings, running
-// each statement, and naming the one that failed.
-//
-// Thirty-three copies of that had already become four spellings of one
-// failure. Two of them printed the whole statement rather than its first line,
-// so a failed CREATE TABLE reported ninety lines of data definition; two more
-// named the table and not the statement. The rule about dropping an index —
-// two engines name its table and the other two refuse to — existed in two
-// independent copies, and a third index-only migration had nothing to stop it
-// forgetting one.
+// one is shaped as it is — and there is nothing repeated about them. What is
+// here is everything else: asking the context which engine this is, refusing
+// an engine there are no spellings for, running each statement, naming the one
+// that failed, and the two rules about dropping what a migration made.
 
 // types is the column spellings for the engine a migration is running against.
 func types(ctx context.Context) (*columnTypes, error) {
@@ -57,11 +49,15 @@ func types(ctx context.Context) (*columnTypes, error) {
 // The other two engines have transactional data definition and never see this;
 // the check is skipped there rather than being a cost they pay for nothing.
 //
-// **The probe names the exact object the statement names.** A helper that
-// skipped on any collision could hide a genuine one — two migrations creating
-// the same table under the same name — so a statement whose object is not one
-// this can identify is run rather than guessed at, and fails the way it
-// always did.
+// **The probe names the exact object the statement names**, and a statement
+// whose object it cannot identify is run rather than guessed at, failing the
+// way it always did.
+//
+// What it cannot tell apart is a half-applied run of this migration from an
+// earlier migration that made the same name. On these two engines a duplicate
+// name is stepped over and warned about rather than refused, so it is caught
+// by the two engines with transactional data definition — and by the warning,
+// which is why the skip is logged rather than silent.
 //
 // MariaDB accepts `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT
 // EXISTS`; MySQL accepts only the first. A probe is what the two have in
@@ -111,9 +107,7 @@ func dropTables(ctx context.Context, tx *sql.Tx, names ...string) error {
 // dropIndex drops an index, naming its table on the engines that require it.
 //
 // MySQL and MariaDB spell this `DROP INDEX "n" ON "t"`; the other two take the
-// index name alone and refuse the table. This was written out twice in two
-// migrations, and a third that drops an index had nothing to stop it being
-// written a third time with one arm missing.
+// index name alone and refuse the table.
 func dropIndex(ctx context.Context, tx *sql.Tx, table, name string) error {
 	if _, err := tx.ExecContext(ctx, dropIndexStatement(ctx, table, name)); err != nil {
 		return fmt.Errorf("drop index %s: %w", name, err)
@@ -248,7 +242,7 @@ func typesFor(e database.Engine) *columnTypes {
 }
 
 // firstLine is what a failed statement is named by. The whole of a CREATE
-// TABLE is ninety lines of data definition, and two migrations reported it.
+// TABLE is ninety lines of data definition.
 func firstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i > 0 {
 		return strings.TrimSpace(s[:i])

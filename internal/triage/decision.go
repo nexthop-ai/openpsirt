@@ -274,7 +274,7 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 		return nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -329,7 +329,7 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 		return nil, err
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}

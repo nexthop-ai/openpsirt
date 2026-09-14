@@ -334,7 +334,7 @@ func (s *Store) EndOfLifeFor(ctx context.Context, streamID int64) (EndOfLife, er
 // not make one of them supported for longer than the other.
 func (s *Store) EndOfLifeForTarget(ctx context.Context, targetID int64) (EndOfLife, error) {
 	return s.endOfLife(ctx,
-		`s.id IN (SELECT tg.stream_id FROM "target" AS tg WHERE tg.id = ?)`, targetID,
+		`s.id IN (SELECT tg.stream_id FROM "target" AS "tg" WHERE tg.id = ?)`, targetID,
 		"build", targetID)
 }
 

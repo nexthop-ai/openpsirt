@@ -3,7 +3,6 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
 )
@@ -49,8 +48,5 @@ func upLease(ctx context.Context, tx *sql.Tx) error {
 
 // The primary key goes with the table and is not dropped separately.
 func downLease(ctx context.Context, tx *sql.Tx) error {
-	if _, err := tx.ExecContext(ctx, `DROP TABLE "lease"`); err != nil {
-		return fmt.Errorf("drop lease: %w", err)
-	}
-	return nil
+	return dropTables(ctx, tx, "lease")
 }

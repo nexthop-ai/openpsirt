@@ -210,3 +210,35 @@ func contains(haystack, needle string) bool {
 		return false
 	})()
 }
+
+func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
+	// The settings are appended after the URL's own query and the driver takes
+	// the last value of a name, so a sql_mode an operator wrote was dropped
+	// without a word — the same loss appending to the server's mode exists to
+	// avoid, and inconsistent with the transport, which an operator may state.
+	got, err := ParseURL("mysql://u:p@h/db?sql_mode=ANSI,NO_ZERO_DATE")
+	if err != nil {
+		t.Fatalf("ParseURL: %v", err)
+	}
+	for _, want := range []string{"ANSI,NO_ZERO_DATE", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
+		if !contains(got.DSN, url.QueryEscape(want)) {
+			t.Errorf("DSN %q lost %q", got.DSN, want)
+		}
+	}
+	// And what the server already held is no longer the base, because the
+	// operator named one.
+	if contains(got.DSN, url.QueryEscape("@@sql_mode")) {
+		t.Errorf("DSN %q added the operator's mode to the server's instead of replacing it", got.DSN)
+	}
+
+	// A quote in the value is escaped for SQL rather than for Go: under
+	// ANSI_QUOTES a double-quoted value is an identifier, so the wrong quoting
+	// asks for a mode named after the text rather than the text.
+	got, err = ParseURL("mysql://u:p@h/db?sql_mode=IT%27S")
+	if err != nil {
+		t.Fatalf("ParseURL: %v", err)
+	}
+	if !contains(got.DSN, url.QueryEscape("'IT''S'")) {
+		t.Errorf("DSN %q does not carry the operator's mode as a SQL string", got.DSN)
+	}
+}

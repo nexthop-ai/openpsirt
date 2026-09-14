@@ -111,7 +111,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return 0, nil, fmt.Errorf("this store is already inside a transaction")
 	}

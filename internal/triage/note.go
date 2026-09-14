@@ -139,7 +139,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 	// that did not would leave the record saying a note was changed and
 	// nothing saying from what, which is worse than keeping no history
 	// because it looks like one.
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, errors.New("this store is already inside a transaction")
 	}

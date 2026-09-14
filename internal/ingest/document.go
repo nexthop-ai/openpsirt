@@ -200,7 +200,7 @@ func (d *Documents) Open(ctx context.Context, documentID int64) io.Reader {
 // of what arrived — which is what retaining a tagged release keeps them for: a re-parse means asking the build to send the file again, and
 // without the hash there is nothing to check the second copy against.
 func (d *Documents) Discard(ctx context.Context, scanID int64) error {
-	db, ok := d.db.(*bun.DB)
+	db, ok := database.Handle(d.db)
 	if !ok {
 		return fmt.Errorf("this store is already inside a transaction")
 	}

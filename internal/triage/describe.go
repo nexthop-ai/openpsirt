@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -274,7 +275,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	}
 	// The graph store reads through the pool. Describing is a read on the
 	// way out of a handler, never part of a transaction.
-	pool, ok := s.db.(*bun.DB)
+	pool, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("describing decisions is not done inside a transaction")
 	}

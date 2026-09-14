@@ -39,7 +39,7 @@ import (
 // risk rather than hiding it, and the queue exists to stop risk being hidden
 // unseen.
 func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int64, reasoning string) (*Revision, error) {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -162,7 +162,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 // No approval needed, for the same reason revising needs none: it puts risk
 // back on the table rather than taking it off.
 func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID int64) error {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return fmt.Errorf("this store is already inside a transaction")
 	}
@@ -206,7 +206,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 // available at the same size. Hunting for what a bulk approval touched, one
 // row at a time, is not an undo anybody will actually use.
 func (s *Store) UndoBatch(ctx context.Context, subject access.Subject, batch string) (Undone, error) {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return Undone{}, fmt.Errorf("this store is already inside a transaction")
 	}

@@ -60,7 +60,7 @@ const (
 // rating used to be. So this swaps a column for a join rather than adding one
 // where none existed.
 func RatedFor(product RatedOn) string {
-	return `LEFT JOIN "issue_rating" AS ir ON ir.vulnerability_id = v.id` +
+	return `LEFT JOIN "issue_rating" AS "ir" ON ir.vulnerability_id = v.id` +
 		` AND ir.product_id = ` + string(product)
 }
 
@@ -140,6 +140,6 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 // Written as a condition on the target rather than as a join, because the
 // statements that need it are updates and no engine here spells a joined
 // update the same way.
-const inThisProduct = `target_id IN (SELECT tg.id FROM "target" AS tg
-	JOIN "stream" AS st ON st.id = tg.stream_id
+const inThisProduct = `target_id IN (SELECT tg.id FROM "target" AS "tg"
+	JOIN "stream" AS "st" ON st.id = tg.stream_id
 	WHERE st.product_id = ?)`

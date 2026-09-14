@@ -42,7 +42,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			"once", len(chosen), cap)
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return 0, fmt.Errorf("this store is already inside a transaction")
 	}

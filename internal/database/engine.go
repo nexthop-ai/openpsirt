@@ -177,8 +177,8 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// connection where it does not. It is a floor rather than a
 		// guarantee, so a deployment that needs certainty asks for tls=true,
 		// which is left alone here.
-		settings := "parseTime=true&loc=UTC&clientFoundRows=true" + transport(u) + "&sql_mode=" +
-			url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES,STRICT_TRANS_TABLES')")
+		settings := "parseTime=true&loc=UTC&clientFoundRows=true" + transport(u) +
+			"&sql_mode=" + url.QueryEscape(mode(u))
 		if query != "" {
 			query += "&" + settings
 		} else {
@@ -239,6 +239,27 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		return path + "?_pragma=" + strings.Join(pragmas, "&_pragma="), nil
 	}
 	return "", fmt.Errorf("unsupported database %q", engine)
+}
+
+// mode is the sql_mode this connection asks for.
+//
+// The two the application depends on are always named. What they are added to
+// is the server's own mode, or the operator's where the URL states one — the
+// settings are appended after the URL's query and the driver takes the last
+// value of a name, so a sql_mode an operator wrote was otherwise dropped
+// without a word. That is the same loss the appending exists to avoid, and
+// inconsistent with the transport below, which an operator may state.
+//
+// Written as a SQL string literal, not a Go one: under ANSI_QUOTES a
+// double-quoted value is an identifier, so quoting it that way would ask the
+// server for a mode named after the operator's text rather than the text.
+func mode(u *url.URL) string {
+	const ours = ",ANSI_QUOTES,STRICT_TRANS_TABLES"
+	base := "@@sql_mode"
+	if held := u.Query().Get("sql_mode"); held != "" {
+		base = "'" + strings.ReplaceAll(held, "'", "''") + "'"
+	}
+	return "CONCAT(" + base + ",'" + ours + "')"
 }
 
 // transport is the tls setting to add to a MySQL or MariaDB DSN, or nothing

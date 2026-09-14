@@ -16,11 +16,18 @@ import (
 // A quoted name does not match, so a hit is by construction a bare one.
 var bareAfter = regexp.MustCompile(`(?i)\b(TABLE|INDEX|CONSTRAINT|REFERENCES)\s+([A-Za-z_][A-Za-z0-9_]*)`)
 
-// bareColumn matches a column declaration opening with an unquoted name. The
-// words excluded are the ones that open a table constraint rather than a
-// column.
+// bareColumn matches an unquoted name where a column name belongs. The words
+// excluded are the ones that open a table constraint, or continue the
+// declaration above, rather than naming a column.
+//
+// **Every name in the body, not only the one that opens a line.** Requiring a
+// line start and trailing whitespace read a table declaration, where each
+// column is on its own line, and nothing else — an index body is
+// `("kind", "at")` on one line, so an unquoted column there was matched by
+// neither this nor bareAfter, which is precisely what the helper below says is
+// covered.
 var bareColumn = regexp.MustCompile(
-	`(?im)^\s*(?:(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|REFERENCES|ON|DEFAULT|NOT|NULL)\b|([A-Za-z_][A-Za-z0-9_]*)\s)`)
+	`(?i)(?:^|[(,])\s*(?:(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|REFERENCES|ON|DEFAULT|NOT|NULL)\b|([A-Za-z_][A-Za-z0-9_]*)\s*(?:[\s,)]|$))`)
 
 func TestEveryIdentifierInTheSchemaIsQuoted(t *testing.T) {
 	// AGENTS.md states this three times and two things claimed to enforce it.

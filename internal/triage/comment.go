@@ -130,7 +130,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 	// the record saying a comment was changed and nothing saying from what
 	// — which is worse than the state this replaces, because it looks like
 	// a history and is not.
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return 0, fmt.Errorf("this store is already inside a transaction")
 	}

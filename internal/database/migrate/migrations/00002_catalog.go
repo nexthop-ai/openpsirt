@@ -139,14 +139,5 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 }
 
 func downCatalog(ctx context.Context, tx *sql.Tx) error {
-	for _, table := range []string{"target", "variant", "stream", "product"} {
-		// Quoted, like every other identifier in the schema. A reserved word
-		// is only reserved when bare, and the four engines do not agree on
-		// which words those are — so an unquoted name fails on whichever
-		// engine somebody is least likely to be running.
-		if _, err := tx.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
-			return err
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "target", "variant", "stream", "product")
 }

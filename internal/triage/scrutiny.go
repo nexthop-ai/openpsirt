@@ -91,7 +91,7 @@ type Grown struct {
 // record's own question is: no approval row from anybody other than the
 // proposer, and none that has been taken back. A flag would report what
 // something asserted about itself.
-const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS ex` +
+const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
 	` WHERE ex.claim_id = de.claim_id AND ex.withdrawn_at IS NULL` +
 	` AND ex.approved_by <> de.proposed_by)`
 

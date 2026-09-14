@@ -21,16 +21,20 @@ import (
 
 // minimum is the oldest release of each engine we will run against.
 //
-// A floor is a release series, and it says two things: the oldest series whose
-// behavior the queries and schema here are written against, and the oldest
-// series upstream publishes fixes for at all.
+// A floor is a release series: the oldest series whose behavior the queries
+// and schema here are written against.
 //
-// **It does not say the server in front of it carries those fixes.** Upstream
-// publishes per patch release, and which patch release an operator runs is a
-// property of the deployment that no comparison made at startup can act on —
-// a floor that admits the series admits every unpatched release in it. So this
-// is a compatibility floor, not the thing that keeps a deployment current, and
-// raising one refuses deployments that start today.
+// **It does not say upstream still publishes fixes for that series.** MySQL
+// 8.0 and MariaDB 10.6 are both past upstream end of life and are admitted
+// anyway, because raising a floor refuses deployments that start today, which
+// is a decision rather than upkeep.
+//
+// **Nor that the server in front of it carries the fixes for its own series.**
+// Upstream publishes per patch release, and which patch release an operator
+// runs is a property of the deployment that no comparison made at startup can
+// act on — a floor that admits a series admits every unpatched release in it.
+// So this is a compatibility floor, not the thing that keeps a deployment
+// current.
 var minimum = map[Engine]Version{
 	Postgres: {14, 0, 0},
 	MySQL:    {8, 0, 0},

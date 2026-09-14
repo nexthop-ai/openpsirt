@@ -70,7 +70,7 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 	}
 	shown := strings.TrimSpace(displayName)
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}

@@ -57,6 +57,5 @@ func upJob(ctx context.Context, tx *sql.Tx) error {
 }
 
 func downJob(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `DROP TABLE "job"`)
-	return err
+	return dropTables(ctx, tx, "job")
 }

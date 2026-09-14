@@ -40,7 +40,7 @@ func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 		if err := schema.Down(ctx, db, silent()); err != nil {
 			t.Fatalf("roll back one: %v", err)
 		}
-		// Not the test's own context: it is cancelled by the time a cleanup
+		// Not the test's own context: it is canceled by the time a cleanup
 		// runs, so the repair would be issued against a dead context and the
 		// database would stay one migration short for every test after this.
 		t.Cleanup(func() { _ = schema.Up(context.WithoutCancel(ctx), db, silent()) })

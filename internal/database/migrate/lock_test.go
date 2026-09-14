@@ -2,9 +2,11 @@ package migrate
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
@@ -106,7 +108,7 @@ func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
 	// connection to the pool rather than closing it — which is why the
 	// connection is pinned in the first place. Left set, one pooled connection
 	// carries a 300-second bound and the others carry the server's default, so
-	// the same query afterwards either waits indefinitely or is cancelled,
+	// the same query afterwards either waits indefinitely or is canceled,
 	// decided by which connection the pool happens to hand out.
 	engines.SkipUnless(t, database.Postgres)
 	url := os.Getenv(postgresURLEnv)
@@ -141,10 +143,13 @@ func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
 }
 
 func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
-	// "The table is not there" and "I could not look" arrived the same way, so
-	// a database whose credentials cannot read the version table reported
-	// version 0 — and the reasonable thing to do about "nothing is applied" is
-	// to migrate a database that may be fully populated.
+	// "The table is not there", "this credential may not read it" and "the
+	// database is unreachable" arrived as one error and read as the first, so
+	// a fully populated database whose credentials omitted that one table
+	// reported version 0 — and the reasonable thing to do about "nothing is
+	// applied" is to migrate it.
+	//
+	// The catalog is asked now, which answers only the question being asked.
 	engines.SkipUnless(t, database.Postgres)
 	url := os.Getenv(postgresURLEnv)
 	if url == "" {
@@ -153,8 +158,8 @@ func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
 	db := open(t, url)
 	ctx := context.Background()
 
-	// A database with no version table reads as version 0, which is the
-	// answer that has to keep working.
+	// A database with no bookkeeping table reads as "not migrated", which is
+	// the answer that has to keep working — it is what a fresh database is.
 	there, err := versionTableExists(ctx, db)
 	if err != nil {
 		t.Fatalf("probing a reachable database reported a failure: %v", err)
@@ -169,6 +174,79 @@ func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
 	if _, err := versionTableExists(ctx, closed); err == nil {
 		t.Error("a database that could not be read reported that the version table is simply absent")
 	}
+}
+
+func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing.T) {
+	// The case the whole distinction exists for. Running migrations under
+	// credentials of their own is the documented reason automatic migration
+	// can be turned off, so a runtime role granted per-table rights that omit
+	// the bookkeeping table is the ordinary arrangement rather than an exotic
+	// one — and it read as a database nobody had ever migrated.
+	engines.SkipUnless(t, database.Postgres)
+	url := os.Getenv(postgresURLEnv)
+	if url == "" {
+		t.Skipf("%s is not set", postgresURLEnv)
+	}
+	owner := open(t, url)
+	ctx := context.Background()
+
+	// A table standing in for the bookkeeping one, so this test neither
+	// depends on the migrations having run nor disturbs them.
+	probe := fmt.Sprintf("probe_unreadable_%d", time.Now().UnixNano())
+	role := probe + "_role"
+	for _, stmt := range []string{
+		`CREATE TABLE "` + probe + `" ("id" INTEGER)`,
+		`CREATE ROLE "` + role + `" LOGIN PASSWORD 'probe'`,
+		`GRANT CONNECT ON DATABASE "openpsirt" TO "` + role + `"`,
+		`GRANT USAGE ON SCHEMA "public" TO "` + role + `"`,
+	} {
+		if _, err := owner.ExecContext(ctx, stmt); err != nil {
+			t.Skipf("this server will not let the test arrange a restricted role (%v)", err)
+		}
+	}
+	t.Cleanup(func() {
+		clean := context.WithoutCancel(ctx)
+		for _, stmt := range []string{
+			`DROP TABLE IF EXISTS "` + probe + `"`,
+			`REVOKE ALL ON SCHEMA "public" FROM "` + role + `"`,
+			`REVOKE ALL ON DATABASE "openpsirt" FROM "` + role + `"`,
+			`DROP ROLE IF EXISTS "` + role + `"`,
+		} {
+			_, _ = owner.ExecContext(clean, stmt)
+		}
+	})
+
+	// The role may reach the database and read the catalog, and may not read
+	// the table. That is exactly the arrangement being described.
+	restricted := open(t, strings.Replace(url, "postgres:test@", role+":probe@", 1))
+	var probed int
+	readErr := restricted.QueryRowContext(ctx,
+		`SELECT 1 FROM "`+probe+`" LIMIT 1`).Scan(&probed)
+	if readErr == nil {
+		t.Skip("the restricted role can read the table, so there is nothing to tell apart")
+	}
+
+	// The catalog still answers, and answers the question that was asked.
+	// This is why PostgreSQL is asked through pg_class: the information schema
+	// is filtered by privilege, so a role with no rights on the table does not
+	// see the table there either, and gives back the same conflation.
+	query, err := catalogQuery(restricted.Server.Engine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seen int
+	if err := restricted.QueryRowContext(ctx, query, probe).Scan(&seen); err != nil {
+		t.Fatalf("a credential that may not read a table could not see it in the catalog either: %v", err)
+	}
+
+	// And the information schema is what that would have looked like.
+	var filtered int
+	if err := restricted.QueryRowContext(ctx,
+		`SELECT 1 FROM "information_schema"."tables"
+		 WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ?`, probe).Scan(&filtered); err == nil {
+		t.Error("the information schema is not privilege-filtered here, so the reason for pg_class no longer holds")
+	}
+	t.Logf("unreadable by this role (%v), present in pg_class, absent from the information schema", readErr)
 }
 
 func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {

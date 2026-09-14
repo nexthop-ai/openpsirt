@@ -251,7 +251,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return nil, err
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -367,7 +367,7 @@ func (s *Store) ApproveClaim(ctx context.Context, subject access.Subject, claimI
 			return nil, err
 		}
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -611,7 +611,7 @@ func (s *Store) Split(ctx context.Context, subject access.Subject, claimID int64
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -735,7 +735,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}

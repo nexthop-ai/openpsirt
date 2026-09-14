@@ -344,6 +344,14 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // rollback, which has to keep working: the migrations a newer binary applied
 // are additive, and refusing here would leave a bad deployment with no way
 // back.
+//
+// **It compares version numbers, which is less than it sounds.** Before the
+// first release a schema change edits the migration that created the thing
+// rather than adding one beside it, so two builds can carry the same highest
+// version and different schemas — and an existing database then matches on the
+// number while its columns are whatever the earlier build made. Nothing here
+// can see that, which is why the line it logs names the version rather than
+// calling the schema current.
 func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 	applied, err := schema.Version(ctx, db)
 	if err != nil {
@@ -359,8 +367,13 @@ func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) 
 				"run \"openpsirt migrate up\", or set OPENPSIRT_AUTO_MIGRATE=true",
 			applied, wanted)
 	}
-	logger.Info("automatic migration is off, and the schema is current",
-		"applied", applied, "expected", wanted)
+	if applied > wanted {
+		logger.Info("automatic migration is off, and the schema is ahead of this build",
+			"applied", applied, "expected", wanted)
+		return nil
+	}
+	logger.Info("automatic migration is off, and the schema version is the one this build expects",
+		"version", applied)
 	return nil
 }
 
@@ -394,7 +407,7 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 		if err != nil {
 			return err
 		}
-		state := "current"
+		state := "the version this build expects"
 		switch {
 		case applied < wanted:
 			state = fmt.Sprintf("behind by %d", wanted-applied)

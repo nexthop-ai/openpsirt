@@ -76,6 +76,5 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 }
 
 func downScan(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `DROP TABLE "scan"`)
-	return err
+	return dropTables(ctx, tx, "scan")
 }

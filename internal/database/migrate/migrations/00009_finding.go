@@ -144,9 +144,13 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 		`CREATE TABLE "scan_run" (
 			"id"               ` + t.id + `,
 			"target_id"        ` + t.ref + ` NOT NULL,
-			"scanner"          ` + t.name + ` NOT NULL,
-			"scanner_version"  ` + t.name + ` NULL,
-			"database_version" ` + t.name + ` NULL,
+			-- What the scanner calls itself and what it was reading, both
+			-- taken verbatim from its output and bounded by nothing on the
+			-- way in — so they are the producer-supplied slot rather than
+			-- the indexed-name one. None of the three is indexed or unique.
+			"scanner"          ` + t.free + ` NOT NULL,
+			"scanner_version"  ` + t.free + ` NULL,
+			"database_version" ` + t.free + ` NULL,
 			"ran_here"         ` + t.boolean + ` NOT NULL,
 			"started_at"       ` + t.timestamp + ` NOT NULL,
 			"finished_at"      ` + t.timestamp + ` NULL,

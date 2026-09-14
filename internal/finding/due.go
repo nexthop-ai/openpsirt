@@ -138,8 +138,8 @@ type Late struct {
 // across products reads from the stream and a list within one binds.
 func OffTheClock(product string, now time.Time) (string, []any) {
 	standing, held := InForce()
-	return `EXISTS (SELECT 1 FROM "decision" AS de
-		JOIN "claim" AS cl ON cl.id = de.claim_id
+	return `EXISTS (SELECT 1 FROM "decision" AS "de"
+		JOIN "claim" AS "cl" ON cl.id = de.claim_id
 		WHERE de.product_id = ` + product + `
 		  AND de.vulnerability_id = f.vulnerability_id
 		  AND de.place_identity = f.place_identity

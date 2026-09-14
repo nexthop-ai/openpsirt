@@ -135,7 +135,7 @@ type Store struct {
 // re-ran the inner half alone would repeat part of a transaction whose other
 // part had been rolled back. Saying so is better than silently doing it.
 func (s *Store) handle() (*bun.DB, error) {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -220,7 +220,7 @@ func (s *Store) record(ctx context.Context, person *Account) error {
 		_, err := db.NewInsert().Model(person).Exec(ctx)
 		return err
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return write(ctx, s.db)
 	}

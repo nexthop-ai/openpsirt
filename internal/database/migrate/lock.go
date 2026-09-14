@@ -178,27 +178,63 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 // rights while running says the running application may hold read and write
 // rights only.
 //
-// **"The table is not there" and "I could not look" arrive the same way.** An
-// absent table is an error rather than an empty result, so every other failure
-// — a credential without SELECT on the version table, a reset connection, a
-// deadline — reads as an empty database unless something tells them apart. It
-// read as one, and "schema version 0" against a fully populated database
-// invites an operator to migrate it again.
+// **The catalog is asked, rather than the table.** Selecting from the table
+// answers three questions at once and cannot tell them apart: it is not there,
+// this credential may not read it, or the database is unreachable. All three
+// arrived as one error and read as the first, so "schema version 0" was
+// printed for a fully populated database whose credentials omitted this one
+// table — and the reasonable thing to do about "nothing is applied" is to
+// migrate. Running migrations under a credential of their own is the
+// documented reason automatic migration can be turned off, so that credential
+// is the ordinary arrangement rather than an exotic one.
 //
-// So a failed probe is followed by a trivial one. A database that answers the
-// second was reachable, and the first failure was about the table; a database
-// that answers neither could not be read, and says so. Two probes rather than
-// matching each engine's code for an absent relation, which is four spellings
-// of a question that has a portable answer.
+// **PostgreSQL is asked through pg_class rather than the information schema**,
+// because the information schema is filtered by privilege on all three
+// servers: a role with no rights on a table does not see the table there, so
+// it gives back the same conflation this exists to remove. `pg_class` is
+// readable by any role, so on that engine the two are genuinely told apart.
+//
+// **On MySQL and MariaDB they are not.** Every catalog those engines offer is
+// privilege-filtered and there is no unfiltered one, so a credential that may
+// not read the table is indistinguishable from an absent table. What that
+// costs is bounded: the next thing to run is the version query or a migration,
+// both of which fail with the engine's own permission message rather than
+// silently.
 func versionTableExists(ctx context.Context, db *database.DB) (bool, error) {
+	query, err := catalogQuery(db.Server.Engine)
+	if err != nil {
+		return false, err
+	}
 	var probe int
-	err := db.QueryRowContext(ctx, "SELECT 1 FROM goose_db_version LIMIT 1").Scan(&probe)
-	if err == nil || database.IsNoRows(err) {
-		return true, nil
+	switch err := db.QueryRowContext(ctx, query, versionTable).Scan(&probe); {
+	case database.IsNoRows(err):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("ask whether this database has been migrated: %w", err)
 	}
-	var alive int
-	if reachable := db.QueryRowContext(ctx, "SELECT 1").Scan(&alive); reachable != nil {
-		return false, fmt.Errorf("read the schema version: %w", err)
-	}
-	return false, nil
+	return true, nil
 }
+
+// catalogQuery asks one engine whether it holds a table of a given name.
+//
+// A catalog is engine-specific by nature: three of the four have an
+// information schema, SQLite has a table of its own, and PostgreSQL is asked
+// somewhere else again for the reason above.
+func catalogQuery(engine database.Engine) (string, error) {
+	switch engine {
+	case database.Postgres:
+		return `SELECT 1 FROM "pg_catalog"."pg_class" AS "c"
+			JOIN "pg_catalog"."pg_namespace" AS "n" ON "n"."oid" = "c"."relnamespace"
+			WHERE "n"."nspname" = CURRENT_SCHEMA() AND "c"."relname" = ? AND "c"."relkind" = 'r'`, nil
+	case database.MySQL, database.MariaDB:
+		return `SELECT 1 FROM "information_schema"."TABLES"
+			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ?`, nil
+	case database.SQLite:
+		return `SELECT 1 FROM "sqlite_master" WHERE "type" = 'table' AND "name" = ?`, nil
+	}
+	return "", fmt.Errorf("no way to read the catalog of %s", engine)
+}
+
+// versionTable is the migration library's bookkeeping table, which it names
+// and this only reads.
+const versionTable = "goose_db_version"
