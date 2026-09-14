@@ -103,9 +103,9 @@ type dependency struct {
 
 // merge folds what a second producer said about a component into the first.
 //
-// Licenses and hashes are unioned by value: two catalogs of one module often
-// disagree about which of the two they can see, and the union is what is
-// actually known. Properties are unioned by name, keeping what the first
+// Licenses, hashes and external references are unioned by value: two catalogs
+// of one module often disagree about which of them they can see, and the union
+// is what is actually known. Properties are unioned by name, keeping what the first
 // producer said, because a property is a producer's own statement and there is
 // no basis here for preferring a later one — a disagreement is recorded as a
 // property of its own rather than resolved, so a reader can see it.
@@ -117,7 +117,7 @@ func merge(into *component, from component) {
 	if into.other == nil {
 		into.other = map[string]json.RawMessage{}
 	}
-	for _, key := range []string{"licenses", "hashes"} {
+	for _, key := range []string{"licenses", "hashes", "externalReferences"} {
 		if joined, ok := unionArrays(into.other[key], from.other[key]); ok {
 			into.other[key] = joined
 		}
@@ -360,11 +360,22 @@ func compose(name, version string, docs []document) (*document, error) {
 			local[id] = id
 		}
 
-		// What this document places. Anything nothing places, in any input, is
-		// what the image contains directly — which for a cataloged binary is
-		// its main module, and for a cataloged filesystem is every package no
-		// other package pulls in.
+		// What a component in this document places. Anything nothing places,
+		// in any input, is what the image contains directly — which for a
+		// cataloged binary is its main module, and for a cataloged filesystem
+		// is every package no other package pulls in.
+		//
+		// An edge from the document's own root does not count. That root
+		// describes the part rather than the whole, and the whole is the image
+		// here — so its children are exactly the things the image contains
+		// directly. Counting them as placed would leave them out of the
+		// composed root's children while the loop below skips their edge for
+		// the same reason, and they would sit in the document attached to
+		// nothing.
 		for _, dep := range doc.Dependencies {
+			if _, underAComponent := local[dep.Ref]; !underAComponent {
+				continue
+			}
 			for _, child := range dep.DependsOn {
 				if ref, known := local[child]; known {
 					placed[ref] = true

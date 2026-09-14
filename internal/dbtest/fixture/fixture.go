@@ -7,13 +7,12 @@
 // **No two attributes of the seeded world are accidentally equal.** Every
 // default differs from its neighbour on purpose, because the defect this
 // package exists to expose is code that reads one attribute and answers with
-// another. Thirty-five packages used to hand-roll a seed of their own, and
-// each independently reached the value that collapses the axis it seeds: a
-// display name that is the address name recapitalized, a person whose display
-// name is empty so every read of it falls back to their identity, one variant
-// and it reaches customers, one stream and it is a branch. Code answering a
-// display name where an address name is resolved is indistinguishable from
-// correct code under any of those.
+// another. A seed written per package reaches for the value that collapses the
+// axis it seeds — a display name that is the address name recapitalized, a
+// person with no display name so every read of it falls back to their
+// identity, one variant and it reaches customers, one stream and it is a
+// branch — and under any of those, code answering a display name where an
+// address name is resolved is indistinguishable from correct code.
 //
 // So the defaults here are:
 //

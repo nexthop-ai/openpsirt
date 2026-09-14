@@ -54,7 +54,7 @@ var allowed = []string{
 func main() {
 	var bad []string
 	// web holds the interface, which reaches no table: it asks this server.
-	err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
+	read, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
 		// A test may assert about one table on purpose: it is saying what is
 		// in a row rather than deciding what somebody may reach.
 		if strings.HasSuffix(path, "_test.go") {
@@ -101,5 +101,5 @@ func main() {
 		}
 		os.Exit(1)
 	}
-	fmt.Println("every query outside the access package asks both grant tables")
+	fmt.Printf("every query outside the access package asks both grant tables (%d files)\n", read)
 }

@@ -371,12 +371,13 @@ func writeDecisions(t *testing.T, decided map[string]decision, seen map[string]b
 }
 
 func TestEveryTopLevelKeyTheReaderClaimsIsRecordedAsRead(t *testing.T) {
-	// A top-level key is one the reader has a function for: claiming it is
-	// the act of reading it. The guard beside this one cannot fail in that
+	// A top-level key is one the reader has a function for: claiming it is the
+	// act of reading it. The guard beside this one cannot fail in that
 	// direction — it checks that everything recorded as read appears in a
 	// fixture, and says nothing about something the reader reads and the
-	// record calls skipped. Four sat that way: two suppliers, a publisher and
-	// an originator, all four read into the component the reader builds.
+	// record calls skipped. A supplier, a publisher and an originator are all
+	// read into the component the reader builds, and all are easy to record
+	// the other way.
 	//
 	// **It is strict for a scalar key and weak for a container.** A key
 	// holding a list appears in the record only through its members, so all

@@ -219,12 +219,12 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// degeneracy rather than a choice. access.Store.Names answers a
 		// display name where one is known and the identity otherwise, so with
 		// none set every read of a name in this package comes back as the
-		// identity — and a field that publishes the wrong one of the two
-		// cannot be told from a field that publishes the right one. Four
-		// routes in this package do publish the wrong one. Giving these
-		// people names is what makes that visible, and it belongs with the
-		// change that decides, field by field, which of the two each should
-		// carry.
+		// identity — and a field publishing the wrong one of the two cannot be
+		// told from a field publishing the right one. Four routes in this
+		// package publish the wrong one, which `TODO.md` records under Known
+		// gaps: giving these people names is what makes that visible, and it
+		// belongs with the change that decides, field by field, which of the
+		// two each should carry.
 		rights := access.NewStore(db.DB)
 		administrator, err := rights.Ensure(ctx, "admin", "", true)
 		if err != nil {

@@ -57,9 +57,9 @@ func main() {
 	// vendor is a dependency's own source, and the interface is walked rather
 	// than skipped: a byte that makes a text tool skip a file is not a Go
 	// question, and the five Go gates beside this one leave web out.
-	err := walk.Paths([]string{"vendor"}, func(path string) error {
+	read, err := walk.Paths([]string{"vendor"}, func(path string) (bool, error) {
 		if !text(path) {
-			return nil
+			return false, nil
 		}
 		// The path comes from the walk over the directory this was started in,
 		// never from a caller, and this program reads a repository and prints
@@ -67,21 +67,21 @@ func main() {
 		// would also cover the next tool written beside it.
 		body, err := os.ReadFile(filepath.Clean(path)) //nolint:gosec // walked, not supplied
 		if err != nil {
-			return err
+			return false, err
 		}
 		if b, line, found := carrying(body); found {
 			bad = append(bad, fmt.Sprintf(
 				"%s:%d: byte 0x%02x, which makes text tools treat this file as binary "+
 					"and skip it. Write it as an escape", path, line, b))
 		}
-		return nil
+		return true, nil
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 	if len(bad) == 0 {
-		fmt.Println("every source file reads as text, so every text check sees all of it")
+		fmt.Printf("every source file reads as text, so every text check sees all of it (%d files)\n", read)
 		return
 	}
 	for _, one := range bad {

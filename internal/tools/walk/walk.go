@@ -35,6 +35,9 @@ import (
 //   - dist, site and bin are output: what is in them was built from what is
 //     checked, so reading them checks the same thing twice and fails on
 //     generated code nobody wrote.
+//
+// A fresh slice each time, because callers append their own names to it and a
+// shared backing array would let one caller's extra reach another's walk.
 func Skipped() []string {
 	return []string{".git", ".demo", ".vite", "node_modules", "dist", "site", "bin"}
 }
@@ -44,12 +47,12 @@ func Skipped() []string {
 //
 // The path is relative and carries no "./" prefix, because that is what a
 // gate prints and what a person pastes back into an editor.
-func Sources(suffix string, visit func(path string, body []byte) error) error {
+func Sources(suffix string, visit func(path string, body []byte) error) (int, error) {
 	return Only(suffix, nil, visit)
 }
 
 // Only is Sources with further directories skipped, named at the call site.
-func Only(suffix string, extra []string, visit func(path string, body []byte) error) error {
+func Only(suffix string, extra []string, visit func(path string, body []byte) error) (int, error) {
 	read := 0
 	err := each(extra, func(path string) error {
 		if !strings.HasSuffix(path, suffix) {
@@ -63,23 +66,31 @@ func Only(suffix string, extra []string, visit func(path string, body []byte) er
 		return visit(path, body)
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return sawSomething(read, "files ending "+suffix)
+	return read, sawSomething(read, "files ending "+suffix)
 }
 
 // Paths visits every file under the working directory, by path alone, for a
 // gate that decides from the name whether to read it at all.
-func Paths(extra []string, visit func(path string) error) error {
-	seen := 0
+//
+// It reports how many the caller kept, not how many it was shown. A count of
+// visits is held above zero by any file at all — a licence, a readme — so the
+// refusal below could never fire for a gate that reads one kind of file, which
+// is the answer-that-means-two-things this package exists to remove.
+func Paths(extra []string, visit func(path string) (bool, error)) (int, error) {
+	kept := 0
 	err := each(extra, func(path string) error {
-		seen++
-		return visit(path)
+		took, err := visit(path)
+		if took {
+			kept++
+		}
+		return err
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return sawSomething(seen, "files")
+	return kept, sawSomething(kept, "files")
 }
 
 func each(extra []string, visit func(path string) error) error {

@@ -19,10 +19,9 @@ import (
 
 var (
 	designHeading = regexp.MustCompile(`(?m)^(#{2,3})\s+(.*)$`)
-	// The label and the anchor. The anchor used to be matched and never
-	// captured — the regex stopped at "(#" — so the comparison was heading
-	// text against entry label and the destination was no part of it. An
-	// entry could read as one section and navigate to another.
+	// The label and the anchor, both captured. Reading the label alone would
+	// compare heading text against entry text and leave the destination out
+	// of it, so an entry could read as one section and navigate to another.
 	contentsEntry = regexp.MustCompile(`(?m)^-\s+\[([^\]]+)\]\(#([^)]+)\)`)
 	fence         = regexp.MustCompile("(?s)```.*?```")
 )

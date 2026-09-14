@@ -1,17 +1,14 @@
 package dbtest
 
 import (
-	"io"
-	"log/slog"
 	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // The table list is what empties a database between two tests in a package,
-// and until now nothing said it named every table.
+// and membership in it is what this says.
 //
 // A table a migration makes and this list omits is never emptied. On SQLite
 // nothing shows, because each test gets its own copy of the migrated template;
@@ -27,14 +24,10 @@ import (
 //
 // **Membership is what this checks; the order stays hand-kept**, because
 // putting children before the rows they reference means reading the foreign
-// keys, and the comment beside each name is the record of that reasoning.
+// keys, and where a position needed that reasoning the comment beside the name
+// is the record of it.
 func TestTheTableListNamesEveryTableTheSchemaMakes(t *testing.T) {
 	Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(t.Context(), db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
-
 		made := TablesIn(t, t.Context(), db)
 		listed := make(map[string]bool, len(tables))
 		for _, name := range tables {

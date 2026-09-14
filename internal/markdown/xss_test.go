@@ -108,9 +108,9 @@ func TestTextPastTheBoundIsRefused(t *testing.T) {
 		t.Fatal("text past the bound was accepted")
 	}
 	// And what a person is shown. A fault about the whole text carries no
-	// line, which is the branch every whole-text refusal takes and the one no
-	// test had read the words out of — so the message somebody sees for "too
-	// long" had never been looked at.
+	// line, which is the branch every whole-text refusal takes, so reading the
+	// words out of one is what says the message somebody sees for "too long"
+	// is a sentence rather than a line number and a blank.
 	if !strings.Contains(err.Error(), "longer than") {
 		t.Errorf("the refusal does not say what is wrong: %q", err)
 	}
@@ -120,9 +120,8 @@ func TestTextPastTheBoundIsRefused(t *testing.T) {
 }
 
 func TestWhatIsNotTextIsRefusedAsNotText(t *testing.T) {
-	// Bytes that are not UTF-8 at all. The refusal had no test: every input
-	// in this file is text, so the arm ran nowhere and its message had never
-	// been read.
+	// Bytes that are not UTF-8 at all. Every other input in this file is text,
+	// so nothing else reaches this arm or reads what it says.
 	err := markdown.Check(string([]byte{0xff, 0xfe, 0x00}))
 	if err == nil {
 		t.Fatal("bytes that are not text were accepted")

@@ -222,14 +222,11 @@ a {
   color: var(--faint);
   font-size: 11px;
 }
-/* What kind of thing a notice is, above what it says. A condition is marked,
-   because acknowledging one hides it rather than resolving it. */
+/* What kind of thing a notice is, said before what it says. A condition is
+   marked, because acknowledging one hides it rather than resolving it. */
 .noticekind {
-  display: block;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--faint);
 }
 .noticekind.holds {

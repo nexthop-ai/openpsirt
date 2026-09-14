@@ -36,7 +36,7 @@ func main() {
 	var bad []string
 	// web holds the interface, which is TypeScript: nothing under it parses
 	// as Go, so reading it is work with no answer.
-	err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
+	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
@@ -74,7 +74,7 @@ func main() {
 		os.Exit(2)
 	}
 	if len(bad) == 0 {
-		fmt.Println("every doc comment sits on the declaration it describes")
+		fmt.Printf("every doc comment sits on the declaration it describes (%d files)\n", read)
 		return
 	}
 	sort.Strings(bad)

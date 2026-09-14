@@ -78,7 +78,7 @@ func main() {
 	var bad []string
 	// web holds the interface, which reaches no engine at all: it talks to
 	// this server over HTTP.
-	err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
+	read, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
 		for _, where := range allowed {
 			if strings.HasPrefix(path, where) {
 				return nil
@@ -110,7 +110,7 @@ func main() {
 	}
 	if len(bad) == 0 {
 		fmt.Printf("engine-specific code is confined to the %d paths this holds, "+
-			"which the design document lists as its own rows\n", len(allowed))
+			"which the design document lists as its own rows (%d files)\n", len(allowed), read)
 		return
 	}
 	sort.Strings(bad)

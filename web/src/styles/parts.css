@@ -1276,17 +1276,13 @@ tr.places td {
 
 /* ---------- forms ---------- */
 
-/* Several fields that belong together and fit beside each other. Each one
-   keeps its own width where there is room and they stack where there is not. */
-.fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap);
-  align-items: flex-start;
-}
-.fields > .field {
-  flex: 1 1 14rem;
-  min-width: 0;
+/* Several fields that belong together, grouped in the markup. The fields carry
+   their own spacing, so this only closes the gap the last one would otherwise
+   leave under the group. Laying them out beside each other is a change to how
+   two screens read and wants somebody looking at them, not a rule added to
+   satisfy a gate. */
+.fields > .field:last-child {
+  margin-bottom: 0;
 }
 .field {
   display: flex;

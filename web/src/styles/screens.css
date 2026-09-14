@@ -739,20 +739,14 @@
   flex-direction: column;
   gap: var(--gap-wide);
 }
-/* What a pending card says at the top and what it offers at the bottom. The
-   head names the issue and who asked; the foot holds the one control. */
+/* What a pending card says at the top and what it offers at the bottom: the
+   head names the issue and who asked, the foot holds the one control. Spacing
+   only — putting either on one line is a change to how the card reads and
+   wants somebody looking at it. */
 .cardhead {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 9px;
   margin-bottom: 9px;
 }
 .cardfoot {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--gap);
   margin-top: 12px;
 }
 .qcard {
@@ -788,12 +782,9 @@
   align-items: center;
   flex-wrap: wrap;
 }
-/* The box that puts one claim into a bulk action. Sized above the browser
-   default because it is the only control on the card a pointer has to find. */
+/* The box that puts one claim into a bulk action. Colored like every other
+   control here and left at the size the browser draws it. */
 .qpick {
-  width: 15px;
-  height: 15px;
-  margin: 0;
   accent-color: var(--accent);
   cursor: pointer;
 }

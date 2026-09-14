@@ -2,14 +2,11 @@ package access
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // atClock is a store whose sense of now a test moves, because a session
@@ -117,10 +114,6 @@ func TestAProviderMayRefreshWhatAProviderGaveAndNotWhatSomebodySet(t *testing.T)
 	// owner signed in.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatal(err)
-		}
 		dbtest.Reset(t, db)
 		store := NewStore(db.DB)
 		person, err := store.Ensure(ctx, "ana", "Ana", false)
@@ -207,10 +200,6 @@ func TestAskingForWhatNobodyOwnsWithoutAskingForADigestIsRefused(t *testing.T) {
 	// believe they have asked for something.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatal(err)
-		}
 		dbtest.Reset(t, db)
 		store := NewStore(db.DB)
 		person, err := store.Ensure(ctx, "ana", "Ana", false)

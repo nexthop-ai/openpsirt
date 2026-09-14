@@ -619,9 +619,9 @@ function Me({ who }: { who: Who }) {
             className="opt"
             role="menuitem"
             // The sequence lives in session.ts, where its ordering can be
-            // asserted. What makes it correct is which parts run before the
-            // await and outside the try, and none of that is visible from a
-            // click handler.
+            // asserted: what makes it correct is which parts run before the
+            // await and outside the try, and a click handler is not somewhere
+            // a test can reach that from.
             onClick={() =>
               signOut(
                 () => api.DELETE("/v1/session", {}),

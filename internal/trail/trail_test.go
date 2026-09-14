@@ -108,11 +108,11 @@ func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
 	// without the escaping "a_b@example.com" also matches "axb@example.com"
 	// and one person's administrative history is reported as another's.
 	//
-	// The escaping is one statement in this package, it had zero executions,
-	// and About had no test at all: its only caller is a handler. The four
-	// engines are the point as well, because the ESCAPE clause parses
-	// differently on each — one of them refuses a backslash outright, which is
-	// why the escape character is a hash.
+	// The escaping is one statement in this package and About's only other
+	// caller is a handler, so this is what reaches either. The four engines
+	// are the point as well: the ESCAPE clause parses differently on each, and
+	// one of them refuses a backslash outright, which is why the escape
+	// character is a hash.
 	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
 		ctx := t.Context()
 		for _, about := range []string{

@@ -417,10 +417,10 @@ func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {
 
 func TestTheReaderDrainsABacklogInsideOneWakeAndReturnsWhenCancelled(t *testing.T) {
 	// Run is what cmd/openpsirt starts and what reads every scan this server
-	// takes in, and it was at 0.0% — every test drives Once. What lives only
-	// in the loop is the draining, the timer reset and the cancellation, and
-	// Once is correct whether or not any of the three is: a loop processing
-	// one job per wake instead of the backlog looks identical from there.
+	// takes in. Every other test here drives Once, and what lives only in the
+	// loop is the draining, the timer reset and the cancellation — Once is
+	// correct whether or not any of the three is, so a loop processing one job
+	// per wake instead of the backlog looks identical from there.
 	//
 	// So: two scans queued at once, an interval far longer than the test, and
 	// both read. If the loop took one job per wake the second would still be

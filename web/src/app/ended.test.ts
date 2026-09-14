@@ -8,8 +8,7 @@ beforeEach(() => {
 describe("a session that ended under somebody", () => {
   it("starts as not ended, because that is what a working session looks like", () => {
     // Read from a fresh module, so that what the assertion observes is the
-    // initializer rather than the sessionResumed the setup above just ran. It
-    // used to assert an initial value that beforeEach had already written.
+    // initializer rather than the sessionResumed the setup above just ran.
     vi.resetModules();
     return import("./ended").then((fresh) => {
       expect(fresh.snapshot()).toBe(false);

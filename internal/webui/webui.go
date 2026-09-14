@@ -18,18 +18,18 @@ var built embed.FS
 
 // ErrNoInterface says no interface was built into this binary.
 //
-// An expected state rather than a fault: an API-only build is a thing
-// somebody chooses, and it serves no page at all. Distinguished from a fault
-// because the two used to be one answer — nil, written nowhere — so the whole
-// interface disappearing and nobody having asked for one were indistinguishable
-// to the caller and silent to everybody.
+// An expected state rather than a fault: an API-only build is a thing somebody
+// chooses, and it serves no page at all. It is a sentinel of its own so that a
+// caller can tell it from a binary whose embedded interface cannot be read,
+// which is broken — answering both with nothing would make the whole interface
+// disappearing indistinguishable from nobody having asked for one.
 var ErrNoInterface = errors.New("no web interface was built into this binary")
 
 // Files is the built interface.
 //
-// It answers ErrNoInterface where the frontend build never ran, and a wrapped
-// error where the embedded directory cannot be read at all — which is a broken
-// binary rather than a choice.
+// It answers ErrNoInterface where the binary carries no interface, and a
+// wrapped error where the embedded directory cannot be read at all — which is
+// a broken binary rather than a choice.
 func Files() (fs.FS, error) {
 	inner, err := fs.Sub(built, "dist")
 	if err != nil {

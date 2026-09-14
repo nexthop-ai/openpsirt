@@ -88,13 +88,13 @@ var banners = map[database.Engine]struct{ says, mustNotSay []string }{
 	database.SQLite:   {mustNotSay: []string{"mariadb", "postgresql"}},
 }
 
-// An engine with no banner recorded used to pass the identity check rather
-// than fail it: the map was read with the one-value form, so an unlisted
-// engine got the empty string and strings.Contains was satisfied by every
-// possible banner. The lookup above refuses instead, and this is what says a
-// fifth engine reaches that refusal at all — the identity test only runs
-// against engines that are configured, so on a SQLite-only machine a missing
-// PostgreSQL entry would go unnoticed until CI.
+// Every engine has to have an entry, and this is what says so. The identity
+// test itself cannot: it runs only against engines that are configured, so on
+// a SQLite-only machine a missing PostgreSQL entry would go unnoticed until
+// CI. Read with the two-value form there for the same reason — a map read
+// one-valued hands back the empty string, and strings.Contains is satisfied by
+// every possible banner, so the check would pass for an engine it knows
+// nothing about.
 func TestEveryEngineHasABannerRecorded(t *testing.T) {
 	if len(database.Engines()) == 0 {
 		t.Fatal("there are no engines, so this checked nothing")

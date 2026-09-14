@@ -7,33 +7,37 @@ import "slices"
 // query that parses here and fails there.
 //
 // **Two of the four are asked and two are typed**, and which is which is what
-// this file has to be honest about. The header here used to say the whole list
-// was regenerated from the running engines; it was not, and "make
-// reserved-words" printed two statements for a person to run and merge by
-// hand. An engine upgrade adds reserved words — MySQL and MariaDB both do,
-// across minor releases — and a gate checking against a typed list keeps
-// passing while a query inventing that alias fails as a syntax error on
-// whichever engine a deployment is running.
+// this file has to be honest about. An engine upgrade adds reserved words —
+// MySQL and MariaDB both do, across minor releases — and a gate checking a
+// typed list keeps passing while a query inventing that alias fails as a
+// syntax error on whichever engine a deployment happens to run.
 //
 //   - PostgreSQL and MySQL publish what they reserve, and are asked: see
 //     words_asked.go, which "make reserved-words" writes and
 //     "make check-engines" refuses to let drift.
 //   - SQLite and MariaDB publish nothing a query can read, so their words are
-//     typed below with the documentation each came from. **That is a gap**,
-//     and it is stated rather than glossed: a word either of them adds arrives
-//     here when somebody reads the release notes.
+//     typed below with the documentation each came from, and neither list is
+//     complete. **That is a gap**, and it is stated rather than glossed: a
+//     word either of them reserves that is not already answered by PostgreSQL
+//     or MySQL arrives here when somebody reads the page and types it.
 func reservedWords() []string {
 	all := slices.Concat(askedWords, sqliteWords, mariadbWords)
 	slices.Sort(all)
 	return slices.Compact(all)
 }
 
-// sqliteWords is what SQLite reserves and neither PostgreSQL nor MySQL does.
+// sqliteWords is the part of SQLite's keyword list carried here by hand.
 //
-// From https://sqlite.org/lang_keywords.html. SQLite is lenient about where a
-// keyword may be used — it accepts most of these as an alias — but the rule
-// this gate enforces is that a name is safe on all four, so a word one engine
-// reserves belongs here whatever the others allow.
+// From https://sqlite.org/lang_keywords.html, which names far more than these:
+// most of that page is already covered by what PostgreSQL and MySQL answer,
+// and the rest is not carried. **So this is a sample rather than a
+// derivation**, and the gap is the same shape as MariaDB's below — a word
+// SQLite reserves that neither of the asked engines does, and that nobody has
+// typed here, is invisible.
+//
+// SQLite is also lenient about where a keyword may be used: it accepts most of
+// these as an alias. They belong on the list anyway, because the rule this
+// gate enforces is that a name is safe on all four.
 var sqliteWords = []string{
 	"abort", "attach", "autoincrement", "conflict", "detach", "glob",
 	"indexed", "instead", "pragma", "reindex", "temp", "vacuum",

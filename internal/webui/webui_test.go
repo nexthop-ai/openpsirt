@@ -9,10 +9,9 @@ import (
 
 // Whether this binary carries an interface, said rather than inferred.
 //
-// Both answers used to be nil, returned from two different failures and
-// written nowhere: the caller passed it straight into the server unchecked, so
-// a build whose interface could not be read at all was indistinguishable from
-// an API-only build, and both were silent.
+// Two different failures, and a caller that passes the result straight into
+// the server. Answering both with nothing would make a build whose interface
+// cannot be read indistinguishable from an API-only build, and both silent.
 //
 // Which of the two this binary is depends on whether the frontend was built
 // before the tests ran, so the test asserts the pair rather than one of them:

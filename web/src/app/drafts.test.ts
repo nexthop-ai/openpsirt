@@ -131,10 +131,10 @@ describe("drafts", () => {
     // colors somebody likes, and a prefix that swept them up would do exactly
     // that.
     //
-    // Both are keys production actually writes here. The scope used to stand
-    // in for the second and it lives in sessionStorage, so the assertion held
-    // of any key that does not exist — forgetAll walks localStorage alone —
-    // and recorded a belief about where the scope is kept that is false.
+    // Both are keys production actually writes here, which is what makes the
+    // assertion mean anything: forgetAll walks localStorage alone, so a key
+    // kept anywhere else survives it whether or not the prefix is right, and
+    // asserting on one would pin nothing.
     window.localStorage.setItem("openpsirt.look", "dusk");
     window.localStorage.setItem("openpsirt.rail", '["manage"]');
     belongTo("oidc:ana");

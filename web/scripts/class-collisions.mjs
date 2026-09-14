@@ -205,7 +205,7 @@ const foreign = /^(recharts-|markdown-body$)/;
 
 // The trailing class admits "$" because a name at the head of a template
 // literal is followed by the interpolation that adds its modifiers —
-// `noticekind${…}` — and reading that as "never applied" would ask somebody to
+// `noticekind${…}` — and reading that as never applied would ask somebody to
 // delete a rule that is in use.
 const unused = names.filter(
   (name) =>
@@ -224,13 +224,13 @@ if (unused.length > 0) {
 
 // Class names nothing styles.
 //
-// The mirror of the check above, and the direction this file did not have: it
-// held one set of names, taken from CSS, and tested it against markup, so a
-// class written onto an element with no rule anywhere shipped silently.
-// Fifteen did. Two were visible: `<text className="tick">` on a hand-drawn
-// chart took the SVG default fill, which is black on a near-black canvas in
-// dark mode, and `className="state closed"` on the word "scanned" rendered in
-// exactly the grey "never scanned" renders in.
+// The mirror of the check above. Holding one set of names, taken from CSS, and
+// testing it against markup cannot see a class written onto an element with no
+// rule anywhere: that name is in the markup and in no stylesheet, so the set
+// never holds it. What it costs is invisible rather than broken — an SVG label
+// with no fill rule takes black, which on a dark canvas is nothing at all, and
+// a state word with no rule renders in the same grey as the state that means
+// the opposite.
 //
 // Tailwind is asked about every name that is not ours, because a utility used
 // in markup is styled by Tailwind rather than by us and is not the subject.

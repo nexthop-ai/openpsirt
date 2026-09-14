@@ -7,15 +7,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// A name no engine answers to used to narrow the run to nothing, and nothing
-// told the two apart.
+// A name no engine answers to narrows the run to nothing, and nothing else
+// tells that apart from a narrowing somebody meant.
 //
 // The wanted set is intersected with the engines a test can reach, so
-// "postgress" or "sqllite" intersects with nothing: every database test skips
-// with a message that reads like a deliberate narrowing, and the process exits
-// 0 having touched no database at all. The one distinction the harness does
-// make — nothing configured at all is a failure — is exactly the one that does
-// not fire, because something *was* configured.
+// "postgress" or "sqllite" intersects with nothing: every database test would
+// skip with a message that reads like a deliberate narrowing, and the process
+// would exit 0 having touched no database at all. The one distinction the
+// harness makes on its own — nothing configured at all is a failure — cannot
+// fire here, because something *was* configured.
 func TestAnEngineNameNothingAnswersToIsRefused(t *testing.T) {
 	for _, name := range []string{"postgress", "sqllite", "maria", "mysql,postgres,typo"} {
 		t.Run(name, func(t *testing.T) {

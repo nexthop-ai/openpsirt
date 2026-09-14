@@ -158,11 +158,10 @@ func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
 	// back. A build reachable only from a place the sample missed was never
 	// offered, and the judgment silently did not travel there.
 	//
-	// Nothing executed the merged answer at all: it is the only producer of
-	// the set of other builds a judgment is offered against, 117 lines at
-	// 0.0%, and its sole caller is this route. A judgment travelling to the
-	// wrong builds, or to none, looked exactly like one that travelled
-	// correctly.
+	// This route is the merged answer's only caller, and the merged answer is
+	// the only producer of the set of other builds a judgment is offered
+	// against. Without a test here, a judgment travelling to the wrong builds
+	// — or to none — looks exactly like one that travelled correctly.
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		// One other build at the version this one ships, and one at another.

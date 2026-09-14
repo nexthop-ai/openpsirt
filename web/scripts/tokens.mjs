@@ -11,11 +11,11 @@
 // definition of nothing: `var(--gone, 8px)` is a deliberate default and is
 // exempt, because the author said what happens when it is absent.
 //
-// And every definition is put to the set of references, which is the direction
-// this check did not have. A token defined and named nowhere is the same
-// rename with the other half left behind, and it was invisible by
-// construction: there was one loop, over references. Three names sat here
-// defined for nothing while the run reported vouching for all sixty.
+// And every definition is put to the set of references, which is the mirror of
+// the same failure: a token defined and named nowhere is that rename with the
+// other half left behind. Checking one direction alone cannot see it, because
+// a definition nothing refers to is exactly what a reference loop never
+// reaches.
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -81,7 +81,7 @@ if (missing.size > 0) {
 }
 
 // The other direction. Nothing is exempt: a token defined and never named is
-// dead whether it is in tokens.css or beside the rule that used to read it.
+// dead whether it is in tokens.css or beside a rule that no longer reads it.
 // The bundle is self-contained and embedded in the binary, so there is no
 // consumer outside this directory for one to be defined for — which the check
 // above already assumes in the other direction.
@@ -99,8 +99,8 @@ if (orphaned.length > 0) {
   process.exit(1);
 }
 
-// The count is the referenced set, not the defined one. It used to report the
-// size of `defined`, so the run said sixty while vouching for fifty-seven.
+// The count is the referenced set rather than the defined one, so the number
+// reported is the number vouched for.
 console.log(
   `every token is defined where it is named and named where it is defined (${named.size})`,
 );

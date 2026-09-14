@@ -18,11 +18,10 @@ import (
 //
 // The message half is tested against a Digest written out by hand, which says
 // what the text does with a withheld count and nothing about how a row becomes
-// one. The half that decides — the branch that reads a row as undisclosed, the
-// counter behind it and the item it builds otherwise — was at 0.0%, so
-// Digest.Mine and Digest.Unowned were provably empty in every test in the
-// tree, and deleting the branch would put the identifier and component of an
-// embargoed finding into outbound mail with nothing failing.
+// one. Nothing else reaches the half that decides — the branch reading a row
+// as undisclosed, the counter behind it, and the item built otherwise — so
+// without this, deleting that branch would put the identifier and component of
+// an embargoed finding into outbound mail and nothing would fail.
 func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()

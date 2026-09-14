@@ -335,10 +335,9 @@ func TestAFullQueueStopsTheAskingRatherThanFailing(t *testing.T) {
 }
 
 func TestACycleWorthOfScanningAlreadyWaitingStopsTheAsking(t *testing.T) {
-	// The other short circuit, and the one nothing reached. The test above
-	// fills the queue to its *backlog* bound, so it is the queue refusing;
-	// this is the schedule declining to ask at all because a cycle's worth is
-	// already waiting. Nothing this pass could add would be reached before
+	// The other short circuit. The test above fills the queue to its
+	// *backlog* bound, so it is the queue refusing; this is the schedule
+	// declining to ask at all because a cycle's worth is already waiting. Nothing this pass could add would be reached before
 	// the next cycle anyway, and asking while the queue is this deep is how a
 	// producer's arriving inventories end up behind re-scans of things
 	// measured yesterday.
@@ -368,9 +367,9 @@ func TestACycleWorthOfScanningAlreadyWaitingStopsTheAsking(t *testing.T) {
 }
 
 func TestTheScheduleAsksOnItsOwnAndReturnsWhenCancelled(t *testing.T) {
-	// Schedule.Run is what cmd/openpsirt starts and it was at 0.0%. What
-	// lives only in the loop is the timer reset and the cancellation, and
-	// Once is correct whether or not either is.
+	// Schedule.Run is what cmd/openpsirt starts. What lives only in the loop
+	// is the timer reset and the cancellation, and Once is correct whether or
+	// not either is.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()

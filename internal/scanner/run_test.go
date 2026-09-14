@@ -527,10 +527,10 @@ func TestWhatTheScannerSaidWhileSucceedingReachesTheRun(t *testing.T) {
 
 func TestTheRunnerScansUntilTheQueueIsEmptyAndReturnsQuietlyOnShutdown(t *testing.T) {
 	// Runner.Run is what cmd/openpsirt starts and what scans every build this
-	// server holds, and it was at 0.0% — every test drives Once. Three things
-	// live only in the loop, and Once is correct whether or not any of them
-	// is: the queue being drained rather than one job taken per wake, the
-	// timer being reset, and shutdown returning without reporting a fault.
+	// server holds. Every other test here drives Once, and three things live
+	// only in the loop — the queue being drained rather than one job taken per
+	// wake, the timer being reset, and shutdown returning without reporting a
+	// fault. Once is correct whether or not any of them is.
 	//
 	// The last one matters on its own. A read cut short by shutdown is handed
 	// back and scanned again later, so it is not an error — and a process that

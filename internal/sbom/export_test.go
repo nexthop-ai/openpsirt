@@ -14,10 +14,10 @@ import "sort"
 // time.
 //
 // **By vocabulary, not by format**, which is the one collision first-match
-// routing cannot survive: a key claimed by both SPDX tables registers as one
-// format and used to report as no overlap at all, while the reader routes a
+// routing cannot survive: a key claimed by both SPDX tables is claimed twice
+// and counted once if the question is asked per format. The reader routes a
 // key to the first vocabulary holding it and keys what it has already read by
-// vocabulary index — precisely because two vocabularies can be two major
+// vocabulary index, precisely because two vocabularies can be two major
 // versions of one format.
 func VocabularyOverlap() map[string][]string {
 	claimed := map[string][]string{}

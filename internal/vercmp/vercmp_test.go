@@ -70,12 +70,12 @@ func TestSemanticVersionsOrderAndAPreReleaseComesFirst(t *testing.T) {
 		{"1.0.0-alpha.1", "1.0.0-alpha.beta", -1},
 		// Build metadata says nothing about order.
 		{"v28.5.2+incompatible", "v28.5.2", 0},
-		// The same comparisons the other way round. Without these the three
-		// arms that only fire when a sorts *after* b never ran: a release
-		// outranking its own pre-release, an alphanumeric identifier
-		// outranking a numeric one, and two differing alphabetic identifiers
-		// — so "alpha before beta" had no test at all, and flipping the
-		// numeric rule broke antisymmetry rather than merely an answer.
+		// The same comparisons the other way round, because three arms fire
+		// only when a sorts *after* b: a release outranking its own
+		// pre-release, an alphanumeric identifier outranking a numeric one,
+		// and two differing alphabetic identifiers. Without the mirrors,
+		// "alpha before beta" is asserted nowhere and flipping the numeric
+		// rule breaks antisymmetry rather than merely an answer.
 		{"1.27.0", "1.27.0-rc.2", 1},
 		{"1.0.0-alpha", "1.0.0-1", 1},
 		{"1.0.0-alpha", "1.0.0-beta", -1},
@@ -130,10 +130,10 @@ func TestOrderingIsAntisymmetric(t *testing.T) {
 }
 
 func TestAnEcosystemIsOrderedByTheSchemeItsIdentifierNames(t *testing.T) {
-	// SchemeOf had no test at all: every table above passes the scheme in as
-	// a literal, so the default arm — every ecosystem whose algorithm is not
-	// written here — had never executed, and adding an ecosystem to the wrong
-	// arm would have ordered its versions by somebody else's rules.
+	// Every table above passes the scheme in as a literal, so nothing else
+	// here reaches SchemeOf at all — including the default arm, which is every
+	// ecosystem whose algorithm is not written here. An ecosystem added to the
+	// wrong arm orders its versions by somebody else's rules.
 	for _, each := range []struct {
 		ecosystem string
 		want      vercmp.Scheme

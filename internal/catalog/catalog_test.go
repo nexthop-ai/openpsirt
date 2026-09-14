@@ -180,9 +180,10 @@ func TestBadNamesAreRejected(t *testing.T) {
 		ctx := t.Context()
 		for _, name := range []string{
 			"", "   ", " leading", "trailing ", string(make([]byte, 200)),
-			// One character over the column's width. The 200-byte name above
-			// is nul bytes, so the control-character rule refuses it first
-			// and the length bound had never decided anything.
+			// One character over the column's width, and nothing else wrong
+			// with it. The 200-byte name above is nul bytes, which the
+			// control-character rule refuses first, so it says nothing about
+			// the length bound.
 			strings.Repeat("a", 192),
 			// A name travels into places that are not this database: a path,
 			// a header, the filename on an export somebody downloads. A
@@ -374,10 +375,10 @@ func TestRedeclaringSomethingDifferentlyIsRefusedAndChangesNothing(t *testing.T)
 	// every build must not fail on the second one, and a pipeline that has
 	// quietly changed what it means by a name must not pass.
 	//
-	// Every one of these arms was unexecuted. The tests above declare
-	// identically and assert the confirmation, so the refusals had never run
-	// — and a refusal that never runs is a rule that can be deleted with the
-	// suite green. Each is checked twice over: the call is refused, and the
+	// The tests above declare identically and assert the confirmation, which
+	// exercises the agreeing half and none of the refusing one — and a
+	// refusal nothing reaches is a rule that can be deleted with the suite
+	// green. Each is checked twice over here: the call is refused, and the
 	// stored value is read back to say the refusal wrote nothing.
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()

@@ -1372,14 +1372,16 @@ how a session that ended is noticed — because each is a defect rather than a
 matter of taste if it is wrong. Everything else is checked by a person looking
 at it.
 
-The draft rules are tested; the sign-out that calls them is not, and nor is the
-panel that offers a way back in. There is no component test here to click a
-control or to see what is drawn over what, so both connections are checked by
-reading. They are the weakest links in the chains those rules describe.
+The draft rules are tested and so is the sign-out that calls them: the sequence
+sits in a function of its own rather than in the click handler, because what
+makes it correct is which parts run before the request and outside the part that
+can fail. The panel that offers a way back in is still checked by reading — no
+component is rendered in any test here, so what is drawn over what, and what a
+click does to it, is a person looking at it.
 
-Several thousand lines of interface, six test files. Where a screen computes
-something rather than draws it, that computation should come out into a function
-beside them.
+Where a screen computes something rather than draws it, that computation comes
+out into a function beside the screen, which is what makes it testable at all.
+Coverage of the interface is measured and reported by the gate.
 
 ## Not built
 

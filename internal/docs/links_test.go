@@ -47,8 +47,8 @@ func TestEveryLinkInsideADocumentReachesAHeading(t *testing.T) {
 	// until they click it. That is how the entry for one section here came to
 	// point at a name it had not carried for some time.
 	//
-	// Links between documents too, and their fragments. Renaming a design
-	// document used to dangle every link to it with nothing failing.
+	// Links between documents too, and their fragments, so that renaming a
+	// design document cannot dangle every link to it in silence.
 	root := filepath.Join("..", "..")
 	var checked, links, crossing int
 	anchorsIn := map[string]map[string]bool{}

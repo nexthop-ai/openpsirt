@@ -58,7 +58,7 @@ export function called(role?: string): string {
 // capabilities bounded by what their holder may read, so granted alone they
 // reach nothing — which was accepted in silence and read as working until
 // somebody signed in to an empty tool.
-export function reaches(role?: string): boolean {
+function reaches(role?: string): boolean {
   return ROLES.find((each) => each.role === role)?.grants ?? true;
 }
 
@@ -70,13 +70,10 @@ export type Holding = { role?: string; effective?: boolean; everywhere?: boolean
 // on a product where they hold no role that reaches anything.
 //
 // **An estate grant counts.** A read held everywhere is a read held here, so a
-// capability granted beside one reaches something. This used to take only
-// per-product holdings, and the grid drew the warning from a second copy of
-// the rule that did count the estate — so the copy with five assertions
-// against it was not the copy anybody saw, and the one that was rendered had
-// none. The caller narrows to what bears on the product, because it is the
-// thing that knows how a product is spelled in each place: a held role names
-// it as it is shown and a grant names it as the API takes it.
+// capability granted beside one reaches something. The caller narrows to what
+// bears on the product, because it is the thing that knows how a product is
+// spelled in each place: a held role names it as it is shown and a grant names
+// it as the API takes it.
 //
 // A withdrawn grant is not held. Counting one would say somebody reads a
 // product because they used to.

@@ -74,9 +74,9 @@ export function mayOf(who: Who | null | undefined, product: string): Can | undef
 
 // Signing out, as a sequence rather than as a click handler.
 //
-// The ordering is the whole of it and the ordering was unassertable: it lived
-// in an anonymous async function on a button, so nothing could reach it and
-// nothing pinned the two things that make it correct.
+// Here rather than in the click handler because the ordering is the whole of
+// it, and an anonymous async function on a button is not somewhere a test can
+// reach.
 //
 // **Drafts are cleared first, before anything is awaited and outside the try.**
 // They hold triage text, private findings included, and text that survived a

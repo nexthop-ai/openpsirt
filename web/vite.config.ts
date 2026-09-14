@@ -13,15 +13,16 @@ export default defineConfig({
   // is tested against the same corpus of payloads. DOMPurify needs a DOM to
   // sanitize in, which is what jsdom is here for.
   //
-  // `.test.tsx` as well as `.test.ts`. JSX cannot be written in a `.ts` file,
-  // so with only the first pattern no component could be rendered in a test
-  // at all — a tooling limit that was easy to mistake for a decision. A
-  // `.tsx` *module* was always importable from a `.ts` test and six already
-  // do it, so an untested pure function in a `.tsx` file is a choice.
+  // `.test.tsx` as well as `.test.ts`, because JSX cannot be written in a
+  // `.ts` file and without the second pattern no component can be rendered in
+  // a test at all. A `.tsx` *module* is importable from a `.ts` test either
+  // way, so an untested pure function in a `.tsx` file is a choice rather than
+  // a limit — and the pure functions are what is tested here. Rendering a
+  // component needs a library to render it with, and none is installed:
+  // nothing is gained by carrying one before the first test that renders.
   //
-  // Coverage is measured, and reported for the interface the way it is for
-  // the Go half. Nothing measured what these tests reached: the figure the
-  // repository quotes is Go only.
+  // Coverage is measured and reported for the interface the way it is for the
+  // Go half, so that a figure quoted for this repository covers both.
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],

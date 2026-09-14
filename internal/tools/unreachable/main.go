@@ -36,8 +36,6 @@ type decl struct {
 	line int
 }
 
-// Always the working directory. It took a path once and that is a taint the
-// analysis gate is right to complain about — a build-time tool that walks
 func main() {
 	var declared []decl
 	// How many times each name is written anywhere, declarations included.
@@ -49,7 +47,7 @@ func main() {
 	// docs hold no Go either — but they are not named here, because reading a
 	// directory with no Go in it costs nothing and a skip list is where a
 	// gate quietly stops looking at part of the tree.
-	err := walk.Sources(".go", func(path string, _ []byte) error {
+	read, err := walk.Sources(".go", func(path string, _ []byte) error {
 		file, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
@@ -107,7 +105,7 @@ func main() {
 	// Said with a count, like the gates beside it. Silence on success and
 	// silence on a walk that reached nothing are the same output, and this is
 	// the gate AGENTS.md leans on.
-	fmt.Printf("every exported symbol is named by something (%d checked)\n", len(declared))
+	fmt.Printf("every exported symbol is named by something (%d in %d files)\n", len(declared), read)
 }
 
 // satisfiesSomething covers the names a standard interface calls, which are

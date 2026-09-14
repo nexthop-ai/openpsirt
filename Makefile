@@ -214,7 +214,7 @@ DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check web-check-if-present scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
 
 all: check build
 
@@ -490,7 +490,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved confined granted attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check-if-present
+check: build vet lint unreachable unclaimed reserved confined granted attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -524,17 +524,17 @@ web-api: openapi
 
 # What CI runs for the interface.
 #
-# It refuses without node rather than passing, like "licenses" and "web-audit"
-# on the identical condition. It used to exit 0 with a note, so "make check" on
-# a machine without node printed success having run no check on the interface
-# at all — not the typecheck, the lint, the stylelint, the tests, the class
-# collisions, the tokens or the severity ladder. Worse through "make gate",
-# whose web tier is this one target: a change touching only web/ ran exactly
-# one thing, which did nothing, and reported green.
+# It refuses without node rather than skipping, like "licenses" and
+# "web-audit" on the identical condition. A skip here is indistinguishable
+# from a pass, and what it covers is the whole tier: the typecheck, the lint,
+# the stylelint, the tests and their coverage, the class collisions, the
+# tokens and the severity ladder. "make gate" routes a change touching only
+# web/ to this one target, so a skip would let such a change report green
+# having been checked by nothing.
 #
-# "check" depends on the tolerant form below instead, so the Go half still
-# gates on a machine without node — and says which tier it skipped, rather
-# than a local pass reading as a full one.
+# A machine without node can still gate a Go-only change: that change lands in
+# the code tier, which does not reach here. What needs node is "make check",
+# which is everything CI checks and is meant to.
 web-check:
 	@command -v $(NPM) >/dev/null 2>&1 || { \
 	  echo "npm not found, so the interface cannot be checked here."; \
@@ -550,21 +550,6 @@ web-check:
 	$(NPM) --prefix web run ladder
 	$(MAKE) web-audit
 	$(MAKE) web-api
-
-# The interface tier where it can be run, and a named skip where it cannot.
-#
-# This is what "check" depends on. The skip is loud and names every check it
-# did not run, because the failure this replaces was a summary line that said
-# nothing and a developer who read it as a full pass.
-web-check-if-present:
-ifeq ($(shell command -v $(NPM) >/dev/null 2>&1 && echo yes),yes)
-	$(MAKE) web-check
-else
-	@echo "SKIPPED: the interface tier. npm is not here, so none of the"
-	@echo "         typecheck, format, lint, stylelint, tests, class collisions,"
-	@echo "         tokens, severity ladder, dependency audit or generated client"
-	@echo "         was run. CI runs all of them. This is not a full check."
-endif
 
 # Known vulnerabilities in what the interface installs.
 #

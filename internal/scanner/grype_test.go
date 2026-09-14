@@ -235,10 +235,9 @@ func TestAnUnknownMatchKindIsTreatedAsTheWeakerOne(t *testing.T) {
 		t.Errorf("a match reached both ways reads as %q, want the weaker of the two", got)
 	}
 
-	// The kind this test is named for, and which its input did not carry: a
-	// word the reader has never seen, with no CPE detail beside it to decide
-	// the answer first. The two details above are both recognized, so the
-	// unknown-kind arm had never executed.
+	// The kind this test is named for: a word the reader does not recognize,
+	// with no CPE detail beside it to decide the answer first. The two details
+	// above are both recognized, so neither of them reaches this arm.
 	const unknown = `{
 	  "matches": [{
 	    "vulnerability": {"id": "CVE-2026-2", "severity": "High"},

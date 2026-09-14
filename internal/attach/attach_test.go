@@ -522,10 +522,10 @@ func TestARecentUploadAndARedactedOneSurviveTheSweep(t *testing.T) {
 }
 
 func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
-	// NewKeeper supplies both production defaults for the attachment sweep —
-	// how long an upload is left and how often the pass runs — and it was at
-	// 0.0%, so neither default had been read by anything and the loop that
-	// reads them had never run.
+	// NewKeeper supplies both production defaults for the attachment sweep:
+	// how long an upload is left, and how often the pass runs. Nothing else
+	// reads either, so a test that drives Sweep directly says nothing about
+	// what a deployment actually sweeps with.
 	//
 	// Nil where the deployment holds no files, which is the arm that keeps a
 	// worker from being started for a feature nobody configured: a goroutine

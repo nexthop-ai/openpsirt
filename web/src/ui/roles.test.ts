@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { called, reaches, ROLES, wouldReachNothing } from "./roles";
+import { called, ROLES, wouldReachNothing } from "./roles";
 
 describe("the roles as somebody granting one reads them", () => {
   it("gives every role a label that is not its own token", () => {
@@ -19,13 +19,16 @@ describe("the roles as somebody granting one reads them", () => {
   });
 
   it("knows which roles reach nothing on their own", () => {
-    expect(reaches("approver")).toBe(false);
-    expect(reaches("assigner")).toBe(false);
-    expect(reaches("public-read")).toBe(true);
+    // Asked through the rule the grid calls, because that is the only caller
+    // the answer has: a capability granted where nothing is held reaches
+    // nothing, and a read granted there reaches the product.
+    expect(wouldReachNothing("approver", [])).toBe(true);
+    expect(wouldReachNothing("assigner", [])).toBe(true);
+    expect(wouldReachNothing("public-read", [])).toBe(false);
     // An unknown role is assumed to grant something rather than being
     // reported as an empty one: warning about a role we cannot describe would
     // be inventing a fact.
-    expect(reaches("something-new")).toBe(true);
+    expect(wouldReachNothing("something-new", [])).toBe(false);
   });
 });
 

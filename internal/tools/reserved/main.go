@@ -142,7 +142,7 @@ func main() {
 	var bad []found
 	fset := token.NewFileSet()
 	// web holds the interface, which writes no SQL: it asks this server.
-	err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
+	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
 		if strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
@@ -244,7 +244,7 @@ func main() {
 	if len(bad) == 0 {
 		fmt.Printf("every name a query invents in a literal is quoted, and no name a "+
 			"migration declares collides with a word any of the four engines reserves "+
-			"(%d words checked)\n", len(reservedWords()))
+			"(%d words checked over %d files)\n", len(reservedWords()), read)
 		return
 	}
 	sort.Slice(bad, func(i, j int) bool {

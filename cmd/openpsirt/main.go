@@ -169,8 +169,9 @@ func run(args []string, stdout, stderr *os.File) error {
 
 	// An API-only build serves no page and says so once; a binary whose
 	// embedded interface cannot be read at all is broken and refuses to
-	// start. Both used to be nil, written nowhere, so the whole interface
-	// disappearing looked exactly like nobody having asked for one.
+	// start. Two different states, told apart here, because serving nothing
+	// on purpose and serving nothing by accident look identical from a
+	// browser.
 	pages, err := webui.Files()
 	switch {
 	case errors.Is(err, webui.ErrNoInterface):

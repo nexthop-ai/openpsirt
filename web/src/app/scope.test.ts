@@ -82,9 +82,8 @@ describe("changing scope stays on the screen", () => {
   });
 });
 
-// What every narrowed screen sends. sixteen call sites across seven screens
-// pass this straight into a request, and it had no test: a level that cannot
-// stand alone leaking into the query is a refusal from the server for a
+// What every narrowed screen sends, straight into a request. A level that
+// cannot stand alone leaking into the query is a refusal from the server for a
 // selection nobody can make in the interface.
 describe("the selection as a request", () => {
   it("sends nothing at all where nothing is selected", () => {

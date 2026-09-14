@@ -333,11 +333,11 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 }
 
 func TestTheSweeperWorksAWholeBacklogInOneWakeAndReturnsWhenCancelled(t *testing.T) {
-	// Sweeper.Run is what cmd/openpsirt starts and what places routed work,
-	// and it was at 0.0% — both tests here drive Once, one of them in a loop
-	// of twenty that stands in for the loop being tested. What only the loop
-	// does is keep going while there is work, reset the timer and return on
-	// cancellation, and Once is correct whether or not any of the three is.
+	// Sweeper.Run is what cmd/openpsirt starts and what places routed work.
+	// The other tests here drive Once, one of them in a loop of twenty that
+	// stands in for the loop being tested — and what only the loop does is
+	// keep going while there is work, reset the timer and return on
+	// cancellation. Once is correct whether or not any of the three is.
 	//
 	// The batch is two and there are more than two findings to place, so a
 	// loop taking one batch per wake would leave some behind: the interval is

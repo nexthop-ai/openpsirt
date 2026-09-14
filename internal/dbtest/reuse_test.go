@@ -16,11 +16,11 @@ import (
 //
 // A server database is created and migrated on first use, and kept between
 // runs because applying the migrations is nearly the whole cost of a server
-// engine. Every green run so far took the create-and-migrate path: nothing
-// exercised recognizing a database that is already there, emptying it instead
-// of migrating it, or dropping the databases an edited migration left behind.
-// The DROP statement in particular — quoted the standard way, which the MySQL
-// connections accept — had never been executed by anything.
+// engine. An ordinary run takes the create-and-migrate path, so nothing in the
+// suite otherwise reaches the other one: recognizing a database that is
+// already there, emptying it instead of migrating it, or dropping what an
+// edited migration left behind. The DROP in particular is quoted the standard
+// way, which the MySQL connections accept, and only running it says so.
 //
 // These run against the servers only. SQLite has no reuse path: each test
 // takes a copy of a migrated template file.
