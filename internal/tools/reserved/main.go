@@ -126,8 +126,16 @@ type found struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "generate" {
+		if err := generate(); err != nil {
+			fmt.Fprintln(os.Stderr, "reserved-words:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	reserved := map[string]bool{}
-	for _, word := range reservedWords {
+	for _, word := range reservedWords() {
 		reserved[word] = true
 	}
 
@@ -236,7 +244,7 @@ func main() {
 	if len(bad) == 0 {
 		fmt.Printf("every name a query invents in a literal is quoted, and no name a "+
 			"migration declares collides with a word any of the four engines reserves "+
-			"(%d words checked)\n", len(reservedWords))
+			"(%d words checked)\n", len(reservedWords()))
 		return
 	}
 	sort.Slice(bad, func(i, j int) bool {

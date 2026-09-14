@@ -67,6 +67,11 @@ var allowed = []string{
 	// the rule is about — and the check that proves each engine ran is
 	// itself what stops that naming going quietly wrong.
 	"internal/dbtest/",
+	// The reserved-word generator, which asks each engine what it reserves.
+	// One statement per engine because each publishes its keywords somewhere
+	// of its own — and it is not a query the application runs, it is how the
+	// list the quoting gate reads stops being a list somebody typed.
+	"internal/tools/reserved/",
 }
 
 func main() {
