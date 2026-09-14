@@ -309,8 +309,18 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 	if err != nil {
 		return nil, err
 	}
+	// The transport is logged because both drivers negotiate it
+	// opportunistically and neither says which way it went, so a deployment
+	// that believed the connection to its findings was encrypted had nowhere
+	// to check.
 	logger.Info("database connected",
-		"engine", db.Server.Engine, "version", db.Server.Version, "url", target.Redacted)
+		"engine", db.Server.Engine, "version", db.Server.Version,
+		"transport", db.Server.Transport, "url", target.Redacted)
+	if db.Server.Engine.IsProduction() && db.Server.Transport == "none" {
+		logger.Warn("the database connection is not encrypted",
+			"engine", db.Server.Engine,
+			"remedy", "ask for encryption in OPENPSIRT_DATABASE_URL: sslmode=verify-full, or tls=true")
+	}
 	if !db.Server.Engine.IsProduction() {
 		logger.Warn("this database is for development and testing only",
 			"engine", db.Server.Engine)

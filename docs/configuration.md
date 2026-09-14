@@ -27,12 +27,28 @@ taken.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_DATABASE_URL` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. SQLite is for development and a single-pod trial, never production. **Required** | unset |
+| `OPENPSIRT_DATABASE_URL` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. **Required** | unset |
 | `OPENPSIRT_AUTO_MIGRATE` | Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run `openpsirt migrate up` yourself, under different credentials, at a time you choose | `true` |
 | `OPENPSIRT_DB_MAX_OPEN` | Most connections open at once | `25` |
 | `OPENPSIRT_DB_MAX_IDLE` | Most connections kept open idle | `25` |
 | `OPENPSIRT_DB_IDLE_TIMEOUT` | How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back | `1m` |
 | `OPENPSIRT_DB_CONN_LIFETIME` | How long a connection is used before it is replaced | `30m` |
+
+### Encrypting the database connection
+
+The connection carries undisclosed findings, and by default it is encrypted
+only where the server offers it. Opportunistic is not the same as certain: a
+server that answers without TLS is accepted, and so is one whose certificate
+nobody checked. Ask for certainty in the URL.
+
+| Engine | Default | Ask for certainty with |
+|---|---|---|
+| PostgreSQL | `sslmode=prefer` — encrypted if the server offers it, no certificate checked | `?sslmode=verify-full`, with `sslrootcert` naming the authority |
+| MySQL, MariaDB | `tls=preferred` — encrypted if the server offers it, no certificate checked | `?tls=true`, which verifies the certificate against the system roots |
+| SQLite | No connection to encrypt | — |
+
+Anything the URL says about the transport is left alone, so `tls=skip-verify`
+or a `sslmode` of your own reaches the driver as written.
 
 ## Scanning
 

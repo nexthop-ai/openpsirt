@@ -13,6 +13,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/uptrace/bun"
+	"modernc.org/sqlite"
 )
 
 // Attempts is how many times a transaction is tried before its failure is
@@ -50,6 +51,14 @@ func InTransaction(ctx context.Context, db *bun.DB, fn func(context.Context, bun
 		}
 		if ctx.Err() != nil {
 			return err
+		}
+		// Nothing follows the last attempt, so there is nothing to back off
+		// before. Sleeping here held the handler goroutine and its pooled
+		// connection for a further backoff interval before returning an error
+		// already decided — under exactly the sustained contention this path
+		// exists to report.
+		if attempt == Attempts {
+			break
 		}
 		// Backing off with a little randomness, so two writers that collided
 		// do not line up and collide again on the same schedule.
@@ -104,9 +113,24 @@ func WorthRetrying(err error) bool {
 		return false
 	}
 
-	// SQLite has no error type worth matching on through this driver, and a
-	// single-file database contends differently anyway: a writer that arrives
-	// while another holds the file is told the database is busy or locked.
+	// SQLite. A single-file database contends differently: a writer that
+	// arrives while another holds the file is told the database is busy or
+	// locked. The driver carries the result code, and the low byte of an
+	// extended code is the primary one — a busy connection reports several
+	// different extended codes for the same condition.
+	var lite *sqlite.Error
+	if errors.As(err, &lite) {
+		switch lite.Code() & 0xff {
+		case 5, // SQLITE_BUSY: another connection holds the file
+			6: // SQLITE_LOCKED: another connection holds a table within it
+			return true
+		}
+		return false
+	}
+
+	// And by text for an error that has crossed a boundary as a sentence, so
+	// a driver's own wording still reads as contention where the type did not
+	// survive.
 	text := strings.ToLower(err.Error())
 	for _, known := range []string{"database is locked", "database table is locked", "sqlite_busy"} {
 		if strings.Contains(text, known) {
@@ -195,13 +219,26 @@ func IsDuplicate(err error) bool {
 // **The rule about reads is unchanged**, and it reaches further here: fn may
 // be re-run by a retry it cannot see, so everything it depends on is read
 // inside it.
+// **Each handle it may be given is named.** This package's own handle embeds
+// `*bun.DB` rather than being one, so a type assertion for `*bun.DB` alone is
+// failed by the very handle Open returns — and the fallthrough that answered
+// it ran every statement as its own autocommit, with no transaction, no retry
+// and nothing said. The two spellings differ by four characters and both
+// compile. Anything this does not recognize is a fault rather than a fifth
+// silent path.
 func Within(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) error) error {
-	if outermost, ok := db.(*bun.DB); ok {
-		return InTransaction(ctx, outermost, func(ctx context.Context, tx bun.Tx) error {
-			return fn(ctx, tx)
-		})
+	join := func(ctx context.Context, tx bun.Tx) error { return fn(ctx, tx) }
+	switch handle := db.(type) {
+	case *DB:
+		return InTransaction(ctx, handle.DB, join)
+	case *bun.DB:
+		return InTransaction(ctx, handle, join)
+	case bun.Tx:
+		// Already inside one, which is the case this helper is named for.
+		return fn(ctx, handle)
+	default:
+		return fmt.Errorf("within a transaction: %T is neither a database handle nor a transaction", db)
 	}
-	return fn(ctx, db)
 }
 
 // FromEngine reports whether an error came from the database rather than from
@@ -218,11 +255,11 @@ func Within(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) e
 //
 // It reads the driver's own types rather than the message, so a sentence a
 // store wrote that happens to contain the word "duplicate" is not mistaken for
-// one. SQLite has no error type worth matching on through this driver, which
-// makes this conservative there — and conservative here means an engine
-// failure read as a refusal, which is the direction the caller-facing message
-// is already safe in, because a store's own sentences are the only thing that
-// reaches it.
+// one. All three drivers have such a type, SQLite included: this listed two
+// and called the third one absent, so on the engine the quick loop actually
+// runs, a constraint violation, a missing column and a full disk were all
+// answered as the caller's mistake, with the driver's own text in the body and
+// nothing logged.
 func FromEngine(err error) bool {
 	if err == nil {
 		return false
@@ -235,10 +272,44 @@ func FromEngine(err error) bool {
 	if errors.As(err, &pg) {
 		return true
 	}
+	var lite *sqlite.Error
+	if errors.As(err, &lite) {
+		return true
+	}
 	// Not a driver's own type, but only ever produced by one: a statement that
-	// ran and returned nothing where something was required, a pool that could
-	// not hand out a connection, and a query that outlived its deadline.
+	// ran and returned nothing where something was required, a pool or a
+	// transaction that was already finished with, and a query that stopped
+	// because the caller's context did — whether it ran out of time or the
+	// caller went away.
 	return errors.Is(err, sql.ErrNoRows) ||
 		errors.Is(err, driver.ErrBadConn) ||
-		errors.Is(err, context.DeadlineExceeded)
+		errors.Is(err, sql.ErrConnDone) ||
+		errors.Is(err, sql.ErrTxDone) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, context.Canceled)
+}
+
+// Affected reports how many rows a write matched.
+//
+// An engine that cannot say is a fault, not a zero. "The row was not there"
+// and "I could not tell you" are different answers, and the callers of this
+// act on the first one: a conditional update reads the count back to find out
+// whether the row it read is still the row it is writing, so a count read as
+// zero becomes "somebody got there first", "you no longer hold this job" or a
+// 404 for a delete that committed. Discarding the error spells every one of
+// those as a confident sentence about rows nobody counted.
+//
+// What the count means is settled elsewhere and is the same on all four
+// engines: rows *matched*, not rows changed — see the connection settings in
+// this package, and `DESIGN-database.md`.
+//
+// No current driver returns an error here, which is the reason this is worth
+// a helper rather than a rule people remember. Nothing would fail today if a
+// caller got it wrong, and nothing will report it on the day one starts.
+func Affected(res sql.Result) (int64, error) {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read how many rows were matched: %w", err)
+	}
+	return n, nil
 }

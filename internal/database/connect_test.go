@@ -22,6 +22,26 @@ func TestOpenIdentifiesTheServer(t *testing.T) {
 	})
 }
 
+func TestOpenSaysWhetherTheConnectionIsEncrypted(t *testing.T) {
+	// Both drivers negotiate opportunistically and neither says which way it
+	// went, so a deployment that believed its connection was encrypted had
+	// nowhere to look. The answer is asked of the server, so it describes the
+	// connection rather than the intention.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		got := db.Server.Transport
+		if got == "" {
+			t.Fatal("the connection does not say what transport it negotiated")
+		}
+		if got == "unknown" {
+			t.Errorf("%s would not say what transport it negotiated", db.Server.Engine)
+		}
+		if db.Server.Engine == database.SQLite && got != "none" {
+			t.Errorf("SQLite is a file and has no transport, but reported %q", got)
+		}
+		t.Logf("%s negotiated %q", db.Server.Engine, got)
+	})
+}
+
 func TestOpenTellsMySQLFromMariaDB(t *testing.T) {
 	// They share a driver and a URL scheme. Believing the URL rather than the
 	// server would apply the wrong version floor and let an unsupported server

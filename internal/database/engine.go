@@ -142,12 +142,20 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// question stop arising.
 		//
 		// **Appended, not assigned.** Setting the mode outright replaces it,
-		// and what it replaces includes the strictness that makes an oversized
-		// value an error rather than a silent truncation. Assigning it cost a
-		// nine-character string stored in a four-character column its last
-		// five characters, with no error, on both of these engines and on
-		// neither of the other two — which is the shape of portability trap
-		// that only shows up in production.
+		// and what it replaces includes whatever else an operator has set.
+		// Assigning it cost a nine-character string stored in a
+		// four-character column its last five characters, with no error, on
+		// both of these engines and on neither of the other two — which is
+		// the shape of portability trap that only shows up in production.
+		//
+		// **Strictness is named rather than inherited.** Appending alone
+		// keeps whatever the server already held, and a server whose global
+		// sql_mode omits STRICT_TRANS_TABLES is the configuration that
+		// produces that truncation — routinely set that way for older
+		// applications. Naming it makes the mode a property of this
+		// application rather than of the server it was pointed at. The set is
+		// deduplicated, so naming a mode the server already holds changes
+		// nothing.
 		//
 		// **How many rows an update touched has to mean the same thing on
 		// every engine.** By default these two report how many rows the update
@@ -159,8 +167,18 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// reports zero, and the caller reports a conflict that did not happen.
 		// Asking for matched rows makes the count answer the question that is
 		// actually being asked, identically everywhere.
-		settings := "parseTime=true&loc=UTC&clientFoundRows=true&sql_mode=" +
-			url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES')")
+		//
+		// **The transport is negotiated rather than left off.** This driver
+		// leaves TLS disabled when nothing asks for it, where the PostgreSQL
+		// driver takes the same URL and negotiates opportunistically — one
+		// URL grammar with opposite defaults, and the rows here are
+		// undisclosed findings. "preferred" matches what the other engine
+		// gives: a handshake where the server offers one, and a plaintext
+		// connection where it does not. It is a floor rather than a
+		// guarantee, so a deployment that needs certainty asks for tls=true,
+		// which is left alone here.
+		settings := "parseTime=true&loc=UTC&clientFoundRows=true" + transport(u) + "&sql_mode=" +
+			url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES,STRICT_TRANS_TABLES')")
 		if query != "" {
 			query += "&" + settings
 		} else {
@@ -223,6 +241,21 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 	return "", fmt.Errorf("unsupported database %q", engine)
 }
 
+// transport is the tls setting to add to a MySQL or MariaDB DSN, or nothing
+// when the URL already carries one.
+//
+// The settings are appended after the URL's own query and the driver takes the
+// last value of a name, so anything named here overrides what an operator
+// wrote. That is wanted for the four settings the application depends on and
+// not for this one: tls=true, tls=skip-verify and the name of a registered
+// configuration are all answers only the deployment can give.
+func transport(u *url.URL) string {
+	if u.Query().Has("tls") {
+		return ""
+	}
+	return "&tls=preferred"
+}
+
 // parseFailure describes a URL the parser refused without repeating it.
 //
 // The parser names what it objected to, which for a malformed escape is the
@@ -235,12 +268,21 @@ func parseFailure(raw string, err error) string {
 	if rest == "" {
 		scheme = ""
 	}
-	// The host is what follows the last "@" of the authority, up to the path.
-	authority, _, _ := strings.Cut(rest, "/")
-	host := authority
-	if at := strings.LastIndex(authority, "@"); at >= 0 {
-		host = authority[at+1:]
+	// The host is what follows the last "@", up to the path. The "@" is found
+	// before the path is cut away, because a password may contain a slash:
+	// cutting at the first slash first leaves the "@" beyond the cut, so the
+	// userinfo is mistaken for the host and the credential is printed. A
+	// base64-shaped generated password contains one routinely.
+	//
+	// The cost of the order is a URL carrying no credential whose path
+	// contains an "@": its last path segment is named as the host. That is a
+	// wrong diagnostic rather than a disclosure, which is the direction to
+	// err in.
+	authority := rest
+	if at := strings.LastIndex(rest, "@"); at >= 0 {
+		authority = rest[at+1:]
 	}
+	host, _, _ := strings.Cut(authority, "/")
 	var urlErr *url.Error
 	kind := "could not be parsed"
 	if errors.As(err, &urlErr) {

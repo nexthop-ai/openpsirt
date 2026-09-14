@@ -10,6 +10,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Supported engines](#supported-engines)
 - [Engine-specific code](#engine-specific-code)
 - [Engine detection](#engine-detection)
+- [Connection encryption](#connection-encryption)
 - [Migrations](#migrations)
 - [Migration locks](#migration-locks)
 - [Identifier quoting](#identifier-quoting)
@@ -35,6 +36,20 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 | MariaDB | Production | 10.6 |
 | SQLite | Development and testing only | 3.35 |
 
+A floor is a release series: the oldest series this application's queries and
+schema are written against, and the oldest upstream publishes fixes for at all.
+It is not a statement about the server in front of it. Upstream publishes per
+patch release, and which patch release an operator runs is a property of that
+deployment — a floor admitting the series admits every unpatched release in it.
+So this is a compatibility floor, and keeping a deployment current is the
+operator's, which the documentation says rather than implying it is handled.
+
+The release number carries a patch level anyway, because servers report one and
+a comparison that discards it cannot tell two releases of a series apart.
+PostgreSQL is the exception that proves the shape: since 10 it numbers releases
+as series and patch, so its patch level is its second part and the same
+comparison orders it correctly.
+
 MySQL and MariaDB are separate targets. They share a wire protocol and a driver
 and have diverged in JSON handling, sequences, partitioning and collation
 defaults, so a query proved on one says nothing about the other.
@@ -59,7 +74,7 @@ Engine-specific code is confined to these places:
 | Schema migrations | Data-definition language differs |
 | The migration lock | Every engine spells advisory locking differently |
 | Connection setup | Driver-specific settings |
-| Recognizing what an engine is telling us | Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
+| Recognizing what an engine is telling us | All three drivers carry an error type of their own, SQLite included. Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
 | Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
@@ -106,6 +121,28 @@ its own.
 A server below the floor stops the process at startup, with the version found
 and the version required both named. The alternative is a failure much later, in
 whichever query first needs something the server cannot do.
+
+The connection is asked one further question at startup: what encryption it
+negotiated. That answer never stops a start — a server that will not say is
+still a server that answered the version question.
+
+## Connection encryption
+
+Every engine negotiates opportunistically, and neither driver says which way it
+went. So a deployment that believed the connection to its findings was
+encrypted had nowhere to look, and the two drivers disagreed about the default:
+one negotiated where the server offered it, the other connected in cleartext
+unless asked.
+
+| | |
+|---|---|
+| The default | Encrypted where the server offers it, cleartext where it does not, no certificate checked. The same on every engine, so one URL grammar no longer means two transports |
+| What it is not | A guarantee. A deployment needing one says so in the URL, and whatever the URL says about the transport is left as written — this sets a floor, it does not override an answer only the deployment can give |
+| How anybody knows | The connection is asked what it negotiated, and the answer is in the line that logs the engine and version. A production engine connected in cleartext is warned about by name, with the setting that fixes it |
+
+Asked rather than assumed, because the intention and the outcome differ exactly
+when it matters: a server that does not offer encryption is answered in
+cleartext by a deployment that asked for it.
 
 ## Migrations
 
@@ -168,10 +205,17 @@ standard quoting. Backticks keep working and string literals are untouched: this
 changes what a double quote means, not what a quote means.
 
 The mode is appended to what is already in force, never assigned. Assigning
-replaces the mode, and what it replaces includes the strictness that makes an
-oversized value an error rather than a quiet truncation. The first version
-assigned, and a nine-character string stored in a four-character column came
-back four characters long, with no error, on those two engines.
+replaces the mode, and what it replaces includes whatever else an operator set.
+The first version assigned, and a nine-character string stored in a
+four-character column came back four characters long, with no error, on those
+two engines.
+
+Strictness is named in the same breath rather than inherited. Appending alone
+keeps whatever the server already held, and a server whose mode omits
+strictness is the configuration that produces that truncation — routinely set
+that way for older applications. Naming it makes the mode a property of this
+application rather than of the server it was pointed at, and the set is
+deduplicated, so naming one a server already holds changes nothing.
 
 The gate reads three places, because it read one. `AS <word>` is the syntax for
 inventing a name and was the whole of what it matched — so a table renamed in a
@@ -221,6 +265,16 @@ handed a false conflict rather than an error.
 
 A test asserts the count on all four engines, checked by removing the setting and
 watching exactly the two fail.
+
+Reading the count is a helper rather than a rule people remember. "The row was
+not there" and "I could not tell you" are different answers, and the callers
+act on the first one — a count read as zero becomes "somebody got there first",
+"you no longer hold this job", or a refusal for a write that committed. A count
+that cannot be read is a fault.
+
+No current driver returns an error there, which is why the helper exists rather
+than the rule. Nothing fails today when a caller gets it wrong, and nothing
+would report it on the day one starts.
 
 ## Collation
 
@@ -290,6 +344,17 @@ The joining spelling is a named helper rather than an `if` on the handle's type,
 because written by hand it reads as a fallback to writing outside a transaction.
 The reads rule reaches further in that case, not less far: the closure may be
 re-run by a retry it cannot see.
+
+**The helper names every handle it accepts, and refuses the rest.** A test for
+one handle type is failed by a handle that merely embeds it, and the arm that
+answered the failure ran each statement as its own autocommit — no transaction,
+no retry, nothing said, and the two spellings differ by four characters. A
+handle nothing recognizes is a fault rather than a further silent path.
+
+Giving up does not back off first. Nothing follows the last attempt, so a wait
+before returning an error already decided holds the caller and its connection
+for an interval that buys nothing — under exactly the sustained contention that
+path exists to report.
 
 ## Connection pool
 

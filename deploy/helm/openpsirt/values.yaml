@@ -42,6 +42,13 @@ database:
   #
   # Putting a password in values.yaml means it ends up in your release history
   # and probably in version control, so existingSecret is the better habit.
+  #
+  # The connection is encrypted where the server offers it and accepted
+  # without encryption where it does not, on every engine. That is a floor,
+  # not a guarantee, and the rows are undisclosed findings — so a deployment
+  # crossing anything it does not own says so in the URL: sslmode=verify-full
+  # for PostgreSQL, tls=true for MySQL and MariaDB. Whatever the URL says
+  # about the transport is left as written.
   url: ""
   existingSecret: ""
   existingSecretKey: "database-url"
