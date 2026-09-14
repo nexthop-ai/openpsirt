@@ -79,7 +79,7 @@ func registerGraph(api huma.API, in Ingest) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Term    string `query:"q" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
+		Term    string `query:"q" maxLength:"200" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many matches to return. Only read when searching"`
 	}) (*rootsOutput, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)

@@ -15426,6 +15426,7 @@ paths:
           name: q
           schema:
             description: Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly
+            maxLength: 200
             type: string
         - description: How many matches to return. Only read when searching
           explode: false

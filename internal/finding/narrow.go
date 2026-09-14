@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -1097,8 +1098,7 @@ func stateHaving(state string) string {
 // is still asked. Issue identifiers are ASCII in every scheme anybody
 // publishes, which is why this is written down rather than fixed.
 func containsTerm(term string) string {
-	replacer := strings.NewReplacer("#", "##", "%", "#%", "_", "#_")
-	return replacer.Replace(strings.ToLower(term))
+	return database.LikeEscaped(strings.ToLower(term))
 }
 
 // trimmed drops blanks from a list of names, so a stray separator in a query

@@ -327,7 +327,12 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 		query = query.Where("c.version = ?", version)
 	}
 	if ecosystem != "" {
-		query = query.Where("LOWER(c.purl) LIKE ?", "pkg:"+strings.ToLower(ecosystem)+"/%")
+		// The ecosystem is escaped and the trailing "/%" is not: the first is
+		// a value somebody supplied and the second is the pattern this clause
+		// is. An unescaped ecosystem made "_" match any character, so one
+		// name could be resolved as another's component.
+		query = query.Where("LOWER(c.purl) LIKE ?"+database.LikeClause,
+			"pkg:"+database.LikeEscaped(strings.ToLower(ecosystem))+"/%")
 	}
 
 	var rows []struct {
@@ -819,7 +824,10 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		// LOWER on both sides rather than a case-insensitive comparison,
 		// which two of the four engines spell differently and one of them
 		// decides by collation.
-		Where("c.name_folded LIKE ?", "%"+Folded(term)+"%").
+		// Escaped as well as folded. Folded trims, lowercases and truncates
+		// and does not escape, so a term of "%" searched the whole build.
+		Where("c.name_folded LIKE ?"+database.LikeClause,
+			"%"+database.LikeEscaped(Folded(term))+"%").
 		GroupExpr("c.id, c.name, c.version, kids.n").
 		OrderExpr("findings DESC, c.name").
 		Limit(limit).

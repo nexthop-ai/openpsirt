@@ -14,6 +14,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Migrations](#migrations)
 - [Migration locks](#migration-locks)
 - [Identifier quoting](#identifier-quoting)
+- [Pattern matching](#pattern-matching)
 - [Affected-row counts](#affected-row-counts)
 - [Absence and failure](#absence-and-failure)
 - [Collation](#collation)
@@ -380,6 +381,29 @@ reported eighteen names, every one the English word "as".
 Two tests hold silent truncation, which is the worst shape a portability
 difference can take — nothing fails and the data is wrong. Both were checked by
 reverting the fix and watching them fail.
+
+## Pattern matching
+
+A search box is not a pattern language. Typing "50%" means a name containing
+"50%", not every name containing "50"; "a_b" means what it says.
+
+| Rule | Reason |
+|---|---|
+| Every value in a `LIKE` is escaped, and every clause states its escape character | SQLite has no default escape character at all, so omitting the clause makes a backslash mean one thing on three engines and another on the fourth |
+| The escape character is `#`, and never a backslash | MySQL and MariaDB treat a backslash as an escape inside a string literal, so `ESCAPE '\'` is an unterminated string: a syntax error on two engines and parsed happily by the other two |
+| The escaping lives here, with the other engine differences | It was written out twice, unexported in one package and copied into another, while four predicates in two further packages had none |
+| A pattern the code wrote is not escaped; a value somebody supplied is | A trailing `/%` matching an ecosystem prefix is the pattern. The ecosystem inside it is not |
+
+What that cost where it was missing: the picker deciding who may be named on
+an embargoed case answered a term of "%" with every person the deployment
+could offer, in one request.
+
+Folding happens in Go and again in the engine. Folding in Go is Unicode-aware
+and `LOWER()` on SQLite is ASCII-only, so a term carrying a non-ASCII capital
+is found on three engines and missed on the fourth wherever the column has no
+folded copy. The component half has one; the issue half does not, and issue
+identifiers are ASCII in every scheme anybody publishes — which is why this is
+written down rather than fixed.
 
 ## Affected-row counts
 

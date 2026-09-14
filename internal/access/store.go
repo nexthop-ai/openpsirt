@@ -754,11 +754,16 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	// Lowered on both sides rather than asked to compare loosely: the
 	// engines do not agree on what a case-insensitive comparison is, and
 	// one spelled the same way everywhere behaves the same way everywhere.
-	if wanted := strings.ToLower(strings.TrimSpace(term)); wanted != "" {
-		like := "%" + wanted + "%"
+	//
+	// Escaped, because a search box is not a pattern language: a term of "%"
+	// matched every person the deployment could offer, in one request, from
+	// the picker that decides who may be named on an embargoed case.
+	if wanted := strings.TrimSpace(term); wanted != "" {
+		like := database.LikeContains(wanted)
 		query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("LOWER(p.identity) LIKE ?", like).
-				WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?", like)
+			return q.WhereOr("LOWER(p.identity) LIKE ?"+database.LikeClause, like).
+				WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?"+
+					database.LikeClause, like)
 		})
 	}
 	var found []Mentionable
