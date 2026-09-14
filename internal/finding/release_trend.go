@@ -44,8 +44,14 @@ type ReleasePoint struct {
 func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope Scope,
 	limit int) ([]ReleasePoint, error) {
 
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second. A person holding
+	// nothing is the first, and is answered below.
+	if subject.Kind != access.Person {
+		return nil, access.Denied("read how a release is trending")
+	}
 	products, all := subject.Products()
-	if subject.Kind != access.Person || (!all && len(products) == 0) {
+	if !all && len(products) == 0 {
 		return nil, nil
 	}
 	if scope.ProductID == nil {

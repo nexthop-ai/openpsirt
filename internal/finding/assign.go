@@ -454,8 +454,14 @@ type Holding struct {
 func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	productID int64) ([]Holding, error) {
 
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second. A person holding
+	// nothing is the first, and is answered below.
+	if subject.Kind != access.Person {
+		return nil, access.Denied("read who is holding work")
+	}
 	products, all := subject.Products()
-	if subject.Kind != access.Person || (!all && len(products) == 0) {
+	if !all && len(products) == 0 {
 		return nil, nil
 	}
 
@@ -689,6 +695,11 @@ func (s *Store) work(ctx context.Context, subject access.Subject, scope Scope,
 func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Scope,
 	holders []int64, since *time.Time, limit, offset int) ([]Owned, int, error) {
 
+	// Not merely empty: "here is nothing" and "you cannot ask" are different
+	// statements, and this is the second.
+	if subject.Kind != access.Person {
+		return nil, 0, access.Denied("read what is assigned")
+	}
 	products, all := subject.Products()
 	mine := subject.Mine()
 	// A capability held without a read role reaches no product, and what

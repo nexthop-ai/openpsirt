@@ -63,8 +63,10 @@ const DefaultRepeatedAt = 2
 func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID int64,
 	atLeast, limit int) ([]Repeated, error) {
 
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, nil
+		return nil, access.Denied("read which deferrals repeat")
 	}
 	if atLeast <= 0 {
 		atLeast = DefaultRepeatedAt

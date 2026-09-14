@@ -632,8 +632,10 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 func (s *Store) Assessments(ctx context.Context, subject access.Subject, productID int64,
 	state string, limit int) ([]Assessment, map[int64]string, error) {
 
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, nil, nil
+		return nil, nil, access.Denied("read what has been assessed")
 	}
 	if productID != 0 && !subject.Sees(productID) {
 		// A product somebody holds nothing on does not exist as far as they

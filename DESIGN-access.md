@@ -811,6 +811,18 @@ A pipeline is refused a read rather than shown an empty one, receipts for its
 own uploads excepted. "Here is nothing" and "you cannot ask" are different
 statements, and the first invites a caller to believe the list is empty.
 
+**Refused where the read is, not only at the edge.** Roughly twenty store reads
+answered a credential that is not a person with an empty result, so the
+invariant the design places in the data layer was in fact enforced by one
+function in a handler — and a check in a handler is the one somebody forgets.
+`Subject.Kind` is a string, so the zero subject took every one of those
+branches as well.
+
+The two halves are separate questions and are answered separately. A credential
+that is not a person is refused. A *person* who holds nothing is answered with
+an empty list, which is the correct answer for a narrowed read and not a
+refusal. Both checks stay: the point is that the layers say the same thing.
+
 Everything except the probes is authenticated, named as a list rather than
 guarded by a path prefix. A prefix leaves everything outside it open by default,
 and the framework registers routes of its own — the API document and its schemas
