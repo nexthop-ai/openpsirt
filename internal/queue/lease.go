@@ -63,6 +63,17 @@ func (l *Leases) Take(ctx context.Context, name, holder string, until time.Durat
 	// second replica's insert is refused by the primary key, which is the
 	// answer rather than an error — both then go on to the update, and that is
 	// what decides between them.
+	// Outside the transaction below, and deliberately. A second replica's
+	// insert is refused by the primary key, which is the answer rather than an
+	// error — but on PostgreSQL a statement that fails inside a transaction
+	// aborts the whole of it, so the refusal that is the ordinary case would
+	// take the update with it. Nothing here depends on the two being atomic:
+	// the row's existence is not what decides, the update is.
+	made := &Lease{Name: name}
+	if _, err := l.db.NewInsert().Model(made).Exec(ctx); err != nil && !database.IsDuplicate(err) {
+		return false, fmt.Errorf("record the lease on %s: %w", name, err)
+	}
+
 	var mine bool
 	err := database.InTransaction(ctx, l.db, func(ctx context.Context, tx bun.Tx) error {
 		// Every attempt starts from nothing: an attempt that was rolled back
@@ -80,11 +91,6 @@ func (l *Leases) Take(ctx context.Context, name, holder string, until time.Durat
 
 func (l *Leases) takeIn(ctx context.Context, tx bun.Tx,
 	name, holder string, now time.Time, until time.Duration) (bool, error) {
-
-	made := &Lease{Name: name}
-	if _, err := tx.NewInsert().Model(made).Exec(ctx); err != nil && !database.IsDuplicate(err) {
-		return false, fmt.Errorf("record the lease on %s: %w", name, err)
-	}
 
 	res, err := tx.NewUpdate().Model((*Lease)(nil)).
 		Set("held_by = ?", holder).

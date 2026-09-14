@@ -269,6 +269,16 @@ transaction began, or carried over from the attempt that failed, describes a
 world that no longer exists. Anything a closure uses but does not fetch is a
 defect.
 
+**A statement that fails inside a transaction is not always recoverable.** On
+PostgreSQL a failed statement aborts the whole transaction: every command after
+it is refused until the block ends, whatever the caller made of the failure. So
+a statement whose failure is the ordinary answer — an insert refused by a
+primary key, where being refused is how a second replica learns the row is
+already there — cannot sit inside a transaction with the work that follows it.
+It runs on its own, and what needs the retry goes in the transaction. Three of
+the four engines carry on after a failed statement, so the quick loop never
+sees this.
+
 A store handed a transaction joins it rather than refusing. Both spellings exist:
 
 | Spelling | Correct where |
