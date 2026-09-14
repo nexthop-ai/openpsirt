@@ -1,6 +1,7 @@
 package markdown_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -102,8 +103,53 @@ func TestEverythingWrongIsReportedAtOnce(t *testing.T) {
 func TestTextPastTheBoundIsRefused(t *testing.T) {
 	// Rendering is work somebody else asked for, and what is stored is kept
 	// forever.
-	if err := markdown.Check(strings.Repeat("a", markdown.MaxBytes+1)); err == nil {
-		t.Error("text past the bound was accepted")
+	err := markdown.Check(strings.Repeat("a", markdown.MaxBytes+1))
+	if err == nil {
+		t.Fatal("text past the bound was accepted")
+	}
+	// And what a person is shown. A fault about the whole text carries no
+	// line, which is the branch every whole-text refusal takes, so reading the
+	// words out of one is what says the message somebody sees for "too long"
+	// is a sentence rather than a line number and a blank.
+	if !strings.Contains(err.Error(), "longer than") {
+		t.Errorf("the refusal does not say what is wrong: %q", err)
+	}
+	if strings.Contains(err.Error(), "line ") {
+		t.Errorf("a fault about the whole text names a line: %q", err)
+	}
+}
+
+func TestWhatIsNotTextIsRefusedAsNotText(t *testing.T) {
+	// Bytes that are not UTF-8 at all. Every other input in this file is text,
+	// so nothing else reaches this arm or reads what it says.
+	err := markdown.Check(string([]byte{0xff, 0xfe, 0x00}))
+	if err == nil {
+		t.Fatal("bytes that are not text were accepted")
+	}
+	if !strings.Contains(err.Error(), "not text this can read") {
+		t.Errorf("the refusal does not say what is wrong: %q", err)
+	}
+}
+
+func TestAFieldOfNothingButProblemsIsAnsweredWithACappedList(t *testing.T) {
+	// A refusal many times the size of what was sent is a way to make
+	// refusing expensive, and sixty problems told at once is not something
+	// anybody reads. The cap and the row that says there are more had zero
+	// executions: no test had ever submitted more than a handful of faults.
+	err := markdown.Check(strings.Repeat("![a](https://evil.example/x.png)\n", 25))
+	if err == nil {
+		t.Fatal("a field of refused images was accepted")
+	}
+	var faults markdown.Faults
+	if !errors.As(err, &faults) {
+		t.Fatalf("refused with %T, want the fault list", err)
+	}
+	if len(faults) != markdown.MaxFaults+1 {
+		t.Errorf("answered with %d faults, want the cap of %d plus the row saying "+
+			"there are more", len(faults), markdown.MaxFaults)
+	}
+	if last := faults[len(faults)-1].Error(); !strings.Contains(last, "and more besides") {
+		t.Errorf("the last row is %q, which does not say there are more", last)
 	}
 }
 

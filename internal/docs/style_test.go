@@ -19,7 +19,10 @@ import (
 
 var (
 	designHeading = regexp.MustCompile(`(?m)^(#{2,3})\s+(.*)$`)
-	contentsEntry = regexp.MustCompile(`(?m)^-\s+\[([^\]]+)\]\(#`)
+	// The label and the anchor, both captured. Reading the label alone would
+	// compare heading text against entry text and leave the destination out
+	// of it, so an entry could read as one section and navigate to another.
+	contentsEntry = regexp.MustCompile(`(?m)^-\s+\[([^\]]+)\]\(#([^)]+)\)`)
 	fence         = regexp.MustCompile("(?s)```.*?```")
 )
 
@@ -66,6 +69,11 @@ func TestEveryDesignDocumentListsItsOwnSections(t *testing.T) {
 		var listed []string
 		for _, m := range contentsEntry.FindAllStringSubmatch(text, -1) {
 			listed = append(listed, m[1])
+			if want := anchorFor(m[1]); m[2] != want {
+				t.Errorf("%s: the Contents entry %q points at #%s, which is not the "+
+					"anchor its own label derives (#%s) — it reads as one section and "+
+					"navigates to another", name, m[1], m[2], want)
+			}
 		}
 		if len(listed) == 0 {
 			t.Errorf("%s: has no Contents section", name)

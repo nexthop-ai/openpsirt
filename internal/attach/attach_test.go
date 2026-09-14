@@ -1,6 +1,7 @@
 package attach_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // fixture is one migrated database with a product, an issue, and a place the
@@ -43,10 +43,6 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)
@@ -477,3 +473,109 @@ func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 		}
 	})
 }
+
+func TestARecentUploadAndARedactedOneSurviveTheSweep(t *testing.T) {
+	// The two predicates the sweep's own test cannot reach. It ages every row
+	// past the window with one update, so "older than" is true of everything
+	// in the fixture and there is never a redacted row at sweep time —
+	// deleting either line leaves that test green.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+
+		// Somebody is still writing the justification the file belongs to.
+		// The window is a grace period, not a formality: sweeping here takes
+		// the file out from under its author mid-sentence.
+		recent := f.upload(t, who, "still-writing.log", []byte("uploaded a moment ago"))
+
+		// And a redacted row, which is a record of a removal rather than an
+		// upload nobody referred to. Sweeping it loses the record of what was
+		// taken and why.
+		redacted := f.upload(t, who, "a-credential.log", []byte("removed on purpose"))
+		if err := f.store.Redact(ctx, f.admin(t), redacted.Token, "a credential"); err != nil {
+			t.Fatalf("redact: %v", err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("token = ?", redacted.Token).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		gone, err := f.store.Sweep(ctx, 24*time.Hour)
+		if err != nil {
+			t.Fatalf("sweep: %v", err)
+		}
+		if gone != 0 {
+			t.Errorf("the sweep took %d file(s), and neither was its to take", gone)
+		}
+		if _, err := f.store.Find(ctx, who, recent.Token); err != nil {
+			t.Errorf("an upload from a moment ago was swept: %v", err)
+		}
+		row, err := f.store.Find(ctx, who, redacted.Token)
+		if err != nil {
+			t.Fatalf("the record of a redaction was swept: %v", err)
+		}
+		if !row.Redacted() {
+			t.Error("the row came back without its redaction")
+		}
+	})
+}
+
+func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
+	// NewKeeper supplies both production defaults for the attachment sweep:
+	// how long an upload is left, and how often the pass runs. Nothing else
+	// reads either, so a test that drives Sweep directly says nothing about
+	// what a deployment actually sweeps with.
+	//
+	// Nil where the deployment holds no files, which is the arm that keeps a
+	// worker from being started for a feature nobody configured: a goroutine
+	// and a log line an operator then has to work out the meaning of.
+	if keeper := attach.NewKeeper(nil, nil, hush(), 0); keeper != nil {
+		t.Error("a deployment that keeps no files was given a sweep to run")
+	}
+
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		abandoned := f.upload(t, who, "abandoned.log", []byte("nothing points here"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("token = ?", abandoned.Token).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		keeper := attach.NewKeeper(f.db.DB, f.files, hush(), 24*time.Hour)
+		if keeper == nil {
+			t.Fatal("a deployment that keeps files was given no sweep to run")
+		}
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			// Longer than this test runs for, so the first wake is what does
+			// the work.
+			keeper.Run(ctx, time.Hour)
+		}()
+
+		deadline := time.Now().Add(20 * time.Second)
+		for time.Now().Before(deadline) {
+			if _, err := f.store.Find(ctx, who, abandoned.Token); err != nil {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		if _, err := f.store.Find(ctx, who, abandoned.Token); err == nil {
+			t.Error("the sweep ran and left an upload nothing refers to")
+		}
+
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
+		}
+	})
+}
+
+// hush is a logger that writes nothing, for the background pass.
+func hush() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }

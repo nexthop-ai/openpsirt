@@ -128,7 +128,7 @@ export function Product() {
                       <td className="num">{(row.open ?? 0).toLocaleString()}</td>
                       <td className="num">
                         {row.overdue ? (
-                          <Link to={`${build}/findings?running=overdue`} className="due late">
+                          <Link to={`${build}/findings?running=overdue`} className="due over">
                             {row.overdue.toLocaleString()}
                           </Link>
                         ) : (

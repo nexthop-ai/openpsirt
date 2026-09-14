@@ -10,7 +10,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 func TestTheSweepClearsSessionsThatHaveRunOut(t *testing.T) {
@@ -20,13 +19,10 @@ func TestTheSweepClearsSessionsThatHaveRunOut(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		person, err := rights.Ensure(ctx, "someone", "", true)
+		person, err := rights.Ensure(ctx, "someone", "Someone", true)
 		if err != nil {
 			t.Fatal(err)
 		}

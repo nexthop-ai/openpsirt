@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { ROLES, reaches } from "../ui/roles";
+import { type Holding, ROLES, wouldReachNothing } from "../ui/roles";
 
 // Who holds what, as a grid of products against capabilities.
 //
@@ -80,16 +80,14 @@ export function Access({
     );
   }
 
-  // What this person can actually reach on a product, so a capability granted
-  // where nothing is readable can be said to reach nothing at the moment it is
-  // granted rather than when they sign in to an empty tool. The estate grant
-  // counts: a read held everywhere is a read held here.
-  function readsAnything(product: string): boolean {
-    return holds.some(
-      (each) =>
-        (each.everywhere || canon.get((each.product ?? "").toLowerCase()) === product) &&
-        each.effective !== false &&
-        reaches(each.role),
+  // What this person holds that bears on a product: a role on the product
+  // itself, or one held across the estate. Narrowed here because this is the
+  // thing that knows how a product is spelled in each place — a held role
+  // names it as it is shown and a grant names it as the API takes it — and
+  // judged by the rule in roles.ts, which is the one with tests against it.
+  function bearingOn(product: string): Holding[] {
+    return holds.filter(
+      (each) => each.everywhere || canon.get((each.product ?? "").toLowerCase()) === product,
     );
   }
 
@@ -160,7 +158,7 @@ export function Access({
                   const has = held(name, each.role);
                   const derived = has?.source === "derived";
                   const covered = Boolean(standing);
-                  const empty = !has && !covered && !each.grants && !readsAnything(name);
+                  const empty = !has && !covered && wouldReachNothing(each.role, bearingOn(name));
                   return (
                     <td key={each.role}>
                       <input

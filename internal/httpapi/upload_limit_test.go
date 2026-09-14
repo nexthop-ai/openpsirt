@@ -15,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // limitedIngest is the ingest fixture with a document limit small enough to
@@ -25,9 +24,6 @@ func limitedIngest(t *testing.T, limits sbom.Limits, fn func(t *testing.T, f *in
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)

@@ -5,8 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import { folded, fold } from "./rail";
-import { forgetAll } from "./drafts";
-import { rememberForward, signedOutHere } from "../screens/SignIn";
+import { signOut } from "./session";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -619,33 +618,16 @@ function Me({ who }: { who: Who }) {
             type="button"
             className="opt"
             role="menuitem"
-            onClick={async () => {
-              // Cleared first, and whatever the server says. Drafts hold
-              // triage text, private findings included, and text that survived
-              // a sign-out would be exposed in a way the application itself is
-              // not. A sign-out that failed to reach the server is the case
-              // where clearing matters most.
-              forgetAll();
-              try {
-                await api.DELETE("/v1/session", {});
-              } finally {
-                // A full load rather than a route change: signing out has to
-                // drop every cached answer, and starting again is the way to
-                // be sure.
-                //
-                // Said in the address, because the sign-in screen forwards
-                // straight to the provider where there is only one — and the
-                // provider still holds its own session, so an unmarked arrival
-                // here would sign them back in and make signing out
-                // impossible.
-                // Marked in this tab as well as in the address. The address
-                // alone is lost the moment somebody presses Back, and the
-                // provider still holds its own session — so Back to any other
-                // screen would forward and sign them straight back in.
-                rememberForward();
-                window.location.assign(signedOutHere);
-              }
-            }}
+            // The sequence lives in session.ts, where its ordering can be
+            // asserted: what makes it correct is which parts run before the
+            // await and outside the try, and a click handler is not somewhere
+            // a test can reach that from.
+            onClick={() =>
+              signOut(
+                () => api.DELETE("/v1/session", {}),
+                (where) => window.location.assign(where),
+              )
+            }
           >
             Sign out
             <span className="tag">{who.identity}</span>

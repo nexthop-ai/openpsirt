@@ -126,11 +126,17 @@ describe("drafts", () => {
   });
 
   it("leaves what is not a draft alone", () => {
-    // The store holds the chosen theme and the scope somebody picked, under
-    // their own names. Signing out is not a reason to forget which colors
-    // somebody likes, and a prefix that swept them up would do exactly that.
+    // This store holds the chosen theme and which rail groups are folded,
+    // under their own names. Signing out is not a reason to forget which
+    // colors somebody likes, and a prefix that swept them up would do exactly
+    // that.
+    //
+    // Both are keys production actually writes here, which is what makes the
+    // assertion mean anything: forgetAll walks localStorage alone, so a key
+    // kept anywhere else survives it whether or not the prefix is right, and
+    // asserting on one would pin nothing.
     window.localStorage.setItem("openpsirt.look", "dusk");
-    window.localStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
+    window.localStorage.setItem("openpsirt.rail", '["manage"]');
     belongTo("oidc:ana");
     keep("revise:7", "typed");
 
@@ -138,6 +144,18 @@ describe("drafts", () => {
 
     expect(restore("revise:7")).toBe("");
     expect(window.localStorage.getItem("openpsirt.look")).toBe("dusk");
-    expect(window.localStorage.getItem("openpsirt.scope")).toBe('{"product":"sonic"}');
+    expect(window.localStorage.getItem("openpsirt.rail")).toBe('["manage"]');
+  });
+
+  it("does not reach the scope, which is kept for the session rather than the person", () => {
+    // Where the scope actually lives, asserted against the store it is in.
+    // Nothing clears it on sign-out, which this says plainly rather than
+    // leaving somebody to infer it from a localStorage key that is never set.
+    window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
+    belongTo("oidc:ana");
+
+    forgetAll();
+
+    expect(window.sessionStorage.getItem("openpsirt.scope")).toBe('{"product":"sonic"}');
   });
 });

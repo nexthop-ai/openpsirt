@@ -10,7 +10,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Crumbs } from "../ui/Crumbs";
 import { Severity } from "../ui/Severity";
-import { JUSTIFICATIONS } from "../ui/Outcome";
+import { JUSTIFICATIONS, type Justification } from "../ui/Outcome";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
 
@@ -220,7 +220,7 @@ export function Together() {
             </p>
           )}
 
-          <ul className="mb-5 max-h-96 divide-y divide-edge overflow-y-auto rounded-lg border border-[var(--line)]">
+          <ul className="mb-5 max-h-96 divide-y divide-[var(--line)] overflow-y-auto rounded-lg border border-[var(--line)]">
             {items.map((issue) => {
               const name = issue.vulnerability ?? "";
               return (
@@ -303,7 +303,7 @@ function Claim({
   mentions: { product: string };
 }) {
   const [outcome, setOutcome] = useState("not-applicable");
-  const [justification, setJustification] = useState(JUSTIFICATIONS[0]?.value ?? "");
+  const [justification, setJustification] = useState<Justification>(JUSTIFICATIONS[0].value);
   // Prefilled from the narrowing that is on, in the form the approver's
   // outlier check reads back — `contains "driver"` — and still editable, since
   // how a set was chosen may be more than one term.
@@ -382,7 +382,10 @@ function Claim({
             <span className="mb-1 block text-[var(--muted)]">Justification</span>
             <select
               value={justification}
-              onChange={(event) => setJustification(event.target.value)}
+              // The options are the vocabulary, so what comes back is one of
+              // it. The type is read out of that list now rather than written
+              // beside it.
+              onChange={(event) => setJustification(event.target.value as Justification)}
               className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
             >
               {JUSTIFICATIONS.map((each) => (

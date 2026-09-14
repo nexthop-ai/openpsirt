@@ -106,21 +106,43 @@ const METRICS: {
   },
 ];
 
+// The versions of the scheme this composes a vector under.
+//
+// The base formula is the same in both, so the two score identically — what
+// differs is what the vector says it is, and that is a statement about which
+// scheme somebody assessed under rather than a formatting detail.
+const NEWEST = "CVSS:3.1";
+const KNOWN = [NEWEST, "CVSS:3.0"];
+
+// versionOf is the scheme a vector states, or the newest where it states none.
+//
+// Kept through an edit. Re-stamping a vector recorded under 3.0 as 3.1 because
+// somebody changed one metric rewrites what the original assessment claimed,
+// and it is silent — the score does not move, because the formula did not.
+export function versionOf(vector: string): string {
+  const stated = vector.toUpperCase().split("/")[0] ?? "";
+  return KNOWN.includes(stated) ? stated : NEWEST;
+}
+
 // vectorOf assembles what has been chosen, or nothing until all eight are.
 //
 // Nothing rather than a partial vector: eight metrics with one unanswered is
 // not a base vector, and a score from seven of them would be a number nobody
 // could reproduce.
-function vectorOf(chosen: Record<string, string>): string {
+export function vectorOf(chosen: Record<string, string>, under: string): string {
   const parts = METRICS.map((m) => chosen[m.key]);
   if (parts.some((p) => !p)) return "";
-  return "CVSS:3.1/" + METRICS.map((m, i) => `${m.key}:${parts[i]}`).join("/");
+  return under + "/" + METRICS.map((m, i) => `${m.key}:${parts[i]}`).join("/");
 }
 
 // The metrics a vector states, which is the reverse of the above. A vector
 // somebody pasted names some or all of them; one nothing has been chosen for
 // yet names none.
-function read(vector: string): Record<string, string> {
+//
+// A part this does not recognize is skipped rather than refused: a vector
+// carrying temporal or environmental metrics beside the base ones is a vector
+// somebody pasted from a scanner, and the eight this composes are still in it.
+export function read(vector: string): Record<string, string> {
   const chosen: Record<string, string> = {};
   for (const part of vector.toUpperCase().split("/").slice(1)) {
     const [metric, value] = part.split(":");
@@ -154,7 +176,7 @@ export function Scoring({
   function pick(metric: string, value: string) {
     const next = { ...chosen, [metric]: value };
     setChosen(next);
-    onChange(vectorOf(next));
+    onChange(vectorOf(next, versionOf(vector)));
   }
 
   const answered = METRICS.filter((m) => chosen[m.key]).length;

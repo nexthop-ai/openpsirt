@@ -24,10 +24,10 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // The two tables a role is held in.
@@ -53,41 +53,38 @@ var allowed = []string{
 
 func main() {
 	var bad []string
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "node_modules", "web", "site", "dist", "bin":
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	// web holds the interface, which reaches no table: it asks this server.
+	read, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
 		// A test may assert about one table on purpose: it is saying what is
 		// in a row rather than deciding what somebody may reach.
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+		if strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		path = strings.TrimPrefix(path, "./")
 		for _, where := range allowed {
 			if strings.HasPrefix(path, where) {
 				return nil
 			}
 		}
-		text, err := os.ReadFile(filepath.Clean(path)) //nolint:gosec // walked, not supplied
-		if err != nil {
-			return err
-		}
-		// The estate table's name contains the other one, so it is taken out
-		// before the per-product name is looked for.
+		// Each table asked about independently, and the answers compared.
+		//
+		// The rule is "name both", which has two failing shapes and this used
+		// to see one. It returned early unless the per-product name appeared,
+		// and the estate table's name *contains* the per-product one, so a
+		// file naming only the estate table satisfied that test and was then
+		// found to name neither once the estate occurrences were taken out.
+		// A store query joining the estate table alone cannot see a role held
+		// against one product, so it answers no for somebody who holds exactly
+		// the grant being asked about — the defect this program describes,
+		// with the two tables the other way round.
 		body := string(text)
-		if !strings.Contains(body, perProduct) {
-			return nil
-		}
-		names := strings.Contains(strings.ReplaceAll(body, estate, ""), perProduct)
-		if names && !strings.Contains(body, estate) {
-			bad = append(bad, path)
+		namesEstate := strings.Contains(body, estate)
+		namesPerProduct := strings.Contains(strings.ReplaceAll(body, estate, ""), perProduct)
+		if namesPerProduct != namesEstate {
+			missing := estate
+			if namesEstate {
+				missing = perProduct
+			}
+			bad = append(bad, fmt.Sprintf("%s: names one grant table and not %s", path, missing))
 		}
 		return nil
 	})
@@ -104,5 +101,5 @@ func main() {
 		}
 		os.Exit(1)
 	}
-	fmt.Println("every query outside the access package asks both grant tables")
+	fmt.Printf("every query outside the access package asks both grant tables (%d files)\n", read)
 }

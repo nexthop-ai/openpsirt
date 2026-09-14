@@ -1,14 +1,11 @@
 package setting
 
 import (
-	"io"
-	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // TestTwoWritesInOneInstantStillRecordTheSetting pins why existence is asked
@@ -25,10 +22,6 @@ import (
 // that does not exist reports 0.
 func TestTwoWritesInOneInstantStillRecordTheSetting(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(t.Context(), db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		frozen := time.Date(2026, 8, 29, 12, 0, 0, 0, time.UTC)

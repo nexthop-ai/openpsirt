@@ -8,27 +8,37 @@ package webui
 
 import (
 	"embed"
+	"errors"
+	"fmt"
 	"io/fs"
 )
 
 //go:embed all:dist
 var built embed.FS
 
-// Files is the built interface, or nil where nothing was built into it.
+// ErrNoInterface says no interface was built into this binary.
 //
-// Nil rather than an empty filesystem, because the two mean different things
-// to whatever serves this: an API-only binary should serve no page at all,
-// where an empty directory would answer every path with a 404 that looks like
-// a broken deployment.
-func Files() fs.FS {
+// An expected state rather than a fault: an API-only build is a thing somebody
+// chooses, and it serves no page at all. It is a sentinel of its own so that a
+// caller can tell it from a binary whose embedded interface cannot be read,
+// which is broken — answering both with nothing would make the whole interface
+// disappearing indistinguishable from nobody having asked for one.
+var ErrNoInterface = errors.New("no web interface was built into this binary")
+
+// Files is the built interface.
+//
+// It answers ErrNoInterface where the binary carries no interface, and a
+// wrapped error where the embedded directory cannot be read at all — which is
+// a broken binary rather than a choice.
+func Files() (fs.FS, error) {
 	inner, err := fs.Sub(built, "dist")
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("read the interface embedded in this binary: %w", err)
 	}
 	// A build that never ran the frontend leaves only the placeholder, and
 	// there is no page to serve.
 	if _, err := fs.Stat(inner, "index.html"); err != nil {
-		return nil
+		return nil, ErrNoInterface
 	}
-	return inner
+	return inner, nil
 }

@@ -20,12 +20,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // opens is a doc comment beginning with what looks like a Go identifier
@@ -34,21 +34,9 @@ var opens = regexp.MustCompile(`^(\w+) (is|are|reports|returns|says|holds|names|
 
 func main() {
 	var bad []string
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "node_modules", "web", "site", "dist", "bin":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
-		path = strings.TrimPrefix(path, "./")
+	// web holds the interface, which is TypeScript: nothing under it parses
+	// as Go, so reading it is work with no answer.
+	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
@@ -86,7 +74,7 @@ func main() {
 		os.Exit(2)
 	}
 	if len(bad) == 0 {
-		fmt.Println("every doc comment sits on the declaration it describes")
+		fmt.Printf("every doc comment sits on the declaration it describes (%d files)\n", read)
 		return
 	}
 	sort.Strings(bad)

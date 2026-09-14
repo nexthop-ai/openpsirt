@@ -15,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // testHeader is what the fixture's proxy would set. Requests from the test
@@ -105,9 +104,6 @@ func catalogOn(t *testing.T, on engines, fn func(t *testing.T, d *declaring)) {
 	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(t.Context(), db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)

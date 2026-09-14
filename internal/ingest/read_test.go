@@ -1,6 +1,7 @@
 package ingest_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 const anInventory = `{
@@ -93,9 +93,6 @@ func eachReader(t *testing.T, fn func(t *testing.T, f *readerFixture)) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)
@@ -416,4 +413,78 @@ func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {
 			t.Errorf("more work was left behind: %+v %v", result, err)
 		}
 	})
+}
+
+func TestTheReaderDrainsABacklogInsideOneWakeAndReturnsWhenCancelled(t *testing.T) {
+	// Run is what cmd/openpsirt starts and what reads every scan this server
+	// takes in. Every other test here drives Once, and what lives only in the
+	// loop is the draining, the timer reset and the cancellation — Once is
+	// correct whether or not any of the three is, so a loop processing one job
+	// per wake instead of the backlog looks identical from there.
+	//
+	// So: two scans queued at once, an interval far longer than the test, and
+	// both read. If the loop took one job per wake the second would still be
+	// waiting when the interval had not yet elapsed.
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+
+		first := f.accept(t, f.branch, time.Now().UTC().Add(-2*time.Hour), anInventory)
+		second := f.accept(t, f.tag, time.Now().UTC().Add(-time.Hour), anInventory)
+
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			// An interval longer than this test will run for, so a second
+			// wake cannot be what reads the second scan.
+			f.reader.Run(ctx, time.Hour)
+		}()
+
+		waitFor(t, func() bool {
+			for _, id := range []int64{first, second} {
+				if state := f.jobState(t, id); state != queue.Done {
+					return false
+				}
+			}
+			return true
+		}, "both scans to be read inside one wake")
+
+		// And cancellation returns rather than logging a fault: a read cut
+		// short by shutdown is handed back and read again later.
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
+		}
+	})
+}
+
+// jobState is what the queue says became of the job for one scan.
+func (f *readerFixture) jobState(t *testing.T, scanID int64) queue.State {
+	t.Helper()
+	var state queue.State
+	if err := f.db.DB.NewSelect().Model((*queue.Job)(nil)).
+		Column("state").
+		Where("kind = ?", queue.Parse).
+		Where("reference = ?", strconv.FormatInt(scanID, 10)).
+		Scan(t.Context(), &state); err != nil {
+		t.Fatalf("read the job for scan %d: %v", scanID, err)
+	}
+	return state
+}
+
+// waitFor polls until done reports true, and fails saying what it was waiting
+// for. A deadline rather than a sleep: the loops under test are driven by a
+// timer, so how long the work takes is not something a test can name.
+func waitFor(t *testing.T, done func() bool, what string) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		if done() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("waited for %s and it did not happen", what)
 }

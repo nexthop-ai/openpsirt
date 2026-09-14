@@ -167,6 +167,20 @@ func run(args []string, stdout, stderr *os.File) error {
 		return err
 	}
 
+	// An API-only build serves no page and says so once; a binary whose
+	// embedded interface cannot be read at all is broken and refuses to
+	// start. Two different states, told apart here, because serving nothing
+	// on purpose and serving nothing by accident look identical from a
+	// browser.
+	pages, err := webui.Files()
+	switch {
+	case errors.Is(err, webui.ErrNoInterface):
+		logger.Info("serving the API only", "why", err)
+		pages = nil
+	case err != nil:
+		return fmt.Errorf("the interface built into this binary could not be read: %w", err)
+	}
+
 	work := queue.New(db, queue.DefaultOptions())
 	// Named before the handler is built as well as before the workers are:
 	// work that must happen once — rewriting deadlines after a policy
@@ -174,7 +188,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	name := workerName()
 	handler, _ := httpapi.New(logger, db.Validate, httpapi.Ingest{
 		DB: db, Queue: work, Replica: name,
-		Interface: httpapi.Interface{Files: webui.Files()},
+		Interface: httpapi.Interface{Files: pages},
 		Access: access.NewResolver(rights, access.Trust{
 			Header: cfg.TrustedHeader, From: cfg.TrustedSources,
 			GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,

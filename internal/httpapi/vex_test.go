@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/publisher"
 )
 
 func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
@@ -327,4 +329,26 @@ func (r *reach) scannedAtTwoPlaces(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestADeploymentThatHasNotSaidWhoItPublishesAsAnswersAConflict(t *testing.T) {
+	// A configuration gap rather than a bad request. Whoever is asking cannot
+	// fix it from here and an operator can, so it is a conflict naming what is
+	// unconfigured rather than a 500 that says something went wrong.
+	//
+	// That distinction is one line in the handler and nothing executed it: the
+	// fixture every other test here uses is configured, and the predicate the
+	// line reads had a wrapper of its own that no test called either.
+	reachAs(t, dbtest.Two, publisher.Named{}, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		got := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom/vex", "")
+		if got.Code != http.StatusConflict {
+			t.Fatalf("answered %d, want a conflict naming what is unconfigured: %s",
+				got.Code, got.Body.String())
+		}
+		if !strings.Contains(strings.ToLower(got.Body.String()), "publish") {
+			t.Errorf("the refusal does not say what is unconfigured: %s", got.Body.String())
+		}
+	})
 }

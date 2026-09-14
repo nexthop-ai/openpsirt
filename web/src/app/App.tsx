@@ -56,6 +56,50 @@ const Stream = lazy(() => import("../screens/Stream").then((m) => ({ default: m.
 
 const build = "/products/:product/streams/:stream/variants/:variant";
 
+// Every address this application answers, as the patterns the router matches.
+//
+// Named and read by the routes below rather than written only in the JSX, so
+// that something other than a person clicking can ask whether an address built
+// by hand elsewhere resolves to a screen. Eight entries in the report catalog
+// compose an address from a scope and nothing pinned any of them against the
+// router — a report leading nowhere redirects to the front page, silently.
+export const ROUTES = {
+  home: "/",
+  reviewQueue: "/review-queue",
+  unassigned: "/unassigned",
+  findings: "/findings",
+  claim: "/claims/:id",
+  decision: "/decisions/:id",
+  issue: "/issues/:vulnerability",
+  products: "/products",
+  product: "/products/:product",
+  streams: "/products/:product/streams",
+  stream: "/products/:product/streams/:stream",
+  variants: "/products/:product/variants",
+  productFindings: "/products/:product/findings",
+  productComponent: "/products/:product/components/:component",
+  buildFindings: `${build}/findings`,
+  finding: `${build}/findings/:vulnerability/components/:component`,
+  tree: `${build}/components`,
+  decide: `${build}/components/:component/decide`,
+  inventories: `${build}/scans`,
+  run: `${build}/runs/:run`,
+  upgrades: `${build}/pending-upgrades`,
+  comparison: "/products/:product/comparison",
+  me: "/me",
+  people: "/people",
+  person: "/people/:identity",
+  teams: "/teams",
+  work: "/work",
+  audit: "/audit",
+  reports: "/reports",
+  report: "/reports/:report",
+  record: "/record",
+  disclosing: "/disclosing",
+  autoAssignment: "/auto-assignment",
+  settings: "/settings",
+} as const;
+
 export function App() {
   const who = useWho();
   const ended = useSyncExternalStore(subscribe, snapshot, snapshot);
@@ -89,57 +133,54 @@ export function App() {
       <Shell who={who.data}>
         <Suspense fallback={<Loading />}>
           <Routes>
-            <Route path="/" element={<Home who={who.data} />} />
-            <Route path="/review-queue" element={<Queue />} />
-            <Route path="/unassigned" element={<Unassigned />} />
-            <Route path="/findings" element={<Findings />} />
+            <Route path={ROUTES.home} element={<Home who={who.data} />} />
+            <Route path={ROUTES.reviewQueue} element={<Queue />} />
+            <Route path={ROUTES.unassigned} element={<Unassigned />} />
+            <Route path={ROUTES.findings} element={<Findings />} />
             {/* One claim, whole, and every act at that grain. A decision's
                 address resolves to it: what a judgment says belongs to the
                 action that made it, not to any one of its rows. */}
-            <Route path="/claims/:id" element={<Claim who={who.data} />} />
-            <Route path="/decisions/:id" element={<Decision />} />
+            <Route path={ROUTES.claim} element={<Claim who={who.data} />} />
+            <Route path={ROUTES.decision} element={<Decision />} />
             {/* One issue, everywhere it sits. Not under a product,
                 because the question it answers spans them. */}
-            <Route path="/issues/:vulnerability" element={<Issue />} />
-            <Route path="/products" element={<Products who={who.data} />} />
-            <Route path="/products/:product" element={<Product />} />
-            <Route path="/products/:product/streams" element={<Streams />} />
+            <Route path={ROUTES.issue} element={<Issue />} />
+            <Route path={ROUTES.products} element={<Products who={who.data} />} />
+            <Route path={ROUTES.product} element={<Product />} />
+            <Route path={ROUTES.streams} element={<Streams />} />
             {/* A branch and a tag share this address and are different
                 questions, so it resolves to whichever screen answers the one
                 that line poses. */}
-            <Route path="/products/:product/streams/:stream" element={<Stream />} />
-            <Route path="/products/:product/variants" element={<Variants />} />
+            <Route path={ROUTES.stream} element={<Stream />} />
+            <Route path={ROUTES.variants} element={<Variants />} />
             {/* The list at whatever the picker selects, and the same screen at the
             address a build's other screens share. */}
-            <Route path="/products/:product/findings" element={<Findings />} />
-            <Route path="/products/:product/components/:component" element={<Component />} />
-            <Route path={`${build}/findings`} element={<Findings />} />
-            <Route
-              path={`${build}/findings/:vulnerability/components/:component`}
-              element={<Finding />}
-            />
-            <Route path={`${build}/components`} element={<Tree />} />
-            <Route path={`${build}/components/:component/decide`} element={<Together />} />
-            <Route path={`${build}/scans`} element={<Inventories />} />
-            <Route path={`${build}/runs/:run`} element={<Run />} />
-            <Route path={`${build}/pending-upgrades`} element={<Upgrades />} />
-            <Route path="/products/:product/comparison" element={<Compare />} />
+            <Route path={ROUTES.productFindings} element={<Findings />} />
+            <Route path={ROUTES.productComponent} element={<Component />} />
+            <Route path={ROUTES.buildFindings} element={<Findings />} />
+            <Route path={ROUTES.finding} element={<Finding />} />
+            <Route path={ROUTES.tree} element={<Tree />} />
+            <Route path={ROUTES.decide} element={<Together />} />
+            <Route path={ROUTES.inventories} element={<Inventories />} />
+            <Route path={ROUTES.run} element={<Run />} />
+            <Route path={ROUTES.upgrades} element={<Upgrades />} />
+            <Route path={ROUTES.comparison} element={<Compare />} />
             {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}
-            <Route path="/me" element={<Me />} />
-            <Route path="/people" element={<People />} />
+            <Route path={ROUTES.me} element={<Me />} />
+            <Route path={ROUTES.people} element={<People />} />
             {/* One person, whole. An administrator's surface: it carries what
                 somebody was told, which is the question asked after a leak. */}
-            <Route path="/people/:identity" element={<Person />} />
-            <Route path="/teams" element={<Teams />} />
-            <Route path="/work" element={<Work />} />
-            <Route path="/audit" element={<Audit />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/reports/:report" element={<Report />} />
-            <Route path="/record" element={<Record />} />
-            <Route path="/disclosing" element={<Disclosing />} />
-            <Route path="/auto-assignment" element={<AutoAssignment />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path={ROUTES.person} element={<Person />} />
+            <Route path={ROUTES.teams} element={<Teams />} />
+            <Route path={ROUTES.work} element={<Work />} />
+            <Route path={ROUTES.audit} element={<Audit />} />
+            <Route path={ROUTES.reports} element={<Reports />} />
+            <Route path={ROUTES.report} element={<Report />} />
+            <Route path={ROUTES.record} element={<Record />} />
+            <Route path={ROUTES.disclosing} element={<Disclosing />} />
+            <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
+            <Route path={ROUTES.settings} element={<Settings />} />
             {/* A path the page does not know either. Sending somebody home is
             better than a dead end, and the address bar already told them
             where they tried to go. */}

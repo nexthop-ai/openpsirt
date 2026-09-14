@@ -134,6 +134,21 @@ ALLOWED_LICENSES := Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,MIT,MPL-2.0
 #                         "neither the name of the copyright holder".
 LICENSE_EXCEPTIONS := modernc.org/mathutil
 
+# The same thing for the interface's dependencies, as package=license so that
+# the license still has to match rather than the package being waved through.
+# One exception list rather than two: a reviewer asking what exceptions this
+# project grants reads one file, and the reason for each is written beside the
+# entry that grants it.
+#
+#   @fontsource/  OFL-1.1, the SIL Open Font License. What fonts are published
+#                 under, and permissive about embedding and redistribution —
+#                 what it withholds is the right to sell the fonts on their
+#                 own, which is not something a shipped application does.
+#   argparse      PSF-2.0, the Python Software Foundation license, because the
+#                 package is a port of Python's argparse and carries the
+#                 original's license. Permissive, and compatible.
+WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
+
 NPM ?= npm
 
 # A throwaway deployment to click around in. Everything about it is
@@ -199,7 +214,7 @@ DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
 
 all: check build
 
@@ -293,7 +308,8 @@ licenses:
 		$(foreach m,$(LICENSE_EXCEPTIONS),--ignore=$(m))
 	@command -v $(NPM) >/dev/null 2>&1 \
 	  || { echo "npm not found, so the interface's licenses are unchecked here"; exit 1; }
-	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) $(NPM) --prefix web run --silent licenses
+	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) LICENSE_EXCEPTIONS=$(WEB_LICENSE_EXCEPTIONS) \
+	  $(NPM) --prefix web run --silent licenses
 
 # We ingest SBOMs, so we publish one for ourselves. CycloneDX because that is
 # the format this project treats as authoritative on the way in.
@@ -506,17 +522,29 @@ web-api: openapi
 	@git diff --exit-code -- web/src/api/schema.d.ts \
 	  || { echo "web/src/api/schema.d.ts is stale: run make web-api and commit it"; exit 1; }
 
-# What CI runs for the interface. Skipped with a note rather than failing where
-# there is no node, so the Go half still gates on a machine without it.
+# What CI runs for the interface.
+#
+# It refuses without node rather than skipping, like "licenses" and
+# "web-audit" on the identical condition. A skip here is indistinguishable
+# from a pass, and what it covers is the whole tier: the typecheck, the lint,
+# the stylelint, the tests and their coverage, the class collisions, the
+# tokens and the severity ladder. "make gate" routes a change touching only
+# web/ to this one target, so a skip would let such a change report green
+# having been checked by nothing.
+#
+# A machine without node can still gate a Go-only change: that change lands in
+# the code tier, which does not reach here. What needs node is "make check",
+# which is everything CI checks and is meant to.
 web-check:
-	@command -v $(NPM) >/dev/null 2>&1 \
-	  || { echo "npm not found, so the interface is unchecked here"; exit 0; }
+	@command -v $(NPM) >/dev/null 2>&1 || { \
+	  echo "npm not found, so the interface cannot be checked here."; \
+	  echo "Install node, or run this on a machine that has it."; exit 1; }
 	$(MAKE) web-deps
 	$(NPM) --prefix web run typecheck
 	$(NPM) --prefix web run format
 	$(NPM) --prefix web run lint
 	$(NPM) --prefix web run stylelint
-	$(NPM) --prefix web test
+	$(NPM) --prefix web run coverage
 	$(NPM) --prefix web run classes
 	$(NPM) --prefix web run tokens
 	$(NPM) --prefix web run ladder
@@ -598,10 +626,21 @@ attached:
 # so the words it reserves that MySQL does not are held by hand in words.go and
 # this leaves them alone.
 reserved-words:
-	@echo "regenerate internal/tools/reserved/words.go from the running engines:"
-	@echo "  PostgreSQL: SELECT word FROM pg_get_keywords() WHERE catcode IN ('R','T')"
-	@echo "  MySQL:      SELECT LOWER(WORD) FROM INFORMATION_SCHEMA.KEYWORDS WHERE RESERVED=1"
-	@echo "and merge with the MariaDB and SQLite words already listed there."
+	$(GO) run ./internal/tools/reserved generate
+	$(GO) run ./internal/tools/reserved
+
+# That the generated half of the word list is what the engines say today.
+#
+# The same generate-and-diff "openapi-current" does, and for the same reason:
+# a list regenerated by hand is a list somebody stops regenerating. Here
+# rather than in "check" because it has to reach the engines, and the gate it
+# protects — "reserved" — reads the committed file, so an engine upgrade that
+# adds a word would leave that gate passing while a query inventing the alias
+# fails as a syntax error on the engine the deployment runs.
+reserved-current: reserved-words
+	@git diff --exit-code -- internal/tools/reserved/words_asked.go \
+	  || { echo "the reserved-word list is stale: the engines reserve words this"; \
+	       echo "list does not carry. Commit the regenerated file."; exit 1; }
 
 # Decisions no design document names. The chain that makes this auditable runs
 # code to design document to decision, and nothing checked that it was whole:
@@ -622,33 +661,43 @@ openapi-current: openapi
 # own output for each engine by name; without the same check locally, "the
 # suite is green" and "the suite ran" are two different facts with one command
 # behind them. This is the command to run before committing.
+#
+# The names it greps for come from the application's own enumeration rather
+# than from a list here. They were written out by hand three times, so a fifth
+# engine would not have been looked for by any of them — and a grep for
+# nothing reports the same "OK" as a grep that found nothing wrong. The empty
+# check below is for the same reason: an enumeration that came back empty would
+# make every loop vacuous.
 check-engines:
 ifneq ($(ENGINES_MISSING),)
 	@echo "Not configured: $(ENGINES_MISSING). SQLite alone tests none of the"
 	@echo "portability traps, so this refuses rather than passing. See AGENTS.md."
 	@exit 1
 endif
-	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
+	@every=$$($(GO) run ./internal/tools/engines) || exit 1; \
+	  servers=$$($(GO) run ./internal/tools/engines servers) || exit 1; \
+	  [ -n "$$every" ] && [ -n "$$servers" ] \
+	    || { echo "the engine list came back empty, so these greps check nothing"; exit 1; }; \
+	  out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
 	  $(GO) test ./internal/schema/ -count=1 -v -run TestMigrationsApplyOnEveryEngine \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in sqlite postgres mysql mariadb; do \
+	  for engine in $$every; do \
 	    grep -q "PASS: TestMigrationsApplyOnEveryEngine/$$engine" "$$out" \
 	      || { echo "$$engine did not run"; exit 1; }; \
-	  done
-	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
+	  done; \
 	  $(GO) test ./internal/database/migrate/ -count=1 -v -run TestLockExcludes \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in postgres mysql mariadb; do \
+	  for engine in $$servers; do \
 	    grep -q "PASS: TestLockExcludesAnotherConnection/$$engine" "$$out" \
 	      || { echo "the migration lock was not exercised on $$engine"; exit 1; }; \
-	  done
-	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
+	  done; \
 	  $(GO) test ./internal/dbtest/ -count=1 -v -run TestEachEngineIsTheEngineItSaysItIs \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in sqlite postgres mysql mariadb; do \
+	  for engine in $$every; do \
 	    grep -q "PASS: TestEachEngineIsTheEngineItSaysItIs/$$engine" "$$out" \
 	      || { echo "$$engine was not checked for being itself"; exit 1; }; \
 	  done
+	$(MAKE) reserved-current
 ifneq ($(strip $(OPENPSIRT_TEST_TOO_OLD_URL)),)
 	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
 	  $(GO) test ./internal/database/ -count=1 -v -run TestOpenRefuses \

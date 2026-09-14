@@ -234,6 +234,26 @@ func TestAnUnknownMatchKindIsTreatedAsTheWeakerOne(t *testing.T) {
 	if got := result.Reported[0].Matched; got != finding.ByIdentifier {
 		t.Errorf("a match reached both ways reads as %q, want the weaker of the two", got)
 	}
+
+	// The kind this test is named for: a word the reader does not recognize,
+	// with no CPE detail beside it to decide the answer first. The two details
+	// above are both recognized, so neither of them reaches this arm.
+	const unknown = `{
+	  "matches": [{
+	    "vulnerability": {"id": "CVE-2026-2", "severity": "High"},
+	    "artifact": {"name": "thing", "version": "1.0"},
+	    "matchDetails": [{"type": "future-fuzzy-match"}]
+	  }],
+	  "descriptor": {"name": "grype", "version": "0.118.0"}
+	}`
+	fuzzy, err := scanner.ParseGrype(strings.NewReader(unknown))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fuzzy.Reported[0].Matched; got != finding.ByIdentifier {
+		t.Errorf("a match kind nobody here has checked reads as %q, want the weaker of "+
+			"the two — unrecognized is the direction that hides something", got)
+	}
 }
 
 func TestTheRangeAMatchFiredOnAndTheDataThatAnsweredAreKept(t *testing.T) {

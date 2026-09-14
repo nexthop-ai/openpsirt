@@ -19,8 +19,11 @@ func TestAReservedWordIsUsableAsAColumnName(t *testing.T) {
 	// the quoting is actually in force rather than merely written down.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := context.Background()
-		// Reserved somewhere among the four: a window function, two clauses,
-		// and a statement keyword.
+		// Reserved somewhere among the four, and four different kinds of
+		// keyword on purpose: a window function, two clauses, and a statement.
+		// Drawn by hand rather than sampled from the gate's word list, because
+		// a sample from 321 words would not guarantee that spread, and the
+		// spread is what makes this more than one probe repeated.
 		probe := probeTable(t)
 		create := `CREATE TABLE "` + probe + `" (
 			"rank" BIGINT NOT NULL, "order" INT, "select" INT, "group" INT)`

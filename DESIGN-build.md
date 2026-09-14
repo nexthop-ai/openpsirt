@@ -16,6 +16,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Test databases](#test-databases)
 - [Pinned pairs](#pinned-pairs)
 - [Static analysis](#static-analysis)
+- [What a gate reads](#what-a-gate-reads)
 - [Licenses](#licenses)
 - [The API document](#the-api-document)
 - [Self-inventory](#self-inventory)
@@ -90,13 +91,15 @@ of ours needs no edit.
 | `make openapi` | Regenerates the API document from the code |
 | `make openapi-current` | The committed API document against what the code generates |
 | `make sbom` | This project's own CycloneDX inventory |
-| `make web-check` | Interface: locked install, type check, Prettier, ESLint, Stylelint, tests, class-name checks, and the generated client diffed against the API document |
+| `make web-check` | Interface: locked install, type check, Prettier, ESLint, Stylelint, tests with coverage, class-name checks, and the generated client diffed against the API document. Refuses without npm rather than skipping |
 | `make unreachable` | Exported code nothing reaches |
 | `make granted` | Every query outside the access package asks both grant tables |
 | `make unclaimed` | Every requirement is named by a design document |
 | `make pins-check` | Every version pinned in two files still agrees |
-| `make check` | Everything above |
-| `make check-engines` | That all four engines ran, and that each was the engine it claimed |
+| `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
+| `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
+| `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
+| `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
 | `make check-packaging` | The container image and the Helm chart. Needs docker and helm |
 | `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker and helm. See `DESIGN-packaging.md` |
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
@@ -132,9 +135,9 @@ query runs both.
 | **`test-all` replaces `test`** | The same tests, against four engines rather than one |
 | **Local and CI run the identical command** | The moment they differ, "it passed locally" stops meaning anything |
 
-Two steps pass only on a commit — `openapi-current` and `web-api` diff a
-regenerated file against the last commit, so on an uncommitted tree they report
-the file as stale.
+Three steps pass only on a commit — `openapi-current`, `web-api` and
+`reserved-current` each diff a regenerated file against the last commit, so on
+an uncommitted tree they report the file as stale.
 
 ## CI jobs
 
@@ -198,7 +201,7 @@ checks.
 | ESLint | Only what `tsc` has no view of. The rules of hooks are the reason it is present |
 | Prettier | Formatting, for TypeScript and CSS. The counterpart to `gofmt` |
 | Stylelint | CSS correctness: unknown properties, duplicate selectors, notation. Nothing about whitespace |
-| `npm run classes` | Two questions about class names, below |
+| `npm run classes` | Three questions about class names, below |
 
 Formatting belongs to one tool. Stylelint's whitespace rules are off rather than
 left to disagree with Prettier.
@@ -232,6 +235,18 @@ puts a modifier in the markup that appears nowhere as a literal. The check is
 deliberately weak — it finds a name mentioned nowhere at all, and stays quiet
 otherwise. Names from a charting library or the markdown renderer's `language-`
 prefix are excluded.
+
+A class applied to an element that nothing styles. The mirror of the question
+above, and the one that catches an element rendering with no rule at all: a
+label with no fill takes the browser's default, which on a dark canvas is
+invisible, and a state word with no rule renders in the same grey as the state
+that means the opposite. Names Tailwind emits a rule for are not the subject and
+are excluded by asking its compiler, which is the same weakness the collision
+check lives with — a name that happens to be a utility passes either way.
+
+Only names written as literals are read. A class assembled entirely from an
+interpolation produces no token, so this stays quiet rather than reporting
+something it cannot see.
 
 ## Database engines
 
@@ -352,6 +367,26 @@ off; error checking excludes the cleanup-path functions conventionally ignored.
 The linter must be built with a Go release at least as new as the code, or it
 cannot read the compiler's export data and fails on every file with a message
 about import versions. The pinned version moves when the language version does.
+
+## What a gate reads
+
+Every gate program written here walks the repository through one reader, which
+holds the default set of directories none of them read: the version history, a
+local run's scratch, somebody else's code, and the three output directories,
+whose contents were built from what is checked anyway.
+
+Each caller names what it adds, at the call site, with the reason beside it. The
+five Go gates add the interface, which is TypeScript; the text-encoding gate
+adds a vendor directory and deliberately does not add the interface, because a
+byte that makes a text tool skip a file is not a Go question.
+
+| Rule | |
+|---|---|
+| **A walk that reaches nothing refuses** | An empty result is what "nothing is wrong" looks like and what "I read nothing" looks like. No caller can tell those apart from a count of zero, so the reader answers an error rather than a silence |
+| **What is counted is what the caller kept**, not what it was shown | A count of visits is held above zero by any file at all, so the refusal above could never fire for a gate that reads one kind of file |
+| **Every gate says how much it read** | The count is beside the all-clear, so a run that quietly stopped reading part of the tree does not look like a run that read all of it |
+| **A directory is matched by name at any depth**, not by path prefix | Which is what a caller adding one means, and it is how nested dependency directories are covered |
+| **A change here takes the whole gate** | These programs decide what every other check looks at, and no narrower tier covers that: the reader holds no queries and registers no operation, so it would otherwise be classified as ordinary code and skip the checks it governs |
 
 ## Licenses
 

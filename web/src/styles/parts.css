@@ -326,6 +326,21 @@ a.kpi:hover {
 .state.lapsed {
   --c: var(--sev-high);
 }
+/* Something that was asked for and has been done: scanned, met. Without an arm
+   of its own it inherited .state's muted default, so a build that *is* being
+   scanned read in exactly the grey a build nobody has ever scanned reads in. */
+.state.closed {
+  --c: var(--ok);
+}
+
+/* A word standing in for a value that is missing in a way somebody should act
+   on. "never", where every other row in the column carries a date: the page
+   exists to show that a product reads as clean when part of it was never
+   looked at, so the word cannot be the same grey as an ordinary absence. */
+.alertish {
+  color: var(--wait);
+  font-weight: 600;
+}
 
 /* What a claim is claiming, on the review queue's card.
    The outcome is what an approver is agreeing to, so it is a mark of its own
@@ -1261,6 +1276,14 @@ tr.places td {
 
 /* ---------- forms ---------- */
 
+/* Several fields that belong together, grouped in the markup. The fields carry
+   their own spacing, so this only closes the gap the last one would otherwise
+   leave under the group. Laying them out beside each other is a change to how
+   two screens read and wants somebody looking at them, not a rule added to
+   satisfy a gate. */
+.fields > .field:last-child {
+  margin-bottom: 0;
+}
 .field {
   display: flex;
   flex-direction: column;

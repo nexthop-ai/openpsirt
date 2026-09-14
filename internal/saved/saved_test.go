@@ -1,21 +1,17 @@
 package saved_test
 
 import (
-	"io"
-	"log/slog"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
-// fixture is one migrated database with a product to keep filters against.
+// fixture is the seeded world with a place to keep filters against.
 type fixture struct {
+	*fixtures.World
 	rights   *access.Store
 	store    *saved.Store
 	products map[string]int64
@@ -23,21 +19,12 @@ type fixture struct {
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
-		dbtest.Reset(t, db)
-		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		fn(t, &fixture{
-			rights:   access.NewStore(db.DB),
-			store:    saved.NewStore(db.DB),
-			products: map[string]int64{"sonic": product.ID},
+			World:    w,
+			rights:   w.Access,
+			store:    saved.NewStore(w.DB.DB),
+			products: map[string]int64{fixtures.ProductName: w.Product.ID},
 		})
 	})
 }

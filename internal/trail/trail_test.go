@@ -1,36 +1,22 @@
 package trail_test
 
 import (
-	"io"
-	"log/slog"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// each is one migrated database per engine, with a person to record changes
+// each is the seeded world per engine, with somebody to record changes
 // against: a change nobody made is a change nothing records, which is the
 // state this store exists to end.
 func each(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
-		dbtest.Reset(t, db)
-
-		person, err := access.NewStore(db.DB).Ensure(ctx, "them@example.com", "Them", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fn(t, trail.NewStore(db.DB),
-			access.NewPerson(person.ID, "them@example.com", true, nil, 0))
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		admin := w.DeclarePerson("admin@example.com", "Alex Admin", true)
+		fn(t, trail.NewStore(w.DB.DB),
+			access.NewPerson(admin.ID, admin.Identity, true, nil, 0))
 	})
 }
 
@@ -111,6 +97,65 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 		if err := s.Record(ctx, access.Subject{}, trail.Setting, "triage-floor",
 			nil, trail.Said("low", true)); err == nil {
 			t.Error("a change with nobody behind it was recorded")
+		}
+	})
+}
+
+func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
+	// About finds the rows named for somebody alone and the rows naming them
+	// beside a product — "a_b@example.com on sonic" — so the second half is a
+	// prefix match. An underscore is a single-character wildcard to LIKE, so
+	// without the escaping "a_b@example.com" also matches "axb@example.com"
+	// and one person's administrative history is reported as another's.
+	//
+	// The escaping is one statement in this package and About's only other
+	// caller is a handler, so this is what reaches either. The four engines
+	// are the point as well: the ESCAPE clause parses differently on each, and
+	// one of them refuses a backslash outright, which is why the escape
+	// character is a hash.
+	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+		ctx := t.Context()
+		for _, about := range []string{
+			"a_b@example.com on sonic",
+			"axb@example.com on sonic",
+			"a_b@example.com",
+			// A percent sign is the other wildcard, and the hash is the
+			// escape character itself.
+			"a%b@example.com on sonic",
+			"a#b@example.com on sonic",
+		} {
+			if err := s.Record(ctx, by, trail.Role, about,
+				nil, trail.Said("private-triage", true)); err != nil {
+				t.Fatalf("record %q: %v", about, err)
+			}
+		}
+
+		for _, want := range []struct {
+			name  string
+			total int
+		}{
+			// The row named for them alone, and the row naming them beside a
+			// product. Never the row that only matches because an underscore
+			// stood in for a character.
+			{"a_b@example.com", 2},
+			{"axb@example.com", 1},
+			{"a%b@example.com", 1},
+			{"a#b@example.com", 1},
+		} {
+			got, total, err := s.About(ctx, trail.Role, want.name, 100, 0)
+			if err != nil {
+				t.Fatalf("read what changed about %q: %v", want.name, err)
+			}
+			if total != want.total || len(got) != want.total {
+				t.Errorf("%q has %d change(s) and %d were read, want %d",
+					want.name, total, len(got), want.total)
+			}
+			for _, change := range got {
+				if change.Name != want.name && change.Name != want.name+" on sonic" {
+					t.Errorf("reading about %q returned a change about %q",
+						want.name, change.Name)
+				}
+			}
 		}
 	})
 }

@@ -1,10 +1,12 @@
 package httpapi_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -328,4 +330,78 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 			t.Errorf("marking answered %d: %s", got.Code, got.Body.String())
 		}
 	})
+}
+
+func TestTheSweeperWorksAWholeBacklogInOneWakeAndReturnsWhenCancelled(t *testing.T) {
+	// Sweeper.Run is what cmd/openpsirt starts and what places routed work.
+	// The other tests here drive Once, one of them in a loop of twenty that
+	// stands in for the loop being tested — and what only the loop does is
+	// keep going while there is work, reset the timer and return on
+	// cancellation. Once is correct whether or not any of the three is.
+	//
+	// The batch is two and there are more than two findings to place, so a
+	// loop taking one batch per wake would leave some behind: the interval is
+	// longer than this test runs for, and a second wake cannot be what
+	// finishes it.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"curlers","members":["triager"]}`); made.Code != http.StatusCreated {
+			t.Fatal(made.Body.String())
+		}
+		if made := asPerson(t, r, "assigner", http.MethodPost,
+			"/v1/products/mine/routing-rules",
+			`{"name":"everything to the curlers","team":"curlers","upstream":"curl"}`,
+		); made.Code != http.StatusCreated {
+			t.Fatalf("adding a rule answered %d: %s", made.Code, made.Body.String())
+		}
+
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		work := queue.New(r.db, queue.DefaultOptions())
+		sweeper := finding.NewSweeperOfSize(r.db, work,
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test", 2)
+
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			sweeper.Run(ctx, time.Hour)
+		}()
+
+		unplaced := func() int {
+			var left int
+			if err := r.db.DB.NewSelect().Table("finding").
+				ColumnExpr("COUNT(*)").
+				Where("assigned_to IS NULL").
+				Where("closed_at IS NULL").
+				Where(`component_id IN (SELECT id FROM "component" WHERE upstream_name = ?)`, "curl").
+				Scan(ctx, &left); err != nil {
+				return -1
+			}
+			return left
+		}
+		waitFor(t, func() bool { return unplaced() == 0 }, "the whole backlog to be placed")
+
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
+		}
+	})
+}
+
+// waitFor polls until done reports true, and fails saying what it was waiting
+// for. A deadline rather than a sleep: the loops under test are driven by a
+// timer, so how long the work takes is not something a test can name.
+func waitFor(t *testing.T, done func() bool, what string) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		if done() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("waited for %s and it did not happen", what)
 }

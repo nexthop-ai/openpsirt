@@ -2,15 +2,13 @@ package catalog_test
 
 import (
 	"errors"
-	"io"
-	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // each runs fn against every available engine, with the schema applied and the
@@ -18,10 +16,6 @@ import (
 func each(t *testing.T, fn func(t *testing.T, db *database.DB, s *catalog.Store)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(t.Context(), db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		fn(t, db, catalog.NewStore(db.DB))
@@ -186,6 +180,11 @@ func TestBadNamesAreRejected(t *testing.T) {
 		ctx := t.Context()
 		for _, name := range []string{
 			"", "   ", " leading", "trailing ", string(make([]byte, 200)),
+			// One character over the column's width, and nothing else wrong
+			// with it. The 200-byte name above is nul bytes, which the
+			// control-character rule refuses first, so it says nothing about
+			// the length bound.
+			strings.Repeat("a", 192),
 			// A name travels into places that are not this database: a path,
 			// a header, the filename on an export somebody downloads. A
 			// carriage return ends a header and a quote ends a quoted field
@@ -195,6 +194,13 @@ func TestBadNamesAreRejected(t *testing.T) {
 			if _, err := s.DeclareProduct(ctx, name, ""); err == nil {
 				t.Errorf("product name %q was accepted", name)
 			}
+		}
+
+		// And the name one character shorter is declared. The pair pins both
+		// edges, so the bound moving away from the column's width fails here
+		// rather than as a truncated write on whichever engine is strict.
+		if _, err := s.DeclareProduct(ctx, strings.Repeat("a", 191), ""); err != nil {
+			t.Errorf("a name of exactly the column's width was refused: %v", err)
 		}
 	})
 }
@@ -310,10 +316,6 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 	// one frozen point and it came from wherever it came from.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		store := catalog.NewStore(db.DB)
@@ -364,6 +366,77 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		// Moving it to a different branch is still a contradiction.
 		if _, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &other.ID); err == nil {
 			t.Error("a tag was moved to a branch it was not cut from")
+		}
+	})
+}
+
+func TestRedeclaringSomethingDifferentlyIsRefusedAndChangesNothing(t *testing.T) {
+	// The whole point of a declaration step: a pipeline that declares before
+	// every build must not fail on the second one, and a pipeline that has
+	// quietly changed what it means by a name must not pass.
+	//
+	// The tests above declare identically and assert the confirmation, which
+	// exercises the agreeing half and none of the refusing one — and a
+	// refusal nothing reaches is a rule that can be deleted with the suite
+	// green. Each is checked twice over here: the call is refused, and the
+	// stored value is read back to say the refusal wrote nothing.
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, _, err := s.EnsureProduct(ctx, "sonic", "Hardware Platform Images")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// A display name is what a person reads. Overwriting it on the next
+		// pipeline run would let one build rename the product for everyone.
+		if _, _, err := s.EnsureProduct(ctx, "sonic", "Something Else"); !errors.Is(err, catalog.ErrDiffers) {
+			t.Errorf("redeclaring the product under another display name: %v", err)
+		}
+		again, err := s.ProductByName(ctx, "sonic")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.DisplayName != "Hardware Platform Images" {
+			t.Errorf("the refused call changed the display name to %q", again.DisplayName)
+		}
+
+		// A tag that became a branch would turn everything filed against it as
+		// a frozen point into something rebuilt nightly.
+		if _, _, err := s.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := s.EnsureStream(ctx, product.ID, "v1.0", catalog.Branch, nil); !errors.Is(err, catalog.ErrDiffers) {
+			t.Errorf("redeclaring a tag as a branch: %v", err)
+		}
+		stream, err := s.StreamByName(ctx, product.ID, "v1.0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stream.Kind != catalog.Tag {
+			t.Errorf("the refused call made it a %s", stream.Kind)
+		}
+
+		// Whether something reaches customers feeds how its findings rank, so
+		// a change here changes what people are told to work on first.
+		if _, _, err := s.EnsureVariant(ctx, product.ID, "lab-only", false); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := s.EnsureVariant(ctx, product.ID, "lab-only", true); !errors.Is(err, catalog.ErrDiffers) {
+			t.Errorf("redeclaring an internal variant as customer-facing: %v", err)
+		}
+		variant, err := s.VariantByName(ctx, product.ID, "lab-only")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if variant.CustomerFacing {
+			t.Error("the refused call made an internal variant customer-facing")
+		}
+		// And the refusal says which it was, because "already declared,
+		// differently" without saying how is a message somebody has to go
+		// and look the answer up for.
+		_, _, err = s.EnsureVariant(ctx, product.ID, "lab-only", true)
+		if !strings.Contains(err.Error(), "internal") {
+			t.Errorf("the refusal does not say what it was declared as: %v", err)
 		}
 	})
 }

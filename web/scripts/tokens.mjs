@@ -10,6 +10,12 @@
 // So every reference is put to the set of definitions. A fallback counts as a
 // definition of nothing: `var(--gone, 8px)` is a deliberate default and is
 // exempt, because the author said what happens when it is absent.
+//
+// And every definition is put to the set of references, which is the mirror of
+// the same failure: a token defined and named nowhere is that rename with the
+// other half left behind. Checking one direction alone cannot see it, because
+// a definition nothing refers to is exactly what a reference loop never
+// reaches.
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -35,11 +41,16 @@ const files = await sources(src);
 // stylesheet or in a style object a component hands an element — a token set
 // per element is as defined as one set on a selector, and the swatch that
 // draws two colors is exactly that.
-const defined = new Set();
+const definedAt = new Map();
 for (const file of files) {
   const text = await readFile(file, "utf8");
-  for (const [, name] of text.matchAll(/(?:^|[;{,]|\s)["']?(--[a-zA-Z0-9_-]+)["']?\s*:/g)) {
-    defined.add(name);
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    for (const [, name] of lines[i].matchAll(/(?:^|[;{,]|\s)["']?(--[a-zA-Z0-9_-]+)["']?\s*:/g)) {
+      if (!definedAt.has(name)) {
+        definedAt.set(name, `${path.relative(path.join(here, ".."), file)}:${i + 1}`);
+      }
+    }
   }
 }
 
@@ -50,7 +61,7 @@ for (const file of files) {
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
     for (const [, name, rest] of lines[i].matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)\s*(,?)/g)) {
-      if (rest === "," || defined.has(name)) continue;
+      if (rest === "," || definedAt.has(name)) continue;
       const at = `${path.relative(path.join(here, ".."), file)}:${i + 1}`;
       if (!missing.has(name)) missing.set(name, []);
       missing.get(name).push(at);
@@ -58,15 +69,38 @@ for (const file of files) {
   }
 }
 
-if (missing.size === 0) {
-  console.log(`every token referred to is defined (${defined.size} of them)`);
-  process.exit(0);
+if (missing.size > 0) {
+  for (const [name, where] of [...missing].sort()) {
+    console.error(`${name} is used at ${where.join(", ")} and defined nowhere`);
+  }
+  console.error(
+    `\n${missing.size} token(s) named and never defined. CSS drops the ` +
+      `declaration silently, so the screen looks nearly right.`,
+  );
+  process.exit(1);
 }
-for (const [name, where] of [...missing].sort()) {
-  console.error(`${name} is used at ${where.join(", ")} and defined nowhere`);
+
+// The other direction. Nothing is exempt: a token defined and never named is
+// dead whether it is in tokens.css or beside a rule that no longer reads it.
+// The bundle is self-contained and embedded in the binary, so there is no
+// consumer outside this directory for one to be defined for — which the check
+// above already assumes in the other direction.
+const named = new Set();
+for (const file of files) {
+  const text = await readFile(file, "utf8");
+  for (const [, name] of text.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)/g)) named.add(name);
 }
-console.error(
-  `\n${missing.size} token(s) named and never defined. CSS drops the ` +
-    `declaration silently, so the screen looks nearly right.`,
+const orphaned = [...definedAt].filter(([name]) => !named.has(name)).sort();
+if (orphaned.length > 0) {
+  for (const [name, at] of orphaned) {
+    console.error(`${name} is defined at ${at} and named nowhere`);
+  }
+  console.error(`\n${orphaned.length} token(s) defined and never used. Delete the definition.`);
+  process.exit(1);
+}
+
+// The count is the referenced set rather than the defined one, so the number
+// reported is the number vouched for.
+console.log(
+  `every token is defined where it is named and named where it is defined (${named.size})`,
 );
-process.exit(1);

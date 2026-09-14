@@ -22,7 +22,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
@@ -97,9 +96,6 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "mine", "Mine")

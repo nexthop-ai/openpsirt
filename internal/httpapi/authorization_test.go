@@ -18,7 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // declaredBody builds a body the endpoint would accept, so that what a test
@@ -158,12 +157,18 @@ func twoReach(t *testing.T, fn func(t *testing.T, r *reach)) {
 
 func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 	t.Helper()
+	reachAs(t, on, publisher.Named{
+		Name: "Example Networks", Namespace: "https://example.test",
+	}, fn)
+}
+
+// reachAs is reachOn for a test that needs the deployment configured
+// differently — the one that has not been told who it publishes as.
+func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T, r *reach)) {
+	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)
@@ -210,6 +215,16 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 			t.Fatal(err)
 		}
 
+		// **Everybody here is seeded with no display name**, which is a
+		// degeneracy rather than a choice. access.Store.Names answers a
+		// display name where one is known and the identity otherwise, so with
+		// none set every read of a name in this package comes back as the
+		// identity — and a field publishing the wrong one of the two cannot be
+		// told from a field publishing the right one. Four routes in this
+		// package publish the wrong one, which `TODO.md` records under Known
+		// gaps: giving these people names is what makes that visible, and it
+		// belongs with the change that decides, field by field, which of the
+		// two each should carry.
 		rights := access.NewStore(db.DB)
 		administrator, err := rights.Ensure(ctx, "admin", "", true)
 		if err != nil {
@@ -373,12 +388,10 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 		handler, api := httpapi.New(quiet, nil, httpapi.Ingest{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(rights, access.Trust{Header: testHeader, From: sources}),
-			// A deployment that has been told who it publishes as, which is
-			// what an advisory needs. The one that has not is tested where
-			// that refusal is.
-			Publisher: publisher.Named{
-				Name: "Example Networks", Namespace: "https://example.test",
-			},
+			// Who this deployment publishes as, which is what an advisory
+			// and a VEX document need. Passed in, because the deployment that
+			// has not been told is a case of its own.
+			Publisher: as,
 		})
 		fn(t, &reach{handler: handler, key: secret, revoked: revokedSecret,
 			rights: rights, db: db, api: api})

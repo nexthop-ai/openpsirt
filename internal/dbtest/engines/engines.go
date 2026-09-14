@@ -8,7 +8,9 @@
 package engines
 
 import (
+	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,6 +32,13 @@ func Wanted(engine database.Engine) bool {
 }
 
 // Selected is the set Env names, or nil when it names nothing.
+//
+// A name no engine answers to panics. The two outcomes are otherwise
+// indistinguishable: a typo intersects with nothing, every database test skips
+// with a message that reads like a deliberate narrowing, and the run exits 0
+// having touched no database at all. There is no *testing.T here — this is
+// read before any test starts — so the refusal is at the process level, which
+// fails the binary rather than passing it.
 func Selected() map[database.Engine]bool {
 	raw := strings.TrimSpace(os.Getenv(Env))
 	if raw == "" {
@@ -37,7 +46,12 @@ func Selected() map[database.Engine]bool {
 	}
 	wanted := map[database.Engine]bool{}
 	for _, name := range strings.Split(raw, ",") {
-		wanted[database.Engine(strings.TrimSpace(strings.ToLower(name)))] = true
+		engine := database.Engine(strings.TrimSpace(strings.ToLower(name)))
+		if !slices.Contains(database.Engines(), engine) {
+			panic(fmt.Sprintf("%s names %q, which is not an engine: it must be one of %v",
+				Env, engine, database.Engines()))
+		}
+		wanted[engine] = true
 	}
 	return wanted
 }

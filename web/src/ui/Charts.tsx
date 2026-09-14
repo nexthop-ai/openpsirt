@@ -40,7 +40,7 @@ export type Point = {
 // Folded here to match, because a rating with no word is treated as a medium
 // rather than dismissed as a low, and the screen has no business disagreeing
 // with what the deadline is set from.
-function folded(by: Record<string, number>): Record<string, number> {
+export function folded(by: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const [word, count] of Object.entries(by)) {
     switch (word) {
@@ -372,7 +372,7 @@ export function Releases({
         />
       ))}
       {[0, most].map((v, i) => (
-        <text key={v} className="tick" x={L - 6} y={T + H - i * H + 4} textAnchor="end">
+        <text key={v} className="axis" x={L - 6} y={T + H - i * H + 4} textAnchor="end">
           {v.toLocaleString()}
         </text>
       ))}
@@ -395,7 +395,7 @@ export function Releases({
             </rect>
             {/* Every release is named. A tick every other bar would leave
                 somebody counting to work out which one they are looking at. */}
-            <text className="tick" x={x + bar / 2} y={T + H + 16} textAnchor="middle">
+            <text className="axis" x={x + bar / 2} y={T + H + 16} textAnchor="middle">
               {point.stream}
             </text>
           </g>

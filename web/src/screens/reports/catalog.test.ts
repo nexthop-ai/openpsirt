@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG, leadsTo, reportAt, scopeWords } from "./catalog";
 import { PAGES } from "./Report";
+import { matchPath } from "react-router-dom";
+import { ROUTES as NAMED } from "../../app/App";
+
+// The router's patterns as a list, because what is asked here is whether an
+// address matches any of them rather than which.
+const ROUTES = Object.values(NAMED);
 
 describe("the catalog and the addresses that answer it", () => {
   // A name in the list with nothing behind it is a link that goes nowhere,
@@ -62,5 +68,39 @@ describe("what a sheet says it was asked of", () => {
     expect(scopeWords({ product: "sonic", stream: "master" })).toBe(
       "sonic · master · every variant",
     );
+  });
+});
+
+describe("every address a report leads to", () => {
+  // Eight entries build an address from a scope by hand, and nothing pinned
+  // one of them against the router. An address that matches no route
+  // redirects to the front page, so a report that leads nowhere looks exactly
+  // like one nobody clicked — the test above pins the seven slug reports
+  // against the pages behind them and says nothing about these.
+  const anywhere = { product: "sonic", stream: "master", variant: "broadcom" };
+
+  it("resolves to a screen", () => {
+    const leading = CATALOG.filter((report) => report.to);
+    expect(leading.length).toBeGreaterThan(0);
+    for (const report of leading) {
+      const address = report.to?.(anywhere) ?? "";
+      const [path] = address.split("?");
+      const hit = ROUTES.some((pattern) => matchPath(pattern, path ?? "") !== null);
+      expect(hit, `${report.name} leads to ${address}, which matches no route`).toBe(true);
+    }
+  });
+
+  it("resolves for a slug report too, through the reports page", () => {
+    // A report with a page of its own is reached at /reports/<slug>, which is
+    // the route the reports screen renders behind.
+    const slugged = CATALOG.filter((each) => each.slug);
+    expect(slugged.length).toBeGreaterThan(0);
+    for (const report of slugged) {
+      const address = `/reports/${report.slug}`;
+      expect(
+        ROUTES.some((pattern) => matchPath(pattern, address) !== null),
+        `${report.name} leads to ${address}, which matches no route`,
+      ).toBe(true);
+    }
   });
 });

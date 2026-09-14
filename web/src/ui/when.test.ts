@@ -27,7 +27,15 @@ describe("how a moment is written", () => {
     expect(since("2026-09-07T11:59:30Z", now)).toBe("just now");
     expect(since("2026-09-07T11:00:00Z", now)).toBe("1 hour ago");
     expect(since("2026-09-04T12:00:00Z", now)).toBe("3 days ago");
+    // Week and year, the two rungs of the ladder nothing reached — so a
+    // wrong divisor on either read as the unit above or below it with the
+    // suite green.
+    expect(since("2026-08-24T12:00:00Z", now)).toBe("2 weeks ago");
     expect(since("2026-08-07T12:00:00Z", now)).toBe("1 month ago");
+    // A year is 365.25 days here, so two calendar years back is 1.998 of
+    // them and reads as one. Which is the sort of thing a rung nothing
+    // exercises gets wrong quietly.
+    expect(since("2024-06-07T12:00:00Z", now)).toBe("2 years ago");
   });
 
   it("reads the same scale the other way for a moment still ahead", () => {

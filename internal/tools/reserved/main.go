@@ -50,13 +50,13 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // invented matches a name this code makes up: AS, then a bare word. A quoted
@@ -126,25 +126,24 @@ type found struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "generate" {
+		if err := generate(); err != nil {
+			fmt.Fprintln(os.Stderr, "reserved-words:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	reserved := map[string]bool{}
-	for _, word := range reservedWords {
+	for _, word := range reservedWords() {
 		reserved[word] = true
 	}
 
 	var bad []found
 	fset := token.NewFileSet()
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "node_modules", "web", "site", "dist":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+	// web holds the interface, which writes no SQL: it asks this server.
+	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
+		if strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
 		file, err := parser.ParseFile(fset, path, nil, 0)
@@ -245,7 +244,7 @@ func main() {
 	if len(bad) == 0 {
 		fmt.Printf("every name a query invents in a literal is quoted, and no name a "+
 			"migration declares collides with a word any of the four engines reserves "+
-			"(%d words checked)\n", len(reservedWords))
+			"(%d words checked over %d files)\n", len(reservedWords()), read)
 		return
 	}
 	sort.Slice(bad, func(i, j int) bool {

@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 // The shape of a document is what it contains with everything it says
@@ -366,4 +368,46 @@ func writeDecisions(t *testing.T, decided map[string]decision, seen map[string]b
 		t.Fatal(err)
 	}
 	t.Logf("wrote %s with %d paths", pathsFile, len(paths))
+}
+
+func TestEveryTopLevelKeyTheReaderClaimsIsRecordedAsRead(t *testing.T) {
+	// A top-level key is one the reader has a function for: claiming it is the
+	// act of reading it. The guard beside this one cannot fail in that
+	// direction — it checks that everything recorded as read appears in a
+	// fixture, and says nothing about something the reader reads and the
+	// record calls skipped. A supplier, a publisher and an originator are all
+	// read into the component the reader builds, and all are easy to record
+	// the other way.
+	//
+	// **It is strict for a scalar key and weak for a container.** A key
+	// holding a list appears in the record only through its members, so all
+	// this can ask of "components" is that something under it is read. The
+	// four above are fields of a component, so a record that calls one of them
+	// skipped again would still pass here — what this stops is a whole
+	// top-level key the reader claims and the record writes off.
+	decided := loadDecisions(t)
+	claimed := sbom.TopLevelKeys()
+	if len(claimed) == 0 {
+		t.Fatal("no vocabulary claims any key, so this checked nothing")
+	}
+	for vocabulary, keys := range claimed {
+		for _, key := range keys {
+			// The record is written in the shape a walk produces, so a key
+			// holding a list is recorded with the brackets the walk writes.
+			var found bool
+			for path, what := range decided {
+				if path == key+":string" || strings.HasPrefix(path, key+"[]") ||
+					strings.HasPrefix(path, key+".") {
+					if what == pathRead {
+						found = true
+						break
+					}
+				}
+			}
+			if !found {
+				t.Errorf("%s claims the top-level key %q and nothing under it is "+
+					"recorded as read", vocabulary, key)
+			}
+		}
+	}
 }

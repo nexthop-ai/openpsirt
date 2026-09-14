@@ -128,7 +128,11 @@ func TestNothingIsCarriedFromAClaimNobodyAgreedTo(t *testing.T) {
 	// Otherwise a version bump manufactures an approval out of nothing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		neverAgreed := f.judged(t, f.at(), 700)
+		// Baselined at the fixture's own severity, so only the "nobody
+		// agreed" rule can produce the refusal. At 700 the severity rule
+		// fired first and this test passed through that arm instead —
+		// deleting the rule it is named for left it green.
+		neverAgreed := f.judged(t, f.at(), finding.SeverityScore("high"))
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
@@ -154,7 +158,10 @@ func TestALapsedClaimNobodyAgreedToIsNotPreAgreed(t *testing.T) {
 	// moment it was written, and appeared in no review queue.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		neverAgreed := f.judged(t, f.at(), 700)
+		// The fixture's own severity, so the severity rule cannot answer
+		// first: what this test is named for is that a lapse is not an
+		// agreement, and at 700 it was the severity arm that refused.
+		neverAgreed := f.judged(t, f.at(), finding.SeverityScore("high"))
 		// What Lapse does to it when the versions move, without standing up a
 		// scan to move them.
 		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).

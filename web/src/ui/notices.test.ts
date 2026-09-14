@@ -14,6 +14,8 @@ describe("what a notification is called", () => {
     expect(label("assigned")).toBe("assigned to you");
     expect(label("sent-back")).toBe("rejected");
     expect(label("build-quiet")).toBe("not being scanned");
+    // The one of the ten this list left out.
+    expect(label("critical-on-release")).toBe("critical on a release");
     // Each of the four staleness conditions says what has stopped rather than
     // what took place; a row that read "claim-waiting" is the word a machine
     // matches on.
@@ -50,5 +52,10 @@ describe("the count on the way in", () => {
     // that cannot be drawn, and it is what nothing-waiting already looks like.
     expect(waiting(-3)).toBe("·");
     expect(waiting(Number.NaN)).toBe("·");
+    // A fractional one, which is what the name promises and no input
+    // supplied: without it the rounding can be deleted and a count renders
+    // as "2.5".
+    expect(waiting(2.5)).toBe("2");
+    expect(waiting(0.5)).toBe("·");
   });
 });

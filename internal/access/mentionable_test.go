@@ -59,20 +59,20 @@ func TestThePickerOffersOnlyPeopleWhoMayRead(t *testing.T) {
 		sonic := f.products["sonic"]
 
 		// An administrator holding nothing on the product.
-		if _, err := f.store.Ensure(ctx, "boss", "", true); err != nil {
+		if _, err := f.store.Ensure(ctx, "boss", "Boss", true); err != nil {
 			t.Fatal(err)
 		}
 		// A reader who is still here, and one who has left.
-		reader, err := f.store.Ensure(ctx, "reader", "", false)
+		reader, err := f.store.Ensure(ctx, "reader", "Reader", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		gone, err := f.store.Ensure(ctx, "gone", "", false)
+		gone, err := f.store.Ensure(ctx, "gone", "Gone", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// And somebody holding a bare capability, which grants no reading.
-		approver, err := f.store.Ensure(ctx, "approver", "", false)
+		approver, err := f.store.Ensure(ctx, "approver", "Approver", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +131,7 @@ func TestAMentionResolvesANamePastTheFirstPage(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		last, err := f.store.Ensure(ctx, "zoe", "", false)
+		last, err := f.store.Ensure(ctx, "zoe", "Zoe", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +171,7 @@ func TestAskingWhoReadsSomethingIsAskedWithASubject(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		sonic := f.products["sonic"]
-		who, err := f.store.Ensure(ctx, "hidden-reader", "", false)
+		who, err := f.store.Ensure(ctx, "hidden-reader", "Hidden Reader", false)
 		if err != nil {
 			t.Fatal(err)
 		}

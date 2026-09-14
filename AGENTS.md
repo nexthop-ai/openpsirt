@@ -331,11 +331,29 @@ This is not the rule above about tense. A comment may say why a shape is
 necessary, including that the obvious alternative fails; what it may not do is
 tell the story of the edit that produced it.
 
-**The tree does not follow this yet.** Fifty-nine comment lines across
-forty-seven files still narrate what stood there before — "it was a select fed
-by the mentions endpoint", "what used to be a checkbox per place". They are
-correct about the code beside them and wrong about what a comment is for, and
-they are fixed as the files are touched rather than in a sweep of their own.
+**The tree does not follow this yet.** Comment lines across the tree still
+narrate what stood there before — "it was a select fed by the mentions
+endpoint", "what used to be a checkbox per place". They are correct about the
+code beside them and wrong about what a comment is for, and they are fixed as
+the files are touched rather than in a sweep of their own.
+
+**A comment does not count the tree's own contents.** Not "fifteen class names
+are styled by nothing", not "thirty-two fixtures do this", not "this is at
+0.0%". A number like that is false the moment anybody edits what it counts, and
+a count of something wrong is false as soon as it is fixed — usually by the
+same change that wrote it down. The reader then has a precise figure and no way
+to tell whether it still holds, which is worse than no figure at all. Say what
+the shape is; if the count matters, the gate that produces it prints the number
+at the time it looked.
+
+**A measurement is not a count, and measurements stay.** "3 ms on PostgreSQL,
+11 ms on MySQL", "335,021 findings for one image, 305,487 of them a single
+kernel", "1,415 against 38": these are facts about the world or about real
+data, they are why the code has the shape it has, and somebody can re-run them
+in two years and see whether they still hold. That is exactly what
+`REQUIREMENTS.md` asks for beside a decision. The test is whether the number
+describes something outside this repository — keep it — or something a commit
+here can change — cut it.
 
 **No ticket or tracker references in code, comments or documents.** A bare
 number is unactionable at the code and rots as work is split or superseded.
@@ -442,6 +460,31 @@ gets ticked without being read.
  including counts, aggregates, search and exports.
 - Regression tests are named for the invariant they pin.
 
+**A test named for an arm has an input that reaches only that arm**, and the
+check is coverage of the named line rather than the test passing. Eighteen
+tests ran on a corpus that was a strict subset of the domain their own name
+described: the table wanted one direction of a comparison, so the three arms
+that fire in the other never ran; the six scores skipped the band between two
+of them; the only over-long name was rejected by an earlier rule. Each passed,
+and deleting the arm it named left the suite green. `go test -coverprofile`
+over the package under test carries the per-statement counts that answer it.
+
+**Two tests asserting the same property are redundant only when they take the
+same path through the code under test.** The check is a path argument, not a
+comparison of assertion text. A whole-tree scan produced seventeen mechanical
+overlap clusters and every genuine one was refuted: the worked example is
+`web/src/ui/versions.test.ts:19` against `:31` over `versions.ts:19-21` — both
+return the empty string, and only the first reaches the comparison on line 21,
+where the second returns on line 20 without it. The other shapes were the same
+behavior at two layers, and the same predicate over different input classes.
+Nothing was deleted.
+
+**The same test the other way round.** `:25` and `:31` also both return the
+empty string, and they *are* the same path: a level of one and a level of none
+both leave the length test on line 19 with nothing, and neither reaches line
+21. Two assertions that read differently and execute identically is what this
+rule says to look for.
+
 ## Commits and pull requests
 
 - **No `Co-Authored-By` trailers.** This project will use DCO, where the only
@@ -515,10 +558,12 @@ not keep it there: `REQUIREMENTS.md` holds every decision and the
 `DESIGN-*.md` documents hold how each area works, and `make unclaimed` fails
 when a requirement no document names.
 
-**Two steps of the gate pass only on a commit.** `openapi-current` and
-`web-api` diff a regenerated file against the last commit, so on an
-uncommitted tree they report the file as stale. Regenerate, commit the
-generated file with the change that produced it, and they pass.
+**Three steps of the gate pass only on a commit.** `openapi-current`,
+`web-api` and `reserved-current` each regenerate a file and diff it against the
+last commit, so on an uncommitted tree they report the file as stale.
+Regenerate, commit the generated file with the change that produced it, and
+they pass. `reserved-current` is in `check-engines` rather than `check`,
+because regenerating the word list means asking the engines.
 
 ## Building
 
@@ -532,7 +577,7 @@ same command and the same pinned versions.
 | `make test-all` | Every configured engine, nothing cached. What `check` runs. The race detector runs on SQLite alone, in a run of its own, because a Go data race does not vary by engine |
 | `make check` | Everything CI checks, except the container and chart |
 | `make measure` | Measurements rather than gates: what a year of nightly scans does to the tables and the queries. Minutes, and behind a build tag so `check` never runs it |
-| `make check-engines` | That all four engines ran, and that each was the engine it claimed |
+| `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
 | `make check-packaging` | The container image and the Helm chart. Needs docker and helm |
 | `make build` | The binary, with version information injected |
 | `make openapi` | Regenerates the API document from the code |
@@ -601,11 +646,12 @@ slip there is, and it used to report fully green.
 `make check` names the engines it did not test, rather than staying silent
 unless all three are missing.
 
-**What it does not cover.** It asserts three test functions in three packages.
-The rest of the suite runs against whatever is configured, so `check-engines`
+**What it does not cover.** It asserts three test functions in three packages,
+and that the committed reserved-word list is what the engines answer today. The
+rest of the suite runs against whatever is configured, so `check-engines`
 passing does not prove that every test ran on every engine — it proves the
-configuration is real and the migrations, the lock and the identity checks
-exercised all four.
+configuration is real and that the migrations, the lock, the identity checks
+and the word list exercised all four.
 
 This is not hypothetical: a table added with a foreign key to `person` was
 missing from the test cleanup, and SQLite alone never noticed. It failed 40
@@ -649,4 +695,15 @@ the file is not the run that uses it. Run `make engines-up` first, then
 ### Adding a table
 
 Add it to `tables` in `internal/dbtest`, ahead of everything it points at.
-Nothing enforces this and SQLite will not catch it.
+
+**Membership is enforced and the order is not.** A test in `internal/dbtest`
+asks the migrated schema what tables it made and fails on a name in one list
+and not the other, in both directions — a table the migrations make and the
+list omits is never emptied between tests, and a name no migration makes is a
+delete against a table that is not there. Where it goes in the list is still
+judgment: putting children before the rows they reference means reading the
+foreign keys, and where a position needed that reasoning the comment beside the
+name is the record of it.
+An ordering mistake fails on the engines that enforce foreign keys during a
+bulk delete, which is not all of them, so it looks engine-specific rather than
+like the ordering mistake it is.

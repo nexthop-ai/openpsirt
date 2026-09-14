@@ -52,6 +52,15 @@ func TestAnIssueReferenceThatIsNotAnIdentifierIsRefusedWhenItIsWritten(t *testin
 		"issue:CV",
 		"issue:1234-not-starting-with-a-letter",
 		"issue:" + strings.Repeat("A", 65),
+		// Destinations whose only defect is a character the per-byte
+		// allowlist rejects. Every row above is decided by the length bound,
+		// the first-character rule or the scheme, before the loop runs at all,
+		// so none of them reaches what an identifier may be made of.
+		"issue:CVE+2026-1",
+		"issue:CVE%2f2026",
+		"issue:CVE-2026-1234?x=1",
+		"issue:CVE~2026",
+		"issue:CVE@2026",
 	} {
 		if err := markdown.Check("[x](" + destination + ")"); err == nil {
 			t.Errorf("%q was accepted, and refers to nothing", destination)

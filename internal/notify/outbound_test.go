@@ -19,7 +19,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // took records what a destination received.
@@ -50,9 +49,6 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
@@ -150,9 +146,6 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
@@ -240,9 +233,6 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", true)
@@ -283,9 +273,6 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", true)

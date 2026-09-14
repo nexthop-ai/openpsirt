@@ -7,19 +7,18 @@ import { JUSTIFICATIONS, type Justification } from "./Outcome";
 // as bare tokens it was a choice made off a list of five snake_case strings,
 // which is an accuracy problem rather than a cosmetic one.
 describe("the recognized justifications", () => {
-  it("covers the whole vocabulary, so nothing falls back to its token", () => {
-    // The list the screens draw from is the list the type allows. A value
-    // added to one and not the other renders as a raw token on every screen,
-    // which is the state this replaced.
-    const offered = JUSTIFICATIONS.map((each) => each.value).sort();
-    const known: Justification[] = [
+  it("names the whole vocabulary the exchange format defines", () => {
+    // The type is read out of this list, so a value in one and not the other
+    // is a compile error rather than something to assert. What is left worth
+    // checking is the list against the format: these five are what CSAF
+    // defines, and a sixth here would ship a token no consumer recognizes.
+    expect(JUSTIFICATIONS.map((each) => each.value as Justification).sort()).toEqual([
       "component_not_present",
-      "vulnerable_code_not_present",
-      "vulnerable_code_not_in_execute_path",
-      "vulnerable_code_cannot_be_controlled_by_adversary",
       "inline_mitigations_already_exist",
-    ];
-    expect(offered).toEqual([...known].sort());
+      "vulnerable_code_cannot_be_controlled_by_adversary",
+      "vulnerable_code_not_in_execute_path",
+      "vulnerable_code_not_present",
+    ]);
   });
 
   it("says each one in words, and says what it claims", () => {

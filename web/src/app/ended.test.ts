@@ -7,7 +7,12 @@ beforeEach(() => {
 
 describe("a session that ended under somebody", () => {
   it("starts as not ended, because that is what a working session looks like", () => {
-    expect(snapshot()).toBe(false);
+    // Read from a fresh module, so that what the assertion observes is the
+    // initializer rather than the sessionResumed the setup above just ran.
+    vi.resetModules();
+    return import("./ended").then((fresh) => {
+      expect(fresh.snapshot()).toBe(false);
+    });
   });
 
   it("tells whoever is watching, once", () => {

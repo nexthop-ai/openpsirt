@@ -1,8 +1,6 @@
 package notify_test
 
 import (
-	"io"
-	"log/slog"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -11,7 +9,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // The notification area is the one read surface that was not narrowed by a
@@ -26,10 +23,6 @@ import (
 func TestWithdrawingTheRoleTakesAwayWhatItLetSomebodyBeTold(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
@@ -113,10 +106,6 @@ func TestWithdrawingTheRoleTakesAwayWhatItLetSomebodyBeTold(t *testing.T) {
 func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
@@ -176,10 +165,6 @@ func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing
 func TestSomethingUndisclosedThatNamesNoProductIsRefused(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		person, err := access.NewStore(db.DB).Ensure(ctx, "someone@example.com", "Someone", false)
@@ -208,10 +193,6 @@ func TestSomethingUndisclosedThatNamesNoProductIsRefused(t *testing.T) {
 func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)

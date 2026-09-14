@@ -34,7 +34,7 @@ func (f *fixture) privately(t *testing.T) access.Subject {
 	t.Helper()
 	ctx := t.Context()
 	rights := access.NewStore(f.db.DB)
-	insider, err := rights.Ensure(ctx, "insider", "", false)
+	insider, err := rights.Ensure(ctx, "insider", "Insider", false)
 	if err != nil {
 		t.Fatal(err)
 	}

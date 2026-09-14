@@ -34,6 +34,13 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		{"SESSION_LIFETIME", "12"},
 		{"DB_MAX_OPEN", "many"},
 		{"DB_MAX_OPEN", "0"},
+		// The trusted-header pair, which this table covered neither half of.
+		// A half-configuration is the dangerous state: a header named with
+		// nothing to trust it from is either a mistake or the first half of
+		// one, and sources configured with no header named reads nothing from
+		// them.
+		{"TRUSTED_HEADER", "X-User"},
+		{"TRUSTED_SOURCES", "not-an-address"},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)
@@ -45,6 +52,45 @@ func TestLoadRejectsBadValues(t *testing.T) {
 				t.Errorf("the refusal does not name the variable: %v", err)
 			}
 		})
+	}
+}
+
+func TestATrustedHeaderHonoredFromAnywhereIsRefused(t *testing.T) {
+	// The one setting that is supposed to be the guard, naming every address.
+	// It is the same reach as trusting the header from anywhere, and halting
+	// on the empty case while accepting this one is a guard that catches only
+	// the honest mistake.
+	//
+	// Nothing in the tree executed this. It is the only production caller of
+	// the check at all, three lines, and with them gone the trusted identity
+	// header is honored from any address that can reach the process.
+	for _, sources := range []string{"0.0.0.0/0", "::/0", "10.0.0.0/8,0.0.0.0/0"} {
+		t.Run(sources, func(t *testing.T) {
+			t.Setenv(envPrefix+"TRUSTED_HEADER", "X-User")
+			t.Setenv(envPrefix+"TRUSTED_SOURCES", sources)
+			_, err := Load()
+			if err == nil {
+				t.Fatalf("TRUSTED_SOURCES=%q was accepted, so the header is honored "+
+					"from every address", sources)
+			}
+			if !strings.Contains(err.Error(), envPrefix+"TRUSTED_HEADER") {
+				t.Errorf("the refusal does not name the variable: %v", err)
+			}
+		})
+	}
+}
+
+func TestATrustedHeaderAndTheSourcesItIsReadFromAreAcceptedTogether(t *testing.T) {
+	// The other side, so the refusals above cannot be satisfied by refusing
+	// the pair outright.
+	t.Setenv(envPrefix+"TRUSTED_HEADER", "X-User")
+	t.Setenv(envPrefix+"TRUSTED_SOURCES", "10.0.0.0/8,192.168.0.0/16")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("a header with the networks it is read from was refused: %v", err)
+	}
+	if c.TrustedHeader != "X-User" || len(c.TrustedSources) != 2 {
+		t.Errorf("read the header as %q from %v", c.TrustedHeader, c.TrustedSources)
 	}
 }
 

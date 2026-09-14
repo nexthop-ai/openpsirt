@@ -16,10 +16,11 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // carrying reports the first offending byte in a file, and where.
@@ -53,41 +54,34 @@ func text(path string) bool {
 
 func main() {
 	var bad []string
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "node_modules", "dist", "site", "bin", "vendor":
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	// vendor is a dependency's own source, and the interface is walked rather
+	// than skipped: a byte that makes a text tool skip a file is not a Go
+	// question, and the five Go gates beside this one leave web out.
+	read, err := walk.Paths([]string{"vendor"}, func(path string) (bool, error) {
 		if !text(path) {
-			return nil
+			return false, nil
 		}
-		// The path comes from WalkDir over the directory this was started in,
+		// The path comes from the walk over the directory this was started in,
 		// never from a caller, and this program reads a repository and prints
 		// filenames. Said here rather than as a configured exclusion, which
 		// would also cover the next tool written beside it.
 		body, err := os.ReadFile(filepath.Clean(path)) //nolint:gosec // walked, not supplied
 		if err != nil {
-			return err
+			return false, err
 		}
 		if b, line, found := carrying(body); found {
 			bad = append(bad, fmt.Sprintf(
 				"%s:%d: byte 0x%02x, which makes text tools treat this file as binary "+
 					"and skip it. Write it as an escape", path, line, b))
 		}
-		return nil
+		return true, nil
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 	if len(bad) == 0 {
-		fmt.Println("every source file reads as text, so every text check sees all of it")
+		fmt.Printf("every source file reads as text, so every text check sees all of it (%d files)\n", read)
 		return
 	}
 	for _, one := range bad {

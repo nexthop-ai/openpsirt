@@ -14,7 +14,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -120,10 +119,6 @@ func read(t *testing.T, db *database.DB) map[string]stored {
 func each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(t.Context(), db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 		fn(t, db)
 	})
@@ -166,6 +161,13 @@ func TestADistributionPackageIsNotAskedAbout(t *testing.T) {
 	each(t, func(t *testing.T, db *database.DB) {
 		r, asked := seed(t, db, []component{
 			{purl: "pkg:deb/debian/openssl@3.5.6-1"},
+			// The same thing, written the way a producer that capitalizes its
+			// type writes it. Every fixture purl was already lower case, so
+			// the LOWER() that makes the four engines agree could be removed
+			// with the suite green — and the row that got through then had no
+			// index and stuck. It behaves differently per engine without it:
+			// SQLite's LIKE is case-insensitive and PostgreSQL's is not.
+			{purl: "pkg:DEB/debian/curl@8.5.0-2"},
 			{purl: ""},
 			{purl: "pkg:cargo/serde@1.0.0"},
 		}, map[string]currency.Latest{"serde": {Version: "1.0.230"}}, nil)
@@ -177,8 +179,12 @@ func TestADistributionPackageIsNotAskedAbout(t *testing.T) {
 			t.Fatalf("asked about %v, expected only serde", *asked)
 		}
 		stored := read(t, db)
-		if stored["pkg:deb/debian/openssl@3.5.6-1"].Checked != nil {
-			t.Error("a distribution package was recorded as asked about")
+		for _, purl := range []string{
+			"pkg:deb/debian/openssl@3.5.6-1", "pkg:DEB/debian/curl@8.5.0-2",
+		} {
+			if stored[purl].Checked != nil {
+				t.Errorf("%s is a distribution package and was recorded as asked about", purl)
+			}
 		}
 	})
 }
@@ -487,9 +493,6 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 		// Seeded for its components and its setting; the refresher it returns
 		// is not the one this drives, because this needs two of them.

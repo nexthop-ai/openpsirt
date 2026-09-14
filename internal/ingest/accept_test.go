@@ -2,16 +2,15 @@ package ingest_test
 
 import (
 	"errors"
-	"io"
-	"log/slog"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // each gives every engine a migrated database, an empty catalog, and one
@@ -20,10 +19,6 @@ func each(t *testing.T, fn func(t *testing.T, s *ingest.Store, targetID int64)) 
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)
@@ -199,6 +194,50 @@ func TestBuildTimeSurvivesTheRoundTrip(t *testing.T) {
 		}
 		if !got.BuiltAt.UTC().Equal(built) {
 			t.Errorf("built_at came back as %v, stored %v", got.BuiltAt.UTC(), built)
+		}
+	})
+}
+
+func TestAFailureQuotingAProducersOwnTextIsStoredAsText(t *testing.T) {
+	// A message saying why a scan could not be read quotes the producer's own
+	// text, which carries multi-byte characters. Cutting the message at a
+	// byte boundary can land inside one of them, and the invalid UTF-8 that
+	// leaves is refused outright by PostgreSQL and in strict mode by MySQL
+	// and MariaDB — so recording why a scan failed failed, leaving the scan
+	// accepted with nothing saying why nothing happened.
+	//
+	// SQLite stores it happily, which is why the quick loop never saw this
+	// and why only the early return had ever executed: no test had ever
+	// passed MarkFailed a message long enough to cut.
+	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+		ctx := t.Context()
+		scan, _, err := s.Record(ctx, arriving(targetID, "cut-inside-a-rune", time.Now().UTC()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// One ASCII character and then 3,000 bytes of two-byte ones, so the
+		// cut at 2,000 lands between the two halves of a character rather
+		// than between two characters. An even offset is the case that
+		// happens to be safe, which is why the input matters as much as the
+		// length.
+		cause := errors.New("x" + strings.Repeat("é", 1500))
+		if err := s.MarkFailed(ctx, scan.ID, cause); err != nil {
+			t.Fatalf("record that the scan failed: %v", err)
+		}
+
+		stored, err := s.ByID(ctx, scan.ID)
+		if err != nil {
+			t.Fatalf("read the scan back: %v", err)
+		}
+		if stored.Failure == "" {
+			t.Fatal("the scan is failed and says nothing about why")
+		}
+		if !utf8.ValidString(stored.Failure) {
+			t.Error("what is stored is not text, so a strict engine would have refused it")
+		}
+		if len(stored.Failure) > 2000 {
+			t.Errorf("stored %d bytes, over the 2000 the column takes", len(stored.Failure))
 		}
 	})
 }

@@ -662,8 +662,15 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil || made.ClaimID == 0 {
 			t.Fatalf("declaring answered %s (%v)", got.Body.String(), err)
 		}
+		// A failure rather than a skip. Waiting is derived from the
+		// deployment's approval threshold, which is a setting: a change that
+		// stopped a promise of this size needing a second person would make
+		// this test pass by not running, and the invariant it is named for —
+		// editing what a release is moving to withdraws the standing
+		// agreement — would stop being checked with nothing reporting red.
 		if !made.Waiting {
-			t.Skip("this promise needed nobody, so there is no agreement to take back")
+			t.Fatal("a bump this size no longer needs a second person, so the " +
+				"agreement this test takes back was never given")
 		}
 		if ok := asPerson(t, r, "reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID), `{}`); ok.Code != http.StatusOK {

@@ -19,12 +19,12 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // asking is a file naming an engine, a driver's own error type, or SQL only
@@ -67,33 +67,22 @@ var allowed = []string{
 	// the rule is about — and the check that proves each engine ran is
 	// itself what stops that naming going quietly wrong.
 	"internal/dbtest/",
+	// The reserved-word generator, which asks each engine what it reserves.
+	// One statement per engine because each publishes its keywords somewhere
+	// of its own — and it is not a query the application runs, it is how the
+	// list the quoting gate reads stops being a list somebody typed.
+	"internal/tools/reserved/",
 }
 
 func main() {
 	var bad []string
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "node_modules", "web", "site", "dist", "bin":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
-		path = strings.TrimPrefix(path, "./")
+	// web holds the interface, which reaches no engine at all: it talks to
+	// this server over HTTP.
+	read, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
 		for _, where := range allowed {
 			if strings.HasPrefix(path, where) {
 				return nil
 			}
-		}
-		text, err := os.ReadFile(filepath.Clean(path)) //nolint:gosec // walked, not supplied
-		if err != nil {
-			return err
 		}
 		for i, line := range strings.Split(string(text), "\n") {
 			// Comments name engines constantly, and correctly: what is being
@@ -121,7 +110,7 @@ func main() {
 	}
 	if len(bad) == 0 {
 		fmt.Printf("engine-specific code is confined to the %d paths this holds, "+
-			"which the design document lists as its own rows\n", len(allowed))
+			"which the design document lists as its own rows (%d files)\n", len(allowed), read)
 		return
 	}
 	sort.Strings(bad)

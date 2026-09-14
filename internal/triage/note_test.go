@@ -261,7 +261,7 @@ func TestSomebodyBroughtOntoACaseReachesItsNotes(t *testing.T) {
 		ctx := t.Context()
 		f.sits(t, access.Private)
 		rights := access.NewStore(f.db.DB)
-		person, err := rights.Ensure(ctx, "collaborator", "", false)
+		person, err := rights.Ensure(ctx, "collaborator", "Collaborator", false)
 		if err != nil {
 			t.Fatal(err)
 		}
