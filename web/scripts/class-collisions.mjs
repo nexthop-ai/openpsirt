@@ -39,9 +39,20 @@ async function stylesheets(dir) {
 const defined = new Map();
 for (const file of await stylesheets(src)) {
   const css = await readFile(file, "utf8");
-  // Strip declaration blocks so that only selectors are read.
-  for (const selector of css.replace(/\{[^{}]*\}/g, "{}").split(/[{}]/)) {
-    for (const [, name] of selector.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) {
+  // Comments and declaration blocks stripped, so that only selectors are read.
+  //
+  // At-rule preludes go too. Blanking the innermost blocks and splitting on
+  // braces leaves every `@import`, `@media` and `@supports` prelude in the
+  // stream, and `@import "@fontsource/instrument-sans/400.css"` then registers
+  // `css` as a class this stylesheet defines — a name the reverse check below
+  // would vouch for and no element could ever carry. The rules inside a media
+  // query arrive as their own fragments after the split, so they are
+  // unaffected.
+  const selectors = css.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{[^{}]*\}/g, "{}");
+  for (const raw of selectors.split(/[{}]/)) {
+    for (const [, name] of raw
+      .replace(/@[\w-]+[^;{}]*;?/g, " ")
+      .matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) {
       if (!defined.has(name)) defined.set(name, path.relative(src, file));
     }
   }
@@ -192,10 +203,14 @@ const markup = sources.join("\n");
 // by the browser rather than by us.
 const foreign = /^(recharts-|markdown-body$)/;
 
+// The trailing class admits "$" because a name at the head of a template
+// literal is followed by the interpolation that adds its modifiers —
+// `noticekind${…}` — and reading that as "never applied" would ask somebody to
+// delete a rule that is in use.
 const unused = names.filter(
   (name) =>
     !foreign.test(name) &&
-    !new RegExp(`[\\s"'\`.]${name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&")}[\\s"'\`:.]`).test(
+    !new RegExp(`[\\s"'\`.]${name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&")}[\\s"'\`:.$]`).test(
       markup,
     ),
 );
@@ -204,6 +219,58 @@ if (unused.length > 0) {
   console.error(`${unused.length} class name(s) are styled and never applied:\n`);
   for (const name of unused) console.error(`  .${name}  (${defined.get(name)})`);
   console.error(`\nDelete the rule, or apply it.`);
+  process.exit(1);
+}
+
+// Class names nothing styles.
+//
+// The mirror of the check above, and the direction this file did not have: it
+// held one set of names, taken from CSS, and tested it against markup, so a
+// class written onto an element with no rule anywhere shipped silently.
+// Fifteen did. Two were visible: `<text className="tick">` on a hand-drawn
+// chart took the SVG default fill, which is black on a near-black canvas in
+// dark mode, and `className="state closed"` on the word "scanned" rendered in
+// exactly the grey "never scanned" renders in.
+//
+// Tailwind is asked about every name that is not ours, because a utility used
+// in markup is styled by Tailwind rather than by us and is not the subject.
+// That absolves a wide set of names — a stray `block` or `border` would pass —
+// which is the same weakness the collision check above already lives with, and
+// it still catches every bespoke name.
+//
+// A class assembled entirely from interpolation produces no token and is
+// therefore quiet rather than noisy, which is the right way round for a check
+// that cannot see what a template literal will hold.
+const written = new Map();
+async function markupClasses(dir) {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await markupClasses(full);
+      continue;
+    }
+    if (!/\.tsx?$/.test(entry.name) || entry.name === "schema.d.ts") continue;
+    const lines = (await readFile(full, "utf8")).split("\n");
+    lines.forEach((line, i) => {
+      for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+        for (const word of (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, " ").split(/\s+/)) {
+          if (/^[A-Za-z][\w-]*$/.test(word) && !defined.has(word) && !written.has(word)) {
+            written.set(word, `${path.relative(src, full)}:${i + 1}`);
+          }
+        }
+      }
+    });
+  }
+}
+await markupClasses(src);
+const styleless = [...written.keys()]
+  .filter((name) => !compiler.build([name]).includes(`.${name}`))
+  .sort();
+
+if (styleless.length > 0) {
+  console.error(`${styleless.length} class name(s) are applied and styled by nothing:\n`);
+  for (const name of styleless) console.error(`  .${name}  (${written.get(name)})`);
+  console.error(`\nWrite the rule, or take the name off the element.`);
   process.exit(1);
 }
 
@@ -218,5 +285,6 @@ if (clashing.length > 0) {
 }
 console.log(
   `no collisions: ${names.length} class names checked against Tailwind, ` +
-    `${modifiers.size} used as a modifier checked against our own rules`,
+    `${modifiers.size} used as a modifier checked against our own rules, ` +
+    `${written.size} applied in markup checked for having a rule`,
 );

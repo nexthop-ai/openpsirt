@@ -134,6 +134,21 @@ ALLOWED_LICENSES := Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,MIT,MPL-2.0
 #                         "neither the name of the copyright holder".
 LICENSE_EXCEPTIONS := modernc.org/mathutil
 
+# The same thing for the interface's dependencies, as package=license so that
+# the license still has to match rather than the package being waved through.
+# One exception list rather than two: a reviewer asking what exceptions this
+# project grants reads one file, and the reason for each is written beside the
+# entry that grants it.
+#
+#   @fontsource/  OFL-1.1, the SIL Open Font License. What fonts are published
+#                 under, and permissive about embedding and redistribution —
+#                 what it withholds is the right to sell the fonts on their
+#                 own, which is not something a shipped application does.
+#   argparse      PSF-2.0, the Python Software Foundation license, because the
+#                 package is a port of Python's argparse and carries the
+#                 original's license. Permissive, and compatible.
+WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
+
 NPM ?= npm
 
 # A throwaway deployment to click around in. Everything about it is
@@ -199,7 +214,7 @@ DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check web-check-if-present scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
 
 all: check build
 
@@ -293,7 +308,8 @@ licenses:
 		$(foreach m,$(LICENSE_EXCEPTIONS),--ignore=$(m))
 	@command -v $(NPM) >/dev/null 2>&1 \
 	  || { echo "npm not found, so the interface's licenses are unchecked here"; exit 1; }
-	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) $(NPM) --prefix web run --silent licenses
+	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) LICENSE_EXCEPTIONS=$(WEB_LICENSE_EXCEPTIONS) \
+	  $(NPM) --prefix web run --silent licenses
 
 # We ingest SBOMs, so we publish one for ourselves. CycloneDX because that is
 # the format this project treats as authoritative on the way in.
@@ -474,7 +490,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved confined granted attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
+check: build vet lint unreachable unclaimed reserved confined granted attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check-if-present
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -506,11 +522,23 @@ web-api: openapi
 	@git diff --exit-code -- web/src/api/schema.d.ts \
 	  || { echo "web/src/api/schema.d.ts is stale: run make web-api and commit it"; exit 1; }
 
-# What CI runs for the interface. Skipped with a note rather than failing where
-# there is no node, so the Go half still gates on a machine without it.
+# What CI runs for the interface.
+#
+# It refuses without node rather than passing, like "licenses" and "web-audit"
+# on the identical condition. It used to exit 0 with a note, so "make check" on
+# a machine without node printed success having run no check on the interface
+# at all — not the typecheck, the lint, the stylelint, the tests, the class
+# collisions, the tokens or the severity ladder. Worse through "make gate",
+# whose web tier is this one target: a change touching only web/ ran exactly
+# one thing, which did nothing, and reported green.
+#
+# "check" depends on the tolerant form below instead, so the Go half still
+# gates on a machine without node — and says which tier it skipped, rather
+# than a local pass reading as a full one.
 web-check:
-	@command -v $(NPM) >/dev/null 2>&1 \
-	  || { echo "npm not found, so the interface is unchecked here"; exit 0; }
+	@command -v $(NPM) >/dev/null 2>&1 || { \
+	  echo "npm not found, so the interface cannot be checked here."; \
+	  echo "Install node, or run this on a machine that has it."; exit 1; }
 	$(MAKE) web-deps
 	$(NPM) --prefix web run typecheck
 	$(NPM) --prefix web run format
@@ -522,6 +550,21 @@ web-check:
 	$(NPM) --prefix web run ladder
 	$(MAKE) web-audit
 	$(MAKE) web-api
+
+# The interface tier where it can be run, and a named skip where it cannot.
+#
+# This is what "check" depends on. The skip is loud and names every check it
+# did not run, because the failure this replaces was a summary line that said
+# nothing and a developer who read it as a full pass.
+web-check-if-present:
+ifeq ($(shell command -v $(NPM) >/dev/null 2>&1 && echo yes),yes)
+	$(MAKE) web-check
+else
+	@echo "SKIPPED: the interface tier. npm is not here, so none of the"
+	@echo "         typecheck, format, lint, stylelint, tests, class collisions,"
+	@echo "         tokens, severity ladder, dependency audit or generated client"
+	@echo "         was run. CI runs all of them. This is not a full check."
+endif
 
 # Known vulnerabilities in what the interface installs.
 #

@@ -35,23 +35,34 @@ if (allowed.size === 0) {
   process.exit(2);
 }
 
-// Licenses accepted for one package despite not being on the list. Each entry
-// states why, in the same shape and for the same reason the Makefile's
-// exceptions do: an exception nobody wrote a reason for is indistinguishable
-// from an oversight.
+// Licenses accepted for one package despite not being on the list.
 //
-//   @fontsource/*  OFL-1.1, the SIL Open Font License. The license fonts are
-//                  published under, and it is permissive about embedding and
-//                  redistribution — what it withholds is the right to sell
-//                  the fonts on their own, which is not something a shipped
-//                  application does.
-//   argparse       PSF-2.0, the Python Software Foundation license, because
-//                  the package is a port of Python's argparse and carries the
-//                  original's license. Permissive, and compatible.
-const exceptions = [
-  { match: /^@fontsource\//, license: "OFL-1.1" },
-  { match: /(^|\/)argparse$/, license: "PSF-2.0" },
-];
+// Passed in, like the allowlist above and for the same reason this file states
+// there: the exceptions were hardcoded here, twenty-seven lines under the
+// comment forbidding exactly that, so one license policy had two exception
+// lists in two files and neither mentioned the other. Granting a fourth
+// exception had no single place to be written.
+//
+// Each entry is `prefix=license`, so the license still has to match: an
+// exception admits one package's actual license rather than waving the package
+// through. The prefix is anchored to a path boundary, because a prefix match
+// on "argparse" would also admit a package named "argparse-lite".
+const exceptions = (process.env.LICENSE_EXCEPTIONS ?? "")
+  .split(",")
+  .map((each) => each.trim())
+  .filter(Boolean)
+  .map((each) => {
+    const [prefix, license] = each.split("=");
+    if (!prefix || !license) {
+      console.error(`LICENSE_EXCEPTIONS entry ${each} is not prefix=license.`);
+      process.exit(2);
+    }
+    const quoted = prefix.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&");
+    return {
+      match: new RegExp(`(^|/)${quoted}${prefix.endsWith("/") ? "" : "($|/)"}`),
+      license,
+    };
+  });
 
 // An SPDX expression is not a license name. "MIT AND ISC" is satisfied only if
 // both are allowed; "(MPL-2.0 OR Apache-2.0)" by either. Treating the whole

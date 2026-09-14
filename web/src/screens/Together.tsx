@@ -220,7 +220,7 @@ export function Together() {
             </p>
           )}
 
-          <ul className="mb-5 max-h-96 divide-y divide-edge overflow-y-auto rounded-lg border border-[var(--line)]">
+          <ul className="mb-5 max-h-96 divide-y divide-[var(--line)] overflow-y-auto rounded-lg border border-[var(--line)]">
             {items.map((issue) => {
               const name = issue.vulnerability ?? "";
               return (

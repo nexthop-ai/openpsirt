@@ -372,7 +372,7 @@ export function Releases({
         />
       ))}
       {[0, most].map((v, i) => (
-        <text key={v} className="tick" x={L - 6} y={T + H - i * H + 4} textAnchor="end">
+        <text key={v} className="axis" x={L - 6} y={T + H - i * H + 4} textAnchor="end">
           {v.toLocaleString()}
         </text>
       ))}
@@ -395,7 +395,7 @@ export function Releases({
             </rect>
             {/* Every release is named. A tick every other bar would leave
                 somebody counting to work out which one they are looking at. */}
-            <text className="tick" x={x + bar / 2} y={T + H + 16} textAnchor="middle">
+            <text className="axis" x={x + bar / 2} y={T + H + 16} textAnchor="middle">
               {point.stream}
             </text>
           </g>

@@ -130,17 +130,14 @@
      what only a phone needs. */
 }
 
-/* ---------- names older code still uses ---------- */
-/* The first stylesheet exposed tinted backgrounds as tokens; the mockup mixes
-   them from the color. Kept as mixes so nothing has two definitions. */
+/* ---------- tinted backgrounds, mixed from the color they tint ---------- */
+/* One definition each, so a tint and the color it is taken from cannot drift
+   apart. */
 :root,
 :root[data-look="dark"] {
   --sev-exploited-bg: color-mix(in oklab, var(--sev-exploited) 12%, transparent);
-  --sev-high-bg: color-mix(in oklab, var(--sev-high) 10%, transparent);
   --ok-bg: color-mix(in oklab, var(--ok) 12%, transparent);
-  --wait-bg: color-mix(in oklab, var(--wait) 12%, transparent);
   --paper: var(--canvas);
-  --navy: var(--side-bg);
 }
 
 * {
@@ -224,6 +221,19 @@ a {
   display: block;
   color: var(--faint);
   font-size: 11px;
+}
+/* What kind of thing a notice is, above what it says. A condition is marked,
+   because acknowledging one hides it rather than resolving it. */
+.noticekind {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.noticekind.holds {
+  color: var(--wait);
 }
 
 /* The look menu on the avatar. */
