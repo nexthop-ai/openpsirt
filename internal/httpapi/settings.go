@@ -54,6 +54,7 @@ var settable = []struct {
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else"},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time"},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it"},
+	{setting.QueueBacklog, "How much background work of one kind may be waiting before more of that kind is refused. A whole number, not a length of time. Counted per kind, so a producer that has filled its own queue does not refuse everybody else's work"},
 	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog"},
 	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload"},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here"},
@@ -360,6 +361,8 @@ func shipped(name string) string {
 		return strconv.Itoa(setting.DefaultAttachmentMaxSize)
 	case setting.RoutingBatch:
 		return strconv.Itoa(setting.DefaultRoutingBatch)
+	case setting.QueueBacklog:
+		return strconv.Itoa(setting.DefaultQueueBacklog)
 	case setting.AttachmentQuota:
 		return strconv.Itoa(setting.DefaultAttachmentQuota)
 	case setting.AttachmentShare:

@@ -78,7 +78,7 @@ func TestAFormLargerThanTheUploadLimitIsRefusedBeforeItIsRead(t *testing.T) {
 			t.Fatalf("an oversized form returned %d, want 413: %s", rec.Code, rec.Body.String())
 		}
 
-		depth, err := f.queue.Depth(t.Context())
+		depth, err := f.queue.Depth(t.Context(), queue.Parse)
 		if err != nil {
 			t.Fatal(err)
 		}

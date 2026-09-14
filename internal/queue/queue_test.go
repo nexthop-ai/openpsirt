@@ -7,14 +7,17 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // quiet is a logger for the paths that report a renewal that did not land.
@@ -277,7 +280,7 @@ func TestABacklogCountsWorkHeldByAWorkerThatStopped(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 
-		depth, err := q.Depth(ctx)
+		depth, err := q.Depth(ctx, "ingest")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -684,6 +687,98 @@ func TestOnlySetAsideWorkIsPutBack(t *testing.T) {
 		}
 		if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotSetAside) {
 			t.Errorf("putting back running work answered %v, want it refused", err)
+		}
+	})
+}
+
+func TestABacklogIsCountedPerKind(t *testing.T) {
+	// The cap exists so a runaway producer cannot push everyone else's work
+	// behind its own. Counted across every kind it does the opposite: the
+	// producer that filled the queue keeps its place and every other producer
+	// is refused.
+	opts := queue.DefaultOptions()
+	opts.MaxBacklog = 2
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		for i := range opts.MaxBacklog {
+			if _, err := q.Add(ctx, queue.Route, fmt.Sprintf("rule-%d", i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// That kind is full and says so.
+		if _, err := q.Add(ctx, queue.Route, "one-too-many"); !errors.Is(err, queue.ErrBacklogFull) {
+			t.Errorf("a full kind accepted more work: %v", err)
+		}
+		// Everybody else is unaffected, which is the whole point of the cap.
+		if _, err := q.Add(ctx, queue.Parse, "an-upload"); err != nil {
+			t.Errorf("one producer's backlog refused another's work: %v", err)
+		}
+	})
+}
+
+func TestTheBacklogLimitIsWhatAnAdministratorSet(t *testing.T) {
+	// The producer a refusal lands on is a build server, and an estate that
+	// pushes work in faster than the workers drain it has no remedy for a
+	// compiled-in number short of a new binary.
+	opts := queue.DefaultOptions()
+	opts.MaxBacklog = 1
+	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		if _, err := q.Add(ctx, queue.Parse, "the-first"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := q.Add(ctx, queue.Parse, "one-too-many"); !errors.Is(err, queue.ErrBacklogFull) {
+			t.Fatalf("the shipped limit was not in force: %v", err)
+		}
+
+		if err := setting.NewStore(db.DB).Set(ctx, setting.QueueBacklog, "5"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := q.Add(ctx, queue.Parse, "room-now"); err != nil {
+			t.Errorf("the limit an administrator set was not read: %v", err)
+		}
+		if limit, err := q.Backlog(ctx); err != nil || limit != 5 {
+			t.Errorf("the limit in force reads as %d (%v), want 5", limit, err)
+		}
+	})
+}
+
+func TestWhatAFailingJobWritesAboutItselfIsBounded(t *testing.T) {
+	// The string comes from whatever failed — a parser, a scanner's output, a
+	// driver — and is stored and then handed back to whoever asks about their
+	// upload. Unbounded, one job writes as much as its cause felt like saying
+	// into a column every reader of that job then carries.
+	opts := queue.DefaultOptions()
+	opts.MaxAttempts = 1
+	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		if _, err := q.Add(ctx, queue.Parse, "a-loud-failure"); err != nil {
+			t.Fatal(err)
+		}
+		job, err := q.Claim(ctx, "worker", queue.Parse)
+		if err != nil || job == nil {
+			t.Fatalf("claiming: %v", err)
+		}
+		// Multi-byte throughout, so a cut at a byte offset would split a
+		// character and leave a tail three of the four engines refuse.
+		shouting := errors.New(strings.Repeat("π", 40000))
+		if err := q.Fail(ctx, job.ID, "worker", shouting); err != nil {
+			t.Fatal(err)
+		}
+
+		var stored string
+		if err := db.QueryRowContext(ctx,
+			`SELECT "last_error" FROM "job" WHERE "id" = ?`, job.ID).Scan(&stored); err != nil {
+			t.Fatal(err)
+		}
+		if len(stored) > 4096 {
+			t.Errorf("a failing job wrote %d bytes about itself", len(stored))
+		}
+		if !utf8.ValidString(stored) {
+			t.Error("the bound cut a character in half, which three engines refuse to store")
+		}
+		if stored == "" {
+			t.Error("the bound threw away what the failure said")
 		}
 	})
 }

@@ -284,7 +284,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// away, on a deployment already behind on its work. It happens after
 	// authorization so that how far behind we are is not something an
 	// unauthorized sender can measure.
-	depth, err := in.Queue.Depth(ctx)
+	depth, err := in.Queue.Depth(ctx, queue.Parse)
 	if err != nil {
 		return nil, wentWrong(in.Logger, "cannot tell how much work is waiting", err)
 	}

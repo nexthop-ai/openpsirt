@@ -162,6 +162,8 @@ function title(name?: string): string {
       return "Total attachment storage";
     case "attachment.per-person-quota":
       return "Attachment storage per person";
+    case "queue.backlog":
+      return "Queued work limit";
     case "routing.batch":
       return "Findings placed per pass";
     case "people.absent-after":

@@ -18,10 +18,12 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // State is where a job has got to.
@@ -68,9 +70,13 @@ type Options struct {
 	// Without a limit, a job that can never succeed retries for ever and
 	// crowds out work that could.
 	MaxAttempts int
-	// MaxBacklog caps how much work may be waiting. Beyond it, new work is
-	// refused so a runaway producer cannot push everyone else's work behind
-	// its own.
+	// MaxBacklog caps how much work of one kind may be waiting. Beyond it,
+	// new work of that kind is refused so a runaway producer cannot push
+	// everyone else's work behind its own.
+	//
+	// Per kind rather than across the queue, because one cap shared between
+	// kinds is the opposite of what it says: the producer that filled it
+	// keeps its place and every other producer is refused.
 	MaxBacklog int
 	// ClaimTimeout is how long a claim is honored with nothing heard from the
 	// worker holding it, after which another worker may take the job. It
@@ -146,12 +152,20 @@ func (q *Queue) Add(ctx context.Context, kind, reference string) (*Job, error) {
 // to exist; rows committed without their job are work nobody will ever pick
 // up, and neither failure announces itself.
 func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (*Job, error) {
-	depth, err := q.depthIn(ctx, db)
+	// Read as the work is queued rather than when the queue was built, so a
+	// number an administrator changes takes effect on the next upload rather
+	// than on the next restart.
+	limit, err := q.backlogLimit(ctx, db)
 	if err != nil {
 		return nil, err
 	}
-	if depth >= q.opts.MaxBacklog {
-		return nil, fmt.Errorf("%w: %d waiting, limit is %d", ErrBacklogFull, depth, q.opts.MaxBacklog)
+	depth, err := q.depthIn(ctx, db, kind)
+	if err != nil {
+		return nil, err
+	}
+	if depth >= limit {
+		return nil, fmt.Errorf("%w: %d %s jobs waiting, limit is %d",
+			ErrBacklogFull, depth, kind, limit)
 	}
 
 	now := q.now().Truncate(time.Microsecond)
@@ -166,10 +180,18 @@ func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (
 	return job, nil
 }
 
-// Depth counts work waiting to be done.
-func (q *Queue) Depth(ctx context.Context) (int, error) { return q.depthIn(ctx, q.db) }
+// Depth counts work of one kind waiting to be done.
+//
+// Per kind, because the cap it feeds exists so that a runaway producer cannot
+// push everyone else's work behind its own — and counted across every kind,
+// the runaway producer's work is exactly what stays queued while everybody
+// else is refused. A bulk change to the routing rules would otherwise refuse
+// every scan upload in the deployment.
+func (q *Queue) Depth(ctx context.Context, kind string) (int, error) {
+	return q.depthIn(ctx, q.db, kind)
+}
 
-func (q *Queue) depthIn(ctx context.Context, db bun.IDB) (int, error) {
+func (q *Queue) depthIn(ctx context.Context, db bun.IDB, kind string) (int, error) {
 	// Waiting, plus what is held by a worker that has stopped reporting.
 	//
 	// Counting only what is pending reads a queue in the middle of a reclaim
@@ -179,6 +201,7 @@ func (q *Queue) depthIn(ctx context.Context, db bun.IDB) (int, error) {
 	// which is what this counts.
 	stale := q.now().Truncate(time.Microsecond).Add(-q.opts.ClaimTimeout)
 	n, err := db.NewSelect().Model((*Job)(nil)).
+		Where("kind = ?", kind).
 		WhereGroup(" AND ", func(s *bun.SelectQuery) *bun.SelectQuery {
 			return s.
 				WhereOr("state = ?", Pending).
@@ -192,8 +215,31 @@ func (q *Queue) depthIn(ctx context.Context, db bun.IDB) (int, error) {
 	return n, nil
 }
 
-// MaxBacklog is how much work may be waiting before more is refused.
+// MaxBacklog is how much work of one kind may be waiting before more of that
+// kind is refused, as this queue was built. Where a deployment has set its own
+// number, Backlog is what is in force.
 func (q *Queue) MaxBacklog() int { return q.opts.MaxBacklog }
+
+// Backlog is the limit in force, which is what an administrator set or the
+// number this queue was built with.
+func (q *Queue) Backlog(ctx context.Context) (int, error) {
+	return q.backlogLimit(ctx, q.db)
+}
+
+// backlogLimit answers what a deployment has set, falling back to the number
+// this queue was built with.
+//
+// A setting rather than a constant, because the producer a refusal lands on is
+// a build server: an estate that pushes more work in than the workers drain
+// has no remedy for a compiled-in number short of a new binary, and waiting is
+// not one when the thing waiting is CI.
+func (q *Queue) backlogLimit(ctx context.Context, db bun.IDB) (int, error) {
+	limit, err := setting.NewStore(db).Count(ctx, setting.QueueBacklog, q.opts.MaxBacklog)
+	if err != nil {
+		return 0, err
+	}
+	return limit, nil
+}
 
 // Claim takes the oldest runnable job of a kind, or returns nil when there is
 // nothing of that kind to do.
@@ -494,7 +540,7 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 
 		now := q.now().Truncate(time.Microsecond)
 		update := tx.NewUpdate().Model((*Job)(nil)).
-			Set("last_error = ?", cause.Error()).
+			Set("last_error = ?", head(cause.Error(), mostOfAnError)).
 			Set("claimed_by = NULL").
 			Set("updated_at = ?", now).
 			Where("id = ?", id).
@@ -515,6 +561,39 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 		}
 		return held(res)
 	})
+}
+
+// mostOfAnError bounds what a failing job may write about itself.
+//
+// The string comes from whatever failed — a parser, a scanner's output, a
+// driver — and is stored and then handed back to whoever asks about their
+// upload. Unbounded, one job can write as much as its cause felt like saying
+// into a column every reader of that job then carries.
+//
+// Generous, because the first lines of a parser's complaint are what make it
+// actionable and cutting them makes the field useless. The worker's own log
+// line carries the whole of it either way.
+const mostOfAnError = 4096
+
+// head is the first n bytes of s, cut on a rune boundary and marked where it
+// was cut.
+//
+// A cut at a byte offset splits a multi-byte character and leaves an invalid
+// tail, which three of the four engines then refuse to store — so the bound
+// meant to keep a write small is what makes it fail.
+func head(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	const cut = "…"
+	room := n - len(cut)
+	if room <= 0 {
+		return ""
+	}
+	for room > 0 && !utf8.RuneStart(s[room]) {
+		room--
+	}
+	return s[:room] + cut
 }
 
 // held reads a conditional update's count as whether the job was still this

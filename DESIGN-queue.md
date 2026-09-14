@@ -13,6 +13,7 @@ Satisfies REQ-03, REQ-06, REQ-69.
 - [Claim renewal](#claim-renewal)
 - [Leases](#leases)
 - [Backlog refusal](#backlog-refusal)
+- [What a failed job records](#what-a-failed-job-records)
 - [Transaction boundary](#transaction-boundary)
 - [Limits](#limits)
 
@@ -112,13 +113,25 @@ the work decides from is fetched inside the thing that serializes it.
 
 ## Backlog refusal
 
-New work is refused once the queue is deeper than a configured limit. The
-caller is told to retry.
+New work is refused once the queue for its kind is deeper than a limit an
+administrator sets. The caller is told to retry.
 
-The depth counts work that is waiting **and** work held by a worker that has
-stopped reporting. Counting only what is waiting reads a queue in the middle of
-a reclaim cycle as empty: every row sits in the claimed state, held by workers
-that died, and the one number an operator has says there is nothing to do.
+| Rule | Reason |
+|---|---|
+| Counted per kind | The cap exists so a runaway producer cannot push everyone else's work behind its own. Counted across every kind it does the opposite: the producer that filled the queue keeps its place while every other producer is refused, so a bulk change to the routing rules refuses every scan upload in the deployment |
+| The depth counts work held by a worker that has stopped reporting | Counting only what is waiting reads a queue in the middle of a reclaim cycle as empty: every row sits in the claimed state, held by workers that died, and the one number an operator has says there is nothing to do |
+| A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
+| Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
+
+## What a failed job records
+
+A job that failed keeps the reason, bounded.
+
+| Rule | Reason |
+|---|---|
+| The reason is capped | It comes from whatever failed — a parser, a scanner's output, a driver — and is handed back to whoever asks about their upload. Unbounded, one job writes as much as its cause felt like saying into a column every reader of that job carries |
+| The cap cuts on a character boundary | A cut at a byte offset splits a multi-byte character and leaves a tail three of the four engines refuse to store, so the bound meant to keep a write small is what makes it fail |
+| The cap is generous and the cut is marked | The first lines of a parser's complaint are what make it actionable. The worker's own log line carries the whole of it either way |
 
 ## Transaction boundary
 

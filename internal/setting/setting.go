@@ -146,6 +146,16 @@ const (
 	// should be is a judgment about a deployment rather than a constant.
 	AttachmentMaxSize = "attachment.max-size"
 	AttachmentQuota   = "attachment.quota"
+	// QueueBacklog is how much work of one kind may be waiting before more of
+	// that kind is refused.
+	//
+	// Per kind, so a producer that has filled its own queue does not refuse
+	// everybody else's work. Settable because what a deployment can hold is a
+	// question about that deployment: an estate large enough to push more than
+	// the shipped number of scans in faster than the workers drain them has no
+	// remedy for a compiled-in one short of a new binary, and the producer
+	// that is refused is a build.
+	QueueBacklog = "queue.backlog"
 	// RoutingBatch is how many findings one pass of the routing sweep may
 	// place. A bulk write is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
@@ -233,6 +243,14 @@ const (
 // write is something somebody triggers by accident, not because two thousand
 // is a suspicious number.
 const DefaultRoutingBatch = 2000
+
+// DefaultQueueBacklog is how much work of one kind may wait where nobody has
+// said.
+//
+// A thousand: deep enough that an ordinary night of builds never reaches it,
+// shallow enough that a producer which has genuinely run away is refused
+// before the table is the problem.
+const DefaultQueueBacklog = 1000
 
 // DefaultAttachmentMaxSize is what one file may be where nobody has said.
 //
