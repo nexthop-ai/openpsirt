@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -23,10 +20,9 @@ func init() {
 // hash is what makes a re-upload idempotent, and the parser version is what
 // bounds the damage if a parser bug is found later.
 func upScan(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -76,12 +72,7 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "scan_newest_idx" ON "scan" ("target_id", "status", "built_at")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downScan(ctx context.Context, tx *sql.Tx) error {

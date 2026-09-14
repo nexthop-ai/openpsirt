@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -32,10 +29,9 @@ func init() {
 // rather than removed: work already routed to one has to keep resolving to
 // something a screen can name.
 func upTeam(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -77,22 +73,9 @@ func upTeam(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "team_member_person_idx" ON "team_member" ("person_id")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downTeam(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{
-		`DROP TABLE "team_member"`,
-		`DROP TABLE "team"`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "team_member", "team")
 }

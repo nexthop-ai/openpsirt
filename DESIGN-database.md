@@ -196,6 +196,43 @@ engine-specific rollback that existed only because a column was added later,
 four files to read to know what one table holds, and ten more migrations for
 the collapse to unpick. Every migration now creates something.
 
+**A migration is its statements and nothing else.** What every one of them does
+around those statements — asking which engine this is, refusing an engine there
+are no spellings for, running each statement, naming the one that failed — is
+one place. Thirty-three copies of it had already become four spellings of one
+failure: two printed the whole statement rather than its first line, so a failed
+table declaration reported ninety lines of data definition, and two more named
+the table and not the statement. Dropping a table and dropping an index are the
+same: two engines name an index's table and the other two refuse to, and that
+rule stood in two independent copies with a third migration free to write it a
+third time with one arm missing.
+
+### Migrations that stop half way
+
+**On MySQL and MariaDB a migration cannot be rolled back.** Both commit
+implicitly before and after every data-definition statement, so the transaction
+each migration is given is decorative there. A failure at statement N leaves 1
+to N-1 committed, the rollback removes nothing, and no version is recorded — so
+the next start runs the same migration from statement 1 and fails on a name
+already taken. Nothing recovers from that on its own; every replacement process
+fails its startup probe in turn.
+
+So on those two engines a statement is preceded by a question: does the thing
+it creates already exist? If it does, it is stepped over and the step is
+logged, and the migration reaches its end and records its version. The other
+two have transactional data definition and never meet this, so they are not
+asked.
+
+| | |
+|---|---|
+| Why a probe rather than a keyword | MariaDB accepts `IF NOT EXISTS` on both a table and an index; MySQL accepts it only on a table. A probe is what the two have in common |
+| What is stepped over | Only the exact object the statement names. One that cannot be identified is run, and fails as it always did — a skip on any collision could hide a real one |
+| What it cannot tell apart | A statement that collides with something an earlier run made, and one that collides with something the same migration made two statements ago. The log is what surfaces the second |
+
+CI runs the success path on four engines, which is why this was invisible: the
+engines agree about what a migration does and disagree only about what is left
+when one stops half way.
+
 ## Migration locks
 
 | Lock | Excludes | Mechanism |

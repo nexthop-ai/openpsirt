@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -40,10 +37,9 @@ func init() {
 // size stay well inside every default, and let a document be read as a stream
 // rather than held whole.
 func upScanDocument(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -70,22 +66,9 @@ func upScanDocument(ctx context.Context, tx *sql.Tx) error {
 		)` + t.suffix,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downScanDocument(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{
-		`DROP TABLE "scan_document_chunk"`,
-		`DROP TABLE "scan_document"`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "scan_document_chunk", "scan_document")
 }

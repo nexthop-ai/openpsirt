@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -32,10 +29,9 @@ func init() {
 // uses, for the same reason: re-scanning nightly against a database that moved
 // slightly must write only what changed.
 func upFinding(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -422,27 +418,9 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downFinding(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{
-		`DROP TABLE "finding"`,
-		`DROP TABLE "suppression"`,
-		`DROP TABLE "scan_run"`,
-		`DROP TABLE "vulnerability_reference"`,
-		`DROP TABLE "vulnerability_alias"`,
-		`DROP TABLE "vulnerability_weakness"`,
-		`DROP TABLE "vulnerability"`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "finding", "suppression", "scan_run", "vulnerability_reference", "vulnerability_alias", "vulnerability_weakness", "vulnerability")
 }

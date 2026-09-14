@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -33,10 +30,9 @@ func init() {
 // sign with — the same reason a mail password is. It is never returned by any
 // endpoint.
 func upOutbound(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -85,22 +81,9 @@ func upOutbound(ctx context.Context, tx *sql.Tx) error {
 		)` + t.suffix,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downOutbound(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{
-		`DROP TABLE "outbound_delivery"`,
-		`DROP TABLE "outbound"`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "outbound_delivery", "outbound")
 }

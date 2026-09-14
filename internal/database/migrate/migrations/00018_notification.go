@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -39,10 +37,9 @@ func init() {
 // longer true is cleared. Two rows for one condition about one thing is the
 // failure that key exists to prevent, which is why it is unique per person.
 func upNotification(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 	statements := []string{
 		`CREATE TABLE "notification" (

@@ -41,6 +41,35 @@ func EngineFrom(ctx context.Context) database.Engine {
 	return e
 }
 
+// loggerKey carries the caller's logger to the migrations, the same way the
+// engine reaches them.
+//
+// A migration that resumes past something it had already created has to say
+// so, and the migration library's own logger is package-level state this does
+// not otherwise write to. Carried rather than passed, because a migration's
+// signature belongs to the library.
+type loggerKey struct{}
+
+// WithEngine carries the engine and the logger a migration runs under.
+//
+// The readers below are exported and this is what establishes what they read,
+// so the pair is complete rather than settable only from inside this package.
+func WithEngine(ctx context.Context, engine database.Engine, logger *slog.Logger) context.Context {
+	ctx = context.WithValue(ctx, engineKey{}, engine)
+	return context.WithValue(ctx, loggerKey{}, logger)
+}
+
+// LoggerFrom returns the logger a migration should report through.
+//
+// Never nil: a migration that wrote nothing because it had nowhere to write it
+// is worse than one that wrote somewhere nobody reads.
+func LoggerFrom(ctx context.Context) *slog.Logger {
+	if l, ok := ctx.Value(loggerKey{}).(*slog.Logger); ok && l != nil {
+		return l
+	}
+	return slog.Default()
+}
+
 func gooseDialect(e database.Engine) (goose.Dialect, error) {
 	switch e {
 	case database.Postgres:
@@ -126,7 +155,7 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 	if err := prepare(db); err != nil {
 		return err
 	}
-	ctx = context.WithValue(ctx, engineKey{}, db.Server.Engine)
+	ctx = WithEngine(ctx, db.Server.Engine, logger)
 
 	release, err := acquire(ctx, db)
 	if err != nil {

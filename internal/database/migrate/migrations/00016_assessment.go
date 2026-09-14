@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -40,10 +37,9 @@ func init() {
 // world's rating goes reads as the world's, and the first person to check
 // against the public record finds a discrepancy nobody declared.
 func upAssessment(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -138,12 +134,7 @@ func upAssessment(ctx context.Context, tx *sql.Tx) error {
 				REFERENCES "product"("id")
 		)` + t.suffix,
 	}
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 // The indexes go with the table and are not dropped separately.
@@ -154,13 +145,5 @@ func upAssessment(ctx context.Context, tx *sql.Tx) error {
 // vulnerability_id — cannot go while the constraint on that column stands. The
 // rollback failed on two engines and passed on the other two.
 func downAssessment(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{
-		`DROP TABLE "issue_rating"`,
-		`DROP TABLE "assessment"`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "issue_rating", "assessment")
 }
