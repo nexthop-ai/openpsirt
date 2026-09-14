@@ -18,10 +18,6 @@ import (
 // way to ask for one that has already run out.
 func atClock(t *testing.T, db *database.DB, at *time.Time) (*Store, int64) {
 	t.Helper()
-	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	if err := schema.Up(t.Context(), db, quiet); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
 	dbtest.Reset(t, db)
 
 	// An administrator, so that no product has to be declared here: what these

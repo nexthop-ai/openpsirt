@@ -1,8 +1,6 @@
 package saved_test
 
 import (
-	"io"
-	"log/slog"
 	"strings"
 	"testing"
 
@@ -11,7 +9,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // fixture is one migrated database with a product to keep filters against.
@@ -25,10 +22,6 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
 		if err != nil {

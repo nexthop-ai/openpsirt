@@ -2,8 +2,6 @@ package ingest_test
 
 import (
 	"errors"
-	"io"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -11,7 +9,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // each gives every engine a migrated database, an empty catalog, and one
@@ -20,10 +17,6 @@ func each(t *testing.T, fn func(t *testing.T, s *ingest.Store, targetID int64)) 
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)

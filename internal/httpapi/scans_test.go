@@ -20,7 +20,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // inventory is an inventory as a build would send one, built around a time so
@@ -167,9 +166,6 @@ func ingestOn(t *testing.T, on engines, opts queue.Options, fn func(t *testing.T
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)

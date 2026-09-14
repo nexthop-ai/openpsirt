@@ -1,14 +1,11 @@
 package trail_test
 
 import (
-	"io"
-	"log/slog"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -19,10 +16,6 @@ func each(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject)
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		person, err := access.NewStore(db.DB).Ensure(ctx, "them@example.com", "Them", true)

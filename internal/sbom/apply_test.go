@@ -1,8 +1,6 @@
 package sbom_test
 
 import (
-	"io"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -12,7 +10,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // TestAProducerDocumentBecomesTheStoredGraph reads a document the way an
@@ -23,10 +20,6 @@ import (
 func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)

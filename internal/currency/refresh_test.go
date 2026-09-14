@@ -14,7 +14,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -120,10 +119,6 @@ func read(t *testing.T, db *database.DB) map[string]stored {
 func each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(t.Context(), db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 		fn(t, db)
 	})
@@ -487,9 +482,6 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 		// Seeded for its components and its setting; the refresher it returns
 		// is not the one this drives, because this needs two of them.

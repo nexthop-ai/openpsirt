@@ -2,24 +2,17 @@ package setting_test
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 func eachSetting(t *testing.T, fn func(t *testing.T, s *setting.Store)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(t.Context(), db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 		fn(t, setting.NewStore(db.DB))
 	})

@@ -13,7 +13,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
@@ -24,9 +23,6 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, hush); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
@@ -113,9 +109,6 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, hush); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)

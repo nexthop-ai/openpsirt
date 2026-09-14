@@ -10,8 +10,6 @@ package finding_test
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -22,7 +20,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // fixture is one migrated database with a variant, a stored graph, and a way
@@ -221,10 +218,6 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := schema.Up(ctx, db, quiet); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)
