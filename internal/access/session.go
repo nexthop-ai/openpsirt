@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Session is somebody's signed-in state.
@@ -165,11 +167,12 @@ func (s *Store) PurgeExpiredSessions(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("clear expired sessions: %w", err)
 	}
-	cleared, err := result.RowsAffected()
+	cleared, err := database.Affected(result)
 	if err != nil {
-		// Every supported driver reports this, but a count that could not be
-		// read is not a reason to report the clearing as having failed.
-		return 0, nil
+		// The delete committed; what cannot be read is how much it took. That
+		// is worth reporting rather than answering "nothing expired", which is
+		// a number nobody counted and reads as a quiet sweep.
+		return 0, fmt.Errorf("clear expired sessions: %w", err)
 	}
 	return cleared, nil
 }

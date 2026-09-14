@@ -351,7 +351,7 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 	if err != nil {
 		return fmt.Errorf("carry an approval forward: %w", err)
 	}
-	changed, err := result.RowsAffected()
+	changed, err := database.Affected(result)
 	if err != nil {
 		return fmt.Errorf("carry an approval forward: %w", err)
 	}
@@ -508,9 +508,9 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			if err != nil {
 				return fmt.Errorf("mark what the code moved out from under: %w", err)
 			}
-			n, err := result.RowsAffected()
+			n, err := database.Affected(result)
 			if err != nil {
-				return fmt.Errorf("cannot tell what was marked: %w", err)
+				return fmt.Errorf("mark what the code moved out from under: %w", err)
 			}
 			moved = n
 			// Who to tell, read back inside the same act. The identifiers

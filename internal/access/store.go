@@ -831,7 +831,7 @@ func (s *Store) Deactivate(ctx context.Context, personID int64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("record that they left: %w", err)
 	}
-	n, err := res.RowsAffected()
+	n, err := database.Affected(res)
 	if err != nil {
 		return false, fmt.Errorf("record that they left: %w", err)
 	}
@@ -849,7 +849,7 @@ func (s *Store) Reactivate(ctx context.Context, personID int64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("record that they are back: %w", err)
 	}
-	n, err := res.RowsAffected()
+	n, err := database.Affected(res)
 	if err != nil {
 		return false, fmt.Errorf("record that they are back: %w", err)
 	}

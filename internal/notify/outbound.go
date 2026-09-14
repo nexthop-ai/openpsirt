@@ -459,7 +459,11 @@ func (s *Store) AddDestination(ctx context.Context, name, kind, url, secret stri
 	if err != nil {
 		return nil, fmt.Errorf("take that destination up again: %w", err)
 	}
-	if n, err := res.RowsAffected(); err == nil && n > 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return nil, fmt.Errorf("take that destination up again: %w", err)
+	}
+	if n > 0 {
 		if err := s.db.NewSelect().Model(row).
 			Where("name = ?", row.Name).Where("kind = ?", row.Kind).
 			Limit(1).Scan(ctx); err != nil {

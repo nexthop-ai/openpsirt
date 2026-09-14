@@ -406,9 +406,11 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 					if err != nil {
 						return changed, fmt.Errorf("rewrite deadlines: %w", err)
 					}
-					if n, err := result.RowsAffected(); err == nil {
-						changed += int(n)
+					n, err := database.Affected(result)
+					if err != nil {
+						return changed, fmt.Errorf("rewrite deadlines: %w", err)
 					}
+					changed += int(n)
 					// Cancellation is honored between slices rather than only
 					// at the end, so shutting down during a rewrite stops
 					// promptly and leaves the rest for the next scan or the
@@ -520,9 +522,9 @@ func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (
 		if err != nil {
 			return fmt.Errorf("take the deadline off %s: %w", why, err)
 		}
-		n, err := result.RowsAffected()
+		n, err := database.Affected(result)
 		if err != nil {
-			return fmt.Errorf("count what lost its deadline on %s: %w", why, err)
+			return fmt.Errorf("take the deadline off %s: %w", why, err)
 		}
 		cleared += int(n)
 		return nil
@@ -564,9 +566,11 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 		if err != nil {
 			return cleared, fmt.Errorf("take the deadline off what is below the line: %w", err)
 		}
-		if n, err := result.RowsAffected(); err == nil {
-			cleared += int(n)
+		n, err := database.Affected(result)
+		if err != nil {
+			return cleared, fmt.Errorf("take the deadline off what is below the line: %w", err)
 		}
+		cleared += int(n)
 	}
 	return cleared, nil
 }

@@ -176,8 +176,13 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 			return err
 		}
 		// Somebody else redacting it first is the outcome asked for, not a
-		// conflict to report.
-		if n, err := res.RowsAffected(); err == nil && n == 0 {
+		// conflict to report. A count that could not be read is neither: it
+		// would have reported a redaction that redacted nothing.
+		n, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("redact that attachment: %w", err)
+		}
+		if n == 0 {
 			return ErrGone
 		}
 		return nil

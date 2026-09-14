@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Identity is how a person signs in.
@@ -218,8 +220,11 @@ func (s *Store) MatchProvider(ctx context.Context, provider, subject, username s
 		// redeem the authorization — so the one whose update matched nothing
 		// is somebody else, and is refused rather than admitted on the
 		// strength of a row the other just claimed.
-		pinned, err := result.RowsAffected()
-		if err != nil || pinned != 1 {
+		pinned, err := database.Affected(result)
+		if err != nil {
+			return nil, fmt.Errorf("pin %q: %w", username, err)
+		}
+		if pinned != 1 {
 			return nil, ErrDenied
 		}
 	}

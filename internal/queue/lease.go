@@ -103,14 +103,13 @@ func (l *Leases) takeIn(ctx context.Context, tx bun.Tx,
 	if err != nil {
 		return false, fmt.Errorf("take the lease on %s: %w", name, err)
 	}
-	// A count that cannot be read is a fault, not "somebody else holds it".
-	// Read as the second, a driver or proxy that cannot report one stops every
-	// recurring sweep on every replica — notifications, digests and the lapse
-	// sweep never run again — with nothing logged, because each replica is
-	// simply told it lost a race it never ran.
-	n, err := res.RowsAffected()
+	// Read as "somebody else holds it", a count that cannot be read stops
+	// every recurring sweep on every replica — notifications, digests and the
+	// lapse sweep never run again — with nothing logged, because each replica
+	// is simply told it lost a race it never ran.
+	n, err := database.Affected(res)
 	if err != nil {
-		return false, fmt.Errorf("cannot tell whether the lease on %s was taken: %w", name, err)
+		return false, fmt.Errorf("take the lease on %s: %w", name, err)
 	}
 	return n > 0, nil
 }

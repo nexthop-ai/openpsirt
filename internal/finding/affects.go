@@ -187,9 +187,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			if err != nil {
 				return fmt.Errorf("take %d builds back out: %w", len(batch), err)
 			}
-			affected, err := result.RowsAffected()
+			affected, err := database.Affected(result)
 			if err != nil {
-				return fmt.Errorf("count what was taken out: %w", err)
+				return fmt.Errorf("take %d builds back out: %w", len(batch), err)
 			}
 			out.Closed += int(affected)
 			return nil

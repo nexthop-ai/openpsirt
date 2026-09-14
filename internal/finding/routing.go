@@ -124,7 +124,11 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 	if err != nil {
 		return fmt.Errorf("retire that rule: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("retire that rule: %w", err)
+	}
+	if n == 0 {
 		return fmt.Errorf("no rule of this product is in use under that identifier")
 	}
 	return nil
@@ -247,13 +251,9 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 	if err != nil {
 		return 0, 0, fmt.Errorf("place what that rule matched: %w", err)
 	}
-	// What the write matched, which is what the receipt reports and what the
-	// caller counts a pass by. A count that cannot be read is a fault: read
-	// as zero it reports a pass that placed nothing, which is indistinguishable
-	// from a rule that matched nothing.
-	n, err := res.RowsAffected()
+	n, err := database.Affected(res)
 	if err != nil {
-		return 0, 0, fmt.Errorf("cannot tell how much that rule placed: %w", err)
+		return 0, 0, fmt.Errorf("place what that rule matched: %w", err)
 	}
 	return len(ids), int(n), nil
 }

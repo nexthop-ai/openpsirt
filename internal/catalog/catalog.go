@@ -224,7 +224,11 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 	if err != nil {
 		return fmt.Errorf("record when this release went out: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record when this release went out: %w", err)
+	}
+	if n == 0 {
 		return fmt.Errorf("release %d: %w", streamID, ErrNotFound)
 	}
 	return nil
@@ -270,7 +274,11 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error 
 	if err != nil {
 		return fmt.Errorf("record what this release was cut from: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record what this release was cut from: %w", err)
+	}
+	if n == 0 {
 		var stood *int64
 		if err := s.db.NewSelect().Model((*Stream)(nil)).Column("parent_id").
 			Where("id = ?", streamID).Scan(ctx, &stood); err != nil {
@@ -299,7 +307,11 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 	if err != nil {
 		return fmt.Errorf("record when this %s goes out of support: %w", what, err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record when this %s goes out of support: %w", what, err)
+	}
+	if n == 0 {
 		return fmt.Errorf("%s %d: %w", what, id, ErrNotFound)
 	}
 	return nil
@@ -531,7 +543,11 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 	if err != nil {
 		return fmt.Errorf("record what this product triages: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record what this product triages: %w", err)
+	}
+	if n == 0 {
 		return fmt.Errorf("product %d: %w", productID, ErrNotFound)
 	}
 	return nil

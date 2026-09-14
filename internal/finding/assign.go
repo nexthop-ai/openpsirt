@@ -78,7 +78,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 	if err != nil {
 		return 0, fmt.Errorf("record who is dealing with this: %w", err)
 	}
-	moved, err := result.RowsAffected()
+	moved, err := database.Affected(result)
 	if err != nil {
 		return 0, fmt.Errorf("record who is dealing with this: %w", err)
 	}
@@ -380,8 +380,11 @@ func (s *Store) ReleaseIn(ctx context.Context, subject access.Subject, party, pr
 		if err != nil {
 			return fmt.Errorf("hand back what they were dealing with: %w", err)
 		}
-		moved, err = result.RowsAffected()
-		return err
+		moved, err = database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("hand back what they were dealing with: %w", err)
+		}
+		return nil
 	})
 	return moved, err
 }
@@ -408,7 +411,10 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 		if err != nil {
 			return fmt.Errorf("move what they were dealing with: %w", err)
 		}
-		moved, _ = result.RowsAffected()
+		moved, err = database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("move what they were dealing with: %w", err)
+		}
 		return nil
 	})
 	return moved, err

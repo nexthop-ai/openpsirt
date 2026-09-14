@@ -174,7 +174,11 @@ func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 		if err != nil {
 			return err
 		}
-		if n, _ := res.RowsAffected(); n == 0 {
+		n, err := database.Affected(res)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
 			return ErrNoSuchTeam
 		}
 		return nil
