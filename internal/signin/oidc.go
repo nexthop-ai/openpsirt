@@ -116,19 +116,25 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	}
 	// Stated by the operator, never defaulted.
 	//
-	// An authorization an administrator wrote for a name is redeemed by
-	// whoever first arrives holding it, so the claim it is matched against
-	// decides who may redeem somebody else's roles. OpenID Connect says an
-	// account holder may set preferred_username and that a relying party may
-	// not rely on it being unique, which makes it the one claim that must not
-	// be the default: on a provider where people choose their own, defaulting
-	// to it hands the grant to whoever claims the name first.
+	// This is not the identity. The subject is, and it is what a first
+	// sign-in pins and what decides from then on. This claim does one job:
+	// match an authorization an administrator wrote for somebody who has not
+	// arrived yet, which has to be a name a person can type.
+	//
+	// So the property it needs is that an end user cannot set it to a name an
+	// administrator might have authorized. OpenID Connect permits a provider
+	// to let people choose their own preferred_username and says a relying
+	// party may not rely on it being unique, and whether a given deployment's
+	// provider does that is a question only its operator can answer — which
+	// is why there is no default rather than a different default.
 	username := strings.TrimSpace(cfg.UsernameClaim)
 	if username == "" {
 		return nil, fmt.Errorf(
 			"the %q provider needs a username claim: set %sOIDC_USERNAME_CLAIM to a claim "+
-				"this provider guarantees is unique and the account holder cannot change. "+
-				"preferred_username is not one, and is why this is not defaulted",
+				"whose value an end user cannot choose, because it is what redeems an "+
+				"authorization written for somebody who has not signed in yet. Which claim "+
+				"that is depends on the provider, so there is no default; the configuration "+
+				"reference names the usual answer for each",
 			cfg.Name, "OPENPSIRT_")
 	}
 

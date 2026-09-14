@@ -147,8 +147,45 @@ username, and two providers issuing them independently cannot be told apart.
 | `OPENPSIRT_OIDC_NAME` | What the sign-in button calls it | `oidc` |
 | `OPENPSIRT_OIDC_CLIENT_ID` | The client registered with the provider | unset |
 | `OPENPSIRT_OIDC_CLIENT_SECRET` | Its secret | unset |
-| `OPENPSIRT_OIDC_USERNAME_CLAIM` | The claim to take a person's identity from. **Required where an OpenID Connect provider is configured**, and it must name a claim the provider guarantees is unique and the account holder cannot change. There is no default: an authorization an administrator wrote is redeemed by whoever first arrives holding the name, and `preferred_username` is a name the account holder may set | none — the process refuses to start without it |
+| `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
 | `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it | unset |
+
+### Which claim carries the username
+
+The claim is not the identity. The provider's subject is, and the first
+sign-in pins it; from then on the subject decides and a rename is followed as
+a label.
+
+This claim does one job: match an authorization an administrator wrote for
+somebody who has not arrived yet. That has to be a name a person can type, so
+the subject itself cannot serve — nobody knows it in advance. The property it
+needs is narrower than immutable:
+
+> **An end user must not be able to set it to a name an administrator might
+> have authorized.**
+
+The exposure runs from the moment a grant is written until somebody redeems
+it, which `signin.claim-window` also bounds.
+
+| Provider | Usually | Check before you trust it |
+|---|---|---|
+| Okta | `preferred_username` — the Okta login, normally the address the directory assigned | Self-service profile editing must not cover the username or the primary email. It does not by default |
+| Entra ID | `oid`, or `upn` where administrators want a name they recognize | `preferred_username` on Entra is not a good choice: it follows the mail nickname |
+| Keycloak | A custom claim mapped to an administrator-managed attribute | If self-registration is on, `preferred_username` is a name the account holder chose, and is the case this refusal exists for |
+| Anything else | Whatever the provider assigns rather than the person | Ask whether a user can edit it in the provider's own account settings |
+
+`preferred_username` rides on the `profile` scope rather than `email`. The
+scopes requested are `openid profile email` and are not configurable, so a
+claim carried by any of the three is available.
+
+A claim the provider does not send, or sends as something other than a string,
+reads as absent. The sign-in then falls back to the address the provider says
+it verified, and failing that to the subject — which matches no authorization
+anybody typed, so the person is refused rather than admitted. **A claim name
+with a typo in it therefore reads as "this person was never granted access"**,
+not as a configuration error, so check the name against the provider's own
+token before deciding somebody's grant is missing.
+
 
 ### GitHub
 

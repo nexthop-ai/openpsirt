@@ -628,9 +628,10 @@ is no default.
 
 | Rule | Reason |
 |---|---|
-| The claim is stated by the operator or the process refuses to start | The claim decides who may redeem an authorization written for a name. A default makes that decision for every deployment that never thought about it |
-| `preferred_username` is not it | OpenID Connect Core says a relying party may not rely on it being unique, and on a provider where people set their own it is a name an attacker can choose |
-| The claim must be one the provider guarantees is unique and the account holder cannot change | Both halves are load-bearing: unique, or two people are one identity; unchangeable, or the name a grant was written for can be taken |
+| The claim is stated by the operator or the process refuses to start | It decides who may redeem an authorization written for a name, and which claim has that property is a fact about the provider. A default makes that decision for every deployment that never examined it |
+| The property required is that an end user cannot choose the value | Narrower than immutable, and deliberately. The claim is not the identity — the subject is, and a rename after binding is followed as a label — so what matters is only that nobody can arrive holding a name an administrator wrote for somebody else |
+| The subject cannot serve as the claim | An authorization is written before anybody has arrived, so the name it is written for has to be one a person can type. The subject is not knowable then |
+| There is no safe default rather than a different default | OpenID Connect permits a provider to let people choose their own `preferred_username`; whether a given one does is a question only its operator can answer. On a provider where the login is assigned by an administrator it is the right answer, and on one with self-registration it is the attack |
 
 ## Sessions and request forgery
 
