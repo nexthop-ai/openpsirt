@@ -94,14 +94,15 @@ func (s *Store) Bind(ctx context.Context, group string, productID int64, role Ro
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
 	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
-		// Binding what is already bound is not a failure.
-		n, counted := s.db.NewSelect().Model((*Binding)(nil)).
-			Where("group_name = ?", group).Where("product_id = ?", productID).
-			Where("role = ?", role).Count(ctx)
-		if counted == nil && n > 0 {
-			return nil
-		}
-		return fmt.Errorf("bind %q to %q: %w", group, role, err)
+		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to %q", group, role),
+			func(ctx context.Context) (bool, error) {
+				// Whether the row is there, which is what the index refused.
+				// A binding has nothing to be in force: it grants at each
+				// member's next sign-in and holds nothing of its own.
+				return s.db.NewSelect().Model((*Binding)(nil)).
+					Where("group_name = ?", group).Where("product_id = ?", productID).
+					Where("role = ?", role).Exists(ctx)
+			})
 	}
 	return nil
 }
@@ -134,12 +135,11 @@ func (s *Store) BindAdmin(ctx context.Context, group string) error {
 	}
 	binding := &AdminBinding{GroupName: group, CreatedAt: s.now().Truncate(time.Microsecond)}
 	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
-		n, counted := s.db.NewSelect().Model((*AdminBinding)(nil)).
-			Where("group_name = ?", group).Count(ctx)
-		if counted == nil && n > 0 {
-			return nil
-		}
-		return fmt.Errorf("bind %q to administration: %w", group, err)
+		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to administration", group),
+			func(ctx context.Context) (bool, error) {
+				return s.db.NewSelect().Model((*AdminBinding)(nil)).
+					Where("group_name = ?", group).Exists(ctx)
+			})
 	}
 	return nil
 }

@@ -51,10 +51,13 @@ func (s *Store) AddToCase(ctx context.Context, productID, vulnerabilityID, perso
 		LivePerson: &personID,
 	}
 	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
-		if on, already := s.onCase(ctx, productID, vulnerabilityID, personID); already == nil && on {
-			return nil
-		}
-		return fmt.Errorf("bring them into that case: %w", err)
+		return s.alreadyThere(ctx, err, "bring them into that case",
+			func(ctx context.Context) (bool, error) {
+				// A live grant, which is what the index holds one of per
+				// person per case: a withdrawn row keeps the record and grants
+				// nothing, so it is not a reason to report success.
+				return s.onCase(ctx, productID, vulnerabilityID, personID)
+			})
 	}
 	return nil
 }

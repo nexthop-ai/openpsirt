@@ -428,6 +428,44 @@ func (s *Store) Resolve(ctx context.Context, identity string) (Subject, error) {
 		person.PartyID, on...).OnCases(cases), nil
 }
 
+// alreadyThere turns a refused insert into success where the state the caller
+// asked for already holds.
+//
+// Five paths wrote this out, and none of them asked what the failure was — so
+// any insert error at all became success as long as a row was there, including
+// one caused by a concurrent insert that was then rolled back. The question is
+// only ever asked of a uniqueness violation, which is the one failure that
+// means "somebody got there first".
+//
+// The predicate stays the caller's, because what "already holds" means is the
+// one part that genuinely differs: a grant asks whether it is in force, a
+// binding asks whether the row exists, and each says why beside itself.
+//
+// Where the row is there and the predicate says no, the caller hears what
+// happened rather than the driver's constraint message — which is what an
+// administrator was shown for an operation the endpoint documents as
+// idempotent.
+//
+// The other way round is also in this package: AddToTeam reads and writes
+// inside one transaction instead. Either is defensible; this is the one for a
+// write whose refusal is a unique index rather than a row it has to see first.
+func (s *Store) alreadyThere(ctx context.Context, insertErr error, what string,
+	present func(context.Context) (bool, error)) error {
+
+	if !database.IsDuplicate(insertErr) {
+		return fmt.Errorf("%s: %w", what, insertErr)
+	}
+	there, err := present(ctx)
+	if err != nil {
+		return fmt.Errorf("%s: %w", what, err)
+	}
+	if there {
+		return nil
+	}
+	return fmt.Errorf("%s: it is already recorded and is not in force, so it "+
+		"cannot be granted again from here", what)
+}
+
 // GrantRole gives somebody a role on a product.
 func (s *Store) GrantRole(ctx context.Context, personID, productID int64, role Role) error {
 	if !role.Valid() {
@@ -439,11 +477,15 @@ func (s *Store) GrantRole(ctx context.Context, personID, productID int64, role R
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
 	if _, err := s.db.NewInsert().Model(grant).Exec(ctx); err != nil {
-		// Granting what somebody already holds is not a failure.
-		if held, err := s.holds(ctx, personID, productID, role); err == nil && held {
-			return nil
-		}
-		return fmt.Errorf("grant %q: %w", role, err)
+		// Granting what somebody already holds is not a failure. In force,
+		// like every other question about what somebody holds: a row set aside
+		// by a change of mode grants nothing, so reporting success on one
+		// would tell an administrator they had granted something that does not
+		// exist.
+		return s.alreadyThere(ctx, err, fmt.Sprintf("grant %q", role),
+			func(ctx context.Context) (bool, error) {
+				return s.holds(ctx, personID, productID, role)
+			})
 	}
 	return nil
 }
@@ -609,31 +651,21 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 	if err != nil || !here {
 		return false, err
 	}
-	// Active ones, like every other question about what somebody holds. A
-	// row that grants nothing must never be counted as access — a grant left
-	// inactive by a switch to group-bound roles answered "they still hold
-	// something here", so their assigned findings stayed with somebody who
-	// could no longer open them, and the response said nothing was released.
-	n, err := s.db.NewSelect().Model((*Grant)(nil)).
-		Where("person_id = ?", personID).
-		Where("active = ?", true).
-		Where("product_id = ?", productID).Count(ctx)
-
+	// Any role at all, asked of the same union every other question uses. In
+	// force, like every question about what somebody holds: a row that grants
+	// nothing must never be counted as access — a grant left inactive by a
+	// switch to group-bound roles answered "they still hold something here",
+	// so their assigned findings stayed with somebody who could no longer open
+	// them and the response said nothing was released. And a role held across
+	// every product is a role held here, so withdrawing their last per-product
+	// grant does not leave their work unreachable.
+	held, err := holdingAny(s.db.NewSelect().
+		TableExpr(`person AS "p"`).ColumnExpr("p.id").
+		Where("p.id = ?", personID), "p.id", Roles(), productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
 	}
-	if n > 0 {
-		return true, nil
-	}
-	// A role held across every product is a role held here, so withdrawing
-	// their last per-product grant does not leave their work unreachable.
-	everywhere, err := s.db.NewSelect().Model((*EstateGrant)(nil)).
-		Where("person_id = ?", personID).
-		Where("active = ?", true).Count(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read what they still hold everywhere: %w", err)
-	}
-	return everywhere > 0, nil
+	return held, nil
 }
 
 // Keys lists the pipeline credentials, without their secrets.
