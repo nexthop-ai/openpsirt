@@ -147,7 +147,7 @@ username, and two providers issuing them independently cannot be told apart.
 | `OPENPSIRT_OIDC_NAME` | What the sign-in button calls it | `oidc` |
 | `OPENPSIRT_OIDC_CLIENT_ID` | The client registered with the provider | unset |
 | `OPENPSIRT_OIDC_CLIENT_SECRET` | Its secret | unset |
-| `OPENPSIRT_OIDC_USERNAME_CLAIM` | The claim to take a person's identity from, when it is not the subject | unset |
+| `OPENPSIRT_OIDC_USERNAME_CLAIM` | The claim to take a person's identity from. **Required where an OpenID Connect provider is configured**, and it must name a claim the provider guarantees is unique and the account holder cannot change. There is no default: an authorization an administrator wrote is redeemed by whoever first arrives holding the name, and `preferred_username` is a name the account holder may set | none — the process refuses to start without it |
 | `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it | unset |
 
 ### GitHub

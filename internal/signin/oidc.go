@@ -114,9 +114,22 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	if len(scopes) == 0 {
 		scopes = []string{oidc.ScopeOpenID, "profile", "email"}
 	}
-	username := cfg.UsernameClaim
+	// Stated by the operator, never defaulted.
+	//
+	// An authorization an administrator wrote for a name is redeemed by
+	// whoever first arrives holding it, so the claim it is matched against
+	// decides who may redeem somebody else's roles. OpenID Connect says an
+	// account holder may set preferred_username and that a relying party may
+	// not rely on it being unique, which makes it the one claim that must not
+	// be the default: on a provider where people choose their own, defaulting
+	// to it hands the grant to whoever claims the name first.
+	username := strings.TrimSpace(cfg.UsernameClaim)
 	if username == "" {
-		username = "preferred_username"
+		return nil, fmt.Errorf(
+			"the %q provider needs a username claim: set %sOIDC_USERNAME_CLAIM to a claim "+
+				"this provider guarantees is unique and the account holder cannot change. "+
+				"preferred_username is not one, and is why this is not defaulted",
+			cfg.Name, "OPENPSIRT_")
 	}
 
 	return &OIDC{
@@ -215,6 +228,7 @@ func (o *OIDC) Complete(ctx context.Context, code string, pending Pending, redir
 	}
 	return &Identity{
 		Subject:       verified.Subject,
+		Provider:      o.name,
 		Username:      username,
 		DisplayName:   text(claims["name"]),
 		Email:         text(claims["email"]),

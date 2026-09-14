@@ -17,7 +17,12 @@ import (
 // by somebody else — while the subject does not. Matching on the moving one is
 // how an account ends up belonging to the wrong person.
 type Identity struct {
-	Subject     string
+	Subject string
+	// Provider is which provider this came from, as that provider names
+	// itself here. It travels with the subject because a subject means
+	// nothing on its own: two providers issue their own identifiers, and one
+	// read as the other names a different person.
+	Provider    string
 	Username    string
 	DisplayName string
 	// Email is where the provider says this person is reached, and

@@ -592,6 +592,46 @@ same person as that username at the provider.
 | A username is folded, an identifier is not | The name is both halves of the rule at once now: an administrator types it to authorize somebody, and a provider reports it at every sign-in. The typed rule wins because the failure runs that way — "Alice" recorded against "alice" reported leaves an authorization nobody can redeem, and under group-bound admission a second account beside the first. Normalized as it is stored, so no engine's collation decides it (REQ-08) |
 | An identifier is unbound by an administrator, never by a sign-in | An identifier belongs to the provider that issued it, so changing provider leaves every account pinned to one that refuses its holder — the name matches and the identifier does not. Clearing it is an administrative act with the authorization left in place; doing it automatically would undo, at the moment it was working, the protection that stops a released name being redeemed by whoever took it |
 
+### Which provider issued an identifier
+
+The provider is recorded beside the identifier it issued, and written at the
+same moment.
+
+| Rule | Reason |
+|---|---|
+| An identifier is read only as the provider that issued it meant it | Two providers issue into their own namespaces and neither knows the other's. The same string names different people at each, so reading one as the other hands somebody the roles of whoever held that string before |
+| An arrival that names no provider is refused | An identifier with no issuer names nobody, and binding one records a subject a later sign-in cannot tell apart from another provider's |
+| A bound identity under a provider that is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
+| A row bound before the provider was recorded reads as the one configured now | There is nothing else it could mean, and refusing every one of them would lock out a deployment that never changed provider |
+
+The way through a deliberate provider change is to withdraw the bindings, which
+is the administrative act the row above describes, and leaves each
+authorization standing to be redeemed again.
+
+### How long a name is redeemable
+
+An authorization nobody has redeemed is matched by name alone, because the
+identifier it will be pinned to is not knowable until somebody arrives holding
+it. That window ends.
+
+| Rule | Reason |
+|---|---|
+| An unredeemed authorization stops being redeemable | It is the one place where a name rather than an identifier decides who gets a set of roles. Left open, it waits for whoever turns up holding that name |
+| The window is written when the authorization is | It carries the window in force at the moment it was granted, the way a token carries the expiry it was minted with, so changing the setting does not silently extend what is already standing |
+| Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
+| A redeemed authorization is not held to it | The identifier decides from then on, and the window was only ever about the name |
+
+### Which claim carries the username
+
+An OpenID Connect provider is told which claim carries the username, and there
+is no default.
+
+| Rule | Reason |
+|---|---|
+| The claim is stated by the operator or the process refuses to start | The claim decides who may redeem an authorization written for a name. A default makes that decision for every deployment that never thought about it |
+| `preferred_username` is not it | OpenID Connect Core says a relying party may not rely on it being unique, and on a provider where people set their own it is a name an attacker can choose |
+| The claim must be one the provider guarantees is unique and the account holder cannot change | Both halves are load-bearing: unique, or two people are one identity; unchangeable, or the name a grant was written for can be taken |
+
 ## Sessions and request forgery
 
 A session is **stored, not held in a process**, so it works whichever replica

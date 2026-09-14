@@ -148,6 +148,8 @@ function title(name?: string): string {
       return "Session lifetime";
     case "token.max-lifetime":
       return "Personal token lifetime";
+    case "signin.claim-window":
+      return "Authorization redemption window";
     case "upstream.currency":
       return "Upstream version checks";
     case "scanning.quiet-after":

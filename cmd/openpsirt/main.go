@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -134,6 +136,16 @@ func run(args []string, stdout, stderr *os.File) error {
 	// only the person trying to sign in ever sees.
 	providers, err := signInProviders(ctx, cfg, logger)
 	if err != nil {
+		return err
+	}
+	// One provider at a time is a rule across time, not only at one instant
+	// (REQ-41). A deployment pointed at a second provider reads identifiers
+	// the first issued as though this one had issued them, and two providers
+	// do not agree on what any given identifier names — so the first person
+	// to sign in redeems whatever the identifier they happen to hold was
+	// bound to. Nothing at sign-in time can tell that from an ordinary
+	// arrival, which is why it is refused here.
+	if err := onlyTheBoundProvider(ctx, rights, providers); err != nil {
 		return err
 	}
 	if len(providers) > 0 && cfg.BaseURL == "" {
@@ -482,6 +494,40 @@ func waitFor(group *sync.WaitGroup, grace time.Duration) bool {
 	case <-time.After(grace):
 		return false
 	}
+}
+
+// onlyTheBoundProvider refuses a provider change that nobody re-granted.
+//
+// Identities bound by a provider that is no longer configured are not
+// interpretable: the identifiers belong to somebody else's namespace. The way
+// out is to withdraw the bindings deliberately, which is an administrative act
+// with a record, rather than to have them silently mean something new.
+func onlyTheBoundProvider(ctx context.Context, rights *access.Store, providers map[string]signin.Provider) error {
+	if len(providers) == 0 {
+		// Nothing is configured, so nothing reinterprets anything. A
+		// deployment authenticating at a proxy is the ordinary case here.
+		return nil
+	}
+	bound, err := rights.BoundProviders(ctx)
+	if err != nil {
+		return err
+	}
+	for _, was := range bound {
+		if _, still := providers[was]; still {
+			continue
+		}
+		configured := make([]string, 0, len(providers))
+		for name := range providers {
+			configured = append(configured, name)
+		}
+		sort.Strings(configured)
+		return fmt.Errorf(
+			"identities here are bound to the %q provider and this deployment is configured for %s: "+
+				"an identifier one provider issued names somebody else at another, so the bindings are "+
+				"withdrawn deliberately before the provider changes",
+			was, strings.Join(configured, ", "))
+	}
+	return nil
 }
 
 // signInProviders builds the way somebody may sign in.

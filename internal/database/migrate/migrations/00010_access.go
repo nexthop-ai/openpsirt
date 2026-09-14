@@ -209,8 +209,28 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			"id"         ` + t.id + `,
 			"person_id"  ` + t.ref + ` NOT NULL,
 			"subject"    ` + t.name + ` NULL,
+			-- Which provider issued the subject beside it, written when the
+			-- binding is made and null until then.
+			--
+			-- One provider is configured at a time (REQ-41), and this is what
+			-- makes that true across time rather than only at one instant: a
+			-- deployment pointed at a second provider would otherwise read
+			-- identifiers issued by the first as though the new one had issued
+			-- them, and two providers do not agree on what any given subject
+			-- names. Recorded so the process can refuse to start instead.
+			"provider"   ` + t.name + ` NULL,
 			"username"   ` + t.name + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
+			-- When an authorization nobody has redeemed stops being
+			-- redeemable.
+			--
+			-- The name is the only thing matching an unredeemed row, because
+			-- the identifier it will be pinned to is not knowable until
+			-- somebody arrives holding it. That window is the one place where
+			-- a name rather than an identifier decides who gets a set of
+			-- roles, so it ends: a grant written for somebody who never came
+			-- is withdrawn rather than left standing.
+			"claimable_until" ` + t.timestamp + ` NULL,
 			"bound_at"   ` + t.timestamp + ` NULL,
 			CONSTRAINT "person_identity_person_fk" FOREIGN KEY ("person_id") REFERENCES "person"("id"),
 			CONSTRAINT "person_identity_username_unique" UNIQUE ("username"),

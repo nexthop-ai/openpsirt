@@ -120,6 +120,7 @@ func (g *GitHub) Complete(ctx context.Context, code string, pending Pending, red
 		// by its owner and then taken by somebody else, and matching on it
 		// would eventually hand one person's access to another.
 		Subject:     strconv.FormatInt(account.ID, 10),
+		Provider:    g.Name(),
 		Username:    username,
 		DisplayName: account.Name,
 	}

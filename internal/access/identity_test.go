@@ -2,6 +2,7 @@ package access_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
@@ -31,7 +32,7 @@ func TestAnAuthorizationIsRedeemedByNameAndThenPinnedToTheIdentifier(t *testing.
 		ctx := t.Context()
 		person := authorized(t, f, "alice", "alice")
 
-		matched, err := f.store.MatchProvider(ctx, "1001", "alice")
+		matched, err := f.store.MatchProvider(ctx, "okta", "1001", "alice")
 		if err != nil {
 			t.Fatalf("somebody authorized in advance was refused: %v", err)
 		}
@@ -64,17 +65,17 @@ func TestSomebodyWhoTakesAReleasedNameIsNotTheirPredecessor(t *testing.T) {
 		alice := authorized(t, f, "alice", "alice")
 
 		// Alice signs in once, which pins her.
-		if _, err := f.store.MatchProvider(ctx, "1001", "alice"); err != nil {
+		if _, err := f.store.MatchProvider(ctx, "okta", "1001", "alice"); err != nil {
 			t.Fatal(err)
 		}
 
 		// Somebody else registers the name she used to hold.
-		if _, err := f.store.MatchProvider(ctx, "2002", "alice"); err == nil {
+		if _, err := f.store.MatchProvider(ctx, "okta", "2002", "alice"); err == nil {
 			t.Fatal("somebody who took a released name was let in as its previous holder")
 		}
 
 		// And Alice, renamed, is still Alice.
-		matched, err := f.store.MatchProvider(ctx, "1001", "alice-at-work")
+		matched, err := f.store.MatchProvider(ctx, "okta", "1001", "alice-at-work")
 		if err != nil {
 			t.Fatalf("somebody who renamed themselves was refused: %v", err)
 		}
@@ -120,7 +121,7 @@ func TestSomebodyNobodyAuthorizedIsRefusedWhateverTheyPresent(t *testing.T) {
 			{"", "alice"},
 			{"1001", ""},
 		} {
-			if _, err := f.store.MatchProvider(ctx, c.subject, c.username); err == nil {
+			if _, err := f.store.MatchProvider(ctx, "okta", c.subject, c.username); err == nil {
 				t.Errorf("%+v was let in", c)
 			}
 		}
@@ -174,7 +175,7 @@ func TestOneUsernameIsOnePersonWhicheverWayTheyArrive(t *testing.T) {
 			ctx := t.Context()
 			person := authorized(t, f, "bhouse@example.com", "bhouse@example.com")
 
-			if _, err := f.store.MatchProvider(ctx, "00u1a2b3", "bhouse@example.com"); err != nil {
+			if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "bhouse@example.com"); err != nil {
 				t.Fatalf("the provider refused somebody authorized: %v", err)
 			}
 			// The recovery path has to work on the day it is needed, and by
@@ -198,7 +199,7 @@ func TestOneUsernameIsOnePersonWhicheverWayTheyArrive(t *testing.T) {
 			if _, err := f.store.MatchProxy(ctx, "bhouse@example.com"); err != nil {
 				t.Fatalf("the proxy refused somebody authorized: %v", err)
 			}
-			matched, err := f.store.MatchProvider(ctx, "00u1a2b3", "bhouse@example.com")
+			matched, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "bhouse@example.com")
 			if err != nil {
 				t.Fatalf("the provider was refused after a proxy arrival: %v", err)
 			}
@@ -219,5 +220,123 @@ func TestOneUsernameIsOnePersonWhicheverWayTheyArrive(t *testing.T) {
 				t.Fatalf("the provider did not bind its identifier: %+v", identities[0])
 			}
 		})
+	})
+}
+
+func TestAnIdentifierIsReadOnlyAsTheProviderThatIssuedItMeantIt(t *testing.T) {
+	// One provider is configured at a time (REQ-41), and that is a rule across
+	// time rather than at one instant. A deployment pointed at a second
+	// provider would read identifiers the first issued as though this one had
+	// issued them — and two providers do not agree on what any identifier
+	// names, so whoever holds that string at the new provider redeems roles
+	// granted to somebody else entirely.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		authorized(t, f, "alice", "alice")
+
+		// Redeemed and pinned under the provider configured at the time.
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
+			t.Fatalf("the authorization was not redeemed: %v", err)
+		}
+
+		// The same identifier, arriving from somewhere else. It is a
+		// different namespace and so a different person.
+		if _, err := f.store.MatchProvider(ctx, "keycloak", "00u1a2b3", "alice"); err == nil {
+			t.Error("an identifier issued by one provider was accepted from another")
+		}
+
+		// And the name is not redeemable a second time to get around that:
+		// the row is pinned, and to an identifier nothing here can still
+		// interpret.
+		if _, err := f.store.MatchProvider(ctx, "keycloak", "kc-99", "alice"); err == nil {
+			t.Error("a pinned name was redeemed again after the provider changed")
+		}
+	})
+}
+
+func TestAnIdentifierWithNoIssuerNamesNobody(t *testing.T) {
+	// A subject is meaningless without the provider that issued it, so an
+	// arrival that cannot say where its identifier came from is refused
+	// rather than bound to whatever is configured.
+	each(t, func(t *testing.T, f *fixture) {
+		authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(t.Context(), "", "1001", "alice"); err == nil {
+			t.Error("an identifier with no issuer was bound to an authorization")
+		}
+	})
+}
+
+func TestWhichProvidersHaveBoundAnIdentity(t *testing.T) {
+	// What the startup check reads. An authorization nobody has redeemed
+	// binds nothing, so it names no provider and does not stop a deployment
+	// that has not yet been signed in to from changing provider.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		authorized(t, f, "alice", "alice")
+
+		bound, err := f.store.BoundProviders(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bound) != 0 {
+			t.Errorf("an unredeemed authorization names %v", bound)
+		}
+
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		bound, err = f.store.BoundProviders(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bound) != 1 || bound[0] != "okta" {
+			t.Errorf("the bound providers read as %v, want just okta", bound)
+		}
+	})
+}
+
+func TestAnAuthorizationNobodyRedeemedStopsBeingRedeemable(t *testing.T) {
+	// The window where a name rather than an identifier decides who gets a set
+	// of roles. An administrator writes the authorization before the person
+	// has ever arrived, so it is matched by the name they typed — and left
+	// open for ever, it waits for whoever turns up holding that name at the
+	// provider, which on a provider where people choose their own name is
+	// anybody who wants those roles.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "alice", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		// Written with a window that has already run out by the time anybody
+		// arrives holding the name.
+		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, person.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err == nil {
+			t.Error("an authorization nobody redeemed inside its window was still redeemed")
+		}
+	})
+}
+
+func TestAnAuthorizationIsRedeemableInsideItsWindow(t *testing.T) {
+	// The other half, and the one that matters more: bounding the window must
+	// not make an ordinary first sign-in fail. Somebody authorized ahead of a
+	// start date arrives days later and is still who was authorized.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person := authorized(t, f, "alice", "alice")
+
+		matched, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice")
+		if err != nil {
+			t.Fatalf("an authorization inside its window was refused: %v", err)
+		}
+		if matched.ID != person.ID {
+			t.Errorf("the authorization was redeemed by person %d, want %d", matched.ID, person.ID)
+		}
 	})
 }

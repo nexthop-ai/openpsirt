@@ -46,7 +46,15 @@ func (s *stubProvider) Complete(_ context.Context, _ string, _ signin.Pending, _
 	if s.fail != nil {
 		return nil, s.fail
 	}
-	return s.says, nil
+	// Stamped here the way both real adapters stamp it, so a test standing on
+	// this double stands on something that behaves like the boundary. An
+	// identifier travels with the provider that issued it, because one
+	// provider's identifier names somebody else at another.
+	said := *s.says
+	if said.Provider == "" {
+		said.Provider = s.Name()
+	}
+	return &said, nil
 }
 
 // signInReach is a server with one provider and one person who was granted

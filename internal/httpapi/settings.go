@@ -46,6 +46,7 @@ var settable = []struct {
 	{setting.DeferralThreshold, "How long something may be put off before a second person has to agree. Measured against everything the finding has already been put off for, not against the postponement being asked for"},
 	{setting.SessionLifetime, "How long a sign-in lasts"},
 	{setting.MaxTokenLifetime, "The longest a personal token may be valid for"},
+	{setting.ClaimWindow, "How long an authorization written for somebody who has never signed in stays redeemable. It is the one window where a name rather than an identifier decides who gets a set of roles, so it ends"},
 	{setting.TogetherCap, "How many findings one action may claim about at once. A whole number, not a length of time"},
 	{setting.TriageFloor, "What counts as worth triaging: everything, or a severity word below which findings are still recorded and counted but kept out of the working list. A product may state its own instead"},
 	{setting.QuietAfter, "How long a build may go without a scan arriving before it is reported as having gone quiet. Measured from the last arrival, or from when the build was declared where nothing has ever arrived"},
@@ -351,6 +352,8 @@ func shipped(name string) string {
 		return access.DefaultSessionLifetime.String()
 	case setting.MaxTokenLifetime:
 		return access.MaxTokenLifetime.String()
+	case setting.ClaimWindow:
+		return access.DefaultClaimWindow.String()
 	case setting.TogetherCap:
 		return strconv.Itoa(triage.DefaultTogetherCap)
 	case setting.AttachmentMaxSize:

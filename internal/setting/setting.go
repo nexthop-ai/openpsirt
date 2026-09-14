@@ -48,6 +48,15 @@ const (
 	// MaxTokenLifetime is the longest a person's own credential may last.
 	// Expiry is mandatory; this is how far out it may be set.
 	MaxTokenLifetime = "token.max-lifetime"
+	// ClaimWindow is how long an authorization an administrator wrote stays
+	// redeemable before the person it names has ever signed in.
+	//
+	// An unredeemed authorization is matched by name alone, because the
+	// identifier it will be pinned to is not knowable until somebody arrives
+	// holding it. That is the one window in which a name decides who gets
+	// somebody else's roles, so it has an end: a grant written for somebody
+	// who never came is withdrawn rather than left standing for ever.
+	ClaimWindow = "signin.claim-window"
 	// DiscloseAfter is how long a finding nobody has announced stays that way
 	// before the date arrives. It gives the embargo an end somebody outside
 	// could hold us to, which is the point of having one at all.

@@ -401,6 +401,12 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 			return finding.NewStore(in.DB.DB)
 		},
 		Trail: in.trail,
+		Settings: func() *setting.Store {
+			if in.DB == nil {
+				return nil
+			}
+			return setting.NewStore(in.DB.DB)
+		},
 	})
 	registerTeams(api, Administering{
 		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
