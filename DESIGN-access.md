@@ -776,6 +776,7 @@ for work it was never scoped for.
 
 | Rule | Reason |
 |---|---|
+| Narrowing removes, never rebuilds | Who somebody is, the teams they are on and the cases they were brought into are not per-product facts, and a token pinned to a product must not stop them being themselves. Written as a fresh subject it carried five fields and dropped the rest, so every "assigned to me" surface answered empty and taking an unowned finding for yourself was refused as giving work to somebody else |
 | A live reference to its owner, never a snapshot | What it reaches is read from what they hold at the moment it is used, so a role withdrawn cuts the token at the same instant — including one withdrawn because a group membership went away, which is the case with nothing else to notice it |
 | It may not mint or withdraw another | Minting resolves through the owner, so a token that could mint would ask for a wider one and be given it, making every limit exactly one request deep |
 | Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration is dropped by narrowing entirely, because a token narrowed to one product that still administered everything would not be narrowed |

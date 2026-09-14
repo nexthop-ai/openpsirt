@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // holder is somebody with a role and a token of their own.
@@ -305,6 +306,100 @@ func TestATokenDefaultsToWhateverTheCeilingAllows(t *testing.T) {
 		}
 		if got := token.ExpiresAt.Sub(token.CreatedAt); got != 24*time.Hour {
 			t.Errorf("lasted %v, want the ceiling of 24h", got)
+		}
+	})
+}
+
+// TestANarrowedTokenIsStillTheSamePerson pins what narrowing takes away and
+// what it must not.
+//
+// It was written as a fresh Subject carrying five fields, so everything else
+// went silently: who somebody is in the assignable space, the teams they are
+// on, and the cases they were brought into. None of those is a per-product
+// fact. Through such a token every "assigned to me" surface answered empty and
+// taking an unowned finding for yourself was refused with a message saying you
+// were giving work to somebody else — while the same acts worked through the
+// same person's session.
+func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		here := f.products["sonic"]
+		elsewhere := f.products["onie"]
+
+		person, err := f.store.Ensure(ctx, "ana", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, here, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, elsewhere, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		team, err := f.store.DeclareTeam(ctx, "kernel", "Kernel")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.AddToTeam(ctx, team.ID, person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+		// Brought into one case here, and one over there. Real issues,
+		// because a case grant points at one.
+		issues, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-0001", Severity: "high"},
+			{Identifier: "CVE-2026-0002", Severity: "high"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mine, theirs := issues["CVE-2026-0001"], issues["CVE-2026-0002"]
+		if err := f.store.AddToCase(ctx, here, mine, person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.AddToCase(ctx, elsewhere, theirs, person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		_, secret, err := f.store.NewToken(ctx, person.ID, "pinned", &here, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		narrowed, err := f.store.ResolveToken(ctx, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		whole, err := f.store.Resolve(ctx, "ana")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Who they are does not change because a credential was pinned.
+		if narrowed.Party() != whole.Party() || narrowed.Party() == 0 {
+			t.Errorf("a narrowed token is party %d and the person is party %d",
+				narrowed.Party(), whole.Party())
+		}
+		if len(narrowed.Mine()) != len(whole.Mine()) {
+			t.Errorf("a narrowed token counts as %v and the person as %v",
+				narrowed.Mine(), whole.Mine())
+		}
+		// The case on the product it is pinned to is reached; the one
+		// elsewhere is not, for the same reason the roles elsewhere are not.
+		if !narrowed.OnCase(here, mine) {
+			t.Error("a narrowed token cannot open the case it was brought into")
+		}
+		if narrowed.OnCase(elsewhere, theirs) {
+			t.Error("a token pinned to one product reaches a case in another")
+		}
+
+		// And it is still narrower than its owner, which is the whole point.
+		if narrowed.Reads(access.Public, elsewhere) {
+			t.Error("a token pinned to one product reads another")
+		}
+		if narrowed.Admin {
+			t.Error("a narrowed token carries administration")
+		}
+		if !narrowed.Reads(access.Public, here) {
+			t.Error("a narrowed token does not read the product it is pinned to")
 		}
 	})
 }

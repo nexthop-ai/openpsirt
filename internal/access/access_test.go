@@ -17,6 +17,10 @@ import (
 // on one says nothing about the other.
 type fixture struct {
 	store *access.Store
+	// db is the handle behind the store, for the few tests that need a row
+	// the access package does not own — an issue, so a case grant has
+	// something real to point at.
+	db *database.DB
 	// catalog declares products, for the tests that need one to appear after
 	// somebody was already granted something.
 	catalog  *catalog.Store
@@ -34,6 +38,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		cat := catalog.NewStore(db.DB)
 		f := &fixture{
 			store:    access.NewStore(db.DB),
+			db:       db,
 			catalog:  cat,
 			products: map[string]int64{}, streams: map[string]int64{}, variants: map[string]int64{},
 		}
