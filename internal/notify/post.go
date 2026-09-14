@@ -160,8 +160,8 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 	err = p.db.NewSelect().
 		Model((*Notification)(nil)).
 		ColumnExpr("nt.*").
-		ColumnExpr("pe.email AS email").
-		Join(`JOIN "person" AS pe ON pe.id = nt.person_id`).
+		ColumnExpr(`pe.email AS "email"`).
+		Join(`JOIN "person" AS "pe" ON pe.id = nt.person_id`).
 		Where("nt.sent_at IS NULL").
 		Where("nt.attempts < ?", tries).
 		// Somebody with no address is told nothing outside the

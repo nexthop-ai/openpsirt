@@ -93,27 +93,27 @@ func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Decidin
 		Places            int    `bun:"places"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS t ON t.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = t.stream_id").
-		Join("JOIN variant AS va ON va.id = t.variant_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("va.display_name AS variant").
-		ColumnExpr("c.version AS version").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "t" ON t.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = t.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = t.variant_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`c.version AS "version"`).
 		// The same expressions the decision is keyed on (place.go). Read raw,
 		// the column is empty for everything that is not a patched fork, so
 		// every other build read as "differing" from one whose key had
 		// fallen back to the shipped version — including builds at the very
 		// same version, which the decision already reached by lookup.
-		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
+		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		// Exactly the grouped expression, not wrapped once more: MySQL's
 		// only_full_group_by matches a selected expression to a grouped one by
 		// text, and the expression already answers '' for no consumer.
-		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
-		ColumnExpr("COUNT(*) AS places").
+		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		Where("st.product_id = ?", at.ProductID).
 		Where("f.vulnerability_id = ?", at.VulnerabilityID).
 		Where("f.place_identity = ?", at.PlaceIdentity).
@@ -231,20 +231,20 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Places            int    `bun:"places"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS t ON t.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = t.stream_id").
-		Join("JOIN variant AS va ON va.id = t.variant_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("va.display_name AS variant").
-		ColumnExpr("c.version AS version").
-		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
-		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
-		ColumnExpr("COUNT(*) AS places").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "t" ON t.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = t.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = t.variant_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
+		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		Where("st.product_id = ?", at.ProductID).
 		Where("f.vulnerability_id = ?", at.VulnerabilityID).
 		Where("f.place_identity IN (?)", bun.List(identities)).

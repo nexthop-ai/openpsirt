@@ -83,24 +83,24 @@ func (s *Store) Disclosing(ctx context.Context, subject access.Subject, scope Sc
 	}
 
 	query := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		Join("JOIN product AS p ON p.id = st.product_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN product AS "p" ON p.id = st.product_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedFor(RatedOnStream)).
-		ColumnExpr("v.identifier AS vulnerability").
-		ColumnExpr("v.description AS summary").
-		ColumnExpr(EffectiveSeverityExpr+" AS severity").
-		ColumnExpr("c.name AS component").
-		ColumnExpr("p.display_name AS product").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("va.display_name AS variant").
-		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
-		ColumnExpr("MIN(f.assigned_to) AS assigned_to").
-		ColumnExpr("COUNT(*) AS places").
+		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`v.description AS "summary"`).
+		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`p.display_name AS "product"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
+		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		Where("f.visibility = ?", access.Private).
 		Where("f.closed_at IS NULL").
 		Where("f.disclose_at IS NOT NULL").
@@ -203,9 +203,9 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject,
 		// moved.
 		var was time.Time
 		err := tx.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("MAX(f.disclose_at)").
 			Where("st.product_id = ?", productID).
 			Where("f.vulnerability_id = ?", vulnerabilityID).
@@ -356,8 +356,8 @@ func moveTo(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("visibility = ?", access.Private).
 		Where("closed_at IS NULL").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-			JOIN "stream" AS st ON st.id = tg.stream_id
+		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+			JOIN "stream" AS "st" ON st.id = tg.stream_id
 			WHERE st.product_id = ?)`, productID).
 		Exec(ctx)
 	if err != nil {
@@ -420,12 +420,12 @@ func (s *Store) Pending(ctx context.Context, subject access.Subject,
 	query := s.db.NewSelect().
 		Model((*Extension)(nil)).
 		ColumnExpr("dx.*").
-		Join(`JOIN "product" AS p ON p.id = dx.product_id`).
-		Join(`JOIN "vulnerability" AS v ON v.id = dx.vulnerability_id`).
-		Join(`LEFT JOIN "person" AS ps ON ps.id = dx.asked_by`).
-		ColumnExpr("p.name AS product").
-		ColumnExpr("v.identifier AS vulnerability").
-		ColumnExpr(`COALESCE(NULLIF(ps.display_name, ''), ps.identity, '') AS asked_by_name`).
+		Join(`JOIN "product" AS "p" ON p.id = dx.product_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = dx.vulnerability_id`).
+		Join(`LEFT JOIN "person" AS "ps" ON ps.id = dx.asked_by`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`COALESCE(NULLIF(ps.display_name, ''), ps.identity, '') AS "asked_by_name"`).
 		Where("dx.needs_approval = ?", true).
 		Where("dx.approved_at IS NULL").
 		OrderExpr("dx.asked_at DESC").

@@ -78,10 +78,10 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Places          int    `bun:"places"`
 	}
 	elsewhere := s.db.NewSelect().Model((*Decision)(nil)).
-		Join(`JOIN "claim" AS cl ON cl.id = de.claim_id`).
-		ColumnExpr("de.vulnerability_id AS vulnerability_id").
-		ColumnExpr("cl.outcome AS outcome").
-		ColumnExpr("COUNT(DISTINCT de.place_identity) AS places").
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`cl.outcome AS "outcome"`).
+		ColumnExpr(`COUNT(DISTINCT de.place_identity) AS "places"`).
 		Where("de.vulnerability_id IN (?)", bun.List(issues)).
 		Where("de.state = ?", Approved).
 		Where("de.live_key IS NOT NULL").
@@ -106,18 +106,18 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Issues    int    `bun:"issues"`
 	}
 	undecided := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join(`JOIN "target" AS tg ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
-		Join(`JOIN "component" AS c ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS uc ON uc.id = f.consumer_id`).
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.closed_at IS NULL").
 		Where("f.place_identity IN (?)", bun.List(places)).
 		Where("st.product_id IN (?)", bun.List(products)).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS de
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
 			WHERE de.product_id = st.product_id
 			  AND de.vulnerability_id = f.vulnerability_id
 			  AND de.place_identity = f.place_identity

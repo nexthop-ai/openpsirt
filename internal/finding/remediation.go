@@ -105,15 +105,15 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Issues  int     `bun:"issues"`
 	}
 	closed := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedFor(RatedOnStream)).
-		ColumnExpr(BandExpr+" AS band").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("MAX(f.closed_at) AS closed_at").
-		ColumnExpr("MIN(f.opened_at) AS opened_at").
+		ColumnExpr(BandExpr+` AS "band"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`MAX(f.closed_at) AS "closed_at"`).
+		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		Where("f.closed_at IS NOT NULL").
 		Where("f.closed_at >= ?", since).
 		Where(resolvedExpr).
@@ -124,9 +124,9 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// own, because averaging inside the grouping would average the places.
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_issue"`, closed).
-		ColumnExpr("per_issue.band AS band").
-		ColumnExpr("COUNT(*) AS issues").
-		ColumnExpr(secondsBetween(s.db)+" AS seconds").
+		ColumnExpr(`per_issue.band AS "band"`).
+		ColumnExpr(`COUNT(*) AS "issues"`).
+		ColumnExpr(secondsBetween(s.db)+` AS "seconds"`).
 		GroupExpr("per_issue.band").
 		Scan(ctx, &spans); err != nil {
 		return nil, fmt.Errorf("read how long fixes took: %w", err)
@@ -141,9 +141,9 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// What opened in the same window, as distinct issues, so the two figures
 	// are in the same unit and can be read against each other.
 	opened := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.vulnerability_id").
 		Where("f.opened_at >= ?", since).
 		GroupExpr("f.vulnerability_id")
@@ -161,9 +161,9 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	for _, bucket := range agingBuckets {
 		older := now.Add(-time.Duration(bucket.from) * 24 * time.Hour)
 		q := s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("f.vulnerability_id").
 			Where("f.closed_at IS NULL").
 			Where("f.opened_at <= ?", older).
@@ -188,8 +188,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		byBand := q.NewSelect().
 			TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(
 				byBandOf(q, s.db), subject, products, all))).
-			ColumnExpr("grouped.band AS band").
-			ColumnExpr("COUNT(*) AS number").
+			ColumnExpr(`grouped.band AS "band"`).
+			ColumnExpr(`COUNT(*) AS "number"`).
 			GroupExpr("grouped.band")
 		if err := byBand.Scan(ctx, &bands); err != nil {
 			return nil, fmt.Errorf("count what is aging, by severity: %w", err)
@@ -209,13 +209,13 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		// question, not "which build of it".
 		standing, held := InForce()
 		unanswered := q.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("f.vulnerability_id").
 			Where("f.closed_at IS NULL").
 			Where("f.opened_at <= ?", older).
-			Where(`NOT EXISTS (SELECT 1 FROM "decision" AS de
+			Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
 				WHERE de.product_id = st.product_id
 				  AND de.vulnerability_id = f.vulnerability_id
 				  AND de.place_identity = f.place_identity
@@ -244,8 +244,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 // is one value by construction: severity belongs to the issue rather than to
 // the place, and MIN over one value is that value.
 func byBandOf(from *bun.SelectQuery, db bun.IDB) *bun.SelectQuery {
-	return from.Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		ColumnExpr("MIN(COALESCE(v.severity, '')) AS band")
+	return from.Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		ColumnExpr(`MIN(COALESCE(v.severity, '')) AS "band"`)
 }
 
 // secondsBetween averages how long an issue was open, through the one place an

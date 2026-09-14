@@ -115,9 +115,9 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 
 	bundled := func(q *bun.SelectQuery) *bun.SelectQuery {
 		return filter.narrow(q.
-			TableExpr("finding AS f").
-			Join("JOIN component AS c ON c.id = f.component_id").
-			Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 			Join(RatedHere, productID).
 			Where("f.target_id IN (?)", bun.List(targets)).
 			Where("f.closed_at IS NULL").
@@ -129,16 +129,16 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	}
 
 	page := bundled(s.db.NewSelect()).
-		ColumnExpr(FoldedOn + " AS fold").
-		ColumnExpr(PerFold(SourceName) + " AS upstream").
-		ColumnExpr(PerFold(SourceVersion) + " AS shipped").
-		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("COUNT(DISTINCT f.target_id) AS builds").
-		ColumnExpr("MAX(f.urgency) AS urgency").
-		ColumnExpr(worst + " AS worst").
-		ColumnExpr("COUNT(*) OVER () AS total").
+		ColumnExpr(FoldedOn + ` AS "fold"`).
+		ColumnExpr(PerFold(SourceName) + ` AS "upstream"`).
+		ColumnExpr(PerFold(SourceVersion) + ` AS "shipped"`).
+		ColumnExpr(`f.fixed_in AS "fixed_in"`).
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
+		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(worst + ` AS "worst"`).
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first. A bundle is worth doing for its worst member, and one
 		// closing nine hundred low findings is not the one to do before a
 		// bundle closing one that is being exploited.
@@ -155,7 +155,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		// Counted the same way the findings list counts its groups:
 		// over a derived table, named and quoted, because GROUPS is
 		// reserved on MySQL 8.
-		counted := bundled(s.db.NewSelect()).ColumnExpr("COUNT(*) AS n")
+		counted := bundled(s.db.NewSelect()).ColumnExpr(`COUNT(*) AS "n"`)
 		if total, err = s.db.NewSelect().
 			TableExpr(`(?) AS "bundled"`, counted).Count(ctx); err != nil {
 			return nil, 0, fmt.Errorf("count what the bumps are: %w", err)
@@ -231,23 +231,23 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		Variant string `bun:"variant"`
 	}
 	q := filter.narrow(s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("f.fixed_in IS NOT NULL").
 		Where("f.fixed_in <> ?", "").
 		GroupExpr(FoldedOn + ", f.fixed_in, c.name, st.name, va.name")).
-		ColumnExpr(FoldedOn + " AS fold").
-		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("c.name AS name").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("va.name AS variant")
+		ColumnExpr(FoldedOn + ` AS "fold"`).
+		ColumnExpr(`f.fixed_in AS "fixed_in"`).
+		ColumnExpr(`c.name AS "name"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`va.name AS "variant"`)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read which packages a bump moves: %w", err)
 	}
@@ -298,16 +298,16 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	// walk of it however large the build is; whether anything is exploited
 	// is read off the urgency, which ranks it in a band of its own.
 	page := s.db.NewSelect().
-		TableExpr("finding AS f").
-		ColumnExpr("f.component_id AS component_id").
+		TableExpr(`finding AS "f"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
 		// Distinct issues rather than rows, because that is what the findings
 		// list shows and therefore what hiding this component would remove
 		// from it.
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("MAX(f.urgency) AS urgency").
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
 		// The total rides on the page, as the findings list's does.
-		ColumnExpr("COUNT(*) OVER () AS total").
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -329,7 +329,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		total = rows[0].Total
 	} else {
 		counted := s.db.NewSelect().
-			TableExpr("finding AS f").
+			TableExpr(`finding AS "f"`).
 			ColumnExpr("f.component_id").
 			Where("f.target_id IN (?)", bun.List(targets)).
 			Where("f.closed_at IS NULL").
@@ -418,11 +418,11 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 		Issues      int    `bun:"issues"`
 	}
 	query := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("COALESCE(v.severity, '') AS band").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`COALESCE(v.severity, '') AS "band"`).
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.component_id IN (?)", bun.List(ids)).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -469,12 +469,12 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 		Purl        string `bun:"purl"`
 	}
 	query := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("c.purl AS purl").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.fixed_in AS "fixed_in"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		Where("f.component_id IN (?)", bun.List(ids)).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -633,15 +633,15 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	// presence of a component is readable to anybody who may read the build
 	// while what is open against it is not.
 	open := s.db.NewSelect().
-		TableExpr("finding AS f").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("MIN(f.due_at) AS due_at").
-		ColumnExpr("MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) AS exploited").
+		TableExpr(`finding AS "f"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		ColumnExpr(`MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) AS "exploited"`).
 		ColumnExpr("COUNT(DISTINCT CASE WHEN f.fixed_in IS NOT NULL AND f.fixed_in <> ''"+
-			" THEN f.vulnerability_id END) AS fixable").
+			` THEN f.vulnerability_id END) AS "fixable"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -652,42 +652,42 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	// open. A component nothing pulls in is contained by the build itself,
 	// which counts as the one thing pulling it in.
 	pullers := s.db.NewSelect().
-		TableExpr("graph_edge AS e").
-		Join("JOIN graph_node AS ch ON ch.id = e.child_id").
-		ColumnExpr("ch.target_id AS target_id").
-		ColumnExpr("ch.component_id AS component_id").
-		ColumnExpr("COUNT(DISTINCT e.parent_id) AS consumers").
+		TableExpr(`graph_edge AS "e"`).
+		Join(`JOIN graph_node AS "ch" ON ch.id = e.child_id`).
+		ColumnExpr(`ch.target_id AS "target_id"`).
+		ColumnExpr(`ch.component_id AS "component_id"`).
+		ColumnExpr(`COUNT(DISTINCT e.parent_id) AS "consumers"`).
 		Where("e.target_id IN (?)", bun.List(targets)).
 		Where("e.closed_scan_id IS NULL").
 		Where("e.parent_id <> e.child_id").
 		GroupExpr("ch.target_id, ch.component_id")
 
 	err = s.db.NewSelect().
-		TableExpr("graph_node AS n").
-		Join("JOIN component AS c ON c.id = n.component_id").
-		Join("JOIN target AS tg ON tg.id = n.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
+		TableExpr(`graph_node AS "n"`).
+		Join(`JOIN component AS "c" ON c.id = n.component_id`).
+		Join(`JOIN target AS "tg" ON tg.id = n.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
 		Join(`LEFT JOIN (?) AS "op" ON "op".target_id = n.target_id AND "op".component_id = n.component_id`, open).
 		Join(`LEFT JOIN (?) AS "pl" ON "pl".target_id = n.target_id AND "pl".component_id = n.component_id`, pullers).
-		ColumnExpr("n.target_id AS target_id").
-		ColumnExpr("n.component_id AS component_id").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("va.name AS variant").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("c.purl AS purl").
-		ColumnExpr("COALESCE(c.summary, '') AS summary").
-		ColumnExpr("COALESCE(c.project_url, '') AS project_url").
-		ColumnExpr("COALESCE(c.supplier, '') AS supplier").
-		ColumnExpr("COALESCE(c.latest_version, '') AS latest_version").
-		ColumnExpr("c.latest_released_at AS latest_released_at").
-		ColumnExpr("c.first_seen_at AS first_seen_at").
-		ColumnExpr(`COALESCE("op".exploited, 0) AS exploited`).
-		ColumnExpr(`COALESCE("op".fixable, 0) AS fixable`).
-		ColumnExpr(`COALESCE("op".issues, 0) AS issues`).
-		ColumnExpr(`COALESCE("op".places, 0) AS places`).
-		ColumnExpr(`"op".due_at AS due_at`).
-		ColumnExpr(`COALESCE("pl".consumers, 1) AS consumers`).
+		ColumnExpr(`n.target_id AS "target_id"`).
+		ColumnExpr(`n.component_id AS "component_id"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
+		ColumnExpr(`COALESCE(c.summary, '') AS "summary"`).
+		ColumnExpr(`COALESCE(c.project_url, '') AS "project_url"`).
+		ColumnExpr(`COALESCE(c.supplier, '') AS "supplier"`).
+		ColumnExpr(`COALESCE(c.latest_version, '') AS "latest_version"`).
+		ColumnExpr(`c.latest_released_at AS "latest_released_at"`).
+		ColumnExpr(`c.first_seen_at AS "first_seen_at"`).
+		ColumnExpr(`COALESCE("op".exploited, 0) AS "exploited"`).
+		ColumnExpr(`COALESCE("op".fixable, 0) AS "fixable"`).
+		ColumnExpr(`COALESCE("op".issues, 0) AS "issues"`).
+		ColumnExpr(`COALESCE("op".places, 0) AS "places"`).
+		ColumnExpr(`"op".due_at AS "due_at"`).
+		ColumnExpr(`COALESCE("pl".consumers, 1) AS "consumers"`).
 		Where("n.target_id IN (?)", bun.List(targets)).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
@@ -768,13 +768,13 @@ func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 	// One row per finding rather than a grouped count, because the grouping is
 	// per version and a version has to be read out of the string first.
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("c.purl AS purl").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.fixed_in AS "fixed_in"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		// Narrowed to the components the rows are about, because a row is one
 		// version: pooled per build, a build shipping one name at two versions
@@ -927,20 +927,20 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 	// A product is reached through the build rather than carried on the
 	// finding, which is where the correlation everywhere else starts from.
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN decision AS de ON de.product_id = st.product_id"+
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`JOIN decision AS "de" ON de.product_id = st.product_id`+
 			" AND de.vulnerability_id = f.vulnerability_id"+
 			" AND de.place_identity = f.place_identity").
 		// The argument, which is where the outcome and the promise live: one
 		// act is one argument, and the rows underneath say where it lands.
-		Join("JOIN claim AS cl ON cl.id = de.claim_id").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("MAX(cl.committed_to) AS committed_to").
-		ColumnExpr("MIN(COALESCE(cl.upgrade_to, '')) AS upgrade_to").
+		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`MAX(cl.committed_to) AS "committed_to"`).
+		ColumnExpr(`MIN(COALESCE(cl.upgrade_to, '')) AS "upgrade_to"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -979,13 +979,13 @@ func (s *Store) bandsPerBuild(ctx context.Context, targets []int64,
 		Issues      int    `bun:"issues"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("COALESCE(v.severity, '') AS band").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`COALESCE(v.severity, '') AS "band"`).
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).

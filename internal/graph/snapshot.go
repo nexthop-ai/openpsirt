@@ -189,7 +189,7 @@ func (s *Store) CurrentNodes(ctx context.Context, targetID int64) ([]Node, error
 func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Described, error) {
 	var rows []Component
 	err := s.db.NewSelect().Model(&rows).
-		Join("JOIN graph_node AS n ON n.component_id = c.id").
+		Join(`JOIN graph_node AS "n" ON n.component_id = c.id`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
@@ -313,11 +313,11 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 	name, version, ecosystem string) (int64, error) {
 
 	query := db.NewSelect().
-		TableExpr("graph_node AS n").
-		Join("JOIN component AS c ON c.id = n.component_id").
-		ColumnExpr("c.id AS id").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("c.purl AS purl").
+		TableExpr(`graph_node AS "n"`).
+		Join(`JOIN component AS "c" ON c.id = n.component_id`).
+		ColumnExpr(`c.id AS "id"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Where("c.name = ?", name).
@@ -494,7 +494,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 
 	var rootID int64
 	err := s.db.NewSelect().
-		TableExpr("graph_node AS n").
+		TableExpr(`graph_node AS "n"`).
 		ColumnExpr("n.component_id").
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
@@ -554,16 +554,16 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 
 	row := &Neighbor{Children: children, ComponentID: componentID}
 	err := s.db.NewSelect().
-		TableExpr("component AS c").
-		ColumnExpr("c.name AS name").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("c.purl AS purl").
+		TableExpr(`component AS "c"`).
+		ColumnExpr(`c.name AS "name"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		// Narrowed exactly as the neighbors are. The root is one row, but a
 		// count that is not narrowed the same way is still a count of what the
 		// reader may not see.
-		ColumnExpr(`(SELECT COUNT(DISTINCT f.vulnerability_id) FROM "finding" AS f
+		ColumnExpr(`(SELECT COUNT(DISTINCT f.vulnerability_id) FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.component_id = c.id
-			  AND f.closed_at IS NULL AND f.visibility IN (?)) AS findings`,
+			  AND f.closed_at IS NULL AND f.visibility IN (?)) AS "findings"`,
 			targetID, bun.List(readable)).
 		Where("c.id = ?", componentID).
 		Scan(ctx, row)
@@ -591,19 +591,19 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 
 	var rows []Neighbor
 	err := s.db.NewSelect().
-		TableExpr("graph_edge AS e").
-		Join("JOIN graph_node AS nn ON nn.id = e."+near).
-		Join("JOIN graph_node AS fn ON fn.id = e."+far).
-		Join("JOIN component AS c ON c.id = fn.component_id").
-		Join(`LEFT JOIN (SELECT dp.component_id AS cid, COUNT(*) AS n
-			FROM "graph_edge" AS d
-			JOIN "graph_node" AS dp ON dp.id = d.parent_id
+		TableExpr(`graph_edge AS "e"`).
+		Join(`JOIN graph_node AS "nn" ON nn.id = e.`+near).
+		Join(`JOIN graph_node AS "fn" ON fn.id = e.`+far).
+		Join(`JOIN component AS "c" ON c.id = fn.component_id`).
+		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
+			FROM "graph_edge" AS "d"
+			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
 			WHERE d.target_id = ? AND d.closed_scan_id IS NULL
-			GROUP BY dp.component_id) AS kids ON kids.cid = c.id`, targetID).
-		ColumnExpr("c.id AS component_id").
-		ColumnExpr("c.name AS name").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("c.purl AS purl").
+			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, targetID).
+		ColumnExpr(`c.id AS "component_id"`).
+		ColumnExpr(`c.name AS "name"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		// What is open against it here, so descending follows the findings
 		// rather than being exploration.
 		// Narrowed like every other count. Without this a reader browsing the
@@ -618,11 +618,11 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		// visibility — and SQLite without statistics took the second, which
 		// matches every open row in the build, once per child: 0.30 s for
 		// the root's thirty children against 0.09 s as one grouped pass.
-		Join(`LEFT JOIN (SELECT f.component_id AS cid, COUNT(DISTINCT f.vulnerability_id) AS n
-			FROM "finding" AS f
+		Join(`LEFT JOIN (SELECT f.component_id AS "cid", COUNT(DISTINCT f.vulnerability_id) AS "n"
+			FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-			GROUP BY f.component_id) AS open ON open.cid = c.id`, targetID, bun.List(readable)).
-		ColumnExpr("COALESCE(open.n, 0) AS findings").
+			GROUP BY f.component_id) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
+		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`).
 		// Whether anything is under it, so a node that opens can be told from
 		// one that does not before somebody clicks it.
 		//
@@ -635,7 +635,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		// 0.106 s for one pass. An index on the node's component was tried
 		// first and made it worse (5.4 s to 10.0 s), because the scan being
 		// repeated is over the edges rather than the lookup it drives.
-		ColumnExpr("COALESCE(kids.n, 0) AS children").
+		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`).
 		Where("e.target_id = ?", targetID).
 		Where("nn.component_id = ?", componentID).
 		Where("e.closed_scan_id IS NULL").
@@ -717,8 +717,8 @@ func ranks(n Neighbor) int {
 func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID int64) ([]access.Visibility, error) {
 	var productID int64
 	err := s.db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("st.product_id").
 		Where("tg.id = ?", targetID).
 		Scan(ctx, &productID)
@@ -759,7 +759,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		return 0, 0, err
 	}
 	components, err := s.db.NewSelect().
-		TableExpr("graph_node AS n").
+		TableExpr(`graph_node AS "n"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Count(ctx)
@@ -767,7 +767,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		return 0, 0, fmt.Errorf("count what this build holds: %w", err)
 	}
 	edges, err := s.db.NewSelect().
-		TableExpr("graph_edge AS e").
+		TableExpr(`graph_edge AS "e"`).
 		Where("e.target_id = ?", targetID).
 		Where("e.closed_scan_id IS NULL").
 		Count(ctx)
@@ -804,21 +804,21 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 
 	var rows []Neighbor
 	err = s.db.NewSelect().
-		TableExpr("graph_node AS n").
-		Join("JOIN component AS c ON c.id = n.component_id").
-		Join(`LEFT JOIN (SELECT dp.component_id AS cid, COUNT(*) AS n
-			FROM "graph_edge" AS d
-			JOIN "graph_node" AS dp ON dp.id = d.parent_id
+		TableExpr(`graph_node AS "n"`).
+		Join(`JOIN component AS "c" ON c.id = n.component_id`).
+		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
+			FROM "graph_edge" AS "d"
+			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
 			WHERE d.target_id = ? AND d.closed_scan_id IS NULL
-			GROUP BY dp.component_id) AS kids ON kids.cid = c.id`, targetID).
-		ColumnExpr("c.name AS name").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("c.purl AS purl").
-		ColumnExpr(`(SELECT COUNT(*) FROM "finding" AS f
+			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, targetID).
+		ColumnExpr(`c.name AS "name"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
+		ColumnExpr(`(SELECT COUNT(*) FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.component_id = c.id
-			  AND f.closed_at IS NULL AND f.visibility IN (?)) AS findings`,
+			  AND f.closed_at IS NULL AND f.visibility IN (?)) AS "findings"`,
 			targetID, bun.List(readable)).
-		ColumnExpr("COALESCE(kids.n, 0) AS children").
+		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		// LOWER on both sides rather than a case-insensitive comparison,

@@ -268,8 +268,8 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		Exploited       bool   `bun:"exploited"`
 	}
 	err := findingsWith(w.db.NewSelect(), true).
-		ColumnExpr("MIN(f.visibility) AS visibility").
-		ColumnExpr("MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) = 1 AS exploited").
+		ColumnExpr(`MIN(f.visibility) AS "visibility"`).
+		ColumnExpr(`MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) = 1 AS "exploited"`).
 		Where("st.kind = ?", catalog.Tag).
 		Where("f.closed_at IS NULL").
 		Where("f.suppressed_by IS NULL").
@@ -446,7 +446,7 @@ func identify(what string) string {
 func (w *Watch) beingTold(ctx context.Context, kind Kind) ([]int64, error) {
 	var people []int64
 	err := w.db.NewSelect().
-		TableExpr("notification AS n").
+		TableExpr(`notification AS "n"`).
 		ColumnExpr("n.person_id").
 		Where("n.kind = ?", kind).
 		Where("n.cleared_at IS NULL").
@@ -496,24 +496,24 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	// number that makes somebody's absence look like a catastrophe.
 	held := w.db.NewSelect().
 		Distinct().
-		TableExpr("finding AS f").
-		ColumnExpr("f.assigned_to AS person_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
+		TableExpr(`finding AS "f"`).
+		ColumnExpr(`f.assigned_to AS "person_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("f.assigned_to IS NOT NULL").
 		Where("f.closed_at IS NULL")
 
 	if err := w.db.NewSelect().
-		TableExpr("person AS p").
+		TableExpr(`person AS "p"`).
 		// Joined on the party a person is assignable as, because that
 		// is what the assignment column holds.
-		Join("JOIN (?) AS work ON work.person_id = p.party_id", held).
-		ColumnExpr("p.id AS id").
-		ColumnExpr("p.identity AS identity").
-		ColumnExpr("COALESCE(p.display_name, '') AS name").
-		ColumnExpr("p.last_seen_at AS last_seen_at").
-		ColumnExpr("p.created_at AS created_at").
-		ColumnExpr("COUNT(*) AS holding").
+		Join(`JOIN (?) AS "work" ON work.person_id = p.party_id`, held).
+		ColumnExpr(`p.id AS "id"`).
+		ColumnExpr(`p.identity AS "identity"`).
+		ColumnExpr(`COALESCE(p.display_name, '') AS "name"`).
+		ColumnExpr(`p.last_seen_at AS "last_seen_at"`).
+		ColumnExpr(`p.created_at AS "created_at"`).
+		ColumnExpr(`COUNT(*) AS "holding"`).
 		// Never signed in counts too — somebody granted a role and given work
 		// who has not arrived is exactly the case worth raising — but it is
 		// measured from when they were **added**, not from the beginning of

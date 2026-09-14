@@ -318,10 +318,25 @@ in `AS groups`, and `GROUPS` is a reserved word in MySQL 8, where it names a
 window frame type. Three engines parsed it and one returned a syntax error,
 which the handler above turned into a 500 with the driver's message discarded.
 
-There are about two hundred and thirty invented names in the tree, so this is a
-gate rather than an audit. The words each engine reserves are held in one list
-with its provenance, asked of the running servers rather than typed, and a check
-reads every `AS` inside a query-building call.
+**A name a query invents is checked for being bare, not for being reserved.**
+The check compared each one against a list of 321 words the four engines
+reserve, which is a strictly weaker property than the rule it was the
+enforcement of: a name nobody has reserved *yet* passed, and MySQL 8.0 reserved
+`rank`, `groups`, `lead` and `cume_dist` with nothing refreshing the list. A
+quoted name does not match the pattern at all, so every hit is by construction
+an unquoted one and the fix is one pair of quotes. There were 1,418 of them
+against 34 already quoted, so no reader could tell which was the convention.
+
+The list of reserved words stays, for the other half. A name a migration
+*declares* is not invented — it was accepted by every engine when the migration
+ran — and the question there is whether it collides with a word one of them
+reserves, which is what a list of those words answers.
+
+The schema is also read back from the database and checked there, on the same
+principle as the index test: what matters is what an operator ends up with. The
+source-reading gate is blind to a name built by concatenation, which is the
+safe direction for a check that fails a build and not a reason to have only
+that check.
 
 The check reads source as text, because SQL is inside the strings and there is no
 parser here for four dialects. That makes it blind to an alias built by

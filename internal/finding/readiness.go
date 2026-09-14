@@ -103,12 +103,12 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 		StreamID int64 `bun:"stream_id"`
 	}
 	err = s.db.NewSelect().
-		TableExpr("stream AS st").
-		Join("JOIN target AS tg ON tg.stream_id = st.id").
-		ColumnExpr("st.id AS stream_id").
+		TableExpr(`stream AS "st"`).
+		Join(`JOIN target AS "tg" ON tg.stream_id = st.id`).
+		ColumnExpr(`st.id AS "stream_id"`).
 		Where("st.parent_id = ?", streamID).
 		Where("tg.variant_id = ?", variantID).
-		Where(`EXISTS (SELECT 1 FROM "scan_run" AS sr
+		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
 			WHERE sr.target_id = tg.id AND sr.finished_at IS NOT NULL)`).
 		OrderExpr("st.created_at DESC, st.id DESC").
 		Limit(1).
@@ -138,14 +138,14 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	// there is to answer.
 	inner := s.db.NewSelect().
 		Distinct().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
-		ColumnExpr(BandExpr+" AS band").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
+		ColumnExpr(BandExpr+` AS "band"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
 		Where("tg.stream_id = ?", streamID).
@@ -158,8 +158,8 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "counted"`, inner).
-		ColumnExpr("counted.band AS band").
-		ColumnExpr("COUNT(*) AS open").
+		ColumnExpr(`counted.band AS "band"`).
+		ColumnExpr(`COUNT(*) AS "open"`).
 		GroupExpr("counted.band").
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("count what this build holds: %w", err)
@@ -172,13 +172,13 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	}
 
 	if err := s.db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		ColumnExpr("tg.id AS target_id").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("st.kind AS kind").
-		ColumnExpr("va.display_name AS variant").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`tg.id AS "target_id"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`st.kind AS "kind"`).
+		ColumnExpr(`va.display_name AS "variant"`).
 		Where("tg.stream_id = ?", streamID).
 		Where("tg.variant_id = ?", variantID).
 		Limit(1).
@@ -191,7 +191,7 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	// and "never scanned" is an ordinary answer here rather than an error.
 	var finished []time.Time
 	if err := s.db.NewSelect().
-		TableExpr("scan_run AS sr").
+		TableExpr(`scan_run AS "sr"`).
 		ColumnExpr("sr.finished_at").
 		Where("sr.target_id = ?", standing.TargetID).
 		Where("sr.finished_at IS NOT NULL").

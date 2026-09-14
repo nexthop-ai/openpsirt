@@ -106,22 +106,22 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 		}
 		inner := s.db.NewSelect().
 			Distinct().
-			TableExpr("finding AS f").
-			Join(`JOIN "vulnerability" AS v ON v.id = f.vulnerability_id`).
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 			Join(RatedHere, productID).
-			ColumnExpr(BandExpr+" AS band").
-			ColumnExpr("f.vulnerability_id AS vulnerability_id").
-			ColumnExpr("f.component_id AS component_id").
-			ColumnExpr("CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END AS exploited",
+			ColumnExpr(BandExpr+` AS "band"`).
+			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+			ColumnExpr(`f.component_id AS "component_id"`).
+			ColumnExpr(`CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END AS "exploited"`,
 				int64(exploitedBand)).
 			Where("f.target_id = ?", targetID).
 			Where("f."+column+" = ?", runID).
 			Where("f.visibility IN (?)", bun.List(visible))
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
-			ColumnExpr("changed.band AS band").
-			ColumnExpr("COUNT(*) AS count").
-			ColumnExpr("SUM(changed.exploited) AS exploited").
+			ColumnExpr(`changed.band AS "band"`).
+			ColumnExpr(`COUNT(*) AS "count"`).
+			ColumnExpr(`SUM(changed.exploited) AS "exploited"`).
 			GroupExpr("changed.band").
 			Scan(ctx, &rows)
 		if err != nil {

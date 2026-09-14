@@ -344,10 +344,10 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 		Product *time.Time `bun:"product_eol"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("stream AS s").
-		Join(`JOIN "product" AS p ON p.id = s.product_id`).
-		ColumnExpr("s.eol_on AS stream_eol").
-		ColumnExpr("p.eol_on AS product_eol").
+		TableExpr(`stream AS "s"`).
+		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
+		ColumnExpr(`s.eol_on AS "stream_eol"`).
+		ColumnExpr(`p.eol_on AS "product_eol"`).
 		Where(where, arg).
 		Scan(ctx, &stated)
 	if err != nil {
@@ -371,9 +371,9 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 func (s *Store) TargetMoves(ctx context.Context, targetID int64) (bool, error) {
 	var kind string
 	err := s.db.NewSelect().
-		TableExpr(`"stream" AS s`).
+		TableExpr(`"stream" AS "s"`).
 		ColumnExpr("s.kind").
-		Where(`s.id IN (SELECT tg.stream_id FROM "target" AS tg WHERE tg.id = ?)`, targetID).
+		Where(`s.id IN (SELECT tg.stream_id FROM "target" AS "tg" WHERE tg.id = ?)`, targetID).
 		Scan(ctx, &kind)
 	if err != nil {
 		if database.IsNoRows(err) {
@@ -392,7 +392,7 @@ func (s *Store) TargetMoves(ctx context.Context, targetID int64) (bool, error) {
 func (s *Store) TagStreams(ctx context.Context) ([]int64, error) {
 	var ids []int64
 	if err := s.db.NewSelect().
-		TableExpr(`"stream" AS s`).
+		TableExpr(`"stream" AS "s"`).
 		ColumnExpr("s.id").
 		Where("s.kind = ?", Tag).Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which releases were built once: %w", err)
@@ -410,8 +410,8 @@ func (s *Store) StreamsPastEndOfLife(ctx context.Context, at time.Time) ([]int64
 	day := at.UTC().Truncate(24 * time.Hour)
 	var past []int64
 	err := s.db.NewSelect().
-		TableExpr("stream AS s").
-		Join(`JOIN "product" AS p ON p.id = s.product_id`).
+		TableExpr(`stream AS "s"`).
+		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
 		ColumnExpr("s.id").
 		// The release's own date where it has one, the product's otherwise —
 		// the same precedence a single read applies, written as a condition
@@ -481,15 +481,15 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 			ProductEOL *time.Time `bun:"product_eol"`
 		}
 		q := s.db.NewSelect().
-			TableExpr(`"stream" AS s`).
-			Join(`JOIN "product" AS p ON p.id = s.product_id`).
-			ColumnExpr("s.id AS stream_id").
-			ColumnExpr("s.name AS stream").
-			ColumnExpr("s.kind AS kind").
-			ColumnExpr("s.eol_on AS own_eol").
-			ColumnExpr("p.id AS product_id").
-			ColumnExpr("p.name AS product").
-			ColumnExpr("p.eol_on AS product_eol").
+			TableExpr(`"stream" AS "s"`).
+			Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
+			ColumnExpr(`s.id AS "stream_id"`).
+			ColumnExpr(`s.name AS "stream"`).
+			ColumnExpr(`s.kind AS "kind"`).
+			ColumnExpr(`s.eol_on AS "own_eol"`).
+			ColumnExpr(`p.id AS "product_id"`).
+			ColumnExpr(`p.name AS "product"`).
+			ColumnExpr(`p.eol_on AS "product_eol"`).
 			Where("s.id IN (?)", bun.List(batch)).
 			OrderExpr("p.name, s.name")
 		if !all {

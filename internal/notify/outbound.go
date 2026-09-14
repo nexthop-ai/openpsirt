@@ -413,9 +413,9 @@ func (s *Store) Destinations(ctx context.Context) ([]Configured, error) {
 			Because string `bun:"because"`
 		}
 		if err := s.db.NewSelect().Model((*Delivery)(nil)).
-			ColumnExpr("SUM(CASE WHEN od.sent_at IS NOT NULL THEN 1 ELSE 0 END) AS sent").
-			ColumnExpr("SUM(CASE WHEN od.sent_at IS NULL THEN 1 ELSE 0 END) AS failing").
-			ColumnExpr("MAX(COALESCE(od.failed, '')) AS because").
+			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NOT NULL THEN 1 ELSE 0 END) AS "sent"`).
+			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NULL THEN 1 ELSE 0 END) AS "failing"`).
+			ColumnExpr(`MAX(COALESCE(od.failed, '')) AS "because"`).
 			Where("od.outbound_id = ?", row.ID).
 			Scan(ctx, &counts); err != nil {
 			return nil, fmt.Errorf("read how it is doing: %w", err)

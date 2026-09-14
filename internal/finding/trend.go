@@ -98,25 +98,25 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		ClosedBecause   string     `bun:"closed_because"`
 	}
 	query := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		// An issue with no published severity is stored as '', not NULL, so
 		// the empty string is what has to be named — a COALESCE alone never
 		// fires and the chart's split gained a key with no name.
-		ColumnExpr("COALESCE(NULLIF(v.severity, ''), 'unknown') AS severity").
+		ColumnExpr(`COALESCE(NULLIF(v.severity, ''), 'unknown') AS "severity"`).
 		// Off the row, not through the run that opened it. That join was an
 		// inner one, so a finding with no run — one somebody recorded by hand
 		// — did not appear on the chart at all rather than appearing wrongly.
-		ColumnExpr("f.opened_at AS opened_at").
+		ColumnExpr(`f.opened_at AS "opened_at"`).
 		// And the closing off the row too, for the same reason and the same
 		// join. A finding a person closed has no run either, so reaching one
 		// for the moment dropped it from the chart exactly as the opening
 		// side used to — this is that lesson arriving on the other half.
-		ColumnExpr("f.closed_at AS closed_at").
-		ColumnExpr("COALESCE(f.closed_because, '') AS closed_because").
+		ColumnExpr(`f.closed_at AS "closed_at"`).
+		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
 		// Only what can fall in the range. A finding opened after the last
 		// point contributes to nothing, and one closed before the first
 		// contributes to nothing either — reading the whole table to discard

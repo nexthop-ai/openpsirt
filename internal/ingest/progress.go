@@ -310,7 +310,7 @@ func (s *Store) claims(ctx context.Context, targetID int64, credential string,
 		ID         int64     `bun:"id"`
 		ReceivedAt time.Time `bun:"received_at"`
 	}
-	q := s.db.NewSelect().TableExpr("scan AS sc").
+	q := s.db.NewSelect().TableExpr(`scan AS "sc"`).
 		Column("sc.id", "sc.received_at").
 		Where("sc.target_id = ?", targetID)
 	if credential != "" {

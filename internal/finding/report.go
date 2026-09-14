@@ -186,19 +186,19 @@ func (s *Store) Unacknowledged(ctx context.Context) ([]Unanswered, error) {
 		Private         int        `bun:"private"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("flaw_report AS fr").
-		Join(`JOIN "vulnerability" AS v ON v.id = fr.vulnerability_id`).
-		Join(`JOIN "finding" AS f ON f.vulnerability_id = fr.vulnerability_id`).
-		Join(`JOIN "target" AS tg ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
-		Join(`JOIN "product" AS p ON p.id = st.product_id`).
-		ColumnExpr("fr.vulnerability_id AS vulnerability_id").
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("MIN(p.name) AS product").
-		ColumnExpr("MIN(v.identifier) AS identifier").
-		ColumnExpr("MIN(fr.reported_by) AS reported_by").
-		ColumnExpr("MIN(fr.received_on) AS received_on").
-		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS private",
+		TableExpr(`flaw_report AS "fr"`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = fr.vulnerability_id`).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = fr.vulnerability_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+		ColumnExpr(`fr.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(v.identifier) AS "identifier"`).
+		ColumnExpr(`MIN(fr.reported_by) AS "reported_by"`).
+		ColumnExpr(`MIN(fr.received_on) AS "received_on"`).
+		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS "private"`,
 			access.Private).
 		Where("fr.acknowledged_at IS NULL").
 		Where("f.closed_at IS NULL").

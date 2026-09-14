@@ -69,19 +69,19 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = w.db.NewSelect().
-		TableExpr("decision AS de").
-		Join("JOIN product AS p ON p.id = de.product_id").
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("de.product_id AS product_id").
-		ColumnExpr("de.proposed_by AS proposed_by").
-		ColumnExpr("MIN(de.id) AS decision_id").
-		ColumnExpr("MIN(p.name) AS product").
-		ColumnExpr("MIN(de.proposed_at) AS proposed_at").
-		ColumnExpr("COUNT(*) AS rows_written").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN product AS "p" ON p.id = de.product_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`de.proposed_by AS "proposed_by"`).
+		ColumnExpr(`MIN(de.id) AS "decision_id"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(de.proposed_at) AS "proposed_at"`).
+		ColumnExpr(`COUNT(*) AS "rows_written"`).
 		// Counted rather than taken from an aggregate over the word itself. A
 		// visibility is a name and MIN over names would be answering "is any
 		// of this private" by alphabetical accident.
-		ColumnExpr("SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS private_rows",
+		ColumnExpr(`SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
 			access.Private).
 		Where("de.state = ?", triage.Proposed).
 		Where("de.needs_approval = ?", true).
@@ -162,14 +162,14 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = w.db.NewSelect().
-		TableExpr("decision AS de").
-		Join("JOIN product AS p ON p.id = de.product_id").
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("de.product_id AS product_id").
-		ColumnExpr("de.proposed_by AS proposed_by").
-		ColumnExpr("MIN(p.name) AS product").
-		ColumnExpr("MIN(de.sent_back_at) AS sent_back_at").
-		ColumnExpr("SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS private_rows",
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN product AS "p" ON p.id = de.product_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`de.proposed_by AS "proposed_by"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(de.sent_back_at) AS "sent_back_at"`).
+		ColumnExpr(`SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
 			access.Private).
 		Where("de.state = ?", triage.Proposed).
 		Where("de.sent_back_at IS NOT NULL").
@@ -242,17 +242,17 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = w.db.NewSelect().
-		TableExpr("decision AS de").
-		Join("JOIN product AS p ON p.id = de.product_id").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN product AS "p" ON p.id = de.product_id`).
 		// The argument, which is where the date lives.
-		Join("JOIN claim AS cl ON cl.id = de.claim_id").
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("de.product_id AS product_id").
-		ColumnExpr("de.proposed_by AS proposed_by").
-		ColumnExpr("MIN(p.name) AS product").
-		ColumnExpr("MIN(cl.deferred_until) AS until").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS private_rows",
+		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`de.proposed_by AS "proposed_by"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(cl.deferred_until) AS "until"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
 			access.Private).
 		// Standing only. A deferral that has been withdrawn or has lapsed is
 		// not one whose end anybody is waiting for — a lapsed one is already
@@ -345,25 +345,25 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	// and dozens of finding rows.
 	work := w.db.NewSelect().
 		Distinct().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		Join("JOIN team AS tm ON tm.party_id = f.assigned_to").
-		ColumnExpr("tm.id AS team_id").
-		ColumnExpr("tm.display_name AS team_display").
-		ColumnExpr("tm.name AS team_name").
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("f.visibility AS visibility").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN team AS "tm" ON tm.party_id = f.assigned_to`).
+		ColumnExpr(`tm.id AS "team_id"`).
+		ColumnExpr(`tm.display_name AS "team_display"`).
+		ColumnExpr(`tm.name AS "team_name"`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`f.visibility AS "visibility"`).
 		Where("f.closed_at IS NULL").
 		Where("f.assigned_at IS NOT NULL").
 		Where("f.assigned_at <= ?", since).
 		Where("tm.retired_at IS NULL").
 		Where("NOT EXISTS (?)", w.db.NewSelect().
-			TableExpr("decision AS de").
+			TableExpr(`decision AS "de"`).
 			ColumnExpr("1").
 			Where("de.product_id = st.product_id").
 			Where("de.vulnerability_id = f.vulnerability_id").
@@ -373,17 +373,17 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 
 	err = w.db.NewSelect().
 		TableExpr(`(?) AS "q"`, work).
-		ColumnExpr("q.team_id AS team_id").
-		ColumnExpr("MIN(COALESCE(NULLIF(q.team_display, ''), q.team_name)) AS team").
+		ColumnExpr(`q.team_id AS "team_id"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF(q.team_display, ''), q.team_name)) AS "team"`).
 		// The matched name for the link and the typed one for the sentence:
 		// what a screen resolves a queue by is not what somebody calls it.
-		ColumnExpr("MIN(q.team_name) AS team_name").
-		ColumnExpr("q.product_id AS product_id").
-		ColumnExpr("MIN(p.name) AS product").
-		ColumnExpr("COUNT(*) AS waiting").
-		ColumnExpr("SUM(CASE WHEN q.visibility = ? THEN 1 ELSE 0 END) AS private_rows",
+		ColumnExpr(`MIN(q.team_name) AS "team_name"`).
+		ColumnExpr(`q.product_id AS "product_id"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`COUNT(*) AS "waiting"`).
+		ColumnExpr(`SUM(CASE WHEN q.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
 			access.Private).
-		Join("JOIN product AS p ON p.id = q.product_id").
+		Join(`JOIN product AS "p" ON p.id = q.product_id`).
 		GroupExpr("q.team_id, q.product_id").
 		Scan(ctx, &rows)
 	if err != nil {

@@ -63,7 +63,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	limit = database.AComponentsWorth.Of(limit)
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.TableExpr("finding AS f").
+		q = q.TableExpr(`finding AS "f"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.component_id = ?", componentID).
 			Where("f.closed_at IS NULL").
@@ -80,7 +80,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// nobody saw. A backslash matched differently on each engine
 			// besides.
 			q = q.Where("f.vulnerability_id IN (?)",
-				q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
+				q.NewSelect().TableExpr(`vulnerability AS "v"`).Column("v.id").
 					Where(`LOWER(v.description) LIKE ? ESCAPE '#'`,
 						"%"+containsTerm(contains)+"%"))
 		}
@@ -107,9 +107,9 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		return nil, 0, 0, fmt.Errorf("count how far these reach: %w", err)
 	}
 	err = narrow(s.db.NewSelect()).
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("COUNT(*) OVER () AS total").
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr("f.vulnerability_id").
 		OrderExpr("MAX(f.urgency) DESC, f.vulnerability_id").
 		Limit(limit).Offset(offset).
@@ -146,11 +146,11 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	if len(issues) > 0 {
 		var rows []shown
 		err = s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-			ColumnExpr("f.vulnerability_id AS vulnerability_id").
-			ColumnExpr("MIN(COALESCE(v.score_centi, 0)) AS severity_centi").
-			ColumnExpr("MIN(COALESCE(f.fixed_in, '')) AS fixed_in").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+			ColumnExpr(`MIN(COALESCE(v.score_centi, 0)) AS "severity_centi"`).
+			ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.component_id = ?", componentID).
 			Where("f.closed_at IS NULL").
@@ -206,14 +206,14 @@ func (s *Store) placesOf(ctx context.Context, targetID, componentID int64, issue
 		ConsumerUpstream  string `bun:"consumer_upstream"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("f.visibility AS visibility").
-		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
-		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`f.visibility AS "visibility"`).
+		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
+		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.component_id = ?", componentID).
 		Where("f.closed_at IS NULL").

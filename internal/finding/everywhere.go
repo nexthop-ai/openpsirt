@@ -64,13 +64,13 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	}
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.TableExpr("finding AS f").
-			Join(`JOIN "target" AS tg ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
-			Join(`JOIN "variant" AS va ON va.id = tg.variant_id`).
-			Join(`JOIN "product" AS p ON p.id = st.product_id`).
-			Join(`JOIN "component" AS c ON c.id = f.component_id`).
-			Join(`LEFT JOIN "component" AS uc ON uc.id = f.consumer_id`).
+		q = q.TableExpr(`finding AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			Where("f.vulnerability_id = ?", vulnerabilityID).
 			Where("f.closed_at IS NULL")
 		return onlyReadable(q, subject, products, all)
@@ -100,16 +100,16 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		FixedIn     string     `bun:"fixed_in"`
 	}
 	sightings := narrow(s.db.NewSelect()).
-		ColumnExpr("p.name AS product").
-		ColumnExpr("COALESCE(NULLIF(p.display_name, ''), p.name) AS product_name").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("va.name AS variant").
-		ColumnExpr("c.name AS component").
-		ColumnExpr("MIN(c.version) AS version").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS private", access.Private).
-		ColumnExpr("MIN(f.due_at) AS due_at").
-		ColumnExpr("MIN(COALESCE(f.fixed_in, '')) AS fixed_in")
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`MIN(c.version) AS "version"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS "private"`, access.Private).
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`)
 	// How far each place has been decided, the same counts the findings list
 	// carries and by the same conditions, so the two agree about what
 	// "agreed" means. Nothing here asks whether a claim is with its author,

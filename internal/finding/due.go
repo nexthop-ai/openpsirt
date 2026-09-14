@@ -226,33 +226,33 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 
 	standing, args := OffTheClock("st.product_id", s.now())
 	query := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		Join("JOIN product AS p ON p.id = st.product_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN product AS "p" ON p.id = st.product_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		// The consumer, for the versions a decision is keyed on.
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("v.identifier AS vulnerability").
-		ColumnExpr("c.name AS component").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("MIN(COALESCE(v.severity, '')) AS severity").
-		ColumnExpr("f.urgency_exploited AS exploited").
-		ColumnExpr("p.display_name AS product").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("va.display_name AS variant").
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`MIN(COALESCE(v.severity, '')) AS "severity"`).
+		ColumnExpr(`f.urgency_exploited AS "exploited"`).
+		ColumnExpr(`p.display_name AS "product"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`va.display_name AS "variant"`).
 		// The earliest of the places this row covers, because that is the one
 		// that makes the whole group late.
-		ColumnExpr("MIN(f.due_at) AS due").
-		ColumnExpr("COUNT(*) AS places").
+		ColumnExpr(`MIN(f.due_at) AS "due"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		// Named only where every place has the same person. Reporting one of
 		// several would tell somebody a finding is being dealt with when most
 		// of it is not.
-		ColumnExpr("MIN(f.assigned_to) AS assigned_to").
-		ColumnExpr("MAX(f.assigned_to) AS assigned_high").
-		ColumnExpr("COUNT(f.assigned_to) AS assigned_count").
+		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
+		ColumnExpr(`MAX(f.assigned_to) AS "assigned_high"`).
+		ColumnExpr(`COUNT(f.assigned_to) AS "assigned_count"`).
 		Where("f.closed_at IS NULL").
 		Where("f.due_at IS NOT NULL").
 		Where("f.due_at <= ?", s.now().UTC().Add(within)).
@@ -347,9 +347,9 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		// more rows.
 		var opened []time.Time
 		err := s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("f.opened_at").
 			Where("f.closed_at IS NULL").
 			Where("st.product_id = ?", productID).
@@ -373,7 +373,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		rated := func(words ...string) func(*bun.UpdateQuery) *bun.UpdateQuery {
 			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
 				return q.Where("urgency_exploited = ?", false).
-					Where(`vulnerability_id IN (SELECT v.id FROM "vulnerability" AS v `+
+					Where(`vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v" `+
 						RatedHere+` WHERE `+BandExpr+` IN (?))`,
 						productID, bun.List(words))
 			}
@@ -516,7 +516,7 @@ func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (
 			Set("due_at = NULL").
 			Where("closed_at IS NULL").
 			Where("due_at IS NOT NULL").
-			Where(`target_id IN (SELECT tg.id FROM "target" AS tg
+			Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
 				WHERE tg.stream_id IN (?))`, bun.List(batch)).
 			Exec(ctx)
 		if err != nil {
@@ -560,7 +560,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 			Where("due_at IS NOT NULL").
 			Where("urgency_exploited = ?", false).
 			Where(inThisProduct, productID).
-			Where(`vulnerability_id NOT IN (SELECT v.id FROM "vulnerability" AS v `+
+			Where(`vulnerability_id NOT IN (SELECT v.id FROM "vulnerability" AS "v" `+
 				RatedHere+` WHERE `+BandExpr+` IN (?))`, productID, bun.List(words)).
 			Exec(ctx)
 		if err != nil {
@@ -590,7 +590,7 @@ const recomputeSlice = 20_000
 func (s *Store) everyProduct(ctx context.Context) ([]int64, error) {
 	var products []int64
 	if err := s.db.NewSelect().
-		TableExpr("product AS p").
+		TableExpr(`product AS "p"`).
 		ColumnExpr("p.id").
 		OrderExpr("p.id").
 		Scan(ctx, &products); err != nil {

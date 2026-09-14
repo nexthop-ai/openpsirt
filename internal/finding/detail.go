@@ -311,9 +311,9 @@ func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]string, 
 		Version string `bun:"version"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"component" AS c`).
-		ColumnExpr("c.id AS id").
-		ColumnExpr("c.version AS version").
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr(`c.id AS "id"`).
+		ColumnExpr(`c.version AS "version"`).
 		Where("c.id IN (?)", bun.List(ids)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what those ship at: %w", err)
 	}
@@ -418,25 +418,25 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 	var rows []evidenceRow
 	err = s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("COALESCE(uc.name, '') AS consumer").
-		ColumnExpr("f.consumer_id AS consumer_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
+		ColumnExpr(`f.consumer_id AS "consumer_id"`).
 		// Which package of the fold this place is. A fold covers every binary
 		// one source package was built at one version, so a place named only
 		// by its consumer would leave a reader unable to tell curl's from
 		// libcurl4t64's.
-		ColumnExpr("c.name AS component").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("f.visibility AS visibility").
-		ColumnExpr("f.disclose_at AS disclose_at").
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`f.visibility AS "visibility"`).
+		ColumnExpr(`f.disclose_at AS "disclose_at"`).
 		// When it runs out, and why it does not where it has none. The
 		// list carries both and the finding's own screen carried
 		// neither, so somebody looking at the one row that matters had
 		// to go back to the list to find out when it was due.
-		ColumnExpr("f.due_at AS due_at").
+		ColumnExpr(`f.due_at AS "due_at"`).
 		// A live claim standing at this place, whatever its state. Proposed
 		// and waiting counts: it is answered as far as the person looking at
 		// it is concerned, and showing it as untouched invites a second claim
@@ -447,47 +447,47 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// that ships the same component reads as standing on this screen; and
 		// a live claim is about the versions it was keyed on, so without the
 		// second a claim about last release's version answers for this one.
-		ColumnExpr(`(SELECT MIN(de.id) FROM "decision" AS de
+		ColumnExpr(`(SELECT MIN(de.id) FROM "decision" AS "de"
 			WHERE de.product_id = ?
 			  AND de.vulnerability_id = f.vulnerability_id
 			  AND de.place_identity = f.place_identity
 			  AND de.live_key IS NOT NULL
-			  AND `+KeyMatches+`) AS decision`, productID).
+			  AND `+KeyMatches+`) AS "decision"`, productID).
 		// And which claim that decision is a row of, so that a claim
 		// shown on the finding can name the places it covers rather
 		// than only count them. At most one live decision stands per
 		// combination of code , so this is the same single row the
 		// column above reaches.
-		ColumnExpr(`(SELECT MIN(de.claim_id) FROM "decision" AS de
+		ColumnExpr(`(SELECT MIN(de.claim_id) FROM "decision" AS "de"
 			WHERE de.product_id = ?
 			  AND de.vulnerability_id = f.vulnerability_id
 			  AND de.place_identity = f.place_identity
 			  AND de.live_key IS NOT NULL
-			  AND `+KeyMatches+`) AS claim`, productID).
-		ColumnExpr("CASE WHEN f.suppressed_by IS NULL THEN ? ELSE ? END AS suppressed", false, true).
-		ColumnExpr("f.urgency AS urgency").
-		ColumnExpr("f.fix_state AS fix_state").
-		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("f.fixed_at AS fixed_at").
-		ColumnExpr("COALESCE(f.matched, '') AS matched").
-		ColumnExpr("COALESCE(f.matched_from, '') AS matched_from").
-		ColumnExpr("COALESCE(f.matched_in, '') AS matched_in").
-		ColumnExpr("COALESCE(f.matched_range, '') AS matched_range").
-		ColumnExpr("COALESCE(f.arrived_from, '') AS arrived_from").
-		ColumnExpr("f.kind AS kind").
+			  AND `+KeyMatches+`) AS "claim"`, productID).
+		ColumnExpr(`CASE WHEN f.suppressed_by IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
+		ColumnExpr(`f.urgency AS "urgency"`).
+		ColumnExpr(`f.fix_state AS "fix_state"`).
+		ColumnExpr(`f.fixed_in AS "fixed_in"`).
+		ColumnExpr(`f.fixed_at AS "fixed_at"`).
+		ColumnExpr(`COALESCE(f.matched, '') AS "matched"`).
+		ColumnExpr(`COALESCE(f.matched_from, '') AS "matched_from"`).
+		ColumnExpr(`COALESCE(f.matched_in, '') AS "matched_in"`).
+		ColumnExpr(`COALESCE(f.matched_range, '') AS "matched_range"`).
+		ColumnExpr(`COALESCE(f.arrived_from, '') AS "arrived_from"`).
+		ColumnExpr(`f.kind AS "kind"`).
 		// When this place first appeared here and which run put it
 		// there . The run is the provenance of the finding, and it is
 		// the only thing that can answer which vulnerability database
 		// produced it.
-		ColumnExpr("f.opened_at AS opened_at").
-		ColumnExpr("f.opened_run_id AS opened_run_id").
+		ColumnExpr(`f.opened_at AS "opened_at"`).
+		ColumnExpr(`f.opened_run_id AS "opened_run_id"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		// The fold rather than the one component named. One judgment covers
 		// the whole fold, so the screen a judgment is made from has to show
 		// the whole of what it would answer — a form that recorded twelve
 		// places having shown six is a form nobody can trust.
-		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS c2 WHERE c2.id = ?)`,
+		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
 			componentID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -640,12 +640,12 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 		Identity *string `bun:"identity"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
+		TableExpr(`finding AS "f"`).
 		// Joined on the party a person is assignable as, which is what
 		// the assignment column holds. A team's queue names no person
 		// and answers empty here, which is what a queue is.
-		Join(`LEFT JOIN "person" AS p ON p.party_id = f.assigned_to`).
-		ColumnExpr("p.identity AS identity").
+		Join(`LEFT JOIN "person" AS "p" ON p.party_id = f.assigned_to`).
+		ColumnExpr(`p.identity AS "identity"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.component_id = ?", componentID).
@@ -674,9 +674,9 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 		Name *string `bun:"name"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join(`LEFT JOIN "routing_rule" AS rr ON rr.id = f.routed_by`).
-		ColumnExpr("rr.name AS name").
+		TableExpr(`finding AS "f"`).
+		Join(`LEFT JOIN "routing_rule" AS "rr" ON rr.id = f.routed_by`).
+		ColumnExpr(`rr.name AS "name"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.component_id = ?", componentID).

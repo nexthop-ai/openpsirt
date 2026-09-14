@@ -73,8 +73,8 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 	}
 	var productID int64
 	err := s.db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("st.product_id").
 		Where("tg.id = ?", targetID).
 		Scan(ctx, &productID)
@@ -89,12 +89,12 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		Issues      int    `bun:"issues"`
 	}
 	held := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join(`JOIN "component" AS c ON c.id = f.component_id`).
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("MIN(c.name) AS name").
-		ColumnExpr("MIN(c.version) AS version").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`MIN(c.name) AS "name"`).
+		ColumnExpr(`MIN(c.version) AS "version"`).
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.closed_at IS NULL").
 		Where("f.assigned_to IN (?)", bun.List(mine)).

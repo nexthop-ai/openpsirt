@@ -78,8 +78,8 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	// paths that drift.
 	remove := db.NewDelete().Model((*Upgrade)(nil)).
 		Where("fold_key = ?", fold).
-		Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-			JOIN "stream" AS st ON st.id = tg.stream_id
+		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+			JOIN "stream" AS "st" ON st.id = tg.stream_id
 			WHERE st.product_id = ?)`, productID)
 	if len(wanted) > 0 {
 		remove = remove.Where("target_id NOT IN (?)", bun.List(wanted))
@@ -96,11 +96,11 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	// core.
 	var already []int64
 	if err := db.NewSelect().
-		TableExpr("upgrade AS ug").
+		TableExpr(`upgrade AS "ug"`).
 		ColumnExpr("ug.target_id").
 		Where("ug.fold_key = ?", fold).
-		Where(`ug.target_id IN (SELECT tg.id FROM "target" AS tg
-			JOIN "stream" AS st ON st.id = tg.stream_id
+		Where(`ug.target_id IN (SELECT tg.id FROM "target" AS "tg"
+			JOIN "stream" AS "st" ON st.id = tg.stream_id
 			WHERE st.product_id = ?)`, productID).
 		Scan(ctx, &already); err != nil {
 		return 0, fmt.Errorf("read what is already committed: %w", err)
@@ -274,11 +274,11 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 		Places int    `bun:"places"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		ColumnExpr(FoldedOn+" AS fold").
-		ColumnExpr("COUNT(DISTINCT f.vulnerability_id) AS issues").
-		ColumnExpr("COUNT(*) AS places").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		ColumnExpr(FoldedOn+` AS "fold"`).
+		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -373,11 +373,11 @@ func (s *Store) packagesIn(ctx context.Context, targetID int64,
 		Name     string `bun:"name"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		ColumnExpr(FoldedOn+" AS fold").
-		ColumnExpr(PerFold(SourceName)+" AS upstream").
-		ColumnExpr("c.name AS name").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		ColumnExpr(FoldedOn+` AS "fold"`).
+		ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
+		ColumnExpr(`c.name AS "name"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
@@ -415,20 +415,20 @@ func (s *Store) heldPerFold(ctx context.Context, targetID int64,
 		Held   int    `bun:"held"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		ColumnExpr(FoldedOn+" AS fold").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		ColumnExpr(FoldedOn+` AS "fold"`).
 		// The party rather than a name: the column holds a party, which may be
 		// a person or a team, and the name is looked up once for the few that
 		// come back rather than joined per row.
-		ColumnExpr("MIN(f.assigned_to) AS least_holder").
-		ColumnExpr("MAX(f.assigned_to) AS most_holder").
+		ColumnExpr(`MIN(f.assigned_to) AS "least_holder"`).
+		ColumnExpr(`MAX(f.assigned_to) AS "most_holder"`).
 		// Two counts rather than a conditional sum: that sum comes back as a
 		// decimal on two of the four engines, and the cast that makes it an
 		// integer is spelled per engine. Counted, a group is wholly held when
 		// the count of holders is the count of rows.
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("COUNT(f.assigned_to) AS held").
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`COUNT(f.assigned_to) AS "held"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -508,9 +508,9 @@ func (s *Store) partiesNamed(ctx context.Context, parties map[int64]bool) (map[i
 		Name    string `bun:"name"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("person AS p").
-		ColumnExpr("p.party_id AS party_id").
-		ColumnExpr("p.identity AS name").
+		TableExpr(`person AS "p"`).
+		ColumnExpr(`p.party_id AS "party_id"`).
+		ColumnExpr(`p.identity AS "name"`).
 		Where("p.party_id IN (?)", bun.List(ids)).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -525,9 +525,9 @@ func (s *Store) partiesNamed(ctx context.Context, parties map[int64]bool) (map[i
 		Name    string `bun:"name"`
 	}
 	err = s.db.NewSelect().
-		TableExpr("team AS t").
-		ColumnExpr("t.party_id AS party_id").
-		ColumnExpr("t.name AS name").
+		TableExpr(`team AS "t"`).
+		ColumnExpr(`t.party_id AS "party_id"`).
+		ColumnExpr(`t.name AS "name"`).
 		Where("t.party_id IN (?)", bun.List(ids)).
 		Scan(ctx, &teams)
 	if err != nil {
@@ -550,9 +550,9 @@ func (s *Store) foldOf(ctx context.Context, db bun.IDB, componentID int64) (key,
 		From    string `bun:"from_version"`
 	}
 	err = db.NewSelect().
-		TableExpr(`"component" AS c`).
-		ColumnExpr("c.fold_key AS fold_key").
-		ColumnExpr("COALESCE(NULLIF(c.upstream_version, ''), c.version, '') AS from_version").
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr(`c.fold_key AS "fold_key"`).
+		ColumnExpr(`COALESCE(NULLIF(c.upstream_version, ''), c.version, '') AS "from_version"`).
 		Where("c.id = ?", componentID).Scan(ctx, &row)
 	if err != nil {
 		return "", "", fmt.Errorf("read what that component folds to: %w", err)
@@ -591,8 +591,8 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	}
 	var here []int64
 	err := db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("tg.id").
 		Where("st.product_id = ?", productID).
 		Where("tg.id IN (?)", bun.List(builds)).
@@ -622,7 +622,7 @@ func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64
 	}
 	var retired []int64
 	err = db.NewSelect().
-		TableExpr("target AS tg").
+		TableExpr(`target AS "tg"`).
 		ColumnExpr("tg.id").
 		Where("tg.id IN (?)", bun.List(ids)).
 		Where("tg.stream_id IN (?)", bun.List(past)).

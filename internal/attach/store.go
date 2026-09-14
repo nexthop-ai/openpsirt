@@ -62,15 +62,15 @@ func visibilityOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 		Private int `bun:"undisclosed"`
 	}
 	err := db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		ColumnExpr("COUNT(*) AS here").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`COUNT(*) AS "here"`).
 		// Counted rather than summed over a CASE. That shape comes back as a
 		// decimal on two of the four engines and the cast that fixes it is
 		// spelled per engine, which is why the rule says to write two counts
 		// — and this was the second copy of a shape recorded as removed.
-		ColumnExpr("COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS undisclosed",
+		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "undisclosed"`,
 			access.Private).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
@@ -279,7 +279,7 @@ func roomIn(ctx context.Context, db bun.IDB, size, quota int64) error {
 	}
 	var held int64
 	if err := db.NewSelect().
-		TableExpr("attachment AS at").
+		TableExpr(`attachment AS "at"`).
 		ColumnExpr("COALESCE(SUM(at.size_bytes), 0)").
 		Where("at.redacted_at IS NULL").
 		Scan(ctx, &held); err != nil {
@@ -304,7 +304,7 @@ func shareLeft(ctx context.Context, db bun.IDB, personID, size, share int64) err
 	}
 	var held int64
 	if err := db.NewSelect().
-		TableExpr("attachment AS at").
+		TableExpr(`attachment AS "at"`).
 		ColumnExpr("COALESCE(SUM(at.size_bytes), 0)").
 		Where("at.redacted_at IS NULL").
 		Where("at.uploaded_by = ?", personID).

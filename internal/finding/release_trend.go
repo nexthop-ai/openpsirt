@@ -67,30 +67,30 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	// over two columns has no spelling all four engines share.
 	inner := s.db.NewSelect().
 		Distinct().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedFor(RatedOnStream)).
-		ColumnExpr("st.display_name AS stream").
+		ColumnExpr(`st.display_name AS "stream"`).
 		// When it went out, where somebody said, and when it was declared
 		// here otherwise. Ordering by the declaration alone made this chart an
 		// accident of administration: a release recorded months after it
 		// shipped sorted after ones that came out later, and a year
 		// backfilled in an afternoon plotted as a single day.
-		ColumnExpr("COALESCE(st.released_on, st.created_at) AS created_at").
-		ColumnExpr(BandExpr+" AS band").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
+		ColumnExpr(`COALESCE(st.released_on, st.created_at) AS "created_at"`).
+		ColumnExpr(BandExpr+` AS "band"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		Where("st.kind = ?", "tag").
 		Where("f.closed_at IS NULL")
 	inner = scope.Narrow(onlyReadable(inner, subject, products, all))
 
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_release"`, inner).
-		ColumnExpr("per_release.stream AS stream").
-		ColumnExpr("per_release.created_at AS created_at").
-		ColumnExpr("per_release.band AS band").
-		ColumnExpr("COUNT(*) AS open").
+		ColumnExpr(`per_release.stream AS "stream"`).
+		ColumnExpr(`per_release.created_at AS "created_at"`).
+		ColumnExpr(`per_release.band AS "band"`).
+		ColumnExpr(`COUNT(*) AS "open"`).
 		GroupExpr("per_release.stream, per_release.created_at, per_release.band").
 		// Newest last, so the chart reads left to right the way time does.
 		OrderExpr("created_at, stream, band").

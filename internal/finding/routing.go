@@ -209,8 +209,8 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		Column("id").
 		Where("closed_at IS NULL").
 		Where("assigned_to IS NULL").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-			JOIN "stream" AS st ON st.id = tg.stream_id
+		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+			JOIN "stream" AS "st" ON st.id = tg.stream_id
 			WHERE st.product_id = ?)`, productID).
 		Limit(room)
 	if rule.Upstream != "" {
@@ -275,10 +275,10 @@ func bySource(query *bun.SelectQuery, pattern string) *bun.SelectQuery {
 	// is an equality test and it can use the index.
 	const name = `COALESCE(NULLIF(c.upstream_folded, ''), c.name_folded)`
 	if glob, like := globbed(pattern); glob {
-		return query.Where(`component_id IN (SELECT c.id FROM "component" AS c
+		return query.Where(`component_id IN (SELECT c.id FROM "component" AS "c"
 			WHERE `+name+` LIKE ? ESCAPE '#')`, like)
 	}
-	return query.Where(`component_id IN (SELECT c.id FROM "component" AS c
+	return query.Where(`component_id IN (SELECT c.id FROM "component" AS "c"
 		WHERE `+name+` = ?)`, pattern)
 }
 
@@ -374,8 +374,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible)).
-			Where(`f.target_id IN (SELECT tg.id FROM "target" AS tg
-				JOIN "stream" AS st ON st.id = tg.stream_id
+			Where(`f.target_id IN (SELECT tg.id FROM "target" AS "tg"
+				JOIN "stream" AS "st" ON st.id = tg.stream_id
 				WHERE st.product_id = ?)`, productID)
 		if upstream != "" {
 			q = bySource(q, upstream)
@@ -396,9 +396,9 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	}
 
 	var found Catches
-	names, err := narrow(s.db.NewSelect().TableExpr("finding AS f").
-		Join(`JOIN "component" AS cn ON cn.id = f.component_id`).
-		ColumnExpr("DISTINCT cn.name AS name").
+	names, err := narrow(s.db.NewSelect().TableExpr(`finding AS "f"`).
+		Join(`JOIN "component" AS "cn" ON cn.id = f.component_id`).
+		ColumnExpr(`DISTINCT cn.name AS "name"`).
 		OrderExpr("cn.name").
 		Limit(sample + 1))
 	if err != nil {
@@ -417,8 +417,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		found.Components = shown
 	}
 
-	counted, err := narrow(s.db.NewSelect().TableExpr("finding AS f").
-		Join(`JOIN "component" AS c ON c.id = f.component_id`).
+	counted, err := narrow(s.db.NewSelect().TableExpr(`finding AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr("DISTINCT f.vulnerability_id, f.component_id"))
 	if err != nil {
 		return Catches{}, err
@@ -429,8 +429,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	}
 	found.Work = work
 
-	unheld, err := narrow(s.db.NewSelect().TableExpr("finding AS f").
-		Join(`JOIN "component" AS c ON c.id = f.component_id`).
+	unheld, err := narrow(s.db.NewSelect().TableExpr(`finding AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr("DISTINCT f.vulnerability_id, f.component_id").
 		Where("f.assigned_to IS NULL"))
 	if err != nil {
@@ -454,8 +454,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]int64, error) {
 	var builds []int64
 	err := s.db.NewSelect().
-		TableExpr("target AS tg").
-		Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("tg.id").
 		Where("st.product_id = ?", productID).
 		Scan(ctx, &builds)
@@ -468,8 +468,8 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 	for _, build := range builds {
 		var roots []int64
 		if err := s.db.NewSelect().
-			TableExpr("graph_node AS n").
-			Join(`JOIN "component" AS c ON c.id = n.component_id`).
+			TableExpr(`graph_node AS "n"`).
+			Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
 			ColumnExpr("DISTINCT n.component_id").
 			Where("n.target_id = ?", build).
 			Where("n.closed_scan_id IS NULL").
@@ -510,9 +510,9 @@ func (s *Store) partiesOf(ctx context.Context, rules []Routing) (map[int64]int64
 		PartyID int64 `bun:"party_id"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("team AS tm").
-		ColumnExpr("tm.id AS id").
-		ColumnExpr("tm.party_id AS party_id").
+		TableExpr(`team AS "tm"`).
+		ColumnExpr(`tm.id AS "id"`).
+		ColumnExpr(`tm.party_id AS "party_id"`).
 		Where("tm.id IN (?)", bun.List(ids)).
 		Where("tm.retired_at IS NULL").
 		Scan(ctx, &rows)

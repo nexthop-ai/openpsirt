@@ -529,7 +529,7 @@ func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, 
 		Set("state = ?", Approved).
 		Where("id IN (?)", bun.List(ids)).
 		Where("state = ?", Proposed).
-		Where(`EXISTS (SELECT 1 FROM "claim" AS ac WHERE ac.id = ? AND ac.revision_id = ?)`,
+		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE ac.id = ? AND ac.revision_id = ?)`,
 			claim.ID, *claim.RevisionID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record an approval: %w", err)

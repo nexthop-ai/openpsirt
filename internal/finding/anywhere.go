@@ -131,15 +131,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 				q = q.Where("st.id NOT IN (?)", bun.List(pastEOL))
 			}
 		}
-		q = q.TableExpr("finding AS f").
-			Join(`JOIN "target" AS tg ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
-			Join(`JOIN "product" AS p ON p.id = st.product_id`).
+		q = q.TableExpr(`finding AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 			// The issue is joined for everybody here, unlike the per-product
 			// page: the line this list applies is the row's own product's, so
 			// the rating has to be compared in the statement rather than
 			// turned into a list of admitted words before it.
-			Join(`JOIN "vulnerability" AS v ON v.id = f.vulnerability_id`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 			// And whatever the row's own product rates it, for the same
 			// reason: a rating belongs to a product, so a list spanning them
 			// reads each row's against the product that row is in.
@@ -147,7 +147,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
-			Join(`JOIN "component" AS c ON c.id = f.component_id`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 			Where("f.closed_at IS NULL")
 		q = onlyReadable(q, subject, products, all)
 		if !wasBelow {
@@ -175,13 +175,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Total           int    `bun:"total"`
 	}
 	page := narrow(s.db.NewSelect()).
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr(FoldedOn + " AS fold").
-		ColumnExpr("MIN(f.component_id) AS component_id").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("MAX(f.urgency) AS urgency").
-		ColumnExpr("COUNT(*) OVER () AS total").
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(FoldedOn + ` AS "fold"`).
+		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(GroupedAcross)
 	if err := page.OrderExpr(sortedAcross(filter)).
 		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {
@@ -229,39 +229,39 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		decorated
 	}
 	body := narrow(s.db.NewSelect()).
-		Join(`JOIN "variant" AS va ON va.id = tg.variant_id`).
-		Join(`LEFT JOIN "component" AS uc ON uc.id = f.consumer_id`).
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("MIN(p.name) AS product").
-		ColumnExpr("MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS product_name").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr(FoldedOn+" AS fold").
-		ColumnExpr("MIN(f.component_id) AS component_id").
-		ColumnExpr("COUNT(DISTINCT f.component_id) AS packages").
-		ColumnExpr("MIN(st.name) AS stream").
-		ColumnExpr("MIN(va.name) AS variant").
-		ColumnExpr("COUNT(DISTINCT f.target_id) AS builds").
-		ColumnExpr("COUNT(*) AS places").
-		ColumnExpr("MAX(f.urgency) AS urgency").
-		ColumnExpr("MAX(COALESCE(v.likelihood_ppm, 0)) AS likelihood_ppm").
-		ColumnExpr("MAX(COALESCE(v.score_centi, 0)) AS score_centi").
-		ColumnExpr("SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS answered").
-		ColumnExpr("MIN(f.opened_at) AS opened_at").
-		ColumnExpr("MIN(f.due_at) AS due_at").
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS "product_name"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(FoldedOn+` AS "fold"`).
+		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
+		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
+		ColumnExpr(`MIN(st.name) AS "stream"`).
+		ColumnExpr(`MIN(va.name) AS "variant"`).
+		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
+		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
+		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
+		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 		// One undisclosed place makes the group undisclosed, counted rather
 		// than aggregated over the word — a maximum of the word returns
 		// "public" for a mixed group, which is the one case it matters for.
-		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS undisclosed",
+		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
-		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
-		ColumnExpr("MIN(f.fix_state) AS fix_state").
-		ColumnExpr("MIN(f.fixed_in) AS fixed_in").
-		ColumnExpr("MIN(COALESCE(f.matched, '')) AS matched").
-		ColumnExpr("MIN(f.target_id) AS target_id").
-		ColumnExpr("MIN(f.consumer_id) AS consumer_id").
-		ColumnExpr("COUNT(DISTINCT f.consumer_id) AS consumers").
-		ColumnExpr("SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS direct").
-		ColumnExpr("0 AS total")
+		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
+		ColumnExpr(`MIN(f.fix_state) AS "fix_state"`).
+		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
+		ColumnExpr(`MIN(COALESCE(f.matched, '')) AS "matched"`).
+		ColumnExpr(`MIN(f.target_id) AS "target_id"`).
+		ColumnExpr(`MIN(f.consumer_id) AS "consumer_id"`).
+		ColumnExpr(`COUNT(DISTINCT f.consumer_id) AS "consumers"`).
+		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
+		ColumnExpr(`0 AS "total"`)
 	// How far each of them has been decided, spelled once for every list
 	// that asks (see decided.go). Across products the row names its own.
 	body = decisionCounts(body, "st.product_id", nil,

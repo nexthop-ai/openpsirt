@@ -101,12 +101,12 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 
 	var rows []placeRow
 	err = s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join(`JOIN component AS c ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS uc ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS v ON v.id = f.vulnerability_id`).
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
-		ColumnExpr("f.visibility AS visibility").
+		ColumnExpr(`f.visibility AS "visibility"`).
 		// The upstream version where one is stated, and the
 		// component's own where none is. Most packages are not forks
 		// and state no upstream at all — measured on a real image, 88%
@@ -125,27 +125,27 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		// about — a fork carrying its own version while the issue
 		// lives upstream — is exactly the case that states an
 		// upstream, so it is unaffected.
-		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
-		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
+		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
+		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		// The three the rating in force is worked out from, scored by the
 		// project's one rule rather than by a second one in SQL: an
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
-		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
+		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
+		ColumnExpr(`COALESCE(ir.severity, '') AS "rated_here"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		// The deadline, because a promise to act is gated against the earliest
 		// one among what the act covers. Read from the rows rather than
 		// supplied, like the versions and the visibility: it is a fact about
 		// the place and a caller free to state it would be choosing whether
 		// their own commitment needed a second person.
-		ColumnExpr("f.due_at AS due_at").
+		ColumnExpr(`f.due_at AS "due_at"`).
 		// Whether the release was built once. A tag cannot change, so what may
 		// be said about a finding on one is narrower, and that is a fact about
 		// the build rather than about who is asking.
-		ColumnExpr("CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS on_tag", catalog.Tag).
-		Join(`JOIN target AS tg ON tg.id = f.target_id`).
-		Join(`JOIN stream AS st ON st.id = tg.stream_id`).
+		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.place_identity = ?", placeIdentity).
@@ -250,10 +250,10 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 		DueAt           *time.Time `bun:"due_at"`
 	}
 	if err := db.NewSelect().
-		TableExpr("finding AS f").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("MIN(f.due_at) AS due_at").
+		TableExpr(`finding AS "f"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where("f.place_identity IN (?)", bun.List(identities)).
@@ -381,31 +381,31 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		FixedIn         string `bun:"fixed_in"`
 	}
 	query := db.NewSelect().
-		TableExpr("finding AS f").
-		Join(`JOIN component AS c ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS uc ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS v ON v.id = f.vulnerability_id`).
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("COALESCE(uc.name, '') AS consumer").
-		ColumnExpr("f.visibility AS visibility").
-		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
-		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
+		ColumnExpr(`f.visibility AS "visibility"`).
+		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
+		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		// The three the rating in force is worked out from, scored by the
 		// project's one rule rather than by a second one in SQL: an
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
-		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
-		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
-		ColumnExpr("f.due_at AS due_at").
-		ColumnExpr("CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS on_tag", catalog.Tag).
-		Join(`JOIN target AS tg ON tg.id = f.target_id`).
-		Join(`JOIN stream AS st ON st.id = tg.stream_id`).
+		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
+		ColumnExpr(`COALESCE(ir.severity, '') AS "rated_here"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+		ColumnExpr(`COALESCE(f.fixed_in, '') AS "fixed_in"`).
+		ColumnExpr(`f.due_at AS "due_at"`).
+		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -424,7 +424,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// all of them, and the act says which it covered — while one source
 		// shipped at two versions in one build stays two, which matching on
 		// the source package's name alone could not do.
-		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS c2
+		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2"
 				WHERE c2."name_folded" = ? LIMIT 1)`, graph.Folded(component)).
 		OrderExpr("f.vulnerability_id, f.component_id, f.target_id, place_identity")
 	err := query.Scan(ctx, &rows)
@@ -508,29 +508,29 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		FixedIn       string `bun:"fixed_in"`
 	}
 	err = s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join(`JOIN component AS c ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS uc ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS v ON v.id = f.vulnerability_id`).
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("COALESCE(uc.name, '') AS consumer").
-		ColumnExpr("f.visibility AS visibility").
-		ColumnExpr(ComponentUpstreamExpr+" AS component_upstream").
-		ColumnExpr(ConsumerUpstreamExpr+" AS consumer_upstream").
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
+		ColumnExpr(`f.visibility AS "visibility"`).
+		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
+		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		// The three the rating in force is worked out from, scored by the
 		// project's one rule rather than by a second one in SQL: an
 		// assessment writes the word and never the published score, so the
 		// score alone says an issue rated critical here is worth zero.
-		ColumnExpr("COALESCE(v.severity, '') AS published_severity").
-		ColumnExpr("COALESCE(ir.severity, '') AS rated_here").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
-		ColumnExpr("COALESCE(f.fixed_in, '') AS fixed_in").
+		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
+		ColumnExpr(`COALESCE(ir.severity, '') AS "rated_here"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+		ColumnExpr(`COALESCE(f.fixed_in, '') AS "fixed_in"`).
 		// The deadline each place carries, for the reason PlaceFor reads it.
-		ColumnExpr("f.due_at AS due_at").
-		ColumnExpr("CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS on_tag", catalog.Tag).
-		Join(`JOIN target AS tg ON tg.id = f.target_id`).
-		Join(`JOIN stream AS st ON st.id = tg.stream_id`).
+		ColumnExpr(`f.due_at AS "due_at"`).
+		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		// The fold rather than the one component named. One judgment covers
@@ -539,7 +539,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		// is a decision about it in both — and offering the places of one
 		// binary alone would let somebody answer a third of the work and read
 		// as having answered it.
-		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS c2 WHERE c2.id = ?)`,
+		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
 			componentID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).

@@ -252,7 +252,7 @@ func (s *Store) MembersOf(ctx context.Context, teamID int64) ([]int64, error) {
 func (s *Store) TeamsOf(ctx context.Context, personID int64) ([]Team, error) {
 	var teams []Team
 	err := s.db.NewSelect().Model(&teams).
-		Join(`JOIN "team_member" AS tmm ON tmm.team_id = tm.id`).
+		Join(`JOIN "team_member" AS "tmm" ON tmm.team_id = tm.id`).
 		Where("tmm.person_id = ?", personID).
 		Where("tm.retired_at IS NULL").
 		Order("tm.name").Scan(ctx)
@@ -335,7 +335,7 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 		return false, nil
 	}
 	reads, err := s.db.NewSelect().
-		TableExpr("role_grant AS rg").
+		TableExpr(`role_grant AS "rg"`).
 		Column("rg.id").
 		Where("rg.person_id = ?", personID).
 		Where("rg.product_id = ?", productID).
@@ -352,7 +352,7 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 	// statement rather than folded into the one above, because this table
 	// names no product and a join would have to invent one.
 	everywhere, err := s.db.NewSelect().
-		TableExpr("role_grant_all AS rga").
+		TableExpr(`role_grant_all AS "rga"`).
 		Column("rga.id").
 		Where("rga.person_id = ?", personID).
 		Where("rga.active = ?", true).
@@ -401,8 +401,8 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	// , and a team whose only qualifying member is an administrator is a
 	// queue nobody working the product can see.
 	reads, err := s.db.NewSelect().
-		TableExpr("team_member AS tmm").
-		Join(`JOIN "role_grant" AS rg ON rg.person_id = tmm.person_id`).
+		TableExpr(`team_member AS "tmm"`).
+		Join(`JOIN "role_grant" AS "rg" ON rg.person_id = tmm.person_id`).
 		Column("tmm.person_id").
 		Where("tmm.team_id = ?", teamID).
 		Where("rg.product_id = ?", productID).
@@ -416,8 +416,8 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 		return true, nil
 	}
 	everywhere, err := s.db.NewSelect().
-		TableExpr("team_member AS tmm").
-		Join(`JOIN "role_grant_all" AS rga ON rga.person_id = tmm.person_id`).
+		TableExpr(`team_member AS "tmm"`).
+		Join(`JOIN "role_grant_all" AS "rga" ON rga.person_id = tmm.person_id`).
 		Column("tmm.person_id").
 		Where("tmm.team_id = ?", teamID).
 		Where("rga.active = ?", true).

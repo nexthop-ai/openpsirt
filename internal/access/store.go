@@ -791,15 +791,15 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 		return nil
 	}
 	return s.db.NewSelect().
-		TableExpr("person AS p").
-		ColumnExpr("p.id AS id").
-		ColumnExpr("p.identity AS identity").
-		ColumnExpr("COALESCE(NULLIF(p.display_name, ''), p.identity) AS name").
+		TableExpr(`person AS "p"`).
+		ColumnExpr(`p.id AS "id"`).
+		ColumnExpr(`p.identity AS "identity"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.identity) AS "name"`).
 		Where("p.deactivated_at IS NULL").
-		Where(`EXISTS (SELECT 1 FROM "role_grant" AS g
+		Where(`EXISTS (SELECT 1 FROM "role_grant" AS "g"
 			WHERE g.person_id = p.id AND g.active = ?
 			  AND g.product_id = ? AND g.role IN (?))
-			OR EXISTS (SELECT 1 FROM "role_grant_all" AS ga
+			OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
 			WHERE ga.person_id = p.id AND ga.active = ?
 			  AND ga.role IN (?))`,
 			true, productID, bun.List(enough), true, bun.List(enough))

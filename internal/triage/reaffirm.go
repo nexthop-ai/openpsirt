@@ -233,11 +233,11 @@ func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64
 		ScoreCenti int    `bun:"score_centi"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("vulnerability AS v").
+		TableExpr(`vulnerability AS "v"`).
 		Join(finding.RatedHere, productID).
-		ColumnExpr("COALESCE(v.severity, '') AS published").
-		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
+		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
+		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		Where("v.id = ?", vulnerabilityID).Scan(ctx, &issue); err != nil {
 		return 0, fmt.Errorf("read how bad this is now: %w", err)
 	}
@@ -346,7 +346,7 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 	result, err := s.db.NewUpdate().Model((*Decision)(nil)).
 		Set("state = ?", Approved).
 		Where("id = ?", made.ID).
-		Where(`EXISTS (SELECT 1 FROM "claim" AS ac WHERE ac.id = ? AND ac.revision_id = ?)`,
+		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE ac.id = ? AND ac.revision_id = ?)`,
 			claim.ID, *claim.RevisionID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("carry an approval forward: %w", err)
@@ -412,9 +412,9 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	openHere := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().
 			ColumnExpr("1").
-			TableExpr("finding AS f").
-			Join("JOIN component AS c ON c.id = f.component_id").
-			Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
 			Where("f.target_id = ?", targetID).
 			Where("f.closed_at IS NULL").
 			Where("f.vulnerability_id = de.vulnerability_id").
@@ -428,11 +428,11 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	stillCovered := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().
 			ColumnExpr("1").
-			TableExpr("finding AS f").
-			Join("JOIN component AS c ON c.id = f.component_id").
-			Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			Where("st.product_id = de.product_id").
 			Where("f.closed_at IS NULL").
 			Where("f.vulnerability_id = de.vulnerability_id").
@@ -450,8 +450,8 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where("de.state IN (?, ?)", Proposed, Approved).
 			Where("de.product_id = (?)", db.NewSelect().
 				ColumnExpr("st.product_id").
-				TableExpr("target AS tg").
-				Join("JOIN stream AS st ON st.id = tg.stream_id").
+				TableExpr(`target AS "tg"`).
+				Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 				Where("tg.id = ?", targetID)).
 			Where("EXISTS (?)", openHere(db).Where("NOT ("+matching+")")).
 			Where("NOT EXISTS (?)", stillCovered(db)).
@@ -611,8 +611,8 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	// one product.
 	var productID int64
 	if err := s.db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("st.product_id").
 		Where("tg.id = ?", toTarget).
 		Scan(ctx, &productID); err != nil {
@@ -643,52 +643,52 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		PlaceIdentity   string `bun:"place_identity"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join("JOIN vulnerability AS v ON v.id = de.vulnerability_id").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN vulnerability AS "v" ON v.id = de.vulnerability_id`).
 		// The argument, which is where the outcome lives.
-		Join("JOIN claim AS cl ON cl.id = de.claim_id").
-		Join("LEFT JOIN claim_revision AS dr ON dr.id = cl.revision_id").
-		ColumnExpr("de.id AS decision_id").
-		ColumnExpr("de.vulnerability_id AS vulnerability_id").
-		ColumnExpr("de.place_identity AS place_identity").
-		ColumnExpr("v.identifier AS vulnerability").
-		ColumnExpr("COALESCE(de.component_upstream_version, '') AS was").
-		ColumnExpr("cl.outcome AS outcome").
-		ColumnExpr("COALESCE(dr.body, '') AS reasoning").
+		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
+		Join(`LEFT JOIN claim_revision AS "dr" ON dr.id = cl.revision_id`).
+		ColumnExpr(`de.id AS "decision_id"`).
+		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`de.place_identity AS "place_identity"`).
+		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "was"`).
+		ColumnExpr(`cl.outcome AS "outcome"`).
+		ColumnExpr(`COALESCE(dr.body, '') AS "reasoning"`).
 		// What the new line has at that place, if anything.
-		ColumnExpr(`COALESCE((SELECT MIN(c.name) FROM "finding" AS f
-			JOIN "component" AS c ON c.id = f.component_id
+		ColumnExpr(`COALESCE((SELECT MIN(c.name) FROM "finding" AS "f"
+			JOIN "component" AS "c" ON c.id = f.component_id
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS component`, toTarget).
+			AS "component"`, toTarget).
 		// Both versions, because a decision is keyed on both. Comparing only
 		// the component's meant a build whose *consumer* had moved was
 		// reported as already covered, when the claim does not reach it and
 		// the finding surfaces unanswered.
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS f
-			JOIN "component" AS c ON c.id = f.component_id
-			LEFT JOIN "component" AS uc ON uc.id = f.consumer_id
+		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
+			JOIN "component" AS "c" ON c.id = f.component_id
+			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS now_at`, toTarget).
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS f
-			JOIN "component" AS c ON c.id = f.component_id
-			LEFT JOIN "component" AS uc ON uc.id = f.consumer_id
+			AS "now_at"`, toTarget).
+		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS "f"
+			JOIN "component" AS "c" ON c.id = f.component_id
+			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS consumer_now`, toTarget).
-		ColumnExpr("COALESCE(de.consumer_upstream_version, '') AS consumer_was").
-		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS f
+			AS "consumer_now"`, toTarget).
+		ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer_was"`).
+		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL)
-			AS still_there`, toTarget).
+			AS "still_there"`, toTarget).
 		// Whether the date it carries has already gone by, either date.
 		ColumnExpr(`(COALESCE(cl.deferred_until, cl.committed_to) IS NOT NULL
-			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS ran_out`, s.now()).
+			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS "ran_out"`, s.now()).
 		Where("de.live_key IS NOT NULL").
 		Where("de.product_id = ?", productID).
 		Where("de.visibility IN (?)", bun.List(readable)).
-		Where(`EXISTS (SELECT 1 FROM "finding" AS g
+		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
 			WHERE g.target_id = ? AND g.vulnerability_id = de.vulnerability_id
 			  AND g.place_identity = de.place_identity)`, fromTarget).
 		Scan(ctx, &rows)

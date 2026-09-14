@@ -266,7 +266,7 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	var decisions []int64
 	covered := s.db.NewSelect().Model((*Approval)(nil)).
 		ColumnExpr("d.id").
-		Join("JOIN decision AS d ON d.claim_id = da.claim_id").
+		Join(`JOIN decision AS "d" ON d.claim_id = da.claim_id`).
 		Where("da.batch = ?", batch).Where("da.withdrawn_at IS NULL")
 	covered = approvableBy(covered, subject, "d")
 	if err := covered.Scan(ctx, &decisions); err != nil {
@@ -307,7 +307,7 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		// nobody but whoever knew its identifier.
 		Set("sent_back_at = ?", nil).
 		Where("id IN (?)", bun.List(decisions)).
-		Where("NOT EXISTS (SELECT 1 FROM claim_approval AS still " +
+		Where(`NOT EXISTS (SELECT 1 FROM claim_approval AS "still" ` +
 			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
 		Exec(ctx); err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
@@ -372,13 +372,13 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	// findings sit behind a claim to somebody who may not read one.
 	readable := readableVisibilities(subject, ids, s, ctx)
 	covered, err := s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join("JOIN finding AS f ON f.vulnerability_id = de.vulnerability_id"+
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN finding AS "f" ON f.vulnerability_id = de.vulnerability_id`+
 			" AND f.place_identity = de.place_identity").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id AND st.product_id = de.product_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
 		Where("COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr).

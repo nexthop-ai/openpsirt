@@ -1,4 +1,4 @@
-// Command reserved reports invented SQL names that an engine reserves.
+// Command reserved reports SQL identifiers this code writes bare.
 //
 // Queries here are written once and run against four engines, and a name this
 // code makes up — an alias on a subquery, a column an expression is given so a
@@ -8,9 +8,23 @@
 // PostgreSQL, and the day somebody writes `AS usage` the suite is green on
 // three engines and a production deployment on the fourth stops answering.
 //
-// So the names are checked against the union of what the four reserve. Nothing
-// currently collides — that is the point of running it now rather than after
-// one does.
+// **An invented name is reported for being bare, not for being reserved.**
+// This checked the word against a list of 321 the four engines reserve, which
+// is a strictly weaker property than the rule it was the enforcement of —
+// AGENTS.md says every identifier is quoted, including the names a query
+// invents. A list somebody typed goes stale the first time an engine reserves
+// a word: MySQL 8.0 added `rank`, `groups`, `lead` and `cume_dist`, and
+// nothing refreshes it. A quoted alias does not match the pattern at all, so
+// a hit here is by construction an unquoted name and the fix is one pair of
+// quotes.
+//
+// It found 1,418 of them against 34 already quoted, so no reader could tell
+// which was the convention.
+//
+// The data-definition half below is the other way round and stays that way.
+// Those names are declared rather than invented, the migrations are where they
+// are declared, and the question there is whether a declared name collides
+// with a reserved word — which is what the list is for.
 //
 // **Only the names this code invents.** A column that exists in the schema is
 // not an invented name: it was declared in a migration, which every engine has
@@ -39,7 +53,8 @@ import (
 )
 
 // invented matches a name this code makes up: AS, then a bare word. A quoted
-// one is already safe, and that is the fix when this reports something.
+// one does not match, which is what makes every hit a defect and the fix one
+// pair of quotes.
 var invented = regexp.MustCompile(`(?i)\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
 
 // declared matches a bare schema identifier in data-definition language.
@@ -80,11 +95,14 @@ var writing = map[string]bool{
 	"ExecContext": true, "QueryContext": true, "Set": true,
 }
 
-// found is one place a name was invented.
+// found is one place a name was written wrongly.
 type found struct {
 	word string
 	file string
 	line int
+	// bare says the name is unquoted, which is the whole complaint. Without
+	// it the complaint is that a declared name collides with a reserved word.
+	bare bool
 }
 
 func main() {
@@ -164,10 +182,7 @@ func main() {
 					continue
 				}
 				for _, match := range invented.FindAllStringSubmatch(text, -1) {
-					word := strings.ToLower(match[1])
-					if reserved[word] {
-						bad = append(bad, found{word: word, file: path, line: at})
-					}
+					bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
 				}
 			}
 			return true
@@ -180,8 +195,9 @@ func main() {
 	}
 
 	if len(bad) == 0 {
-		fmt.Printf("no invented name collides with a word any of the four engines reserves "+
-			"(%d words checked)\n", len(reservedWords))
+		fmt.Printf("every name a query invents is quoted, and no name a migration declares "+
+			"collides with a word any of the four engines reserves (%d words checked)\n",
+			len(reservedWords))
 		return
 	}
 	sort.Slice(bad, func(i, j int) bool {
@@ -191,10 +207,15 @@ func main() {
 		return bad[i].line < bad[j].line
 	})
 	for _, one := range bad {
+		if one.bare {
+			fmt.Fprintf(os.Stderr, "%s:%d: the name %q is written bare. "+
+				"Quote it: AS %q\n", one.file, one.line, one.word, one.word)
+			continue
+		}
 		fmt.Fprintf(os.Stderr, "%s:%d: %q is reserved by one of the four engines. "+
 			"Quote it, or call it something else\n", one.file, one.line, one.word)
 	}
-	fmt.Fprintf(os.Stderr, "\n%d invented name(s) an engine will refuse to parse.\n", len(bad))
+	fmt.Fprintf(os.Stderr, "\n%d name(s) an engine may refuse to parse.\n", len(bad))
 	os.Exit(1)
 }
 
