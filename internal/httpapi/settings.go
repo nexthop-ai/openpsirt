@@ -46,6 +46,7 @@ var settable = []struct {
 	{setting.DeferralThreshold, "How long something may be put off before a second person has to agree. Measured against everything the finding has already been put off for, not against the postponement being asked for"},
 	{setting.SessionLifetime, "How long a sign-in lasts"},
 	{setting.MaxTokenLifetime, "The longest a personal token may be valid for"},
+	{setting.ClaimWindow, "How long an authorization written for somebody who has never signed in stays redeemable. It is the one window where a name rather than an identifier decides who gets a set of roles, so it ends"},
 	{setting.TogetherCap, "How many findings one action may claim about at once. A whole number, not a length of time"},
 	{setting.TriageFloor, "What counts as worth triaging: everything, or a severity word below which findings are still recorded and counted but kept out of the working list. A product may state its own instead"},
 	{setting.QuietAfter, "How long a build may go without a scan arriving before it is reported as having gone quiet. Measured from the last arrival, or from when the build was declared where nothing has ever arrived"},
@@ -53,6 +54,7 @@ var settable = []struct {
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else"},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time"},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it"},
+	{setting.QueueBacklog, "How much background work of one kind may be waiting before more of that kind is refused. A whole number, not a length of time. Counted per kind, so a producer that has filled its own queue does not refuse everybody else's work"},
 	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog"},
 	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload"},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here"},
@@ -88,7 +90,7 @@ func aSeverity(name string) bool { return name == setting.TriageFloor }
 func aCount(name string) bool {
 	switch name {
 	case setting.TogetherCap, setting.AttachmentMaxSize, setting.AttachmentQuota,
-		setting.AttachmentShare, setting.RoutingBatch:
+		setting.AttachmentShare, setting.RoutingBatch, setting.QueueBacklog:
 		return true
 	}
 	return false
@@ -351,12 +353,16 @@ func shipped(name string) string {
 		return access.DefaultSessionLifetime.String()
 	case setting.MaxTokenLifetime:
 		return access.MaxTokenLifetime.String()
+	case setting.ClaimWindow:
+		return access.DefaultClaimWindow.String()
 	case setting.TogetherCap:
 		return strconv.Itoa(triage.DefaultTogetherCap)
 	case setting.AttachmentMaxSize:
 		return strconv.Itoa(setting.DefaultAttachmentMaxSize)
 	case setting.RoutingBatch:
 		return strconv.Itoa(setting.DefaultRoutingBatch)
+	case setting.QueueBacklog:
+		return strconv.Itoa(setting.DefaultQueueBacklog)
 	case setting.AttachmentQuota:
 		return strconv.Itoa(setting.DefaultAttachmentQuota)
 	case setting.AttachmentShare:

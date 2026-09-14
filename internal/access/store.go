@@ -121,6 +121,11 @@ type Key struct {
 type Store struct {
 	db  bun.IDB
 	now func() time.Time
+	// claimWindow is how long an authorization this store writes stays
+	// redeemable by name. Carried on the store rather than read at the write,
+	// because the store is what a handler already holds and the setting is
+	// read where settings are read.
+	claimWindow time.Duration
 }
 
 // handle returns the connection this store was built over, or reports that it
@@ -151,7 +156,11 @@ func staleEnough(recorded *time.Time, now time.Time) bool {
 
 // NewStore returns a store over db.
 func NewStore(db bun.IDB) *Store {
-	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
+	return &Store{
+		db:          db,
+		now:         func() time.Time { return time.Now().UTC() },
+		claimWindow: DefaultClaimWindow,
+	}
 }
 
 // Ensure records somebody who has been granted access, or confirms one already

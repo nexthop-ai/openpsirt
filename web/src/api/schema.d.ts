@@ -4134,6 +4134,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/work/set-aside": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List work that stopped being retried
+         * @description Returns background work the queue has set aside, newest first, with why each stopped where anything reported a reason. A job is set aside once it has been tried as many times as it is allowed to be, whether it reported a failure or its worker stopped answering.
+         *
+         *     At most 200 are returned. `total` is how many are set aside in all, so a clipped page can be told from a complete one.
+         *
+         *     **Requires:** administrator
+         */
+        get: operations["list-set-aside-work"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/work/set-aside/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry work that was set aside
+         * @description Puts one set-aside job back in the queue for whichever worker takes it next, with its attempts reset to zero and its last error kept.
+         *
+         *     A job that is not set aside is refused rather than moved.
+         *
+         *     **Requires:** administrator
+         */
+        post: operations["retry-set-aside-work"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6219,6 +6267,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ApprovalBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyAssessmentBody: {
             /**
@@ -6228,6 +6278,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AssessmentBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyBindingBody: {
             /**
@@ -6237,6 +6289,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["BindingBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyCollaboratorBody: {
             /**
@@ -6246,6 +6300,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["CollaboratorBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyCommentBody: {
             /**
@@ -6255,6 +6311,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["CommentBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyEmbargoedBody: {
             /**
@@ -6264,6 +6322,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["EmbargoedBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyExtensionBody: {
             /**
@@ -6273,6 +6333,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ExtensionBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyHolderBody: {
             /**
@@ -6282,6 +6344,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["HolderBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyHoldingBody: {
             /**
@@ -6291,6 +6355,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["HoldingBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyIssuanceBody: {
             /**
@@ -6300,6 +6366,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["IssuanceBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyKeyBody: {
             /**
@@ -6309,6 +6377,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["KeyBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyLateBody: {
             /**
@@ -6318,6 +6388,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["LateBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyMentionableBody: {
             /**
@@ -6327,6 +6399,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["MentionableBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyNoteBody: {
             /**
@@ -6336,6 +6410,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["NoteBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyOutboundBody: {
             /**
@@ -6345,6 +6421,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["OutboundBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyPendingExtensionBody: {
             /**
@@ -6354,6 +6432,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["PendingExtensionBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyPerBuildBody: {
             /**
@@ -6363,6 +6443,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["PerBuildBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyPersonBody: {
             /**
@@ -6372,6 +6454,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["PersonBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyPlannedBody: {
             /**
@@ -6381,6 +6465,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["PlannedBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyPointBody: {
             /**
@@ -6390,6 +6476,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["PointBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyProductBody: {
             /**
@@ -6399,6 +6487,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ProductBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyProviderBody: {
             /**
@@ -6408,6 +6498,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ProviderBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyRateBody: {
             /**
@@ -6417,6 +6509,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["RateBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyReleaseBody: {
             /**
@@ -6426,6 +6520,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ReleaseBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyRevisionBody: {
             /**
@@ -6435,6 +6531,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["RevisionBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyRuleBody: {
             /**
@@ -6444,6 +6542,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["RuleBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodySavedBody: {
             /**
@@ -6453,6 +6553,19 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["SavedBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodySetAsideBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodySetAsideBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SetAsideBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodySettingBody: {
             /**
@@ -6462,6 +6575,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["SettingBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyStreamBody: {
             /**
@@ -6471,6 +6586,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["StreamBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyString: {
             /**
@@ -6480,6 +6597,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: string[] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyTeamBody: {
             /**
@@ -6489,6 +6608,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["TeamBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyTokenBody: {
             /**
@@ -6498,6 +6619,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["TokenBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyVariantBody: {
             /**
@@ -6507,6 +6630,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["VariantBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyWasSaidBody: {
             /**
@@ -6516,6 +6641,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["WasSaidBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyWentBody: {
             /**
@@ -6525,6 +6652,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["WentBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         MatchBody: {
             /** @description This is another version in the same build, not another build */
@@ -7855,6 +7984,29 @@ export interface components {
              */
             readonly $schema?: string;
             value: string;
+        };
+        SetAsideBody: {
+            /**
+             * Format: int64
+             * @description How many times it was tried
+             */
+            attempts: number;
+            /**
+             * Format: int64
+             * @description The job, for putting it back
+             */
+            id: number;
+            /** @description Which worker the job was for */
+            kind: string;
+            /** @description Why it stopped, where anything reported one */
+            last_error?: string;
+            /** @description What the work was about */
+            reference: string;
+            /**
+             * Format: date-time
+             * @description When it was set aside
+             */
+            stopped_at: string;
         };
         SettingBody: {
             /** @description Nobody has set this; the shipped value is in use */
@@ -14906,6 +15058,65 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Info"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-set-aside-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodySetAsideBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retry-set-aside-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job to put back */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

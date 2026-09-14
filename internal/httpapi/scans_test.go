@@ -232,7 +232,7 @@ func TestAnUploadIsTakenAndLeavesWorkBehind(t *testing.T) {
 			t.Fatalf("held %d documents, want an inventory and two suppression sets", len(docs))
 		}
 
-		depth, err := f.queue.Depth(t.Context())
+		depth, err := f.queue.Depth(t.Context(), queue.Parse)
 		if err != nil || depth != 1 {
 			t.Errorf("%d jobs waiting, want 1 (%v)", depth, err)
 		}
@@ -261,7 +261,7 @@ func TestTheSameFileSentAgainReportsSuccess(t *testing.T) {
 
 		// It must not become a second piece of work, or the same scan is read
 		// twice for no reason.
-		if depth, _ := f.queue.Depth(t.Context()); depth != 1 {
+		if depth, _ := f.queue.Depth(t.Context(), queue.Parse); depth != 1 {
 			t.Errorf("%d jobs waiting after a repeat, want 1", depth)
 		}
 		docs, _ := ingest.NewDocuments(f.db.DB).List(t.Context(), first.ScanID)
@@ -363,7 +363,7 @@ func TestAnUploadInTheThirdSpdxVersionIsTaken(t *testing.T) {
 		if result.BuiltAt != built.Format(time.RFC3339) {
 			t.Errorf("reported build time %q, want %q", result.BuiltAt, built.Format(time.RFC3339))
 		}
-		if depth, _ := f.queue.Depth(t.Context()); depth != 1 {
+		if depth, _ := f.queue.Depth(t.Context(), queue.Parse); depth != 1 {
 			t.Errorf("%d jobs waiting, want 1", depth)
 		}
 	})
@@ -400,7 +400,7 @@ func TestAnUploadInEitherFormatIsTaken(t *testing.T) {
 		if result.BuiltAt != built.Format(time.RFC3339) {
 			t.Errorf("reported build time %q, want %q", result.BuiltAt, built.Format(time.RFC3339))
 		}
-		if depth, _ := f.queue.Depth(t.Context()); depth != 1 {
+		if depth, _ := f.queue.Depth(t.Context(), queue.Parse); depth != 1 {
 			t.Errorf("%d jobs waiting, want 1", depth)
 		}
 	})

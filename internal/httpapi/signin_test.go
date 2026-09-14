@@ -30,11 +30,22 @@ import (
 // stubProvider stands in for a real one, so the paths that decide who gets in
 // can be tested without an identity provider to sign in to.
 type stubProvider struct {
-	says *signin.Identity
-	fail error
+	says   *signin.Identity
+	fail   error
+	issuer string
 }
 
 func (s *stubProvider) Name() string { return "stub" }
+
+// Issuer is who mints the identifiers, which is what an identity is recorded
+// against. Distinct from the name here on purpose: the two being the same
+// string is what hid a provider change from the startup check.
+func (s *stubProvider) Issuer() string {
+	if s.issuer != "" {
+		return s.issuer
+	}
+	return "https://stub.example"
+}
 
 func (s *stubProvider) Begin(_ context.Context, _ string) (string, signin.Pending, error) {
 	return "https://provider.example/authorize", signin.Pending{
@@ -46,7 +57,15 @@ func (s *stubProvider) Complete(_ context.Context, _ string, _ signin.Pending, _
 	if s.fail != nil {
 		return nil, s.fail
 	}
-	return s.says, nil
+	// Stamped here the way both real adapters stamp it, so a test standing on
+	// this double stands on something that behaves like the boundary. An
+	// identifier travels with the provider that issued it, because one
+	// provider's identifier names somebody else at another.
+	said := *s.says
+	if said.Provider == "" {
+		said.Provider = s.Issuer()
+	}
+	return &said, nil
 }
 
 // signInReach is a server with one provider and one person who was granted

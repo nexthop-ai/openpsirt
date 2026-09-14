@@ -141,6 +141,10 @@ type listOutput[T any] struct {
 
 type listBody[T any] struct {
 	Items []T `json:"items"`
+	// Total is how many there are in all, where a listing is capped and the
+	// caller would otherwise be unable to tell a clipped page from a complete
+	// answer. Omitted by the listings that return everything.
+	Total int `json:"total,omitempty"`
 }
 
 // registerCatalog registers the three groups the catalog is made of.

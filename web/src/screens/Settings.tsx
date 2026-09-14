@@ -148,6 +148,8 @@ function title(name?: string): string {
       return "Session lifetime";
     case "token.max-lifetime":
       return "Personal token lifetime";
+    case "signin.claim-window":
+      return "Authorization redemption window";
     case "upstream.currency":
       return "Upstream version checks";
     case "scanning.quiet-after":
@@ -160,6 +162,8 @@ function title(name?: string): string {
       return "Total attachment storage";
     case "attachment.per-person-quota":
       return "Attachment storage per person";
+    case "queue.backlog":
+      return "Queued work limit";
     case "routing.batch":
       return "Findings placed per pass";
     case "people.absent-after":
@@ -219,7 +223,7 @@ const choices: Record<string, string[]> = {
 // time. Named here because everything else here is a duration, and a duration
 // is composed rather than typed — asking somebody to write "8760h" is asking
 // for a mistake that is a factor of twenty-four.
-const counts = new Set(["triage.together-cap", "routing.batch"]);
+const counts = new Set(["triage.together-cap", "routing.batch", "queue.backlog"]);
 
 // The settings whose value is a number of bytes. Composed for the same reason
 // a duration is: 26214400 is twenty-five megabytes, and nobody reads it as

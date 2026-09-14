@@ -16,6 +16,11 @@ type Message struct {
 	// Text is markdown, which is what a mail carries as its text part . A
 	// chat adapter translates rather than forwarding it.
 	Text string
+	// Link is the address a channel may carry. For something undisclosed it
+	// is the way in and never the thing itself, which is why it is composed
+	// here with the text rather than rebuilt by whatever is carrying it: an
+	// address built a second time is built without the rule.
+	Link string
 }
 
 // what each kind is called where somebody reads it as a subject line.
@@ -78,10 +83,11 @@ func Compose(n Notification, baseURL string) Message {
 			"This message deliberately says no more than that, including in its " +
 			"address: it travels outside the application, where the check on who " +
 			"may read it does not reach. Your notifications say which thing.\n"
-		if front := link(baseURL, "/"); front != "" {
+		front := link(baseURL, "/")
+		if front != "" {
 			text += "\n" + front + "\n"
 		}
-		return Message{Subject: subject, Text: text}
+		return Message{Subject: subject, Text: text, Link: front}
 	}
 
 	text := strings.TrimSpace(n.Body)
@@ -91,7 +97,7 @@ func Compose(n Notification, baseURL string) Message {
 	if where != "" {
 		text += "\n" + where + "\n"
 	}
-	return Message{Subject: subject, Text: text}
+	return Message{Subject: subject, Text: text, Link: where}
 }
 
 // link makes the address a reader can follow from wherever they are.

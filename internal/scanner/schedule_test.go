@@ -282,6 +282,31 @@ func TestOnlyTheReplicaHoldingTheLeaseDecidesWhatToScanAgain(t *testing.T) {
 	})
 }
 
+func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
+	// The cap exists so a runaway producer cannot push everyone else's work
+	// behind its own. Counted across every kind it did the opposite: a bulk
+	// change to the routing rules filled the queue and then refused every
+	// scan and every upload in the deployment.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx := t.Context()
+		full := queue.New(f.db, queue.Options{
+			MaxAttempts: 5, MaxBacklog: 1, ClaimTimeout: 30 * time.Minute,
+			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
+		})
+		if _, err := full.Add(ctx, queue.Route, "a-bulk-rule-change"); err != nil {
+			t.Fatal(err)
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		asked, err := scanner.NewSchedule(f.db, full, quiet, "one").Once(ctx)
+		if err != nil {
+			t.Fatalf("another producer's backlog was reported as a failure: %v", err)
+		}
+		if asked != 1 {
+			t.Errorf("asked for %d scans while another kind's queue was full, want 1", asked)
+		}
+	})
+}
+
 func TestAFullQueueStopsTheAskingRatherThanFailing(t *testing.T) {
 	// What is due stays due. Pressing on would push a producer's arriving
 	// inventories behind a re-scan of something last measured yesterday, and
@@ -292,7 +317,9 @@ func TestAFullQueueStopsTheAskingRatherThanFailing(t *testing.T) {
 			MaxAttempts: 5, MaxBacklog: 1, ClaimTimeout: 30 * time.Minute,
 			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
 		})
-		if _, err := full.Add(ctx, "ingest", "something-else"); err != nil {
+		// Filled with the kind the schedule produces. A backlog is per kind,
+		// so another producer's queue is not what stops this one.
+		if _, err := full.Add(ctx, queue.Scan, "something-else"); err != nil {
 			t.Fatal(err)
 		}
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))

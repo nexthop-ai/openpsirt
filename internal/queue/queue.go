@@ -18,10 +18,12 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // State is where a job has got to.
@@ -68,9 +70,13 @@ type Options struct {
 	// Without a limit, a job that can never succeed retries for ever and
 	// crowds out work that could.
 	MaxAttempts int
-	// MaxBacklog caps how much work may be waiting. Beyond it, new work is
-	// refused so a runaway producer cannot push everyone else's work behind
-	// its own.
+	// MaxBacklog caps how much work of one kind may be waiting. Beyond it,
+	// new work of that kind is refused so a runaway producer cannot push
+	// everyone else's work behind its own.
+	//
+	// Per kind rather than across the queue, because one cap shared between
+	// kinds is the opposite of what it says: the producer that filled it
+	// keeps its place and every other producer is refused.
 	MaxBacklog int
 	// ClaimTimeout is how long a claim is honored with nothing heard from the
 	// worker holding it, after which another worker may take the job. It
@@ -94,8 +100,12 @@ type Options struct {
 // producer that will retry on its own if we refuse.
 func DefaultOptions() Options {
 	return Options{
-		MaxAttempts:  5,
-		MaxBacklog:   1000,
+		MaxAttempts: 5,
+		// The same number the settings screen reports as shipped. Written in
+		// one place, because these are read by different things — the screen
+		// reports the setting package's, the queue falls back to this one —
+		// and two spellings disagree the first time either moves.
+		MaxBacklog:   setting.DefaultQueueBacklog,
 		ClaimTimeout: 30 * time.Minute,
 		Heartbeat:    5 * time.Minute,
 		Backoff:      30 * time.Second,
@@ -115,8 +125,28 @@ func New(db *database.DB, opts Options) *Queue {
 }
 
 // Add puts work on the queue, refusing it when the backlog is already too deep.
+//
+// The depth and the insert go in one transaction, so the count the refusal
+// rests on is the count at the moment of the write rather than one taken
+// beforehand, and a commit a cluster refuses is tried again rather than
+// reported as work that could not be queued.
 func (q *Queue) Add(ctx context.Context, kind, reference string) (*Job, error) {
-	return q.AddTx(ctx, q.db, kind, reference)
+	var job *Job
+	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		// Every attempt starts from nothing: an attempt that was rolled back
+		// describes a queue that no longer exists.
+		job = nil
+		added, err := q.AddTx(ctx, tx, kind, reference)
+		if err != nil {
+			return err
+		}
+		job = added
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return job, nil
 }
 
 // AddTx is Add within a caller's transaction.
@@ -126,12 +156,20 @@ func (q *Queue) Add(ctx context.Context, kind, reference string) (*Job, error) {
 // to exist; rows committed without their job are work nobody will ever pick
 // up, and neither failure announces itself.
 func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (*Job, error) {
-	depth, err := q.depthIn(ctx, db)
+	// Read as the work is queued rather than when the queue was built, so a
+	// number an administrator changes takes effect on the next upload rather
+	// than on the next restart.
+	limit, err := q.backlogLimit(ctx, db)
 	if err != nil {
 		return nil, err
 	}
-	if depth >= q.opts.MaxBacklog {
-		return nil, fmt.Errorf("%w: %d waiting, limit is %d", ErrBacklogFull, depth, q.opts.MaxBacklog)
+	depth, err := q.depthIn(ctx, db, kind)
+	if err != nil {
+		return nil, err
+	}
+	if depth >= limit {
+		return nil, fmt.Errorf("%w: %d %s jobs waiting, limit is %d",
+			ErrBacklogFull, depth, kind, limit)
 	}
 
 	now := q.now().Truncate(time.Microsecond)
@@ -146,19 +184,66 @@ func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (
 	return job, nil
 }
 
-// Depth counts work waiting to be done.
-func (q *Queue) Depth(ctx context.Context) (int, error) { return q.depthIn(ctx, q.db) }
+// Depth counts work of one kind waiting to be done.
+//
+// Per kind, because the cap it feeds exists so that a runaway producer cannot
+// push everyone else's work behind its own — and counted across every kind,
+// the runaway producer's work is exactly what stays queued while everybody
+// else is refused. A bulk change to the routing rules would otherwise refuse
+// every scan upload in the deployment.
+func (q *Queue) Depth(ctx context.Context, kind string) (int, error) {
+	return q.depthIn(ctx, q.db, kind)
+}
 
-func (q *Queue) depthIn(ctx context.Context, db bun.IDB) (int, error) {
-	n, err := db.NewSelect().Model((*Job)(nil)).Where("state = ?", Pending).Count(ctx)
+func (q *Queue) depthIn(ctx context.Context, db bun.IDB, kind string) (int, error) {
+	// Waiting, plus what is held by a worker that has stopped reporting.
+	//
+	// Counting only what is pending reads a queue in the middle of a reclaim
+	// cycle as empty: every row sits in the running state, held by workers
+	// that died, and the one number an operator has says there is nothing to
+	// do. A claim past its timeout is work waiting for whoever takes it next,
+	// which is what this counts.
+	stale := q.now().Truncate(time.Microsecond).Add(-q.opts.ClaimTimeout)
+	n, err := db.NewSelect().Model((*Job)(nil)).
+		Where("kind = ?", kind).
+		WhereGroup(" AND ", func(s *bun.SelectQuery) *bun.SelectQuery {
+			return s.
+				WhereOr("state = ?", Pending).
+				WhereOr("state = ? AND claimed_at < ? AND attempts < max_attempts",
+					Running, stale)
+		}).
+		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("measure backlog: %w", err)
 	}
 	return n, nil
 }
 
-// MaxBacklog is how much work may be waiting before more is refused.
+// MaxBacklog is how much work of one kind may be waiting before more of that
+// kind is refused, as this queue was built. Where a deployment has set its own
+// number, Backlog is what is in force.
 func (q *Queue) MaxBacklog() int { return q.opts.MaxBacklog }
+
+// Backlog is the limit in force, which is what an administrator set or the
+// number this queue was built with.
+func (q *Queue) Backlog(ctx context.Context) (int, error) {
+	return q.backlogLimit(ctx, q.db)
+}
+
+// backlogLimit answers what a deployment has set, falling back to the number
+// this queue was built with.
+//
+// A setting rather than a constant, because the producer a refusal lands on is
+// a build server: an estate that pushes more work in than the workers drain
+// has no remedy for a compiled-in number short of a new binary, and waiting is
+// not one when the thing waiting is CI.
+func (q *Queue) backlogLimit(ctx context.Context, db bun.IDB) (int, error) {
+	limit, err := setting.NewStore(db).Count(ctx, setting.QueueBacklog, q.opts.MaxBacklog)
+	if err != nil {
+		return 0, err
+	}
+	return limit, nil
+}
 
 // Claim takes the oldest runnable job of a kind, or returns nil when there is
 // nothing of that kind to do.
@@ -181,6 +266,12 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 
 	var job *Job
 	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		// Every attempt starts from nothing. InTransaction re-runs this
+		// closure when a commit is refused for a reason worth retrying, and an
+		// attempt that claimed a job and was then rolled back would leave the
+		// pointer set — so an attempt that finds nothing claimable returns no
+		// error and Claim hands back a claim the database does not have.
+		job = nil
 		id, err := claimableID(ctx, tx, q.db.Server.Engine, kind, now, staleBefore)
 		if err != nil || id == 0 {
 			return err
@@ -204,7 +295,8 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 			WhereGroup(" AND ", func(u *bun.UpdateQuery) *bun.UpdateQuery {
 				return u.
 					WhereOr("state = ? AND run_after <= ?", Pending, now).
-					WhereOr("state = ? AND claimed_at < ?", Running, staleBefore)
+					WhereOr("state = ? AND claimed_at < ? AND attempts < max_attempts",
+						Running, staleBefore)
 			}).
 			Exec(ctx)
 		if err != nil {
@@ -222,6 +314,61 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 	}
 	return job, nil
 }
+
+// Bury sets aside work whose worker never came back.
+//
+// A worker that dies reports nothing, so nothing calls Fail and the row stays
+// in the running state holding a claim that has gone stale. Once its attempts
+// have run out that claim is no longer reclaimable, and without this it would
+// sit there for ever: a producer asking about its upload reads a running row
+// as work still in progress, so the failure is never reported and the build is
+// never enqueued again.
+//
+// Its own pass rather than work done on the way past a claim. Folded into the
+// claim it is a range update every worker runs on every poll, over the rows
+// every other worker is claiming — which on MySQL deadlocks six workers
+// against each other rather than handing out work.
+//
+// Written as the failure Fail would have written. To everything downstream it
+// is the same failure; the difference is only that nobody was left alive to
+// report it.
+func (q *Queue) Bury(ctx context.Context) (int, error) {
+	now := q.now().Truncate(time.Microsecond)
+	stale := now.Add(-q.opts.ClaimTimeout)
+
+	var buried int
+	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		// Every attempt starts from nothing: a count from an attempt that was
+		// rolled back describes a queue that no longer exists.
+		buried = 0
+		res, err := tx.NewUpdate().Model((*Job)(nil)).
+			Set("state = ?", Dead).
+			Set("last_error = ?", ErrWorkerGone.Error()).
+			Set("claimed_by = NULL").
+			Set("updated_at = ?", now).
+			Where("state = ?", Running).
+			Where("claimed_at < ?", stale).
+			Where("attempts >= max_attempts").
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("set aside work whose worker never came back: %w", err)
+		}
+		if n, err := res.RowsAffected(); err == nil {
+			buried = int(n)
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return buried, nil
+}
+
+// ErrWorkerGone is what a job records when the worker holding it never
+// reported back. It is the last_error somebody reads on the set-aside row,
+// and it is deliberately not the words of any particular failure: nothing
+// observed one.
+var ErrWorkerGone = errors.New("the worker holding this job never reported back")
 
 // ErrNoLongerHeld says the job was not this worker's to finish: its claim went
 // stale and another worker took it, or it has already been finished. Whoever
@@ -256,8 +403,14 @@ const settleTimeout = 5 * time.Second
 // the answer that matters — the work is being done twice from that moment —
 // and it is what Holding watches for.
 func (q *Queue) Renew(ctx context.Context, id int64, worker string) error {
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		return q.renewIn(ctx, tx, id, worker)
+	})
+}
+
+func (q *Queue) renewIn(ctx context.Context, tx bun.Tx, id int64, worker string) error {
 	now := q.now().Truncate(time.Microsecond)
-	res, err := q.db.NewUpdate().Model((*Job)(nil)).
+	res, err := tx.NewUpdate().Model((*Job)(nil)).
 		Set("claimed_at = ?", now).
 		Set("updated_at = ?", now).
 		Where("id = ?", id).
@@ -346,19 +499,37 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 // in the middle of. That case is reported as ErrNoLongerHeld rather than as a
 // failure: the work was done, and its record is the other worker's to write.
 func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
-	now := q.now().Truncate(time.Microsecond)
-	res, err := q.db.NewUpdate().Model((*Job)(nil)).
-		Set("state = ?", Done).
-		Set("claimed_by = NULL").
-		Set("updated_at = ?", now).
-		Where("id = ?", id).
-		Where("state = ?", Running).
-		Where("claimed_by = ?", worker).
-		Exec(ctx)
-	if err != nil {
-		return err
-	}
-	return held(res)
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		now := q.now().Truncate(time.Microsecond)
+		res, err := tx.NewUpdate().Model((*Job)(nil)).
+			Set("state = ?", Done).
+			Set("claimed_by = NULL").
+			Set("updated_at = ?", now).
+			Where("id = ?", id).
+			Where("state = ?", Running).
+			Where("claimed_by = ?", worker).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		if err := held(res); err == nil {
+			return nil
+		}
+		// Nothing matched, which on a first attempt means the claim is
+		// somebody else's now. On a retry it also covers a commit that
+		// succeeded and whose answer never arrived, so the question is asked
+		// of the row rather than assumed: work that is finished is finished,
+		// and reporting a lost claim for it would have the caller record a
+		// failure against a job that succeeded.
+		ending := new(Job)
+		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
+			return ErrNoLongerHeld
+		}
+		if ending.State == Done {
+			return nil
+		}
+		return ErrNoLongerHeld
+	})
 }
 
 // Fail records that work did not succeed, by the worker that holds it.
@@ -381,7 +552,7 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 
 		now := q.now().Truncate(time.Microsecond)
 		update := tx.NewUpdate().Model((*Job)(nil)).
-			Set("last_error = ?", cause.Error()).
+			Set("last_error = ?", head(cause.Error(), mostOfAnError)).
 			Set("claimed_by = NULL").
 			Set("updated_at = ?", now).
 			Where("id = ?", id).
@@ -404,6 +575,39 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 	})
 }
 
+// mostOfAnError bounds what a failing job may write about itself.
+//
+// The string comes from whatever failed — a parser, a scanner's output, a
+// driver — and is stored and then handed back to whoever asks about their
+// upload. Unbounded, one job can write as much as its cause felt like saying
+// into a column every reader of that job then carries.
+//
+// Generous, because the first lines of a parser's complaint are what make it
+// actionable and cutting them makes the field useless. The worker's own log
+// line carries the whole of it either way.
+const mostOfAnError = 4096
+
+// head is the first n bytes of s, cut on a rune boundary and marked where it
+// was cut.
+//
+// A cut at a byte offset splits a multi-byte character and leaves an invalid
+// tail, which three of the four engines then refuse to store — so the bound
+// meant to keep a write small is what makes it fail.
+func head(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	const cut = "…"
+	room := n - len(cut)
+	if room <= 0 {
+		return ""
+	}
+	for room > 0 && !utf8.RuneStart(s[room]) {
+		room--
+	}
+	return s[:room] + cut
+}
+
 // held reads a conditional update's count as whether the job was still this
 // worker's. Rows matched rather than rows changed, which the connection
 // settings make true on every engine.
@@ -412,4 +616,163 @@ func held(res sql.Result) error {
 		return ErrNoLongerHeld
 	}
 	return nil
+}
+
+// SetAside lists work that stopped being retried, newest first.
+//
+// The operator surface over the dead state. Work is set aside rather than
+// deleted so that the row and its last error are the evidence of why it
+// stopped, and evidence nobody can reach is evidence nobody has: a job that
+// stops being retried with nowhere to see it is the same silence as one that
+// is retried for ever.
+func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, int, error) {
+	if limit <= 0 || limit > setAsideCeiling {
+		limit = setAsideCeiling
+	}
+	var jobs []Job
+	if err := q.db.NewSelect().Model(&jobs).
+		Where("state = ?", Dead).
+		OrderExpr("updated_at DESC, id DESC").
+		Limit(limit).Scan(ctx); err != nil {
+		return nil, 0, fmt.Errorf("list work that was set aside: %w", err)
+	}
+	// Counted as well as listed. A page that stops at the cap with nothing
+	// saying so cannot be told from a complete answer, and a restart loop
+	// sets aside far more than one page holds — which is exactly the state
+	// somebody opens this in.
+	total, err := q.db.NewSelect().Model((*Job)(nil)).
+		Where("state = ?", Dead).Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count work that was set aside: %w", err)
+	}
+	return jobs, total, nil
+}
+
+// setAsideCeiling bounds the set-aside listing. A read on an interactive route
+// carries a cap, and a deployment whose queue has gone wrong is exactly where
+// the list is longest.
+const setAsideCeiling = 200
+
+// ErrNotSetAside says the job is not one that stopped being retried, so there
+// is nothing here to put back.
+var ErrNotSetAside = errors.New("that job was not set aside")
+
+// Requeue puts set-aside work back, with its attempts started again.
+//
+// The attempts are reset rather than the ceiling raised: whoever puts a job
+// back has decided the reason it kept failing is dealt with, and a job that
+// came back with one attempt left would be set aside again by the next
+// transient failure. The last error is kept until something overwrites it, so
+// the evidence of the previous run survives the decision to try again.
+func (q *Queue) Requeue(ctx context.Context, id int64) error {
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		now := q.now().Truncate(time.Microsecond)
+		res, err := tx.NewUpdate().Model((*Job)(nil)).
+			Set("state = ?", Pending).
+			Set("attempts = ?", 0).
+			Set("run_after = ?", now).
+			Set("claimed_by = NULL").
+			Set("claimed_at = NULL").
+			Set("updated_at = ?", now).
+			Where("id = ?", id).
+			Where("state = ?", Dead).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("put job %d back: %w", id, err)
+		}
+		// Rows matched rather than rows changed, which the connection settings
+		// make true on every engine. Nothing matched means the job is not set
+		// aside — already running again, or never there.
+		if n, err := res.RowsAffected(); err == nil && n == 0 {
+			return ErrNotSetAside
+		}
+		return nil
+	})
+}
+
+// Ending is how a worker settled one job, and whether the job had already gone
+// to somebody else.
+type Ending struct {
+	// HandedOver says the claim went to another worker while the work ran. The
+	// work that was done stands; the job's ending is the other worker's to
+	// write, so there is nothing here to retry.
+	HandedOver bool
+	// Err is what the caller should surface, which is the work's own failure
+	// where there was one and the failure to record an ending where there was
+	// not.
+	Err error
+}
+
+// Settle records how a job ended, whatever stopped the work.
+//
+// Here rather than in each worker. The sequence — open a context that outlives
+// a cancellation, record the ending against it, tell a stale claim apart from
+// a write that failed, and notice a takeover — was written out in both workers
+// down to the comment paragraph, and they had begun to disagree. A third
+// worker would have been a third copy, and the rule for a job finished by a
+// worker that no longer holds it would then have three readings.
+//
+// noun is what the reference is called in a log line, because "scan" and
+// "target" are the same field to this package and not to an operator reading
+// it. recover runs only where the failure is the work's own — not on a
+// cancellation and not on a takeover — which is the one respect the two
+// workers genuinely differ; it is a closure rather than a flag so that the
+// difference stays visible at the call site.
+func (q *Queue) Settle(ctx context.Context, job *Job, worker, noun string,
+	logger *slog.Logger, work error, taken error, recover func(context.Context) error) Ending {
+
+	// A shutdown cancels the work, and the cancellation must not also stop the
+	// job being handed back — otherwise it stays claimed by a process that has
+	// gone until the claim goes stale, half an hour later.
+	settled, done := Settling(ctx)
+	defer done()
+
+	var ended error
+	if work != nil {
+		if recover != nil && ctx.Err() == nil && taken == nil {
+			if err := recover(settled); err != nil && logger != nil {
+				logger.Warn("could not record why work failed",
+					"job", job.ID, noun, job.Reference, "error", err)
+			}
+		}
+		ended = q.Fail(settled, job.ID, worker, work)
+	} else {
+		ended = q.Succeed(settled, job.ID, worker)
+	}
+
+	out := Ending{Err: work}
+	switch {
+	case errors.Is(ended, ErrNoLongerHeld):
+		// The claim went stale while the work ran and another worker took the
+		// job over. What was done stands; the job's ending is the other
+		// worker's to write, so there is nothing to retry here — but work
+		// that outran its claim is worth knowing about.
+		if logger != nil {
+			logger.Warn("a job was finished by a worker that no longer held it",
+				"job", job.ID, noun, job.Reference)
+		}
+	case ended != nil:
+		if logger != nil {
+			logger.Warn("could not record how a job ended", "job", job.ID, "error", ended)
+		}
+		if work == nil {
+			out.Err = ended
+		}
+	}
+
+	if taken != nil {
+		// The work was stopped because the job went to another worker, so the
+		// error it ended with describes that rather than anything about the
+		// thing being worked on. There is nothing to retry and nothing to
+		// report: the job is in hand elsewhere. It is logged because a claim
+		// that went stale under running work means the renewals were not
+		// landing.
+		if logger != nil {
+			logger.Warn("work was stopped because another worker took its job over",
+				"job", job.ID, noun, job.Reference)
+		}
+		out.HandedOver = true
+		out.Err = nil
+	}
+	return out
 }

@@ -50,6 +50,18 @@ func TestASettingCheckedAsANumberIsComposedAsOne(t *testing.T) {
 		composed[name] = true
 	}
 
+	// A setting absent from both lists passes the pairing below, because the
+	// pairing only sees disagreement. That is how a whole number came to be
+	// validated as a length of time with the suite green and every value an
+	// operator typed refused, so the description is read as well: a setting
+	// that calls itself a whole number is checked as one.
+	for _, each := range settable {
+		if strings.Contains(each.means, "A whole number") && !aCount(each.name) {
+			t.Errorf("%s is offered as a whole number and the write path checks it as a "+
+				"length of time, so every number an operator types is refused", each.name)
+		}
+	}
+
 	for _, each := range settable {
 		if aCount(each.name) && !composed[each.name] {
 			t.Errorf("%s is checked as a number here and the screen draws it as a raw text "+

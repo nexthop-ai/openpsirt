@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -136,6 +138,16 @@ func run(args []string, stdout, stderr *os.File) error {
 	if err != nil {
 		return err
 	}
+	// One provider at a time is a rule across time, not only at one instant
+	// (REQ-41). A deployment pointed at a second provider reads identifiers
+	// the first issued as though this one had issued them, and two providers
+	// do not agree on what any given identifier names — so the first person
+	// to sign in redeems whatever the identifier they happen to hold was
+	// bound to. Nothing at sign-in time can tell that from an ordinary
+	// arrival, which is why it is refused here.
+	if err := onlyTheBoundProvider(ctx, rights, providers); err != nil {
+		return err
+	}
 	if len(providers) > 0 && cfg.BaseURL == "" {
 		// A provider sends people back to an address, and it compares that
 		// address against what it was registered with. Deriving it from
@@ -228,9 +240,14 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Removes uploads nothing ever referred to. Nil where this deployment
 	// holds no files, which is ordinary.
 	keeper := attach.NewKeeper(db.DB, files, logger, 0)
+	// Sets aside work whose worker never came back. Nothing else is the
+	// moment to notice: a worker that was killed reports nothing, so the row
+	// would sit claimed for ever and read everywhere else as work in progress.
+	undertaker := queue.NewUndertaker(work, queue.NewLeases(db.DB), name, logger)
 	return serve(cfg, logger, handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
+		undertaker: undertaker,
 	})
 }
 
@@ -340,7 +357,7 @@ func newLogger(cfg config.Config, w *os.File) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, opts))
 }
 
-// passes is what runs beside the server: the nine background loops, each of
+// passes is what runs beside the server: the ten background loops, each of
 // which may be absent because the thing it works on is not configured.
 //
 // Grouped rather than passed one at a time. Twelve parameters is past what a
@@ -356,6 +373,9 @@ type passes struct {
 	outward  *notify.Signal
 	keeper   *attach.Keeper
 	routing  *finding.Sweeper
+	// undertaker sets aside work whose worker never came back, which is the
+	// only pass that observes a worker having died at all.
+	undertaker *queue.Undertaker
 }
 
 // background starts every pass that has something to work on, and answers
@@ -391,6 +411,9 @@ func (p passes) background(ctx context.Context) *sync.WaitGroup {
 	}
 	if p.routing != nil {
 		start(p.routing.Run, readInterval)
+	}
+	if p.undertaker != nil {
+		start(p.undertaker.Run, 0)
 	}
 	start(p.schedule.Run, scheduleInterval)
 	start(p.upstream.Run, askInterval)
@@ -482,6 +505,58 @@ func waitFor(group *sync.WaitGroup, grace time.Duration) bool {
 	case <-time.After(grace):
 		return false
 	}
+}
+
+// onlyTheBoundProvider refuses a provider change that nobody re-granted.
+//
+// Identities bound by a provider that is no longer configured are not
+// interpretable: the identifiers belong to somebody else's namespace. The way
+// out is to withdraw the bindings deliberately, which is an administrative act
+// with a record, rather than to have them silently mean something new.
+func onlyTheBoundProvider(ctx context.Context, rights *access.Store, providers map[string]signin.Provider) error {
+	if len(providers) == 0 {
+		// Nothing is configured, so nothing reinterprets anything. A
+		// deployment authenticating at a proxy is the ordinary case here.
+		return nil
+	}
+	bound, err := rights.BoundProviders(ctx)
+	if err != nil {
+		return err
+	}
+	// Compared on the issuer rather than the name. The name is a label an
+	// operator picks and may change without anything about the identities
+	// moving, and repointing the issuer at a different provider while leaving
+	// the label alone is the ordinary shape of a provider change — so
+	// comparing names would miss the case this exists for and refuse the one
+	// it does not care about.
+	issuers := make(map[string]bool, len(providers))
+	configured := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		issuers[provider.Issuer()] = true
+		configured = append(configured, provider.Issuer())
+	}
+	sort.Strings(configured)
+
+	for _, was := range bound {
+		if issuers[was] {
+			continue
+		}
+		// The way out has to be in the message. By the time anybody reads
+		// this the provider has already changed and the process will not
+		// start, so the route that withdraws a binding is not serving — and
+		// naming the act without saying where it is reachable from leaves an
+		// operator with a stopped process and no next step.
+		return fmt.Errorf(
+			"identities here are bound to %q and this deployment is configured for %s: "+
+				"an identifier one provider issued names somebody else at another. Point "+
+				"%sOIDC_ISSUER back at %[1]q, unbind each person under Administration "+
+				"(DELETE /v1/people/{identity}/identifier), and change the issuer after that "+
+				"— a binding is withdrawn while the provider that made it is still "+
+				"configured. Where %[1]q cannot be reached either, configure the trusted "+
+				"header with no provider at all and do the same from there",
+			was, strings.Join(configured, ", "), "OPENPSIRT_")
+	}
+	return nil
 }
 
 // signInProviders builds the way somebody may sign in.

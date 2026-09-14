@@ -147,8 +147,83 @@ username, and two providers issuing them independently cannot be told apart.
 | `OPENPSIRT_OIDC_NAME` | What the sign-in button calls it | `oidc` |
 | `OPENPSIRT_OIDC_CLIENT_ID` | The client registered with the provider | unset |
 | `OPENPSIRT_OIDC_CLIENT_SECRET` | Its secret | unset |
-| `OPENPSIRT_OIDC_USERNAME_CLAIM` | The claim to take a person's identity from, when it is not the subject | unset |
+| `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
 | `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it | unset |
+
+### Which claim carries the username
+
+The claim is not the identity. The provider's subject is, and the first
+sign-in pins it; from then on the subject decides and a rename is followed as
+a label.
+
+This claim does one job: match an authorization an administrator wrote for
+somebody who has not arrived yet. That has to be a name a person can type, so
+the subject itself cannot serve — nobody knows it in advance. The property it
+needs is narrower than immutable:
+
+> **An end user must not be able to set it to a name an administrator might
+> have authorized.**
+
+The exposure runs from the moment a grant is written until somebody redeems
+it, which `signin.claim-window` also bounds.
+
+| Provider | Usually | Check before you trust it |
+|---|---|---|
+| Okta | `preferred_username` — the Okta login, normally the address the directory assigned | Self-service profile editing must not cover the username or the primary email. It does not by default |
+| Entra ID | `oid`, or `upn` where administrators want a name they recognize | `preferred_username` on Entra is not a good choice: it follows the mail nickname |
+| Keycloak | A custom claim mapped to an administrator-managed attribute | If self-registration is on, `preferred_username` is a name the account holder chose, and is the case this refusal exists for |
+| Anything else | Whatever the provider assigns rather than the person | Ask whether a user can edit it in the provider's own account settings |
+
+`preferred_username` rides on the `profile` scope rather than `email`. The
+scopes requested are `openid profile email` and are not configurable, so a
+claim carried by any of the three is available.
+
+A claim the provider does not send, or sends as something other than a string,
+reads as absent. The sign-in then falls back to the address the provider says
+it verified, and failing that to the subject — which matches no authorization
+anybody typed, so the person is refused rather than admitted. **A claim name
+with a typo in it therefore reads as "this person was never granted access"**,
+not as a configuration error, so check the name against the provider's own
+token before deciding somebody's grant is missing.
+
+### Signing in when the provider is gone
+
+The trusted header below is the way in that does not depend on the provider,
+and it is what a provider change goes through. A pinned identifier does not
+refuse a proxy arrival, so everybody reaches what they already hold.
+
+**The provider is down and people must sign in.**
+
+1. Unset `OPENPSIRT_OIDC_ISSUER`. A provider that cannot be discovered stops
+   the process at startup, so leaving it set means nothing starts at all.
+2. Set `OPENPSIRT_TRUSTED_HEADER` and `OPENPSIRT_TRUSTED_SOURCES`. Both are
+   needed; half a configuration stops the process.
+3. Restart. Sign-in is by the name the proxy asserts.
+
+**The provider is changing.** An identifier belongs to the provider that
+issued it, and the same string names somebody else at another one, so a
+deployment configured for a provider its bound identities do not name refuses
+to start.
+
+1. Point `OPENPSIRT_OIDC_ISSUER` back at the **old** provider, or configure the
+   trusted header with no provider at all where the old one cannot be reached
+   either. A binding is withdrawn while the provider that made it is still
+   configured.
+2. `DELETE /v1/people/{identity}/identifier` for each person. The
+   authorization and the roles stay; only the pin goes.
+3. Configure the new provider and restart. Each name is redeemed again by
+   whoever next arrives holding it.
+
+Doing it the other way round — configuring the new provider first — leaves a
+process that will not start. The refusal names the old issuer and the steps, so
+the way out is to put that value back and start at step 1.
+
+What is compared is the **issuer**, not `OPENPSIRT_OIDC_NAME`. Renaming the
+button changes nothing, and repointing the issuer while leaving the button
+alone is caught.
+
+
+
 
 ### GitHub
 

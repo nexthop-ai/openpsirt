@@ -592,6 +592,67 @@ same person as that username at the provider.
 | A username is folded, an identifier is not | The name is both halves of the rule at once now: an administrator types it to authorize somebody, and a provider reports it at every sign-in. The typed rule wins because the failure runs that way — "Alice" recorded against "alice" reported leaves an authorization nobody can redeem, and under group-bound admission a second account beside the first. Normalized as it is stored, so no engine's collation decides it (REQ-08) |
 | An identifier is unbound by an administrator, never by a sign-in | An identifier belongs to the provider that issued it, so changing provider leaves every account pinned to one that refuses its holder — the name matches and the identifier does not. Clearing it is an administrative act with the authorization left in place; doing it automatically would undo, at the moment it was working, the protection that stops a released name being redeemed by whoever took it |
 
+### Which provider issued an identifier
+
+The issuer is recorded beside the identifier it minted, and written at the
+same moment.
+
+The issuer rather than the name the sign-in button carries. The name is a label
+an operator picks and may change without anything about the identities moving,
+and repointing a deployment at a different provider while leaving the label
+alone is the ordinary shape of a provider change — so a check on the name would
+miss the case this exists for and refuse the one it does not care about.
+
+| Rule | Reason |
+|---|---|
+| An identifier is read only as the issuer that minted it meant it | Two providers issue into their own namespaces and neither knows the other's. The same string names different people at each, so reading one as the other hands somebody the roles of whoever held that string before |
+| An arrival that names no provider is refused | An identifier with no issuer names nobody, and binding one records a subject a later sign-in cannot tell apart from another provider's |
+| A bound identity whose issuer is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
+| A row bound before the provider was recorded reads as the one configured now | There is nothing else it could mean, and refusing every one of them would lock out a deployment that never changed provider |
+| A row nobody has bound names no provider | Unbinding clears the identifier and the provider that issued it together. Left behind, a withdrawn binding still reads as a binding nobody withdrew, so unbinding everybody would not be enough to let the new provider start |
+
+### The way in without the provider
+
+The trusted header is the way in that does not depend on the provider, and it
+is what a provider change goes through.
+
+| Situation | What to do |
+|---|---|
+| The provider is down and people must sign in | Configure the trusted header and leave no provider configured. A pinned identifier does not refuse a proxy arrival, so everybody reaches what they already hold |
+| The provider is changing | Unbind each person, then configure the new provider. The authorization stays and is redeemed again by whoever arrives under that name |
+| The provider is changing and the old one cannot be reached | The same, reached through the trusted header, because a provider that cannot be discovered stops the process before anybody could unbind anything |
+
+| Rule | Reason |
+|---|---|
+| A deployment configured for a provider its bound identities do not name refuses to start, and says how to undo it | The refusal is the only place anybody learns that the bindings need withdrawing, so stating the condition without the remedy leaves an operator with a process that will not start and no next step |
+| The window an unredeemed authorization lapses in is charged on every path a name arrives by | The proxy path is the one where a name alone decides who gets the roles, so an authorization nobody redeemed matters most there. The deployment's own way back in is not what this closes: an administrator named in configuration is authorized again at every start, which restarts the window |
+
+### How long a name is redeemable
+
+An authorization nobody has redeemed is matched by name alone, because the
+identifier it will be pinned to is not knowable until somebody arrives holding
+it. That window ends.
+
+| Rule | Reason |
+|---|---|
+| An unredeemed authorization stops being redeemable, on every path | It is the one place where a name rather than an identifier decides who gets a set of roles. Left open, it waits for whoever turns up holding that name |
+| Authorizing somebody again restarts it, and so does unbinding them | Otherwise the window is written once and never again: an authorization nobody redeemed could be reopened by no act at all, and the administrators named in configuration — whose authorization is written again at every start — would lose their way in on the day it lapsed, with nothing logged |
+| The window is written when the authorization is | It carries the window in force at the moment it was granted, the way a token carries the expiry it was minted with, so changing the setting does not silently extend what is already standing |
+| Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
+| A redeemed authorization is not held to it | The identifier decides from then on, and the window was only ever about the name |
+
+### Which claim carries the username
+
+An OpenID Connect provider is told which claim carries the username, and there
+is no default.
+
+| Rule | Reason |
+|---|---|
+| The claim is stated by the operator or the process refuses to start | It decides who may redeem an authorization written for a name, and which claim has that property is a fact about the provider. A default makes that decision for every deployment that never examined it |
+| The property required is that an end user cannot choose the value | Narrower than immutable, and deliberately. The claim is not the identity — the subject is, and a rename after binding is followed as a label — so what matters is only that nobody can arrive holding a name an administrator wrote for somebody else |
+| The subject cannot serve as the claim | An authorization is written before anybody has arrived, so the name it is written for has to be one a person can type. The subject is not knowable then |
+| There is no safe default rather than a different default | OpenID Connect permits a provider to let people choose their own `preferred_username`; whether a given one does is a question only its operator can answer. On a provider where the login is assigned by an administrator it is the right answer, and on one with self-registration it is the attack |
+
 ## Sessions and request forgery
 
 A session is **stored, not held in a process**, so it works whichever replica

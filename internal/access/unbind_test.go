@@ -20,7 +20,7 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 
 		// The old provider, which pins its own identifier at her first
 		// successful sign-in.
-		if _, err := f.store.MatchProvider(ctx, "github-1001", "alice"); err != nil {
+		if _, err := f.store.MatchProvider(ctx, "okta", "github-1001", "alice"); err != nil {
 			t.Fatalf("the first sign-in was refused: %v", err)
 		}
 
@@ -28,7 +28,7 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 		// its own, so hers does not match what was pinned — which is the same
 		// answer somebody who took a released name gets, and correctly so:
 		// nothing here can tell the two apart.
-		if _, err := f.store.MatchProvider(ctx, "okta-abc", "alice"); err == nil {
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "alice"); err == nil {
 			t.Fatal("an identifier from a different provider was accepted, so a released name would be too")
 		}
 
@@ -38,7 +38,7 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 			t.Fatalf("unbinding was refused: %v", err)
 		}
 
-		matched, err := f.store.MatchProvider(ctx, "okta-abc", "alice")
+		matched, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "alice")
 		if err != nil {
 			t.Fatalf("she was still refused after unbinding: %v", err)
 		}
@@ -58,7 +58,7 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 		if identities[0].Subject == nil || *identities[0].Subject != "okta-abc" {
 			t.Fatalf("the new identifier was not pinned: %+v", identities[0])
 		}
-		if _, err := f.store.MatchProvider(ctx, "github-1001", "alice"); err == nil {
+		if _, err := f.store.MatchProvider(ctx, "okta", "github-1001", "alice"); err == nil {
 			t.Error("the old identifier still signs in, so unbinding widened rather than moved the pin")
 		}
 	})
@@ -74,13 +74,13 @@ func TestUnbindingAnIdentifierGrantsNothing(t *testing.T) {
 		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.MatchProvider(ctx, "okta-abc", "mallory"); err == nil {
+		if _, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "mallory"); err == nil {
 			t.Error("somebody nobody authorized was let in")
 		}
 		// And an arrival with no identifier at all is still refused, which is
 		// the rule unbinding must not quietly relax: an unpinned row is
 		// redeemable by name, not by nothing.
-		if _, err := f.store.MatchProvider(ctx, "", "alice"); err == nil {
+		if _, err := f.store.MatchProvider(ctx, "okta", "", "alice"); err == nil {
 			t.Error("an arrival naming no identifier redeemed an unbound authorization")
 		}
 	})

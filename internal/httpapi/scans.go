@@ -284,11 +284,19 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// away, on a deployment already behind on its work. It happens after
 	// authorization so that how far behind we are is not something an
 	// unauthorized sender can measure.
-	depth, err := in.Queue.Depth(ctx)
+	depth, err := in.Queue.Depth(ctx, queue.Parse)
 	if err != nil {
 		return nil, wentWrong(in.Logger, "cannot tell how much work is waiting", err)
 	}
-	if depth >= in.Queue.MaxBacklog() {
+	// The limit in force, not the one this binary was built with. Refusing
+	// against the built-in number makes the effective limit the smaller of the
+	// two, so raising the setting changes nothing for the producer the setting
+	// exists for.
+	limit, err := in.Queue.Backlog(ctx)
+	if err != nil {
+		return nil, wentWrong(in.Logger, "cannot tell how much work may wait", err)
+	}
+	if depth >= limit {
 		return nil, huma.NewError(http.StatusServiceUnavailable,
 			fmt.Sprintf("%d scans are already waiting to be read; try again shortly", depth))
 	}

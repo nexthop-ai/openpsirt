@@ -74,6 +74,12 @@ func NewGitHub(cfg GitHubConfig) (*GitHub, error) {
 // Name is how a sign-in path names this provider.
 func (g *GitHub) Name() string { return "github" }
 
+// Issuer is who mints the identifiers GitHub hands over.
+//
+// A constant, because there is one: an account identifier is GitHub's own and
+// a deployment cannot point this adapter at a second forge.
+func (g *GitHub) Issuer() string { return "https://github.com" }
+
 // Begin returns where to send the browser.
 func (g *GitHub) Begin(_ context.Context, redirectURI string) (string, Pending, error) {
 	pending, err := newPending()
@@ -120,6 +126,7 @@ func (g *GitHub) Complete(ctx context.Context, code string, pending Pending, red
 		// by its owner and then taken by somebody else, and matching on it
 		// would eventually hand one person's access to another.
 		Subject:     strconv.FormatInt(account.ID, 10),
+		Provider:    g.Issuer(),
 		Username:    username,
 		DisplayName: account.Name,
 	}

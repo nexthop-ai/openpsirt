@@ -25,7 +25,11 @@ import (
 // page: it would mean a second thing able to authenticate, verified by a
 // second path, and it would be readable by anything that got into the page.
 type OIDC struct {
-	name     string
+	name string
+	// issuer is who mints the identifiers this provider hands over, which is
+	// what an identity is recorded against. Kept apart from name, which is a
+	// label an operator picks and may change without anything moving.
+	issuer   string
 	config   oauth2.Config
 	verifier *oidc.IDTokenVerifier
 	// groupsClaim names where this provider puts group membership. There is no
@@ -114,13 +118,33 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	if len(scopes) == 0 {
 		scopes = []string{oidc.ScopeOpenID, "profile", "email"}
 	}
-	username := cfg.UsernameClaim
+	// Stated by the operator, never defaulted.
+	//
+	// This is not the identity. The subject is, and it is what a first
+	// sign-in pins and what decides from then on. This claim does one job:
+	// match an authorization an administrator wrote for somebody who has not
+	// arrived yet, which has to be a name a person can type.
+	//
+	// So the property it needs is that an end user cannot set it to a name an
+	// administrator might have authorized. OpenID Connect permits a provider
+	// to let people choose their own preferred_username and says a relying
+	// party may not rely on it being unique, and whether a given deployment's
+	// provider does that is a question only its operator can answer — which
+	// is why there is no default rather than a different default.
+	username := strings.TrimSpace(cfg.UsernameClaim)
 	if username == "" {
-		username = "preferred_username"
+		return nil, fmt.Errorf(
+			"the %q provider needs a username claim: set %sOIDC_USERNAME_CLAIM to a claim "+
+				"whose value an end user cannot choose, because it is what redeems an "+
+				"authorization written for somebody who has not signed in yet. Which claim "+
+				"that is depends on the provider, so there is no default; the configuration "+
+				"reference names the usual answer for each",
+			cfg.Name, "OPENPSIRT_")
 	}
 
 	return &OIDC{
-		name: cfg.Name,
+		name:   cfg.Name,
+		issuer: strings.TrimRight(strings.TrimSpace(cfg.Issuer), "/"),
 		config: oauth2.Config{
 			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
 			Endpoint: endpoint, Scopes: scopes,
@@ -131,6 +155,9 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		client:        guarded,
 	}, nil
 }
+
+// Issuer is who mints the identifiers this provider hands over.
+func (o *OIDC) Issuer() string { return o.issuer }
 
 // Name is how a sign-in path names this provider.
 func (o *OIDC) Name() string { return o.name }
@@ -215,6 +242,7 @@ func (o *OIDC) Complete(ctx context.Context, code string, pending Pending, redir
 	}
 	return &Identity{
 		Subject:       verified.Subject,
+		Provider:      o.issuer,
 		Username:      username,
 		DisplayName:   text(claims["name"]),
 		Email:         text(claims["email"]),

@@ -23,10 +23,21 @@ type Identity struct {
 	// through the provider binds it. A proxy binds nothing, so an identity
 	// reached only that way keeps waiting to be bound — which is what lets the
 	// provider still bind it afterwards.
-	Subject   *string    `bun:"subject"`
-	Username  string     `bun:"username,notnull"`
-	CreatedAt time.Time  `bun:"created_at,notnull"`
-	BoundAt   *time.Time `bun:"bound_at"`
+	Subject *string `bun:"subject"`
+	// Provider is which provider issued that subject, written with it and
+	// absent until a provider binds. A subject means nothing without it: two
+	// providers issue their own identifiers and neither knows the other's, so
+	// reading one as the other is how a deployment that changed provider
+	// hands somebody the roles of whoever held that identifier before.
+	Provider  *string   `bun:"provider"`
+	Username  string    `bun:"username,notnull"`
+	CreatedAt time.Time `bun:"created_at,notnull"`
+	// ClaimableUntil is when an authorization nobody has redeemed stops being
+	// redeemable. Null on a row a proxy created, which authorizes nothing on
+	// its own, and meaningless once Subject is set: a bound identity is
+	// matched by its identifier and the window is over.
+	ClaimableUntil *time.Time `bun:"claimable_until"`
+	BoundAt        *time.Time `bun:"bound_at"`
 }
 
 // folded is how a username is stored and how it is matched.
@@ -45,6 +56,29 @@ func folded(username string) string {
 	return strings.ToLower(strings.TrimSpace(username))
 }
 
+// DefaultClaimWindow is how long an unredeemed authorization stays redeemable
+// where an administrator has not said otherwise.
+//
+// Thirty days: long enough for somebody authorized ahead of a start date, a
+// notice period or a holiday to arrive and redeem it, and short enough that a
+// grant written for a person who never came does not stand for the life of the
+// deployment. The window exists at all because an unredeemed authorization is
+// the one thing here matched by a name rather than by an identifier, and a
+// name is what somebody else can arrive holding.
+const DefaultClaimWindow = 30 * 24 * time.Hour
+
+// ClaimingWithin says how long the authorizations this store writes stay
+// redeemable. The window in force when the authorization was written is the
+// one it carries, the same way a token carries the expiry it was minted with.
+func (s *Store) ClaimingWithin(window time.Duration) *Store {
+	if window <= 0 {
+		return s
+	}
+	within := *s
+	within.claimWindow = window
+	return &within
+}
+
 // Claim authorizes somebody to sign in, before any provider has been asked
 // about them.
 //
@@ -58,18 +92,39 @@ func (s *Store) Claim(ctx context.Context, personID int64, username string) erro
 		return fmt.Errorf("a way to sign in needs a username")
 	}
 
+	at := s.now().Truncate(time.Microsecond)
+	until := at.Add(s.window())
+
 	existing := new(Identity)
 	err := s.db.NewSelect().Model(existing).Where("username = ?", username).Scan(ctx)
 	if err == nil {
 		if existing.PersonID != personID {
 			return fmt.Errorf("%q is already somebody else here", username)
 		}
+		// Authorizing somebody again restarts the window. Without this the
+		// window is written once and never again, so an authorization nobody
+		// redeemed could not be reopened by any act at all — and the
+		// administrators named in configuration, whose authorization is
+		// written again at every start, would stop being able to sign in on
+		// the day it lapsed, with nothing logged and the deployment still
+		// reporting that somebody can administer it.
+		//
+		// A bound row is matched by its identifier and has no window, so it
+		// is left alone.
+		if existing.Subject == nil {
+			if _, err := s.db.NewUpdate().Model((*Identity)(nil)).
+				Set("claimable_until = ?", until).
+				Where("id = ?", existing.ID).Where("subject IS NULL").
+				Exec(ctx); err != nil {
+				return fmt.Errorf("renew the window on %q: %w", username, err)
+			}
+		}
 		return nil
 	}
 
 	claim := &Identity{
 		PersonID: personID, Username: username,
-		CreatedAt: s.now().Truncate(time.Microsecond),
+		CreatedAt: at, ClaimableUntil: &until,
 	}
 	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
 		return fmt.Errorf("authorize %q: %w", username, err)
@@ -87,10 +142,17 @@ func (s *Store) Claim(ctx context.Context, personID int64, username string) erro
 //
 // Nothing here creates a person. It returns who was already authorized, or
 // nothing at all.
-func (s *Store) MatchProvider(ctx context.Context, subject, username string) (*Account, error) {
+func (s *Store) MatchProvider(ctx context.Context, provider, subject, username string) (*Account, error) {
 	// The identifier is the provider's own and is compared exactly. Only the
 	// name is folded.
+	provider = strings.TrimSpace(provider)
 	subject, username = strings.TrimSpace(subject), folded(username)
+	if provider == "" {
+		// An identifier with no issuer names nobody. Binding one would record
+		// a subject that a later sign-in cannot tell apart from a different
+		// provider's, which is the reinterpretation this records to prevent.
+		return nil, ErrDenied
+	}
 	if subject == "" || username == "" {
 		// A provider that names somebody without a stable identifier leaves
 		// the authorization redeemable by name forever, which is the matching
@@ -102,6 +164,12 @@ func (s *Store) MatchProvider(ctx context.Context, subject, username string) (*A
 	bound := new(Identity)
 	if err := s.db.NewSelect().Model(bound).
 		Where("subject = ?", subject).Scan(ctx); err == nil {
+		if !issuedBy(bound, provider) {
+			// The identifier matches and the provider that issued it does
+			// not, so this is a different person who happens to hold the same
+			// string at a provider this deployment was pointed at later.
+			return nil, ErrDenied
+		}
 		// Their name may have moved since they were last here. Following it
 		// keeps what an administrator reads current; it never decides
 		// anything, because the identifier already did.
@@ -117,6 +185,12 @@ func (s *Store) MatchProvider(ctx context.Context, subject, username string) (*A
 	if err != nil {
 		return nil, err
 	}
+	if claimed.Subject != nil && !issuedBy(claimed, provider) {
+		// Pinned by a provider that is no longer the one configured. The name
+		// is not redeemable again on that account: whoever holds it now was
+		// authorized against an identifier nothing here can still interpret.
+		return nil, ErrDenied
+	}
 	if claimed.Subject != nil && *claimed.Subject != subject {
 		// The name was pinned to somebody else's identifier. Whoever holds it
 		// now is not who was authorized, which is the case this whole shape
@@ -125,9 +199,16 @@ func (s *Store) MatchProvider(ctx context.Context, subject, username string) (*A
 	}
 
 	if claimed.Subject == nil {
+		if lapsed(claimed, s.now()) {
+			// Written for somebody who never came. The name is the only thing
+			// matching it, so leaving it redeemable for ever leaves a set of
+			// roles waiting for whoever turns up holding that name.
+			return nil, ErrDenied
+		}
 		at := s.now().Truncate(time.Microsecond)
 		result, err := s.db.NewUpdate().Model((*Identity)(nil)).
-			Set("subject = ?", subject).Set("bound_at = ?", at).
+			Set("subject = ?", subject).Set("provider = ?", provider).
+			Set("bound_at = ?", at).
 			Where("id = ?", claimed.ID).Where("subject IS NULL").Exec(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("pin %q: %w", username, err)
@@ -143,6 +224,36 @@ func (s *Store) MatchProvider(ctx context.Context, subject, username string) (*A
 		}
 	}
 	return s.byID(ctx, claimed.PersonID)
+}
+
+// issuedBy says whether a bound row was bound by the provider now configured.
+//
+// A row with no provider recorded is one bound before the issuer was written
+// down, and is read as belonging to whoever is configured now — there is
+// nothing else it could mean, and refusing every one of them would lock out a
+// deployment that never changed provider at all.
+func issuedBy(row *Identity, provider string) bool {
+	return row.Provider == nil || strings.EqualFold(*row.Provider, provider)
+}
+
+// BoundProviders is every provider that has bound an identifier here.
+//
+// Read at startup against the one provider configured, because a deployment
+// pointed at a second one reinterprets identifiers the first issued and
+// nothing at sign-in time can tell that apart from an ordinary arrival.
+func (s *Store) BoundProviders(ctx context.Context) ([]string, error) {
+	var names []string
+	if err := s.db.NewSelect().Model((*Identity)(nil)).
+		Column("provider").
+		Where("provider IS NOT NULL").
+		// A row nobody has bound holds nothing hostage. Both halves are
+		// cleared together by an unbind, and requiring the identifier as well
+		// means a half-cleared row cannot stop a deployment starting.
+		Where("subject IS NOT NULL").
+		Distinct().Scan(ctx, &names); err != nil {
+		return nil, fmt.Errorf("read which providers have bound an identity: %w", err)
+	}
+	return names, nil
 }
 
 // MatchProxy finds who a trusted proxy is asserting.
@@ -167,7 +278,26 @@ func (s *Store) MatchProxy(ctx context.Context, username string) (*Account, erro
 	if err != nil {
 		return nil, err
 	}
+	if lapsed(claimed, s.now()) {
+		// The same window the provider path charges. This is the path where a
+		// name alone decides who gets the roles, so it is where an
+		// authorization nobody redeemed matters most — and an administrator
+		// named in configuration is authorized again at every start, so the
+		// deployment's own way back in does not lapse under it.
+		return nil, ErrDenied
+	}
 	return s.byID(ctx, claimed.PersonID)
+}
+
+// lapsed says an authorization nobody has redeemed is past its window.
+//
+// A bound row is matched by its identifier and has no window: the window is
+// only ever about a name, which is the one thing somebody else can arrive
+// holding.
+func lapsed(claimed *Identity, now time.Time) bool {
+	return claimed.Subject == nil &&
+		claimed.ClaimableUntil != nil &&
+		!now.Before(*claimed.ClaimableUntil)
 }
 
 // claimedBy reads the authorization waiting under a username.
@@ -220,11 +350,28 @@ func (s *Store) rename(ctx context.Context, identity *Identity, username string)
 // it was working.
 func (s *Store) UnbindIdentifier(ctx context.Context, personID int64) error {
 	if _, err := s.db.NewUpdate().Model((*Identity)(nil)).
-		Set("subject = NULL").Set("bound_at = NULL").
+		// The provider goes with the identifier it issued. Left behind, it
+		// still names a provider this deployment is moving away from, and the
+		// startup check reads that as bindings nobody withdrew — so unbinding
+		// everybody would not be enough to let the new provider start.
+		//
+		// The window restarts with them. Unbinding says the authorization is
+		// standing and redeemable again, and a row that came back carrying a
+		// window which lapsed while it was bound is redeemable by nobody.
+		Set("subject = NULL").Set("provider = NULL").Set("bound_at = NULL").
+		Set("claimable_until = ?", s.now().Truncate(time.Microsecond).Add(s.window())).
 		Where("person_id = ?", personID).Exec(ctx); err != nil {
 		return fmt.Errorf("unbind how they sign in: %w", err)
 	}
 	return nil
+}
+
+// window is how long an authorization this store writes stays redeemable.
+func (s *Store) window() time.Duration {
+	if s.claimWindow <= 0 {
+		return DefaultClaimWindow
+	}
+	return s.claimWindow
 }
 
 // Identities lists the ways somebody may sign in.
@@ -256,7 +403,10 @@ type Arrival struct {
 	// paths an arrival took decides whether an identifier is bound and whether
 	// a mismatch refuses, and an authorization boundary should not turn on a
 	// field somebody could leave empty by accident.
-	ViaProxy    bool
+	ViaProxy bool
+	// Provider names which provider issued Subject. Empty for a proxy
+	// arrival, which binds nothing.
+	Provider    string
 	Username    string
 	DisplayName string
 }
@@ -266,7 +416,7 @@ func (s *Store) match(ctx context.Context, who Arrival) (*Account, error) {
 	if who.ViaProxy {
 		return s.MatchProxy(ctx, who.Username)
 	}
-	return s.MatchProvider(ctx, who.Subject, who.Username)
+	return s.MatchProvider(ctx, who.Provider, who.Subject, who.Username)
 }
 
 // handle is what to call somebody in a record of what they did.

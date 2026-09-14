@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -80,6 +81,10 @@ type Administering struct {
 	// process has no database, and then nothing is recorded — which is the
 	// same state as having no database to change anything in.
 	Trail func() *trail.Store
+	// Settings is where the window an unredeemed authorization stays
+	// redeemable for is read. Nil where this process has no database, and
+	// then the built-in window applies.
+	Settings func() *setting.Store
 }
 
 // PersonBody is somebody who has been granted access.
@@ -346,7 +351,18 @@ func registerAdministration(api huma.API, a Administering) {
 				trail.Said("administrator", before.IsAdmin),
 				trail.Said("administrator", *in.Body.Admin))
 		}
-		if err := store.Claim(ctx, person.ID, in.Body.Identity); err != nil {
+		// An authorization is matched by name until somebody redeems it, so
+		// it carries the window in force when it was written.
+		window := access.DefaultClaimWindow
+		if a.Settings != nil {
+			if settings := a.Settings(); settings != nil {
+				window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
+				if err != nil {
+					return nil, wentWrong(a.Logger, "cannot read how long an authorization stays redeemable", err)
+				}
+			}
+		}
+		if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {
 			return nil, asked(a.Logger, err)
 		}
 		// Recorded here, so it outranks whatever a provider states

@@ -17,7 +17,12 @@ import (
 // by somebody else — while the subject does not. Matching on the moving one is
 // how an account ends up belonging to the wrong person.
 type Identity struct {
-	Subject     string
+	Subject string
+	// Provider is which provider this came from, as that provider names
+	// itself here. It travels with the subject because a subject means
+	// nothing on its own: two providers issue their own identifiers, and one
+	// read as the other names a different person.
+	Provider    string
 	Username    string
 	DisplayName string
 	// Email is where the provider says this person is reached, and
@@ -62,8 +67,17 @@ type Pending struct {
 // token and publishes no discovery document, so there is nothing for the first
 // adapter to verify.
 type Provider interface {
-	// Name is how a sign-in path names this provider in a URL.
+	// Name is how a sign-in path names this provider in a URL. Cosmetic and
+	// operator-chosen: it is what the button says.
 	Name() string
+	// Issuer is who mints the identifiers this provider hands over.
+	//
+	// Not the name. The name is a label an operator picks and may change
+	// without anything about the identities moving, and repointing the issuer
+	// at a different provider while leaving the label alone is the ordinary
+	// shape of a provider change. What decides whether an identifier is still
+	// interpretable is who minted it, so that is what is recorded beside it.
+	Issuer() string
 	// Begin returns where to send the browser, and what to remember until it
 	// comes back.
 	Begin(ctx context.Context, redirectURI string) (string, Pending, error)

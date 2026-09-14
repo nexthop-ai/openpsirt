@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -92,60 +91,32 @@ func (r *Reader) Once(ctx context.Context) (*Result, error) {
 	result, err := r.read(working, job.Reference)
 	taken := release()
 
-	// What became of the scan is recorded whatever ended the reading. A
-	// shutdown cancels the read, and the cancellation must not also stop the
-	// job being handed back — otherwise it stays claimed by a process that
-	// has gone until the claim goes stale, half an hour later.
-	settled, done := queue.Settling(ctx)
-	defer done()
-	var ended error
-	if err != nil {
-		// The failure is recorded against the scan as well as the job. A
-		// producer sending files nothing can read has to be visible as that,
-		// rather than as a queue that keeps retrying for reasons only an
-		// operator reading logs would ever see.
-		//
-		// Not on a cancellation, though: nothing is wrong with the document,
-		// and the job goes back to be read once the process is running again.
-		// Nor when the job went to another worker, which is reading the same
-		// document and will record what became of it.
-		if ctx.Err() == nil && taken == nil {
+	// A failure is recorded against the scan as well as the job. A producer
+	// sending files nothing can read has to be visible as that, rather than
+	// as a queue that keeps retrying for reasons only an operator reading
+	// logs would ever see. Passed as the recovery rather than done here,
+	// because it is the one part of settling a job the two workers differ on:
+	// it must not run on a cancellation, where nothing is wrong with the
+	// document, nor where the job went to another worker, which is reading
+	// the same document and will record what became of it.
+	ending := r.queue.Settle(ctx, job, r.name, "scan", r.logger, err, taken,
+		func(settled context.Context) error {
+			// Logged here rather than handed back, because the two failures
+			// are different things an operator acts on differently and the
+			// queue has no words for either.
 			if marked := r.markFailed(settled, job.Reference, err); marked != nil {
-				r.logger.Error("could not record why a scan failed", "scan", job.Reference, "error", marked)
-			} else if err := r.reinstate(settled, job.Reference); err != nil {
+				r.logger.Error("could not record why a scan failed",
+					"scan", job.Reference, "error", marked)
+			} else if back := r.reinstate(settled, job.Reference); back != nil {
 				r.logger.Error("could not bring back the scan this one had overtaken",
-					"scan", job.Reference, "error", err)
+					"scan", job.Reference, "error", back)
 			}
-		}
-		ended = r.queue.Fail(settled, job.ID, r.name, err)
-	} else {
-		ended = r.queue.Succeed(settled, job.ID, r.name)
-	}
-	switch {
-	case errors.Is(ended, queue.ErrNoLongerHeld):
-		// The claim went stale while the read ran and another worker took
-		// the job over. What was stored stands; the job's ending is the other
-		// worker's to write, so there is nothing to retry here — but a read
-		// that outran its claim is worth knowing about.
-		r.logger.Warn("a job was finished by a worker that no longer held it",
-			"job", job.ID, "scan", job.Reference)
-	case ended != nil:
-		r.logger.Warn("could not record how a job ended", "job", job.ID, "error", ended)
-		if err == nil {
-			return result, ended
-		}
-	}
-	if taken != nil {
-		// The read was stopped because the job went to another worker, so the
-		// error it ended with describes that rather than anything about the
-		// document. There is nothing to retry and nothing to report: the job
-		// is in hand elsewhere. It is logged because a claim that went stale
-		// under a running read means the renewals were not landing.
-		r.logger.Warn("a read was stopped because another worker took its job over",
-			"job", job.ID, "scan", job.Reference)
+			return nil
+		})
+	if ending.HandedOver {
 		return nil, nil
 	}
-	return result, err
+	return result, ending.Err
 }
 
 // Run reads scans until the context ends.

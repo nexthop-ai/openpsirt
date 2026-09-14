@@ -44,6 +44,12 @@ func TestAMessageAboutSomethingUndisclosedSaysOnlyThatThereIsSomething(t *testin
 	if strings.Contains(got.Text, "/findings/") {
 		t.Errorf("the address names the finding, which the body was careful not to:\n%s", got.Text)
 	}
+	// The same address a channel carries in a field of its own. A webhook
+	// body puts the link somewhere a reader does not have to open the text to
+	// see, so the rule holds there or it does not hold.
+	if got.Link != "https://psirt.example/" {
+		t.Errorf("the composed address is %q, want the front door", got.Link)
+	}
 }
 
 func TestAMessageAboutSomethingPublicCarriesWhatItIsAbout(t *testing.T) {
@@ -66,6 +72,9 @@ func TestAMessageAboutSomethingPublicCarriesWhatItIsAbout(t *testing.T) {
 	}
 	if !strings.Contains(got.Text, "https://psirt.example/products/openpsirt/") {
 		t.Errorf("the message carries no way to reach it:\n%s", got.Text)
+	}
+	if got.Link != "https://psirt.example"+n.Link {
+		t.Errorf("the composed address is %q, want the finding itself", got.Link)
 	}
 }
 

@@ -3,7 +3,6 @@ package scanner
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -81,43 +80,11 @@ func (r *Runner) Once(ctx context.Context) (*Outcome, error) {
 	outcome, err := r.scan(working, job.Reference)
 	taken := release()
 
-	// How the job ended is recorded whatever ended it. A shutdown cancels the
-	// scan, and the cancellation must not also stop the job being handed
-	// back — otherwise it stays claimed by a process that has gone until the
-	// claim goes stale, half an hour later.
-	settled, done := queue.Settling(ctx)
-	defer done()
-	var ended error
-	if err != nil {
-		ended = r.queue.Fail(settled, job.ID, r.name, err)
-	} else {
-		ended = r.queue.Succeed(settled, job.ID, r.name)
-	}
-	switch {
-	case errors.Is(ended, queue.ErrNoLongerHeld):
-		// The claim went stale while the scan ran and another worker took
-		// the job over. What this scan recorded stands; the job's ending is
-		// the other worker's to write, so there is nothing to retry here —
-		// but a scan that outran its claim is worth knowing about.
-		r.logger.Warn("a job was finished by a worker that no longer held it",
-			"job", job.ID, "target", job.Reference)
-	case ended != nil:
-		r.logger.Warn("could not record how a job ended", "job", job.ID, "error", ended)
-		if err == nil {
-			return outcome, ended
-		}
-	}
-	if taken != nil {
-		// The scan was stopped because the job went to another worker, so the
-		// error it ended with describes that rather than anything about the
-		// target. There is nothing to retry and nothing to report: the job is
-		// in hand elsewhere. It is logged because a claim that went stale
-		// under a running scan means the renewals were not landing.
-		r.logger.Warn("a scan was stopped because another worker took its job over",
-			"job", job.ID, "target", job.Reference)
+	ending := r.queue.Settle(ctx, job, r.name, "target", r.logger, err, taken, nil)
+	if ending.HandedOver {
 		return nil, nil
 	}
-	return outcome, err
+	return outcome, ending.Err
 }
 
 // Run scans until the context ends.

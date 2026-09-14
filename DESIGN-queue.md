@@ -13,6 +13,7 @@ Satisfies REQ-03, REQ-06, REQ-69.
 - [Claim renewal](#claim-renewal)
 - [Leases](#leases)
 - [Backlog refusal](#backlog-refusal)
+- [What a failed job records](#what-a-failed-job-records)
 - [Transaction boundary](#transaction-boundary)
 - [Limits](#limits)
 
@@ -56,6 +57,23 @@ afterwards.
 | Retry with a growing delay | A briefly unavailable dependency is not hammered while it recovers |
 | A limit on attempts | A job that can never succeed would otherwise retry forever and crowd out work that could |
 | Set aside, never deleted | The row is kept with its last error, which is the evidence of why it failed |
+| The limit is charged on the reclaim as well as on a reported failure | A worker that is killed reports nothing, so the only record of the attempt is the count the claim itself incremented. Charged only where a worker reports, a job that kills its worker is reclaimed for ever and the set-aside state is never reached |
+| A claim that can no longer be reclaimed is set aside by a pass of its own | A job left in the claimed state reads everywhere else as work somebody is doing, and a worker that died is not something any act by a person is the moment to notice. Folded into the claim instead, it is a range update every worker runs on every poll over the rows every other worker is claiming — which on MySQL deadlocks six workers against one another rather than handing out work |
+| One replica buries | Every replica running the same range update is the same contention between processes that folding it into the claim caused between workers |
+| Work abandoned by its worker records that, in place of the reason nobody reported | Downstream it is the same failure. Somebody reading the row has to be able to tell "this failed" from "nothing was left alive to say" |
+
+### Work that stopped being retried
+
+Set-aside work has an operator surface: a list of what stopped and why, and a
+way to put one back.
+
+| Rule | Reason |
+|---|---|
+| The list is set-aside work alone | Waiting and running work needs no attention, and a list of it invites acting on a state that moves underneath the reader. What is set aside has stopped moving by definition |
+| Putting a job back starts its attempts again | Whoever does it has decided the cause is dealt with. A job returned with one attempt left is set aside again by the next transient failure |
+| The last error survives being put back | It is the evidence of the previous run, and the decision to try again is not a reason to destroy it |
+| Only set-aside work is put back | Returning a running job hands the same work to two workers, which on an ingest looks like real change rather than an error |
+| The listing is capped | A read on an interactive route carries a bound, and a deployment whose queue has gone wrong is where the list is longest |
 
 ## Claim renewal
 
@@ -68,6 +86,8 @@ so several renewals may fail before the claim is at risk.
 | Renewal refused, another worker holds the job | The work is canceled and the worker is told the claim was lost, not that the work failed |
 | Renewal fails for any other reason | Reported and retried next interval. The claim is not lost until the timeout passes with nothing landing |
 | The job ends | Renewal stops first and the worker waits for it, so nothing else writes to the job while the ending is written |
+| Settling a job is one sequence, owned by the queue | Opening a context that outlives a cancellation, recording the ending against it, telling a stale claim apart from a write that failed, and noticing a takeover were written out in each worker down to the comment paragraph, and the copies had begun to disagree. A third worker would have been a third reading of the rule for a job finished by a worker that no longer holds it |
+| What a worker does about its own failure is passed in | It is the one respect the workers genuinely differ: the reader records the failure against the scan as well as the job, and must not on a cancellation or where the job went to another worker. Passed as a closure rather than a flag, so the difference is visible where it is made |
 | The claim went stale while the work ran | Only the claim holder finishes a job: the finishing statement carries the claim's condition. A refused finish is reported as "no longer held" and logged |
 | Shutdown mid-job | The job is handed back as a failed attempt. The writes recording an ending run under their own context, detached from the cancellation and bounded by a few seconds |
 
@@ -87,7 +107,7 @@ update.
 
 | Work shape | On losing the race | Passes |
 |---|---|---|
-| May be skipped | Does nothing this cycle, asks again next | Asking public indexes what upstream released; deciding which builds are due a scan |
+| May be skipped | Does nothing this cycle, asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; setting aside work whose worker never came back |
 | Must happen | Waits for its turn, then applies | Rewriting deadlines after a policy change |
 
 Work that waits reads what it decides from **after** its turn comes. Anything
@@ -95,8 +115,25 @@ the work decides from is fetched inside the thing that serializes it.
 
 ## Backlog refusal
 
-New work is refused once the pending queue is deeper than a configured limit.
-The caller is told to retry.
+New work is refused once the queue for its kind is deeper than a limit an
+administrator sets. The caller is told to retry.
+
+| Rule | Reason |
+|---|---|
+| Counted per kind | The cap exists so a runaway producer cannot push everyone else's work behind its own. Counted across every kind it does the opposite: the producer that filled the queue keeps its place while every other producer is refused, so a bulk change to the routing rules refuses every scan upload in the deployment |
+| The depth counts work held by a worker that has stopped reporting | Counting only what is waiting reads a queue in the middle of a reclaim cycle as empty: every row sits in the claimed state, held by workers that died, and the one number an operator has says there is nothing to do |
+| A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
+| Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
+
+## What a failed job records
+
+A job that failed keeps the reason, bounded.
+
+| Rule | Reason |
+|---|---|
+| The reason is capped | It comes from whatever failed — a parser, a scanner's output, a driver — and is handed back to whoever asks about their upload. Unbounded, one job writes as much as its cause felt like saying into a column every reader of that job carries |
+| The cap cuts on a character boundary | A cut at a byte offset splits a multi-byte character and leaves a tail three of the four engines refuse to store, so the bound meant to keep a write small is what makes it fail |
+| The cap is generous and the cut is marked | The first lines of a parser's complaint are what make it actionable. The worker's own log line carries the whole of it either way |
 
 ## Transaction boundary
 
@@ -106,6 +143,18 @@ The caller states whether a job commits with the rows it is about.
 |---|---|---|
 | Commit with the rows | Work describing something the same transaction wrote, such as an upload | A job committed alone can be claimed before its rows exist; rows committed without their job are work nobody picks up |
 | Queue afterwards | Work that merely follows a write, such as sweeping routing rules after a rule is recorded | None. A failure to queue is logged rather than returned, because the rule is recorded either way and an error would invite a retry that records it twice |
+
+Every write the queue makes of its own — queueing, claiming, renewing,
+finishing, failing, setting aside, putting back, and taking or handing back a
+lease — goes through the retry helper rather than running as a statement on its
+own.
+
+| Rule | Reason |
+|---|---|
+| A cluster refuses at commit, not at the statement | See `DESIGN-database.md` § Retryable transactions. A write outside a transaction cannot be retried at all: the failure arrives where there is nothing left to go again |
+| Finishing is the write where it costs most | Reported up rather than retried, a job that finished is recorded by its caller as failed and handed out again. The work runs twice, which on an ingest looks like real change |
+| A finish whose commit was refused asks the row rather than assuming | A second attempt covers both "somebody else holds it now" and "the commit succeeded and the answer never arrived". Work that is finished is finished, and reporting a lost claim for it would record a failure against a job that succeeded |
+| A lease take that is refused would read as losing a race | A replica told it lost a race it never ran stops sweeping, with nothing logged, on every replica at once |
 
 ## Limits
 

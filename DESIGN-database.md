@@ -269,6 +269,16 @@ transaction began, or carried over from the attempt that failed, describes a
 world that no longer exists. Anything a closure uses but does not fetch is a
 defect.
 
+**A statement that fails inside a transaction is not always recoverable.** On
+PostgreSQL a failed statement aborts the whole transaction: every command after
+it is refused until the block ends, whatever the caller made of the failure. So
+a statement whose failure is the ordinary answer — an insert refused by a
+primary key, where being refused is how a second replica learns the row is
+already there — cannot sit inside a transaction with the work that follows it.
+It runs on its own, and what needs the retry goes in the transaction. Three of
+the four engines carry on after a failed statement, so the quick loop never
+sees this.
+
 A store handed a transaction joins it rather than refusing. Both spellings exist:
 
 | Spelling | Correct where |
@@ -392,6 +402,15 @@ was identical in two checkouts, and one dropped the other's database mid-run.
 
 The line is drawn at SQL rather than at the package: a handler test that pins a
 query keeps all four.
+
+The harness also offers a handle whose `COMMIT` can be made to fail.
+
+| | |
+|---|---|
+| Why it exists | A retry that is never exercised is a retry nobody has tested. The failure a cluster produces arrives at commit, on a transaction whose every statement already succeeded, and nothing else here can produce one — so the code that runs when it happens was reachable by no test at all |
+| What it does | Refuses a stated number of commits, in the words this engine's lost-race check matches, rolling the work back the way a refused commit does. A hook runs between the refusal and the retry, which is where a test puts what another worker did in the meantime |
+| What a test asserts with it | Both directions. That a value from the attempt which was rolled back does not survive into the next one, and that the work still happens — and that the path under test committed something the handle could refuse, because a write outside a transaction passes every other assertion by never running the code they are about |
+| Why it is SQLite underneath | What is pinned does not vary by engine: the retry is driven by the error, and the error is synthesized |
 
 The rule has to be applied, and a whole area arrived on two engines. Routing
 rules, VEX statements, teams, saved filters and the administration trail were

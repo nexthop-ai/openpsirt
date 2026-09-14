@@ -31,12 +31,17 @@ type Lease struct {
 // row locking, because a lease is one row and there is no queue of them to
 // skip past.
 type Leases struct {
-	db  bun.IDB
+	// db is the handle rather than any transaction-or-handle, because taking
+	// a lease is its own transaction: a cluster certifies at commit, so a
+	// take whose statements all succeeded can still be rolled back under it,
+	// and a replica told it lost a race it never ran stops sweeping with
+	// nothing logged.
+	db  *bun.DB
 	now func() time.Time
 }
 
 // NewLeases returns the leases held in db.
-func NewLeases(db bun.IDB) *Leases {
+func NewLeases(db *bun.DB) *Leases {
 	return &Leases{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
@@ -54,16 +59,37 @@ func (l *Leases) Take(ctx context.Context, name, holder string, until time.Durat
 	now := l.now().Truncate(time.Microsecond)
 	// The row is made on first use rather than seeded by the migration: what
 	// work exists is decided in code, and a migration listing the names would
-	// be a second place to change whenever a pass is added or retired. A
-	// second replica's insert is refused by the primary key, which is the
-	// answer rather than an error — both then go on to the update, and that is
-	// what decides between them.
+	// be a second place to change whenever a pass is added or retired.
+	// Outside the transaction below, and deliberately. A second replica's
+	// insert is refused by the primary key, which is the answer rather than an
+	// error — but on PostgreSQL a statement that fails inside a transaction
+	// aborts the whole of it, so the refusal that is the ordinary case would
+	// take the update with it. Nothing here depends on the two being atomic:
+	// the row's existence is not what decides, the update is.
 	made := &Lease{Name: name}
 	if _, err := l.db.NewInsert().Model(made).Exec(ctx); err != nil && !database.IsDuplicate(err) {
 		return false, fmt.Errorf("record the lease on %s: %w", name, err)
 	}
 
-	res, err := l.db.NewUpdate().Model((*Lease)(nil)).
+	var mine bool
+	err := database.InTransaction(ctx, l.db, func(ctx context.Context, tx bun.Tx) error {
+		// Every attempt starts from nothing: an attempt that was rolled back
+		// took no lease, whatever it decided.
+		mine = false
+		taken, err := l.takeIn(ctx, tx, name, holder, now, until)
+		if err != nil {
+			return err
+		}
+		mine = taken
+		return nil
+	})
+	return mine, err
+}
+
+func (l *Leases) takeIn(ctx context.Context, tx bun.Tx,
+	name, holder string, now time.Time, until time.Duration) (bool, error) {
+
+	res, err := tx.NewUpdate().Model((*Lease)(nil)).
 		Set("held_by = ?", holder).
 		Set("held_until = ?", now.Add(until)).
 		Where("name = ?", name).
@@ -124,14 +150,16 @@ func (l *Leases) Await(ctx context.Context, name, holder string, until, poll tim
 // rather than making one possible. That is what it is for — a replica shutting
 // down cleanly should not leave the work stopped for the length of a lease.
 func (l *Leases) Release(ctx context.Context, name, holder string) error {
-	_, err := l.db.NewUpdate().Model((*Lease)(nil)).
-		Set("held_by = NULL").
-		Set("held_until = NULL").
-		Where("name = ?", name).
-		Where("held_by = ?", holder).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("hand back the lease on %s: %w", name, err)
-	}
-	return nil
+	return database.InTransaction(ctx, l.db, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewUpdate().Model((*Lease)(nil)).
+			Set("held_by = NULL").
+			Set("held_until = NULL").
+			Where("name = ?", name).
+			Where("held_by = ?", holder).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("hand back the lease on %s: %w", name, err)
+		}
+		return nil
+	})
 }
