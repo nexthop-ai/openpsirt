@@ -39,7 +39,7 @@ import (
 // risk rather than hiding it, and the queue exists to stop risk being hidden
 // unseen.
 func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int64, reasoning string) (*Revision, error) {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -162,7 +162,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 // No approval needed, for the same reason revising needs none: it puts risk
 // back on the table rather than taking it off.
 func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID int64) error {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return fmt.Errorf("this store is already inside a transaction")
 	}
@@ -206,7 +206,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 // available at the same size. Hunting for what a bulk approval touched, one
 // row at a time, is not an undo anybody will actually use.
 func (s *Store) UndoBatch(ctx context.Context, subject access.Subject, batch string) (Undone, error) {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return Undone{}, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -266,7 +266,7 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	var decisions []int64
 	covered := s.db.NewSelect().Model((*Approval)(nil)).
 		ColumnExpr("d.id").
-		Join("JOIN decision AS d ON d.claim_id = da.claim_id").
+		Join(`JOIN decision AS "d" ON d.claim_id = da.claim_id`).
 		Where("da.batch = ?", batch).Where("da.withdrawn_at IS NULL")
 	covered = approvableBy(covered, subject, "d")
 	if err := covered.Scan(ctx, &decisions); err != nil {
@@ -307,7 +307,7 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		// nobody but whoever knew its identifier.
 		Set("sent_back_at = ?", nil).
 		Where("id IN (?)", bun.List(decisions)).
-		Where("NOT EXISTS (SELECT 1 FROM claim_approval AS still " +
+		Where(`NOT EXISTS (SELECT 1 FROM claim_approval AS "still" ` +
 			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
 		Exec(ctx); err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
@@ -372,13 +372,13 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	// findings sit behind a claim to somebody who may not read one.
 	readable := readableVisibilities(subject, ids, s, ctx)
 	covered, err := s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join("JOIN finding AS f ON f.vulnerability_id = de.vulnerability_id"+
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN finding AS "f" ON f.vulnerability_id = de.vulnerability_id`+
 			" AND f.place_identity = de.place_identity").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id AND st.product_id = de.product_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
 		Where("COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr).

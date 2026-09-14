@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -21,10 +18,9 @@ func init() {
 // a separate service, and neither is acceptable for something an operator
 // installs against whatever database they already run.
 func upJob(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -57,15 +53,9 @@ func upJob(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "job_set_aside_idx" ON "job" ("state", "updated_at", "id")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downJob(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `DROP TABLE "job"`)
-	return err
+	return dropTables(ctx, tx, "job")
 }

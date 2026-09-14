@@ -413,9 +413,9 @@ func (s *Store) Destinations(ctx context.Context) ([]Configured, error) {
 			Because string `bun:"because"`
 		}
 		if err := s.db.NewSelect().Model((*Delivery)(nil)).
-			ColumnExpr("SUM(CASE WHEN od.sent_at IS NOT NULL THEN 1 ELSE 0 END) AS sent").
-			ColumnExpr("SUM(CASE WHEN od.sent_at IS NULL THEN 1 ELSE 0 END) AS failing").
-			ColumnExpr("MAX(COALESCE(od.failed, '')) AS because").
+			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NOT NULL THEN 1 ELSE 0 END) AS "sent"`).
+			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NULL THEN 1 ELSE 0 END) AS "failing"`).
+			ColumnExpr(`MAX(COALESCE(od.failed, '')) AS "because"`).
 			Where("od.outbound_id = ?", row.ID).
 			Scan(ctx, &counts); err != nil {
 			return nil, fmt.Errorf("read how it is doing: %w", err)
@@ -459,7 +459,11 @@ func (s *Store) AddDestination(ctx context.Context, name, kind, url, secret stri
 	if err != nil {
 		return nil, fmt.Errorf("take that destination up again: %w", err)
 	}
-	if n, err := res.RowsAffected(); err == nil && n > 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return nil, fmt.Errorf("take that destination up again: %w", err)
+	}
+	if n > 0 {
 		if err := s.db.NewSelect().Model(row).
 			Where("name = ?", row.Name).Where("kind = ?", row.Kind).
 			Limit(1).Scan(ctx); err != nil {

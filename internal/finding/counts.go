@@ -60,12 +60,12 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 
 	inner := s.db.NewSelect().
 		Distinct().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		ColumnExpr(column + " AS grouped_by").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(column + ` AS "grouped_by"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("f.closed_at IS NULL")
 	if !all {
 		inner = inner.Where("st.product_id IN (?)", bun.List(products))
@@ -78,8 +78,8 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 	}
 	err := s.db.NewSelect().
 		TableExpr(`(?) AS "counted"`, inner).
-		ColumnExpr("counted.grouped_by AS grouped_by").
-		ColumnExpr("COUNT(*) AS open").
+		ColumnExpr(`counted.grouped_by AS "grouped_by"`).
+		ColumnExpr(`COUNT(*) AS "open"`).
 		GroupExpr("counted.grouped_by").
 		Scan(ctx, &rows)
 	if err != nil {

@@ -88,18 +88,18 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 	// case this exists to report, and joining the scan table would drop
 	// exactly those rows.
 	query := s.db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN product AS p ON p.id = st.product_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("st.id AS stream_id").
-		ColumnExpr("p.name AS product").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("st.kind AS stream_kind").
-		ColumnExpr("va.name AS variant").
-		ColumnExpr("tg.created_at AS declared_at").
-		ColumnExpr("(SELECT MAX(sc.received_at) FROM scan AS sc WHERE sc.target_id = tg.id) AS last_seen")
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN product AS "p" ON p.id = st.product_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`st.id AS "stream_id"`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.kind AS "stream_kind"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`tg.created_at AS "declared_at"`).
+		ColumnExpr(`(SELECT MAX(sc.received_at) FROM scan AS "sc" WHERE sc.target_id = tg.id) AS "last_seen"`)
 	if !all {
 		query = query.Where("st.product_id IN (?)", bun.List(products))
 	}

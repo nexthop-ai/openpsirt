@@ -173,7 +173,11 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		if err != nil {
 			return err
 		}
-		if n, _ := res.RowsAffected(); n > 0 {
+		n, err := database.Affected(res)
+		if err != nil {
+			return err
+		}
+		if n > 0 {
 			return db.NewSelect().Model(kept).
 				Where("person_id = ?", personID).Where("product_id = ?", productID).
 				Where("name = ?", matched).
@@ -182,16 +186,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		_, err = db.NewInsert().Model(kept).Exec(ctx)
 		return err
 	}
-	db, ok := s.db.(*bun.DB)
-	var err error
-	if ok {
-		err = database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-			return write(ctx, tx)
-		})
-	} else {
-		err = write(ctx, s.db)
-	}
-	if err != nil {
+	if err := database.Within(ctx, s.db, write); err != nil {
 		return nil, fmt.Errorf("keep that filter: %w", err)
 	}
 	return kept, nil
@@ -229,7 +224,11 @@ func (s *Store) ForgetFilter(ctx context.Context, personID, productID int64, nam
 	if err != nil {
 		return fmt.Errorf("forget that filter: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("forget that filter: %w", err)
+	}
+	if n == 0 {
 		return ErrNoSuchFilter
 	}
 	return nil

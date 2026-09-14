@@ -32,16 +32,16 @@ const depth = 64
 // nothing crossing the wire.
 func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 	return bun.NewRawQuery(db, `WITH RECURSIVE "down" AS (
-		SELECT n.id AS node, 0 AS depth
-		FROM "graph_node" AS n
+		SELECT n.id AS "node", 0 AS "depth"
+		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id = ?
 		UNION
 		SELECT e.child_id, d.depth + 1
-		FROM "down" AS d CROSS JOIN "graph_edge" AS e
+		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
 		  AND d.depth < ? AND e.parent_id <> e.child_id
 	)
-	SELECT DISTINCT n.component_id FROM "down" AS d JOIN "graph_node" AS n ON n.id = d.node`,
+	SELECT DISTINCT n.component_id FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node`,
 		targetID, componentID, targetID, depth)
 }
 
@@ -94,26 +94,26 @@ func (s *Store) beneath(ctx context.Context, targetID int64, visible []access.Vi
 		Issues      int    `bun:"issues"`
 	}
 	err := s.db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT n.id AS start, n.id AS node, 0 AS depth
-		FROM "graph_node" AS n
+		SELECT n.id AS "start", n.id AS "node", 0 AS "depth"
+		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
 		UNION
 		SELECT d.start, e.child_id, d.depth + 1
-		FROM "down" AS d CROSS JOIN "graph_edge" AS e
+		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
 		  AND d.depth < ? AND e.parent_id <> e.child_id
 	)
-	SELECT sn.component_id AS component_id, p.band AS band,
-	       COUNT(DISTINCT p.vulnerability_id) AS issues
-	FROM (SELECT DISTINCT d.start, d.node FROM "down" AS d) AS w
-	JOIN "graph_node" AS sn ON sn.id = w.start
-	JOIN "graph_node" AS n ON n.id = w.node
-	JOIN (SELECT f.component_id AS component_id, f.vulnerability_id AS vulnerability_id,
-	             COALESCE(v.severity, '') AS band
-	      FROM "finding" AS f
-	      JOIN "vulnerability" AS v ON v.id = f.vulnerability_id
+	SELECT sn.component_id AS "component_id", p.band AS "band",
+	       COUNT(DISTINCT p.vulnerability_id) AS "issues"
+	FROM (SELECT DISTINCT d.start, d.node FROM "down" AS "d") AS "w"
+	JOIN "graph_node" AS "sn" ON sn.id = w.start
+	JOIN "graph_node" AS "n" ON n.id = w.node
+	JOIN (SELECT f.component_id AS "component_id", f.vulnerability_id AS "vulnerability_id",
+	             COALESCE(v.severity, '') AS "band"
+	      FROM "finding" AS "f"
+	      JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id
 	      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-	      GROUP BY f.component_id, f.vulnerability_id, COALESCE(v.severity, '')) AS p
+	      GROUP BY f.component_id, f.vulnerability_id, COALESCE(v.severity, '')) AS "p"
 	  ON p.component_id = n.component_id
 	GROUP BY sn.component_id, p.band`,
 		targetID, bun.List(of), targetID, depth, targetID, bun.List(visible)).
@@ -155,21 +155,21 @@ type step struct {
 func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64) ([]step, error) {
 	var rows []step
 	err := s.db.NewRaw(`WITH RECURSIVE "up" AS (
-		SELECT n.id AS start, n.id AS node, n.id AS via, 0 AS depth
-		FROM "graph_node" AS n
+		SELECT n.id AS "start", n.id AS "node", n.id AS "via", 0 AS "depth"
+		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
 		UNION
 		SELECT u.start, e.parent_id, u.node, u.depth + 1
-		FROM "up" AS u CROSS JOIN "graph_edge" AS e
+		FROM "up" AS "u" CROSS JOIN "graph_edge" AS "e"
 		WHERE e.child_id = u.node AND e.closed_scan_id IS NULL
 		  AND u.depth < ? AND e.parent_id <> e.child_id
 	)
-	SELECT u.start AS start, u.node AS node, u.via AS via, u.depth AS depth,
-	       n.component_id AS component_id, n.is_root AS is_root,
-	       c.name AS name, c.version AS version
-	FROM "up" AS u
-	JOIN "graph_node" AS n ON n.id = u.node
-	JOIN "component" AS c ON c.id = n.component_id`,
+	SELECT u.start AS "start", u.node AS "node", u.via AS "via", u.depth AS "depth",
+	       n.component_id AS "component_id", n.is_root AS "is_root",
+	       c.name AS "name", c.version AS "version"
+	FROM "up" AS "u"
+	JOIN "graph_node" AS "n" ON n.id = u.node
+	JOIN "component" AS "c" ON c.id = n.component_id`,
 		targetID, bun.List(componentIDs), depth).
 		Scan(ctx, &rows)
 	if err != nil {

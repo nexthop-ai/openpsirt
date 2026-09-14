@@ -95,7 +95,7 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	productID int64) (int, error) {
 
 	q := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr("de.claim_id AS claim_id").
+		ColumnExpr(`de.claim_id AS "claim_id"`).
 		GroupExpr("de.claim_id").
 		Where("de.product_id = ?", productID)
 	q = approvableBy(waiting(q, s.now()), subject, "de")
@@ -141,8 +141,8 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
 	// page is a page of claims and the count counts claims.
 	waitingClaims := func() *bun.SelectQuery {
 		q := s.db.NewSelect().Model((*Decision)(nil)).
-			ColumnExpr("de.claim_id AS claim_id").
-			ColumnExpr("MAX(de.id) AS newest").
+			ColumnExpr(`de.claim_id AS "claim_id"`).
+			ColumnExpr(`MAX(de.id) AS "newest"`).
 			GroupExpr("de.claim_id")
 		q = approvableBy(waiting(q, s.now()), subject, "de")
 		// One product where the caller named one. A claim is decided in a
@@ -270,19 +270,19 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		Variant string `bun:"variant"`
 	}
 	query := s.db.NewSelect().
-		TableExpr("decision AS de").
+		TableExpr(`decision AS "de"`).
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
-		Join("CROSS JOIN finding AS f").
+		Join(`CROSS JOIN finding AS "f"`).
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("va.display_name AS variant").
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`va.display_name AS "variant"`).
 		Where("de.claim_id IN (?)", bun.List(claims)).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
@@ -326,11 +326,11 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ProductID int64 `bun:"product_id"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("decision AS de").
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("de.vulnerability_id AS vulnerability_id").
-		ColumnExpr("MIN(de.id) AS decision_id").
-		ColumnExpr("de.product_id AS product_id").
+		TableExpr(`decision AS "de"`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`MIN(de.id) AS "decision_id"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
 		Where("de.claim_id IN (?)", bun.List(claimIDs)).
 		GroupExpr("de.claim_id, de.vulnerability_id, de.product_id").
 		Scan(ctx, &heads); err != nil {
@@ -379,17 +379,17 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		FixedIn         string `bun:"fixed_in"`
 	}
 	known := s.db.NewSelect().
-		TableExpr("decision AS de").
+		TableExpr(`decision AS "de"`).
 		// The decision on the outside, as buildsCovered has it.
-		Join("CROSS JOIN finding AS f").
+		Join(`CROSS JOIN finding AS "f"`).
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("MIN(f.fixed_in) AS fixed_in").
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
 		Where("de.claim_id IN (?)", bun.List(claimIDs)).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
@@ -544,9 +544,9 @@ func (s *Store) reasoningPerClaim(ctx context.Context, ids []int64) (map[int64]s
 		Body    string `bun:"body"`
 	}
 	if err := s.db.NewSelect().Model((*Claim)(nil)).
-		Join(`JOIN "claim_revision" AS dr ON dr.id = cl.revision_id`).
-		ColumnExpr("cl.id AS claim_id").
-		ColumnExpr("dr.body AS body").
+		Join(`JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
+		ColumnExpr(`cl.id AS "claim_id"`).
+		ColumnExpr(`dr.body AS "body"`).
 		Where("cl.id IN (?)", bun.List(ids)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the reasoning: %w", err)
 	}
@@ -613,10 +613,10 @@ func waiting(query *bun.SelectQuery, now time.Time) *bun.SelectQuery {
 	// date are. An EXISTS rather than a join, because this narrows queries
 	// that already group and count over the decision and a join would multiply
 	// nothing here but would have to be repeated at every caller.
-	ranOut := `EXISTS (SELECT 1 FROM "claim" AS wc WHERE wc.id = de.claim_id
+	ranOut := `EXISTS (SELECT 1 FROM "claim" AS "wc" WHERE wc.id = de.claim_id
 		AND wc.outcome = ? AND wc.deferred_until IS NOT NULL AND wc.deferred_until <= ?)`
 	// The promise that came due, asked the same way of the same table.
-	cameDue := `EXISTS (SELECT 1 FROM "claim" AS wp WHERE wp.id = de.claim_id
+	cameDue := `EXISTS (SELECT 1 FROM "claim" AS "wp" WHERE wp.id = de.claim_id
 		AND wp.outcome IN (?) AND wp.committed_to IS NOT NULL AND wp.committed_to <= ?)`
 	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.

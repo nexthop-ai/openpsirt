@@ -94,7 +94,7 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		}
 		if len(f.Outcomes) > 0 {
 			// Asked of the claim, which is where what a judgment says lives.
-			q = q.Where(`EXISTS (SELECT 1 FROM "claim" AS oc`+
+			q = q.Where(`EXISTS (SELECT 1 FROM "claim" AS "oc"`+
 				` WHERE oc.id = de.claim_id AND oc.outcome IN (?))`, bun.List(f.Outcomes))
 		}
 		if len(f.States) > 0 {
@@ -117,25 +117,25 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		// tests the rule rather than reading back an assertion about
 		// it.
 		if f.Alone {
-			q = q.Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS ex` +
+			q = q.Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
 				` WHERE ex.claim_id = de.claim_id AND ex.withdrawn_at IS NULL` +
 				` AND ex.approved_by <> de.proposed_by)`)
 		}
 		if f.Proposer != "" {
-			q = q.Where(`EXISTS (SELECT 1 FROM "person" AS pp`+
+			q = q.Where(`EXISTS (SELECT 1 FROM "person" AS "pp"`+
 				` WHERE pp.id = de.proposed_by AND pp.identity = ?)`, f.Proposer)
 		}
 		// An agreement that still stands. Somebody who agreed and then took it
 		// back did not approve this, and answering otherwise would make the
 		// withdrawal invisible to the one report that exists to find it.
 		if f.Approver != "" {
-			q = q.Where(`EXISTS (SELECT 1 FROM "claim_approval" AS ap`+
-				` JOIN "person" AS ape ON ape.id = ap.approved_by`+
+			q = q.Where(`EXISTS (SELECT 1 FROM "claim_approval" AS "ap"`+
+				` JOIN "person" AS "ape" ON ape.id = ap.approved_by`+
 				` WHERE ap.claim_id = de.claim_id AND ap.withdrawn_at IS NULL`+
 				` AND ape.identity = ?)`, f.Approver)
 		}
 		if f.Issue != "" {
-			q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS iv`+
+			q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS "iv"`+
 				` WHERE iv.id = de.vulnerability_id AND iv.identifier = ?)`, f.Issue)
 		}
 		// The component is reached through a finding at the place, the same
@@ -143,8 +143,8 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		// judgment about something since removed still names it, which is
 		// exactly what an audit asks for.
 		if f.Component != "" {
-			q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS cf`+
-				` JOIN "component" AS cc ON cc.id = cf.component_id`+
+			q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
+				` JOIN "component" AS "cc" ON cc.id = cf.component_id`+
 				` WHERE cf.vulnerability_id = de.vulnerability_id`+
 				` AND cf.place_identity = de.place_identity AND cc.name = ?)`, f.Component)
 		}
@@ -235,8 +235,8 @@ func (s *Store) namesOf(ctx context.Context, ids map[int64]bool) (map[int64]stri
 		Identity string `bun:"identity"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"person" AS p`).
-		ColumnExpr("p.id AS id").ColumnExpr("p.identity AS identity").
+		TableExpr(`"person" AS "p"`).
+		ColumnExpr(`p.id AS "id"`).ColumnExpr(`p.identity AS "identity"`).
 		Where("p.id IN (?)", bun.List(wanted)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read who these people are: %w", err)
 	}
@@ -280,21 +280,21 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		Product    string `bun:"product"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS de`).
-		Join(`JOIN "finding" AS f ON f.vulnerability_id = de.vulnerability_id`+
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id`+
 			` AND f.place_identity = de.place_identity`).
-		Join(`JOIN "target" AS tg ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS st ON st.id = tg.stream_id AND st.product_id = de.product_id`).
-		Join(`JOIN "product" AS p ON p.id = st.product_id`).
-		Join(`JOIN "vulnerability" AS v ON v.id = f.vulnerability_id`).
-		Join(`JOIN "component" AS c ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS uc ON uc.id = f.consumer_id`).
-		ColumnExpr("de.id AS decision_id").
-		ColumnExpr("MIN(v.identifier) AS issue").
-		ColumnExpr("MIN(c.name) AS component").
-		ColumnExpr("MIN(c.version) AS version").
-		ColumnExpr("MIN(COALESCE(uc.name, ?)) AS consumer", "").
-		ColumnExpr("MIN(p.display_name) AS product").
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`de.id AS "decision_id"`).
+		ColumnExpr(`MIN(v.identifier) AS "issue"`).
+		ColumnExpr(`MIN(c.name) AS "component"`).
+		ColumnExpr(`MIN(c.version) AS "version"`).
+		ColumnExpr(`MIN(COALESCE(uc.name, ?)) AS "consumer"`, "").
+		ColumnExpr(`MIN(p.display_name) AS "product"`).
 		Where("de.id IN (?)", bun.List(keys)).
 		GroupExpr("de.id").
 		Scan(ctx, &rows)

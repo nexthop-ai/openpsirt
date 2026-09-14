@@ -91,7 +91,7 @@ type Grown struct {
 // record's own question is: no approval row from anybody other than the
 // proposer, and none that has been taken back. A flag would report what
 // something asserted about itself.
-const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS ex` +
+const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
 	` WHERE ex.claim_id = de.claim_id AND ex.withdrawn_at IS NULL` +
 	` AND ex.approved_by <> de.proposed_by)`
 
@@ -127,11 +127,11 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows    int    `bun:"written"`
 	}
 	err := narrow(s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join(`JOIN "claim" AS cl ON cl.id = de.claim_id`).
-		ColumnExpr("cl.outcome AS outcome").
-		ColumnExpr("COUNT(DISTINCT de.claim_id) AS claims").
-		ColumnExpr("COUNT(*) AS written").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`cl.outcome AS "outcome"`).
+		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		ColumnExpr(`COUNT(*) AS "written"`).
 		Where("cl.outcome <> ?", Affected).
 		Where(standing, held...).
 		Where(standingAlone).
@@ -156,14 +156,14 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join(`JOIN "claim_approval" AS ap ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS pe ON pe.id = ap.approved_by`).
-		ColumnExpr("ap.batch AS batch").
-		ColumnExpr("pe.identity AS identity").
-		ColumnExpr("MIN(ap.approved_at) AS approved_at").
-		ColumnExpr("COUNT(DISTINCT de.claim_id) AS claims").
-		ColumnExpr("COUNT(*) AS written").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
+		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
+		ColumnExpr(`ap.batch AS "batch"`).
+		ColumnExpr(`pe.identity AS "identity"`).
+		ColumnExpr(`MIN(ap.approved_at) AS "approved_at"`).
+		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		ColumnExpr(`COUNT(*) AS "written"`).
 		Where("ap.batch IS NOT NULL").
 		Where("ap.withdrawn_at IS NULL").
 		GroupExpr("ap.batch, pe.identity").
@@ -187,14 +187,14 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows     int    `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join(`JOIN "claim_approval" AS ap ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS pr ON pr.id = de.proposed_by`).
-		Join(`JOIN "person" AS ape ON ape.id = ap.approved_by`).
-		ColumnExpr("pr.identity AS proposer").
-		ColumnExpr("ape.identity AS approver").
-		ColumnExpr("COUNT(DISTINCT de.claim_id) AS claims").
-		ColumnExpr("COUNT(*) AS written").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
+		Join(`JOIN "person" AS "pr" ON pr.id = de.proposed_by`).
+		Join(`JOIN "person" AS "ape" ON ape.id = ap.approved_by`).
+		ColumnExpr(`pr.identity AS "proposer"`).
+		ColumnExpr(`ape.identity AS "approver"`).
+		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		ColumnExpr(`COUNT(*) AS "written"`).
 		Where("ap.withdrawn_at IS NULL").
 		GroupExpr("pr.identity, ape.identity").
 		OrderExpr("written DESC")).Scan(ctx, &pairs)
@@ -221,17 +221,17 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join(`JOIN "claim" AS cl ON cl.id = de.claim_id`).
-		Join(`JOIN "claim_approval" AS ap ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS pe ON pe.id = ap.approved_by`).
-		Join(`JOIN "product" AS pd ON pd.id = de.product_id`).
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("pe.identity AS identity").
-		ColumnExpr("MIN(ap.approved_at) AS approved_at").
-		ColumnExpr("pd.name AS product").
-		ColumnExpr("cl.outcome AS outcome").
-		ColumnExpr("COUNT(*) AS written").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
+		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
+		Join(`JOIN "product" AS "pd" ON pd.id = de.product_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`pe.identity AS "identity"`).
+		ColumnExpr(`MIN(ap.approved_at) AS "approved_at"`).
+		ColumnExpr(`pd.name AS "product"`).
+		ColumnExpr(`cl.outcome AS "outcome"`).
+		ColumnExpr(`COUNT(*) AS "written"`).
 		Where("ap.withdrawn_at IS NULL").
 		Where(standing, held...).
 		// The right they used, checked against what they hold now rather than
@@ -239,18 +239,18 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// agreed could agree today. A grant made inactive by a change of mode
 		// is kept so the change can be undone, and it grants nothing while it
 		// sits there — so it is not a right somebody still holds.
-		Where(`NOT EXISTS (SELECT 1 FROM "role_grant" AS rg`+
+		Where(`NOT EXISTS (SELECT 1 FROM "role_grant" AS "rg"`+
 			` WHERE rg.person_id = ap.approved_by AND rg.product_id = de.product_id`+
 			` AND rg.active = ? AND rg.role = ?)`, true, access.Approver).
 		// Nor one held across every product, which is the same right reached
 		// by the other grant. Without this an approver holding it that way
 		// had every approval they ever gave reported as lapsed.
-		Where(`NOT EXISTS (SELECT 1 FROM "role_grant_all" AS rga`+
+		Where(`NOT EXISTS (SELECT 1 FROM "role_grant_all" AS "rga"`+
 			` WHERE rga.person_id = ap.approved_by`+
 			` AND rga.active = ? AND rga.role = ?)`, true, access.Approver).
 		// An administrator reaches every product, so one is never in this list
 		// however their grants read.
-		Where(`NOT EXISTS (SELECT 1 FROM "person" AS ad`+
+		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
 			` WHERE ad.id = ap.approved_by AND ad.is_admin = ?)`, true).
 		GroupExpr("de.claim_id, pe.identity, pd.name, cl.outcome").
 		OrderExpr("written DESC")).Scan(ctx, &lapsed)
@@ -275,15 +275,15 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Covered    int       `bun:"covered"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr("decision AS de").
-		Join(`JOIN "claim" AS cl ON cl.id = de.claim_id`).
-		Join(`JOIN "claim_approval" AS ap ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS pe ON pe.id = ap.approved_by`).
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("pe.identity AS identity").
-		ColumnExpr("MIN(ap.approved_at) AS approved_at").
-		ColumnExpr("cl.outcome AS outcome").
-		ColumnExpr("MIN(ap.covered) AS covered").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
+		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`pe.identity AS "identity"`).
+		ColumnExpr(`MIN(ap.approved_at) AS "approved_at"`).
+		ColumnExpr(`cl.outcome AS "outcome"`).
+		ColumnExpr(`MIN(ap.covered) AS "covered"`).
 		Where("ap.withdrawn_at IS NULL").
 		Where("ap.covered IS NOT NULL").
 		Where(standing, held...).
@@ -323,7 +323,7 @@ func (s *Store) decisionsOf(ctx context.Context, subject access.Subject,
 
 	var ids []int64
 	err := readableBy(s.db.NewSelect().
-		TableExpr("decision AS de").
+		TableExpr(`decision AS "de"`).
 		ColumnExpr("de.id").
 		Where("de.claim_id = ?", claimID), subject, "de").Scan(ctx, &ids)
 	if err != nil {

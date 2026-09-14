@@ -42,8 +42,8 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 		// Assigning one build left the identical work unassigned
 		// beside it, which is how a person ends up holding half of
 		// what they think they hold.
-		Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-			JOIN "stream" AS st ON st.id = tg.stream_id
+		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+			JOIN "stream" AS "st" ON st.id = tg.stream_id
 			WHERE st.product_id = ?)`, productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("component_id = ?", componentID).
@@ -78,7 +78,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 	if err != nil {
 		return 0, fmt.Errorf("record who is dealing with this: %w", err)
 	}
-	moved, err := result.RowsAffected()
+	moved, err := database.Affected(result)
 	if err != nil {
 		return 0, fmt.Errorf("record who is dealing with this: %w", err)
 	}
@@ -199,8 +199,8 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 		if !dispatches {
 			held, err := s.db.NewSelect().Model((*Finding)(nil)).
 				Column("id").
-				Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-					JOIN "stream" AS st ON st.id = tg.stream_id
+				Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+					JOIN "stream" AS "st" ON st.id = tg.stream_id
 					WHERE st.product_id = ?)`, productID).
 				Where("vulnerability_id = ?", vulnerabilityID).
 				Where("component_id = ?", componentID).
@@ -231,8 +231,8 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// to the finding rather than to the place.
 	private, err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-			WHERE tg.stream_id IN (SELECT st.id FROM "stream" AS st
+		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+			WHERE tg.stream_id IN (SELECT st.id FROM "stream" AS "st"
 				WHERE st.product_id = ?))`, productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("component_id = ?", componentID).
@@ -270,8 +270,8 @@ func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetI
 	}
 	private, err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-			JOIN "stream" AS st ON st.id = tg.stream_id
+		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+			JOIN "stream" AS "st" ON st.id = tg.stream_id
 			WHERE st.product_id = ?)`, productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("component_id = ?", componentID).
@@ -316,8 +316,8 @@ func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject
 		Where("closed_at IS NULL").
 		Where("visibility IN (?)", bun.List(visible)).
 		Where("visibility = ?", access.Private).
-		Where(`component_id IN (SELECT c.id FROM "component" AS c
-			WHERE `+FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS c2
+		Where(`component_id IN (SELECT c.id FROM "component" AS "c"
+			WHERE `+FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2"
 				WHERE c2."name_folded" = ? LIMIT 1))`, graph.Folded(component)).
 		Exists(ctx)
 	if err != nil {
@@ -373,15 +373,18 @@ func (s *Store) ReleaseIn(ctx context.Context, subject access.Subject, party, pr
 			Set("assigned_to = ?", nil).Set("assigned_at = ?", nil).
 			Where("assigned_to = ?", party).
 			Where("closed_at IS NULL").
-			Where(`target_id IN (SELECT tg.id FROM "target" AS tg
-				JOIN "stream" AS st ON st.id = tg.stream_id
+			Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
+				JOIN "stream" AS "st" ON st.id = tg.stream_id
 				WHERE st.product_id = ?)`, productID).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("hand back what they were dealing with: %w", err)
 		}
-		moved, err = result.RowsAffected()
-		return err
+		moved, err = database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("hand back what they were dealing with: %w", err)
+		}
+		return nil
 	})
 	return moved, err
 }
@@ -408,7 +411,10 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 		if err != nil {
 			return fmt.Errorf("move what they were dealing with: %w", err)
 		}
-		moved, _ = result.RowsAffected()
+		moved, err = database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("move what they were dealing with: %w", err)
+		}
 		return nil
 	})
 	return moved, err
@@ -455,9 +461,9 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 
 	mine := func() *bun.SelectQuery {
 		query := s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			Where("f.closed_at IS NULL").
 			Where("f.assigned_to IS NOT NULL")
 		// One product where the caller named one, for a screen that is about
@@ -480,7 +486,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	// GROUPS is a reserved word in MySQL 8 and the obvious alias is a
 	// syntax error on one engine and fine on the other three.
 	pieces := mine().
-		ColumnExpr("f.assigned_to AS person_id").
+		ColumnExpr(`f.assigned_to AS "person_id"`).
 		GroupExpr("f.assigned_to, f.vulnerability_id, f.component_id, st.product_id")
 
 	// Bounded like every other list. It is a name-yielding projection —
@@ -492,10 +498,10 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	var held []Holding
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "work"`, pieces).
-		ColumnExpr(`"work".person_id AS person_id`).
-		ColumnExpr("COUNT(*) AS open").
-		ColumnExpr("0 AS places").
-		ColumnExpr("0 AS overdue").
+		ColumnExpr(`"work".person_id AS "person_id"`).
+		ColumnExpr(`COUNT(*) AS "open"`).
+		ColumnExpr(`0 AS "places"`).
+		ColumnExpr(`0 AS "overdue"`).
 		GroupExpr(`"work".person_id`).
 		OrderExpr("open DESC, person_id").
 		Limit(database.InBulk.Most).
@@ -512,8 +518,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		Places   int   `bun:"places"`
 	}
 	if err := mine().
-		ColumnExpr("f.assigned_to AS person_id").
-		ColumnExpr("COUNT(*) AS places").
+		ColumnExpr(`f.assigned_to AS "person_id"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		GroupExpr("f.assigned_to").
 		Scan(ctx, &spread); err != nil {
 		return nil, fmt.Errorf("read how far what they hold reaches: %w", err)
@@ -547,9 +553,9 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	// calling it a fortieth of one is a number nobody acts on.
 	standing, args := OffTheClock("st.product_id", s.now())
 	late := mine().
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("f.assigned_to AS person_id").
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`f.assigned_to AS "person_id"`).
 		Where("f.due_at IS NOT NULL").
 		Where("f.due_at < ?", s.now().UTC()).
 		Where("f.suppressed_by IS NULL").
@@ -557,8 +563,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		GroupExpr("f.assigned_to, f.vulnerability_id, f.component_id, st.product_id")
 	err := s.db.NewSelect().
 		TableExpr(`(?) AS "work"`, late).
-		ColumnExpr(`"work".person_id AS person_id`).
-		ColumnExpr("COUNT(*) AS overdue").
+		ColumnExpr(`"work".person_id AS "person_id"`).
+		ColumnExpr(`COUNT(*) AS "overdue"`).
 		GroupExpr(`"work".person_id`).
 		Scan(ctx, &counted)
 	if err != nil {
@@ -695,9 +701,9 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	limit = database.AList.Of(limit)
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.TableExpr("finding AS f").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+		q = q.TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			Where("f.closed_at IS NULL")
 		if since != nil {
 			q = q.Where("f.opened_at > ?", *since)
@@ -761,33 +767,33 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		OpenedAt        time.Time `bun:"opened_at"`
 	}
 	err := narrow(s.db.NewSelect()).
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("st.product_id AS product_id").
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`st.product_id AS "product_id"`).
 		// One of the builds, and how many there are. The one is what a link
 		// and an action need somewhere to point; the count is what stops a
 		// screen presenting it as the only one. MIN rather than any other
 		// choice because it is stable: a row that named a different build
 		// between two reads would move under somebody.
-		ColumnExpr("MIN(f.target_id) AS target_id").
-		ColumnExpr("COUNT(DISTINCT f.target_id) AS builds").
-		ColumnExpr("MAX(f.urgency) AS urgency").
+		ColumnExpr(`MIN(f.target_id) AS "target_id"`).
+		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
+		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
 		// The oldest place decides, as it does everywhere else here: a group
 		// open for a month with one place added yesterday has been somebody's
 		// problem for a month, and a maximum made it read as a day old — so
 		// the unassigned queue and the digest built on it sorted a six-week
 		// backlog item as new work.
-		ColumnExpr("MIN(f.opened_at) AS opened_at").
+		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		// Any undisclosed row makes the group undisclosed. Written as a sum
 		// rather than a boolean aggregate: the four engines do not agree on
 		// one, and counting is the same question asked portably.
-		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS undisclosed",
+		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
-		ColumnExpr("COUNT(*) AS places").
+		ColumnExpr(`COUNT(*) AS "places"`).
 		// The total rides on the page, as the findings list's does: the
 		// groups the narrowing admits, counted after the grouping and before
 		// the limit, in the statement that groups them.
-		ColumnExpr("COUNT(*) OVER () AS total").
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr("f.vulnerability_id, f.component_id, st.product_id").
 		OrderExpr("urgency DESC, f.vulnerability_id, f.component_id, st.product_id").
 		Limit(limit).Offset(offset).
@@ -869,14 +875,14 @@ func targetsNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]build
 	}
 	var builds []buildName
 	err := db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		Join("JOIN product AS p ON p.id = st.product_id").
-		ColumnExpr("tg.id AS target_id").
-		ColumnExpr("p.display_name AS product").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("va.display_name AS variant").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN product AS "p" ON p.id = st.product_id`).
+		ColumnExpr(`tg.id AS "target_id"`).
+		ColumnExpr(`p.display_name AS "product"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`va.display_name AS "variant"`).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Scan(ctx, &builds)
 	if err != nil {

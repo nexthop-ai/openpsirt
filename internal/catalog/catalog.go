@@ -224,7 +224,11 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 	if err != nil {
 		return fmt.Errorf("record when this release went out: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record when this release went out: %w", err)
+	}
+	if n == 0 {
 		return fmt.Errorf("release %d: %w", streamID, ErrNotFound)
 	}
 	return nil
@@ -270,7 +274,11 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error 
 	if err != nil {
 		return fmt.Errorf("record what this release was cut from: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record what this release was cut from: %w", err)
+	}
+	if n == 0 {
 		var stood *int64
 		if err := s.db.NewSelect().Model((*Stream)(nil)).Column("parent_id").
 			Where("id = ?", streamID).Scan(ctx, &stood); err != nil {
@@ -299,7 +307,11 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 	if err != nil {
 		return fmt.Errorf("record when this %s goes out of support: %w", what, err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record when this %s goes out of support: %w", what, err)
+	}
+	if n == 0 {
 		return fmt.Errorf("%s %d: %w", what, id, ErrNotFound)
 	}
 	return nil
@@ -322,7 +334,7 @@ func (s *Store) EndOfLifeFor(ctx context.Context, streamID int64) (EndOfLife, er
 // not make one of them supported for longer than the other.
 func (s *Store) EndOfLifeForTarget(ctx context.Context, targetID int64) (EndOfLife, error) {
 	return s.endOfLife(ctx,
-		`s.id IN (SELECT tg.stream_id FROM "target" AS tg WHERE tg.id = ?)`, targetID,
+		`s.id IN (SELECT tg.stream_id FROM "target" AS "tg" WHERE tg.id = ?)`, targetID,
 		"build", targetID)
 }
 
@@ -332,10 +344,10 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 		Product *time.Time `bun:"product_eol"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("stream AS s").
-		Join(`JOIN "product" AS p ON p.id = s.product_id`).
-		ColumnExpr("s.eol_on AS stream_eol").
-		ColumnExpr("p.eol_on AS product_eol").
+		TableExpr(`stream AS "s"`).
+		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
+		ColumnExpr(`s.eol_on AS "stream_eol"`).
+		ColumnExpr(`p.eol_on AS "product_eol"`).
 		Where(where, arg).
 		Scan(ctx, &stated)
 	if err != nil {
@@ -359,9 +371,9 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 func (s *Store) TargetMoves(ctx context.Context, targetID int64) (bool, error) {
 	var kind string
 	err := s.db.NewSelect().
-		TableExpr(`"stream" AS s`).
+		TableExpr(`"stream" AS "s"`).
 		ColumnExpr("s.kind").
-		Where(`s.id IN (SELECT tg.stream_id FROM "target" AS tg WHERE tg.id = ?)`, targetID).
+		Where(`s.id IN (SELECT tg.stream_id FROM "target" AS "tg" WHERE tg.id = ?)`, targetID).
 		Scan(ctx, &kind)
 	if err != nil {
 		if database.IsNoRows(err) {
@@ -380,7 +392,7 @@ func (s *Store) TargetMoves(ctx context.Context, targetID int64) (bool, error) {
 func (s *Store) TagStreams(ctx context.Context) ([]int64, error) {
 	var ids []int64
 	if err := s.db.NewSelect().
-		TableExpr(`"stream" AS s`).
+		TableExpr(`"stream" AS "s"`).
 		ColumnExpr("s.id").
 		Where("s.kind = ?", Tag).Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which releases were built once: %w", err)
@@ -398,8 +410,8 @@ func (s *Store) StreamsPastEndOfLife(ctx context.Context, at time.Time) ([]int64
 	day := at.UTC().Truncate(24 * time.Hour)
 	var past []int64
 	err := s.db.NewSelect().
-		TableExpr("stream AS s").
-		Join(`JOIN "product" AS p ON p.id = s.product_id`).
+		TableExpr(`stream AS "s"`).
+		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
 		ColumnExpr("s.id").
 		// The release's own date where it has one, the product's otherwise —
 		// the same precedence a single read applies, written as a condition
@@ -469,15 +481,15 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 			ProductEOL *time.Time `bun:"product_eol"`
 		}
 		q := s.db.NewSelect().
-			TableExpr(`"stream" AS s`).
-			Join(`JOIN "product" AS p ON p.id = s.product_id`).
-			ColumnExpr("s.id AS stream_id").
-			ColumnExpr("s.name AS stream").
-			ColumnExpr("s.kind AS kind").
-			ColumnExpr("s.eol_on AS own_eol").
-			ColumnExpr("p.id AS product_id").
-			ColumnExpr("p.name AS product").
-			ColumnExpr("p.eol_on AS product_eol").
+			TableExpr(`"stream" AS "s"`).
+			Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
+			ColumnExpr(`s.id AS "stream_id"`).
+			ColumnExpr(`s.name AS "stream"`).
+			ColumnExpr(`s.kind AS "kind"`).
+			ColumnExpr(`s.eol_on AS "own_eol"`).
+			ColumnExpr(`p.id AS "product_id"`).
+			ColumnExpr(`p.name AS "product"`).
+			ColumnExpr(`p.eol_on AS "product_eol"`).
 			Where("s.id IN (?)", bun.List(batch)).
 			OrderExpr("p.name, s.name")
 		if !all {
@@ -531,7 +543,11 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 	if err != nil {
 		return fmt.Errorf("record what this product triages: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record what this product triages: %w", err)
+	}
+	if n == 0 {
 		return fmt.Errorf("product %d: %w", productID, ErrNotFound)
 	}
 	return nil

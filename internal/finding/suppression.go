@@ -270,16 +270,16 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// When it was first said and when it stopped, read off the scans the
 		// interval is held against: the claim itself carries scan identifiers,
 		// and a screen needs moments.
-		Join("JOIN scan AS opened ON opened.id = sup.opened_scan_id").
-		Join("LEFT JOIN scan AS closed ON closed.id = sup.closed_scan_id").
-		ColumnExpr("sup.vulnerability AS vulnerability").
-		ColumnExpr("COALESCE(NULLIF(sup.subject_name, ''), sup.subject_purl) AS subject").
-		ColumnExpr("sup.status AS status").
-		ColumnExpr("COALESCE(sup.justification, '') AS justification").
-		ColumnExpr("COALESCE(sup.statement, '') AS statement").
-		ColumnExpr("sup.origin AS origin").
-		ColumnExpr("opened.built_at AS since").
-		ColumnExpr("closed.built_at AS until").
+		Join(`JOIN scan AS "opened" ON opened.id = sup.opened_scan_id`).
+		Join(`LEFT JOIN scan AS "closed" ON closed.id = sup.closed_scan_id`).
+		ColumnExpr(`sup.vulnerability AS "vulnerability"`).
+		ColumnExpr(`COALESCE(NULLIF(sup.subject_name, ''), sup.subject_purl) AS "subject"`).
+		ColumnExpr(`sup.status AS "status"`).
+		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
+		ColumnExpr(`COALESCE(sup.statement, '') AS "statement"`).
+		ColumnExpr(`sup.origin AS "origin"`).
+		ColumnExpr(`opened.built_at AS "since"`).
+		ColumnExpr(`closed.built_at AS "until"`).
 		// What it is still saying first, newest first within that: a claim
 		// that stopped is history and a claim that stands is the estate.
 		OrderExpr("CASE WHEN sup.closed_scan_id IS NULL THEN 0 ELSE 1 END, " +

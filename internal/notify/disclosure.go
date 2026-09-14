@@ -76,17 +76,17 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Visibility      string `bun:"visibility"`
 	}
 	err := w.db.NewSelect().
-		TableExpr("decision AS de").
-		Join("JOIN vex_statement AS ss ON ss.id = de.from_statement_id").
-		Join("JOIN product AS p ON p.id = de.product_id").
-		Join("JOIN vulnerability AS v ON v.id = de.vulnerability_id").
-		ColumnExpr("MIN(de.id) AS decision_id").
-		ColumnExpr("de.product_id AS product_id").
-		ColumnExpr("de.vulnerability_id AS vulnerability_id").
-		ColumnExpr("MIN(p.name) AS product").
-		ColumnExpr("MIN(v.identifier) AS vulnerability").
-		ColumnExpr("MIN(ss.publisher) AS publisher").
-		ColumnExpr("MIN(de.visibility) AS visibility").
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN vex_statement AS "ss" ON ss.id = de.from_statement_id`).
+		Join(`JOIN product AS "p" ON p.id = de.product_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = de.vulnerability_id`).
+		ColumnExpr(`MIN(de.id) AS "decision_id"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
+		ColumnExpr(`MIN(ss.publisher) AS "publisher"`).
+		ColumnExpr(`MIN(de.visibility) AS "visibility"`).
 		// Standing, because a decision nobody is relying on any more is not
 		// one whose evidence moving matters.
 		Where("de.live_key IS NOT NULL").
@@ -161,8 +161,8 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64,
 		AssignedTo      *int64    `bun:"assigned_to"`
 	}
 	err := findingsWith(w.db.NewSelect(), false).
-		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
-		ColumnExpr("MIN(f.assigned_to) AS assigned_to").
+		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
+		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
 		Where("f.visibility = ?", access.Private).
 		Where("f.closed_at IS NULL").
 		Where("f.disclose_at IS NOT NULL").

@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -25,10 +22,9 @@ func init() {
 // scan. A nightly rebuild changes very little, so recording only what changed
 // keeps stored volume tracking change rather than tracking scans.
 func upGraph(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -177,23 +173,9 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "graph_edge_child_idx" ON "graph_edge" ("child_id", "closed_scan_id")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downGraph(ctx context.Context, tx *sql.Tx) error {
-	for _, table := range []string{"graph_edge", "graph_node", "component"} {
-		// Quoted, like every other identifier in the schema. A reserved word
-		// is only reserved when bare, and the four engines do not agree on
-		// which words those are — so an unquoted name fails on whichever
-		// engine somebody is least likely to be running.
-		if _, err := tx.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
-			return err
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "graph_edge", "graph_node", "component")
 }

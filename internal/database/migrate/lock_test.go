@@ -2,8 +2,11 @@ package migrate
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
@@ -100,14 +103,210 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 	}
 }
 
-func TestSQLiteNeedsNoAdvisoryLock(t *testing.T) {
-	db := open(t, "sqlite://"+t.TempDir()+"/lock.db")
+func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
+	// The bound on the lock wait is a session setting, and Close returns the
+	// connection to the pool rather than closing it — which is why the
+	// connection is pinned in the first place. Left set, one pooled connection
+	// carries a 300-second bound and the others carry the server's default, so
+	// the same query afterwards either waits indefinitely or is canceled,
+	// decided by which connection the pool happens to hand out.
+	engines.SkipUnless(t, database.Postgres)
+	url := os.Getenv(postgresURLEnv)
+	if url == "" {
+		t.Skipf("%s is not set", postgresURLEnv)
+	}
+	db := open(t, url)
+	ctx := context.Background()
+
+	var before string
+	if err := db.QueryRowContext(ctx, "SHOW lock_timeout").Scan(&before); err != nil {
+		t.Fatalf("read the bound before: %v", err)
+	}
+
+	release, err := acquire(ctx, db)
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	if err := release(ctx); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+
+	// The pool holds one connection under the default settings, so the
+	// checkout after the release is the connection the lock was taken on.
+	var after string
+	if err := db.QueryRowContext(ctx, "SHOW lock_timeout").Scan(&after); err != nil {
+		t.Fatalf("read the bound after: %v", err)
+	}
+	if after != before {
+		t.Errorf("the connection went back to the pool carrying lock_timeout = %q, not %q", after, before)
+	}
+}
+
+func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
+	// "The table is not there", "this credential may not read it" and "the
+	// database is unreachable" arrived as one error and read as the first, so
+	// a fully populated database whose credentials omitted that one table
+	// reported version 0 — and the reasonable thing to do about "nothing is
+	// applied" is to migrate it.
+	//
+	// The catalog is asked now, which answers only the question being asked.
+	engines.SkipUnless(t, database.Postgres)
+	url := os.Getenv(postgresURLEnv)
+	if url == "" {
+		t.Skipf("%s is not set", postgresURLEnv)
+	}
+	db := open(t, url)
+	ctx := context.Background()
+
+	// A database with no bookkeeping table reads as "not migrated", which is
+	// the answer that has to keep working — it is what a fresh database is.
+	there, err := versionTableExists(ctx, db)
+	if err != nil {
+		t.Fatalf("probing a reachable database reported a failure: %v", err)
+	}
+	t.Logf("the version table is there: %v", there)
+
+	// And one that cannot be reached at all reports that, rather than zero.
+	closed := open(t, url)
+	if err := closed.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if _, err := versionTableExists(ctx, closed); err == nil {
+		t.Error("a database that could not be read reported that the version table is simply absent")
+	}
+}
+
+func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing.T) {
+	// The case the whole distinction exists for. Running migrations under
+	// credentials of their own is the documented reason automatic migration
+	// can be turned off, so a runtime role granted per-table rights that omit
+	// the bookkeeping table is the ordinary arrangement rather than an exotic
+	// one — and it read as a database nobody had ever migrated.
+	engines.SkipUnless(t, database.Postgres)
+	url := os.Getenv(postgresURLEnv)
+	if url == "" {
+		t.Skipf("%s is not set", postgresURLEnv)
+	}
+	owner := open(t, url)
+	ctx := context.Background()
+
+	// A table standing in for the bookkeeping one, so this test neither
+	// depends on the migrations having run nor disturbs them.
+	probe := fmt.Sprintf("probe_unreadable_%d", time.Now().UnixNano())
+	role := probe + "_role"
+	for _, stmt := range []string{
+		`CREATE TABLE "` + probe + `" ("id" INTEGER)`,
+		`CREATE ROLE "` + role + `" LOGIN PASSWORD 'probe'`,
+		`GRANT CONNECT ON DATABASE "openpsirt" TO "` + role + `"`,
+		`GRANT USAGE ON SCHEMA "public" TO "` + role + `"`,
+	} {
+		if _, err := owner.ExecContext(ctx, stmt); err != nil {
+			t.Skipf("this server will not let the test arrange a restricted role (%v)", err)
+		}
+	}
+	t.Cleanup(func() {
+		clean := context.WithoutCancel(ctx)
+		for _, stmt := range []string{
+			`DROP TABLE IF EXISTS "` + probe + `"`,
+			`REVOKE ALL ON SCHEMA "public" FROM "` + role + `"`,
+			`REVOKE ALL ON DATABASE "openpsirt" FROM "` + role + `"`,
+			`DROP ROLE IF EXISTS "` + role + `"`,
+		} {
+			_, _ = owner.ExecContext(clean, stmt)
+		}
+	})
+
+	// The role may reach the database and read the catalog, and may not read
+	// the table. That is exactly the arrangement being described.
+	restricted := open(t, strings.Replace(url, "postgres:test@", role+":probe@", 1))
+	var probed int
+	readErr := restricted.QueryRowContext(ctx,
+		`SELECT 1 FROM "`+probe+`" LIMIT 1`).Scan(&probed)
+	if readErr == nil {
+		t.Skip("the restricted role can read the table, so there is nothing to tell apart")
+	}
+
+	// The catalog still answers, and answers the question that was asked.
+	// This is why PostgreSQL is asked through pg_class: the information schema
+	// is filtered by privilege, so a role with no rights on the table does not
+	// see the table there either, and gives back the same conflation.
+	query, err := catalogQuery(restricted.Server.Engine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seen int
+	if err := restricted.QueryRowContext(ctx, query, probe).Scan(&seen); err != nil {
+		t.Fatalf("a credential that may not read a table could not see it in the catalog either: %v", err)
+	}
+
+	// And the information schema is what that would have looked like.
+	var filtered int
+	if err := restricted.QueryRowContext(ctx,
+		`SELECT 1 FROM "information_schema"."tables"
+		 WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ?`, probe).Scan(&filtered); err == nil {
+		t.Error("the information schema is not privilege-filtered here, so the reason for pg_class no longer holds")
+	}
+	t.Logf("unreadable by this role (%v), present in pg_class, absent from the information schema", readErr)
+}
+
+func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
+	// The other three engines take a lock in the database. SQLite could not:
+	// its handle is capped at one connection, which the migration itself
+	// needs, so every in-database spelling deadlocks against that — and what
+	// stood instead was a comment saying SQLite "is only ever used by a single
+	// process", enforced by one Helm template while the binary accepts a
+	// SQLite URL with a warning.
+	//
+	// Two handles rather than two processes, because the lock is on the open
+	// file description rather than on the process: two descriptors conflict
+	// whether or not they are in the same program, which is what makes this
+	// testable at all. Six processes against one file were run by hand, and
+	// went from one migrating and three failing to one migrating and the rest
+	// waiting and finding the work done.
+	path := t.TempDir() + "/locked.db"
+	first := open(t, "sqlite://"+path)
+	second := open(t, "sqlite://"+path)
+	ctx := context.Background()
+
+	// Otherwise the second attempt waits five minutes.
+	restore := lockWaitSeconds
+	lockWaitSeconds = 1
+	t.Cleanup(func() { lockWaitSeconds = restore })
+
+	release, err := acquire(ctx, first)
+	if err != nil {
+		t.Fatalf("the first migration could not take the lock: %v", err)
+	}
+	if _, err := acquire(ctx, second); err == nil {
+		t.Error("two processes were allowed to migrate one file at the same time")
+	} else if !strings.Contains(err.Error(), "another process") {
+		t.Errorf("the refusal does not say what is in the way: %v", err)
+	}
+
+	// And once it is released, the next one gets it — a lock that is never
+	// handed on is a deployment that starts once.
+	if err := release(ctx); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+	again, err := acquire(ctx, second)
+	if err != nil {
+		t.Fatalf("the lock was not handed on after release: %v", err)
+	}
+	if err := again(ctx); err != nil {
+		t.Errorf("release by the second: %v", err)
+	}
+}
+
+func TestAnInMemoryDatabaseHasNoSecondProcessToExclude(t *testing.T) {
+	// It belongs to the process that opened it, so there is no file to lock
+	// and nothing that could reach it. Worth pinning because the lock is taken
+	// on a path, and an empty path is what this case gives it.
+	db := open(t, "sqlite://:memory:")
 	release, err := acquire(context.Background(), db)
 	if err != nil {
-		t.Fatalf("acquire on sqlite: %v", err)
+		t.Fatalf("acquire against an in-memory database: %v", err)
 	}
 	if err := release(context.Background()); err != nil {
-		t.Errorf("release on sqlite: %v", err)
+		t.Errorf("release: %v", err)
 	}
-	_ = database.SQLite
 }

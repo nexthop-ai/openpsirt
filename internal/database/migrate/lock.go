@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -43,6 +44,10 @@ func namedLock(ctx context.Context, conn *sql.Conn) (string, error) {
 // rather than blocking every replacement pod indefinitely.
 var lockWaitSeconds = 300
 
+// resetWait bounds unwinding the session before the connection goes back to
+// the pool. It is one round trip against a server that has just answered.
+const resetWait = 5 * time.Second
+
 // unlock releases a migration lock and returns the pinned connection.
 type unlock func(context.Context) error
 
@@ -61,17 +66,36 @@ type unlock func(context.Context) error
 // process and every other instance would block on it.
 func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 	if db.Server.Engine == database.SQLite {
-		// SQLite has no advisory lock and needs none: it is only ever used by
-		// a single process, so there is no other process to exclude.
-		// Concurrency within this process is handled by the migration mutex.
-		return func(context.Context) error { return nil }, nil
+		// SQLite has no advisory lock and cannot take one on this handle: it
+		// is capped at a single connection, which the migration itself needs.
+		// The exclusion is a lock on a file beside the database — see
+		// filelock.go, which has the whole of why.
+		return sqliteLock(ctx, db)
 	}
 
 	conn, err := db.DB.DB.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("pin a connection for the migration lock: %w", err)
 	}
+	// The session settings this function makes are unwound before the
+	// connection goes back. Close returns it to the pool rather than closing
+	// it — which is the whole reason the connection is pinned above — so a
+	// setting left behind travels on one pooled connection and not the others,
+	// and the same query afterwards behaves differently depending on which
+	// connection it is handed.
 	closeConn := func() {
+		if db.Server.Engine == database.Postgres {
+			// Without a context of its own this would be skipped on exactly
+			// the path that most needs it: a migration abandoned because its
+			// context ended.
+			reset, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+			defer cancel()
+			// A reset that fails leaves the connection carrying the bound,
+			// which is the state this arrived in and is stricter rather than
+			// looser. There is nothing further to do about it from a cleanup
+			// that runs on every path including the failing ones.
+			_, _ = conn.ExecContext(reset, "RESET lock_timeout")
+		}
 		if err := conn.Close(); err != nil {
 			_ = err // returning the connection to the pool; nothing to do
 		}
@@ -153,8 +177,64 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 // makes a read-only inspection command perform schema changes — and no schema
 // rights while running says the running application may hold read and write
 // rights only.
-func versionTableExists(ctx context.Context, db *database.DB) bool {
+//
+// **The catalog is asked, rather than the table.** Selecting from the table
+// answers three questions at once and cannot tell them apart: it is not there,
+// this credential may not read it, or the database is unreachable. All three
+// arrived as one error and read as the first, so "schema version 0" was
+// printed for a fully populated database whose credentials omitted this one
+// table — and the reasonable thing to do about "nothing is applied" is to
+// migrate. Running migrations under a credential of their own is the
+// documented reason automatic migration can be turned off, so that credential
+// is the ordinary arrangement rather than an exotic one.
+//
+// **PostgreSQL is asked through pg_class rather than the information schema**,
+// because the information schema is filtered by privilege on all three
+// servers: a role with no rights on a table does not see the table there, so
+// it gives back the same conflation this exists to remove. `pg_class` is
+// readable by any role, so on that engine the two are genuinely told apart.
+//
+// **On MySQL and MariaDB they are not.** Every catalog those engines offer is
+// privilege-filtered and there is no unfiltered one, so a credential that may
+// not read the table is indistinguishable from an absent table. What that
+// costs is bounded: the next thing to run is the version query or a migration,
+// both of which fail with the engine's own permission message rather than
+// silently.
+func versionTableExists(ctx context.Context, db *database.DB) (bool, error) {
+	query, err := catalogQuery(db.Server.Engine)
+	if err != nil {
+		return false, err
+	}
 	var probe int
-	err := db.QueryRowContext(ctx, "SELECT 1 FROM goose_db_version LIMIT 1").Scan(&probe)
-	return err == nil || err == sql.ErrNoRows
+	switch err := db.QueryRowContext(ctx, query, versionTable).Scan(&probe); {
+	case database.IsNoRows(err):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("ask whether this database has been migrated: %w", err)
+	}
+	return true, nil
 }
+
+// catalogQuery asks one engine whether it holds a table of a given name.
+//
+// A catalog is engine-specific by nature: three of the four have an
+// information schema, SQLite has a table of its own, and PostgreSQL is asked
+// somewhere else again for the reason above.
+func catalogQuery(engine database.Engine) (string, error) {
+	switch engine {
+	case database.Postgres:
+		return `SELECT 1 FROM "pg_catalog"."pg_class" AS "c"
+			JOIN "pg_catalog"."pg_namespace" AS "n" ON "n"."oid" = "c"."relnamespace"
+			WHERE "n"."nspname" = CURRENT_SCHEMA() AND "c"."relname" = ? AND "c"."relkind" = 'r'`, nil
+	case database.MySQL, database.MariaDB:
+		return `SELECT 1 FROM "information_schema"."TABLES"
+			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ?`, nil
+	case database.SQLite:
+		return `SELECT 1 FROM "sqlite_master" WHERE "type" = 'table' AND "name" = ?`, nil
+	}
+	return "", fmt.Errorf("no way to read the catalog of %s", engine)
+}
+
+// versionTable is the migration library's bookkeeping table, which it names
+// and this only reads.
+const versionTable = "goose_db_version"

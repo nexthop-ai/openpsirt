@@ -45,17 +45,17 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	}
 
 	q := s.db.NewSelect().
-		TableExpr("advisory_issuance AS ai").
-		Join(`JOIN "product" AS pd ON pd.id = ai.product_id`).
-		Join(`JOIN "vulnerability" AS v ON v.id = ai.vulnerability_id`).
-		Join(`JOIN "person" AS pe ON pe.id = ai.issued_by`).
-		ColumnExpr("pd.name AS product").
-		ColumnExpr("v.identifier AS issue").
-		ColumnExpr("ai.ordinal AS ordinal").
-		ColumnExpr("ai.summary AS summary").
-		ColumnExpr("pe.identity AS issued_by").
-		ColumnExpr("ai.issued_at AS issued_at").
-		ColumnExpr("ai.digest AS digest").
+		TableExpr(`advisory_issuance AS "ai"`).
+		Join(`JOIN "product" AS "pd" ON pd.id = ai.product_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = ai.vulnerability_id`).
+		Join(`JOIN "person" AS "pe" ON pe.id = ai.issued_by`).
+		ColumnExpr(`pd.name AS "product"`).
+		ColumnExpr(`v.identifier AS "issue"`).
+		ColumnExpr(`ai.ordinal AS "ordinal"`).
+		ColumnExpr(`ai.summary AS "summary"`).
+		ColumnExpr(`pe.identity AS "issued_by"`).
+		ColumnExpr(`ai.issued_at AS "issued_at"`).
+		ColumnExpr(`ai.digest AS "digest"`).
 		OrderExpr("ai.issued_at DESC, ai.id DESC")
 	if !all {
 		q = q.Where("ai.product_id IN (?)", bun.List(products))
@@ -72,9 +72,9 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	// where a visibility lives — an issuance carries none of its own, and
 	// reading one as public because it has no visibility column is how an
 	// undisclosed flaw would be announced by the report about announcements.
-	visible := `EXISTS (SELECT 1 FROM "finding" AS f
-		JOIN "target" AS t ON t.id = f.target_id
-		JOIN "stream" AS st ON st.id = t.stream_id
+	visible := `EXISTS (SELECT 1 FROM "finding" AS "f"
+		JOIN "target" AS "t" ON t.id = f.target_id
+		JOIN "stream" AS "st" ON st.id = t.stream_id
 		WHERE st.product_id = ai.product_id
 		  AND f.vulnerability_id = ai.vulnerability_id
 		  AND f.kind = ?`

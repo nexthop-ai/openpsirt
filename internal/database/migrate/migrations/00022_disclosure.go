@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -29,10 +26,9 @@ func init() {
 // still waiting, is part of the record of how long this stayed hidden — and
 // the finding's own date follows only an approved one.
 func upDisclosureExtension(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -70,19 +66,9 @@ func upDisclosureExtension(ctx context.Context, tx *sql.Tx) error {
 			ON "disclosure_extension" ("vulnerability_id", "product_id")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downDisclosureExtension(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{`DROP TABLE "disclosure_extension"`} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "disclosure_extension")
 }

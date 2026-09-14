@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -90,7 +91,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 
 	var rows []describedRow
 	err := s.db.NewSelect().
-		TableExpr("decision AS de").
+		TableExpr(`decision AS "de"`).
 		// The decision is on the outside of this join by construction, and
 		// the spelling is the instruction. CROSS JOIN ... WHERE is an inner
 		// join on every engine; on SQLite, which plans without statistics
@@ -99,35 +100,35 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		// equality that matches ten rows when it matches every open row in
 		// the deployment, and probed the decisions once per row: 0.46 s to
 		// describe a page of thirty-two, against 0.1 ms the other way round.
-		Join("CROSS JOIN finding AS f").
+		Join(`CROSS JOIN finding AS "f"`).
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		Join("JOIN product AS pr ON pr.id = st.product_id").
-		ColumnExpr("de.id AS decision_id").
-		ColumnExpr("de.claim_id AS claim_id").
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN product AS "pr" ON pr.id = st.product_id`).
+		ColumnExpr(`de.id AS "decision_id"`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr("CASE WHEN COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr+
 			" AND COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr+
-			" THEN 1 ELSE 0 END AS exact").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("de.product_id AS product_id").
-		ColumnExpr("pr.display_name AS product").
-		ColumnExpr("pr.name AS product_name").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("st.name AS stream_name").
-		ColumnExpr("va.display_name AS variant").
-		ColumnExpr("va.name AS variant_name").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("c.name AS component").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("f.consumer_id AS consumer_id").
-		ColumnExpr("COALESCE(uc.name, '') AS consumer").
-		ColumnExpr("f.fix_state AS fix_state").
-		ColumnExpr("f.fixed_in AS fixed_in").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
+			` THEN 1 ELSE 0 END AS "exact"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`pr.display_name AS "product"`).
+		ColumnExpr(`pr.name AS "product_name"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`st.name AS "stream_name"`).
+		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`va.name AS "variant_name"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`f.consumer_id AS "consumer_id"`).
+		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
+		ColumnExpr(`f.fix_state AS "fix_state"`).
+		ColumnExpr(`f.fixed_in AS "fixed_in"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("st.product_id = de.product_id").
 		Where("f.closed_at IS NULL").
@@ -193,11 +194,11 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Places      int   `bun:"places"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("finding AS f").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("COUNT(*) AS places").
+		TableExpr(`finding AS "f"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.vulnerability_id IN (?)", bun.List(wanted)).
 		Where("f.component_id IN (?)", bun.List(components)).
@@ -229,19 +230,19 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Decided     int   `bun:"decided"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr("decision AS de").
+		TableExpr(`decision AS "de"`).
 		// The decision on the outside, as above.
-		Join("CROSS JOIN finding AS f").
+		Join(`CROSS JOIN finding AS "f"`).
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		ColumnExpr("de.claim_id AS claim_id").
-		ColumnExpr("f.target_id AS target_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
-		ColumnExpr("COUNT(DISTINCT f.place_identity) AS decided").
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`f.target_id AS "target_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`COUNT(DISTINCT f.place_identity) AS "decided"`).
 		Where("de.claim_id IN (?)", bun.List(claims)).
 		Where("de.live_key IS NOT NULL").
 		Where("st.product_id = de.product_id").
@@ -274,7 +275,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	}
 	// The graph store reads through the pool. Describing is a read on the
 	// way out of a handler, never part of a transaction.
-	pool, ok := s.db.(*bun.DB)
+	pool, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("describing decisions is not done inside a transaction")
 	}

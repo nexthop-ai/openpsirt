@@ -21,20 +21,21 @@ func TestAReservedWordIsUsableAsAColumnName(t *testing.T) {
 		ctx := context.Background()
 		// Reserved somewhere among the four: a window function, two clauses,
 		// and a statement keyword.
-		const create = `CREATE TABLE "reserved_probe" (
+		probe := probeTable(t)
+		create := `CREATE TABLE "` + probe + `" (
 			"rank" BIGINT NOT NULL, "order" INT, "select" INT, "group" INT)`
 		if _, err := db.ExecContext(ctx, create); err != nil {
 			t.Fatalf("a table of reserved names was refused: %v", err)
 		}
-		t.Cleanup(func() { _, _ = db.ExecContext(ctx, `DROP TABLE "reserved_probe"`) })
+		t.Cleanup(func() { _, _ = db.ExecContext(ctx, `DROP TABLE "`+probe+`"`) })
 
 		if _, err := db.ExecContext(ctx,
-			`INSERT INTO "reserved_probe" ("rank", "order", "select", "group") VALUES (1, 2, 3, 4)`); err != nil {
+			`INSERT INTO "`+probe+`" ("rank", "order", "select", "group") VALUES (1, 2, 3, 4)`); err != nil {
 			t.Fatalf("insert: %v", err)
 		}
 		var rank int
 		if err := db.QueryRowContext(ctx,
-			`SELECT "rank" FROM "reserved_probe" WHERE "order" = 2`).Scan(&rank); err != nil {
+			`SELECT "rank" FROM "`+probe+`" WHERE "order" = 2`).Scan(&rank); err != nil {
 			t.Fatalf("select: %v", err)
 		}
 		if rank != 1 {

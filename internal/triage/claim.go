@@ -251,7 +251,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return nil, err
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -367,7 +367,7 @@ func (s *Store) ApproveClaim(ctx context.Context, subject access.Subject, claimI
 			return nil, err
 		}
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -529,20 +529,19 @@ func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, 
 		Set("state = ?", Approved).
 		Where("id IN (?)", bun.List(ids)).
 		Where("state = ?", Proposed).
-		Where(`EXISTS (SELECT 1 FROM "claim" AS ac WHERE ac.id = ? AND ac.revision_id = ?)`,
+		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE ac.id = ? AND ac.revision_id = ?)`,
 			claim.ID, *claim.RevisionID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record an approval: %w", err)
 	}
-	// The count is the control, so a driver that cannot report it is a
+	// The count is the control here, so a count that cannot be read is a
 	// refusal rather than a pass. Read as optional, the whole revision-bound
-	// check was skipped on any driver or proxy that does not answer — after
-	// the approval row was already written, leaving a claim agreed to under
-	// an approval naming reasoning that is no longer what it rests on.
-	n, err := moved.RowsAffected()
+	// check would be skipped after the approval row was already written,
+	// leaving a claim agreed to under an approval naming reasoning that is no
+	// longer what it rests on.
+	n, err := database.Affected(moved)
 	if err != nil {
-		return fmt.Errorf("cannot tell whether the reasoning changed while this "+
-			"was being agreed to: %w", err)
+		return fmt.Errorf("record an approval: %w", err)
 	}
 	if n != int64(len(ids)) {
 		return fmt.Errorf("the reasoning changed while this was being agreed to; read it again")
@@ -612,7 +611,7 @@ func (s *Store) Split(ctx context.Context, subject access.Subject, claimID int64
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -736,7 +735,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -797,10 +796,9 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 		if err != nil {
 			return fmt.Errorf("record that this was sent back: %w", err)
 		}
-		n, err := marked.RowsAffected()
+		n, err := database.Affected(marked)
 		if err != nil {
-			return fmt.Errorf("cannot tell whether the claim changed while it was "+
-				"being sent back: %w", err)
+			return fmt.Errorf("record that this was sent back: %w", err)
 		}
 		if n != int64(len(ids)) {
 			return fmt.Errorf("the claim changed while it was being sent back; read it again")

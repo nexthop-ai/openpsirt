@@ -62,11 +62,9 @@ func upSettings(ctx context.Context, tx *sql.Tx) error {
 	default:
 		return fmt.Errorf("no schema for %s", e)
 	}
-	_, err := tx.ExecContext(ctx, stmt)
-	return err
+	return apply(ctx, tx, []string{stmt})
 }
 
 func downSettings(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `DROP TABLE "application_setting"`)
-	return err
+	return dropTables(ctx, tx, "application_setting")
 }

@@ -259,7 +259,7 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 	// the claim. An EXISTS rather than a join, so that counting the page and
 	// reading it narrow identically without one of them multiplying rows.
 	saying := func(q *bun.SelectQuery, clause string, values ...any) *bun.SelectQuery {
-		return q.Where(`EXISTS (SELECT 1 FROM "claim" AS fc WHERE fc.id = de.claim_id AND `+
+		return q.Where(`EXISTS (SELECT 1 FROM "claim" AS "fc" WHERE fc.id = de.claim_id AND `+
 			clause+`)`, values...)
 	}
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {

@@ -137,16 +137,16 @@ func (s *Store) TagsInUse(ctx context.Context, subject access.Subject,
 	// A word survives where any finding it marks is readable, which is the
 	// same rule the list it filters answers by: offering a filter that
 	// matches nothing the caller may see would be its own small oracle.
-	const onSomethingReadable = `EXISTS (SELECT 1 FROM "finding" AS f
-		JOIN "target" AS tg ON tg.id = f.target_id
-		JOIN "stream" AS st ON st.id = tg.stream_id
+	const onSomethingReadable = `EXISTS (SELECT 1 FROM "finding" AS "f"
+		JOIN "target" AS "tg" ON tg.id = f.target_id
+		JOIN "stream" AS "st" ON st.id = tg.stream_id
 		WHERE st.product_id = ft.product_id
 		  AND f.vulnerability_id = ft.vulnerability_id
 		  AND f.component_id = ft.component_id
 		  AND f.visibility IN (?))`
 	if err := s.db.NewSelect().Model((*Tag)(nil)).
-		ColumnExpr("MIN(ft.typed) AS typed").
-		ColumnExpr("COUNT(*) AS used").
+		ColumnExpr(`MIN(ft.typed) AS "typed"`).
+		ColumnExpr(`COUNT(*) AS "used"`).
 		Where("ft.product_id = ?", productID).
 		Where(onSomethingReadable, bun.List(visible)).
 		GroupExpr("ft.tag").

@@ -103,9 +103,11 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		if err != nil {
 			return fmt.Errorf("set aside what they said before: %w", err)
 		}
-		if n, err := res.RowsAffected(); err == nil {
-			superseded = int(n)
+		n, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("set aside what they said before: %w", err)
 		}
+		superseded = int(n)
 		for i := range said {
 			said[i].ProductID = productID
 			said[i].Publisher = publisher

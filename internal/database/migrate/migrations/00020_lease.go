@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -27,10 +24,9 @@ func init() {
 // the same reason: the statement repeats the conditions that made the lease
 // available, so a second replica's update matches nothing.
 func upLease(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -47,18 +43,10 @@ func upLease(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "lease_pk" PRIMARY KEY ("name")
 		)` + t.suffix,
 	}
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 // The primary key goes with the table and is not dropped separately.
 func downLease(ctx context.Context, tx *sql.Tx) error {
-	if _, err := tx.ExecContext(ctx, `DROP TABLE "lease"`); err != nil {
-		return fmt.Errorf("drop lease: %w", err)
-	}
-	return nil
+	return dropTables(ctx, tx, "lease")
 }

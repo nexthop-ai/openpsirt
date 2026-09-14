@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -31,10 +28,9 @@ func init() {
 // borrows from the other: overlapping them is how a bump at the top of a build
 // invalidates a judgment made about a leaf.
 func upTriage(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -378,25 +374,9 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "claim_comment_claim_idx" ON "claim_comment" ("claim_id")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downTriage(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{
-		`DROP TABLE "claim_comment"`,
-		`DROP TABLE "claim_approval"`,
-		`DROP TABLE "claim_revision"`,
-		`DROP TABLE "decision"`,
-		`DROP TABLE "claim"`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "claim_comment", "claim_approval", "claim_revision", "decision", "claim")
 }

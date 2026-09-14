@@ -135,7 +135,7 @@ type Store struct {
 // re-ran the inner half alone would repeat part of a transaction whose other
 // part had been rolled back. Saying so is better than silently doing it.
 func (s *Store) handle() (*bun.DB, error) {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -220,7 +220,7 @@ func (s *Store) record(ctx context.Context, person *Account) error {
 		_, err := db.NewInsert().Model(person).Exec(ctx)
 		return err
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return write(ctx, s.db)
 	}
@@ -791,15 +791,15 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 		return nil
 	}
 	return s.db.NewSelect().
-		TableExpr("person AS p").
-		ColumnExpr("p.id AS id").
-		ColumnExpr("p.identity AS identity").
-		ColumnExpr("COALESCE(NULLIF(p.display_name, ''), p.identity) AS name").
+		TableExpr(`person AS "p"`).
+		ColumnExpr(`p.id AS "id"`).
+		ColumnExpr(`p.identity AS "identity"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.identity) AS "name"`).
 		Where("p.deactivated_at IS NULL").
-		Where(`EXISTS (SELECT 1 FROM "role_grant" AS g
+		Where(`EXISTS (SELECT 1 FROM "role_grant" AS "g"
 			WHERE g.person_id = p.id AND g.active = ?
 			  AND g.product_id = ? AND g.role IN (?))
-			OR EXISTS (SELECT 1 FROM "role_grant_all" AS ga
+			OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
 			WHERE ga.person_id = p.id AND ga.active = ?
 			  AND ga.role IN (?))`,
 			true, productID, bun.List(enough), true, bun.List(enough))
@@ -831,7 +831,7 @@ func (s *Store) Deactivate(ctx context.Context, personID int64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("record that they left: %w", err)
 	}
-	n, err := res.RowsAffected()
+	n, err := database.Affected(res)
 	if err != nil {
 		return false, fmt.Errorf("record that they left: %w", err)
 	}
@@ -849,7 +849,7 @@ func (s *Store) Reactivate(ctx context.Context, personID int64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("record that they are back: %w", err)
 	}
-	n, err := res.RowsAffected()
+	n, err := database.Affected(res)
 	if err != nil {
 		return false, fmt.Errorf("record that they are back: %w", err)
 	}

@@ -81,14 +81,14 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 
 	at := func(targetID int64) *bun.SelectQuery {
 		q := s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-			Join("JOIN component AS c ON c.id = f.component_id").
-			ColumnExpr("v.identifier AS vulnerability").
-			ColumnExpr("c.name AS component").
-			ColumnExpr("COALESCE(v.severity, '') AS severity").
-			ColumnExpr("COALESCE(f.closed_because, '') AS because").
-			ColumnExpr("MIN(COALESCE(f.arrived_from, '')) AS arrived_from").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			ColumnExpr(`v.identifier AS "vulnerability"`).
+			ColumnExpr(`c.name AS "component"`).
+			ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).
+			ColumnExpr(`MIN(COALESCE(f.arrived_from, '')) AS "arrived_from"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.visibility IN (?)", bun.List(visible)).
 			GroupExpr("v.identifier, c.name, v.severity, f.closed_because")
@@ -185,11 +185,11 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	at := func(targetID int64) ([]Changed, error) {
 		var rows []Changed
 		err := s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-			Join("JOIN component AS c ON c.id = f.component_id").
-			ColumnExpr("v.identifier AS vulnerability").
-			ColumnExpr("c.name AS component").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			ColumnExpr(`v.identifier AS "vulnerability"`).
+			ColumnExpr(`c.name AS "component"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.visibility = ?", access.Private).
 			Where("f.closed_at IS NULL").
@@ -307,19 +307,19 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 			MovedTo       string `bun:"moved_to"`
 		}
 		err := s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-			Join("JOIN component AS cp ON cp.id = f.component_id").
-			ColumnExpr("v.identifier AS vulnerability").
-			ColumnExpr("cp.name AS component").
-			ColumnExpr("COALESCE(f.closed_because, '') AS because").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN component AS "cp" ON cp.id = f.component_id`).
+			ColumnExpr(`v.identifier AS "vulnerability"`).
+			ColumnExpr(`cp.name AS "component"`).
+			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).
 			// The version it went from is the closed row's own component:
 			// what closed is the finding against the version that carried the
 			// issue, so that row still names it. Upstream where there is one,
 			// because that is the version the match was made against and the
 			// one a fix version is comparable to.
-			ColumnExpr("COALESCE(NULLIF(cp.upstream_version, ''), cp.version) AS from_version").
-			ColumnExpr("COALESCE(f.moved_to, '') AS moved_to").
+			ColumnExpr(`COALESCE(NULLIF(cp.upstream_version, ''), cp.version) AS "from_version"`).
+			ColumnExpr(`COALESCE(f.moved_to, '') AS "moved_to"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.closed_at IS NOT NULL").
 			Where("v.identifier IN (?)", bun.List(issues)).

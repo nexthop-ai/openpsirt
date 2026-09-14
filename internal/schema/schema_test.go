@@ -29,6 +29,23 @@ func uniqueName(t *testing.T) string {
 	return fmt.Sprintf("probe-%s-%d-%d", t.Name(), time.Now().UnixNano(), probeCounter.Add(1))
 }
 
+// probeTable returns a table name no other run will collide with.
+//
+// The same reason as uniqueName, one level up. Three probe tables took fixed
+// names with their cleanup in t.Cleanup, which does not run when a test binary
+// is killed — so a run interrupted against a server left a table behind, and
+// the next run's CREATE failed and blamed the connection mode for it. The
+// message pointed at the setting rather than at the leftover, on three engines
+// at once.
+//
+// Letters, digits and underscores only, so it needs no quoting to be legal
+// anywhere — though it is quoted at every use regardless, like everything else
+// in the schema.
+func probeTable(t *testing.T) string {
+	t.Helper()
+	return fmt.Sprintf("probe_%d_%d", time.Now().UnixNano(), probeCounter.Add(1))
+}
+
 func TestMigrationsApplyOnEveryEngine(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -41,6 +58,16 @@ func TestMigrationsApplyOnEveryEngine(t *testing.T) {
 		}
 		if version == 0 {
 			t.Fatal("nothing was applied; the migration set is empty")
+		}
+		// And it is the version this build was written against, which is the
+		// comparison a deployment applying migrations separately is refused
+		// on. A number nothing is compared to says only that it is not zero.
+		wanted, err := schema.Expected()
+		if err != nil {
+			t.Fatalf("read what this build expects: %v", err)
+		}
+		if version != wanted {
+			t.Errorf("applying every migration left version %d, and this build expects %d", version, wanted)
 		}
 		// The table must be usable with the same portable Go on every engine,
 		// which means writing and reading a real time.Time.
@@ -81,11 +108,20 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 		if err := schema.Up(ctx, db, quiet()); err != nil {
 			t.Fatalf("first run: %v", err)
 		}
-		first, _ := schema.Version(ctx, db)
+		// Checked, because two discarded errors are two zeros, and a pair of
+		// zeros compares equal — so idempotency was "proved" by a test that
+		// had read no version at all.
+		first, err := schema.Version(ctx, db)
+		if err != nil {
+			t.Fatalf("read the version after the first run: %v", err)
+		}
 		if err := schema.Up(ctx, db, quiet()); err != nil {
 			t.Fatalf("second run: %v", err)
 		}
-		second, _ := schema.Version(ctx, db)
+		second, err := schema.Version(ctx, db)
+		if err != nil {
+			t.Fatalf("read the version after the second run: %v", err)
+		}
 		if first != second {
 			t.Errorf("version moved on a second run: %d then %d", first, second)
 		}

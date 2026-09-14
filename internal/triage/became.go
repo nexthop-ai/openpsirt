@@ -102,8 +102,8 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 	// of claims and the count counts claims.
 	mine := func() *bun.SelectQuery {
 		q := s.db.NewSelect().Model((*Decision)(nil)).
-			ColumnExpr("de.claim_id AS claim_id").
-			ColumnExpr("MAX(de.id) AS newest").
+			ColumnExpr(`de.claim_id AS "claim_id"`).
+			ColumnExpr(`MAX(de.id) AS "newest"`).
 			Where("de.proposed_by = ?", subject.ID).
 			GroupExpr("de.claim_id")
 		return readableBy(q, subject, "de")

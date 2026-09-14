@@ -42,7 +42,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			"once", len(chosen), cap)
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return 0, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -169,34 +169,34 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		OnTag int `bun:"on_tag"`
 	}
 	err := s.db.NewSelect().
-		TableExpr("decision AS de").
-		ColumnExpr("de.product_id AS product_id").
-		ColumnExpr("de.vulnerability_id AS vulnerability_id").
-		ColumnExpr("de.place_identity AS place_identity").
-		ColumnExpr(`COALESCE((SELECT MIN(f.visibility) FROM "finding" AS f
+		TableExpr(`decision AS "de"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`de.place_identity AS "place_identity"`).
+		ColumnExpr(`COALESCE((SELECT MIN(f.visibility) FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS visibility`, toTarget).
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS f
-			JOIN "component" AS c ON c.id = f.component_id
-			LEFT JOIN "component" AS uc ON uc.id = f.consumer_id
+			AS "visibility"`, toTarget).
+		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ComponentUpstreamExpr+`) FROM "finding" AS "f"
+			JOIN "component" AS "c" ON c.id = f.component_id
+			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS component_now`, toTarget).
-		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS f
-			JOIN "component" AS c ON c.id = f.component_id
-			LEFT JOIN "component" AS uc ON uc.id = f.consumer_id
+			AS "component_now"`, toTarget).
+		ColumnExpr(`COALESCE((SELECT MIN(`+finding.ConsumerUpstreamExpr+`) FROM "finding" AS "f"
+			JOIN "component" AS "c" ON c.id = f.component_id
+			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
-			AS consumer_now`, toTarget).
+			AS "consumer_now"`, toTarget).
 		// Whether the line being carried onto was built once. It is a fact
 		// about the target rather than about the decision, and leaving it
 		// off made every carried place read as a branch — so the rule that
 		// refuses a dated judgment on a tag could not fire here however
 		// often it was asked.
 		ColumnExpr(`(SELECT CASE WHEN st.kind = ? THEN 1 ELSE 0 END
-			FROM "target" AS tg JOIN "stream" AS st ON st.id = tg.stream_id
-			WHERE tg.id = ?) AS on_tag`, catalog.Tag, toTarget).
+			FROM "target" AS "tg" JOIN "stream" AS "st" ON st.id = tg.stream_id
+			WHERE tg.id = ?) AS "on_tag"`, catalog.Tag, toTarget).
 		Where("de.id = ?", decisionID).
 		Scan(ctx, &row)
 	if err != nil {

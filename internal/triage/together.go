@@ -111,7 +111,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return 0, nil, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -207,23 +207,23 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		OnTag             int    `bun:"on_tag"`
 	}
 	query := tx.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("st.product_id AS product_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.place_identity AS place_identity").
-		ColumnExpr("f.visibility AS visibility").
-		ColumnExpr(finding.ComponentUpstreamExpr+" AS component_upstream").
-		ColumnExpr(finding.ConsumerUpstreamExpr+" AS consumer_upstream").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS severity_centi").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.place_identity AS "place_identity"`).
+		ColumnExpr(`f.visibility AS "visibility"`).
+		ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
+		ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "severity_centi"`).
 		// Whether the release was built once, which decides what may be said
 		// about it. As an integer rather than a boolean: the four engines
 		// spell a boolean three ways.
-		ColumnExpr("MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS on_tag", catalog.Tag).
+		ColumnExpr(`MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
 		Where("f.target_id = ?", at.TargetID).
 		Where("f.component_id = ?", at.ComponentID).
 		Where("f.closed_at IS NULL").

@@ -72,7 +72,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject, up Upgr
 			fmt.Sprintf("decide what is fixed in product %d", up.ProductID))
 	}
 
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return Declared{}, fmt.Errorf("this store is already inside a transaction")
 	}
@@ -245,7 +245,7 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		return fmt.Errorf("say why the promise is changing: a date moved with no reason " +
 			"is one nobody can agree to again")
 	}
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return fmt.Errorf("this store is already inside a transaction")
 	}

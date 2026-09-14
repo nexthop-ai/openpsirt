@@ -302,7 +302,11 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 		if err != nil {
 			return fmt.Errorf("claim job %d: %w", id, err)
 		}
-		if n, _ := res.RowsAffected(); n == 0 {
+		n, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("claim job %d: %w", id, err)
+		}
+		if n == 0 {
 			// Someone else got there first. Nothing to do this round.
 			return nil
 		}
@@ -353,9 +357,11 @@ func (q *Queue) Bury(ctx context.Context) (int, error) {
 		if err != nil {
 			return fmt.Errorf("set aside work whose worker never came back: %w", err)
 		}
-		if n, err := res.RowsAffected(); err == nil {
-			buried = int(n)
+		n, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("set aside work whose worker never came back: %w", err)
 		}
+		buried = int(n)
 		return nil
 	})
 	if err != nil {
@@ -611,8 +617,15 @@ func head(s string, n int) string {
 // held reads a conditional update's count as whether the job was still this
 // worker's. Rows matched rather than rows changed, which the connection
 // settings make true on every engine.
+//
+// A count that cannot be read is not zero. Read as one, every ending a worker
+// recorded would report the job lost and nothing would ever be settled.
 func held(res sql.Result) error {
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("find out whether this job is still ours: %w", err)
+	}
+	if n == 0 {
 		return ErrNoLongerHeld
 	}
 	return nil
@@ -683,7 +696,11 @@ func (q *Queue) Requeue(ctx context.Context, id int64) error {
 		// Rows matched rather than rows changed, which the connection settings
 		// make true on every engine. Nothing matched means the job is not set
 		// aside — already running again, or never there.
-		if n, err := res.RowsAffected(); err == nil && n == 0 {
+		n, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("put job %d back: %w", id, err)
+		}
+		if n == 0 {
 			return ErrNotSetAside
 		}
 		return nil

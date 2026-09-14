@@ -90,21 +90,21 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// thing, which is what the findings list answers for a whole product.
 	grouped := func(byBuild bool) *bun.SelectQuery {
 		q := s.db.NewSelect().
-			TableExpr("finding AS f").
-			Join(`JOIN "component" AS c ON c.id = f.component_id`).
-			Join(`LEFT JOIN "component" AS uc ON uc.id = f.consumer_id`).
-			ColumnExpr("COUNT(*) AS places").
-			ColumnExpr("MIN(f.due_at) AS due_at").
-			ColumnExpr("MAX(f.urgency) AS urgency").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+			ColumnExpr(`COUNT(*) AS "places"`).
+			ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+			ColumnExpr(`MAX(f.urgency) AS "urgency"`).
 			ColumnExpr(decidedAs("?", anyClaim), productID, "withdrawn")
 		q = decisionCounts(q, "?", []any{productID}, claimApproved).
-			Where(`f.target_id IN (SELECT tg.id FROM "target" AS tg
-				JOIN "stream" AS st ON st.id = tg.stream_id
+			Where(`f.target_id IN (SELECT tg.id FROM "target" AS "tg"
+				JOIN "stream" AS "st" ON st.id = tg.stream_id
 				WHERE st.product_id = ?)`, productID).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible))
 		if byBuild {
-			return q.ColumnExpr("f.target_id AS target_id").
+			return q.ColumnExpr(`f.target_id AS "target_id"`).
 				GroupExpr("f.target_id, f.vulnerability_id, f.component_id")
 		}
 		return q.GroupExpr("f.vulnerability_id, f.component_id")
@@ -113,12 +113,12 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// rows and the product's totals cannot come to mean different things.
 	counted := func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.
-			ColumnExpr("COUNT(*) AS open").
-			ColumnExpr("SUM(CASE WHEN grouped.due_at IS NOT NULL AND grouped.due_at < ? THEN 1 ELSE 0 END) AS overdue", now).
-			ColumnExpr("SUM(CASE WHEN grouped.urgency >= ? THEN 1 ELSE 0 END) AS exploited",
+			ColumnExpr(`COUNT(*) AS "open"`).
+			ColumnExpr(`SUM(CASE WHEN grouped.due_at IS NOT NULL AND grouped.due_at < ? THEN 1 ELSE 0 END) AS "overdue"`, now).
+			ColumnExpr(`SUM(CASE WHEN grouped.urgency >= ? THEN 1 ELSE 0 END) AS "exploited"`,
 				int64(exploitedBand)).
-			ColumnExpr("SUM(CASE WHEN grouped.any_claim = 0 THEN 1 ELSE 0 END) AS undecided").
-			ColumnExpr("SUM(CASE WHEN grouped.approved_here = grouped.places THEN 1 ELSE 0 END) AS agreed")
+			ColumnExpr(`SUM(CASE WHEN grouped.any_claim = 0 THEN 1 ELSE 0 END) AS "undecided"`).
+			ColumnExpr(`SUM(CASE WHEN grouped.approved_here = grouped.places THEN 1 ELSE 0 END) AS "agreed"`)
 	}
 	groups := grouped(true)
 
@@ -134,12 +134,12 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	}
 	err := counted(s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, groups).
-		Join(`JOIN "target" AS tg ON tg.id = grouped.target_id`).
-		Join(`JOIN "stream" AS st ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS va ON va.id = tg.variant_id`).
-		ColumnExpr("grouped.target_id AS target_id").
-		ColumnExpr("MIN(st.name) AS stream").
-		ColumnExpr("MIN(va.name) AS variant")).
+		Join(`JOIN "target" AS "tg" ON tg.id = grouped.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`grouped.target_id AS "target_id"`).
+		ColumnExpr(`MIN(st.name) AS "stream"`).
+		ColumnExpr(`MIN(va.name) AS "variant"`)).
 		GroupExpr("grouped.target_id").
 		Scan(ctx, &rows)
 	if err != nil {

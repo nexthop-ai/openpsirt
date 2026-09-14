@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -36,10 +33,9 @@ func init() {
 // cited can be noticed: what matters is that the ground moved under a
 // dismissal somebody approved, and a digest is how that is seen at all.
 func upVex(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -96,19 +92,9 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			ON "vex_statement" ("product_id", "vulnerability", "component", "superseded_at")`,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downVex(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{`DROP TABLE "vex_statement"`} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "vex_statement")
 }

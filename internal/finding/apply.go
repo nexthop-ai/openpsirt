@@ -139,7 +139,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		}
 		var startedAt time.Time
 		if err := tx.NewSelect().
-			TableExpr("scan_run AS r").
+			TableExpr(`scan_run AS "r"`).
 			ColumnExpr("r.started_at").
 			Where("r.id = ?", runID).
 			Scan(ctx, &startedAt); err != nil {
@@ -522,14 +522,14 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 			LikelihoodPPM int    `bun:"likelihood_ppm"`
 		}
 		err := tx.NewSelect().
-			TableExpr("vulnerability AS v").
+			TableExpr(`vulnerability AS "v"`).
 			Join(RatedHere, productID).
-			ColumnExpr("v.id AS id").
-			ColumnExpr("COALESCE(v.severity, ?) AS published", "").
-			ColumnExpr("COALESCE(ir.severity, ?) AS assessed", "").
-			ColumnExpr("v.exploited AS exploited").
-			ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
-			ColumnExpr("COALESCE(v.likelihood_ppm, 0) AS likelihood_ppm").
+			ColumnExpr(`v.id AS "id"`).
+			ColumnExpr(`COALESCE(v.severity, ?) AS "published"`, "").
+			ColumnExpr(`COALESCE(ir.severity, ?) AS "assessed"`, "").
+			ColumnExpr(`v.exploited AS "exploited"`).
+			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+			ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
 			Where("v.id IN (?)", bun.List(batch)).
 			Scan(ctx, &found)
 		rows = append(rows, found...)
@@ -717,7 +717,7 @@ func componentsByID(ctx context.Context, db bun.IDB, findings []Finding) (map[in
 func openComponents(ctx context.Context, db bun.IDB, targetID int64) (inventory, error) {
 	var rows []graph.Component
 	err := db.NewSelect().Model(&rows).
-		Join("JOIN graph_node AS n ON n.component_id = c.id").
+		Join(`JOIN graph_node AS "n" ON n.component_id = c.id`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Scan(ctx)
@@ -763,12 +763,12 @@ func openPlaces(ctx context.Context, db bun.IDB, targetID int64) (consumers, err
 		ParentIsRoot      bool  `bun:"parent_is_root"`
 	}
 	err := db.NewSelect().
-		TableExpr("graph_edge AS e").
-		Join("JOIN graph_node AS child ON child.id = e.child_id").
-		Join("JOIN graph_node AS parent ON parent.id = e.parent_id").
-		ColumnExpr("child.component_id AS child_component_id").
-		ColumnExpr("parent.component_id AS parent_component_id").
-		ColumnExpr("parent.is_root AS parent_is_root").
+		TableExpr(`graph_edge AS "e"`).
+		Join(`JOIN graph_node AS "child" ON child.id = e.child_id`).
+		Join(`JOIN graph_node AS "parent" ON parent.id = e.parent_id`).
+		ColumnExpr(`child.component_id AS "child_component_id"`).
+		ColumnExpr(`parent.component_id AS "parent_component_id"`).
+		ColumnExpr(`parent.is_root AS "parent_is_root"`).
 		Where("e.target_id = ?", targetID).
 		Where("e.closed_scan_id IS NULL").
 		Scan(ctx, &edges)
@@ -833,8 +833,8 @@ func sameDate(a, b *time.Time) bool {
 func shippedToCustomers(ctx context.Context, tx bun.Tx, targetID int64) (bool, error) {
 	var shipped bool
 	err := tx.NewSelect().
-		TableExpr("target AS t").
-		Join("JOIN variant AS v ON v.id = t.variant_id").
+		TableExpr(`target AS "t"`).
+		Join(`JOIN variant AS "v" ON v.id = t.variant_id`).
 		Column("v.customer_facing").
 		Where("t.id = ?", targetID).
 		Scan(ctx, &shipped)

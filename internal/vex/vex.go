@@ -168,12 +168,12 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	// whose versions match it, so what belongs in this document is what this
 	// build ships rather than everything the product has ever decided.
 	err = s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join(`JOIN "target" AS tg ON tg.id = f.target_id`).
-		Join(`JOIN "component" AS c ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS uc ON uc.id = f.consumer_id`).
-		Join(`JOIN "vulnerability" AS v ON v.id = f.vulnerability_id`).
-		Join(`LEFT JOIN "decision" AS de ON de.vulnerability_id = f.vulnerability_id
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`LEFT JOIN "decision" AS "de" ON de.vulnerability_id = f.vulnerability_id
 			AND de.place_identity = f.place_identity
 			AND de.product_id = ?
 			AND de.state = 'approved'
@@ -186,22 +186,22 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// part of the join rather than a filter, as it was on the decision:
 		// what the counting below asks is whether *every* open place is
 		// dismissed, and a filter would drop the places that are not.
-		Join(`LEFT JOIN "claim" AS cl ON cl.id = de.claim_id
+		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			AND cl.outcome IN ('not-applicable', 'already-fixed')`).
-		Join(`LEFT JOIN "claim_revision" AS dr ON dr.id = cl.revision_id`).
-		ColumnExpr("v.id AS vulnerability_id").
-		ColumnExpr("v.identifier AS identifier").
-		ColumnExpr("c.name AS component").
-		ColumnExpr("COALESCE(c.purl, '') AS purl").
-		ColumnExpr("MIN(cl.outcome) AS outcome").
+		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
+		ColumnExpr(`v.id AS "vulnerability_id"`).
+		ColumnExpr(`v.identifier AS "identifier"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
 		// The words and the moment of the earliest of them, which is the claim
 		// that has stood longest about this component. Where several places
 		// were decided separately the document has one thing to say and has to
 		// choose which; the first is the one a reader can check against the
 		// record.
-		ColumnExpr("COALESCE(MIN(cl.justification), '') AS justification").
-		ColumnExpr("COALESCE(MIN(dr.body), '') AS reasoning").
-		ColumnExpr("MIN(de.proposed_at) AS decided_at").
+		ColumnExpr(`COALESCE(MIN(cl.justification), '') AS "justification"`).
+		ColumnExpr(`COALESCE(MIN(dr.body), '') AS "reasoning"`).
+		ColumnExpr(`MIN(de.proposed_at) AS "decided_at"`).
 		Where("f.target_id = ?", target.ID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -327,9 +327,9 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 		Identifier      string `bun:"identifier"`
 	}
 	err := s.db.NewSelect().Model((*finding.Alias)(nil)).
-		Join(`JOIN "vulnerability" AS v ON v.id = va.vulnerability_id`).
-		ColumnExpr("va.vulnerability_id AS vulnerability_id").
-		ColumnExpr("va.identifier AS identifier").
+		Join(`JOIN "vulnerability" AS "v" ON v.id = va.vulnerability_id`).
+		ColumnExpr(`va.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`va.identifier AS "identifier"`).
 		Where("va.vulnerability_id IN (?)", bun.List(issues)).
 		// The other names, so not the one the statement is already
 		// filed under. The alias table holds every name an issue

@@ -13,9 +13,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 
-	// Registers every migration. This blank import is the reason this package
-	// exists; do not remove it.
-	_ "github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
+	// Registering every migration is what this import is for, and what this
+	// package exists for. It was blank until Expected gave it something to
+	// name; importing the runner without it still compiles and runs against an
+	// empty migration set.
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 )
 
 // Up brings the database up to the schema this build expects.
@@ -31,4 +33,14 @@ func Down(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 // Version reports the schema version currently applied.
 func Version(ctx context.Context, db *database.DB) (int64, error) {
 	return migrate.Version(ctx, db)
+}
+
+// Expected reports the schema version this build was written against.
+//
+// The other half of Version. A deployment that applies migrations separately
+// runs a binary and a schema that move independently, and until there was a
+// number for what the binary expects there was no way to say whether they had
+// moved together.
+func Expected() (int64, error) {
+	return migrations.Expected()
 }

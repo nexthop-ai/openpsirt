@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -161,6 +162,37 @@ func TestContentionThatNeverClearsIsReportedRatherThanRetriedForever(t *testing.
 	})
 }
 
+func TestGivingUpDoesNotWaitToBackOffBeforeNothing(t *testing.T) {
+	// The backoff sat inside the loop body with nothing guarding the last
+	// attempt, so a transaction that had already run out of attempts slept a
+	// final interval before returning an error that was decided before it
+	// began — holding the handler goroutine and its pooled connection for it,
+	// under exactly the sustained contention this path exists to report.
+	//
+	// Measured from the last attempt rather than from the start, because the
+	// backoffs between attempts are jittered and their totals overlap: a run
+	// with the final sleep and a run without it can take the same wall-clock
+	// time. What cannot overlap is what happens after the last attempt
+	// returns, which is a rollback and nothing else.
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		var lastAttempt time.Time
+		err := database.InTransaction(t.Context(), db.DB,
+			func(ctx context.Context, tx bun.Tx) error {
+				defer func() { lastAttempt = time.Now() }()
+				return &pgconn.PgError{Code: "40001", Message: "could not serialize access"}
+			})
+		trailing := time.Since(lastAttempt)
+		if err == nil {
+			t.Fatal("a transaction that never succeeded reported success")
+		}
+		// The shortest final backoff is the fifth step, 50ms before any
+		// jitter. Anything under half of that is the rollback and the return.
+		if trailing > 25*time.Millisecond {
+			t.Errorf("giving up spent %s after its last attempt, which is a backoff before nothing", trailing)
+		}
+	})
+}
+
 func TestFindingNothingIsToldApartFromFailing(t *testing.T) {
 	// This was three separate copies, each asking whether the words "no rows"
 	// appeared anywhere in the message. That is wrong in both directions, and
@@ -192,6 +224,128 @@ func TestFindingNothingIsToldApartFromFailing(t *testing.T) {
 			if database.IsNoRows(impostor) {
 				t.Errorf("a failure read as an empty result: %v", impostor)
 			}
+		}
+	})
+}
+
+func TestWithinOpensATransactionForThisPackagesOwnHandle(t *testing.T) {
+	// The handle this package hands out embeds a bun.DB rather than being
+	// one, so an assertion for *bun.DB alone was failed by the very handle
+	// Open returns — and the arm that answered it ran each statement as its
+	// own autocommit, with no transaction, no retry and nothing said. The two
+	// spellings differ by four characters and both compile.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		for _, handle := range []struct {
+			what string
+			db   bun.IDB
+		}{
+			{"this package's handle", db},
+			{"the embedded handle", db.DB},
+		} {
+			t.Run(handle.what, func(t *testing.T) {
+				var inside bun.IDB
+				if err := database.Within(t.Context(), handle.db,
+					func(ctx context.Context, tx bun.IDB) error {
+						inside = tx
+						return nil
+					}); err != nil {
+					t.Fatalf("Within: %v", err)
+				}
+				if _, ok := inside.(bun.Tx); !ok {
+					t.Errorf("the closure ran against %T, which is not a transaction", inside)
+				}
+			})
+		}
+	})
+}
+
+func TestWithinJoinsATransactionItIsGiven(t *testing.T) {
+	// The case the helper is named for: a method whose requirement is "both
+	// statements or neither" has that met by the caller's transaction, and
+	// refusing would make it uncallable from inside one.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		err := database.InTransaction(t.Context(), db.DB, func(ctx context.Context, tx bun.Tx) error {
+			return database.Within(ctx, tx, func(ctx context.Context, inner bun.IDB) error {
+				if inner != bun.IDB(tx) {
+					t.Errorf("the caller's transaction was replaced by %T", inner)
+				}
+				return nil
+			})
+		})
+		if err != nil {
+			t.Fatalf("Within inside a transaction: %v", err)
+		}
+	})
+}
+
+func TestWithinRefusesAHandleItDoesNotRecognize(t *testing.T) {
+	// The arm that used to run the closure unwrapped. A handle nothing here
+	// knows about is a fault worth reporting, not a fifth way to run work
+	// outside a transaction and say nothing about it.
+	err := database.Within(t.Context(), stranger{}, func(ctx context.Context, db bun.IDB) error {
+		t.Error("the closure ran against a handle that is not a transaction")
+		return nil
+	})
+	if err == nil {
+		t.Fatal("an unrecognized handle was accepted")
+	}
+	if !strings.Contains(err.Error(), "stranger") {
+		t.Errorf("the refusal does not say what it was given: %v", err)
+	}
+}
+
+// stranger satisfies bun.IDB and is nothing Within knows about.
+type stranger struct{ bun.IDB }
+
+// mute is a result that cannot say how many rows a write matched, which is
+// what a driver upgrade, a proxy or a fifth engine could start doing at any
+// time. No driver here does it today, which is exactly why nothing would
+// notice the day one starts.
+type mute struct{}
+
+func (mute) LastInsertId() (int64, error) { return 0, errors.New("no identifier to give") }
+func (mute) RowsAffected() (int64, error) { return 0, errors.New("this driver cannot count matches") }
+
+func TestACountThatCannotBeReadIsAFaultRatherThanZero(t *testing.T) {
+	// "The row was not there" and "I could not tell you" are different
+	// answers, and the callers act on the first: a conditional update reads
+	// the count back to find out whether the row it read is still the row it
+	// is writing. Discarding the error spells every one of those as a
+	// confident sentence about rows nobody counted — a job given up while
+	// still held, a delete that committed answered as a 404, a claim nobody
+	// ever takes.
+	n, err := database.Affected(mute{})
+	if err == nil {
+		t.Fatalf("a count that could not be read came back as %d", n)
+	}
+	if n != 0 {
+		t.Errorf("a failed read reported %d rows", n)
+	}
+	// And it says what went wrong, because "0" tells an operator nothing.
+	if !strings.Contains(err.Error(), "cannot count matches") {
+		t.Errorf("what the driver said was lost: %v", err)
+	}
+}
+
+func TestACountThatCanBeReadIsReturned(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		if _, err := db.NewRaw(`CREATE TABLE "counted" ("id" INTEGER PRIMARY KEY)`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = db.NewRaw(`DROP TABLE "counted"`).Exec(context.WithoutCancel(ctx))
+		})
+		res, err := db.NewRaw(`INSERT INTO "counted" ("id") VALUES (1), (2), (3)`).Exec(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n, err := database.Affected(res)
+		if err != nil {
+			t.Fatalf("Affected: %v", err)
+		}
+		if n != 3 {
+			t.Errorf("three rows were written and the count says %d", n)
 		}
 	})
 }

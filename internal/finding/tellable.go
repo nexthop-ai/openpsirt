@@ -86,9 +86,9 @@ func MayBeToldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 	}
 	products, all := subject.Products()
 	held, err := onlyReadable(db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("st.product_id = ?", productID),
 		subject, products, all).Count(ctx)
@@ -108,9 +108,9 @@ func MayBeToldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 // exists in a product it does not.
 func sitsIn(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (bool, error) {
 	here, err := db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.id").
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("st.product_id = ?", productID).

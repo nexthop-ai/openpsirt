@@ -530,12 +530,12 @@ func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build,
 	}
 	var rows []build
 	if err := db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		ColumnExpr("tg.id AS id").
-		ColumnExpr("st.display_name AS stream").
-		ColumnExpr("va.display_name AS variant").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`tg.id AS "id"`).
+		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`va.display_name AS "variant"`).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("name the builds a page sits in: %w", err)
@@ -654,22 +654,22 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 
 	var heads []groupHead
 	page := s.db.NewSelect().
-		TableExpr("finding AS f").
+		TableExpr(`finding AS "f"`).
 		// The fold, which is the unit a person acts in: two binaries of one
 		// source package are one row, because upgrading them is one act,
 		// deciding about them is one judgment and routing them is one rule.
 		// A reader with no way to see that was reading a list a third of
 		// which was the same work said again.
-		Join("JOIN component AS c ON c.id = f.component_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr(FoldedOn+" AS fold").
-		ColumnExpr("MIN(f.component_id) AS component_id").
-		ColumnExpr("COUNT(*) AS places").
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(FoldedOn+` AS "fold"`).
+		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
 		// The most urgent place this issue sits at. A group is one decision
 		// about one issue at one fold, so what should decide where that
 		// decision appears is the worst of what it covers.
-		ColumnExpr("MAX(f.urgency) AS urgency").
-		ColumnExpr("COUNT(*) OVER () AS total").
+		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -679,7 +679,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	// a page rather than a scan, and a join added for everybody would pay for
 	// a sort almost nobody asks for.
 	if by, known := order[filter.SortBy]; known && by.issue {
-		page = page.Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id")
+		page = page.Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`)
 	}
 	page = page.
 		// Ordered by urgency unless somebody asked otherwise. Urgency
@@ -708,8 +708,8 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	// page was being looked at — and this is the one somebody quotes, because
 	// it is what a deep link or the last page shows.
 	counted := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		ColumnExpr("f.vulnerability_id").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -752,28 +752,28 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	// author.
 	var rows []decorated
 	q := s.db.NewSelect().
-		TableExpr("finding AS f").
+		TableExpr(`finding AS "f"`).
 		// Joined for the likelihood and the score. Likelihood ranks above
 		// severity, so a list that orders by it and does not show it looks
 		// unsorted.
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		// And for the versions a decision is keyed on. Two primary-key
 		// lookups per place on the page, so the correlated counts can ask
 		// whether a claim is about the versions shipping here rather than
 		// about the place at whatever versions it once held.
-		Join("JOIN component AS c ON c.id = f.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f.consumer_id").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr(FoldedOn+" AS fold").
-		ColumnExpr("MIN(f.component_id) AS component_id").
-		ColumnExpr("MAX(COALESCE(v.likelihood_ppm, 0)) AS likelihood_ppm").
-		ColumnExpr("MAX(COALESCE(v.score_centi, 0)) AS score_centi").
-		ColumnExpr("SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS answered").
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(FoldedOn+` AS "fold"`).
+		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
+		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
+		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
+		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
 		// When the earliest of these places opened, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not
 		// the year in the identifier.
-		ColumnExpr("MIN(f.opened_at) AS opened_at").
-		ColumnExpr("MIN(f.due_at) AS due_at").
+		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 		// Whether anything here is undisclosed, and when the earliest embargo
 		// ends. One undisclosed place among fifty makes the group
 		// undisclosed, which is what it is for anybody deciding what may be
@@ -786,33 +786,33 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// marker on a row holding an undisclosed place. The four engines do
 		// not agree on a boolean aggregate either, and counting is the same
 		// question asked portably.
-		ColumnExpr("SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS undisclosed",
+		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
-		ColumnExpr("MIN(f.disclose_at) AS disclose_at").
-		ColumnExpr("MIN(f.fix_state) AS fix_state").
-		ColumnExpr("MIN(f.fixed_in) AS fixed_in").
+		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
+		ColumnExpr(`MIN(f.fix_state) AS "fix_state"`).
+		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
 		// Any of them: a group is an issue at a component, every place of it
 		// comes from one line of a scanner's report, and the applier writes
 		// that line to all of them.
-		ColumnExpr("MIN(COALESCE(f.matched, '')) AS matched").
+		ColumnExpr(`MIN(COALESCE(f.matched, '')) AS "matched"`).
 		// One of the ways down, and how many there are. MIN passes over the
 		// places the build pulls in directly, whose consumer is null, so those
 		// are counted separately rather than being read as "no route at all".
-		ColumnExpr("MIN(f.consumer_id) AS consumer_id").
-		ColumnExpr("COUNT(DISTINCT f.consumer_id) AS consumers").
+		ColumnExpr(`MIN(f.consumer_id) AS "consumer_id"`).
+		ColumnExpr(`COUNT(DISTINCT f.consumer_id) AS "consumers"`).
 		// The other number a reader is shown, counted here rather than beside
 		// the window function that pages the list — see groupHead. The
 		// consumers are already counted just above, and a distinct count of
 		// place identities would not do: a place is a package under a
 		// consumer, so across a fold of three packages that is the place count
 		// with a different word on it.
-		ColumnExpr("COUNT(DISTINCT f.component_id) AS packages").
-		ColumnExpr("SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS direct").
+		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
+		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
 		// How many builds in the selection hold this group, and one of them to
 		// name. Both are one where the selection is a single build, which is
 		// why the row says nothing about either there.
-		ColumnExpr("COUNT(DISTINCT f.target_id) AS builds").
-		ColumnExpr("MIN(f.target_id) AS target_id")
+		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
+		ColumnExpr(`MIN(f.target_id) AS "target_id"`)
 	// How far each group has been decided, counted the way the state filter
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.

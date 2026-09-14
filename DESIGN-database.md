@@ -10,6 +10,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Supported engines](#supported-engines)
 - [Engine-specific code](#engine-specific-code)
 - [Engine detection](#engine-detection)
+- [Connection encryption](#connection-encryption)
 - [Migrations](#migrations)
 - [Migration locks](#migration-locks)
 - [Identifier quoting](#identifier-quoting)
@@ -35,6 +36,25 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 | MariaDB | Production | 10.6 |
 | SQLite | Development and testing only | 3.35 |
 
+A floor is a release series: the oldest series this application's queries and
+schema are written against. **It is not a statement that upstream still
+publishes fixes for that series** — MySQL 8.0 and MariaDB 10.6 are both past
+upstream end of life and are still admitted, because raising a floor refuses
+deployments that start today and that is a decision rather than upkeep.
+
+Nor is it a statement about the server in front of it. Upstream publishes per
+patch release, and which patch release an operator runs is a property of that
+deployment — a floor admitting the series admits every unpatched release in it.
+So this is a compatibility floor, and keeping a deployment current is the
+operator's responsibility, which this document says rather than implying it is
+handled.
+
+The release number carries a patch level anyway, because servers report one and
+a comparison that discards it cannot tell two releases of a series apart.
+PostgreSQL is the exception that proves the shape: since 10 it numbers releases
+as series and patch, so its patch level is its second part and the same
+comparison orders it correctly.
+
 MySQL and MariaDB are separate targets. They share a wire protocol and a driver
 and have diverged in JSON handling, sequences, partitioning and collation
 defaults, so a query proved on one says nothing about the other.
@@ -59,7 +79,7 @@ Engine-specific code is confined to these places:
 | Schema migrations | Data-definition language differs |
 | The migration lock | Every engine spells advisory locking differently |
 | Connection setup | Driver-specific settings |
-| Recognizing what an engine is telling us | Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
+| Recognizing what an engine is telling us | All three drivers carry an error type of their own, SQLite included. Three questions, three functions: whether a failure is a lost race worth retrying (REQ-71), whether it is a unique constraint refusing a duplicate, and whether it came from the engine at all rather than from the caller asking for something impossible. Each is a different code in a different error type per engine, and each is asked somewhere a wrong answer is silent — a retry that never happens, a constraint message shown to a person, a broken database answered as a mistyped request |
 | Subtracting two moments | No portable expression yields seconds from two timestamps: one returns an interval, one a number of days, the rest something else |
 | Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
@@ -107,12 +127,76 @@ A server below the floor stops the process at startup, with the version found
 and the version required both named. The alternative is a failure much later, in
 whichever query first needs something the server cannot do.
 
+The connection is asked one further question at startup: what encryption it
+negotiated. That answer never stops a start — a server that will not say is
+still a server that answered the version question.
+
+## Connection encryption
+
+Every engine negotiates opportunistically, and neither driver says which way it
+went. So a deployment that believed the connection to its findings was
+encrypted had nowhere to look, and the two drivers disagreed about the default:
+one negotiated where the server offered it, the other connected in cleartext
+unless asked.
+
+| | |
+|---|---|
+| The default | Encrypted where the server offers it, cleartext where it does not, no certificate checked. The same on every engine, so one URL grammar no longer means two transports |
+| What it is not | A guarantee. A deployment needing one says so in the URL, and whatever the URL says about the transport is left as written — this sets a floor, it does not override an answer only the deployment can give |
+| How anybody knows | The connection is asked what it negotiated, and the answer is in the line that logs the engine and version. A production engine connected in cleartext is warned about by name, with the setting that fixes it |
+
+Asked rather than assumed, because the intention and the outcome differ exactly
+when it matters: a server that does not offer encryption is answered in
+cleartext by a deployment that asked for it.
+
 ## Migrations
 
 Embedded in the binary and applied at startup by default, so a deployment is one
 artifact and an upgrade is deploying it. Automatic application can be disabled,
 and `openpsirt migrate up|down|status` runs them separately for an operator who
 would rather use different credentials at a time they choose.
+
+**With automatic application off, the schema is compared before anything is
+served.** The binary and the schema then move independently, and nothing
+compared them: a build carrying a new migration started, granted
+administrators, answered the readiness probe — which is a ping — and failed
+every request touching the new table. In a rolling deployment the probe passing
+is what retires the last replica that worked.
+
+| Applied version | What happens |
+|---|---|
+| Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
+| Equal | Served, and the two versions are logged |
+| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back |
+
+What the binary carries is the highest version among the embedded migration
+sources, read from their file names, which is the same rule the migration
+library applies to them.
+
+**Version zero means nothing is applied, and nothing else.** The bookkeeping
+table is looked for before the version is read, so a read-only inspection does
+not create it. Selecting from the table to find out answers three questions at
+once and cannot tell them apart — it is not there, this credential may not read
+it, or the database is unreachable — and all three read as the first, so
+`migrate status` printed version 0 for a fully populated database whose
+credentials omitted that one table. The reasonable thing to do about "nothing
+is applied" is to migrate it.
+
+The catalog is asked instead, which answers only the question being put to it.
+
+| Engine | Asked | Tells an absent table from an unreadable one |
+|---|---|---|
+| PostgreSQL | `pg_class` | Yes |
+| MySQL, MariaDB | The information schema | No |
+| SQLite | `sqlite_master` | There are no privileges to have |
+
+PostgreSQL is asked through `pg_class` rather than its information schema
+because every information schema here is filtered by privilege: a role with no
+rights on a table does not see the table listed, which is the same conflation
+again. `pg_class` is readable by any role. MySQL and MariaDB offer no
+unfiltered catalog, so on those two the two cases stay indistinguishable —
+bounded by what runs next, which is the version query or a migration, both of
+which fail with the engine's own permission message rather than silently.
 
 Migrations are written in Go rather than SQL files, because they branch on the
 engine. A timestamp column has no portable spelling: PostgreSQL has no
@@ -132,17 +216,70 @@ engine-specific rollback that existed only because a column was added later,
 four files to read to know what one table holds, and ten more migrations for
 the collapse to unpick. Every migration now creates something.
 
+**A migration is its statements and nothing else.** What every one of them does
+around those statements — asking which engine this is, refusing an engine there
+are no spellings for, running each statement, naming the one that failed — is
+one place. Thirty-three copies of it had already become four spellings of one
+failure: two printed the whole statement rather than its first line, so a failed
+table declaration reported ninety lines of data definition, and two more named
+the table and not the statement. Dropping a table and dropping an index are the
+same: two engines name an index's table and the other two refuse to, and that
+rule stood in two independent copies with a third migration free to write it a
+third time with one arm missing.
+
+### Migrations that stop half way
+
+**On MySQL and MariaDB a migration cannot be rolled back.** Both commit
+implicitly before and after every data-definition statement, so the transaction
+each migration is given is decorative there. A failure at statement N leaves 1
+to N-1 committed, the rollback removes nothing, and no version is recorded — so
+the next start runs the same migration from statement 1 and fails on a name
+already taken. Nothing recovers from that on its own; every replacement process
+fails its startup probe in turn.
+
+So on those two engines a statement is preceded by a question: does the thing
+it creates already exist? If it does, it is stepped over and the step is
+logged, and the migration reaches its end and records its version. The other
+two have transactional data definition and never meet this, so they are not
+asked.
+
+| | |
+|---|---|
+| Why a probe rather than a keyword | MariaDB accepts `IF NOT EXISTS` on both a table and an index; MySQL accepts it only on a table. A probe is what the two have in common |
+| What is stepped over | Only the exact object the statement names. One that cannot be identified is run, and fails as it always did — a skip on any collision could hide a real one |
+| What it cannot tell apart | A statement that collides with something an earlier run made, and one that collides with something the same migration made two statements ago. The log is what surfaces the second |
+
+CI runs the success path on four engines, which is why this was invisible: the
+engines agree about what a migration does and disagree only about what is left
+when one stops half way.
+
 ## Migration locks
 
 | Lock | Excludes | Mechanism |
 |---|---|---|
 | Migration mutex | Other goroutines in this process | An ordinary mutex |
-| Advisory lock | Other instances on the same database | `pg_advisory_lock`, which belongs to the database; `GET_LOCK` on a name carrying the database, since a MySQL named lock belongs to the server; nothing on SQLite |
+| Advisory lock | Other instances on the same database | `pg_advisory_lock`, which belongs to the database; `GET_LOCK` on a name carrying the database, since a MySQL named lock belongs to the server; an operating-system lock on a file beside a SQLite database |
 
 Both are required. The in-process mutex exists because the migration library
 keeps its dialect in package-level state, so two goroutines migrating at once
 race on it regardless of any database lock. The advisory lock exists because a
 rolling deployment starts several instances at once.
+
+**SQLite takes its lock outside the database, because it cannot take one
+inside.** The handle is capped at a single connection — the file has one writer
+— so a lock held on a pinned connection would be holding the only connection
+the migration needs. What stood instead was the assumption that SQLite is only
+ever used by one process, enforced by one chart template while the binary
+accepts a SQLite URL with a warning. Four processes against one file with no
+lock: one migrated and three failed, on the migration library's own
+bookkeeping. Nothing was corrupted and the schema ended correct, so what the
+lock buys is those three waiting and finding the work already done.
+
+The operating system's own advisory locking rather than a lock file written and
+removed by hand, because the kernel drops it when a process ends however it
+ends. A file left behind by a crash is one nothing will ever remove, and every
+start afterwards refuses for a reason that stopped being true. A platform
+without that locking refuses rather than returning a lock that locks nothing.
 
 The advisory lock is taken on a pinned connection rather than on the pool. These
 are session locks: released from the pool, the release can land on a different
@@ -153,6 +290,12 @@ than assumed, because both engines report "you did not hold this" as a value.
 The wait is bounded on both engines. An unbounded wait means an instance wedged
 mid-migration blocks every replacement silently, and the startup probe kills each
 in turn.
+
+The bound is a session setting, and it is unwound before the connection goes
+back — on every path, including the failing ones. Left set, one pooled
+connection carries a five-minute bound while the others carry the server
+default, and the same query afterwards either waits or is canceled depending
+on which connection the pool hands out.
 
 ## Identifier quoting
 
@@ -168,10 +311,17 @@ standard quoting. Backticks keep working and string literals are untouched: this
 changes what a double quote means, not what a quote means.
 
 The mode is appended to what is already in force, never assigned. Assigning
-replaces the mode, and what it replaces includes the strictness that makes an
-oversized value an error rather than a quiet truncation. The first version
-assigned, and a nine-character string stored in a four-character column came
-back four characters long, with no error, on those two engines.
+replaces the mode, and what it replaces includes whatever else an operator set.
+The first version assigned, and a nine-character string stored in a
+four-character column came back four characters long, with no error, on those
+two engines.
+
+Strictness is named in the same breath rather than inherited. Appending alone
+keeps whatever the server already held, and a server whose mode omits
+strictness is the configuration that produces that truncation — routinely set
+that way for older applications. Naming it makes the mode a property of this
+application rather than of the server it was pointed at, and the set is
+deduplicated, so naming one a server already holds changes nothing.
 
 The gate reads three places, because it read one. `AS <word>` is the syntax for
 inventing a name and was the whole of what it matched — so a table renamed in a
@@ -188,10 +338,36 @@ in `AS groups`, and `GROUPS` is a reserved word in MySQL 8, where it names a
 window frame type. Three engines parsed it and one returned a syntax error,
 which the handler above turned into a 500 with the driver's message discarded.
 
-There are about two hundred and thirty invented names in the tree, so this is a
-gate rather than an audit. The words each engine reserves are held in one list
-with its provenance, asked of the running servers rather than typed, and a check
-reads every `AS` inside a query-building call.
+**A name a query invents is checked for being bare, not for being reserved.**
+The check compared each one against a list of 321 words the four engines
+reserve, which is a strictly weaker property than the rule it was the
+enforcement of: a name nobody has reserved *yet* passed, and MySQL 8.0 reserved
+`rank`, `groups`, `lead` and `cume_dist` with nothing refreshing the list. A
+quoted name does not match the pattern at all, so every hit is by construction
+an unquoted one and the fix is one pair of quotes. There were 1,418 of them
+against 34 already quoted, so no reader could tell which was the convention.
+
+The list of reserved words stays, for the other half. A name a migration
+*declares* is not invented — it was accepted by every engine when the migration
+ran — and the question there is whether it collides with a word one of them
+reserves, which is what a list of those words answers.
+
+Where a query is written is not what makes it a query. Reading only the
+arguments of the query builder's own methods left every statement held in a
+constant, returned from a helper or handed to the raw-query constructor
+unchecked — thirty-eight bare names, under an all-clear. Every string literal
+that looks like a statement is read now, and `FROM "` or `JOIN "` is what
+marks one: every table here is quoted, so that appears in SQL and not in
+prose, where matching the bare keywords reported sixty-odd English sentences.
+
+**A name that is not in a literal is still invisible**, because there is no
+parser here for four dialects — an alias assembled from two pieces is the
+shape, and the one that existed is now quoted at its joint. That is the safe
+direction for a check that fails a build, and it is why the gate says every
+name *in a literal* rather than claiming the rule outright.
+
+The schema is also read back from the database and checked there, on the same
+principle as the index test: what matters is what an operator ends up with.
 
 The check reads source as text, because SQL is inside the strings and there is no
 parser here for four dialects. That makes it blind to an alias built by
@@ -221,6 +397,16 @@ handed a false conflict rather than an error.
 
 A test asserts the count on all four engines, checked by removing the setting and
 watching exactly the two fail.
+
+Reading the count is a helper rather than a rule people remember. "The row was
+not there" and "I could not tell you" are different answers, and the callers
+act on the first one — a count read as zero becomes "somebody got there first",
+"you no longer hold this job", or a refusal for a write that committed. A count
+that cannot be read is a fault.
+
+No current driver returns an error there, which is why the helper exists rather
+than the rule. Nothing fails today when a caller gets it wrong, and nothing
+would report it on the day one starts.
 
 ## Collation
 
@@ -290,6 +476,17 @@ The joining spelling is a named helper rather than an `if` on the handle's type,
 because written by hand it reads as a fallback to writing outside a transaction.
 The reads rule reaches further in that case, not less far: the closure may be
 re-run by a retry it cannot see.
+
+**The helper names every handle it accepts, and refuses the rest.** A test for
+one handle type is failed by a handle that merely embeds it, and the arm that
+answered the failure ran each statement as its own autocommit — no transaction,
+no retry, nothing said, and the two spellings differ by four characters. A
+handle nothing recognizes is a fault rather than a further silent path.
+
+Giving up does not back off first. Nothing follows the last attempt, so a wait
+before returning an error already decided holds the caller and its connection
+for an interval that buys nothing — under exactly the sustained contention that
+path exists to report.
 
 ## Connection pool
 

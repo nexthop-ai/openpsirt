@@ -621,7 +621,11 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject, id int6
 	// button that clears everything, answered "no notification of yours by
 	// that number" about one plainly theirs. Acknowledging is idempotent
 	// instead.
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("acknowledge that notification: %w", err)
+	}
+	if n == 0 {
 		return access.Denied("acknowledge a notification")
 	}
 	return nil
@@ -641,9 +645,9 @@ func (s *Store) AcknowledgeAll(ctx context.Context, subject access.Subject) (int
 	if err != nil {
 		return 0, fmt.Errorf("acknowledge everything: %w", err)
 	}
-	n, err := res.RowsAffected()
+	n, err := database.Affected(res)
 	if err != nil {
-		return 0, nil
+		return 0, fmt.Errorf("acknowledge everything: %w", err)
 	}
 	return int(n), nil
 }

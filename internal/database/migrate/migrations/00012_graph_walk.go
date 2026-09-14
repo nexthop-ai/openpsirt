@@ -3,12 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -41,27 +37,9 @@ func upGraphWalk(ctx context.Context, tx *sql.Tx) error {
 	statements := []string{
 		`CREATE INDEX "finding_component_idx" ON "finding" ("target_id", "component_id", "closed_at")`,
 	}
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downGraphWalk(ctx context.Context, tx *sql.Tx) error {
-	// Two engines name the table when dropping an index and two do not, which
-	// is the only reason this is not one string.
-	drop := `DROP INDEX "finding_component_idx"`
-	switch migrate.EngineFrom(ctx) {
-	case database.MySQL, database.MariaDB:
-		drop += ` ON "finding"`
-	}
-
-	for _, stmt := range []string{drop} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropIndex(ctx, tx, "finding", "finding_component_idx")
 }

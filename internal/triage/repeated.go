@@ -73,16 +73,16 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 
 	var rows []Repeated
 	q := s.db.NewSelect().
-		TableExpr(`"decision" AS de`).
-		Join(`JOIN "vulnerability" AS v ON v.id = de.vulnerability_id`).
-		Join(`JOIN "product" AS p ON p.id = de.product_id`).
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 		// And what that product rates the issue, where it rates it anything.
 		// The report is per product already, and a rating belongs to one — so
 		// the word beside a repeated deferral is the word the team doing the
 		// deferring holds.
 		Join(finding.RatedFor(finding.RatedOnDecision)).
 		// The argument, which is where the outcome and the date live.
-		Join(`JOIN "claim" AS cl ON cl.id = de.claim_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		// Grouped on the product's identifier and the issue's, with the names
 		// carried along as labels. Grouping on the display name merged two
 		// products a catalog is free to display alike — one ordinary judgment
@@ -90,21 +90,21 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 		// both, and a genuine per-product pattern was reported against
 		// whichever name the group collapsed onto. Only the product's name is
 		// unique, and it is not the one anybody reads.
-		ColumnExpr("MIN(p.display_name) AS product").
-		ColumnExpr("MIN(v.identifier) AS vulnerability").
-		ColumnExpr("MIN("+finding.EffectiveSeverityExpr+") AS severity").
-		ColumnExpr("de.place_identity AS place_identity").
+		ColumnExpr(`MIN(p.display_name) AS "product"`).
+		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
+		ColumnExpr("MIN("+finding.EffectiveSeverityExpr+`) AS "severity"`).
+		ColumnExpr(`de.place_identity AS "place_identity"`).
 		// Counted over the deferrals that actually held. One taken back
 		// before it took effect put nothing off, and counting it would make
 		// correcting a mistake read as avoiding the work.
-		ColumnExpr("SUM(CASE WHEN "+heldSeconds(s.db)+" > 0 THEN 1 ELSE 0 END) AS times").
-		ColumnExpr("MAX(cl.deferred_until) AS last_until").
+		ColumnExpr("SUM(CASE WHEN "+heldSeconds(s.db)+` > 0 THEN 1 ELSE 0 END) AS "times"`).
+		ColumnExpr(`MAX(cl.deferred_until) AS "last_until"`).
 		// Summed in days here rather than as intervals, because the four
 		// engines return an interval as four different things and a caller
 		// would have to know which one it was talking to.
-		ColumnExpr(deferredDays(s.db)+" AS total_days").
+		ColumnExpr(deferredDays(s.db)+` AS "total_days"`).
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND cl.deferred_until > ?"+
-			" THEN 1 ELSE 0 END) AS standing", s.now().UTC()).
+			` THEN 1 ELSE 0 END) AS "standing"`, s.now().UTC()).
 		Where("cl.outcome = ?", Deferred).
 		// Withdrawn ones counted for the span they were in force, the way the
 		// threshold counts them. Left out, the report built to catch

@@ -408,7 +408,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Where(EffectiveSeverityExpr+" IN (?)", bun.List(words))
 		} else {
 			q = q.Where("f.vulnerability_id IN (?)",
-				q.NewSelect().TableExpr("vulnerability AS v").
+				q.NewSelect().TableExpr(`vulnerability AS "v"`).
 					Join(RatedHere, f.ProductID).
 					Column("v.id").
 					Where(EffectiveSeverityExpr+" IN (?)", bun.List(words)))
@@ -458,10 +458,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 				WhereOr("f.component_id IN (?)",
 					componentsWhere(q, "c.name_folded LIKE ? ESCAPE '#'", like)).
 				WhereOr("f.vulnerability_id IN (?)",
-					q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
+					q.NewSelect().TableExpr(`vulnerability AS "v"`).Column("v.id").
 						Where("LOWER(v.identifier) LIKE ? ESCAPE '#'", like)).
 				WhereOr("f.vulnerability_id IN (?)",
-					q.NewSelect().TableExpr("vulnerability_alias AS va").
+					q.NewSelect().TableExpr(`vulnerability_alias AS "va"`).
 						Column("va.vulnerability_id").
 						Where("LOWER(va.identifier) LIKE ? ESCAPE '#'", like))
 		})
@@ -474,7 +474,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		// One subquery holding an OR rather than one per kind, because a
 		// component has one identifier and is of one kind: asking for two
 		// kinds as two IN clauses is asking a component to be both.
-		where := q.NewSelect().TableExpr("component AS c").Column("c.id")
+		where := q.NewSelect().TableExpr(`component AS "c"`).Column("c.id")
 		where = where.WhereGroup(" AND ", func(g *bun.SelectQuery) *bun.SelectQuery {
 			for _, kind := range kinds {
 				g = g.WhereOr("LOWER(c.purl) LIKE ? ESCAPE '#'", "pkg:"+containsTerm(kind)+"/%")
@@ -509,7 +509,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Where("ir.severity IS NOT NULL")
 		} else {
 			q = q.Where("f.vulnerability_id IN (?)",
-				q.NewSelect().TableExpr(`"issue_rating" AS ir`).
+				q.NewSelect().TableExpr(`"issue_rating" AS "ir"`).
 					Column("ir.vulnerability_id").
 					Where("ir.product_id = ?", f.ProductID))
 		}
@@ -544,14 +544,14 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Having("MAX(f.closed_at) > ?", *f.ClosedAfter)
 	}
 	if f.ProposedAfter != nil {
-		q = q.Where(`EXISTS (SELECT 1 FROM "decision" AS de
+		q = q.Where(`EXISTS (SELECT 1 FROM "decision" AS "de"
 			WHERE de.vulnerability_id = f.vulnerability_id
 			  AND de.place_identity = f.place_identity
 			  AND de.proposed_at > ?)`, *f.ProposedAfter)
 	}
 	if f.LikelihoodAtLeast > 0 {
 		q = q.Where("f.vulnerability_id IN (?)",
-			q.NewSelect().TableExpr("vulnerability AS v").Column("v.id").
+			q.NewSelect().TableExpr(`vulnerability AS "v"`).Column("v.id").
 				Where("COALESCE(v.likelihood_ppm, 0) >= ?", f.LikelihoodAtLeast))
 	}
 	if f.OpenedBefore != nil {
@@ -577,7 +577,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		for _, cwe := range cwes {
 			upper = append(upper, strings.ToUpper(strings.TrimSpace(cwe)))
 		}
-		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability_weakness" AS vw
+		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability_weakness" AS "vw"
 			WHERE vw.vulnerability_id = f.vulnerability_id
 			  AND vw.cwe IN (?))`, bun.List(upper))
 	}
@@ -586,7 +586,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		// is put on and the grain this list groups by — so the membership test
 		// is on the group's own key rather than on a place.
 		where, args := f.product()
-		q = q.Where(`EXISTS (SELECT 1 FROM "finding_tag" AS ft
+		q = q.Where(`EXISTS (SELECT 1 FROM "finding_tag" AS "ft"
 			WHERE ft.product_id = `+where+`
 			  AND ft.vulnerability_id = f.vulnerability_id
 			  AND ft.component_id = f.component_id
@@ -761,17 +761,17 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		// LOWERon the issue's side the plan scanned the whole
 		// vulnerability table, and the whole alias table, once per
 		// statement.
-		pairs := `(SELECT ss.product_id AS product_id, vc.id AS component_id,
-			vv.id AS vulnerability_id
-			FROM "vex_statement" AS ss
-			JOIN "component" AS vc ON vc.name_folded = ss.component
-			JOIN "vulnerability" AS vv ON vv.identifier_folded = ss.vulnerability
+		pairs := `(SELECT ss.product_id AS "product_id", vc.id AS "component_id",
+			vv.id AS "vulnerability_id"
+			FROM "vex_statement" AS "ss"
+			JOIN "component" AS "vc" ON vc.name_folded = ss.component
+			JOIN "vulnerability" AS "vv" ON vv.identifier_folded = ss.vulnerability
 			WHERE ` + narrowing + `
 			UNION
 			SELECT ss.product_id, vc.id, vl.vulnerability_id
-			FROM "vex_statement" AS ss
-			JOIN "component" AS vc ON vc.name_folded = ss.component
-			JOIN "vulnerability_alias" AS vl ON vl.identifier_folded = ss.vulnerability
+			FROM "vex_statement" AS "ss"
+			JOIN "component" AS "vc" ON vc.name_folded = ss.component
+			JOIN "vulnerability_alias" AS "vl" ON vl.identifier_folded = ss.vulnerability
 			WHERE ` + narrowing + `)`
 
 		where, args := f.product()
@@ -779,7 +779,7 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		joined = append(joined, about...)
 		joined = append(joined, about...)
 		joined = append(joined, args...)
-		q = q.Join("JOIN "+pairs+" AS vx ON vx.component_id = f.component_id"+
+		q = q.Join("JOIN "+pairs+` AS "vx" ON vx.component_id = f.component_id`+
 			" AND vx.vulnerability_id = f.vulnerability_id"+
 			// Correlated on the row's own product where the list spans them,
 			// so a statement in one product cannot answer for a finding in
@@ -799,7 +799,7 @@ func (f Filter) at() time.Time {
 // componentsWhere is the identifiers of the components a condition selects,
 // as a subquery for a membership test on a finding's component or consumer.
 func componentsWhere(q *bun.SelectQuery, condition string, args ...any) *bun.SelectQuery {
-	return q.NewSelect().TableExpr("component AS c").Column("c.id").Where(condition, args...)
+	return q.NewSelect().TableExpr(`component AS "c"`).Column("c.id").Where(condition, args...)
 }
 
 // Hidden counts what the line keeps out of a list, so that the list can say so
@@ -825,8 +825,8 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		return 0, nil
 	}
 	counted := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		ColumnExpr("f.vulnerability_id").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -837,7 +837,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		// beneath the line. Both read the way Floor.narrow reads them.
 		counted = counted.Where("f.urgency < ?", int64(exploitedBand)).
 			Where("f.vulnerability_id IN (?)",
-				counted.NewSelect().TableExpr("vulnerability AS v").
+				counted.NewSelect().TableExpr(`vulnerability AS "v"`).
 					Join(RatedHere, productID).
 					Column("v.id").
 					Where(BandExpr+" NOT IN (?)", bun.List(words)))
@@ -963,24 +963,24 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	// version as standing over a second build shipping another.
 	standingHere, inForce := InForce()
 	decided := q.NewSelect().
-		TableExpr(`"decision" AS de`).
-		Join("JOIN finding AS f2 ON f2.vulnerability_id = de.vulnerability_id"+
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN finding AS "f2" ON f2.vulnerability_id = de.vulnerability_id`+
 			" AND f2.place_identity = de.place_identity").
-		Join("JOIN component AS c ON c.id = f2.component_id").
-		Join("LEFT JOIN component AS uc ON uc.id = f2.consumer_id").
+		Join(`JOIN component AS "c" ON c.id = f2.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f2.consumer_id`).
 		// The argument, which is where the outcome lives: one act is one
 		// argument, and the rows underneath say where it lands.
-		Join("JOIN claim AS cl ON cl.id = de.claim_id").
-		ColumnExpr("f2.id AS finding_id").
+		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`f2.id AS "finding_id"`).
 		// Waiting, and standing: the row's own count requires the live key
 		// and this did not, so a claim proposed and then withdrawn put its
 		// group in the waiting bucket while the row drew no state word at
 		// all. Both are the same question and have to be the same condition.
-		ColumnExpr("MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS waiting",
+		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS "waiting"`,
 			proposed).
-		ColumnExpr("MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS approved",
+		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS "approved"`,
 			approved).
-		ColumnExpr("MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS lapsed", lapsed).
+		ColumnExpr(`MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
 		// Whether a promise to upgrade stands over this place. Counted
 		// only for the claim that currently stands, like "approved"
 		// above: a promise that was withdrawn is not one, and a
@@ -988,7 +988,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// clean up. That is the whole argument for deriving this
 		// rather than writing a tag.
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
-			" AND cl.outcome = ? THEN 1 ELSE 0 END) AS planned",
+			` AND cl.outcome = ? THEN 1 ELSE 0 END) AS "planned"`,
 			append(append([]any{}, inForce...), string(upgradeNeeded))...).
 		// Which kind of judgment stands here, counted only for the claim that
 		// currently stands: a dismissal withdrawn eighteen months ago must not
@@ -997,7 +997,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// what has been dismissed answers with what somebody has merely
 		// proposed dismissing.
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
-			" AND cl.outcome IN (?) THEN 1 ELSE 0 END) AS this_outcome",
+			` AND cl.outcome IN (?) THEN 1 ELSE 0 END) AS "this_outcome"`,
 			append(append([]any{}, inForce...), bun.List(outcomes))...).
 		Where("f2.closed_at IS NULL").
 		Where(coversHere).
@@ -1008,13 +1008,13 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// the product the finding it answers for sits in, which is the same
 		// rule the bound number states inside one product.
 		decided = decided.
-			Join("JOIN target AS tg2 ON tg2.id = f2.target_id").
-			Join("JOIN stream AS st2 ON st2.id = tg2.stream_id").
+			Join(`JOIN target AS "tg2" ON tg2.id = f2.target_id`).
+			Join(`JOIN stream AS "st2" ON st2.id = tg2.stream_id`).
 			Where("de.product_id = st2.product_id")
 	} else {
 		decided = decided.Where("de.product_id = ?", f.ProductID)
 	}
-	q = q.Join("LEFT JOIN (?) AS dd ON dd.finding_id = f.id", decided)
+	q = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`, decided)
 
 	if askedOutcome {
 		// Every place answered the same way, not merely one of them: a group

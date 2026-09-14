@@ -141,9 +141,9 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 			if err != nil {
 				return fmt.Errorf("close %d findings: %w", len(batch), err)
 			}
-			affected, err := result.RowsAffected()
+			affected, err := database.Affected(result)
 			if err != nil {
-				return fmt.Errorf("count what was closed: %w", err)
+				return fmt.Errorf("close %d findings: %w", len(batch), err)
 			}
 			out.Closed += int(affected)
 			return nil

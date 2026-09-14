@@ -1,4 +1,4 @@
-// Command reserved reports invented SQL names that an engine reserves.
+// Command reserved reports SQL identifiers this code writes bare.
 //
 // Queries here are written once and run against four engines, and a name this
 // code makes up — an alias on a subquery, a column an expression is given so a
@@ -8,9 +8,30 @@
 // PostgreSQL, and the day somebody writes `AS usage` the suite is green on
 // three engines and a production deployment on the fourth stops answering.
 //
-// So the names are checked against the union of what the four reserve. Nothing
-// currently collides — that is the point of running it now rather than after
-// one does.
+// **An invented name is reported for being bare, not for being reserved.**
+// This checked the word against a list of 321 the four engines reserve, which
+// is a strictly weaker property than the rule it was the enforcement of —
+// AGENTS.md says every identifier is quoted, including the names a query
+// invents. A list somebody typed goes stale the first time an engine reserves
+// a word: MySQL 8.0 added `rank`, `groups`, `lead` and `cume_dist`, and
+// nothing refreshes it. A quoted alias does not match the pattern at all, so
+// a hit here is by construction an unquoted name and the fix is one pair of
+// quotes.
+//
+// It found 1,418 of them against 34 already quoted, so no reader could tell
+// which was the convention.
+//
+// **What it still cannot see is a name that is not in a literal.** An alias
+// assembled from two pieces — `"… AS " + state.alias` — is invisible to
+// anything reading source as text, and there is no parser here for four
+// dialects. That is the safe direction for a check that fails a build, and it
+// is why the all-clear says "in a literal" rather than claiming the rule
+// outright. The schema test that reads the live database is the other half.
+//
+// The data-definition half below is the other way round and stays that way.
+// Those names are declared rather than invented, the migrations are where they
+// are declared, and the question there is whether a declared name collides
+// with a reserved word — which is what the list is for.
 //
 // **Only the names this code invents.** A column that exists in the schema is
 // not an invented name: it was declared in a migration, which every engine has
@@ -39,8 +60,22 @@ import (
 )
 
 // invented matches a name this code makes up: AS, then a bare word. A quoted
-// one is already safe, and that is the fix when this reports something.
+// one does not match, which is what makes every hit a defect and the fix one
+// pair of quotes.
 var invented = regexp.MustCompile(`(?i)\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
+
+// statement recognizes a string literal as SQL wherever it is written.
+//
+// Reading only the arguments of the builder's own methods missed every query
+// held in a const, returned by a helper, or handed to the raw-query
+// constructor — about thirty bare names, while the gate printed an all-clear.
+// Where a query lives is not what makes it a query.
+//
+// `FROM "` or `JOIN "` is the marker because every table in this schema is
+// quoted, so it appears in SQL and not in prose. Matching the bare keywords
+// instead reported sixty-odd English sentences: an API description saying "as
+// a" after the word "from" is not an alias.
+var statement = regexp.MustCompile(`(?i)\b(?:FROM|JOIN)\s+"`)
 
 // declared matches a bare schema identifier in data-definition language.
 //
@@ -76,15 +111,18 @@ var aliased = regexp.MustCompile(`\balias:([A-Za-z_][A-Za-z0-9_]*)`)
 var writing = map[string]bool{
 	"TableExpr": true, "ColumnExpr": true, "GroupExpr": true, "OrderExpr": true,
 	"Having": true, "Where": true, "Join": true, "JoinOn": true,
-	"WhereOr": true, "Raw": true, "NewRaw": true, "Exec": true,
+	"WhereOr": true, "Raw": true, "NewRaw": true, "NewRawQuery": true, "Exec": true,
 	"ExecContext": true, "QueryContext": true, "Set": true,
 }
 
-// found is one place a name was invented.
+// found is one place a name was written wrongly.
 type found struct {
 	word string
 	file string
 	line int
+	// bare says the name is unquoted, which is the whole complaint. Without
+	// it the complaint is that a declared name collides with a reserved word.
+	bare bool
 }
 
 func main() {
@@ -118,6 +156,31 @@ func main() {
 		// is full of the same words — and with the SQL comments inside those
 		// strings taken off first, for the same reason.
 		definitions := strings.Contains(path, "database/migrate/migrations/")
+		// Every SQL literal, wherever it is written. A pass of its own, and
+		// first, so the walk below can tell whether a literal it reaches has
+		// already been read as a statement in its own right — a node is
+		// visited before its children, so one walk could not.
+		seen := map[int]bool{}
+		ast.Inspect(file, func(node ast.Node) bool {
+			lit, ok := node.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			text, err := strconv.Unquote(lit.Value)
+			if err != nil {
+				text = lit.Value
+			}
+			if !statement.MatchString(withoutSQLComments(text)) {
+				return true
+			}
+			at := fset.Position(lit.Pos()).Line
+			seen[at] = true
+			for _, match := range invented.FindAllStringSubmatch(withoutSQLComments(text), -1) {
+				bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
+			}
+			return true
+		})
+
 		ast.Inspect(file, func(node ast.Node) bool {
 			if definitions {
 				if lit, ok := node.(*ast.BasicLit); ok && lit.Kind == token.STRING {
@@ -163,11 +226,11 @@ func main() {
 				if !ok {
 					continue
 				}
+				if seen[at] {
+					continue // already read as a statement in its own right
+				}
 				for _, match := range invented.FindAllStringSubmatch(text, -1) {
-					word := strings.ToLower(match[1])
-					if reserved[word] {
-						bad = append(bad, found{word: word, file: path, line: at})
-					}
+					bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
 				}
 			}
 			return true
@@ -180,7 +243,8 @@ func main() {
 	}
 
 	if len(bad) == 0 {
-		fmt.Printf("no invented name collides with a word any of the four engines reserves "+
+		fmt.Printf("every name a query invents in a literal is quoted, and no name a "+
+			"migration declares collides with a word any of the four engines reserves "+
 			"(%d words checked)\n", len(reservedWords))
 		return
 	}
@@ -191,10 +255,15 @@ func main() {
 		return bad[i].line < bad[j].line
 	})
 	for _, one := range bad {
+		if one.bare {
+			fmt.Fprintf(os.Stderr, "%s:%d: the name %q is written bare. "+
+				"Quote it: AS %q\n", one.file, one.line, one.word, one.word)
+			continue
+		}
 		fmt.Fprintf(os.Stderr, "%s:%d: %q is reserved by one of the four engines. "+
 			"Quote it, or call it something else\n", one.file, one.line, one.word)
 	}
-	fmt.Fprintf(os.Stderr, "\n%d invented name(s) an engine will refuse to parse.\n", len(bad))
+	fmt.Fprintf(os.Stderr, "\n%d name(s) an engine may refuse to parse.\n", len(bad))
 	os.Exit(1)
 }
 

@@ -56,9 +56,61 @@ func TestMySQLDSNIsRewrittenForItsDriver(t *testing.T) {
 		t.Fatalf("ParseURL: %v", err)
 	}
 	want := "user:secret@tcp(db.example:3306)/openpsirt?parseTime=true&loc=UTC&" +
-		"clientFoundRows=true&sql_mode=" + url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES')")
+		"clientFoundRows=true&tls=preferred&sql_mode=" +
+		url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES,STRICT_TRANS_TABLES')")
 	if got.DSN != want {
 		t.Errorf("DSN\n got %q\nwant %q", got.DSN, want)
+	}
+}
+
+func TestMySQLDSNNegotiatesTLSUnlessTheURLSaysOtherwise(t *testing.T) {
+	// This driver leaves the connection in cleartext when nothing asks for
+	// TLS, where pgx takes the same URL and negotiates opportunistically. One
+	// URL grammar with opposite transport defaults, over a database holding
+	// undisclosed findings.
+	got, err := ParseURL("mysql://u:p@h/db")
+	if err != nil {
+		t.Fatalf("ParseURL: %v", err)
+	}
+	if !contains(got.DSN, "tls=preferred") {
+		t.Errorf("DSN %q does not ask for a transport", got.DSN)
+	}
+
+	// "preferred" is a floor, and a deployment that needs certainty says so.
+	// Naming tls here as well would override the answer only the deployment
+	// can give, because the driver takes the last value of a name.
+	for _, raw := range []string{
+		"mysql://u:p@h/db?tls=true",
+		"mysql://u:p@h/db?tls=skip-verify",
+		"mariadb://u:p@h/db?tls=our-own-config",
+	} {
+		got, err := ParseURL(raw)
+		if err != nil {
+			t.Fatalf("ParseURL(%q): %v", raw, err)
+		}
+		if strings.Count(got.DSN, "tls=") != 1 {
+			t.Errorf("ParseURL(%q) DSN %q names tls more than once", raw, got.DSN)
+		}
+		if contains(got.DSN, "tls=preferred") {
+			t.Errorf("ParseURL(%q) DSN %q overrode the transport the URL asked for", raw, got.DSN)
+		}
+	}
+}
+
+func TestMySQLDSNAssertsStrictnessRatherThanInheritingIt(t *testing.T) {
+	// Appending alone keeps whatever the server already held, and a server
+	// whose global sql_mode omits strictness truncates an oversized value with
+	// no error — the one portability difference that loses data rather than
+	// reporting it. Naming the mode makes it a property of this application
+	// rather than of the server it was pointed at.
+	got, err := ParseURL("mysql://u:p@h/db")
+	if err != nil {
+		t.Fatalf("ParseURL: %v", err)
+	}
+	for _, want := range []string{"CONCAT", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
+		if !contains(got.DSN, url.QueryEscape(want)) && !contains(got.DSN, want) {
+			t.Errorf("DSN %q is missing %q", got.DSN, want)
+		}
 	}
 }
 
@@ -118,6 +170,25 @@ func TestAURLTheParserRefusesIsNotRepeatedBack(t *testing.T) {
 	}
 }
 
+func TestAPasswordContainingASlashIsNotMistakenForTheHost(t *testing.T) {
+	// The authority was cut at the first slash before the "@" was looked for,
+	// so a password with a slash in it — which a base64-shaped generated one
+	// has routinely — put the "@" beyond the cut, and the userinfo was named
+	// as the host in the first line a misconfigured start writes to stderr.
+	_, err := ParseURL("postgres://openpsirt:hunter2secret/x@db.internal:5432/openpsirt")
+	if err == nil {
+		t.Fatal("a URL with a slash in the password was accepted")
+	}
+	for _, secret := range []string{"hunter", "openpsirt:"} {
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("the error repeats the credential: %v", err)
+		}
+	}
+	if !strings.Contains(err.Error(), "db.internal:5432") {
+		t.Errorf("the error does not name the host it could not reach: %v", err)
+	}
+}
+
 func TestOnlySQLiteIsNonProduction(t *testing.T) {
 	for _, e := range []Engine{Postgres, MySQL, MariaDB} {
 		if !e.IsProduction() {
@@ -138,4 +209,36 @@ func contains(haystack, needle string) bool {
 		}
 		return false
 	})()
+}
+
+func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
+	// The settings are appended after the URL's own query and the driver takes
+	// the last value of a name, so a sql_mode an operator wrote was dropped
+	// without a word — the same loss appending to the server's mode exists to
+	// avoid, and inconsistent with the transport, which an operator may state.
+	got, err := ParseURL("mysql://u:p@h/db?sql_mode=ANSI,NO_ZERO_DATE")
+	if err != nil {
+		t.Fatalf("ParseURL: %v", err)
+	}
+	for _, want := range []string{"ANSI,NO_ZERO_DATE", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
+		if !contains(got.DSN, url.QueryEscape(want)) {
+			t.Errorf("DSN %q lost %q", got.DSN, want)
+		}
+	}
+	// And what the server already held is no longer the base, because the
+	// operator named one.
+	if contains(got.DSN, url.QueryEscape("@@sql_mode")) {
+		t.Errorf("DSN %q added the operator's mode to the server's instead of replacing it", got.DSN)
+	}
+
+	// A quote in the value is escaped for SQL rather than for Go: under
+	// ANSI_QUOTES a double-quoted value is an identifier, so the wrong quoting
+	// asks for a mode named after the text rather than the text.
+	got, err = ParseURL("mysql://u:p@h/db?sql_mode=IT%27S")
+	if err != nil {
+		t.Fatalf("ParseURL: %v", err)
+	}
+	if !contains(got.DSN, url.QueryEscape("'IT''S'")) {
+		t.Errorf("DSN %q does not carry the operator's mode as a SQL string", got.DSN)
+	}
 }

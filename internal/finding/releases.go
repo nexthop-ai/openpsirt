@@ -61,29 +61,29 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// concatenating them into one string is a portability trap of its own.
 	inner := s.db.NewSelect().
 		Distinct().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("st.kind AS kind").
-		ColumnExpr("va.name AS variant").
-		ColumnExpr(BandExpr+" AS band").
-		ColumnExpr("f.vulnerability_id AS vulnerability_id").
-		ColumnExpr("f.component_id AS component_id").
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.kind AS "kind"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(BandExpr+` AS "band"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("st.product_id = ?", productID).
 		Where("f.closed_at IS NULL")
 	inner = inOneProduct(inner, subject, productID, all)
 
 	query := s.db.NewSelect().
 		TableExpr(`(?) AS "at"`, inner).
-		ColumnExpr("at.stream AS stream").
-		ColumnExpr("at.kind AS kind").
-		ColumnExpr("at.variant AS variant").
-		ColumnExpr("at.band AS band").
-		ColumnExpr("COUNT(*) AS open").
+		ColumnExpr(`at.stream AS "stream"`).
+		ColumnExpr(`at.kind AS "kind"`).
+		ColumnExpr(`at.variant AS "variant"`).
+		ColumnExpr(`at.band AS "band"`).
+		ColumnExpr(`COUNT(*) AS "open"`).
 		GroupExpr("at.stream, at.kind, at.variant, at.band").
 		// Ordered here rather than in the caller, so every reader of this gets
 		// the same sequence. A chart whose points move between requests is
@@ -109,14 +109,14 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		Variant string `bun:"variant"`
 	}
 	builds := s.db.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS va ON va.id = tg.variant_id").
-		ColumnExpr("st.name AS stream").
-		ColumnExpr("st.kind AS kind").
-		ColumnExpr("va.name AS variant").
+		TableExpr(`target AS "tg"`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.kind AS "kind"`).
+		ColumnExpr(`va.name AS "variant"`).
 		Where("st.product_id = ?", productID).
-		Where(`EXISTS (SELECT 1 FROM "scan_run" AS sr
+		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
 			WHERE sr.target_id = tg.id AND sr.finished_at IS NOT NULL)`).
 		OrderExpr("st.name, va.name")
 	if err := builds.Scan(ctx, &scanned); err != nil {
@@ -216,10 +216,10 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 	}
 	err = s.db.NewSelect().
 		Distinct().
-		TableExpr("finding AS f").
-		Join("JOIN component AS c ON c.id = f.component_id").
-		ColumnExpr("c.version AS version").
-		ColumnExpr("c.purl AS purl").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`c.purl AS "purl"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").

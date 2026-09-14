@@ -372,7 +372,7 @@ func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
 // first time. Two administrators setting the same thing at once resolve
 // against the primary key: one insert wins, the loser retries as an update.
 func (s *Store) Set(ctx context.Context, name, value string) error {
-	db, ok := s.db.(*bun.DB)
+	db, ok := database.Handle(s.db)
 	if !ok {
 		return fmt.Errorf("this store is already inside a transaction")
 	}
@@ -385,18 +385,20 @@ func (s *Store) Set(ctx context.Context, name, value string) error {
 	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		now := s.now().Truncate(time.Microsecond)
 
-		if _, err := tx.NewUpdate().Model((*Setting)(nil)).
+		res, err := tx.NewUpdate().Model((*Setting)(nil)).
 			Set("value = ?", value).Set("updated_at = ?", now).
-			Where("name = ?", name).Exec(ctx); err != nil {
+			Where("name = ?", name).Exec(ctx)
+		if err != nil {
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
 
-		// Asked inside the transaction, so what it sees is what the update
-		// just wrote against. Rows touched is not the question: two of the
-		// four engines report nothing touched when an update writes a value
-		// identical to the one already stored, which is the same number "no
-		// such setting" reports.
-		n, err := tx.NewSelect().Model((*Setting)(nil)).Where("name = ?", name).Count(ctx)
+		// How many rows the update matched, which is the question being asked
+		// — whether the setting was already there. This counted the rows in a
+		// second statement instead, on the ground that two of the four engines
+		// report nothing touched when an update writes a value identical to
+		// the one already stored. The connection settings make that untrue:
+		// the count is rows matched on all four.
+		n, err := database.Affected(res)
 		if err != nil {
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}

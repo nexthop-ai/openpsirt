@@ -60,7 +60,7 @@ const (
 // rating used to be. So this swaps a column for a join rather than adding one
 // where none existed.
 func RatedFor(product RatedOn) string {
-	return `LEFT JOIN "issue_rating" AS ir ON ir.vulnerability_id = v.id` +
+	return `LEFT JOIN "issue_rating" AS "ir" ON ir.vulnerability_id = v.id` +
 		` AND ir.product_id = ` + string(product)
 }
 
@@ -119,9 +119,9 @@ func RatingIn(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64)
 func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]int64, error) {
 	var products []int64
 	err := db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("st.product_id").
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
@@ -140,6 +140,6 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 // Written as a condition on the target rather than as a join, because the
 // statements that need it are updates and no engine here spells a joined
 // update the same way.
-const inThisProduct = `target_id IN (SELECT tg.id FROM "target" AS tg
-	JOIN "stream" AS st ON st.id = tg.stream_id
+const inThisProduct = `target_id IN (SELECT tg.id FROM "target" AS "tg"
+	JOIN "stream" AS "st" ON st.id = tg.stream_id
 	WHERE st.product_id = ?)`

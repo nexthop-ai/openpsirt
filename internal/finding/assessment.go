@@ -127,8 +127,8 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 			Published string `bun:"severity"`
 		}
 		err = tx.NewSelect().
-			TableExpr("vulnerability AS v").
-			ColumnExpr("COALESCE(v.severity, '') AS severity").
+			TableExpr(`vulnerability AS "v"`).
+			ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
 			Where("v.id = ?", vulnerabilityID).
 			Scan(ctx, &issue)
 		if err != nil {
@@ -400,10 +400,10 @@ func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
 		Likelihood int    `bun:"likelihood_ppm"`
 	}
 	err := tx.NewSelect().
-		TableExpr("vulnerability AS v").
-		ColumnExpr("COALESCE(v.severity, '') AS severity").
-		ColumnExpr("COALESCE(v.score_centi, 0) AS score_centi").
-		ColumnExpr("COALESCE(v.likelihood_ppm, 0) AS likelihood_ppm").
+		TableExpr(`vulnerability AS "v"`).
+		ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+		ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
 		Where("v.id = ?", vulnerabilityID).
 		Scan(ctx, &issue)
 	if err != nil {
@@ -482,8 +482,8 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 			Exploited bool `bun:"exploited"`
 		}
 		if err := tx.NewSelect().
-			TableExpr("vulnerability AS v").
-			ColumnExpr("COALESCE(v.exploited, ?) AS exploited", false).
+			TableExpr(`vulnerability AS "v"`).
+			ColumnExpr(`COALESCE(v.exploited, ?) AS "exploited"`, false).
 			Where("v.id = ?", id).Scan(ctx, &issue); err != nil {
 			return fmt.Errorf("read what is known about this issue: %w", err)
 		}
@@ -579,14 +579,14 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 		Severity  string    `bun:"severity"`
 	}
 	err = tx.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
-		ColumnExpr("f.urgency_exploited AS exploited").
-		ColumnExpr("f.opened_at AS opened_at").
-		ColumnExpr(EffectiveSeverityExpr+" AS severity").
+		ColumnExpr(`f.urgency_exploited AS "exploited"`).
+		ColumnExpr(`f.opened_at AS "opened_at"`).
+		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
@@ -661,9 +661,9 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 		// product.
 		readable := onlyReadable(s.db.NewSelect().
 			ColumnExpr("1").
-			TableExpr("finding AS f").
-			Join("JOIN target AS tg ON tg.id = f.target_id").
-			Join("JOIN stream AS st ON st.id = tg.stream_id").
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 			Where("f.vulnerability_id = asm.vulnerability_id").
 			Where("st.product_id = asm.product_id"),
 			subject, products, all)
@@ -770,14 +770,14 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		Open      int    `bun:"open"`
 	}
 	q := s.db.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN target AS tg ON tg.id = f.target_id").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr(`finding AS "f"`).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, claim.ProductID).
-		ColumnExpr("f.urgency_exploited AS exploited").
-		ColumnExpr(EffectiveSeverityExpr+" AS severity").
-		ColumnExpr("COUNT(*) AS open").
+		ColumnExpr(`f.urgency_exploited AS "exploited"`).
+		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
+		ColumnExpr(`COUNT(*) AS "open"`).
 		Where("f.vulnerability_id = ?", claim.VulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", claim.ProductID).

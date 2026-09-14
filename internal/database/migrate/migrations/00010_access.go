@@ -3,11 +3,8 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/pressly/goose/v3"
-
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -26,10 +23,9 @@ func init() {
 // a row whose product is absent, and a uniqueness rule over a column that may
 // be absent behaves differently on each of the four engines.
 func upAccess(ctx context.Context, tx *sql.Tx) error {
-	e := migrate.EngineFrom(ctx)
-	t := typesFor(e)
-	if t == nil {
-		return fmt.Errorf("no schema for %s", e)
+	t, err := types(ctx)
+	if err != nil {
+		return err
 	}
 
 	statements := []string{
@@ -383,30 +379,9 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 		)` + t.suffix,
 	}
 
-	for _, stmt := range statements {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return apply(ctx, tx, statements)
 }
 
 func downAccess(ctx context.Context, tx *sql.Tx) error {
-	for _, stmt := range []string{
-		`DROP TABLE "personal_token"`,
-		`DROP TABLE "person_identity"`,
-		`DROP TABLE "group_admin"`,
-		`DROP TABLE "group_role"`,
-		`DROP TABLE "session"`,
-		`DROP TABLE "api_key"`,
-		`DROP TABLE "role_grant_all"`,
-		`DROP TABLE "role_grant"`,
-		`DROP TABLE "person"`,
-		`DROP TABLE "party"`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
+	return dropTables(ctx, tx, "personal_token", "person_identity", "group_admin", "group_role", "session", "api_key", "role_grant_all", "role_grant", "person", "party")
 }
