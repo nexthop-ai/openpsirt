@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -48,32 +47,12 @@ func (f *fixture) scan(t *testing.T) int64 {
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		p, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		br, err := cat.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		v, err := cat.DeclareVariant(ctx, p.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, br.ID, v.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		fn(t, &fixture{
-			store: graph.NewStore(db.DB), scans: ingest.NewStore(db.DB), db: db,
-			targetID: target.ID,
+			store: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB), db: w.DB,
+			targetID: w.Target.ID,
 			scope: finding.Scope{
-				ProductID: &p.ID, StreamID: &br.ID, VariantID: &v.ID,
+				ProductID: &w.Product.ID, StreamID: &w.Branch.ID, VariantID: &w.Customer.ID,
 			},
 			built: time.Now().UTC().Add(-48 * time.Hour),
 		})

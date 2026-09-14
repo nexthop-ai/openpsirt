@@ -24,7 +24,7 @@ func atClock(t *testing.T, db *database.DB, at *time.Time) (*Store, int64) {
 	// tests move is the clock, and a role grant would only add a table this
 	// package cannot reach without importing something that imports it back.
 	store := &Store{db: db.DB, now: func() time.Time { return *at }}
-	person, err := store.Ensure(t.Context(), "someone", "", true)
+	person, err := store.Ensure(t.Context(), "someone", "Someone", true)
 	if err != nil {
 		t.Fatal(err)
 	}

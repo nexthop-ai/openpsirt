@@ -22,7 +22,7 @@ func TestTheSweepClearsSessionsThatHaveRunOut(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		person, err := rights.Ensure(ctx, "someone", "", true)
+		person, err := rights.Ensure(ctx, "someone", "Someone", true)
 		if err != nil {
 			t.Fatal(err)
 		}

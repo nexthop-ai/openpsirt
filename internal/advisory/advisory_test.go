@@ -3,15 +3,15 @@ package advisory_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -28,7 +28,7 @@ type fixture struct {
 	graph   *graph.Store
 	scans   *ingest.Store
 	product int64
-	// master is the branch and 202411 the tagged release, so an advisory has
+	// master is the branch and v2.4.1 the tagged release, so an advisory has
 	// more than one release to name. With one, the list cannot be told from
 	// "whichever build was asked from".
 	master, tagged int64
@@ -46,44 +46,17 @@ var (
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		targets := map[string]int64{}
-		for name, kind := range map[string]catalog.Kind{
-			"master": catalog.Branch, "202411": catalog.Tag,
-		} {
-			stream, err := cat.DeclareStream(ctx, product.ID, name, kind, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			targets[name] = target.ID
-		}
-
-		person, err := access.NewStore(db.DB).Ensure(ctx, "me@example.com", "Me", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		// The branch is the seeded target; the tag needs one of its own,
+		// because what an advisory says about a release that never moves is
+		// half of what this store answers.
+		tagged := w.TargetFor(w.Tag, w.Customer)
 		f := &fixture{
-			db: db, store: advisory.NewStore(db.DB), finds: finding.NewStore(db.DB),
-			graph: graph.NewStore(db.DB), scans: ingest.NewStore(db.DB),
-			product: product.ID, master: targets["master"], tagged: targets["202411"],
-			who: access.NewPerson(person.ID, "me@example.com", false, map[int64][]access.Role{
-				product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+			db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
+			graph: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB),
+			product: w.Product.ID, master: w.Target.ID, tagged: tagged.ID,
+			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
+				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
 			}, 0),
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		}
@@ -150,8 +123,13 @@ func TestAnAdvisoryNamesEveryReleaseHoldingTheFlawAndNamesEachInTheTree(t *testi
 		affected := doc.Vulnerabilities[0].Status.KnownAffected
 		// Named by stream and variant together, never by one of them: the same
 		// branch built two ways is two builds, and naming only the branch
-		// would claim something about hardware nobody built for.
-		want := []string{"sonic:202411:broadcom", "sonic:master:broadcom"}
+		// would claim something about hardware nobody built for. In name
+		// order, which is what a reader of the document sees.
+		want := []string{
+			"sonic:" + fixtures.BranchName + ":broadcom",
+			"sonic:" + fixtures.TagName + ":broadcom",
+		}
+		slices.Sort(want)
 		if len(affected) != len(want) {
 			t.Fatalf("affected: %v, want %v", affected, want)
 		}
@@ -194,7 +172,7 @@ func TestAReleaseThatFixedTheFlawIsNamedAsFixedRatherThanLeftOut(t *testing.T) {
 			t.Fatal(err)
 		}
 		done, err := f.finds.Resolve(ctx, f.who, f.tagged, issueID,
-			"Shipped in 202411.3, which carries the patch.")
+			"Shipped in v2.4.1, which carries the patch.")
 		if err != nil {
 			t.Fatalf("closing it in the tagged release: %v", err)
 		}
@@ -210,7 +188,7 @@ func TestAReleaseThatFixedTheFlawIsNamedAsFixedRatherThanLeftOut(t *testing.T) {
 		if len(status.KnownAffected) != 1 || status.KnownAffected[0] != "sonic:master:broadcom" {
 			t.Errorf("affected: %v, want the branch alone", status.KnownAffected)
 		}
-		if len(status.Fixed) != 1 || status.Fixed[0] != "sonic:202411:broadcom" {
+		if len(status.Fixed) != 1 || status.Fixed[0] != "sonic:"+fixtures.TagName+":broadcom" {
 			t.Errorf("fixed: %v, want the release it left", status.Fixed)
 		}
 	})

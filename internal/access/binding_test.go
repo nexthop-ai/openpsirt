@@ -83,7 +83,7 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 	// cannot be a way in behind the groups' back.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "", false)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestSwitchingToGroupBoundSetsAssignmentsAsideRatherThanDeletingThem(t *test
 	// how the team actually divides work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "", false)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", false)
 		if err != nil {
 			t.Fatal(err)
 		}

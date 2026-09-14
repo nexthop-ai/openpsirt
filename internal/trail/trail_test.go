@@ -4,26 +4,19 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// each is one migrated database per engine, with a person to record changes
+// each is the seeded world per engine, with somebody to record changes
 // against: a change nobody made is a change nothing records, which is the
 // state this store exists to end.
 func each(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		person, err := access.NewStore(db.DB).Ensure(ctx, "them@example.com", "Them", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fn(t, trail.NewStore(db.DB),
-			access.NewPerson(person.ID, "them@example.com", true, nil, 0))
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		admin := w.DeclarePerson("admin@example.com", "Alex Admin", true)
+		fn(t, trail.NewStore(w.DB.DB),
+			access.NewPerson(admin.ID, admin.Identity, true, nil, 0))
 	})
 }
 

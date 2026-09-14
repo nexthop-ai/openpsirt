@@ -97,7 +97,7 @@ func TestAuthenticatingCreatesNobody(t *testing.T) {
 func TestARoleOnOneProductSaysNothingAboutAnother(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "reader", "", false)
+		person, err := f.store.Ensure(ctx, "reader", "Reader", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestARoleOnOneProductSaysNothingAboutAnother(t *testing.T) {
 func TestReadingPublicIsNotReadingPrivate(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, _ := f.store.Ensure(ctx, "public-only", "", false)
+		person, _ := f.store.Ensure(ctx, "public-only", "Public Only", false)
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
@@ -148,7 +148,7 @@ func TestACapabilityHandsOverNoVisibility(t *testing.T) {
 	// everything there is to approve.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, _ := f.store.Ensure(ctx, "approver", "", false)
+		person, _ := f.store.Ensure(ctx, "approver", "Approver", false)
 		for _, role := range []access.Role{access.Approver, access.Assigner} {
 			if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], role); err != nil {
 				t.Fatal(err)
@@ -178,7 +178,7 @@ func TestAReportingRoleCannotBeGranted(t *testing.T) {
 	// hits.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, _ := f.store.Ensure(ctx, "auditor", "", false)
+		person, _ := f.store.Ensure(ctx, "auditor", "Auditor", false)
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.Role("reporting")); err == nil {
 			t.Error("a retired role was granted")
 		}
@@ -199,7 +199,7 @@ func TestAnAdministratorAdministersRatherThanHoldingEveryRole(t *testing.T) {
 	// able to change everything.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Ensure(ctx, "admin", "", true); err != nil {
+		if _, err := f.store.Ensure(ctx, "admin", "Admin", true); err != nil {
 			t.Fatal(err)
 		}
 		subject, err := f.store.Resolve(ctx, "admin")
@@ -403,7 +403,7 @@ func TestTheHeaderIsRefusedFromSomewhereUntrusted(t *testing.T) {
 	// have authenticated somebody.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "", true)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", true)
 		if err != nil {
 			t.Fatal(err)
 		}

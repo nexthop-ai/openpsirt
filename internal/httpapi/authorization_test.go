@@ -206,6 +206,16 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 			t.Fatal(err)
 		}
 
+		// **Everybody here is seeded with no display name**, which is a
+		// degeneracy rather than a choice. access.Store.Names answers a
+		// display name where one is known and the identity otherwise, so with
+		// none set every read of a name in this package comes back as the
+		// identity — and a field that publishes the wrong one of the two
+		// cannot be told from a field that publishes the right one. Four
+		// routes in this package do publish the wrong one. Giving these
+		// people names is what makes that visible, and it belongs with the
+		// change that decides, field by field, which of the two each should
+		// carry.
 		rights := access.NewStore(db.DB)
 		administrator, err := rights.Ensure(ctx, "admin", "", true)
 		if err != nil {

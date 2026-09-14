@@ -85,7 +85,7 @@ func TestAnUnstatedLifetimeTakesTheDefault(t *testing.T) {
 	// which lands on the default rather than on a session that never ends.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "", false)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", false)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -91,15 +91,15 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		}
 		issue := interned["CVE-2026-1"]
 		rights := access.NewStore(db.DB)
-		one, err := rights.Ensure(ctx, "proposer", "", false)
+		one, err := rights.Ensure(ctx, "proposer", "Proposer", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		two, err := rights.Ensure(ctx, "approver", "", false)
+		two, err := rights.Ensure(ctx, "approver", "Approver", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		none, err := rights.Ensure(ctx, "onlooker", "", false)
+		none, err := rights.Ensure(ctx, "onlooker", "Onlooker", false)
 		if err != nil {
 			t.Fatal(err)
 		}
