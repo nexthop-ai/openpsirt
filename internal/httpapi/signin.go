@@ -381,14 +381,15 @@ func signingKey(ctx context.Context, in Ingest) ([]byte, error) {
 		return nil, err
 	}
 	minted := base64.RawURLEncoding.EncodeToString(fresh)
-	if err := settings.Set(ctx, setting.SignInKey, minted); err != nil {
+	// Only where nothing holds one, and the answer is whatever is stored
+	// afterwards. Written as a plain set followed by a read, two replicas
+	// starting together both minted and the second overwrote the first: every
+	// session signed with the losing key stopped verifying, a sign-in already
+	// in flight included. The read-back closed the window between that write
+	// and itself, and not the one that mattered.
+	stored, err := settings.SetIfAbsent(ctx, setting.SignInKey, minted)
+	if err != nil {
 		return nil, err
-	}
-	// Read back, so two processes minting at once agree on which key won
-	// rather than each signing with its own.
-	stored, found, err := settings.Get(ctx, setting.SignInKey)
-	if err != nil || !found {
-		return fresh, err
 	}
 	return base64.RawURLEncoding.DecodeString(stored)
 }

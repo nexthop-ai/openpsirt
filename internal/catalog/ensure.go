@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // ErrDiffers is returned when something has been declared before, with
@@ -25,6 +26,31 @@ var ErrDiffers = errors.New("already declared, differently")
 // whatever cuts a branch needs to know whether anything changed, and a person
 // reading the answer needs to know whether they created something.
 func (s *Store) EnsureProduct(ctx context.Context, name, displayName string) (*Product, bool, error) {
+	for again := true; ; again = false {
+		product, made, err := s.ensureProduct(ctx, name, displayName)
+		if again && raced(err) {
+			continue
+		}
+		return product, made, err
+	}
+}
+
+// raced reports whether a declaration lost to another writer.
+//
+// The read and the write below it are two statements, so two pipelines
+// declaring the same thing at once both find nothing and both insert. The
+// unique index refuses the loser, and without this the loser is handed a
+// constraint violation on a route documented as idempotent — which is the
+// ordinary case from CI, where nothing coordinates the pipelines.
+//
+// Going round once more lands in the confirm arm, which is the answer the
+// second caller was always going to get. Once and no more: a row that keeps
+// disappearing is not a race and must not become a loop.
+func raced(err error) bool {
+	return database.IsDuplicate(err) || errors.Is(err, ErrExists)
+}
+
+func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*Product, bool, error) {
 	existing, err := s.ProductByName(ctx, name)
 	switch {
 	case err == nil:
@@ -46,6 +72,16 @@ func (s *Store) EnsureProduct(ctx context.Context, name, displayName string) (*P
 
 // EnsureStream declares a branch or tag, or confirms one already declared.
 func (s *Store) EnsureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, bool, error) {
+	for again := true; ; again = false {
+		stream, made, err := s.ensureStream(ctx, productID, name, kind, parentID)
+		if again && raced(err) {
+			continue
+		}
+		return stream, made, err
+	}
+}
+
+func (s *Store) ensureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, bool, error) {
 	existing, err := s.StreamByName(ctx, productID, name)
 	switch {
 	case err == nil:
@@ -94,6 +130,16 @@ func (s *Store) EnsureStream(ctx context.Context, productID int64, name string, 
 // EnsureVariant declares a way a product is built, or confirms one already
 // declared.
 func (s *Store) EnsureVariant(ctx context.Context, productID int64, name string, customerFacing bool) (*Variant, bool, error) {
+	for again := true; ; again = false {
+		variant, made, err := s.ensureVariant(ctx, productID, name, customerFacing)
+		if again && raced(err) {
+			continue
+		}
+		return variant, made, err
+	}
+}
+
+func (s *Store) ensureVariant(ctx context.Context, productID int64, name string, customerFacing bool) (*Variant, bool, error) {
 	existing, err := s.VariantByName(ctx, productID, name)
 	switch {
 	case err == nil:

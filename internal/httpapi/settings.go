@@ -195,14 +195,14 @@ func registerSettings(api huma.API, in Ingest) {
 						input.Body.Value))
 			}
 		}
-		// What it held, read before it is overwritten: it is not
-		// derivable afterwards, and "who raised the floor to critical"
-		// is half the question somebody asks.
-		before, had, err := setting.NewStore(in.DB.DB).Get(ctx, input.Name)
+		// What it held, answered by the write that replaced it: it is not
+		// derivable afterwards, and "who raised the floor to critical" is half
+		// the question somebody asks. Read in a statement of its own it was
+		// the value at some earlier moment — two administrators moving the
+		// same setting at once both read the original, and the second wrote a
+		// prior value into an append-only trail that nothing ever held.
+		before, had, err := setting.NewStore(in.DB.DB).Change(ctx, input.Name, input.Body.Value)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "that setting could not be read", err)
-		}
-		if err := setting.NewStore(in.DB.DB).Set(ctx, input.Name, input.Body.Value); err != nil {
 			return nil, wentWrong(in.Logger, "that setting could not be recorded", err)
 		}
 		noteChange(ctx, in, trail.Setting, input.Name,

@@ -40,6 +40,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [Disclosure](#disclosure)
 - [Extending a disclosure date](#extending-a-disclosure-date)
 - [Case collaborators](#case-collaborators)
+- [Values a deployment mints](#values-a-deployment-mints)
 - [Mail addresses](#mail-addresses)
 - [Absent holders](#absent-holders)
 - [Limits](#limits)
@@ -974,6 +975,26 @@ named issue.
 A collaborator does not get the findings list. They reach the case through the
 notification the grant sends — the one message that names an undisclosed issue on
 purpose, because it goes to the person who has just been given that issue.
+
+## Values a deployment mints
+
+Some settings are written by the deployment rather than typed by an operator.
+The signing key sessions are verified against is the one that matters.
+
+| Rule | Reason |
+|---|---|
+| Minted only where nothing holds one, and the answer is what is stored | Two replicas starting together both find nothing and both mint. Written as a plain set, the second overwrites the first — and every session signed with the losing key stops verifying, a sign-in already in flight included |
+| The caller takes whichever key won | It wants a key everybody agrees on, not the one it generated |
+
+**What a setting held is answered by the write that replaced it.** Read in a
+statement of its own beforehand it is the value at some earlier moment: two
+administrators moving the same setting at once both read the original, and the
+second writes a prior value into the append-only trail that nothing ever held
+afterwards. A record of who changed what, wrong about the what, and unfixable
+later because the value is gone.
+
+A read-back after the write closes only the window between that write and
+itself, which is not the window that matters.
 
 ## Mail addresses
 

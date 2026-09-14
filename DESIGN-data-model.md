@@ -145,6 +145,22 @@ stream name would then produce a stream that looks genuine, with its own
 findings, counts and place in every report, while the real stream appears to have
 stopped being scanned.
 
+**Declaring is idempotent, including against another writer.** Declaring what
+is already there succeeds and changes nothing, because a pipeline that has to
+know whether it is the first one is not usable from CI — and nothing
+coordinates CI pipelines, so two arriving together is the ordinary case rather
+than the exotic one.
+
+| Rule | Reason |
+|---|---|
+| A declaration that loses to another writer reads what won and confirms it | The read and the write are two statements, so both callers find nothing and both insert. The unique index refuses one of them, and the refusal is not the loser's to report |
+| Once more and no further | A row that keeps disappearing is not a race, and a retry with no bound is a loop |
+| Declaring something *else* under a known name is still refused | Idempotence is about the same declaration arriving twice. A tag redeclared as a branch, or a product redeclared with another display name, is a name quietly changing meaning |
+
+The same holds for the build a scan is filed against: two pipelines filing the
+first scan for one release and variant at once must not produce two rows, which
+would be two histories for one thing somebody ships.
+
 ## Names
 
 Bounded: no leading or trailing spaces, nothing empty, and a length keeping a

@@ -749,6 +749,14 @@ func (s *Store) TargetFor(ctx context.Context, streamID, variantID int64) (*Targ
 
 	target = &Target{StreamID: streamID, VariantID: variantID, CreatedAt: now()}
 	if _, err := s.db.NewInsert().Model(target).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			// Two pipelines filed the first scan for this pair at once. The
+			// row the other one wrote is the row: the read above and this
+			// write are two statements, so both found nothing and both
+			// inserted, and the unique index refused whichever arrived
+			// second. Nothing here is the loser's to report.
+			return s.ExistingTarget(ctx, streamID, variantID)
+		}
 		return nil, fmt.Errorf("record that this release is built as this variant: %w", err)
 	}
 	return target, nil
