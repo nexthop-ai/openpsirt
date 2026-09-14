@@ -240,9 +240,14 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Removes uploads nothing ever referred to. Nil where this deployment
 	// holds no files, which is ordinary.
 	keeper := attach.NewKeeper(db.DB, files, logger, 0)
+	// Sets aside work whose worker never came back. Nothing else is the
+	// moment to notice: a worker that was killed reports nothing, so the row
+	// would sit claimed for ever and read everywhere else as work in progress.
+	undertaker := queue.NewUndertaker(work, queue.NewLeases(db.DB), name, logger)
 	return serve(cfg, logger, handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
+		undertaker: undertaker,
 	})
 }
 
@@ -352,7 +357,7 @@ func newLogger(cfg config.Config, w *os.File) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, opts))
 }
 
-// passes is what runs beside the server: the nine background loops, each of
+// passes is what runs beside the server: the ten background loops, each of
 // which may be absent because the thing it works on is not configured.
 //
 // Grouped rather than passed one at a time. Twelve parameters is past what a
@@ -368,6 +373,9 @@ type passes struct {
 	outward  *notify.Signal
 	keeper   *attach.Keeper
 	routing  *finding.Sweeper
+	// undertaker sets aside work whose worker never came back, which is the
+	// only pass that observes a worker having died at all.
+	undertaker *queue.Undertaker
 }
 
 // background starts every pass that has something to work on, and answers
@@ -403,6 +411,9 @@ func (p passes) background(ctx context.Context) *sync.WaitGroup {
 	}
 	if p.routing != nil {
 		start(p.routing.Run, readInterval)
+	}
+	if p.undertaker != nil {
+		start(p.undertaker.Run, 0)
 	}
 	start(p.schedule.Run, scheduleInterval)
 	start(p.upstream.Run, askInterval)

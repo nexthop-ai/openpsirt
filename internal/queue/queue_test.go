@@ -231,10 +231,19 @@ func TestWorkWhoseWorkerKeepsDyingIsSetAside(t *testing.T) {
 			t.Errorf("work was reclaimed past its limit: %+v %v", job, err)
 		}
 
-		// Set aside, not merely skipped. A row left running reads to the
-		// screen a producer watches as work still in progress, so the upload
-		// is never reported as unreadable and the build is never enqueued
-		// again — which is the same silence in a different place.
+		// Skipping it is only half. A row left running reads to the screen a
+		// producer watches as work still in progress, so the upload is never
+		// reported as unreadable and the build is never enqueued again —
+		// which is the same silence in a different place. The pass is what
+		// moves it, because nothing a person does is the moment to notice
+		// that a worker is not coming back.
+		buried, err := q.Bury(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if buried != 1 {
+			t.Errorf("the pass set aside %d jobs, want one", buried)
+		}
 		var state string
 		var reported sql.NullString
 		if err := db.QueryRowContext(ctx,

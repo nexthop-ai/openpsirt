@@ -196,11 +196,6 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 
 	var job *Job
 	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
-		// What cannot be reclaimed is set aside first, so the state that says
-		// so is reached rather than left for a pass nobody wrote.
-		if err := buryAbandoned(ctx, tx, kind, now, staleBefore); err != nil {
-			return err
-		}
 		id, err := claimableID(ctx, tx, q.db.Server.Engine, kind, now, staleBefore)
 		if err != nil || id == 0 {
 			return err
@@ -244,7 +239,7 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 	return job, nil
 }
 
-// buryAbandoned sets aside work of one kind whose worker never came back.
+// Bury sets aside work whose worker never came back.
 //
 // A worker that dies reports nothing, so nothing calls Fail and the row stays
 // in the running state holding a claim that has gone stale. Once its attempts
@@ -253,29 +248,36 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 // as work still in progress, so the failure is never reported and the build is
 // never enqueued again.
 //
-// Run inside the claim, against the same kind and the same instant, because it
-// is the other half of the same decision — a job the select below will not
-// reclaim is one this has just buried, and two separate passes deciding that
-// could disagree about which jobs those are.
+// Its own pass rather than work done on the way past a claim. Folded into the
+// claim it is a range update every worker runs on every poll, over the rows
+// every other worker is claiming — which on MySQL deadlocks six workers
+// against each other rather than handing out work.
 //
 // Written as the failure Fail would have written. To everything downstream it
 // is the same failure; the difference is only that nobody was left alive to
 // report it.
-func buryAbandoned(ctx context.Context, tx bun.Tx, kind string, now, staleBefore time.Time) error {
-	_, err := tx.NewUpdate().Model((*Job)(nil)).
+func (q *Queue) Bury(ctx context.Context) (int, error) {
+	now := q.now().Truncate(time.Microsecond)
+	stale := now.Add(-q.opts.ClaimTimeout)
+
+	res, err := q.db.NewUpdate().Model((*Job)(nil)).
 		Set("state = ?", Dead).
 		Set("last_error = ?", ErrWorkerGone.Error()).
 		Set("claimed_by = NULL").
 		Set("updated_at = ?", now).
-		Where("kind = ?", kind).
 		Where("state = ?", Running).
-		Where("claimed_at < ?", staleBefore).
+		Where("claimed_at < ?", stale).
 		Where("attempts >= max_attempts").
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("set aside work whose worker never came back: %w", err)
+		return 0, fmt.Errorf("set aside work whose worker never came back: %w", err)
 	}
-	return nil
+	buried, err := res.RowsAffected()
+	if err != nil {
+		// The count is the only thing lost; the statement said it succeeded.
+		return 0, nil
+	}
+	return int(buried), nil
 }
 
 // ErrWorkerGone is what a job records when the worker holding it never

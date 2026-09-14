@@ -57,7 +57,8 @@ afterwards.
 | A limit on attempts | A job that can never succeed would otherwise retry forever and crowd out work that could |
 | Set aside, never deleted | The row is kept with its last error, which is the evidence of why it failed |
 | The limit is charged on the reclaim as well as on a reported failure | A worker that is killed reports nothing, so the only record of the attempt is the count the claim itself incremented. Charged only where a worker reports, a job that kills its worker is reclaimed for ever and the set-aside state is never reached |
-| A claim that can no longer be reclaimed is set aside by the claim that skips it | One decision rather than two. A separate pass could disagree with the claim about which jobs those are, and a job left in the claimed state reads everywhere else as work somebody is doing |
+| A claim that can no longer be reclaimed is set aside by a pass of its own | A job left in the claimed state reads everywhere else as work somebody is doing, and a worker that died is not something any act by a person is the moment to notice. Folded into the claim instead, it is a range update every worker runs on every poll over the rows every other worker is claiming — which on MySQL deadlocks six workers against one another rather than handing out work |
+| One replica buries | Every replica running the same range update is the same contention between processes that folding it into the claim caused between workers |
 | Work abandoned by its worker records that, in place of the reason nobody reported | Downstream it is the same failure. Somebody reading the row has to be able to tell "this failed" from "nothing was left alive to say" |
 
 ### Work that stopped being retried
@@ -103,7 +104,7 @@ update.
 
 | Work shape | On losing the race | Passes |
 |---|---|---|
-| May be skipped | Does nothing this cycle, asks again next | Asking public indexes what upstream released; deciding which builds are due a scan |
+| May be skipped | Does nothing this cycle, asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; setting aside work whose worker never came back |
 | Must happen | Waits for its turn, then applies | Rewriting deadlines after a policy change |
 
 Work that waits reads what it decides from **after** its turn comes. Anything
