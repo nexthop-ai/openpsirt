@@ -100,3 +100,62 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 		}
 	})
 }
+
+func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
+	// About finds the rows named for somebody alone and the rows naming them
+	// beside a product — "a_b@example.com on sonic" — so the second half is a
+	// prefix match. An underscore is a single-character wildcard to LIKE, so
+	// without the escaping "a_b@example.com" also matches "axb@example.com"
+	// and one person's administrative history is reported as another's.
+	//
+	// The escaping is one statement in this package, it had zero executions,
+	// and About had no test at all: its only caller is a handler. The four
+	// engines are the point as well, because the ESCAPE clause parses
+	// differently on each — one of them refuses a backslash outright, which is
+	// why the escape character is a hash.
+	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+		ctx := t.Context()
+		for _, about := range []string{
+			"a_b@example.com on sonic",
+			"axb@example.com on sonic",
+			"a_b@example.com",
+			// A percent sign is the other wildcard, and the hash is the
+			// escape character itself.
+			"a%b@example.com on sonic",
+			"a#b@example.com on sonic",
+		} {
+			if err := s.Record(ctx, by, trail.Role, about,
+				nil, trail.Said("private-triage", true)); err != nil {
+				t.Fatalf("record %q: %v", about, err)
+			}
+		}
+
+		for _, want := range []struct {
+			name  string
+			total int
+		}{
+			// The row named for them alone, and the row naming them beside a
+			// product. Never the row that only matches because an underscore
+			// stood in for a character.
+			{"a_b@example.com", 2},
+			{"axb@example.com", 1},
+			{"a%b@example.com", 1},
+			{"a#b@example.com", 1},
+		} {
+			got, total, err := s.About(ctx, trail.Role, want.name, 100, 0)
+			if err != nil {
+				t.Fatalf("read what changed about %q: %v", want.name, err)
+			}
+			if total != want.total || len(got) != want.total {
+				t.Errorf("%q has %d change(s) and %d were read, want %d",
+					want.name, total, len(got), want.total)
+			}
+			for _, change := range got {
+				if change.Name != want.name && change.Name != want.name+" on sonic" {
+					t.Errorf("reading about %q returned a change about %q",
+						want.name, change.Name)
+				}
+			}
+		}
+	})
+}

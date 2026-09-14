@@ -50,7 +50,11 @@ func registerVEX(api huma.API, in Ingest) {
 				return nil, noSuchProduct()
 			case errors.Is(err, access.ErrDenied):
 				return nil, noSuchProduct()
-			case err != nil && !vex.Publishable(in.Publisher):
+			// Asked of the publisher directly. The same question had a
+			// wrapper of its own in the package that answers it, so one
+			// predicate was spelled two ways in one file — and the wrapper
+			// was the half nothing executed.
+			case err != nil && !in.Publisher.Stated():
 				// A configuration gap rather than a bad request, and named as
 				// one: whoever is asking cannot fix it from here, and an
 				// operator can.

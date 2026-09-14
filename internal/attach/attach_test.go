@@ -471,3 +471,50 @@ func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 		}
 	})
 }
+
+func TestARecentUploadAndARedactedOneSurviveTheSweep(t *testing.T) {
+	// The two predicates the sweep's own test cannot reach. It ages every row
+	// past the window with one update, so "older than" is true of everything
+	// in the fixture and there is never a redacted row at sweep time —
+	// deleting either line leaves that test green.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+
+		// Somebody is still writing the justification the file belongs to.
+		// The window is a grace period, not a formality: sweeping here takes
+		// the file out from under its author mid-sentence.
+		recent := f.upload(t, who, "still-writing.log", []byte("uploaded a moment ago"))
+
+		// And a redacted row, which is a record of a removal rather than an
+		// upload nobody referred to. Sweeping it loses the record of what was
+		// taken and why.
+		redacted := f.upload(t, who, "a-credential.log", []byte("removed on purpose"))
+		if err := f.store.Redact(ctx, f.admin(t), redacted.Token, "a credential"); err != nil {
+			t.Fatalf("redact: %v", err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("token = ?", redacted.Token).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		gone, err := f.store.Sweep(ctx, 24*time.Hour)
+		if err != nil {
+			t.Fatalf("sweep: %v", err)
+		}
+		if gone != 0 {
+			t.Errorf("the sweep took %d file(s), and neither was its to take", gone)
+		}
+		if _, err := f.store.Find(ctx, who, recent.Token); err != nil {
+			t.Errorf("an upload from a moment ago was swept: %v", err)
+		}
+		row, err := f.store.Find(ctx, who, redacted.Token)
+		if err != nil {
+			t.Fatalf("the record of a redaction was swept: %v", err)
+		}
+		if !row.Redacted() {
+			t.Error("the row came back without its redaction")
+		}
+	})
+}

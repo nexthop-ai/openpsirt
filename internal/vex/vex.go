@@ -308,10 +308,6 @@ func statusOf(outcome string) string {
 	return "not_affected"
 }
 
-// Publishable reports whether a deployment has said who it publishes as, for a
-// caller that needs to tell a configuration gap from a bad request.
-func Publishable(p publisher.Named) bool { return p.Stated() }
-
 // namesOf is what each of these issues is also called, keyed by issue.
 //
 // One read for the whole document rather than one per statement: a build with

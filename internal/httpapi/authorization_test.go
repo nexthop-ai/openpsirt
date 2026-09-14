@@ -157,6 +157,15 @@ func twoReach(t *testing.T, fn func(t *testing.T, r *reach)) {
 
 func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 	t.Helper()
+	reachAs(t, on, publisher.Named{
+		Name: "Example Networks", Namespace: "https://example.test",
+	}, fn)
+}
+
+// reachAs is reachOn for a test that needs the deployment configured
+// differently — the one that has not been told who it publishes as.
+func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T, r *reach)) {
+	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -379,12 +388,10 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 		handler, api := httpapi.New(quiet, nil, httpapi.Ingest{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(rights, access.Trust{Header: testHeader, From: sources}),
-			// A deployment that has been told who it publishes as, which is
-			// what an advisory needs. The one that has not is tested where
-			// that refusal is.
-			Publisher: publisher.Named{
-				Name: "Example Networks", Namespace: "https://example.test",
-			},
+			// Who this deployment publishes as, which is what an advisory
+			// and a VEX document need. Passed in, because the deployment that
+			// has not been told is a case of its own.
+			Publisher: as,
 		})
 		fn(t, &reach{handler: handler, key: secret, revoked: revokedSecret,
 			rights: rights, db: db, api: api})
