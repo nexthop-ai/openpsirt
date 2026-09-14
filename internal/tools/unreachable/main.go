@@ -24,9 +24,10 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 type decl struct {
@@ -37,9 +38,6 @@ type decl struct {
 
 // Always the working directory. It took a path once and that is a taint the
 // analysis gate is right to complain about — a build-time tool that walks
-// wherever it is pointed is a shape worth not having, however harmless here.
-const root = "."
-
 func main() {
 	var declared []decl
 	// How many times each name is written anywhere, declarations included.
@@ -47,19 +45,11 @@ func main() {
 	mentions := map[string]int{}
 	fset := token.NewFileSet()
 
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			if path != root && skipped(info.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
+	// web holds the interface, which is TypeScript, and deploy, assets and
+	// docs hold no Go either — but they are not named here, because reading a
+	// directory with no Go in it costs nothing and a skip list is where a
+	// gate quietly stops looking at part of the tree.
+	err := walk.Sources(".go", func(path string, _ []byte) error {
 		file, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
@@ -114,6 +104,10 @@ func main() {
 			"nobody can walk through.\n", len(orphans))
 		os.Exit(1)
 	}
+	// Said with a count, like the gates beside it. Silence on success and
+	// silence on a walk that reached nothing are the same output, and this is
+	// the gate AGENTS.md leans on.
+	fmt.Printf("every exported symbol is named by something (%d checked)\n", len(declared))
 }
 
 // satisfiesSomething covers the names a standard interface calls, which are
@@ -126,12 +120,4 @@ func satisfiesSomething(name string) bool {
 		return true
 	}
 	return false
-}
-
-func skipped(name string) bool {
-	switch name {
-	case ".git", "bin", "node_modules", "deploy", "assets", "docs":
-		return true
-	}
-	return strings.HasPrefix(name, ".")
 }

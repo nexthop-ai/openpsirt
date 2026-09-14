@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -186,5 +187,98 @@ func TestWhatTheProducerSaidIsCarriedThrough(t *testing.T) {
 	}
 	if back["bom-ref"] != "pkg:apk/alpine/musl@1.2.5" {
 		t.Errorf("the reference was not rewritten to the identity: %v", back["bom-ref"])
+	}
+}
+
+func TestWhatASecondProducerSaidAboutOneComponentIsKeptToo(t *testing.T) {
+	// The live composition is three inputs: a filesystem catalog, and one
+	// catalog per binary. A component all three see — the Go runtime's own
+	// module, a distribution package a binary also links — was described by
+	// each of them and only the first description survived, taking the
+	// licenses and hashes the others recorded with it.
+	filesystem := `{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "components": [
+	    {"bom-ref": "a", "type": "library", "name": "zlib", "version": "1.3",
+	     "purl": "pkg:apk/alpine/zlib@1.3",
+	     "licenses": [{"license": {"id": "Zlib"}}],
+	     "hashes": [{"alg": "SHA-256", "content": "aaaa"}],
+	     "properties": [{"name": "syft:location:0:path", "value": "/lib/libz.so"}]}
+	  ]
+	}`
+	binary := `{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "components": [
+	    {"bom-ref": "b", "type": "library", "name": "zlib", "version": "1.3",
+	     "purl": "pkg:apk/alpine/zlib@1.3",
+	     "licenses": [{"license": {"id": "MIT"}}],
+	     "hashes": [{"alg": "SHA-512", "content": "bbbb"}],
+	     "properties": [{"name": "syft:location:0:path", "value": "/usr/bin/openpsirt"}]}
+	  ]
+	}`
+	composed, err := compose("openpsirt-image", "1.0",
+		[]document{read(t, filesystem), read(t, binary)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(composed.Components) != 1 {
+		t.Fatalf("one component described twice became %d", len(composed.Components))
+	}
+	body, err := json.Marshal(composed.Components[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, said := range []string{"Zlib", "MIT", "aaaa", "bbbb"} {
+		if !strings.Contains(string(body), said) {
+			t.Errorf("%q did not survive composing: %s", said, body)
+		}
+	}
+	// The two producers disagree about where it was found. Neither answer is
+	// discarded and neither is chosen: the first stands and the second is
+	// recorded beside it, which is what makes a producer disagreement
+	// something a reader can see.
+	for _, said := range []string{"/lib/libz.so", "/usr/bin/openpsirt", "disagreement"} {
+		if !strings.Contains(string(body), said) {
+			t.Errorf("%q is not in the composed properties: %s", said, body)
+		}
+	}
+}
+
+func TestAComponentTheNextInputPlacesIsNotAlsoHungOffTheImage(t *testing.T) {
+	// Placement used to be asked one input at a time, while the components
+	// were pooled across all of them. So a component the filesystem catalog
+	// described and the binary's catalog placed failed the first document's
+	// test and was hung off the image root: the shipped inventory then said
+	// the image contains directly what actually sits inside a binary.
+	described := `{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "components": [
+	    {"bom-ref": "lib", "type": "library", "name": "zlib", "version": "1.3",
+	     "purl": "pkg:apk/alpine/zlib@1.3"}
+	  ]
+	}`
+	places := `{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "components": [
+	    {"bom-ref": "app", "type": "application", "name": "openpsirt", "version": "1.0",
+	     "purl": "pkg:golang/github.com/nexthop-ai/openpsirt@1.0"},
+	    {"bom-ref": "lib", "type": "library", "name": "zlib", "version": "1.3",
+	     "purl": "pkg:apk/alpine/zlib@1.3"}
+	  ],
+	  "dependencies": [{"ref": "app", "dependsOn": ["lib"]}]
+	}`
+	composed, err := compose("openpsirt-image", "1.0",
+		[]document{read(t, described), read(t, places)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range kids(t, composed, "root") {
+		if ref == "pkg:apk/alpine/zlib@1.3" {
+			t.Error("a component the second input places is also reported as " +
+				"directly in the image")
+		}
+	}
+	if kids := kids(t, composed, "pkg:golang/github.com/nexthop-ai/openpsirt@1.0"); len(kids) != 1 {
+		t.Errorf("the application places %v, want the library it links", kids)
 	}
 }

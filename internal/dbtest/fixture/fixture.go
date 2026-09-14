@@ -29,8 +29,6 @@ package fixture
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -181,14 +179,3 @@ func (w *World) DeclarePerson(identity, displayName string, admin bool) *access.
 	}
 	return person
 }
-
-// RootName is the root component a build of this variant ships under.
-//
-// It differs per variant because it does in production, and a flaw recorded
-// against the build itself is keyed on it. A fixture giving every variant the
-// same root cannot tell a lookup by variant from a lookup by product.
-func RootName(v *catalog.Variant) string { return ProductName + "-" + v.Name }
-
-// Quiet is a logger that writes nothing, for the few tests that migrate a
-// database themselves.
-func Quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
