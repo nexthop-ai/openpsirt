@@ -364,3 +364,68 @@ func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testin
 		}
 	})
 }
+
+func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
+	// "May this subject see this product" has two rules here, and the pair is
+	// deliberate: a route about the product as a whole asks what somebody may
+	// see, and a route about one named issue admits somebody brought into a
+	// case. Which of the two an endpoint wants is a security judgment, and it
+	// was made by hand at every call site and visible at none.
+	//
+	// Recording which builds an issue affects gated on the narrow rule and
+	// then resolved each named build with the wide one — so one request gave
+	// both answers about the same subject and the same product, four lines
+	// apart.
+	//
+	// What is pinned is that the product question has one answer. What each
+	// route then allows is a separate question, answered by the act: a
+	// collaborator opens their case, and neither manages its list nor says
+	// which builds the issue affects, because both are product-level acts.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The route about their own case answers it.
+		if got := asPerson(t, r, "outsider", http.MethodGet,
+			findingAt(embargoed), ""); got.Code != http.StatusOK {
+			t.Fatalf("a route about their own case answered %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		// Every other issue-scoped route refuses them for what they may do,
+		// never for the product not existing — that answer contradicts the one
+		// they just got.
+		const invisible = "no product is declared by that name"
+		for _, c := range []struct {
+			method string
+			path   string
+			body   string
+		}{
+			{http.MethodGet, "/v1/products/mine/issues/" + embargoed + "/collaborators", ""},
+			{http.MethodPut, "/v1/products/mine/issues/" + embargoed + "/builds",
+				`{"builds":[{"stream":"master","variant":"broadcom"}]}`},
+		} {
+			got := asPerson(t, r, "outsider", c.method, c.path, c.body)
+			if got.Code < 400 {
+				t.Errorf("%s %s answered %d for a case collaborator", c.method, c.path, got.Code)
+			}
+			if contains(got.Body.String(), invisible) {
+				t.Errorf("%s %s says the product does not exist, having admitted them "+
+					"to the same product elsewhere in the same breath: %s",
+					c.method, c.path, got.Body.String())
+			}
+		}
+
+		// And a route about the product as a whole is not theirs, which is
+		// where that answer is the right one.
+		got := asPerson(t, r, "outsider", http.MethodGet, "/v1/products/mine/assessments", "")
+		if got.Code < 400 {
+			t.Errorf("a case collaborator reached the product's assessments: %d", got.Code)
+		}
+	})
+}

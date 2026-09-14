@@ -231,6 +231,38 @@ func productNamedVisibly(ctx context.Context, in Ingest, subject access.Subject,
 	return product, nil
 }
 
+// productForIssue resolves a product for a route that is about one issue in
+// it.
+//
+// **The wider of the two rules here, and the pair is deliberate.** A route
+// about the product as a whole asks productNamedVisibly, which is what
+// somebody may see; a route about one named issue asks this, which admits
+// somebody brought into a case. Which of the two an endpoint wants is a
+// security judgment, and it was made by hand at every call site and visible at
+// none — including one handler that applied both in a single request, so one
+// answer about one subject and one product contradicted the other four lines
+// later.
+//
+// Wider than productNamedVisibly by the case grants: somebody brought into one case
+// holds nothing on the product and may still act on the issue they were
+// brought in on, so refusing to resolve the product would refuse them the one
+// thing they were granted while telling them nothing they did not already
+// know. Every read past this still asks about the issue, which is where the
+// case grant is honored again. It is the rule the catalog already applies when
+// it resolves a build for somebody on a case.
+func productForIssue(ctx context.Context, in Ingest, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
+	if err != nil {
+		return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
+	}
+	if !subject.Sees(product.ID) && len(subject.Cases(product.ID)) == 0 {
+		return nil, noSuchProduct()
+	}
+	return product, nil
+}
+
 // locatedVisibly resolves the three names a build is addressed by.
 //
 // The refusal is noSuchProduct whichever of the three did not resolve. Which
@@ -321,7 +353,7 @@ func narrowedTo(ctx context.Context, in Ingest, subject access.Subject,
 	if name == "" {
 		return 0, nil
 	}
-	product, err := productNamed(ctx, in, subject, name)
+	product, err := productNamedVisibly(ctx, in, subject, name)
 	if err != nil {
 		return 0, err
 	}

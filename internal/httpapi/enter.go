@@ -608,8 +608,12 @@ func registerAffects(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		product, err := productNamedVisibly(ctx, in, subject, input.Product)
+		// The rule for a route about one named issue, which is what this is —
+		// and it is the rule the build lookup below applies. Gated on the
+		// narrower one, a single request gave both answers about the same
+		// subject and the same product: refused here as though the product did
+		// not exist, and admitted four lines later.
+		product, err := productForIssue(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -622,9 +626,9 @@ func registerAffects(api huma.API, in Ingest) {
 
 		targets := make([]int64, 0, len(input.Body.Builds))
 		for _, build := range input.Body.Builds {
-			at, err := names.LocateVisible(ctx, subject, input.Product, build.Stream, build.Variant)
+			at, err := locatedVisibly(ctx, in, subject, input.Product, build.Stream, build.Variant)
 			if err != nil {
-				return nil, undeclared(in.Logger, err, "that build could not be looked up")
+				return nil, err
 			}
 			target, err := targetRow(ctx, in, at.StreamID, at.VariantID)
 			if err != nil {

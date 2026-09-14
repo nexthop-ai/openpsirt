@@ -257,7 +257,11 @@ func caseAtHolding(ctx context.Context, in Ingest, product, vulnerability string
 		return access.Subject{}, nil, 0, 0,
 			noDatabase(in.Logger)
 	}
-	named, err := productNamedVisibly(ctx, in, subject, product)
+	// A route about one named issue, so the wider of the two rules: somebody
+	// brought into a case here holds nothing on the product and is still
+	// answering about the one issue they were granted. What they may do with
+	// it is decided below, by the issue rather than by the product.
+	named, err := productForIssue(ctx, in, subject, product)
 	if err != nil {
 		return access.Subject{}, nil, 0, 0, err
 	}

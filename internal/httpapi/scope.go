@@ -79,6 +79,10 @@ func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
 	}
 
 	names := catalog.NewStore(in.DB.DB)
+	// Resolved even where the subject cannot see it, because what a refusal
+	// here must not do is say whether the name exists — the branch and the
+	// variant below answer the same way the product does, and the sees flag is
+	// what keeps them in step.
 	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, q.Product)
 	if err != nil {
 		return finding.Scope{}, false, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)

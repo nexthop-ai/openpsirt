@@ -87,7 +87,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		product, err := productNamed(ctx, in, subject, input.Product)
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +215,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		// exist as far as they are concerned.
 		within := int64(0)
 		if input.Product != "" {
-			product, err := productNamed(ctx, in, subject, input.Product)
+			product, err := productNamedVisibly(ctx, in, subject, input.Product)
 			if err != nil {
 				return nil, err
 			}
@@ -298,19 +298,4 @@ func productsNamed(ctx context.Context, in Ingest,
 	}
 	shown, err = products.ProductNames(ctx, ids)
 	return called, shown, err
-}
-
-// productNamed resolves a product name the caller supplied, refusing one they
-// hold nothing on in the words an undeclared name gets.
-func productNamed(ctx context.Context, in Ingest, subject access.Subject,
-	name string) (*catalog.Product, error) {
-
-	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
-	if err != nil {
-		return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
-	}
-	if !subject.Sees(product.ID) {
-		return nil, noSuchProduct()
-	}
-	return product, nil
 }
