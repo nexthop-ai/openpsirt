@@ -115,8 +115,28 @@ func New(db *database.DB, opts Options) *Queue {
 }
 
 // Add puts work on the queue, refusing it when the backlog is already too deep.
+//
+// The depth and the insert go in one transaction, so the count the refusal
+// rests on is the count at the moment of the write rather than one taken
+// beforehand, and a commit a cluster refuses is tried again rather than
+// reported as work that could not be queued.
 func (q *Queue) Add(ctx context.Context, kind, reference string) (*Job, error) {
-	return q.AddTx(ctx, q.db, kind, reference)
+	var job *Job
+	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		// Every attempt starts from nothing: an attempt that was rolled back
+		// describes a queue that no longer exists.
+		job = nil
+		added, err := q.AddTx(ctx, tx, kind, reference)
+		if err != nil {
+			return err
+		}
+		job = added
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return job, nil
 }
 
 // AddTx is Add within a caller's transaction.
@@ -325,8 +345,14 @@ const settleTimeout = 5 * time.Second
 // the answer that matters — the work is being done twice from that moment —
 // and it is what Holding watches for.
 func (q *Queue) Renew(ctx context.Context, id int64, worker string) error {
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		return q.renewIn(ctx, tx, id, worker)
+	})
+}
+
+func (q *Queue) renewIn(ctx context.Context, tx bun.Tx, id int64, worker string) error {
 	now := q.now().Truncate(time.Microsecond)
-	res, err := q.db.NewUpdate().Model((*Job)(nil)).
+	res, err := tx.NewUpdate().Model((*Job)(nil)).
 		Set("claimed_at = ?", now).
 		Set("updated_at = ?", now).
 		Where("id = ?", id).
@@ -415,19 +441,37 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 // in the middle of. That case is reported as ErrNoLongerHeld rather than as a
 // failure: the work was done, and its record is the other worker's to write.
 func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
-	now := q.now().Truncate(time.Microsecond)
-	res, err := q.db.NewUpdate().Model((*Job)(nil)).
-		Set("state = ?", Done).
-		Set("claimed_by = NULL").
-		Set("updated_at = ?", now).
-		Where("id = ?", id).
-		Where("state = ?", Running).
-		Where("claimed_by = ?", worker).
-		Exec(ctx)
-	if err != nil {
-		return err
-	}
-	return held(res)
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		now := q.now().Truncate(time.Microsecond)
+		res, err := tx.NewUpdate().Model((*Job)(nil)).
+			Set("state = ?", Done).
+			Set("claimed_by = NULL").
+			Set("updated_at = ?", now).
+			Where("id = ?", id).
+			Where("state = ?", Running).
+			Where("claimed_by = ?", worker).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		if err := held(res); err == nil {
+			return nil
+		}
+		// Nothing matched, which on a first attempt means the claim is
+		// somebody else's now. On a retry it also covers a commit that
+		// succeeded and whose answer never arrived, so the question is asked
+		// of the row rather than assumed: work that is finished is finished,
+		// and reporting a lost claim for it would have the caller record a
+		// failure against a job that succeeded.
+		ending := new(Job)
+		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
+			return ErrNoLongerHeld
+		}
+		if ending.State == Done {
+			return nil
+		}
+		return ErrNoLongerHeld
+	})
 }
 
 // Fail records that work did not succeed, by the worker that holds it.

@@ -71,6 +71,18 @@ func (l *losesARace) arm(n int) {
 	l.armed = n
 }
 
+// unspent is how many armed commits never happened.
+//
+// Asserted rather than assumed, because a path that commits nothing cannot
+// lose a race and would pass every assertion below it without ever running
+// the code they are about. A write outside a transaction is exactly that
+// path, and it is what these tests exist to keep the queue off.
+func (l *losesARace) unspent() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.armed
+}
+
 type racingConn struct {
 	driver.Conn
 	owner *losesARace
@@ -109,7 +121,7 @@ func (t *racingTx) Commit() error {
 	if !lost {
 		return t.Tx.Commit()
 	}
-	if err := t.Tx.Rollback(); err != nil {
+	if err := t.Rollback(); err != nil {
 		return err
 	}
 	if between != nil {
@@ -227,5 +239,73 @@ func TestACommitThatLosesARaceIsTriedAgain(t *testing.T) {
 	}
 	if job.Reference != "the-only-job" {
 		t.Errorf("claimed %q", job.Reference)
+	}
+}
+
+func TestFinishingWorkSurvivesACommitThatLosesARace(t *testing.T) {
+	// A cluster certifies at COMMIT, so a write whose statements all succeeded
+	// can still be rolled back under it. Reported up rather than retried, that
+	// turns a job which finished into a job the caller records as failed and
+	// the queue hands out again — the work runs twice, which on an ingest
+	// looks like real change.
+	ctx := t.Context()
+	handle, owner := racing(t, nil)
+
+	q := queue.New(handle, queue.DefaultOptions())
+	if _, err := q.Add(ctx, "ingest", "finishes"); err != nil {
+		t.Fatal(err)
+	}
+	job, err := q.Claim(ctx, "worker", "ingest")
+	if err != nil || job == nil {
+		t.Fatalf("claiming: %v", err)
+	}
+
+	owner.arm(1)
+	if err := q.Succeed(ctx, job.ID, "worker"); err != nil {
+		t.Fatalf("finishing work lost one commit and gave up: %v", err)
+	}
+	if owner.unspent() != 0 {
+		t.Fatalf("finishing work committed nothing this could refuse, so it writes " +
+			"outside a transaction and a refused commit cannot be retried at all")
+	}
+
+	var state string
+	if err := handle.QueryRowContext(ctx,
+		`SELECT "state" FROM "job" WHERE "id" = ?`, job.ID).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state != string(queue.Done) {
+		t.Errorf("the job is %q rather than %q after finishing", state, queue.Done)
+	}
+}
+
+func TestQueueingWorkSurvivesACommitThatLosesARace(t *testing.T) {
+	// The same at the other end: a refused commit on the insert meant the work
+	// was never queued, and the caller was told so.
+	ctx := t.Context()
+	handle, owner := racing(t, nil)
+
+	q := queue.New(handle, queue.DefaultOptions())
+	owner.arm(1)
+	job, err := q.Add(ctx, "ingest", "queued-despite-a-lost-race")
+	if err != nil {
+		t.Fatalf("queueing work lost one commit and gave up: %v", err)
+	}
+	if job == nil {
+		t.Fatal("nothing was queued")
+	}
+	if owner.unspent() != 0 {
+		t.Fatalf("queueing work committed nothing this could refuse, so it writes " +
+			"outside a transaction and a refused commit cannot be retried at all")
+	}
+
+	var queued int
+	if err := handle.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM "job" WHERE "reference" = ?`, "queued-despite-a-lost-race").
+		Scan(&queued); err != nil {
+		t.Fatal(err)
+	}
+	if queued != 1 {
+		t.Errorf("%d rows were queued, want exactly one", queued)
 	}
 }

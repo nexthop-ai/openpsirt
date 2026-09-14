@@ -79,7 +79,7 @@ type Refresher struct {
 //
 // The name identifies this replica in the lease. Every replica runs this pass,
 // and only the one holding the lease asks anything.
-func NewRefresher(db bun.IDB, logger *slog.Logger, replica string) *Refresher {
+func NewRefresher(db *bun.DB, logger *slog.Logger, replica string) *Refresher {
 	client := New()
 	return &Refresher{
 		db: db, Index: client.For, logger: logger,
