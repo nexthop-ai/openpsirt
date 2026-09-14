@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // The tree, seen upward, for somebody narrowed to their own work.
@@ -71,15 +72,9 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 	if subject.Kind != access.Person || len(mine) == 0 {
 		return nil, true, nil
 	}
-	var productID int64
-	err := s.db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id").
-		Where("tg.id = ?", targetID).
-		Scan(ctx, &productID)
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
 	if err != nil {
-		return nil, false, fmt.Errorf("look up which product this build belongs to: %w", err)
+		return nil, false, err
 	}
 
 	var rows []struct {

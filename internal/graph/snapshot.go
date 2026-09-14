@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -715,15 +716,9 @@ func ranks(n Neighbor) int {
 // count here that is not narrowed the same way is the more dangerous of the
 // two: nobody looking at it expects it to be a disclosure.
 func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID int64) ([]access.Visibility, error) {
-	var productID int64
-	err := s.db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id").
-		Where("tg.id = ?", targetID).
-		Scan(ctx, &productID)
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
 	if err != nil {
-		return nil, fmt.Errorf("look up which product this build belongs to: %w", err)
+		return nil, err
 	}
 	if !subject.Sees(productID) {
 		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
