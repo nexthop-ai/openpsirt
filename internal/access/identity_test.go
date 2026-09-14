@@ -340,3 +340,74 @@ func TestAnAuthorizationIsRedeemableInsideItsWindow(t *testing.T) {
 		}
 	})
 }
+
+func TestAProxyLetsSomebodyInWhileTheProviderIsUnreachable(t *testing.T) {
+	// The way back in when the provider is down. A reverse proxy asserts the
+	// name and the deployment runs with no provider configured at all, which
+	// is the arrangement the trusted header exists for.
+	//
+	// A pinned identifier does not refuse it, and must not: the mismatch
+	// refusal protects a name that moved between people at the provider, and
+	// a deployment trusting the header has already granted whatever sets it
+	// the power to claim to be anybody.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person := authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
+			t.Fatalf("the first sign-in did not pin: %v", err)
+		}
+
+		got, err := f.store.MatchProxy(ctx, "alice")
+		if err != nil {
+			t.Fatalf("somebody bound to a provider cannot come in by proxy: %v", err)
+		}
+		if got.ID != person.ID {
+			t.Errorf("the proxy resolved to person %d, want %d", got.ID, person.ID)
+		}
+	})
+}
+
+func TestChangingProviderIsUnbindThenSwitch(t *testing.T) {
+	// The provider change this refuses to do silently, done deliberately.
+	//
+	// Unbinding leaves the authorization standing and clears what the old
+	// provider issued — both halves of it. Leaving the provider behind would
+	// make the startup check read withdrawn bindings as bindings nobody
+	// withdrew, so unbinding everybody would still not let the new provider
+	// start, and the way back in would be editing the database by hand.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person := authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if bound, err := f.store.BoundProviders(ctx); err != nil || len(bound) != 1 {
+			t.Fatalf("the bound providers read as %v (%v)", bound, err)
+		}
+
+		if err := f.store.UnbindIdentifier(ctx, person.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		// Nothing is bound now, so a deployment configured for somewhere else
+		// starts rather than refusing.
+		bound, err := f.store.BoundProviders(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bound) != 0 {
+			t.Errorf("unbinding left %v behind, which still refuses the new provider", bound)
+		}
+
+		// And the authorization is redeemable again, under the new provider,
+		// by whoever arrives holding the name — which is what it was before
+		// anybody signed in.
+		matched, err := f.store.MatchProvider(ctx, "entra", "aad-9f2c", "alice")
+		if err != nil {
+			t.Fatalf("the authorization was not redeemable under the new provider: %v", err)
+		}
+		if matched.ID != person.ID {
+			t.Errorf("the new provider redeemed person %d, want %d", matched.ID, person.ID)
+		}
+	})
+}

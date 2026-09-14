@@ -229,7 +229,12 @@ func issuedBy(row *Identity, provider string) bool {
 func (s *Store) BoundProviders(ctx context.Context) ([]string, error) {
 	var names []string
 	if err := s.db.NewSelect().Model((*Identity)(nil)).
-		Column("provider").Where("provider IS NOT NULL").
+		Column("provider").
+		Where("provider IS NOT NULL").
+		// A row nobody has bound holds nothing hostage. Both halves are
+		// cleared together by an unbind, and requiring the identifier as well
+		// means a half-cleared row cannot stop a deployment starting.
+		Where("subject IS NOT NULL").
 		Distinct().Scan(ctx, &names); err != nil {
 		return nil, fmt.Errorf("read which providers have bound an identity: %w", err)
 	}
@@ -311,7 +316,11 @@ func (s *Store) rename(ctx context.Context, identity *Identity, username string)
 // it was working.
 func (s *Store) UnbindIdentifier(ctx context.Context, personID int64) error {
 	if _, err := s.db.NewUpdate().Model((*Identity)(nil)).
-		Set("subject = NULL").Set("bound_at = NULL").
+		// The provider goes with the identifier it issued. Left behind, it
+		// still names a provider this deployment is moving away from, and the
+		// startup check reads that as bindings nobody withdrew — so unbinding
+		// everybody would not be enough to let the new provider start.
+		Set("subject = NULL").Set("provider = NULL").Set("bound_at = NULL").
 		Where("person_id = ?", personID).Exec(ctx); err != nil {
 		return fmt.Errorf("unbind how they sign in: %w", err)
 	}

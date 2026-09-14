@@ -186,6 +186,38 @@ with a typo in it therefore reads as "this person was never granted access"**,
 not as a configuration error, so check the name against the provider's own
 token before deciding somebody's grant is missing.
 
+### Signing in when the provider is gone
+
+The trusted header below is the way in that does not depend on the provider,
+and it is what a provider change goes through. A pinned identifier does not
+refuse a proxy arrival, so everybody reaches what they already hold.
+
+**The provider is down and people must sign in.**
+
+1. Unset `OPENPSIRT_OIDC_ISSUER`. A provider that cannot be discovered stops
+   the process at startup, so leaving it set means nothing starts at all.
+2. Set `OPENPSIRT_TRUSTED_HEADER` and `OPENPSIRT_TRUSTED_SOURCES`. Both are
+   needed; half a configuration stops the process.
+3. Restart. Sign-in is by the name the proxy asserts.
+
+**The provider is changing.** An identifier belongs to the provider that
+issued it, and the same string names somebody else at another one, so a
+deployment configured for a provider its bound identities do not name refuses
+to start.
+
+1. Start with the **old** provider configured, or with the trusted header
+   where the old one cannot be reached either.
+2. `DELETE /v1/people/{identity}/identifier` for each person. The
+   authorization and the roles stay; only the pin goes.
+3. Configure the new provider and restart. Each name is redeemed again by
+   whoever next arrives holding it.
+
+Doing it the other way round — configuring the new provider first — leaves a
+process that will not start. The refusal names the old provider and the steps,
+so the way out is to put that value back and start at step 1.
+
+
+
 
 ### GitHub
 

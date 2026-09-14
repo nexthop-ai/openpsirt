@@ -534,9 +534,12 @@ func onlyTheBoundProvider(ctx context.Context, rights *access.Store, providers m
 		sort.Strings(configured)
 		return fmt.Errorf(
 			"identities here are bound to the %q provider and this deployment is configured for %s: "+
-				"an identifier one provider issued names somebody else at another, so the bindings are "+
-				"withdrawn deliberately before the provider changes",
-			was, strings.Join(configured, ", "))
+				"an identifier one provider issued names somebody else at another, so the bindings "+
+				"are withdrawn deliberately before the provider changes. Start again naming %q, "+
+				"unbind each person (DELETE /v1/people/{identity}/identifier), then configure %s. "+
+				"Where the old provider cannot be reached either, configure the trusted header "+
+				"instead and do the same from there",
+			was, strings.Join(configured, ", "), was, strings.Join(configured, ", "))
 	}
 	return nil
 }

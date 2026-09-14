@@ -603,10 +603,23 @@ same moment.
 | An arrival that names no provider is refused | An identifier with no issuer names nobody, and binding one records a subject a later sign-in cannot tell apart from another provider's |
 | A bound identity under a provider that is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
 | A row bound before the provider was recorded reads as the one configured now | There is nothing else it could mean, and refusing every one of them would lock out a deployment that never changed provider |
+| A row nobody has bound names no provider | Unbinding clears the identifier and the provider that issued it together. Left behind, a withdrawn binding still reads as a binding nobody withdrew, so unbinding everybody would not be enough to let the new provider start |
 
-The way through a deliberate provider change is to withdraw the bindings, which
-is the administrative act the row above describes, and leaves each
-authorization standing to be redeemed again.
+### The way in without the provider
+
+The trusted header is the way in that does not depend on the provider, and it
+is what a provider change goes through.
+
+| Situation | What to do |
+|---|---|
+| The provider is down and people must sign in | Configure the trusted header and leave no provider configured. A pinned identifier does not refuse a proxy arrival, so everybody reaches what they already hold |
+| The provider is changing | Unbind each person, then configure the new provider. The authorization stays and is redeemed again by whoever arrives under that name |
+| The provider is changing and the old one cannot be reached | The same, reached through the trusted header, because a provider that cannot be discovered stops the process before anybody could unbind anything |
+
+| Rule | Reason |
+|---|---|
+| A deployment configured for a provider its bound identities do not name refuses to start, and says how to undo it | The refusal is the only place anybody learns that the bindings need withdrawing, so stating the condition without the remedy leaves an operator with a process that will not start and no next step |
+| The window an unredeemed authorization lapses in does not apply to a proxy arrival | The window bounds who may redeem a name at a provider nobody here controls. A proxy is the deployment's own infrastructure, and it is the way back in when the provider is gone — expiring the grant there would close the door this exists to hold open |
 
 ### How long a name is redeemable
 
