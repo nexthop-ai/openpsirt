@@ -4,7 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // One person brought into one undisclosed case, without being granted private
@@ -217,6 +222,89 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 		if got := asPerson(t, r, "triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
 			t.Errorf("a decision listed to this collaborator answered %d when opened: %s",
 				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
+	// A grant on an embargoed case that the API can show and cannot withdraw.
+	//
+	// Store.Names answers a display name where one is set, and the list put
+	// that in a field named identity. The removal route resolves {identity}
+	// through ByIdentity, which matches the folded identity column — so
+	// somebody with a display name was listed under a value matching no row,
+	// the chip's remove answered 404, and the grant on the undisclosed issue
+	// stood.
+	//
+	// Nothing could have caught it: every fixture in the tree sets a display
+	// name equal to the identity, which is the one case where the two strings
+	// agree.
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+
+		// Somebody whose display name is not their identity, which is the
+		// shape the recording route itself documents.
+		person, err := r.rights.Ensure(ctx, "ana", "Ana Ruiz", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.Claim(ctx, person.ID, "ana"); err != nil {
+			t.Fatal(err)
+		}
+		mine, err := catalog.NewStore(r.db.DB).ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.GrantRole(ctx, person.ID, mine.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
+		at := "/v1/products/mine/issues/" + embargoed + "/collaborators"
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			at+"/ana", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var listed struct {
+			Items []struct {
+				Identity string `json:"identity"`
+				Name     string `json:"name"`
+				AddedAt  string `json:"added_at"`
+			} `json:"items"`
+		}
+		read(t, r, "private-triage", at, &listed)
+		if len(listed.Items) != 1 {
+			t.Fatalf("the case lists %d collaborators: %+v", len(listed.Items), listed.Items)
+		}
+		one := listed.Items[0]
+		// The handle in the field the removal route resolves, and the label
+		// beside it rather than in place of it.
+		if one.Identity != "ana" {
+			t.Errorf("the collaborator is listed as %q, which resolves to nobody", one.Identity)
+		}
+		if one.Name != "Ana Ruiz" {
+			t.Errorf("the listing does not say what to call them: %q", one.Name)
+		}
+		// Not the zero time. A person the grant reports and the rows do not
+		// used to come back dated 0001-01-01.
+		if strings.HasPrefix(one.AddedAt, "0001-") || one.AddedAt == "" {
+			t.Errorf("the listing dates the grant %q", one.AddedAt)
+		}
+
+		// And what the list published takes them off again.
+		// Escaped the way a client puts a path segment together, so that a
+		// value which is not a handle fails the assertion above rather than
+		// the request builder here.
+		if got := asPerson(t, r, "private-triage", http.MethodDelete,
+			at+"/"+url.PathEscape(one.Identity), ""); got.Code != http.StatusNoContent {
+			t.Fatalf("removing them by the name the list gave answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		read(t, r, "private-triage", at, &listed)
+		if len(listed.Items) != 0 {
+			t.Errorf("they are still on the case: %+v", listed.Items)
 		}
 	})
 }

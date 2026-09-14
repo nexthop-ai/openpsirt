@@ -4488,8 +4488,10 @@ export interface components {
             readonly $schema?: string;
             /** @description The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here */
             group: string;
-            /** @description The product the role is held against */
+            /** @description The product the role is held against, by the name that addresses it */
             product?: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /**
              * @description What membership of this group grants
              * @enum {string}
@@ -5905,8 +5907,10 @@ export interface components {
             effective: boolean;
             /** @description Held across every product, including products declared later */
             everywhere?: boolean;
-            /** @description The product the role is held against. Absent where it is held across every product */
+            /** @description The product the role is held against, by the name that addresses it. Absent where it is held across every product */
             product?: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /**
              * @description What they may do with it
              * @enum {string}
@@ -6106,8 +6110,10 @@ export interface components {
             last_used_at?: string;
             /** @description What this credential is for */
             name: string;
-            /** @description The product it may send scans for. Always required */
+            /** @description The product it may send scans for, by the name that addresses it. Always required */
             product: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Optionally, the one release it may send for */
@@ -8310,8 +8316,10 @@ export interface components {
             name: string;
             /** @description Whose it is. Shown to an administrator listing everybody's */
             owner?: string;
-            /** @description Optionally, the one product it may reach */
+            /** @description Optionally, the one product it may reach, by the name that addresses it */
             product?: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Whether it has been withdrawn */

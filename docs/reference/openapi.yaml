@@ -514,7 +514,10 @@ components:
           minLength: 1
           type: string
         product:
-          description: The product the role is held against
+          description: The product the role is held against, by the name that addresses it
+          type: string
+        product_display_name:
+          description: What to call that product, where it was declared with a display name
           type: string
         role:
           description: What membership of this group grants
@@ -2942,7 +2945,10 @@ components:
           description: Held across every product, including products declared later
           type: boolean
         product:
-          description: The product the role is held against. Absent where it is held across every product
+          description: The product the role is held against, by the name that addresses it. Absent where it is held across every product
+          type: string
+        product_display_name:
+          description: What to call that product, where it was declared with a display name
           type: string
         role:
           description: What they may do with it
@@ -3344,8 +3350,11 @@ components:
           minLength: 1
           type: string
         product:
-          description: The product it may send scans for. Always required
+          description: The product it may send scans for, by the name that addresses it. Always required
           minLength: 1
+          type: string
+        product_display_name:
+          description: What to call that product, where it was declared with a display name
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -7233,7 +7242,10 @@ components:
           description: Whose it is. Shown to an administrator listing everybody's
           type: string
         product:
-          description: Optionally, the one product it may reach
+          description: Optionally, the one product it may reach, by the name that addresses it
+          type: string
+        product_display_name:
+          description: What to call that product, where it was declared with a display name
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again

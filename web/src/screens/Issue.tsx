@@ -23,8 +23,10 @@ import { useWho } from "../app/session";
 export function Issue() {
   const { vulnerability = "" } = useParams();
   const who = useWho();
-  const mine = (writtenBy: string) =>
-    !!who.data && (writtenBy === who.data.identity || writtenBy === who.data.name);
+  // The identity alone. A note records who wrote it by the name they sign in
+  // under, and matching a display name as well made ownership turn on a label
+  // anybody can be given.
+  const mine = (writtenBy: string) => !!who.data && writtenBy === who.data.identity;
   const found = useQuery({
     queryKey: ["issue", vulnerability],
     queryFn: async () =>

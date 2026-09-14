@@ -234,7 +234,9 @@ func teamBody(ctx context.Context, store *access.Store, team access.Team) (TeamB
 	if err != nil {
 		return TeamBody{}, err
 	}
-	named, err := store.Names(ctx, members)
+	// The identity, because the field is documented as the identity people
+	// sign in under and the route that takes somebody off a team resolves it.
+	named, err := store.Handles(ctx, members)
 	if err != nil {
 		return TeamBody{}, err
 	}

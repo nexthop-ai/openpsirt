@@ -19,6 +19,7 @@ Satisfies REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67.
 - [Path version](#path-version)
 - [Declared privileges](#declared-privileges)
 - [Representation](#representation)
+- [Addresses and labels](#addresses-and-labels)
 - [File organization](#file-organization)
 - [Limits](#limits)
 
@@ -246,6 +247,28 @@ A caller receives the source and renders it themselves. The server has already
 refused what its policy forbids at submission (REQ-67), so the text is known-good
 under the rules in force when it was written; rules written since are the
 renderer's to apply. The rules are in `DESIGN-text.md`.
+
+## Addresses and labels
+
+A product, a person and a team each answer to two strings: the one that
+addresses it, and the one somebody declared to read. They are different
+wherever a display name is more than a recapitalization.
+
+| Rule | Reason |
+|---|---|
+| A field a write resolves carries the address | It is what the lookup matches. A listing that published the label there could not be used to undo what it listed |
+| The label goes beside it, never in place of it | A screen still shows what a person reads. Two fields is the only arrangement where both are true |
+| The label is absent where it repeats the address | So that "no display name" and "the same again" do not read alike |
+| A name in a path is the address | Folding only lowercases and trims, so a label matches no row |
+
+What this cost, twice. A collaborator on an embargoed case was listed under
+their display name in a field called `identity`, and the removal route resolves
+that field — so somebody who should no longer see the case could be listed and
+not taken off. And a role on a product declared `acme-router` and displayed
+`Acme Router` was listed as `Acme Router`, which the withdraw beside it sent
+back, and nothing matched.
+
+Both had the other field already declared and never filled.
 
 ## File organization
 

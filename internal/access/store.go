@@ -641,6 +641,10 @@ func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 // otherwise. Batched because the alternative is a query per row, and the
 // places this is needed — a review queue, a list of what was dismissed — are
 // exactly the ones that are long.
+//
+// **What this answers is never sent back to a lookup.** A display name is a
+// label somebody chose and resolves to nobody; Handles is what a route naming
+// a person in its path matches.
 func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error) {
 	names := map[int64]string{}
 	if len(ids) == 0 {
@@ -660,6 +664,34 @@ func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error
 		names[person.ID] = person.Identity
 	}
 	return names, nil
+}
+
+// Handles resolves people to the identity they sign in under.
+//
+// Beside Names, and the other half of it: Names is for showing and this is for
+// resolving, and wherever somebody has a display name the two are different
+// strings. ByIdentity matches the folded identity column alone, so a list that
+// published a display name in a field a route resolves could not be acted on —
+// which is how a collaborator on an embargoed case became somebody the API
+// could list and not remove.
+//
+// The package offered no batch identity lookup at all, so a handler that had
+// to round-trip a name had nothing else to reach for.
+func (s *Store) Handles(ctx context.Context, ids []int64) (map[int64]string, error) {
+	handles := map[int64]string{}
+	if len(ids) == 0 {
+		return handles, nil
+	}
+	var people []Account
+	if err := s.db.NewSelect().Model(&people).
+		Column("id", "identity").
+		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what these people sign in as: %w", err)
+	}
+	for _, person := range people {
+		handles[person.ID] = person.Identity
+	}
+	return handles, nil
 }
 
 // Mentionable is somebody who could be named in text about a product.

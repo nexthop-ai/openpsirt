@@ -26,19 +26,29 @@ func TestAPersonalTokenIsNarrowedWhenItIsMade(t *testing.T) {
 		}
 		var out struct {
 			Items []struct {
-				Name      string `json:"name"`
-				Product   string `json:"product"`
-				Withdrawn bool   `json:"withdrawn"`
+				Name               string `json:"name"`
+				Product            string `json:"product"`
+				ProductDisplayName string `json:"product_display_name"`
+				Withdrawn          bool   `json:"withdrawn"`
 			} `json:"items"`
 		}
 		if err := json.Unmarshal(listed.Body.Bytes(), &out); err != nil {
 			t.Fatalf("decode: %v (%s)", err, listed.Body.String())
 		}
-		// Reported by display name, as every other credential listing
-		// reports a product: what the request takes is the name, and what an
-		// answer shows is what a person reads.
-		if len(out.Items) != 1 || out.Items[0].Product != "Mine" {
-			t.Fatalf("the narrowing is not read back: %s", listed.Body.String())
+		// **The address, in the field minting resolves.** This asserted the
+		// display name, with a comment saying an answer shows what a person
+		// reads — which is true of a field beside it and not of this one: a
+		// product declared "acme-router" and displayed "Acme Router" was
+		// listed under a word that matches no row, so a token could not be
+		// remade from what the list said it covered.
+		if len(out.Items) != 1 || out.Items[0].Product != "mine" {
+			t.Fatalf("the narrowing is not read back as the name that resolves it: %s",
+				listed.Body.String())
+		}
+		// And what a person reads, beside it.
+		if out.Items[0].ProductDisplayName != "Mine" {
+			t.Errorf("the listing does not say what to call the product: %s",
+				listed.Body.String())
 		}
 	})
 }
