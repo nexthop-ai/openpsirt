@@ -442,6 +442,24 @@ gets ticked without being read.
  including counts, aggregates, search and exports.
 - Regression tests are named for the invariant they pin.
 
+**A test named for an arm has an input that reaches only that arm**, and the
+check is coverage of the named line rather than the test passing. Eighteen
+tests ran on a corpus that was a strict subset of the domain their own name
+described: the table wanted one direction of a comparison, so the three arms
+that fire in the other never ran; the six scores skipped the band between two
+of them; the only over-long name was rejected by an earlier rule. Each passed,
+and deleting the arm it named left the suite green. `tools/coverage.out`
+carries the per-statement counts that answer it.
+
+**Two tests asserting the same property are redundant only when they take the
+same path through the code under test.** The check is a path argument, not a
+comparison of assertion text. A whole-tree scan produced seventeen mechanical
+overlap clusters and every genuine one was refuted: the worked example is
+`web/src/ui/versions.test.ts:25` against `:31` over `versions.ts:18-21` —
+both return the empty string, and neither line executes for the other's input.
+The other shapes were the same behavior at two layers, and the same predicate
+over different input classes. Nothing was deleted.
+
 ## Commits and pull requests
 
 - **No `Co-Authored-By` trailers.** This project will use DCO, where the only
