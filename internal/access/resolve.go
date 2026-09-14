@@ -131,7 +131,6 @@ func NewResolver(store *Store, trust Trust) *Resolver {
 	}
 }
 
-// WithMode tells the resolver where roles come from.
 // ReportsGroups says whether a trusted proxy is configured to report group
 // membership.
 //
@@ -142,6 +141,7 @@ func (r *Resolver) ReportsGroups() bool {
 	return strings.TrimSpace(r.trust.GroupsHeader) != ""
 }
 
+// WithMode tells the resolver where roles come from.
 func (r *Resolver) WithMode(mode func(context.Context) Mode) *Resolver {
 	if mode != nil {
 		r.mode = mode

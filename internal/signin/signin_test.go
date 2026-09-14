@@ -4,9 +4,15 @@ import (
 	"testing"
 )
 
-func TestAProofKeyIsSentAsADigestAndKeptAsTheSecret(t *testing.T) {
-	// The provider only ever sees the digest, so an authorization code
-	// intercepted on its way back cannot be exchanged by whoever took it.
+func TestWhatOneSignInIsGivenIsUnguessableAndItsOwn(t *testing.T) {
+	// What this file can say about a sign-in's three values: that they are
+	// distinct, unguessable, and not shared with the next sign-in.
+	//
+	// It was named for the proof key being sent as a digest and kept as the
+	// secret, and it asserted that a sha256 digest differs from its own
+	// preimage — false for every implementation of challenge(), including a
+	// broken one — while sending nothing anywhere. That control is the address
+	// Begin produces, and it is asserted there, against both adapters.
 	first, err := newPending()
 	if err != nil {
 		t.Fatal(err)
@@ -16,9 +22,6 @@ func TestAProofKeyIsSentAsADigestAndKeptAsTheSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if first.challenge() == first.Verifier {
-		t.Error("the proof key was sent as the secret it is meant to hash")
-	}
 	if first.State == second.State || first.Nonce == second.Nonce || first.Verifier == second.Verifier {
 		t.Error("two sign-ins were given the same values")
 	}

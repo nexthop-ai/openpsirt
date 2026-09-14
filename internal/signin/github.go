@@ -103,27 +103,14 @@ func (g *GitHub) Issuer() string { return "https://github.com" }
 
 // Begin returns where to send the browser.
 func (g *GitHub) Begin(_ context.Context, redirectURI string) (string, Pending, error) {
-	pending, err := newPending()
-	if err != nil {
-		return "", Pending{}, err
-	}
-	config := g.config
-	config.RedirectURL = redirectURI
-
-	return config.AuthCodeURL(pending.State,
-		oauth2.SetAuthURLParam("code_challenge", pending.challenge()),
-		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-	), pending, nil
+	// No nonce: GitHub issues no identity token, so there is nothing to tie
+	// one to.
+	return beginPKCE(g.config, redirectURI, nil)
 }
 
 // Complete exchanges the code and asks GitHub who this is.
 func (g *GitHub) Complete(ctx context.Context, code string, pending Pending, redirectURI string) (*Identity, error) {
-	config := g.config
-	config.RedirectURL = redirectURI
-
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, g.client)
-	token, err := config.Exchange(ctx, code,
-		oauth2.SetAuthURLParam("code_verifier", pending.Verifier))
+	token, err := exchangePKCE(ctx, g.config, g.client, code, redirectURI, pending)
 	if err != nil {
 		return nil, fmt.Errorf("exchange what github sent back: %w", err)
 	}

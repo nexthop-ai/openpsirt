@@ -109,8 +109,6 @@ func (in Ingest) trail() *trail.Store {
 	return trail.NewStore(in.DB.DB)
 }
 
-// rights returns a store over who may do what, or nothing where there is no
-// database.
 // groupsReachable says whether anything configured here can report which
 // groups somebody is in: a provider with a source of them, or a trusted proxy
 // that reports them.
@@ -127,6 +125,8 @@ func (in Ingest) groupsReachable() bool {
 	return in.Access != nil && in.Access.ReportsGroups()
 }
 
+// rights returns a store over who may do what, or nothing where there is no
+// database.
 func (in Ingest) rights() *access.Store {
 	if in.DB == nil {
 		return nil

@@ -119,6 +119,19 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 		if err := rights.GrantRole(ctx, granted.ID, product.ID, access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
+		// A second person who also holds a role, so that a test about whose
+		// session comes back has two possible answers. With one, asserting
+		// the identity asserts the only value the provider stub could return.
+		other, err := rights.Ensure(ctx, "other", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.Claim(ctx, other.ID, "other"); err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, other.ID, product.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
 		// Somebody recorded and granted nothing, who must be refused exactly
 		// as a stranger is.
 		ungranted, err := rights.Ensure(ctx, "ungranted", "", false)
@@ -617,6 +630,12 @@ func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
 		// they started this sign-in. The stub answers with a fixed one.
 		const state = "the-state"
 
+		r.provider.says = &signin.Identity{Subject: "2", Username: "other"}
+
+		// Who the provider will say signed in: the attacker, because this is
+		// the attacker's sign-in. The victim is somebody else entirely, and
+		// the point is that the session that comes back is never theirs.
+
 		// Planted in the victim's browser, which then completes it.
 		req := httptest.NewRequest(http.MethodGet,
 			"/v1/sign-in/stub/callback?state="+state+"&code=a-code", nil)
@@ -633,17 +652,31 @@ func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
 		if rec.Code != http.StatusFound {
 			t.Fatalf("completing the planted sign-in answered %d: %s", rec.Code, rec.Body.String())
 		}
+		// Found outside the loop, so an absent cookie fails rather than
+		// skipping the assertion: this sat behind a continue, and a callback
+		// issuing no session at all left the test green.
+		var session string
 		for _, cookie := range rec.Result().Cookies() {
-			if cookie.Name != access.CookieName(access.SessionCookie, true) || cookie.Value == "" {
-				continue
+			if cookie.Name == access.CookieName(access.SessionCookie, true) && cookie.Value != "" {
+				session = cookie.Value
 			}
-			who, _, err := r.rights.ResolveSession(t.Context(), cookie.Value)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if who.Identity != "granted" {
-				t.Errorf("the session handed to the browser is %q", who.Identity)
-			}
+		}
+		if session == "" {
+			t.Fatal("the planted sign-in completed and issued no session, so the " +
+				"assertion below would not have run")
+		}
+		who, _, err := r.rights.ResolveSession(t.Context(), session)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The attacker's own account, which is the whole of what the planted
+		// cookie buys: never the victim's. This asserted "granted", which is
+		// the only identity the stub could return — so the test named for the
+		// planted-cookie attack asserted an identity the stub was the sole
+		// possible source of.
+		if who.Identity != "other" {
+			t.Errorf("the session handed to the browser is %q, want the account the "+
+				"planted sign-in was minted for", who.Identity)
 		}
 	})
 }

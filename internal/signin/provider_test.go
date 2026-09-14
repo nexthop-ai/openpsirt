@@ -466,3 +466,54 @@ func TestTeamsAreReadPastTheFirstPage(t *testing.T) {
 		t.Errorf("reading stopped at the first page: %v", who.Groups)
 	}
 }
+
+func TestBothAdaptersStartASignInTheSameWay(t *testing.T) {
+	// The proof key and its method were written out once per adapter, and the
+	// literals involved appeared exactly twice in the tree. A hardening change
+	// landing in one and not the other downgrades that provider alone, and
+	// nothing observed either.
+	//
+	// So both are asked, and what differs is stated: OpenID Connect carries a
+	// nonce, because it has an identity token to tie to this sign-in, and
+	// GitHub issues none.
+	p := standing(t)
+	oidc, err := p.adapter(t, OIDCConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	forge, err := NewGitHub(GitHubConfig{ClientID: "a-client", ClientSecret: "a-secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, adapter := range []Provider{oidc, forge} {
+		at, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
+		if err != nil {
+			t.Fatalf("%s: %v", adapter.Name(), err)
+		}
+		parsed, err := url.Parse(at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		query := parsed.Query()
+		if got := query.Get("code_challenge"); got != pending.challenge() {
+			t.Errorf("%s carries %q as the challenge", adapter.Name(), got)
+		}
+		if query.Get("code_challenge") == pending.Verifier {
+			t.Errorf("%s sends the secret the proof key hashes", adapter.Name())
+		}
+		if got := query.Get("code_challenge_method"); got != "S256" {
+			t.Errorf("%s states the challenge method as %q", adapter.Name(), got)
+		}
+		if query.Get("redirect_uri") != "https://here.example/back" {
+			t.Errorf("%s sends the browser back to %q",
+				adapter.Name(), query.Get("redirect_uri"))
+		}
+		// The nonce is the one difference, and it is the one that matters:
+		// without it there is nothing tying a verified identity token to this
+		// sign-in.
+		if _, isOIDC := adapter.(*OIDC); isOIDC != (query.Get("nonce") != "") {
+			t.Errorf("%s carries nonce=%q", adapter.Name(), query.Get("nonce"))
+		}
+	}
+}

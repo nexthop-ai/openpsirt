@@ -216,39 +216,17 @@ func (o *OIDC) GroupsSource() bool { return strings.TrimSpace(o.groupsClaim) != 
 
 // Begin returns where to send the browser.
 func (o *OIDC) Begin(_ context.Context, redirectURI string) (string, Pending, error) {
-	pending, err := newPending()
-	if err != nil {
-		return "", Pending{}, err
-	}
-	config := o.config
-	config.RedirectURL = redirectURI
-
-	// The proof key is sent as a digest and kept as the secret it hashes, so
-	// an authorization code intercepted on its way back cannot be exchanged by
-	// whoever intercepted it.
-	return config.AuthCodeURL(pending.State,
-		oidc.Nonce(pending.Nonce),
-		oauth2.SetAuthURLParam("code_challenge", pending.challenge()),
-		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-	), pending, nil
+	// The nonce is what ties the identity token that comes back to this
+	// sign-in, and it is the half GitHub has no use for: it issues no identity
+	// token to tie.
+	return beginPKCE(o.config, redirectURI, func(pending Pending) []oauth2.AuthCodeOption {
+		return []oauth2.AuthCodeOption{oidc.Nonce(pending.Nonce)}
+	})
 }
 
 // Complete exchanges the code for who the provider says this is.
 func (o *OIDC) Complete(ctx context.Context, code string, pending Pending, redirectURI string) (*Identity, error) {
-	config := o.config
-	config.RedirectURL = redirectURI
-
-	// Through the guarded client, like every other fetch here. Without this
-	// the exchange falls back to the default client, which has no timeout at
-	// all, follows up to ten redirects — re-sending the authorization code,
-	// and downgrading to plain HTTP if told to — and resolves the issuer's
-	// name afresh on every sign-in with nothing checking what it resolves to.
-	// The key fetches were guarded because the verifier kept this client; the
-	// token exchange was the one call that did not, so the paragraph above
-	// describing all of them was true of all but the one carrying the secret.
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, o.client)
-	token, err := config.Exchange(ctx, code,
-		oauth2.SetAuthURLParam("code_verifier", pending.Verifier))
+	token, err := exchangePKCE(ctx, o.config, o.client, code, redirectURI, pending)
 	if err != nil {
 		return nil, fmt.Errorf("exchange what %q sent back: %w", o.name, err)
 	}
