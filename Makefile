@@ -544,7 +544,7 @@ web-check:
 	$(NPM) --prefix web run format
 	$(NPM) --prefix web run lint
 	$(NPM) --prefix web run stylelint
-	$(NPM) --prefix web test
+	$(NPM) --prefix web run coverage
 	$(NPM) --prefix web run classes
 	$(NPM) --prefix web run tokens
 	$(NPM) --prefix web run ladder

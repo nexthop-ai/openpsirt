@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { findingsPath, needsBuild, onFindings, rescoped } from "./scope";
+import { beforeEach, describe, expect, it } from "vitest";
+import { findingsPath, needsBuild, onFindings, remember, rescoped, scopeQuery } from "./scope";
 
 const BUILD = "/products/sonic/streams/master/variants/broadcom";
 
@@ -79,5 +79,68 @@ describe("changing scope stays on the screen", () => {
     expect(
       rescoped("/review-queue", { product: "sonic", stream: "master", variant: "broadcom" }),
     ).toBe(null);
+  });
+});
+
+// What every narrowed screen sends. sixteen call sites across seven screens
+// pass this straight into a request, and it had no test: a level that cannot
+// stand alone leaking into the query is a refusal from the server for a
+// selection nobody can make in the interface.
+describe("the selection as a request", () => {
+  it("sends nothing at all where nothing is selected", () => {
+    expect(scopeQuery({})).toEqual({});
+  });
+
+  it("drops a level that cannot stand without the one above it", () => {
+    // A branch or a variant without a product is refused by the server rather
+    // than guessed at, so sending one turns a selection nobody can make into
+    // an error somebody has to read.
+    expect(scopeQuery({ stream: "master" })).toEqual({});
+    expect(scopeQuery({ variant: "broadcom" })).toEqual({});
+    expect(scopeQuery({ stream: "master", variant: "broadcom" })).toEqual({});
+  });
+
+  it("sends each level that is selected, and no level that is not", () => {
+    expect(scopeQuery({ product: "sonic" })).toEqual({ product: "sonic" });
+    // A variant without a branch is a real selection: the same hardware
+    // across every release.
+    expect(scopeQuery({ product: "sonic", variant: "broadcom" })).toEqual({
+      product: "sonic",
+      variant: "broadcom",
+    });
+    expect(scopeQuery({ product: "sonic", stream: "master", variant: "broadcom" })).toEqual({
+      product: "sonic",
+      stream: "master",
+      variant: "broadcom",
+    });
+  });
+});
+
+describe("what is remembered about where somebody is working", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
+  it("keeps the selection for the tab rather than for the browser", () => {
+    // The session store, not the local one: it is where somebody is working
+    // right now rather than a preference, and a second tab looking at another
+    // product must not drag the first one with it.
+    remember({ product: "sonic", stream: "master" });
+    expect(window.localStorage.getItem("openpsirt.scope")).toBeNull();
+    expect(JSON.parse(window.sessionStorage.getItem("openpsirt.scope") ?? "null")).toEqual({
+      product: "sonic",
+      stream: "master",
+    });
+  });
+
+  it("survives a browser that refuses storage", () => {
+    // A browser that will not keep it still works; it just forgets. Throwing
+    // here would take a screen down over a preference.
+    const kept = window.sessionStorage.setItem;
+    window.sessionStorage.setItem = () => {
+      throw new Error("storage is off");
+    };
+    expect(() => remember({ product: "sonic" })).not.toThrow();
+    window.sessionStorage.setItem = kept;
   });
 });

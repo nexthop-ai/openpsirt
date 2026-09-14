@@ -49,4 +49,17 @@ describe("granting somebody an empty tool", () => {
     // mistake as not warning at all, in the direction that hides it.
     expect(wouldReachNothing("approver", [{ role: "public-read", effective: false }])).toBe(true);
   });
+
+  it("counts a read held across the estate", () => {
+    // A read held everywhere is a read held here, so a capability granted
+    // beside one reaches something. This is the case the grid's own copy of
+    // the rule handled and this one did not — so the copy with assertions
+    // against it was not the copy anybody saw.
+    expect(wouldReachNothing("approver", [{ role: "private-read", everywhere: true }])).toBe(false);
+    // And a withdrawn estate grant is no more held than a withdrawn one on
+    // the product itself.
+    expect(
+      wouldReachNothing("approver", [{ role: "private-read", everywhere: true, effective: false }]),
+    ).toBe(true);
+  });
 });

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap, Refused } from "../api/queries";
+import { forgetAll } from "./drafts";
+import { rememberForward, signedOutHere } from "../screens/SignIn";
 
 export type Can = {
   product: string;
@@ -68,4 +70,46 @@ export function useWho() {
 // forbidden — the same answer the server gives.
 export function mayOf(who: Who | null | undefined, product: string): Can | undefined {
   return who?.reach.find((each) => each.product === product);
+}
+
+// Signing out, as a sequence rather than as a click handler.
+//
+// The ordering is the whole of it and the ordering was unassertable: it lived
+// in an anonymous async function on a button, so nothing could reach it and
+// nothing pinned the two things that make it correct.
+//
+// **Drafts are cleared first, before anything is awaited and outside the try.**
+// They hold triage text, private findings included, and text that survived a
+// sign-out would be exposed in a way the application itself is not. A sign-out
+// that never reached the server is exactly the case where clearing matters
+// most, so it cannot sit inside the part that can fail.
+//
+// **Forwarding is marked in this tab as well as in the address.** Where there
+// is one provider the sign-in screen forwards straight to it, and the provider
+// still holds its own session — so an unmarked arrival would sign them back in
+// and make signing out impossible. The address alone is lost the moment
+// somebody presses Back, which would forward from any other screen.
+//
+// A full load rather than a route change, because signing out has to drop
+// every cached answer and starting again is the way to be sure.
+//
+// **It does not fail.** A server that never heard is not something a caller
+// can act on — the drafts are gone, the forward is marked, and the page is
+// already being replaced — and the caller is a click handler, so a rejection
+// there is an unhandled one in the browser console rather than anything
+// anybody sees. The one thing left of the session is a row on the server that
+// expires on its own.
+export async function signOut(
+  end: () => Promise<unknown>,
+  go: (where: string) => void,
+): Promise<void> {
+  forgetAll();
+  try {
+    await end();
+  } catch {
+    // Said above: there is nothing to do with it and nowhere to say it.
+  } finally {
+    rememberForward();
+    go(signedOutHere);
+  }
 }

@@ -40,7 +40,7 @@ export type Point = {
 // Folded here to match, because a rating with no word is treated as a medium
 // rather than dismissed as a low, and the screen has no business disagreeing
 // with what the deadline is set from.
-function folded(by: Record<string, number>): Record<string, number> {
+export function folded(by: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const [word, count] of Object.entries(by)) {
     switch (word) {

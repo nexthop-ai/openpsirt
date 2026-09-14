@@ -12,7 +12,28 @@ export default defineConfig({
   // The renderer carries the sanitizing that used to run on the server, so it
   // is tested against the same corpus of payloads. DOMPurify needs a DOM to
   // sanitize in, which is what jsdom is here for.
-  test: { environment: "jsdom", include: ["src/**/*.test.ts"] },
+  //
+  // `.test.tsx` as well as `.test.ts`. JSX cannot be written in a `.ts` file,
+  // so with only the first pattern no component could be rendered in a test
+  // at all — a tooling limit that was easy to mistake for a decision. A
+  // `.tsx` *module* was always importable from a `.ts` test and six already
+  // do it, so an untested pure function in a `.tsx` file is a choice.
+  //
+  // Coverage is measured, and reported for the interface the way it is for
+  // the Go half. Nothing measured what these tests reached: the figure the
+  // repository quotes is Go only.
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary"],
+      include: ["src/**/*.{ts,tsx}"],
+      // Generated from the API document, and the screens are compiled
+      // against it — a type file has nothing to execute.
+      exclude: ["src/api/schema.d.ts", "src/**/*.test.{ts,tsx}"],
+    },
+  },
   server: {
     // Vite refuses a Host header it does not recognize, which is protection
     // against a hostile page resolving a name to this machine. Browsing by
