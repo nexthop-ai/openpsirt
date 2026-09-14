@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -43,6 +44,10 @@ func namedLock(ctx context.Context, conn *sql.Conn) (string, error) {
 // rather than blocking every replacement pod indefinitely.
 var lockWaitSeconds = 300
 
+// resetWait bounds unwinding the session before the connection goes back to
+// the pool. It is one round trip against a server that has just answered.
+const resetWait = 5 * time.Second
+
 // unlock releases a migration lock and returns the pinned connection.
 type unlock func(context.Context) error
 
@@ -71,7 +76,25 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pin a connection for the migration lock: %w", err)
 	}
+	// The session settings this function makes are unwound before the
+	// connection goes back. Close returns it to the pool rather than closing
+	// it — which is the whole reason the connection is pinned above — so a
+	// setting left behind travels on one pooled connection and not the others,
+	// and the same query afterwards behaves differently depending on which
+	// connection it is handed.
 	closeConn := func() {
+		if db.Server.Engine == database.Postgres {
+			// Without a context of its own this would be skipped on exactly
+			// the path that most needs it: a migration abandoned because its
+			// context ended.
+			reset, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+			defer cancel()
+			// A reset that fails leaves the connection carrying the bound,
+			// which is the state this arrived in and is stricter rather than
+			// looser. There is nothing further to do about it from a cleanup
+			// that runs on every path including the failing ones.
+			_, _ = conn.ExecContext(reset, "RESET lock_timeout")
+		}
 		if err := conn.Close(); err != nil {
 			_ = err // returning the connection to the pool; nothing to do
 		}
@@ -153,8 +176,28 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 // makes a read-only inspection command perform schema changes — and no schema
 // rights while running says the running application may hold read and write
 // rights only.
-func versionTableExists(ctx context.Context, db *database.DB) bool {
+//
+// **"The table is not there" and "I could not look" arrive the same way.** An
+// absent table is an error rather than an empty result, so every other failure
+// — a credential without SELECT on the version table, a reset connection, a
+// deadline — reads as an empty database unless something tells them apart. It
+// read as one, and "schema version 0" against a fully populated database
+// invites an operator to migrate it again.
+//
+// So a failed probe is followed by a trivial one. A database that answers the
+// second was reachable, and the first failure was about the table; a database
+// that answers neither could not be read, and says so. Two probes rather than
+// matching each engine's code for an absent relation, which is four spellings
+// of a question that has a portable answer.
+func versionTableExists(ctx context.Context, db *database.DB) (bool, error) {
 	var probe int
 	err := db.QueryRowContext(ctx, "SELECT 1 FROM goose_db_version LIMIT 1").Scan(&probe)
-	return err == nil || err == sql.ErrNoRows
+	if err == nil || database.IsNoRows(err) {
+		return true, nil
+	}
+	var alive int
+	if reachable := db.QueryRowContext(ctx, "SELECT 1").Scan(&alive); reachable != nil {
+		return false, fmt.Errorf("read the schema version: %w", err)
+	}
+	return false, nil
 }

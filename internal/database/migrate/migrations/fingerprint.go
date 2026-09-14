@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -57,4 +59,49 @@ func Fingerprint() (string, error) {
 		fingerprint = hex.EncodeToString(sum.Sum(nil))
 	})
 	return fingerprint, fingerprintErr
+}
+
+var (
+	expectedOnce sync.Once
+	expected     int64
+	expectedErr  error
+)
+
+// Expected is the highest migration version this build carries.
+//
+// Read from the embedded sources rather than from the migration library, which
+// holds the registered set in package-level state with no way to ask it. The
+// number in a migration's file name is its version — that is the library's own
+// rule, and the registration in each file's init is keyed on it — so the two
+// cannot disagree without the file being misnamed, which nothing else would
+// accept either.
+//
+// What it is for: a deployment that applies migrations separately needs to
+// know whether the database is behind the binary, and "behind" needs a number
+// on both sides. Every other reading of the applied version had only one.
+func Expected() (int64, error) {
+	expectedOnce.Do(func() {
+		names, err := fs.Glob(sources, "*.go")
+		if err != nil {
+			expectedErr = err
+			return
+		}
+		for _, name := range names {
+			digits, _, ok := strings.Cut(name, "_")
+			if !ok {
+				continue // fingerprint.go and anything else that is not one
+			}
+			version, err := strconv.ParseInt(digits, 10, 64)
+			if err != nil {
+				continue
+			}
+			if version > expected {
+				expected = version
+			}
+		}
+		if expected == 0 {
+			expectedErr = fmt.Errorf("this build carries no migrations")
+		}
+	})
+	return expected, expectedErr
 }

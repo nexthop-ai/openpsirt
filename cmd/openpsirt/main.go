@@ -96,8 +96,8 @@ func run(args []string, stdout, stderr *os.File) error {
 		if err := schema.Up(ctx, db, logger); err != nil {
 			return err
 		}
-	} else {
-		logger.Info("automatic migration is off; run \"openpsirt migrate up\" separately")
+	} else if err := schemaIsCurrent(ctx, db, logger); err != nil {
+		return err
 	}
 
 	// Named administrators are granted at every start, which is what makes
@@ -328,6 +328,42 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 	return db, nil
 }
 
+// schemaIsCurrent refuses to serve against a schema this build is ahead of.
+//
+// Applying migrations separately is supported and is why the setting exists.
+// What it leaves is a binary and a schema that move independently, and nothing
+// compared them: a build carrying a new migration started, granted
+// administrators, answered the readiness probe, and failed every request that
+// touched the new table. In a rolling deployment the probe passing is what
+// retires the last replica that worked.
+//
+// Refused at startup rather than through readiness, which is where every other
+// startup condition is refused and what keeps the previous replica alive.
+//
+// **Only when the database is behind.** A schema ahead of this build is a
+// rollback, which has to keep working: the migrations a newer binary applied
+// are additive, and refusing here would leave a bad deployment with no way
+// back.
+func schemaIsCurrent(ctx context.Context, db *database.DB, logger *slog.Logger) error {
+	applied, err := schema.Version(ctx, db)
+	if err != nil {
+		return err
+	}
+	wanted, err := schema.Expected()
+	if err != nil {
+		return err
+	}
+	if applied < wanted {
+		return fmt.Errorf(
+			"the database is at schema version %d and this build expects %d: "+
+				"run \"openpsirt migrate up\", or set OPENPSIRT_AUTO_MIGRATE=true",
+			applied, wanted)
+	}
+	logger.Info("automatic migration is off, and the schema is current",
+		"applied", applied, "expected", wanted)
+	return nil
+}
+
 // runMigrate applies or rolls back schema changes on their own, so an operator
 // can run them under different credentials and at a time they choose.
 func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout *os.File, args []string) error {
@@ -348,12 +384,25 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 	case "down":
 		return schema.Down(ctx, db, logger)
 	case "status":
-		v, err := schema.Version(ctx, db)
+		applied, err := schema.Version(ctx, db)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(stdout, "%s %s, schema version %d\n",
-			db.Server.Engine, db.Server.Version, v)
+		// Both numbers, because one of them answers nothing. "Schema version
+		// 34" is only useful beside what this build was written against.
+		wanted, err := schema.Expected()
+		if err != nil {
+			return err
+		}
+		state := "current"
+		switch {
+		case applied < wanted:
+			state = fmt.Sprintf("behind by %d", wanted-applied)
+		case applied > wanted:
+			state = "ahead of this build"
+		}
+		_, err = fmt.Fprintf(stdout, "%s %s, schema version %d of %d (%s)\n",
+			db.Server.Engine, db.Server.Version, applied, wanted, state)
 		return err
 	}
 	return fmt.Errorf("unknown migrate action %q: want up, down or status", action)

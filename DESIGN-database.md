@@ -151,6 +151,33 @@ artifact and an upgrade is deploying it. Automatic application can be disabled,
 and `openpsirt migrate up|down|status` runs them separately for an operator who
 would rather use different credentials at a time they choose.
 
+**With automatic application off, the schema is compared before anything is
+served.** The binary and the schema then move independently, and nothing
+compared them: a build carrying a new migration started, granted
+administrators, answered the readiness probe — which is a ping — and failed
+every request touching the new table. In a rolling deployment the probe passing
+is what retires the last replica that worked.
+
+| Applied version | What happens |
+|---|---|
+| Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
+| Equal | Served, and the two versions are logged |
+| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back |
+
+What the binary carries is the highest version among the embedded migration
+sources, read from their file names, which is the same rule the migration
+library applies to them.
+
+**Version zero means nothing is applied, and nothing else.** The bookkeeping
+table is probed before the version is read, so a read-only inspection does not
+create it — and an absent table arrives as an error rather than an empty
+result, so every other failure read as an empty database. `migrate status`
+printed version 0 for a fully populated database whose credentials could not
+read that one table, and the reasonable thing to do about "nothing is applied"
+is to migrate. A failed probe is followed by a trivial one: a database that
+answers the second was reachable and the table is genuinely absent; one that
+answers neither could not be read, and says so.
+
 Migrations are written in Go rather than SQL files, because they branch on the
 engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
@@ -190,6 +217,12 @@ than assumed, because both engines report "you did not hold this" as a value.
 The wait is bounded on both engines. An unbounded wait means an instance wedged
 mid-migration blocks every replacement silently, and the startup probe kills each
 in turn.
+
+The bound is a session setting, and it is unwound before the connection goes
+back — on every path, including the failing ones. Left set, one pooled
+connection carries a five-minute bound while the others carry the server
+default, and the same query afterwards either waits or is cancelled depending
+on which connection the pool hands out.
 
 ## Identifier quoting
 

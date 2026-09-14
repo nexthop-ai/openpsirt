@@ -44,8 +44,13 @@ func TestConcurrentMigrationsInOneProcessDoNotCollide(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read version: %v", err)
 		}
-		if version == 0 {
-			t.Fatal("nothing was applied")
+		wanted, err := schema.Expected()
+		if err != nil {
+			t.Fatalf("read what this build expects: %v", err)
+		}
+		if version != wanted {
+			t.Errorf("four instances migrating at once left version %d, and this build expects %d",
+				version, wanted)
 		}
 	})
 }

@@ -98,6 +98,10 @@ func Down(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 // creates it when missing, which would make a read-only inspection command
 // need schema-change rights on a fresh database, against no schema rights
 // while running.
+//
+// Zero means nothing is applied and nothing else. A database that could not be
+// read is an error, because the two were the same answer and the reasonable
+// thing to do about "nothing is applied" is to migrate.
 func Version(ctx context.Context, db *database.DB) (int64, error) {
 	running.Lock()
 	defer running.Unlock()
@@ -105,7 +109,11 @@ func Version(ctx context.Context, db *database.DB) (int64, error) {
 	if err := prepare(db); err != nil {
 		return 0, err
 	}
-	if !versionTableExists(ctx, db) {
+	there, err := versionTableExists(ctx, db)
+	if err != nil {
+		return 0, err
+	}
+	if !there {
 		return 0, nil
 	}
 	return goose.GetDBVersionContext(ctx, db.DB.DB)

@@ -111,3 +111,73 @@ func TestSQLiteNeedsNoAdvisoryLock(t *testing.T) {
 	}
 	_ = database.SQLite
 }
+
+func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
+	// The bound on the lock wait is a session setting, and Close returns the
+	// connection to the pool rather than closing it — which is why the
+	// connection is pinned in the first place. Left set, one pooled connection
+	// carries a 300-second bound and the others carry the server's default, so
+	// the same query afterwards either waits indefinitely or is cancelled,
+	// decided by which connection the pool happens to hand out.
+	engines.SkipUnless(t, database.Postgres)
+	url := os.Getenv(postgresURLEnv)
+	if url == "" {
+		t.Skipf("%s is not set", postgresURLEnv)
+	}
+	db := open(t, url)
+	ctx := context.Background()
+
+	var before string
+	if err := db.QueryRowContext(ctx, "SHOW lock_timeout").Scan(&before); err != nil {
+		t.Fatalf("read the bound before: %v", err)
+	}
+
+	release, err := acquire(ctx, db)
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	if err := release(ctx); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+
+	// The pool holds one connection under the default settings, so the
+	// checkout after the release is the connection the lock was taken on.
+	var after string
+	if err := db.QueryRowContext(ctx, "SHOW lock_timeout").Scan(&after); err != nil {
+		t.Fatalf("read the bound after: %v", err)
+	}
+	if after != before {
+		t.Errorf("the connection went back to the pool carrying lock_timeout = %q, not %q", after, before)
+	}
+}
+
+func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
+	// "The table is not there" and "I could not look" arrived the same way, so
+	// a database whose credentials cannot read the version table reported
+	// version 0 — and the reasonable thing to do about "nothing is applied" is
+	// to migrate a database that may be fully populated.
+	engines.SkipUnless(t, database.Postgres)
+	url := os.Getenv(postgresURLEnv)
+	if url == "" {
+		t.Skipf("%s is not set", postgresURLEnv)
+	}
+	db := open(t, url)
+	ctx := context.Background()
+
+	// A database with no version table reads as version 0, which is the
+	// answer that has to keep working.
+	there, err := versionTableExists(ctx, db)
+	if err != nil {
+		t.Fatalf("probing a reachable database reported a failure: %v", err)
+	}
+	t.Logf("the version table is there: %v", there)
+
+	// And one that cannot be reached at all reports that, rather than zero.
+	closed := open(t, url)
+	if err := closed.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	if _, err := versionTableExists(ctx, closed); err == nil {
+		t.Error("a database that could not be read reported that the version table is simply absent")
+	}
+}
