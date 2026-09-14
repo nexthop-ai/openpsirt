@@ -4165,6 +4165,25 @@ components:
       required:
         - items
       type: object
+    ListBodySetAsideBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodySetAsideBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SetAsideBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+      type: object
     ListBodySettingBody:
       additionalProperties: false
       properties:
@@ -6517,6 +6536,37 @@ components:
           type: string
       required:
         - value
+      type: object
+    SetAsideBody:
+      additionalProperties: false
+      properties:
+        attempts:
+          description: How many times it was tried
+          format: int64
+          type: integer
+        id:
+          description: The job, for putting it back
+          format: int64
+          type: integer
+        kind:
+          description: Which worker the job was for
+          type: string
+        last_error:
+          description: Why it stopped, where anything reported one
+          type: string
+        reference:
+          description: What the work was about
+          type: string
+        stopped_at:
+          description: When it was set aside
+          format: date-time
+          type: string
+      required:
+        - id
+        - kind
+        - reference
+        - attempts
+        - stopped_at
       type: object
     SettingBody:
       additionalProperties: false
@@ -18417,3 +18467,62 @@ paths:
       x-openpsirt-requires:
         scope: any
         note: "A person rather than a pipeline: a build server has no business asking what version is running."
+  /v1/work/set-aside:
+    get:
+      description: |-
+        Returns background work the queue has set aside, newest first, with why each stopped where anything reported a reason.
+
+        A job is set aside after it has been tried as many times as it is allowed to be. That includes a job whose worker was killed rather than one that reported a failure: nothing reports a worker that is gone, so the reason reads as the worker never having come back.
+
+        **Requires:** administrator
+      operationId: list-set-aside-work
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodySetAsideBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List work that stopped being retried
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
+  /v1/work/set-aside/{id}/retry:
+    post:
+      description: |-
+        Puts one set-aside job back in the queue with its attempts started again, for whichever worker takes it next.
+
+        Whoever does this has decided the reason it kept failing is dealt with, so the count starts from nothing: a job put back with one attempt left would be set aside again by the next transient failure. A job that is not set aside is refused rather than moved.
+
+        **Requires:** administrator
+      operationId: retry-set-aside-work
+      parameters:
+        - description: The job to put back
+          in: path
+          name: id
+          required: true
+          schema:
+            description: The job to put back
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Retry work that was set aside
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment

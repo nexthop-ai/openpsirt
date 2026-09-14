@@ -4134,6 +4134,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/work/set-aside": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List work that stopped being retried
+         * @description Returns background work the queue has set aside, newest first, with why each stopped where anything reported a reason.
+         *
+         *     A job is set aside after it has been tried as many times as it is allowed to be. That includes a job whose worker was killed rather than one that reported a failure: nothing reports a worker that is gone, so the reason reads as the worker never having come back.
+         *
+         *     **Requires:** administrator
+         */
+        get: operations["list-set-aside-work"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/work/set-aside/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry work that was set aside
+         * @description Puts one set-aside job back in the queue with its attempts started again, for whichever worker takes it next.
+         *
+         *     Whoever does this has decided the reason it kept failing is dealt with, so the count starts from nothing: a job put back with one attempt left would be set aside again by the next transient failure. A job that is not set aside is refused rather than moved.
+         *
+         *     **Requires:** administrator
+         */
+        post: operations["retry-set-aside-work"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6454,6 +6502,15 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["SavedBody"][] | null;
         };
+        ListBodySetAsideBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodySetAsideBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SetAsideBody"][] | null;
+        };
         ListBodySettingBody: {
             /**
              * Format: uri
@@ -7855,6 +7912,29 @@ export interface components {
              */
             readonly $schema?: string;
             value: string;
+        };
+        SetAsideBody: {
+            /**
+             * Format: int64
+             * @description How many times it was tried
+             */
+            attempts: number;
+            /**
+             * Format: int64
+             * @description The job, for putting it back
+             */
+            id: number;
+            /** @description Which worker the job was for */
+            kind: string;
+            /** @description Why it stopped, where anything reported one */
+            last_error?: string;
+            /** @description What the work was about */
+            reference: string;
+            /**
+             * Format: date-time
+             * @description When it was set aside
+             */
+            stopped_at: string;
         };
         SettingBody: {
             /** @description Nobody has set this; the shipped value is in use */
@@ -14906,6 +14986,65 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Info"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-set-aside-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodySetAsideBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retry-set-aside-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job to put back */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

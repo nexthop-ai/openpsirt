@@ -336,6 +336,8 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerDue(api, in)
 	registerGraph(api, in)
 	registerSettings(api, in)
+	// What the queue set aside, and putting it back.
+	registerWork(api, in)
 	registerTrail(api, in)
 	registerSaved(api, in)
 	registerBundles(api, in)

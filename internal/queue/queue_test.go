@@ -2,6 +2,7 @@ package queue_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -191,6 +192,88 @@ func TestAStaleClaimIsTakenOverByAnotherWorker(t *testing.T) {
 		}
 		if second.Attempts != 2 {
 			t.Errorf("attempts is %d after a retake, want 2", second.Attempts)
+		}
+	})
+}
+
+func TestWorkWhoseWorkerKeepsDyingIsSetAside(t *testing.T) {
+	// The other way work stops succeeding, and the one nothing reported.
+	//
+	// A worker that fails tells the queue so, and the attempts ceiling is
+	// charged where it tells it. A worker that is killed — evicted, out of
+	// memory, a node that went — tells nothing, so the ceiling was never
+	// reached and the job was reclaimed on every poll for ever. A scan that
+	// kills its worker therefore stopped that build being scanned, silently:
+	// the row stayed in the running state, which reads everywhere else as
+	// work somebody is doing.
+	opts := queue.DefaultOptions()
+	opts.MaxAttempts = 3
+	opts.ClaimTimeout = time.Millisecond
+	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		if _, err := q.Add(ctx, "scan", "kills-its-worker"); err != nil {
+			t.Fatal(err)
+		}
+		// Claimed and abandoned, over and over, with nothing ever reported.
+		for attempt := 1; attempt <= opts.MaxAttempts; attempt++ {
+			job, err := q.Claim(ctx, "worker-that-dies", "scan")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if job == nil {
+				t.Fatalf("nothing to claim on attempt %d, and the ceiling is %d",
+					attempt, opts.MaxAttempts)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		if job, err := q.Claim(ctx, "worker-that-lives", "scan"); err != nil || job != nil {
+			t.Errorf("work was reclaimed past its limit: %+v %v", job, err)
+		}
+
+		// Set aside, not merely skipped. A row left running reads to the
+		// screen a producer watches as work still in progress, so the upload
+		// is never reported as unreadable and the build is never enqueued
+		// again — which is the same silence in a different place.
+		var state string
+		var reported sql.NullString
+		if err := db.QueryRowContext(ctx,
+			"SELECT state, last_error FROM job WHERE reference = ?", "kills-its-worker").
+			Scan(&state, &reported); err != nil {
+			t.Fatal(err)
+		}
+		if state != string(queue.Dead) {
+			t.Errorf("the job is %q rather than %q, so it is still held by a worker "+
+				"that is not coming back", state, queue.Dead)
+		}
+		if !reported.Valid || reported.String == "" {
+			t.Error("the set-aside job says nothing about why it stopped")
+		}
+	})
+}
+
+func TestABacklogCountsWorkHeldByAWorkerThatStopped(t *testing.T) {
+	// The depth is what an operator has and what the backlog guard reads. A
+	// queue in the middle of a reclaim cycle holds every row in the running
+	// state, and counting only what is pending reports that as nothing to do.
+	opts := queue.DefaultOptions()
+	opts.ClaimTimeout = time.Millisecond
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		if _, err := q.Add(ctx, "ingest", "held-by-nobody"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := q.Claim(ctx, "worker-that-dies", "ingest"); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(20 * time.Millisecond)
+
+		depth, err := q.Depth(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if depth != 1 {
+			t.Errorf("the backlog reads as %d with one job held by a worker that stopped", depth)
 		}
 	})
 }
@@ -524,6 +607,74 @@ func TestRenewalsStopWithTheWorkTheyHeldFor(t *testing.T) {
 		// Whoever held it still holds it, and finishes it as usual.
 		if err := q.Succeed(ctx, job.ID, "worker"); err != nil {
 			t.Errorf("the holder could not finish its job: %v", err)
+		}
+	})
+}
+
+func TestSetAsideWorkCanBeSeenAndPutBack(t *testing.T) {
+	// Setting work aside without somewhere to see it moves the silence rather
+	// than ending it: the job stops being retried and the only signal is the
+	// thing it was about quietly not happening.
+	opts := queue.DefaultOptions()
+	opts.MaxAttempts = 1
+	opts.Backoff = 0
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		if _, err := q.Add(ctx, "ingest", "unreadable"); err != nil {
+			t.Fatal(err)
+		}
+		job, err := q.Claim(ctx, "worker", "ingest")
+		if err != nil || job == nil {
+			t.Fatalf("claiming: %v", err)
+		}
+		if err := q.Fail(ctx, job.ID, "worker", errors.New("not an inventory")); err != nil {
+			t.Fatal(err)
+		}
+
+		aside, err := q.SetAside(ctx, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(aside) != 1 {
+			t.Fatalf("the set-aside list holds %d jobs, want one", len(aside))
+		}
+		if aside[0].Reference != "unreadable" {
+			t.Errorf("the list names %q", aside[0].Reference)
+		}
+		if aside[0].LastError == nil || *aside[0].LastError == "" {
+			t.Error("the set-aside job does not say why it stopped")
+		}
+
+		// Put back with its attempts started again. A job that came back with
+		// one attempt left would be set aside by the next transient failure,
+		// which is not what somebody who fixed the cause asked for.
+		if err := q.Requeue(ctx, job.ID); err != nil {
+			t.Fatal(err)
+		}
+		again, err := q.Claim(ctx, "worker", "ingest")
+		if err != nil || again == nil {
+			t.Fatalf("the job did not come back: %v", err)
+		}
+		if again.Attempts != 1 {
+			t.Errorf("attempts is %d on the first try after being put back, want 1", again.Attempts)
+		}
+	})
+}
+
+func TestOnlySetAsideWorkIsPutBack(t *testing.T) {
+	// Putting back a job somebody is running would hand the same work to two
+	// workers, which on an ingest looks like real change rather than an error.
+	each(t, queue.DefaultOptions(), func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		if _, err := q.Add(ctx, "ingest", "in-progress"); err != nil {
+			t.Fatal(err)
+		}
+		job, err := q.Claim(ctx, "worker", "ingest")
+		if err != nil || job == nil {
+			t.Fatalf("claiming: %v", err)
+		}
+		if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotSetAside) {
+			t.Errorf("putting back running work answered %v, want it refused", err)
 		}
 	})
 }

@@ -150,7 +150,22 @@ func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (
 func (q *Queue) Depth(ctx context.Context) (int, error) { return q.depthIn(ctx, q.db) }
 
 func (q *Queue) depthIn(ctx context.Context, db bun.IDB) (int, error) {
-	n, err := db.NewSelect().Model((*Job)(nil)).Where("state = ?", Pending).Count(ctx)
+	// Waiting, plus what is held by a worker that has stopped reporting.
+	//
+	// Counting only what is pending reads a queue in the middle of a reclaim
+	// cycle as empty: every row sits in the running state, held by workers
+	// that died, and the one number an operator has says there is nothing to
+	// do. A claim past its timeout is work waiting for whoever takes it next,
+	// which is what this counts.
+	stale := q.now().Truncate(time.Microsecond).Add(-q.opts.ClaimTimeout)
+	n, err := db.NewSelect().Model((*Job)(nil)).
+		WhereGroup(" AND ", func(s *bun.SelectQuery) *bun.SelectQuery {
+			return s.
+				WhereOr("state = ?", Pending).
+				WhereOr("state = ? AND claimed_at < ? AND attempts < max_attempts",
+					Running, stale)
+		}).
+		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("measure backlog: %w", err)
 	}
@@ -181,6 +196,11 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 
 	var job *Job
 	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		// What cannot be reclaimed is set aside first, so the state that says
+		// so is reached rather than left for a pass nobody wrote.
+		if err := buryAbandoned(ctx, tx, kind, now, staleBefore); err != nil {
+			return err
+		}
 		id, err := claimableID(ctx, tx, q.db.Server.Engine, kind, now, staleBefore)
 		if err != nil || id == 0 {
 			return err
@@ -204,7 +224,8 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 			WhereGroup(" AND ", func(u *bun.UpdateQuery) *bun.UpdateQuery {
 				return u.
 					WhereOr("state = ? AND run_after <= ?", Pending, now).
-					WhereOr("state = ? AND claimed_at < ?", Running, staleBefore)
+					WhereOr("state = ? AND claimed_at < ? AND attempts < max_attempts",
+						Running, staleBefore)
 			}).
 			Exec(ctx)
 		if err != nil {
@@ -222,6 +243,46 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 	}
 	return job, nil
 }
+
+// buryAbandoned sets aside work of one kind whose worker never came back.
+//
+// A worker that dies reports nothing, so nothing calls Fail and the row stays
+// in the running state holding a claim that has gone stale. Once its attempts
+// have run out that claim is no longer reclaimable, and without this it would
+// sit there for ever: a producer asking about its upload reads a running row
+// as work still in progress, so the failure is never reported and the build is
+// never enqueued again.
+//
+// Run inside the claim, against the same kind and the same instant, because it
+// is the other half of the same decision — a job the select below will not
+// reclaim is one this has just buried, and two separate passes deciding that
+// could disagree about which jobs those are.
+//
+// Written as the failure Fail would have written. To everything downstream it
+// is the same failure; the difference is only that nobody was left alive to
+// report it.
+func buryAbandoned(ctx context.Context, tx bun.Tx, kind string, now, staleBefore time.Time) error {
+	_, err := tx.NewUpdate().Model((*Job)(nil)).
+		Set("state = ?", Dead).
+		Set("last_error = ?", ErrWorkerGone.Error()).
+		Set("claimed_by = NULL").
+		Set("updated_at = ?", now).
+		Where("kind = ?", kind).
+		Where("state = ?", Running).
+		Where("claimed_at < ?", staleBefore).
+		Where("attempts >= max_attempts").
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("set aside work whose worker never came back: %w", err)
+	}
+	return nil
+}
+
+// ErrWorkerGone is what a job records when the worker holding it never
+// reported back. It is the last_error somebody reads on the set-aside row,
+// and it is deliberately not the words of any particular failure: nothing
+// observed one.
+var ErrWorkerGone = errors.New("the worker holding this job never reported back")
 
 // ErrNoLongerHeld says the job was not this worker's to finish: its claim went
 // stale and another worker took it, or it has already been finished. Whoever
@@ -410,6 +471,67 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 func held(res sql.Result) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNoLongerHeld
+	}
+	return nil
+}
+
+// SetAside lists work that stopped being retried, newest first.
+//
+// The operator surface over the dead state. Work is set aside rather than
+// deleted so that the row and its last error are the evidence of why it
+// stopped, and evidence nobody can reach is evidence nobody has: a job that
+// stops being retried with nowhere to see it is the same silence as one that
+// is retried for ever.
+func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, error) {
+	if limit <= 0 || limit > setAsideCeiling {
+		limit = setAsideCeiling
+	}
+	var jobs []Job
+	if err := q.db.NewSelect().Model(&jobs).
+		Where("state = ?", Dead).
+		OrderExpr("updated_at DESC, id DESC").
+		Limit(limit).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("list work that was set aside: %w", err)
+	}
+	return jobs, nil
+}
+
+// setAsideCeiling bounds the set-aside listing. A read on an interactive route
+// carries a cap, and a deployment whose queue has gone wrong is exactly where
+// the list is longest.
+const setAsideCeiling = 200
+
+// ErrNotSetAside says the job is not one that stopped being retried, so there
+// is nothing here to put back.
+var ErrNotSetAside = errors.New("that job was not set aside")
+
+// Requeue puts set-aside work back, with its attempts started again.
+//
+// The attempts are reset rather than the ceiling raised: whoever puts a job
+// back has decided the reason it kept failing is dealt with, and a job that
+// came back with one attempt left would be set aside again by the next
+// transient failure. The last error is kept until something overwrites it, so
+// the evidence of the previous run survives the decision to try again.
+func (q *Queue) Requeue(ctx context.Context, id int64) error {
+	now := q.now().Truncate(time.Microsecond)
+	res, err := q.db.NewUpdate().Model((*Job)(nil)).
+		Set("state = ?", Pending).
+		Set("attempts = ?", 0).
+		Set("run_after = ?", now).
+		Set("claimed_by = NULL").
+		Set("claimed_at = NULL").
+		Set("updated_at = ?", now).
+		Where("id = ?", id).
+		Where("state = ?", Dead).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("put job %d back: %w", id, err)
+	}
+	// Rows matched rather than rows changed, which the connection settings
+	// make true on every engine. Nothing matched means the job is not set
+	// aside — already running again, or never there.
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotSetAside
 	}
 	return nil
 }

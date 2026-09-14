@@ -56,6 +56,22 @@ afterwards.
 | Retry with a growing delay | A briefly unavailable dependency is not hammered while it recovers |
 | A limit on attempts | A job that can never succeed would otherwise retry forever and crowd out work that could |
 | Set aside, never deleted | The row is kept with its last error, which is the evidence of why it failed |
+| The limit is charged on the reclaim as well as on a reported failure | A worker that is killed reports nothing, so the only record of the attempt is the count the claim itself incremented. Charged only where a worker reports, a job that kills its worker is reclaimed for ever and the set-aside state is never reached |
+| A claim that can no longer be reclaimed is set aside by the claim that skips it | One decision rather than two. A separate pass could disagree with the claim about which jobs those are, and a job left in the claimed state reads everywhere else as work somebody is doing |
+| Work abandoned by its worker records that, in place of the reason nobody reported | Downstream it is the same failure. Somebody reading the row has to be able to tell "this failed" from "nothing was left alive to say" |
+
+### Work that stopped being retried
+
+Set-aside work has an operator surface: a list of what stopped and why, and a
+way to put one back.
+
+| Rule | Reason |
+|---|---|
+| The list is set-aside work alone | Waiting and running work needs no attention, and a list of it invites acting on a state that moves underneath the reader. What is set aside has stopped moving by definition |
+| Putting a job back starts its attempts again | Whoever does it has decided the cause is dealt with. A job returned with one attempt left is set aside again by the next transient failure |
+| The last error survives being put back | It is the evidence of the previous run, and the decision to try again is not a reason to destroy it |
+| Only set-aside work is put back | Returning a running job hands the same work to two workers, which on an ingest looks like real change rather than an error |
+| The listing is capped | A read on an interactive route carries a bound, and a deployment whose queue has gone wrong is where the list is longest |
 
 ## Claim renewal
 
@@ -95,8 +111,13 @@ the work decides from is fetched inside the thing that serializes it.
 
 ## Backlog refusal
 
-New work is refused once the pending queue is deeper than a configured limit.
-The caller is told to retry.
+New work is refused once the queue is deeper than a configured limit. The
+caller is told to retry.
+
+The depth counts work that is waiting **and** work held by a worker that has
+stopped reporting. Counting only what is waiting reads a queue in the middle of
+a reclaim cycle as empty: every row sits in the claimed state, held by workers
+that died, and the one number an operator has says there is nothing to do.
 
 ## Transaction boundary
 

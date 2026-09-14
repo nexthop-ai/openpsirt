@@ -30,10 +30,15 @@ func claimableID(ctx context.Context, tx bun.Tx, engine database.Engine, kind st
 	// worker that took work meant for another would do the wrong thing to it
 	// and then mark it done — the reference means something different to each
 	// of them, so the mistake does not even fail.
+	// The attempts ceiling is charged on the reclaim arm as well as by Fail.
+	// A worker that dies reports nothing, so the only record of the attempt is
+	// the count the claim itself incremented — and without the ceiling here,
+	// a job whose worker is killed every time is reclaimed for ever and the
+	// state that says so is never reached.
 	const base = `SELECT id FROM job
 		 WHERE kind = ?
 		   AND ((state = ? AND run_after <= ?)
-		    OR  (state = ? AND claimed_at < ?))
+		    OR  (state = ? AND claimed_at < ? AND attempts < max_attempts))
 		 ORDER BY id
 		 LIMIT 1`
 
