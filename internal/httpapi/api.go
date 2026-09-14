@@ -371,6 +371,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerReachAcross(api, in)
 	registerBindings(api, Administering{
 		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
+		Groups: in.groupsReachable,
 	}, func() *setting.Store {
 		if in.DB == nil {
 			return nil

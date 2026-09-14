@@ -87,6 +87,18 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 				"nothing would administer this deployment in that mode: bind a group to admin, " +
 					"or name somebody in configuration, before switching")
 		}
+		// And something has to be able to say what groups somebody is in. A
+		// provider configured without a source of groups reports every arrival
+		// as belonging to nothing, so in this mode nobody derives any role —
+		// which is the same lockout the check above prevents, arriving by the
+		// other door and looking like a working deployment that admits nobody.
+		if wanted == access.GroupBound && a.Groups != nil && !a.Groups() {
+			return nil, huma.Error409Conflict(
+				"nothing here can say which groups somebody is in, so in that mode " +
+					"nobody would hold any role: configure a groups claim on the provider, " +
+					"an organization for GitHub sign-in, or a trusted proxy that reports " +
+					"groups, before switching")
+		}
 
 		if err := rights.SwitchTo(ctx, wanted); err != nil {
 			return nil, wentWrong(a.Logger, "cannot change where roles come from", err)

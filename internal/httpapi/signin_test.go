@@ -32,7 +32,13 @@ type stubProvider struct {
 	says   *signin.Identity
 	fail   error
 	issuer string
+	// groups says whether this provider is configured to hand over group
+	// membership, which is what decides whether roles may be switched to
+	// group-bound at all.
+	groups bool
 }
+
+func (s *stubProvider) GroupsSource() bool { return s.groups }
 
 func (s *stubProvider) Name() string { return "stub" }
 
@@ -530,6 +536,10 @@ func TestATamperedReturnAddressIsStillRefused(t *testing.T) {
 				"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
 			},
 			"return": "https://elsewhere.example/page",
+			// Sealed just now: a value with no time in it is refused for
+			// being stale, which is a different refusal from the one this
+			// test is about.
+			"minted": time.Now().UTC(),
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -658,3 +668,62 @@ func TestTheCookiesABrowserHoldsAreBoundToThisHost(t *testing.T) {
 		}
 	}
 }
+
+func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
+	// The window was a MaxAge on the cookie and nothing else, which is a
+	// request to the browser — and the browser holding it may be the one that
+	// planted it. The payload carried no time, so the server could not tell a
+	// one-minute-old value from a one-month-old one, and the signing key is
+	// minted once and never rotated: a sealed sign-in stayed acceptable for
+	// the life of the deployment.
+	twoSignIn(t, func(t *testing.T, r *signInReach) {
+		sealed := func(minted time.Time) string {
+			body, err := json.Marshal(map[string]any{
+				"pending": map[string]string{
+					"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
+				},
+				"minted": minted,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return r.sealed(t, body)
+		}
+		complete := func(cookie string) int {
+			req := httptest.NewRequest(http.MethodGet,
+				"/v1/sign-in/stub/callback?state=the-state&code=a-code", nil)
+			req.Header.Set("Cookie", "openpsirt_pending="+cookie)
+			rec := httptest.NewRecorder()
+			r.handler.ServeHTTP(rec, req)
+			return rec.Code
+		}
+
+		// Sealed just now, and accepted — so the refusals below are the age
+		// rather than the whole path being broken.
+		if got := complete(sealed(time.Now().UTC())); got != http.StatusFound {
+			t.Fatalf("a sign-in sealed just now answered %d", got)
+		}
+		// Older than the window it was given.
+		if got := complete(sealed(time.Now().UTC().Add(-2 * pendingLifeForTest))); got == http.StatusFound {
+			t.Error("a sign-in sealed long ago was still completed")
+		}
+		// And one carrying no time at all, which is what every value sealed
+		// before this check looks like.
+		body, err := json.Marshal(map[string]any{
+			"pending": map[string]string{
+				"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := complete(r.sealed(t, body)); got == http.StatusFound {
+			t.Error("a sign-in carrying no mint time was read as fresh")
+		}
+	})
+}
+
+// pendingLifeForTest is the window a sign-in is given, which the package keeps
+// unexported. Stated here rather than reached for, so the test says what it
+// assumes.
+const pendingLifeForTest = 10 * time.Minute

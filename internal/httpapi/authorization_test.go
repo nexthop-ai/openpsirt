@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
 // declaredBody builds a body the endpoint would accept, so that what a test
@@ -963,4 +964,82 @@ func filled(path string) string {
 		path = strings.ReplaceAll(path, from, to)
 	}
 	return path
+}
+
+// saying is a provider that reports whether it has a source of groups, and
+// nothing else. What is under test is the answer to that one question.
+type saying struct {
+	*stubProvider
+	groups bool
+}
+
+func (s *saying) GroupsSource() bool { return s.groups }
+
+func TestRolesCannotBeBoundToGroupsNothingCanReport(t *testing.T) {
+	// The other door to the lockout the mode switch already guards. A provider
+	// configured without a source of groups reports every arrival as belonging
+	// to nothing, so in group-bound mode nobody derives any role — and the
+	// deployment looks like a working one that admits nobody, including
+	// whoever made the change.
+	//
+	// The OIDC adapter supplies a default for the username claim and none for
+	// the groups claim, so this is the default configuration rather than an
+	// exotic one.
+	twoReach(t, func(t *testing.T, r *reach) {
+		// Something has to administer in the new mode, or the check beside
+		// this one refuses first and this would prove nothing.
+		if err := r.rights.BindAdmin(t.Context(), "admins"); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct {
+			what   string
+			groups bool
+			want   int
+		}{
+			{"a provider that reports no groups", false, http.StatusConflict},
+			{"a provider that does", true, http.StatusOK},
+		} {
+			handler := withProvider(t, r, c.groups)
+			req := httptest.NewRequest(http.MethodPut, "/v1/roles/mode",
+				strings.NewReader(`{"mode":"group-bound"}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set(testHeader, "admin")
+			fromOurOwnPage(req)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != c.want {
+				t.Errorf("%s: switching answered %d, want %d: %s",
+					c.what, rec.Code, c.want, rec.Body.String())
+			}
+			if c.want == http.StatusConflict && !contains(rec.Body.String(), "groups") {
+				t.Errorf("%s: the refusal does not say what is missing: %s",
+					c.what, rec.Body.String())
+			}
+		}
+	})
+}
+
+// withProvider is the server again, with one sign-in provider that either has
+// a source of groups or has not.
+func withProvider(t *testing.T, r *reach, groups bool) http.Handler {
+	t.Helper()
+	files, err := attach.NewFiles(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources, err := access.ParseSources("192.0.2.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil,
+		httpapi.Ingest{
+			DB: r.db, Queue: queue.New(r.db, queue.DefaultOptions()), Files: files,
+			Access: access.NewResolver(r.rights,
+				access.Trust{Header: testHeader, From: sources}),
+			Providers: map[string]signin.Provider{
+				"one": &saying{stubProvider: &stubProvider{}, groups: groups},
+			},
+		})
+	return handler
 }

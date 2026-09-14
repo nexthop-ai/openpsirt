@@ -48,13 +48,30 @@ type OIDC struct {
 
 // OIDCConfig is what an operator supplies for an OpenID Connect provider.
 type OIDCConfig struct {
-	Name          string
-	Issuer        string
-	ClientID      string
-	ClientSecret  string
-	Scopes        []string
+	Name         string
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	Scopes       []string
+	// GroupsClaim names the claim carrying group membership. **Empty means
+	// groups are never read**, which is the right answer for a deployment
+	// assigning roles directly and the wrong one for a deployment about to
+	// switch to group-bound roles: every claim set then reads as having no
+	// groups, and nobody derives anything.
+	//
+	// Stated here because the GitHub adapter states the same choice about its
+	// organization and this did not, so the two adapters read as though they
+	// disagreed about whether empty was a choice or an omission.
 	GroupsClaim   string
 	UsernameClaim string
+	// client is what discovery and every fetch after it go through.
+	//
+	// Unexported, so only this package can supply one: the guard refuses plain
+	// HTTP, refuses any host but the issuer's, and refuses to connect inside
+	// this network — all three of which describe a test server exactly, and
+	// every method of this type was unexecuted for want of one. The guard has
+	// its own tests, against the layers rather than through them.
+	client *http.Client
 }
 
 // NewOIDC discovers a provider and returns an adapter for it.
@@ -74,10 +91,24 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
 		return nil, fmt.Errorf("the %q provider needs a client identifier and secret", cfg.Name)
 	}
+	// The name becomes a path segment and a route parameter, so it has to be
+	// one. Unchecked, a name carrying a slash or a space produced a deployment
+	// that started, logged "sign-in configured", and could not complete a
+	// sign-in for anybody.
+	name := strings.TrimSpace(cfg.Name)
+	if name == "" || len(name) > 64 || url.PathEscape(name) != name {
+		return nil, fmt.Errorf(
+			"the provider name %q cannot be part of an address: set %sOIDC_NAME to a short "+
+				"name made only of characters a URL path segment carries as written",
+			cfg.Name, "OPENPSIRT_")
+	}
 
 	// Discovery and the key fetches that follow it are pinned to the issuer's
 	// host, refuse redirects, and refuse to connect inside this network.
-	guarded := outward.Guarded(issuer.Hostname())
+	guarded := cfg.client
+	if guarded == nil {
+		guarded = outward.Guarded(issuer.Hostname())
+	}
 	ctx = oidc.ClientContext(ctx, guarded)
 	provider, err := oidc.NewProvider(ctx, strings.TrimSuffix(cfg.Issuer, "/"))
 	if err != nil {
@@ -95,10 +126,22 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	// Checked at startup rather than at each redirect, so a provider that
 	// would do this stops the process instead of producing a deployment that
 	// misdirects the first person to sign in.
+	// The keys are fetched from a third endpoint, which the discovery document
+	// names and the library does not expose — so it was the one address this
+	// process fetches that nothing checked. A provider naming it elsewhere
+	// produces a deployment that starts and verifies no token for anybody.
+	var document struct {
+		JWKSURL string `json:"jwks_uri"`
+	}
+	if err := provider.Claims(&document); err != nil {
+		return nil, fmt.Errorf("read what the %q provider published: %w", cfg.Name, err)
+	}
+
 	endpoint := provider.Endpoint()
 	for what, raw := range map[string]string{
 		"authorization": endpoint.AuthURL,
 		"token":         endpoint.TokenURL,
+		"keys":          document.JWKSURL,
 	} {
 		named, err := url.Parse(raw)
 		if err != nil {
@@ -143,7 +186,7 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	}
 
 	return &OIDC{
-		name:   cfg.Name,
+		name:   name,
 		issuer: strings.TrimRight(strings.TrimSpace(cfg.Issuer), "/"),
 		config: oauth2.Config{
 			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
@@ -161,6 +204,15 @@ func (o *OIDC) Issuer() string { return o.issuer }
 
 // Name is how a sign-in path names this provider.
 func (o *OIDC) Name() string { return o.name }
+
+// GroupsSource reports whether a claim carrying group membership was named.
+//
+// Empty means groups are never read: the lookup is of a claim nobody sets, so
+// every claim set reads as having none. The GitHub adapter stated that as a
+// deliberate choice about its organization and this said nothing, so the two
+// adapters read as though they disagreed about whether empty was a choice or
+// an omission.
+func (o *OIDC) GroupsSource() bool { return strings.TrimSpace(o.groupsClaim) != "" }
 
 // Begin returns where to send the browser.
 func (o *OIDC) Begin(_ context.Context, redirectURI string) (string, Pending, error) {

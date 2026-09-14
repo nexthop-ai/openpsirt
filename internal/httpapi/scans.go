@@ -111,6 +111,22 @@ func (in Ingest) trail() *trail.Store {
 
 // rights returns a store over who may do what, or nothing where there is no
 // database.
+// groupsReachable says whether anything configured here can report which
+// groups somebody is in: a provider with a source of them, or a trusted proxy
+// that reports them.
+//
+// Asked before roles are switched to group-bound. Without a source every
+// arrival belongs to nothing, so nobody derives any role and the deployment
+// locks itself out — including whoever made the change.
+func (in Ingest) groupsReachable() bool {
+	for _, provider := range in.Providers {
+		if provider.GroupsSource() {
+			return true
+		}
+	}
+	return in.Access != nil && in.Access.ReportsGroups()
+}
+
 func (in Ingest) rights() *access.Store {
 	if in.DB == nil {
 		return nil

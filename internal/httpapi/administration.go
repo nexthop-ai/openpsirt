@@ -86,6 +86,14 @@ type Administering struct {
 	// redeemable for is read. Nil where this process has no database, and
 	// then the built-in window applies.
 	Settings func() *setting.Store
+	// Groups says whether anything configured here can hand over group
+	// membership: a provider with a source of groups, or a trusted proxy that
+	// reports them.
+	//
+	// Asked before roles are switched to group-bound. Without a source every
+	// arrival reports belonging to nothing, so nobody derives any role and the
+	// deployment locks itself out — including whoever made the change.
+	Groups func() bool
 }
 
 // PersonBody is somebody who has been granted access.
