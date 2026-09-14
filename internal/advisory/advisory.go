@@ -599,12 +599,18 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	}
 	sum := sha256.Sum256(body)
 
-	recorded := &Issuance{
-		ProductID: named.ID, VulnerabilityID: issue.ID,
-		Digest: hex.EncodeToString(sum[:]), Summary: strings.TrimSpace(summary),
-		IssuedBy: subject.ID, IssuedAt: s.now().UTC().Truncate(time.Microsecond),
-	}
+	issuedAt := s.now().UTC().Truncate(time.Microsecond)
+	var recorded *Issuance
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// Built inside, because an insert writes the generated identifier back
+		// into the model and the ordinal below is read from the database. A
+		// retry of a rolled-back attempt would re-insert a model carrying both
+		// of that attempt's answers.
+		recorded = &Issuance{
+			ProductID: named.ID, VulnerabilityID: issue.ID,
+			Digest: hex.EncodeToString(sum[:]), Summary: strings.TrimSpace(summary),
+			IssuedBy: subject.ID, IssuedAt: issuedAt,
+		}
 		// Scanned into a value rather than read through a cursor: a cursor
 		// left open while the insert runs is two statements interleaved on one
 		// connection, which one engine tolerates and another refuses.

@@ -196,6 +196,12 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 
 	var job *Job
 	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		// Every attempt starts from nothing. InTransaction re-runs this
+		// closure when a commit is refused for a reason worth retrying, and an
+		// attempt that claimed a job and was then rolled back would leave the
+		// pointer set — so an attempt that finds nothing claimable returns no
+		// error and Claim hands back a claim the database does not have.
+		job = nil
 		id, err := claimableID(ctx, tx, q.db.Server.Engine, kind, now, staleBefore)
 		if err != nil || id == 0 {
 			return err

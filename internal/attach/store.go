@@ -224,16 +224,20 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	}
 
 	now := s.now().Truncate(time.Microsecond)
-	row := &Attachment{
-		Token: token, ProductID: productID, VulnerabilityID: vulnerabilityID,
-		Filename: SafeName(filename), ContentType: contentType, SizeBytes: size,
-		Digest: hex.EncodeToString(digest.Sum(nil)), ObjectKey: key,
-		UploadedBy: subject.ID, UploadedAt: now,
-	}
-	if hangsOffTheIssue {
-		row.AttachedAt = &now
-	}
+	var row *Attachment
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// Built inside, because an insert writes the generated identifier back
+		// into the model. A retry of a rolled-back attempt would re-insert a
+		// model already carrying the key that attempt was given.
+		row = &Attachment{
+			Token: token, ProductID: productID, VulnerabilityID: vulnerabilityID,
+			Filename: SafeName(filename), ContentType: contentType, SizeBytes: size,
+			Digest: hex.EncodeToString(digest.Sum(nil)), ObjectKey: key,
+			UploadedBy: subject.ID, UploadedAt: now,
+		}
+		if hangsOffTheIssue {
+			row.AttachedAt = &now
+		}
 		// Asked again inside the transaction, because the first answer
 		// was read before the bytes were carried and the deployment
 		// may have filled up while they were.
