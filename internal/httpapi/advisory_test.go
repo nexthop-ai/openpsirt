@@ -221,3 +221,61 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotGeneratedForSomebodyWhoMayNotSeeIt
 		}
 	})
 }
+
+func TestAProductYouCannotSeeAnswersLikeOneNobodyDeclared(t *testing.T) {
+	// Every refusal here is shaped so that "you may not see that" and "that
+	// does not exist" cannot be told apart. Both of the reads had a refusal
+	// for it and neither was ever executed — and one of them was broken: it
+	// answered a denial the handler had no arm for, so a product the reader
+	// could not see faulted with a 500 while an undeclared name answered 404.
+	// The pair of answers is the directory.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+				`"summary":"The console does not clear the previous session.",`+
+				`"severity":"high"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+
+		// "outsider" holds a role on theirs and nothing on mine, so "mine" is
+		// a product they may not see. "nosuch" was never declared. The two
+		// must be indistinguishable on every route.
+		for _, route := range []struct {
+			method string
+			path   string
+			body   string
+		}{
+			{http.MethodGet, "/advisory", ""},
+			{http.MethodGet, "/advisory/issuance", ""},
+			{http.MethodPost, "/advisory/issuance", `{"summary":"Issued."}`},
+		} {
+			invisible := asPerson(t, r, "outsider", route.method,
+				"/v1/products/mine/issues/"+recorded.Identifier+route.path, route.body)
+			undeclared := asPerson(t, r, "outsider", route.method,
+				"/v1/products/nosuch/issues/"+recorded.Identifier+route.path, route.body)
+
+			if invisible.Code != undeclared.Code {
+				t.Errorf("%s%s: a product they may not see answers %d and one nobody "+
+					"declared answers %d — the difference is a directory",
+					route.method, route.path, invisible.Code, undeclared.Code)
+			}
+			if invisible.Code >= 500 {
+				t.Errorf("%s%s: a product they may not see faulted: %d %s",
+					route.method, route.path, invisible.Code, invisible.Body.String())
+			}
+			if invisible.Body.String() != undeclared.Body.String() {
+				t.Errorf("%s%s: the two refusals read differently:\n  %s\n  %s",
+					route.method, route.path, invisible.Body.String(), undeclared.Body.String())
+			}
+		}
+	})
+}

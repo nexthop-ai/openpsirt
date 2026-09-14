@@ -666,8 +666,13 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	if !subject.Sees(named.ID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", named.ID))
+	// The same refusal For gives, and for the same reason. Answered as a
+	// denial it reached the handler with no arm for it and became a 500, while
+	// a product nobody declared answered 404 — so the pair of answers said
+	// which products exist, which is the oracle every refusal here is shaped
+	// to avoid.
+	if subject.Kind != access.Person || !subject.Sees(named.ID) {
+		return nil, ErrNoSuchIssue
 	}
 	// Authorized before the identifier is resolved, so a name nobody holds
 	// and a name in a product this reader cannot see answer alike.
