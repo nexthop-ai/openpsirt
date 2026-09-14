@@ -23,6 +23,17 @@ func TestAVectorIsScoredTheWayThePublishedFormulaScoresIt(t *testing.T) {
 		{"CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N", 550, "medium"},
 		{"CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:L/A:N", 470, "medium"},
 		{"CVSS:3.1/AV:P/AC:H/PR:H/UI:R/S:U/C:N/I:N/A:N", 0, "none"},
+		// The two bands nothing reached. The six scores above are 9.8, 9.1,
+		// 5.5, 4.7, 0.0 and 9.8, so nothing landed in [7.0, 9.0) or in
+		// (0.0, 4.0) and neither arm of the band had ever run — while the
+		// band is what decides a finding's deadline window.
+		//
+		// 6.42 × 0.56 impact plus 8.22 × 0.85 × 0.77 × 0.85 × 0.85
+		// exploitability is 7.482, which rounds up to 7.5.
+		{"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N", 750, "high"},
+		// 6.42 × 0.22 plus 8.22 × 0.55 × 0.44 × 0.27 × 0.62 is 1.745, which
+		// rounds up to 1.8.
+		{"CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N", 180, "low"},
 		// The same base formula, so the older version scores identically.
 		{"CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", 980, "critical"},
 	} {

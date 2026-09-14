@@ -500,5 +500,17 @@ func matched(details []matchDetail) finding.Matched {
 	if len(details) == 0 {
 		return ""
 	}
-	return finding.ByAdvisory
+	// An allowlist, so that the paragraph above is true. It used to be a
+	// denylist — anything not naming a CPE read as the ecosystem advisory —
+	// which meant a match kind this does not know read as the *authoritative*
+	// one, the direction that hides something, and the comment said the
+	// opposite. A word nobody here has checked is a word whose strength
+	// nobody here has checked.
+	for _, detail := range details {
+		switch strings.ToLower(detail.Type) {
+		case "exact-direct-match", "exact-indirect-match":
+			return finding.ByAdvisory
+		}
+	}
+	return finding.ByIdentifier
 }
