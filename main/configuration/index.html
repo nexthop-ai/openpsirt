@@ -494,6 +494,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#which-claim-carries-the-username" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which claim carries the username
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signing-in-when-the-provider-is-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing in when the provider is gone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#github" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -719,6 +741,28 @@
     <span class="md-ellipsis">
       
         An OpenID Connect provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-claim-carries-the-username" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which claim carries the username
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signing-in-when-the-provider-is-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing in when the provider is gone
       
     </span>
   </a>
@@ -1082,8 +1126,8 @@ username, and two providers issuing them independently cannot be told apart.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_OIDC_USERNAME_CLAIM</code></td>
-<td>The claim to take a person's identity from, when it is not the subject</td>
-<td>unset</td>
+<td>Which claim carries the name an authorization is written for. <strong>Required</strong>, with no default — see below</td>
+<td>none — the process refuses to start without it</td>
 </tr>
 <tr>
 <td><code>OPENPSIRT_OIDC_GROUPS_CLAIM</code></td>
@@ -1092,6 +1136,93 @@ username, and two providers issuing them independently cannot be told apart.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="which-claim-carries-the-username">Which claim carries the username<a class="headerlink" href="#which-claim-carries-the-username" title="Permanent link">&para;</a></h3>
+<p>The claim is not the identity. The provider's subject is, and the first
+sign-in pins it; from then on the subject decides and a rename is followed as
+a label.</p>
+<p>This claim does one job: match an authorization an administrator wrote for
+somebody who has not arrived yet. That has to be a name a person can type, so
+the subject itself cannot serve — nobody knows it in advance. The property it
+needs is narrower than immutable:</p>
+<blockquote>
+<p><strong>An end user must not be able to set it to a name an administrator might
+have authorized.</strong></p>
+</blockquote>
+<p>The exposure runs from the moment a grant is written until somebody redeems
+it, which <code>signin.claim-window</code> also bounds.</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Usually</th>
+<th>Check before you trust it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Okta</td>
+<td><code>preferred_username</code> — the Okta login, normally the address the directory assigned</td>
+<td>Self-service profile editing must not cover the username or the primary email. It does not by default</td>
+</tr>
+<tr>
+<td>Entra ID</td>
+<td><code>oid</code>, or <code>upn</code> where administrators want a name they recognize</td>
+<td><code>preferred_username</code> on Entra is not a good choice: it follows the mail nickname</td>
+</tr>
+<tr>
+<td>Keycloak</td>
+<td>A custom claim mapped to an administrator-managed attribute</td>
+<td>If self-registration is on, <code>preferred_username</code> is a name the account holder chose, and is the case this refusal exists for</td>
+</tr>
+<tr>
+<td>Anything else</td>
+<td>Whatever the provider assigns rather than the person</td>
+<td>Ask whether a user can edit it in the provider's own account settings</td>
+</tr>
+</tbody>
+</table>
+<p><code>preferred_username</code> rides on the <code>profile</code> scope rather than <code>email</code>. The
+scopes requested are <code>openid profile email</code> and are not configurable, so a
+claim carried by any of the three is available.</p>
+<p>A claim the provider does not send, or sends as something other than a string,
+reads as absent. The sign-in then falls back to the address the provider says
+it verified, and failing that to the subject — which matches no authorization
+anybody typed, so the person is refused rather than admitted. <strong>A claim name
+with a typo in it therefore reads as "this person was never granted access"</strong>,
+not as a configuration error, so check the name against the provider's own
+token before deciding somebody's grant is missing.</p>
+<h3 id="signing-in-when-the-provider-is-gone">Signing in when the provider is gone<a class="headerlink" href="#signing-in-when-the-provider-is-gone" title="Permanent link">&para;</a></h3>
+<p>The trusted header below is the way in that does not depend on the provider,
+and it is what a provider change goes through. A pinned identifier does not
+refuse a proxy arrival, so everybody reaches what they already hold.</p>
+<p><strong>The provider is down and people must sign in.</strong></p>
+<ol>
+<li>Unset <code>OPENPSIRT_OIDC_ISSUER</code>. A provider that cannot be discovered stops
+   the process at startup, so leaving it set means nothing starts at all.</li>
+<li>Set <code>OPENPSIRT_TRUSTED_HEADER</code> and <code>OPENPSIRT_TRUSTED_SOURCES</code>. Both are
+   needed; half a configuration stops the process.</li>
+<li>Restart. Sign-in is by the name the proxy asserts.</li>
+</ol>
+<p><strong>The provider is changing.</strong> An identifier belongs to the provider that
+issued it, and the same string names somebody else at another one, so a
+deployment configured for a provider its bound identities do not name refuses
+to start.</p>
+<ol>
+<li>Point <code>OPENPSIRT_OIDC_ISSUER</code> back at the <strong>old</strong> provider, or configure the
+   trusted header with no provider at all where the old one cannot be reached
+   either. A binding is withdrawn while the provider that made it is still
+   configured.</li>
+<li><code>DELETE /v1/people/{identity}/identifier</code> for each person. The
+   authorization and the roles stay; only the pin goes.</li>
+<li>Configure the new provider and restart. Each name is redeemed again by
+   whoever next arrives holding it.</li>
+</ol>
+<p>Doing it the other way round — configuring the new provider first — leaves a
+process that will not start. The refusal names the old issuer and the steps, so
+the way out is to put that value back and start at step 1.</p>
+<p>What is compared is the <strong>issuer</strong>, not <code>OPENPSIRT_OIDC_NAME</code>. Renaming the
+button changes nothing, and repointing the issuer while leaving the button
+alone is caught.</p>
 <h3 id="github">GitHub<a class="headerlink" href="#github" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
