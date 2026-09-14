@@ -149,3 +149,76 @@ func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
 		}
 	})
 }
+
+func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
+	// The whole reason this operation exists beside the per-place one. A
+	// judgment is about an issue in a component, which is a group of places
+	// rather than one — a kernel flaw sits at sixty — and asking per place is
+	// a request each, so the screen sampled the first few and merged what came
+	// back. A build reachable only from a place the sample missed was never
+	// offered, and the judgment silently did not travel there.
+	//
+	// Nothing executed the merged answer at all: it is the only producer of
+	// the set of other builds a judgment is offered against, 117 lines at
+	// 0.0%, and its sole caller is this route. A judgment travelling to the
+	// wrong builds, or to none, looked exactly like one that travelled
+	// correctly.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		// One other build at the version this one ships, and one at another.
+		// The decision is keyed on the versions rather than on the build, so
+		// the first is reached by lookup and the second has to be agreed to.
+		r.scannedAlso(t, "arista", "3.7.0")
+		r.scannedAlso(t, "mellanox", "3.8.0")
+
+		var reached struct {
+			Automatic []struct {
+				Variant string `json:"variant"`
+				Version string `json:"version"`
+				Places  int    `json:"places"`
+			} `json:"automatic"`
+			Differing []struct {
+				Variant string `json:"variant"`
+				Version string `json:"version"`
+				Places  int    `json:"places"`
+			} `json:"differing"`
+		}
+		read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/components/libnl-3-200/reach", &reached)
+
+		if len(reached.Automatic) != 1 || reached.Automatic[0].Variant != "arista" {
+			t.Errorf("the build at the same version is reached by lookup and was "+
+				"answered as %+v", reached.Automatic)
+		}
+		if len(reached.Differing) != 1 || reached.Differing[0].Variant != "mellanox" ||
+			reached.Differing[0].Version != "3.8.0" {
+			t.Errorf("the build at another version has to be agreed to and was "+
+				"answered as %+v", reached.Differing)
+		}
+		// A build reached from two places of one finding is one thing to tick
+		// and carries the places of both, which is what merging means here.
+		for _, each := range append(reached.Automatic, reached.Differing...) {
+			if each.Places < 1 {
+				t.Errorf("%s is offered and names no place it was reached from", each.Variant)
+			}
+		}
+	})
+}
+
+func TestTheMergedReachAnswersNothingToSomebodyWhoMayNotSeeTheProduct(t *testing.T) {
+	// Every query carries a subject, and this one produces the list of other
+	// builds a judgment is written into. An answer that named a build somebody
+	// may not see would be a directory of what exists, and ticking it would
+	// write a decision where they hold nothing.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		r.scannedAlso(t, "arista", "3.7.0")
+		got := asPerson(t, r, "outsider", http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/components/libnl-3-200/reach", "")
+		if got.Code != http.StatusNotFound {
+			t.Errorf("somebody who may not see the product was answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
