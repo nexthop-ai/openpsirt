@@ -622,30 +622,39 @@ openapi-current: openapi
 # own output for each engine by name; without the same check locally, "the
 # suite is green" and "the suite ran" are two different facts with one command
 # behind them. This is the command to run before committing.
+#
+# The names it greps for come from the application's own enumeration rather
+# than from a list here. They were written out by hand three times, so a fifth
+# engine would not have been looked for by any of them — and a grep for
+# nothing reports the same "OK" as a grep that found nothing wrong. The empty
+# check below is for the same reason: an enumeration that came back empty would
+# make every loop vacuous.
 check-engines:
 ifneq ($(ENGINES_MISSING),)
 	@echo "Not configured: $(ENGINES_MISSING). SQLite alone tests none of the"
 	@echo "portability traps, so this refuses rather than passing. See AGENTS.md."
 	@exit 1
 endif
-	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
+	@every=$$($(GO) run ./internal/tools/engines) || exit 1; \
+	  servers=$$($(GO) run ./internal/tools/engines servers) || exit 1; \
+	  [ -n "$$every" ] && [ -n "$$servers" ] \
+	    || { echo "the engine list came back empty, so these greps check nothing"; exit 1; }; \
+	  out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
 	  $(GO) test ./internal/schema/ -count=1 -v -run TestMigrationsApplyOnEveryEngine \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in sqlite postgres mysql mariadb; do \
+	  for engine in $$every; do \
 	    grep -q "PASS: TestMigrationsApplyOnEveryEngine/$$engine" "$$out" \
 	      || { echo "$$engine did not run"; exit 1; }; \
-	  done
-	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
+	  done; \
 	  $(GO) test ./internal/database/migrate/ -count=1 -v -run TestLockExcludes \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in postgres mysql mariadb; do \
+	  for engine in $$servers; do \
 	    grep -q "PASS: TestLockExcludesAnotherConnection/$$engine" "$$out" \
 	      || { echo "the migration lock was not exercised on $$engine"; exit 1; }; \
-	  done
-	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
+	  done; \
 	  $(GO) test ./internal/dbtest/ -count=1 -v -run TestEachEngineIsTheEngineItSaysItIs \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in sqlite postgres mysql mariadb; do \
+	  for engine in $$every; do \
 	    grep -q "PASS: TestEachEngineIsTheEngineItSaysItIs/$$engine" "$$out" \
 	      || { echo "$$engine was not checked for being itself"; exit 1; }; \
 	  done

@@ -649,4 +649,14 @@ the file is not the run that uses it. Run `make engines-up` first, then
 ### Adding a table
 
 Add it to `tables` in `internal/dbtest`, ahead of everything it points at.
-Nothing enforces this and SQLite will not catch it.
+
+**Membership is enforced and the order is not.** A test in `internal/dbtest`
+asks the migrated schema what tables it made and fails on a name in one list
+and not the other, in both directions — a table the migrations make and the
+list omits is never emptied between tests, and a name no migration makes is a
+delete against a table that is not there. Where it goes in the list is still
+judgment: putting children before the rows they reference means reading the
+foreign keys, and the comment beside each name is the record of that reasoning.
+An ordering mistake fails on the engines that enforce foreign keys during a
+bulk delete, which is not all of them, so it looks engine-specific rather than
+like the ordering mistake it is.

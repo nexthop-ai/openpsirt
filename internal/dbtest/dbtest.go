@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -59,16 +60,37 @@ type candidate struct {
 	env  string
 }
 
+// urlEnv names the environment variable holding a URL for each engine that
+// needs one. SQLite needs none: it is a file this harness makes.
+var urlEnv = map[database.Engine]string{
+	database.Postgres: PostgresURLEnv,
+	database.MySQL:    MySQLURLEnv,
+	database.MariaDB:  MariaDBURLEnv,
+}
+
+// candidates is every engine a test may reach, SQLite first so that the one
+// engine every checkout has is the one a failing run reports first.
+//
+// Derived from database.Engines rather than listed again, so that an engine
+// added there is one this harness runs rather than one it silently omits.
 func candidates() []candidate {
-	return []candidate{
-		{name: database.SQLite},
-		{name: database.Postgres, env: PostgresURLEnv},
-		{name: database.MySQL, env: MySQLURLEnv},
-		{name: database.MariaDB, env: MariaDBURLEnv},
+	all := []candidate{{name: database.SQLite}}
+	for _, engine := range database.Engines() {
+		if engine == database.SQLite {
+			continue
+		}
+		all = append(all, candidate{name: engine, env: urlEnv[engine]})
 	}
+	return all
 }
 
 // Each runs fn once against every database available, as a subtest.
+//
+// **The database arrives migrated and empty of the previous test's rows.**
+// Every path here hands back a migrated schema — SQLite copies a template that
+// was migrated once per binary, and each server database is either migrated on
+// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
+// Reset only where a test leaves rows a later one must not see.
 //
 // This is for a test that pins what a query does: every portability defect
 // found so far was a query behaving differently on one engine, so a store
@@ -81,6 +103,12 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Alone is Each for a test that cannot run beside another in its package.
 //
+// **The database arrives migrated and empty of the previous test's rows.**
+// Every path here hands back a migrated schema — SQLite copies a template that
+// was migrated once per binary, and each server database is either migrated on
+// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
+// Reset only where a test leaves rows a later one must not see.
+//
 // What qualifies is a test that changes something the whole process shares —
 // an environment variable, the working directory — rather than one that is
 // merely delicate. Everything else uses Each: the databases are already
@@ -92,6 +120,12 @@ func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 }
 
 // Two runs fn against SQLite and PostgreSQL only.
+//
+// **The database arrives migrated and empty of the previous test's rows.**
+// Every path here hands back a migrated schema — SQLite copies a template that
+// was migrated once per binary, and each server database is either migrated on
+// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
+// Reset only where a test leaves rows a later one must not see.
 //
 // This is for a test that pins something above the store — routing, which
 // role reaches which endpoint, the shape of a response — where the queries
@@ -107,6 +141,12 @@ func Two(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 }
 
 // Only runs fn against one engine.
+//
+// **The database arrives migrated and empty of the previous test's rows.**
+// Every path here hands back a migrated schema — SQLite copies a template that
+// was migrated once per binary, and each server database is either migrated on
+// creation or emptied on reuse — so a test needs no schema.Up of its own. Call
+// Reset only where a test leaves rows a later one must not see.
 //
 // The narrowest of the three, and it needs the narrowest reason: not "the
 // other engines are slow" but "the other engines cannot disagree". What
@@ -612,6 +652,42 @@ var tables = []string{
 	"application_setting",
 }
 
+// TablesIn is every table the migrations made, sorted, read from the database
+// rather than from the migration source.
+//
+// SQLite only: the three server engines spell this question three other ways,
+// and the answer does not vary by engine — the migrations are one list of
+// statements and what differs between engines is the column types. A caller
+// that wants it on a server engine wants a different question.
+//
+// It fails rather than returning nothing, because an empty answer and a
+// database nobody migrated look the same to every caller.
+func TablesIn(t *testing.T, ctx context.Context, db *database.DB) []string {
+	t.Helper()
+	rows, err := db.QueryContext(ctx,
+		`SELECT "name" FROM "sqlite_master" WHERE "type" = 'table' AND "name" NOT LIKE 'sqlite_%'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var made []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		made = append(made, name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(made) == 0 {
+		t.Fatal("the schema declared no tables, so this checked nothing")
+	}
+	slices.Sort(made)
+	return made
+}
+
 // Reset empties every table, leaving the schema in place.
 //
 // It lives here rather than in each test package so that adding a table is one
@@ -637,7 +713,7 @@ func clear(ctx context.Context, db *database.DB) error {
 	// touches a handful of the fifty-odd tables, so most of the work was
 	// emptying tables that were already empty. Which ones hold anything is one
 	// more statement, asked before the deletes and inside the same transaction.
-	return db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
 		occupied, err := occupied(ctx, tx)
 		if err != nil {
 			return err

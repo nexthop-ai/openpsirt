@@ -30,6 +30,14 @@ const (
 	SQLite Engine = "sqlite"
 )
 
+// Engines is every supported engine, in the order they are declared.
+//
+// One enumeration, so that a fifth engine is added in one place. A test
+// harness narrowing a run by name checks against this, and a gate asking
+// which engines a run must have reached reads it rather than a list somebody
+// typed beside it.
+func Engines() []Engine { return []Engine{Postgres, MySQL, MariaDB, SQLite} }
+
 // String returns the engine's name.
 func (e Engine) String() string { return string(e) }
 

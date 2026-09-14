@@ -51,40 +51,65 @@ func TestEachEngineIsTheEngineItSaysItIs(t *testing.T) {
 			t.Fatalf("ask the server what it is: %v", err)
 		}
 
-		// What each engine's own version string contains. MariaDB reports
-		// itself through MySQL's function and says "MariaDB" in the text,
-		// which is the only thing telling the two apart from here.
-		want := map[database.Engine]string{
-			database.Postgres: "postgresql",
-			database.MariaDB:  "mariadb",
-		}[labeled]
+		want, known := banners[labeled]
+		if !known {
+			t.Fatalf("no banner is recorded for %q, so this test cannot tell "+
+				"which engine it connected to", labeled)
+		}
 
 		lower := strings.ToLower(said)
-		switch labeled {
-		case database.SQLite:
-			// sqlite_version() answers on SQLite and nowhere else, so getting
-			// an answer at all is the check. And the connection has to agree
-			// it is SQLite, or the URL points somewhere else entirely.
-			if db.Server.Engine != database.SQLite {
-				t.Errorf("the connection labeled sqlite opened as %s", db.Server.Engine)
-			}
-		case database.MySQL:
-			// MySQL is the awkward one: it has no banner of its own, so it is
-			// named by what it must *not* say. MariaDB answers the same
-			// function, and a wrong URL could reach anything.
-			for _, other := range []string{"mariadb", "postgresql", "sqlite"} {
-				if strings.Contains(lower, other) {
-					t.Errorf("the connection labeled mysql reports itself as %q", said)
-				}
-			}
-		default:
-			if !strings.Contains(lower, want) {
+		for _, says := range want.says {
+			if !strings.Contains(lower, says) {
 				t.Errorf("the connection labeled %s reports itself as %q, "+
 					"so this run tested a different engine than it said",
 					labeled, said)
 			}
 		}
+		for _, other := range want.mustNotSay {
+			if strings.Contains(lower, other) {
+				t.Errorf("the connection labeled %s reports itself as %q", labeled, said)
+			}
+		}
 	})
+}
+
+// What each engine's own version string says about itself, and what it must
+// not say.
+//
+// MariaDB reports itself through MySQL's function and says "MariaDB" in the
+// text, which is the only thing telling the two apart from here. MySQL is the
+// awkward one: it has no banner of its own, so it is named by what it must
+// *not* say. SQLite answers a function no other engine has, so getting an
+// answer at all is most of the check.
+var banners = map[database.Engine]struct{ says, mustNotSay []string }{
+	database.Postgres: {says: []string{"postgresql"}},
+	database.MariaDB:  {says: []string{"mariadb"}},
+	database.MySQL:    {mustNotSay: []string{"mariadb", "postgresql", "sqlite"}},
+	database.SQLite:   {mustNotSay: []string{"mariadb", "postgresql"}},
+}
+
+// An engine with no banner recorded used to pass the identity check rather
+// than fail it: the map was read with the one-value form, so an unlisted
+// engine got the empty string and strings.Contains was satisfied by every
+// possible banner. The lookup above refuses instead, and this is what says a
+// fifth engine reaches that refusal at all — the identity test only runs
+// against engines that are configured, so on a SQLite-only machine a missing
+// PostgreSQL entry would go unnoticed until CI.
+func TestEveryEngineHasABannerRecorded(t *testing.T) {
+	if len(database.Engines()) == 0 {
+		t.Fatal("there are no engines, so this checked nothing")
+	}
+	for _, engine := range database.Engines() {
+		want, known := banners[engine]
+		if !known {
+			t.Errorf("%s has no banner recorded, so the identity check cannot "+
+				"tell whether a connection labeled %s reached it", engine, engine)
+			continue
+		}
+		if len(want.says) == 0 && len(want.mustNotSay) == 0 {
+			t.Errorf("%s has an empty banner, which every version string satisfies", engine)
+		}
+	}
 }
 
 // Two is skipping, not silently running fewer engines: the two it leaves out

@@ -2,7 +2,6 @@ package schema_test
 
 import (
 	"context"
-	"sort"
 	"strings"
 	"testing"
 
@@ -40,7 +39,7 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 			t.Fatalf("migrate up: %v", err)
 		}
 
-		for _, table := range tablesIn(t, ctx, db) {
+		for _, table := range dbtest.TablesIn(t, ctx, db) {
 			indexes := indexesOn(t, ctx, db, table)
 			for name, columns := range indexes {
 				for other, wider := range indexes {
@@ -67,33 +66,6 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 			}
 		}
 	})
-}
-
-// tablesIn is every table the migrations made.
-func tablesIn(t *testing.T, ctx context.Context, db *database.DB) []string {
-	t.Helper()
-	rows, err := db.QueryContext(ctx,
-		`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = rows.Close() }()
-	var tables []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			t.Fatal(err)
-		}
-		tables = append(tables, name)
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	if len(tables) == 0 {
-		t.Fatal("the schema declared no tables, so this checked nothing")
-	}
-	sort.Strings(tables)
-	return tables
 }
 
 // indexesOn is every index on one table, by name, with its columns in order.
