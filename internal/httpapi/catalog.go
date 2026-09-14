@@ -212,7 +212,10 @@ func declineDeclaration(err error) error {
 		// would let a pipeline quietly redefine what a name refers to.
 		return huma.NewError(http.StatusConflict, err.Error())
 	case errors.Is(err, catalog.ErrNotFound):
-		return huma.Error404NotFound(err.Error())
+		// Composed from the names the caller supplied and fixed words, which
+		// is what makes it safe to publish: an administrator declaring under
+		// a product that does not exist needs to know which name was wrong.
+		return undeclared(nil, err, "")
 	default:
 		return huma.Error400BadRequest(err.Error())
 	}

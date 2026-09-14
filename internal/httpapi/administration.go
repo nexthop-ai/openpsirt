@@ -412,7 +412,7 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			product, err := names.ProductByName(ctx, hold.Product)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
 			}
 			if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
 				return nil, huma.Error400BadRequest(err.Error())
@@ -470,7 +470,7 @@ func registerAdministration(api huma.API, a Administering) {
 		}
 		product, err := names.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(a.Logger, err, "that product could not be looked up")
 		}
 		if err := store.Withdraw(ctx, person.ID, product.ID, access.Role(in.Role)); err != nil {
 			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)

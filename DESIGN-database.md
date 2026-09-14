@@ -15,6 +15,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Migration locks](#migration-locks)
 - [Identifier quoting](#identifier-quoting)
 - [Affected-row counts](#affected-row-counts)
+- [Absence and failure](#absence-and-failure)
 - [Collation](#collation)
 - [Replica coordination](#replica-coordination)
 - [Retryable transactions](#retryable-transactions)
@@ -408,6 +409,27 @@ that cannot be read is a fault.
 No current driver returns an error there, which is why the helper exists rather
 than the rule. Nothing fails today when a caller gets it wrong, and nothing
 would report it on the day one starts.
+
+## Absence and failure
+
+A row that is not there and a read that could not be made are different answers,
+and a store that wraps both alike makes every caller above it wrong at once.
+
+| Rule | Reason |
+|---|---|
+| A reader says which of the two it hit | The caller chooses a status from it. Wrapped alike, the only status available is the one that asserts something the read never established |
+| Absence is a sentinel each package words for itself | A caller matches on the sentinel through the wrapping. Matching on a message is the same mistake as reading an engine's error text |
+| A failed read names the act, and the act reaches the log | "Look up product 12" is what an operator needs. What the driver said is not a thing to publish |
+| One helper, not a rule people remember | The split was made by hand at forty call sites and made correctly at five |
+
+The correct spelling already existed six times in the catalog beside readers
+that did not have it — `TargetFor` and `ExistingTarget` are the same two-column
+select, and only one of them told the two apart. `ExistingTarget` has
+twenty-three callers, twenty-one of which turned its error into "nothing has
+been scanned there".
+
+What that cost: a database nobody could reach reported to every authenticated
+caller that their products, builds, issues and findings did not exist.
 
 ## Collation
 

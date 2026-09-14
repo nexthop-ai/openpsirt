@@ -118,7 +118,7 @@ func registerVexImport(api huma.API, in Ingest) {
 		}
 		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
 		}
 
 		// Read as a stream, digested as it goes, and never held whole. Read

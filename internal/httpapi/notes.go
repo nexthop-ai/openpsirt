@@ -246,7 +246,7 @@ func productForIssue(ctx context.Context, in Ingest, subject access.Subject,
 
 	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
 	if err != nil {
-		return nil, noSuchProduct()
+		return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
 	}
 	if !subject.Sees(product.ID) && len(subject.Cases(product.ID)) == 0 {
 		return nil, noSuchProduct()

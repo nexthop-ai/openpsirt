@@ -10,7 +10,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
@@ -52,18 +51,17 @@ func registerRetained(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		named, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		if subject.Kind == access.Pipeline &&
 			!subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
 			return nil, huma.Error403Forbidden("not authorized")
 		}
-		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 		// The scan has to be this build's, and one this caller may see: a key
 		// reads back what it sent and nothing more, which is the rule the

@@ -9,7 +9,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // HolderBody is somebody or something work can be handed to.
@@ -71,9 +70,9 @@ func registerHolders(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		// Asking who may hold undisclosed work is itself a question about
 		// undisclosed work, and is answered the way every other path answers

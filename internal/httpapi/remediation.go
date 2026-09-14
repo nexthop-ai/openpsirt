@@ -141,9 +141,9 @@ func registerRemediation(api huma.API, in Ingest) {
 			// nothing on answer alike. Telling them apart is a way
 			// to read the deployment's product list one guess at a
 			// time.
-			named, err := in.catalog().ProductByName(ctx, input.Product)
-			if err != nil || !subject.Sees(named.ID) {
-				return nil, noSuchProduct()
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
 			}
 			productID = named.ID
 		}

@@ -108,6 +108,22 @@ reached the caller as a bad request carrying the statement text and, for a
 connection failure, the address and user it tried. Where the type cannot decide,
 the error is treated as a refusal.
 
+**A 404 is never built from an error's own text.** It asserts that a name
+reaches nothing, and the body then publishes whatever the error carried — for a
+store read, the driver's message. Thirty handlers wrote one, over readers that
+returned the driver's error unwrapped, so a connection failure reached an
+authenticated caller as "that product does not exist" with the database host,
+port and driver in the detail. A gate checks it.
+
+The one exception is named in place: the catalog's own not-declared error is
+composed from the names the caller supplied and fixed words, and a pipeline
+whose upload was refused has to be told which of the product, the branch and
+the variant it was. That arm is reached only once the sentinel has been tested.
+
+A read that could not be made is a fault rather than a 404. The split is one
+helper rather than a judgment made per route, because it was being made per
+route and made correctly at five sites of forty.
+
 A process with no database answers with one sentence. Every handler guards
 against it, because a nil pointer inside one is worse than a refusal. Each guard
 had invented its own wording — twenty-one of them, reading as twenty-one

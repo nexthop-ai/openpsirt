@@ -384,7 +384,8 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 		Where("identifier = ?", identifier).
 		Limit(1).Scan(ctx)
 	if err != nil {
-		return nil, nil, ErrNoSuchIssue
+		return nil, nil, database.FromRead(err, ErrNoSuchIssue,
+			fmt.Sprintf("look up what issue %q is", identifier))
 	}
 
 	// The earliest finding of this issue in this product that a person
@@ -401,11 +402,18 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 		Where("f.kind = ?", finding.Entered).
 		OrderExpr("f.opened_at ASC, f.id ASC").
 		Limit(1).Scan(ctx)
+	if err != nil && !database.IsNoRows(err) {
+		return nil, nil, fmt.Errorf("look up what we recorded about %q: %w", identifier, err)
+	}
 	if err != nil {
 		// Whether the issue is here at all and whether it is ours are told
 		// apart deliberately: the first is a typo and the second is a scope
 		// rule somebody has to understand.
-		if s.here(ctx, subject, productID, issue.ID) {
+		held, here := s.here(ctx, subject, productID, issue.ID)
+		if here != nil {
+			return nil, nil, here
+		}
+		if held {
 			return nil, nil, ErrNotOurs
 		}
 		return nil, nil, ErrNoSuchIssue
@@ -414,8 +422,13 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 }
 
 // here reports whether the product holds this issue at all, however it arrived.
+//
+// It decides which of two refusals the caller is given, so a count it could not
+// make is reported rather than read as a zero: "this product holds no issue by
+// that name" is a statement about the catalog, and a failed read does not
+// support it.
 func (s *Store) here(ctx context.Context, subject access.Subject,
-	productID, issueID int64) bool {
+	productID, issueID int64) (bool, error) {
 
 	count, err := s.db.NewSelect().Model((*finding.Finding)(nil)).
 		Join(`JOIN target AS "t" ON t.id = f.target_id`).
@@ -424,7 +437,10 @@ func (s *Store) here(ctx context.Context, subject access.Subject,
 		Where("f.vulnerability_id = ?", issueID).
 		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
 		Count(ctx)
-	return err == nil && count > 0
+	if err != nil {
+		return false, fmt.Errorf("count where issue %d sits here: %w", issueID, err)
+	}
+	return count > 0, nil
 }
 
 // releases reports every build of the product that holds this issue or once

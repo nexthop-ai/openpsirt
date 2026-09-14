@@ -251,7 +251,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// sender may not file against is reported as not declared, so that a
 		// stolen key cannot be used to read the shipping catalog one guess at
 		// a time.
-		return nil, huma.Error404NotFound(err.Error())
+		return nil, undeclared(in.Logger, err, "that build could not be looked up")
 	}
 
 	// A key authorizes an upload; it does not describe one. Every
@@ -574,7 +574,7 @@ func registerReceipts(api huma.API, in Ingest) {
 		names := catalog.NewStore(in.DB.DB)
 		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(in.Logger, err, "that build could not be looked up")
 		}
 
 		if subject.Kind == access.Pipeline &&

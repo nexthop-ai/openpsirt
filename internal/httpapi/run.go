@@ -6,7 +6,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -71,14 +70,13 @@ func registerRun(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		named, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, target.ID, input.Run)
 		if err != nil {

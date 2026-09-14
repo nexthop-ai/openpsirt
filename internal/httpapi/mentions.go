@@ -7,7 +7,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // MentionableBody is somebody who could be named in a comment or a
@@ -42,9 +41,9 @@ func registerMentions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 
 		// Asking who may be told about an undisclosed finding is itself a

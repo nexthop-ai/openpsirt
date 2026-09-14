@@ -99,7 +99,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		}
 		product, err := store.VisibleProduct(ctx, subject, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		rows, err := store.Streams(ctx, subject, product.ID)
 		if err != nil {
@@ -176,7 +176,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		}
 		product, err := store.VisibleProduct(ctx, subject, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		rows, err := store.Variants(ctx, subject, product.ID)
 		if err != nil {
@@ -217,7 +217,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		}
 		_, stream, err := store.VisibleStream(ctx, subject, in.Product, in.Stream)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		rows, err := store.BuiltAs(ctx, subject, stream.ID)
 		if err != nil {

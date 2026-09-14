@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -118,9 +117,9 @@ func registerScrutiny(api huma.API, in Ingest) {
 			// Resolved against what the caller may see, and a product they may
 			// not read answers as one nobody declared. Anything else turns
 			// this into a way to ask which products exist.
-			named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, err
 			}
 			products = []int64{named.ID}
 		}

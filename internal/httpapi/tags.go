@@ -6,7 +6,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -102,9 +101,9 @@ func registerTags(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		rows, err := finding.NewStore(in.DB.DB).TagsInUse(ctx, subject, named.ID)
 		if err != nil {

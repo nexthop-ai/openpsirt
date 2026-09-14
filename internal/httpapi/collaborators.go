@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -238,9 +237,9 @@ func caseAtHolding(ctx context.Context, in Ingest, product, vulnerability string
 		return access.Subject{}, nil, 0, 0,
 			noDatabase(in.Logger)
 	}
-	named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, product)
+	named, err := productNamedVisibly(ctx, in, subject, product)
 	if err != nil {
-		return access.Subject{}, nil, 0, 0, noSuchProduct()
+		return access.Subject{}, nil, 0, 0, err
 	}
 	if triaging && !subject.Triages(access.Public, named.ID) {
 		// Asked before the name is resolved further, so a refusal says

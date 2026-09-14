@@ -60,7 +60,7 @@ func registerTokens(api huma.API, in Ingest) {
 			"found when somebody leaves and nobody knows what breaks if it is turned off.",
 		Tags: []string{"Access"}, DefaultStatus: http.StatusCreated,
 	}, ownSubject, "Signed in, not through a token: a token cannot mint another."), func(ctx context.Context, input *struct{ Body TokenBody }) (*struct{ Body TokenBody }, error) {
-		subject, rights, names, err := mine(ctx, in)
+		subject, rights, _, err := mine(ctx, in)
 		if err != nil {
 			return nil, err
 		}
@@ -79,9 +79,9 @@ func registerTokens(api huma.API, in Ingest) {
 			// Resolved through what this person may see, so naming a product
 			// they cannot read answers as one that was never declared rather
 			// than telling them it exists.
-			product, err := names.VisibleProduct(ctx, subject, input.Body.Product)
+			product, err := productNamedVisibly(ctx, in, subject, input.Body.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, err
 			}
 			productID = &product.ID
 		}

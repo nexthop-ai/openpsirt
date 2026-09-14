@@ -109,11 +109,11 @@ func registerEntry(api huma.API, in Ingest) {
 		for _, build := range input.Body.Builds {
 			at, err := names.LocateVisible(ctx, subject, input.Product, build.Stream, build.Variant)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(in.Logger, err, "that build could not be looked up")
 			}
-			target, err := names.ExistingTarget(ctx, at.StreamID, at.VariantID)
+			target, err := targetRow(ctx, in, at.StreamID, at.VariantID)
 			if err != nil {
-				return nil, nothingScannedThere()
+				return nil, err
 			}
 			targets = append(targets, target.ID)
 		}
@@ -139,13 +139,13 @@ func registerEntry(api huma.API, in Ingest) {
 			case errors.As(err, &several):
 				return nil, severalComponents(several, "version, and ecosystem where two share one")
 			case errors.Is(err, finding.ErrNoSuchComponent):
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
 			case errors.Is(err, finding.ErrNothingSaid):
 				return nil, asked(in.Logger, err)
 			case errors.Is(err, finding.ErrNotAVector):
 				return nil, asked(in.Logger, err)
 			case errors.Is(err, finding.ErrNothingScanned):
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, huma.Error404NotFound(finding.ErrNothingScanned.Error())
 			case errors.Is(err, finding.ErrNoBuild), errors.Is(err, finding.ErrSeveralProducts):
 				return nil, asked(in.Logger, err)
 			}
@@ -212,14 +212,13 @@ func registerResolution(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		named, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 		issueID, err := issueHere(ctx, in, subject, named.ProductID, input.Vulnerability)
 		if err != nil {
@@ -525,9 +524,9 @@ func embargoAt(ctx context.Context, in Ingest, productName, issueName string) (
 		return subject, nil, 0, 0,
 			noDatabase(in.Logger)
 	}
-	product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, productName)
+	product, err := productNamedVisibly(ctx, in, subject, productName)
 	if err != nil {
-		return subject, nil, 0, 0, noSuchProduct()
+		return subject, nil, 0, 0, err
 	}
 	issue, err := issueHere(ctx, in, subject, product.ID, issueName)
 	if err != nil {
@@ -610,9 +609,9 @@ func registerAffects(api huma.API, in Ingest) {
 			return nil, noDatabase(in.Logger)
 		}
 		names := catalog.NewStore(in.DB.DB)
-		product, err := names.ProductByName(ctx, input.Product)
-		if err != nil || !subject.Sees(product.ID) {
-			return nil, noSuchProduct()
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
 		}
 		// The resolver everything else uses, so an issue found by a CVE it was
 		// later given answers the same as one found by what we filed it under.
@@ -625,11 +624,11 @@ func registerAffects(api huma.API, in Ingest) {
 		for _, build := range input.Body.Builds {
 			at, err := names.LocateVisible(ctx, subject, input.Product, build.Stream, build.Variant)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(in.Logger, err, "that build could not be looked up")
 			}
-			target, err := names.ExistingTarget(ctx, at.StreamID, at.VariantID)
+			target, err := targetRow(ctx, in, at.StreamID, at.VariantID)
 			if err != nil {
-				return nil, nothingScannedThere()
+				return nil, err
 			}
 			targets = append(targets, target.ID)
 		}
@@ -646,9 +645,10 @@ func registerAffects(api huma.API, in Ingest) {
 				errors.Is(err, finding.ErrNoBuild),
 				errors.Is(err, finding.ErrSeveralProducts):
 				return nil, asked(in.Logger, err)
-			case errors.Is(err, finding.ErrNoSuchComponent),
-				errors.Is(err, finding.ErrNothingOpenThere):
-				return nil, huma.Error404NotFound(err.Error())
+			case errors.Is(err, finding.ErrNoSuchComponent):
+				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
+			case errors.Is(err, finding.ErrNothingOpenThere):
+				return nil, huma.Error404NotFound(finding.ErrNothingOpenThere.Error())
 			}
 			return nil, refusedFinding(in, err)
 		}

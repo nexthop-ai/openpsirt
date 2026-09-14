@@ -171,7 +171,7 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		}
 		product, err := names.ProductByName(ctx, in.Body.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
 		}
 		if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
 			return nil, wentWrong(a.Logger, "cannot bind a group", err)
@@ -214,7 +214,7 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 
 		product, err := names.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
 		}
 		if err := rights.Unbind(ctx, in.Group, product.ID, access.Role(in.Role)); err != nil {
 			return nil, wentWrong(a.Logger, "cannot unbind a group", err)

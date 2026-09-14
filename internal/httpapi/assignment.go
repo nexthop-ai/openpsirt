@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -548,14 +547,13 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 	product, stream, variant, vulnerability, component string) (int64, int64, int64, int64, error) {
 
-	names := catalog.NewStore(in.DB.DB)
-	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
-		return 0, 0, 0, 0, noSuchProduct()
+		return 0, 0, 0, 0, err
 	}
-	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 	if err != nil {
-		return 0, 0, 0, 0, nothingScannedThere()
+		return 0, 0, 0, 0, err
 	}
 	issue, err := issueHere(ctx, in, subject, named.ProductID, vulnerability)
 	if err != nil {

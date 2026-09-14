@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -200,14 +199,13 @@ func browsing(ctx context.Context, in Ingest, product, stream, variant string) (
 	if err != nil {
 		return access.Subject{}, 0, err
 	}
-	names := catalog.NewStore(in.DB.DB)
-	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
-		return access.Subject{}, 0, noSuchProduct()
+		return access.Subject{}, 0, err
 	}
-	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 	if err != nil {
-		return access.Subject{}, 0, nothingScannedThere()
+		return access.Subject{}, 0, err
 	}
 	return subject, target.ID, nil
 }

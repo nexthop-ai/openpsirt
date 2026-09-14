@@ -11,7 +11,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -168,17 +167,8 @@ func registerComparisonExport(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
 		locate := func(stream, variant string) (int64, error) {
-			named, err := names.LocateVisible(ctx, subject, input.Product, stream, variant)
-			if err != nil {
-				return 0, noSuchProduct()
-			}
-			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
-			if err != nil {
-				return 0, nothingScannedThere()
-			}
-			return target.ID, nil
+			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
 		}
 		from, err := locate(input.From, input.FromVariant)
 		if err != nil {

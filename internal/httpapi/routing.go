@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -58,10 +57,9 @@ func registerRouting(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		product, err := names.ProductByName(ctx, input.Product)
-		if err != nil || !subject.Sees(product.ID) {
-			return nil, noSuchProduct()
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
 		}
 		// A rule is configuration rather than a finding, so there is nothing
 		// in it for the data layer to narrow: a reader either gets the whole
@@ -116,9 +114,9 @@ func registerRouting(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
-		if err != nil || !subject.Sees(product.ID) {
-			return nil, noSuchProduct()
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
 		}
 		// Declared triage, like the rule it previews. What comes back is
 		// narrowed to what the asker may read, but a preview is part of
@@ -215,7 +213,7 @@ func registerRouting(api huma.API, in Ingest) {
 				return nil, err
 			}
 			if err := finding.NewStore(in.DB.DB).RetireRule(ctx, subject, product, input.ID); err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, absent(in.Logger, err, "that rule could not be retired", noSuchRule)
 			}
 			noteChange(ctx, in, trail.Role,
 				"routing "+input.Product+" · "+strconv.FormatInt(input.ID, 10),
@@ -241,9 +239,9 @@ func routable(ctx context.Context, in Ingest, name string) (access.Subject, int6
 	if in.DB == nil {
 		return access.Subject{}, 0, nil, noDatabase(in.Logger)
 	}
-	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
-	if err != nil || !subject.Sees(product.ID) {
-		return access.Subject{}, 0, nil, noSuchProduct()
+	product, err := productNamedVisibly(ctx, in, subject, name)
+	if err != nil {
+		return access.Subject{}, 0, nil, err
 	}
 	if !subject.Holds(access.Assigner, product.ID) {
 		// Answered as a product that is not there, the way every other

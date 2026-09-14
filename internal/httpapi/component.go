@@ -9,7 +9,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -211,20 +210,19 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 			return nil, huma.Error422UnprocessableEntity(
 				"say when this will be done, as a date like 2026-03-31")
 		}
-		names := catalog.NewStore(in.DB.DB)
-		product, err := names.VisibleProduct(ctx, subject, input.Product)
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		builds := make([]int64, 0, len(input.Body.Builds))
 		for _, at := range input.Body.Builds {
-			located, err := names.LocateVisible(ctx, subject, input.Product, at.Stream, at.Variant)
+			located, err := locatedVisibly(ctx, in, subject, input.Product, at.Stream, at.Variant)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, err
 			}
-			target, err := names.ExistingTarget(ctx, located.StreamID, located.VariantID)
+			target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
 			if err != nil {
-				return nil, nothingScannedThere()
+				return nil, err
 			}
 			builds = append(builds, target.ID)
 		}

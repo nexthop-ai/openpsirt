@@ -248,7 +248,15 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 	product, identifier string) (productID, vulnerabilityID int64, err error) {
 
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
-	if err != nil || subject.Kind != access.Person || !subject.Sees(named.ID) {
+	switch {
+	case errors.Is(err, catalog.ErrNotFound):
+		return 0, 0, ErrNoSuchIssue
+	case err != nil:
+		// A read that could not be made is not an answer about what exists.
+		// Folded in with the two conditions below, an outage told every caller
+		// their attachments were gone.
+		return 0, 0, err
+	case subject.Kind != access.Person || !subject.Sees(named.ID):
 		return 0, 0, ErrNoSuchIssue
 	}
 	var issue int64

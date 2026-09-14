@@ -129,9 +129,9 @@ func registerReports(api huma.API, in Ingest) {
 		// answered 200 with an empty list for a product held by somebody else
 		// and 404 for a name nobody has, which hands anyone holding one
 		// product the name of every other by guessing.
-		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		releases, err := finding.NewStore(in.DB.DB).Releases(ctx, subject, named.ID)
 		if err != nil {
@@ -185,17 +185,8 @@ func registerReports(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
 		locate := func(stream, variant string) (int64, error) {
-			named, err := names.LocateVisible(ctx, subject, input.Product, stream, variant)
-			if err != nil {
-				return 0, noSuchProduct()
-			}
-			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
-			if err != nil {
-				return 0, nothingScannedThere()
-			}
-			return target.ID, nil
+			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
 		}
 		from, err := locate(input.From, input.FromVariant)
 		if err != nil {
@@ -333,15 +324,7 @@ func registerNotes(api huma.API, in Ingest) {
 		}
 		names := catalog.NewStore(in.DB.DB)
 		locate := func(stream, variant string) (int64, error) {
-			named, err := names.LocateVisible(ctx, subject, input.Product, stream, variant)
-			if err != nil {
-				return 0, noSuchProduct()
-			}
-			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
-			if err != nil {
-				return 0, nothingScannedThere()
-			}
-			return target.ID, nil
+			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
 		}
 		from, err := locate(input.From, input.FromVariant)
 		if err != nil {
@@ -530,22 +513,21 @@ func registerCarrying(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		to, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		to, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		toTarget, err := names.ExistingTarget(ctx, to.StreamID, to.VariantID)
+		toTarget, err := targetRow(ctx, in, to.StreamID, to.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
-		from, err := names.LocateVisible(ctx, subject, input.Product, input.From, input.FromVariant)
+		from, err := locatedVisibly(ctx, in, subject, input.Product, input.From, input.FromVariant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		fromTarget, err := names.ExistingTarget(ctx, from.StreamID, from.VariantID)
+		fromTarget, err := targetRow(ctx, in, from.StreamID, from.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 
 		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,

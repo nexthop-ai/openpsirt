@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // WentBody is one advisory that went out.
@@ -60,9 +59,9 @@ func registerPublished(api huma.API, in Ingest) {
 		}
 		var products []int64
 		if input.Product != "" {
-			named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, err
 			}
 			products = []int64{named.ID}
 		}

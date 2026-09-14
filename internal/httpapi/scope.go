@@ -79,9 +79,9 @@ func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
 	}
 
 	names := catalog.NewStore(in.DB.DB)
-	product, err := names.ProductByName(ctx, q.Product)
+	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, q.Product)
 	if err != nil {
-		return finding.Scope{}, false, noSuchProduct()
+		return finding.Scope{}, false, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
 	}
 	sees := subject.Sees(product.ID)
 	scope.ProductID = &product.ID

@@ -306,7 +306,10 @@ func productNamed(ctx context.Context, in Ingest, subject access.Subject,
 	name string) (*catalog.Product, error) {
 
 	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
-	if err != nil || !subject.Sees(product.ID) {
+	if err != nil {
+		return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
+	}
+	if !subject.Sees(product.ID) {
 		return nil, noSuchProduct()
 	}
 	return product, nil

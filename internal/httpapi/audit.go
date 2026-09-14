@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -111,9 +110,9 @@ func (a Auditing) narrow(ctx context.Context, in Ingest,
 		if name == "" {
 			continue
 		}
-		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, name)
+		named, err := productNamedVisibly(ctx, in, subject, name)
 		if err != nil {
-			return filter, since, until, noSuchProduct()
+			return filter, since, until, err
 		}
 		filter.ProductIDs = append(filter.ProductIDs, named.ID)
 	}

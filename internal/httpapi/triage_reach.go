@@ -94,11 +94,11 @@ func registerElsewhere(api huma.API, in Ingest) {
 		names := catalog.NewStore(in.DB.DB)
 		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(in.Logger, err, "that build could not be looked up")
 		}
-		here, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		here, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 
 		reach, err := finding.NewStore(in.DB.DB).Reaching(ctx, subject, *at, here.ID)

@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
 )
 
@@ -157,7 +156,7 @@ func registerSaved(api huma.API, in Ingest) {
 		}
 		if err := store.ForgetFilter(ctx, who.ID, product, input.Name); err != nil {
 			if errors.Is(err, saved.ErrNoSuchFilter) {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, huma.Error404NotFound(saved.ErrNoSuchFilter.Error())
 			}
 			return nil, wentWrong(in.Logger, "that filter could not be forgotten", err)
 		}
@@ -198,9 +197,9 @@ func filtersFor(ctx context.Context, in Ingest, name string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, name)
+	product, err := productNamedVisibly(ctx, in, subject, name)
 	if err != nil {
-		return 0, noSuchProduct()
+		return 0, err
 	}
 	return product.ID, nil
 }

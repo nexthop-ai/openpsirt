@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -93,9 +92,9 @@ func registerOverview(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		standing, whole, err := finding.NewStore(in.DB.DB).HowItStands(ctx, subject, named.ID)
 		if err != nil {

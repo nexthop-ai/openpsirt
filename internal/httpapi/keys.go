@@ -80,21 +80,21 @@ func registerKeys(api huma.API, a Administering) {
 
 		product, err := names.ProductByName(ctx, in.Body.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(a.Logger, err, "that product could not be looked up")
 		}
 		scope := access.Scope{ProductID: product.ID}
 
 		if in.Body.Stream != "" {
 			stream, err := names.StreamByName(ctx, product.ID, in.Body.Stream)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
 			}
 			scope.StreamID = &stream.ID
 		}
 		if in.Body.Variant != "" {
 			variant, err := names.VariantByName(ctx, product.ID, in.Body.Variant)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
 			}
 			scope.VariantID = &variant.ID
 		}
