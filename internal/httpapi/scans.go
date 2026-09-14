@@ -752,7 +752,7 @@ func registerCoverage(api huma.API, in Ingest) {
 			"been filed against is measured from when it was declared.\n\n" +
 			"How long counts as quiet is the `scanning.quiet-after` setting.",
 		Tags: []string{"Scans"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"How many to return. Quietest first, so the default is the answer for any estate somebody reads by hand"`
 		Offset int `query:"offset" minimum:"0" doc:"How many to skip"`
@@ -843,7 +843,7 @@ func registerCoverageExport(api huma.API, in Ingest) {
 			"nothing would be a different answer.\n\n" +
 			"The threshold `quiet` was computed against is stated in the file.",
 		Tags: []string{"Scans"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
 		ScopeQuery
 	}) (*huma.StreamResponse, error) {

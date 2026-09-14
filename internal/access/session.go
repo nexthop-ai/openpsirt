@@ -52,6 +52,19 @@ type Issued struct {
 // day without asking somebody to sign in over lunch.
 const DefaultSessionLifetime = 12 * time.Hour
 
+// MaxSessionLifetime is the ceiling on a sign-in.
+//
+// Group membership is read at sign-in and never again, so a session's lifetime
+// *is* the window in which somebody removed from a privileged provider group
+// still holds what that group gave them. Unbounded, that window was whatever an
+// administrator typed: a lifetime of 8760h made every browser sign-in last a
+// year, and the setting took it without comment.
+//
+// Thirty days is long enough for the case the default argues for and short
+// enough that a group membership cannot outlive a month. A personal token, the
+// other thing somebody holds for a long time, has had two ceilings all along.
+const MaxSessionLifetime = 30 * 24 * time.Hour
+
 // StartSession signs somebody in for a bounded time.
 //
 // Nothing here decides whether they should be here. That is settled before
@@ -61,6 +74,12 @@ const DefaultSessionLifetime = 12 * time.Hour
 func (s *Store) StartSession(ctx context.Context, personID int64, lifetime time.Duration) (*Issued, error) {
 	if lifetime <= 0 {
 		lifetime = DefaultSessionLifetime
+	}
+	// Refused rather than quietly clamped, so an administrator who asked for a
+	// year is told the limit instead of discovering it at the next sign-in.
+	if lifetime > MaxSessionLifetime {
+		return nil, fmt.Errorf("a sign-in may last at most %s, and this asks for %s",
+			MaxSessionLifetime, lifetime)
 	}
 	token, err := secret()
 	if err != nil {

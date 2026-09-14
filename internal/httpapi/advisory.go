@@ -34,7 +34,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"Requires a publisher configured for this deployment: a document naming none is " +
 			"not a valid CSAF document.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The identifier the issue is filed under"`
 	}) (*struct{ Body *advisory.Document }, error) {
@@ -84,7 +84,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"makes the comparison possible, and it was taken from the document generated here " +
 			"rather than from anything sent.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The identifier the issue is filed under"`
 	}) (*listOutput[IssuanceBody], error) {

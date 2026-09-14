@@ -441,7 +441,7 @@ func registerExtensions(api huma.API, in Ingest) {
 			"should not have their own request hidden from them.\n\n" +
 			"Agree with `POST /v1/disclosure-extensions/{id}/approval`.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Only where you may read undisclosed work."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Only where you may read undisclosed work."), func(ctx context.Context, input *struct {
 		Limit int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 	}) (*listOutput[PendingExtensionBody], error) {
 		subject, err := reading(ctx)

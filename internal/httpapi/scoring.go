@@ -20,7 +20,7 @@ func registerScoring(api huma.API, in Ingest) {
 			"different scheme, and scoring either with this one produces a number nothing " +
 			"downstream could tell apart from a real one.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers a calculation, and reads nothing."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers a calculation, and reads nothing."), func(ctx context.Context, input *struct {
 		Vector string `query:"vector" required:"true" doc:"A CVSS 3.0 or 3.1 base vector"`
 	}) (*struct {
 		Body struct {

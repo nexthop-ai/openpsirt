@@ -60,7 +60,7 @@ func registerCarried(api huma.API, in Ingest) {
 			"that is no longer here is exactly the row somebody asking why a patch stopped " +
 			"working is looking for.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`

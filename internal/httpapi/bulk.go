@@ -36,7 +36,7 @@ func registerBulk(api huma.API, in Ingest) {
 			"`contains` matches the text of a report. It narrows a list; it is not part of any " +
 			"claim made afterwards.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`

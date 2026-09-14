@@ -208,7 +208,7 @@ Each operation carries a structured statement of what it asks of a caller
 
 | Field | Holds |
 |---|---|
-| Scope | The deployment, a product, yourself, any recognized credential, or answered without one |
+| Scope | The deployment, a product, yourself, any signed-in person, any recognized credential, or answered without one |
 | Roles | Any one of which is sufficient |
 | Note | Only where a rule is not a role |
 
@@ -231,6 +231,19 @@ gated operation as somebody holding none of its roles; a 2xx fails it.
 
 A gate refuses an operation declaring neither scope nor roles. An endpoint added
 without one is not broken, it is undocumented.
+
+**"Any signed-in person" and "any recognized credential" are two scopes, because
+a pipeline's key is not somebody.** Seventy-four operations declared the second
+and then refused every credential that is not a person, so the reference, the
+extension a client generator reads, and an access review all stated a rule the
+code contradicted. The word could not be redefined instead: two operations
+really do mean any credential — a key reads back the scans it sent, and the
+receipts for them.
+
+The part of a requirement that is about the subject alone is enforced before any
+handler runs, which is what makes the handler's own check the second statement
+of a rule rather than the only statement of one the document contradicts. A role
+on a product needs the product resolved and stays in the handler.
 
 The privileges page keeps only what a per-endpoint line cannot carry: what each
 role means, how roles are granted, what a declaration is and is not, and that

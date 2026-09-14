@@ -41,7 +41,7 @@ func registerTeams(api huma.API, a Administering) {
 			"names; who is on it is the same question as who is here, and that is answered " +
 			"where the rest of the record is.",
 		Tags: []string{"Administration"},
-	}, anySubject, "Membership is listed for an administrator; anybody else sees the names."),
+	}, anyPerson, "Membership is listed for an administrator; anybody else sees the names."),
 		func(ctx context.Context, _ *struct{}) (*listOutput[TeamBody], error) {
 			if _, err := reading(ctx); err != nil {
 				return nil, err

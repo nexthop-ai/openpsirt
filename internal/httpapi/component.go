@@ -86,7 +86,7 @@ func registerComponent(api huma.API, in Ingest) {
 			"`due_at` is what a commitment about that build is gated against, and is absent " +
 			"where nothing is open.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Component string `path:"component"`
 		ScopeQuery

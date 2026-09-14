@@ -1,6 +1,7 @@
 package access_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -188,6 +189,49 @@ func TestAStrangersTokenReachesNothing(t *testing.T) {
 			if _, _, err := f.store.ResolveSession(t.Context(), token); err == nil {
 				t.Errorf("%q resolved to somebody", token)
 			}
+		}
+	})
+}
+
+// TestASignInHasACeiling pins the window a session is.
+//
+// Group membership is read at sign-in and never again, so the lifetime *is*
+// how long somebody removed from a privileged provider group still holds what
+// that group gave them. It was clamped up from nothing and accepted anything
+// above it, so an administrator setting 8760h made every browser sign-in last
+// a year — while a personal token, the other thing somebody holds for a long
+// time, has had two ceilings all along.
+func TestASignInHasACeiling(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "ana", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Nothing asked for takes the default, which is the ordinary case.
+		issued, err := f.store.StartSession(ctx, person.ID, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if issued.Session.ExpiresAt.Sub(issued.Session.CreatedAt) != access.DefaultSessionLifetime {
+			t.Errorf("a sign-in asking for nothing lasts %s",
+				issued.Session.ExpiresAt.Sub(issued.Session.CreatedAt))
+		}
+
+		// The ceiling itself is allowed.
+		if _, err := f.store.StartSession(ctx, person.ID, access.MaxSessionLifetime); err != nil {
+			t.Errorf("a sign-in at the ceiling was refused: %v", err)
+		}
+
+		// And a year is refused, told rather than quietly shortened: an
+		// administrator who typed it should hear the limit now.
+		_, err = f.store.StartSession(ctx, person.ID, 365*24*time.Hour)
+		if err == nil {
+			t.Fatal("a sign-in lasting a year was issued")
+		}
+		if !strings.Contains(err.Error(), access.MaxSessionLifetime.String()) {
+			t.Errorf("the refusal does not say the limit: %v", err)
 		}
 	})
 }

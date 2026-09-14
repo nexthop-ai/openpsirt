@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -493,14 +492,21 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 		return Subject{}, ErrDenied
 	}
 
+	// Matched on the whole digest, which is the comparison. A constant-time
+	// compare stood here afterwards, over the row the equality had just
+	// selected — so it could not fail, and the sentence above it said the
+	// lookup was "not by itself a statement that the secrets match" when a SQL
+	// equality on the whole digest is exactly that.
+	//
+	// The presented secret is never compared byte by byte: only its digest
+	// reaches the database. What decides the timing of this is the index
+	// lookup, which is not constant time and which nothing here controls —
+	// making that a property rather than decoration means replacing the lookup
+	// with a fetch by a non-secret key and a comparison in Go, which is a
+	// different design and would be stated as one.
 	key := new(Key)
 	err := s.db.NewSelect().Model(key).Where("secret_hash = ?", hashSecret(secret)).Scan(ctx)
 	if err != nil {
-		return Subject{}, ErrDenied
-	}
-	// Compared again in constant time. The lookup above found a row by digest,
-	// which is not by itself a statement that the secrets match.
-	if subtle.ConstantTimeCompare([]byte(key.SecretHash), []byte(hashSecret(secret))) != 1 {
 		return Subject{}, ErrDenied
 	}
 	if key.RevokedAt != nil {

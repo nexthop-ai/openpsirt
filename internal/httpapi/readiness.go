@@ -62,7 +62,7 @@ func registerReadiness(api huma.API, in Ingest) {
 			"Counted as issues at components at or above the deployment's line, which `floor` " +
 			"names.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`

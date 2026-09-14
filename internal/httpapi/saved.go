@@ -58,7 +58,7 @@ func registerSaved(api huma.API, in Ingest) {
 			"names branches and variants that usually exist in no other, so one offered " +
 			"everywhere would be offered where it matches nothing.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers your own and nobody else's."),
+	}, anyPerson, "Answers your own and nobody else's."),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 		}) (*listOutput[SavedBody], error) {
@@ -97,7 +97,7 @@ func registerSaved(api huma.API, in Ingest) {
 			"Saving under a name you already use replaces it: the act is deciding what that " +
 			"name means, and refusing would make somebody delete before they could correct.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, anySubject, "Yours alone."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Yours alone."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Name    string `path:"name" maxLength:"120"`
 		Body    struct {
@@ -142,7 +142,7 @@ func registerSaved(api huma.API, in Ingest) {
 			"the same answer as somebody else's — the filters are personal, and the query " +
 			"says so rather than only the screen.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, anySubject, "Yours alone."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Yours alone."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Name    string `path:"name" maxLength:"120"`
 	}) (*struct{}, error) {

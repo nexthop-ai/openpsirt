@@ -199,7 +199,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			"A claim carries the severity recorded against its issue, so claims about " +
 			"findings you cannot read are absent rather than refused.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Narrowed to issues you may read a finding of in the product the rating "+
+	}, anyPerson, "Narrowed to issues you may read a finding of in the product the rating "+
 		"belongs to. A rating is about one product, and an issue this deployment minted for a "+
 		"flaw nobody has announced is not public knowledge."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`

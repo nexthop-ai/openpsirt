@@ -38,7 +38,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 			"from the rest. What is about a judgment at a place is a comment on that claim " +
 			"instead.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers where you may read a finding of this issue in this product, at its "+
+	}, anyPerson, "Answers where you may read a finding of this issue in this product, at its "+
 		"visibility — an issue with one undisclosed place here is undisclosed for this. "+
 		"Anywhere else it answers as an issue that is not there."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
@@ -154,7 +154,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 			"reading the note itself, asked of the issue rather than of the note, because two " +
 			"rules for one question is one rule out of step.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only where you may read what the note is about, which is the "+
+	}, anyPerson, "Answers only where you may read what the note is about, which is the "+
 		"note's own product and issue rather than anything in the path."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*listOutput[WasSaidBody], error) {

@@ -69,7 +69,7 @@ func registerMeasures(api huma.API, in Ingest) {
 			"Narrowed to what you may read, like every count here — so two people asking get " +
 			"different answers rather than one of them getting an error.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Days int `query:"days" default:"90" minimum:"1" maximum:"366" doc:"How far back to measure"`
 	}) (*struct{ Body MeasuresBody }, error) {
 		subject, store, err := triaging(ctx, in)

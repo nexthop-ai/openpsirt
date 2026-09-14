@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -883,4 +884,83 @@ func TestAMalformedCredentialIsRefused(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestWhatAnOperationSaysItNeedsIsWhatItEnforces walks the document the server
+// builds and puts a pipeline key at every operation declaring a scope that
+// excludes one.
+//
+// The declaration wrote a document and nothing else for this scope: seventy-four
+// operations said "any recognized credential" and then refused every credential
+// that is not a person, so the generated reference, the extension a client
+// generator reads, and an access review all stated a rule the code contradicted.
+// Two operations really do mean any credential — a key reads back the scans it
+// sent — which is why the word could not simply be redefined.
+func TestWhatAnOperationSaysItNeedsIsWhatItEnforces(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		checked := 0
+		for _, op := range r.api.OpenAPI().Paths {
+			for method, operation := range map[string]*huma.Operation{
+				http.MethodGet: op.Get, http.MethodPost: op.Post,
+				http.MethodPut: op.Put, http.MethodDelete: op.Delete,
+			} {
+				if operation == nil || operation.Extensions == nil {
+					continue
+				}
+				asks, stated := operation.Extensions["x-openpsirt-requires"]
+				if !stated {
+					continue
+				}
+				scope := declaredScope(t, asks)
+				if scope != "person" && scope != "self" {
+					continue
+				}
+				// A path with its parameters filled in with names the fixture
+				// declares, so a refusal is about the credential rather than
+				// about a name nothing matches.
+				path := filled(operation.Path)
+				if strings.Contains(path, "{") {
+					continue
+				}
+				got := r.asKey(t, method, path)
+				if got != http.StatusForbidden && got != http.StatusUnauthorized {
+					t.Errorf("%s %s says it needs a signed-in person and answered a "+
+						"pipeline key %d", method, path, got)
+				}
+				checked++
+			}
+		}
+		// A sweep that reached nothing looks exactly like a sweep that found
+		// nothing wrong.
+		if checked < 20 {
+			t.Errorf("only %d operations were reached, so this proves little", checked)
+		}
+	})
+}
+
+// declaredScope reads the scope off an operation's declaration, whichever
+// shape the document put it in.
+func declaredScope(t *testing.T, asks any) string {
+	t.Helper()
+	encoded, err := json.Marshal(asks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		Scope string `json:"scope"`
+	}
+	if err := json.Unmarshal(encoded, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.Scope
+}
+
+// filled puts the fixture's own names into a templated path.
+func filled(path string) string {
+	for from, to := range map[string]string{
+		"{product}": "mine", "{stream}": "master", "{variant}": "broadcom",
+	} {
+		path = strings.ReplaceAll(path, from, to)
+	}
+	return path
 }

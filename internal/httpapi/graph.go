@@ -75,7 +75,7 @@ func registerGraph(api huma.API, in Ingest) {
 			"with five thousand children — so searching is the way in, and browsing is for " +
 			"answering \"what else is under this\" once you are already somewhere.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
@@ -137,7 +137,7 @@ func registerGraph(api huma.API, in Ingest) {
 			"versions, `version` says which — without it, a name that matches more than one is " +
 			"refused with 409, naming the choices, rather than guessed at.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`

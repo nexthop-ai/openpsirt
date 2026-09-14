@@ -23,9 +23,22 @@ const (
 	perProduct = "product"
 	// deploymentWide is administrator, which is not held per product.
 	deploymentWide = "deployment"
-	// anySubject is any credential this deployment recognizes. It still
-	// answers only what that subject may see.
+	// anySubject is any credential this deployment recognizes, a pipeline's
+	// key included. It still answers only what that subject may see.
+	//
+	// Two operations mean it: a key reads back the scans it sent, and the
+	// receipts for them. Everything else that carried it refuses a key in the
+	// handler, which is what anyPerson is for.
 	anySubject = "any"
+	// anyPerson is any credential belonging to somebody who signed in. A
+	// pipeline's key is not somebody.
+	//
+	// Seventy-four operations declared anySubject and then refused every
+	// credential that is not a person, so the generated reference, the
+	// extension a client generator reads, and an access review all stated a
+	// rule the code contradicted. The word could not simply be redefined,
+	// because two operations really do mean it.
+	anyPerson = "person"
 	// ownSubject is whoever is asking, about themselves.
 	ownSubject = "self"
 	// noCredential is the handful of operations answered before anybody has
@@ -73,6 +86,8 @@ func (r requires) said() string {
 		what = "administrator"
 	case r.Scope == ownSubject:
 		what = "your own credential"
+	case r.Scope == anyPerson:
+		what = "any signed-in person, and not a pipeline key"
 	case r.Scope == noCredential:
 		what = "nothing: this is answered before anybody has a credential"
 	default:
@@ -173,9 +188,11 @@ func enforceDeclarations(api huma.API) {
 				refuse(http.StatusForbidden)
 				return
 			}
-		case ownSubject:
-			// About the caller themselves, so there has to be a person for
-			// it to be about.
+		case ownSubject, anyPerson:
+			// About the caller themselves, or answered only to somebody who
+			// signed in. Either way there has to be a person. Enforced here so
+			// that the handler's own check is the second statement of a rule
+			// rather than the only statement of one the document contradicts.
 			if subject.Kind != access.Person {
 				refuse(http.StatusForbidden)
 				return

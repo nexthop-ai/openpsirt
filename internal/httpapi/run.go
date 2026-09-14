@@ -60,7 +60,7 @@ func registerRun(api huma.API, in Ingest) {
 			"Derived when it is asked for rather than stored, so it moves as findings close " +
 			"and reopen — and narrowed by what you may see, like every other count here.",
 		Tags: []string{"Ingest"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`

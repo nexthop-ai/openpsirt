@@ -588,7 +588,7 @@ func registerVersion(api huma.API) {
 		Summary:     "Get the server version",
 		Description: "Identifies the build that is answering, so an operator can tell which version they are looking at.",
 		Tags:        []string{"Meta"},
-	}, anySubject, "A person rather than a pipeline: a build server has no "+
+	}, anyPerson, "A person rather than a pipeline: a build server has no "+
 		"business asking what version is running."),
 		func(ctx context.Context, _ *struct{}) (*VersionOutput, error) {
 			// A person, not a pipeline. A build server has no business asking

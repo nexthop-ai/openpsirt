@@ -346,7 +346,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			"holding the same versions. `builds` says how many that is. Where two builds ship " +
 			"different versions of the component they are different work and appear separately.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
@@ -401,7 +401,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			"also what an identity somebody holds answers when none of their work is yours to " +
 			"see. The two are deliberately the same.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see. An identity nobody holds answers as one whose "+
+	}, anyPerson, "Answers only what you may see. An identity nobody holds answers as one whose "+
 		"work you cannot see."), func(ctx context.Context, input *struct {
 		Identity string `path:"identity" doc:"Their sign-in identity, or 'me' for your own"`
 		ScopeQuery
@@ -507,7 +507,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			"a person who has gone is the problem — nothing tells this software that somebody " +
 			"has left.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 	}) (*listOutput[HoldingBody], error) {
 		subject, err := reading(ctx)

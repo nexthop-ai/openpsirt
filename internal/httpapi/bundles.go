@@ -47,7 +47,7 @@ func registerBundles(api huma.API, in Ingest) {
 			"severity, exploited, component, search, ecosystem and state. Not the rest: a " +
 			"filter that answers about a place or a deadline has no row here to narrow.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Stream    string `query:"stream" doc:"Limit to one branch or tag"`
 		Variant   string `query:"variant" doc:"Limit to one variant"`
@@ -179,7 +179,7 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 			"promise is the one read, so a replanned upgrade is a planned one with a later " +
 			"date.",
 		Tags: []string{"Remediation"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`

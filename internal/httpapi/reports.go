@@ -54,7 +54,7 @@ func registerReports(api huma.API, in Ingest) {
 			"Worked out when it is asked for. Nothing is precomputed or refreshed on a schedule " +
 			"until a measurement says it has to be.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
 		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
@@ -116,7 +116,7 @@ func registerReports(api huma.API, in Ingest) {
 			"the one expression the working list and the deadline also read, so a chart cannot " +
 			"disagree with a list about what counts as high.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*listOutput[ReleaseBody], error) {
 		subject, err := reading(ctx)
@@ -167,7 +167,7 @@ func registerReports(api huma.API, in Ingest) {
 			"public document, so including something undisclosed should be deliberate rather " +
 			"than something pasted in without noticing.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product        string `path:"product"`
 		From           string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
 		FromVariant    string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
@@ -247,7 +247,7 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 			"product must be named: two products' tags interleave by date and mean nothing side " +
 			"by side.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Limit int `query:"limit" default:"12" minimum:"1" maximum:"50" doc:"How many releases, most recent kept"`
 	}) (*struct {
@@ -307,7 +307,7 @@ func registerNotes(api huma.API, in Ingest) {
 			"Where fixes are left out for not having been disclosed, the note says how many " +
 			"and never which.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product        string `path:"product"`
 		From           string `query:"from" required:"true" doc:"The earlier build's stream"`
 		FromVariant    string `query:"from_variant" required:"true" doc:"The earlier build's variant"`

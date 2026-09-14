@@ -397,7 +397,7 @@ func registerFindings(api huma.API, in Ingest) {
 			"chain belongs to one build's graph. `beneath` is a walk over one build's edges " +
 			"and is refused unless both are named.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
 		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
@@ -513,7 +513,7 @@ func registerComponentFindings(api huma.API, in Ingest) {
 			"matches the rest. `beneath` is a walk over one build's edges and is refused " +
 			"unless both are named.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
 		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
@@ -766,7 +766,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			"versions, `version` says which — without it, a name that matches more than one is " +
 			"refused rather than guessed at.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`

@@ -60,7 +60,7 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 			"every release-level count here uses.\n\n" +
 			"Narrowed by what you may see, and ordered by what is open.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 	}) (*retiredOutput, error) {
 		rows, err := outOfSupport(ctx, in, input.ScopeQuery)
@@ -89,7 +89,7 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 			"The day the file was taken is stated in it, because how long ago a release ended " +
 			"is only readable against a date.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
 		ScopeQuery
 	}) (*huma.StreamResponse, error) {

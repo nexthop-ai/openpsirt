@@ -153,7 +153,7 @@ func registerAudit(api huma.API, in Ingest) {
 			"`wont-fix` and `already-fixed` all require approval, so a row in that answer is a " +
 			"control that failed.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Auditing
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset int `query:"offset" minimum:"0"`
