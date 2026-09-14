@@ -334,6 +334,14 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 	if len(enough) == 0 {
 		return false, nil
 	}
+	// Somebody who has left reads nothing, whatever their grants still say.
+	// Deactivation leaves the grant rows in place on purpose — it is the
+	// recorded act of leaving rather than an undoing of what they held — so
+	// every question of this shape has to ask the person as well.
+	here, err := s.here(ctx, personID)
+	if err != nil || !here {
+		return false, err
+	}
 	reads, err := s.db.NewSelect().
 		TableExpr(`role_grant AS "rg"`).
 		Column("rg.id").
@@ -362,6 +370,26 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 		return false, fmt.Errorf("read whether they may see this anywhere: %w", err)
 	}
 	return everywhere, nil
+}
+
+// here reports whether this person is still someone the deployment answers
+// for: recorded, and not deactivated.
+//
+// One spelling, because "may this person do this" has to exclude somebody who
+// has left at every site that asks it, and it excluded them at one — the
+// mention picker, whose own doc gives the reason: they are refused at sign-in,
+// so offering their name mentions somebody who will never see it. The same
+// sentence applies to routing work to them and to counting administrators, and
+// was carried to neither.
+func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
+	live, err := s.db.NewSelect().Model((*Account)(nil)).
+		Where("id = ?", personID).
+		Where("deactivated_at IS NULL").
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether they are still here: %w", err)
+	}
+	return live, nil
 }
 
 // rolesReading is which roles are enough to read at a visibility, asked of the
@@ -400,11 +428,17 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	// An administrator is not counted. Administration is not a read grant
 	// , and a team whose only qualifying member is an administrator is a
 	// queue nobody working the product can see.
+	// A member who has left is not a member who can read it. The team is a
+	// queue, and one whose only qualifying member is gone is a queue nobody
+	// working the product can see — the argument the administrator case below
+	// already makes, for a case nobody made it for.
 	reads, err := s.db.NewSelect().
 		TableExpr(`team_member AS "tmm"`).
 		Join(`JOIN "role_grant" AS "rg" ON rg.person_id = tmm.person_id`).
+		Join(`JOIN "person" AS "pe" ON pe.id = tmm.person_id`).
 		Column("tmm.person_id").
 		Where("tmm.team_id = ?", teamID).
+		Where("pe.deactivated_at IS NULL").
 		Where("rg.product_id = ?", productID).
 		Where("rg.active = ?", true).
 		Where("rg.role IN (?)", bun.List(enough)).
@@ -418,8 +452,10 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	everywhere, err := s.db.NewSelect().
 		TableExpr(`team_member AS "tmm"`).
 		Join(`JOIN "role_grant_all" AS "rga" ON rga.person_id = tmm.person_id`).
+		Join(`JOIN "person" AS "pe" ON pe.id = tmm.person_id`).
 		Column("tmm.person_id").
 		Where("tmm.team_id = ?", teamID).
+		Where("pe.deactivated_at IS NULL").
 		Where("rga.active = ?", true).
 		Where("rga.role IN (?)", bun.List(enough)).
 		Exists(ctx)

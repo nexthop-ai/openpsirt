@@ -596,6 +596,13 @@ func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Ro
 // their assigned work into work nobody can reach: assigned, so not in the
 // shared queue, and assigned to somebody who can no longer open it.
 func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) (bool, error) {
+	// And they are still here. A departed person's grant rows are left in
+	// place deliberately, so counting them left their work with somebody who
+	// is refused at sign-in and the answer said nothing was released.
+	here, err := s.here(ctx, personID)
+	if err != nil || !here {
+		return false, err
+	}
 	// Active ones, like every other question about what somebody holds. A
 	// row that grants nothing must never be counted as access — a grant left
 	// inactive by a switch to group-bound roles answered "they still hold
@@ -605,6 +612,7 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 		Where("person_id = ?", personID).
 		Where("active = ?", true).
 		Where("product_id = ?", productID).Count(ctx)
+
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
 	}
