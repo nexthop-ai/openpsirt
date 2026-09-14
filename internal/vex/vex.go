@@ -140,6 +140,14 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	if err != nil {
 		return nil, err
 	}
+	// The document is about the whole build, so asking for it is a
+	// product-wide question. The lookup above admits somebody brought into one
+	// case here — the names their own issue sits at have to resolve, or the
+	// grant refuses them the one thing it gave — and that is not an answer to
+	// this one. Asked before the build is resolved any further.
+	if !subject.Reads(access.Public, named.ProductID) {
+		return nil, access.Denied(fmt.Sprintf("read findings in product %d", named.ProductID))
+	}
 	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
 	if err != nil {
 		return nil, err

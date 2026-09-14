@@ -28,8 +28,9 @@ func registerVEX(api huma.API, in Ingest) {
 			"Requires a publisher configured for this deployment: a document naming none has " +
 			"nobody as its author.",
 		Tags: []string{"Findings"},
-	}, perProduct, "Answers only what you may see: the document is what stands about "+
-		"the build, which is a read of it rather than an act of triage."),
+	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
+		"the document is about the whole build rather than about one issue.",
+		readRights()...),
 		func(ctx context.Context, input *struct {
 			Product     string `path:"product"`
 			Stream      string `path:"stream"`

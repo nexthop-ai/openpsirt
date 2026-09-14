@@ -198,6 +198,15 @@ func approveRights() []access.Role {
 	return []access.Role{access.Approver, access.PublicTriage, access.PrivateTriage}
 }
 
+// readRights is who may read findings on a product: the pair that reads, and
+// the pair that triages, because triage implies reading at the same
+// visibility. What Reads admits, said as a list for the operations that gate
+// on it.
+func readRights() []access.Role {
+	return []access.Role{access.PublicRead, access.PublicTriage,
+		access.PrivateRead, access.PrivateTriage}
+}
+
 // privateRights is who may read work nobody has announced.
 func privateRights() []access.Role {
 	return []access.Role{access.PrivateRead, access.PrivateTriage}
