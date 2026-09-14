@@ -1,6 +1,7 @@
 package scanner_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -329,6 +330,77 @@ func TestAFullQueueStopsTheAskingRatherThanFailing(t *testing.T) {
 		}
 		if asked != 0 {
 			t.Errorf("asked for %d scans against a full queue", asked)
+		}
+	})
+}
+
+func TestACycleWorthOfScanningAlreadyWaitingStopsTheAsking(t *testing.T) {
+	// The other short circuit, and the one nothing reached. The test above
+	// fills the queue to its *backlog* bound, so it is the queue refusing;
+	// this is the schedule declining to ask at all because a cycle's worth is
+	// already waiting. Nothing this pass could add would be reached before
+	// the next cycle anyway, and asking while the queue is this deep is how a
+	// producer's arriving inventories end up behind re-scans of things
+	// measured yesterday.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx := t.Context()
+		roomy := queue.New(f.db, queue.Options{
+			MaxAttempts: 5, MaxBacklog: 10_000, ClaimTimeout: 30 * time.Minute,
+			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
+		})
+		// A cycle's worth of scans already queued, none of them this build's.
+		// Numbered, because the bound is on queued *builds*: a reference that
+		// is not a number does not name one and is dropped before the count.
+		for i := range 200 {
+			if _, err := roomy.Add(ctx, queue.Scan, strconv.Itoa(1_000_000+i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		asked, err := scanner.NewSchedule(f.db, roomy, quiet, "one").Once(ctx)
+		if err != nil {
+			t.Fatalf("a deep queue was reported as a failure: %v", err)
+		}
+		if asked != 0 {
+			t.Errorf("asked for %d more scans with a cycle's worth already waiting", asked)
+		}
+	})
+}
+
+func TestTheScheduleAsksOnItsOwnAndReturnsWhenCancelled(t *testing.T) {
+	// Schedule.Run is what cmd/openpsirt starts and it was at 0.0%. What
+	// lives only in the loop is the timer reset and the cancellation, and
+	// Once is correct whether or not either is.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+
+		// Due, so the first wake has something to ask for.
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Run)(nil)).
+			Set("finished_at = ?", time.Now().UTC().Add(-90*24*time.Hour)).
+			Where("target_id = ?", f.target).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		schedule := scanner.NewSchedule(f.db, f.queue, quiet, "one")
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			schedule.Run(ctx, time.Hour)
+		}()
+
+		waitFor(t, func() bool {
+			n, err := f.db.DB.NewSelect().Model((*queue.Job)(nil)).
+				Where("kind = ?", queue.Scan).Count(ctx)
+			return err == nil && n > 0
+		}, "the schedule to ask for a scan on its own")
+
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
 		}
 	})
 }

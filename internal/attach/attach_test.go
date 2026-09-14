@@ -1,7 +1,9 @@
 package attach_test
 
 import (
+	"context"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -518,3 +520,62 @@ func TestARecentUploadAndARedactedOneSurviveTheSweep(t *testing.T) {
 		}
 	})
 }
+
+func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
+	// NewKeeper supplies both production defaults for the attachment sweep —
+	// how long an upload is left and how often the pass runs — and it was at
+	// 0.0%, so neither default had been read by anything and the loop that
+	// reads them had never run.
+	//
+	// Nil where the deployment holds no files, which is the arm that keeps a
+	// worker from being started for a feature nobody configured: a goroutine
+	// and a log line an operator then has to work out the meaning of.
+	if keeper := attach.NewKeeper(nil, nil, hush(), 0); keeper != nil {
+		t.Error("a deployment that keeps no files was given a sweep to run")
+	}
+
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		abandoned := f.upload(t, who, "abandoned.log", []byte("nothing points here"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("token = ?", abandoned.Token).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		keeper := attach.NewKeeper(f.db.DB, f.files, hush(), 24*time.Hour)
+		if keeper == nil {
+			t.Fatal("a deployment that keeps files was given no sweep to run")
+		}
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			// Longer than this test runs for, so the first wake is what does
+			// the work.
+			keeper.Run(ctx, time.Hour)
+		}()
+
+		deadline := time.Now().Add(20 * time.Second)
+		for time.Now().Before(deadline) {
+			if _, err := f.store.Find(ctx, who, abandoned.Token); err != nil {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		if _, err := f.store.Find(ctx, who, abandoned.Token); err == nil {
+			t.Error("the sweep ran and left an upload nothing refers to")
+		}
+
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
+		}
+	})
+}
+
+// hush is a logger that writes nothing, for the background pass.
+func hush() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }

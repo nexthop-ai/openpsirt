@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -522,4 +523,105 @@ func TestWhatTheScannerSaidWhileSucceedingReachesTheRun(t *testing.T) {
 			t.Errorf("a run that warned reads as failed: %q", runs[0].Failure)
 		}
 	})
+}
+
+func TestTheRunnerScansUntilTheQueueIsEmptyAndReturnsQuietlyOnShutdown(t *testing.T) {
+	// Runner.Run is what cmd/openpsirt starts and what scans every build this
+	// server holds, and it was at 0.0% — every test drives Once. Three things
+	// live only in the loop, and Once is correct whether or not any of them
+	// is: the queue being drained rather than one job taken per wake, the
+	// timer being reset, and shutdown returning without reporting a fault.
+	//
+	// The last one matters on its own. A read cut short by shutdown is handed
+	// back and scanned again later, so it is not an error — and a process that
+	// logged one at every stop would teach an operator to ignore the level
+	// that means something.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+
+		said := &recording{}
+		runner := scanner.NewRunner(f.db, f.queue, &stub{reported: []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
+			Component: libnl,
+		}}}, slog.New(said), "test")
+
+		f.waiting(t)
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			// Longer than this test runs for, so a second wake cannot be what
+			// finishes the work.
+			runner.Run(ctx, time.Hour)
+		}()
+
+		waitFor(t, func() bool { return f.finishedRuns(t) > 0 }, "the queued build to be scanned")
+
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
+		}
+		if at, message := said.worst(); at >= slog.LevelError {
+			t.Errorf("stopping reported %v: %q — a scan cut short by shutdown is "+
+				"handed back rather than failed", at, message)
+		}
+	})
+}
+
+// finishedRuns is how many scan runs have finished against this build.
+func (f *runFixture) finishedRuns(t *testing.T) int {
+	t.Helper()
+	n, err := f.db.DB.NewSelect().Model((*finding.Run)(nil)).
+		Where("target_id = ?", f.target).
+		Where("finished_at IS NOT NULL").
+		Count(t.Context())
+	if err != nil {
+		t.Fatalf("count the scan runs: %v", err)
+	}
+	return n
+}
+
+// recording keeps the worst thing a loop said, so a test can assert that
+// stopping said nothing at the level that means something is wrong.
+type recording struct {
+	mu      sync.Mutex
+	level   slog.Level
+	message string
+}
+
+func (r *recording) Enabled(context.Context, slog.Level) bool { return true }
+
+func (r *recording) Handle(_ context.Context, record slog.Record) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if record.Level >= r.level {
+		r.level, r.message = record.Level, record.Message
+	}
+	return nil
+}
+
+func (r *recording) WithAttrs([]slog.Attr) slog.Handler { return r }
+func (r *recording) WithGroup(string) slog.Handler      { return r }
+
+func (r *recording) worst() (slog.Level, string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.level, r.message
+}
+
+// waitFor polls until done reports true. A deadline rather than a sleep: the
+// loops under test are driven by a timer, so how long the work takes is not
+// something a test can name.
+func waitFor(t *testing.T, done func() bool, what string) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		if done() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("waited for %s and it did not happen", what)
 }
