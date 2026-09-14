@@ -86,6 +86,8 @@ so several renewals may fail before the claim is at risk.
 | Renewal refused, another worker holds the job | The work is canceled and the worker is told the claim was lost, not that the work failed |
 | Renewal fails for any other reason | Reported and retried next interval. The claim is not lost until the timeout passes with nothing landing |
 | The job ends | Renewal stops first and the worker waits for it, so nothing else writes to the job while the ending is written |
+| Settling a job is one sequence, owned by the queue | Opening a context that outlives a cancellation, recording the ending against it, telling a stale claim apart from a write that failed, and noticing a takeover were written out in each worker down to the comment paragraph, and the copies had begun to disagree. A third worker would have been a third reading of the rule for a job finished by a worker that no longer holds it |
+| What a worker does about its own failure is passed in | It is the one respect the workers genuinely differ: the reader records the failure against the scan as well as the job, and must not on a cancellation or where the job went to another worker. Passed as a closure rather than a flag, so the difference is visible where it is made |
 | The claim went stale while the work ran | Only the claim holder finishes a job: the finishing statement carries the claim's condition. A refused finish is reported as "no longer held" and logged |
 | Shutdown mid-job | The job is handed back as a failed attempt. The writes recording an ending run under their own context, detached from the cancellation and bounded by a few seconds |
 

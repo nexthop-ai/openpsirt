@@ -782,3 +782,63 @@ func TestWhatAFailingJobWritesAboutItselfIsBounded(t *testing.T) {
 		}
 	})
 }
+
+func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
+	// The pass is what moves abandoned work out of the claimed state, so a
+	// loop that buried once and stopped, or that never reset its timer, would
+	// leave the defect it exists for in place — and Once is correct in both
+	// cases, which is why the loop itself is what this drives.
+	opts := queue.DefaultOptions()
+	opts.MaxAttempts = 1
+	opts.ClaimTimeout = time.Millisecond
+	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+
+		// Two, queued one after the other, so what is pinned is a pass that
+		// keeps running rather than one that fired once.
+		for _, ref := range []string{"first", "second"} {
+			if _, err := q.Add(ctx, queue.Scan, ref); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := q.Claim(ctx, "worker-that-dies", queue.Scan); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			queue.NewUndertaker(q, queue.NewLeases(db.DB), "the-only-replica", quiet).
+				Run(ctx, time.Millisecond)
+		}()
+
+		deadline := time.After(10 * time.Second)
+		for {
+			var aside int
+			if err := db.QueryRowContext(ctx,
+				`SELECT COUNT(*) FROM "job" WHERE "state" = ?`, string(queue.Dead)).
+				Scan(&aside); err != nil {
+				t.Fatal(err)
+			}
+			if aside == 2 {
+				break
+			}
+			select {
+			case <-deadline:
+				t.Fatalf("the pass set aside %d of 2 abandoned jobs", aside)
+			case <-time.After(5 * time.Millisecond):
+			}
+		}
+
+		// And it stops when it is told to. A pass that ignores cancellation
+		// holds the database open while the process is trying to shut down.
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Error("the pass did not return when the context ended")
+		}
+	})
+}

@@ -666,3 +666,90 @@ func (q *Queue) Requeue(ctx context.Context, id int64) error {
 	}
 	return nil
 }
+
+// Ending is how a worker settled one job, and whether the job had already gone
+// to somebody else.
+type Ending struct {
+	// HandedOver says the claim went to another worker while the work ran. The
+	// work that was done stands; the job's ending is the other worker's to
+	// write, so there is nothing here to retry.
+	HandedOver bool
+	// Err is what the caller should surface, which is the work's own failure
+	// where there was one and the failure to record an ending where there was
+	// not.
+	Err error
+}
+
+// Settle records how a job ended, whatever stopped the work.
+//
+// Here rather than in each worker. The sequence — open a context that outlives
+// a cancellation, record the ending against it, tell a stale claim apart from
+// a write that failed, and notice a takeover — was written out in both workers
+// down to the comment paragraph, and they had begun to disagree. A third
+// worker would have been a third copy, and the rule for a job finished by a
+// worker that no longer holds it would then have three readings.
+//
+// noun is what the reference is called in a log line, because "scan" and
+// "target" are the same field to this package and not to an operator reading
+// it. recover runs only where the failure is the work's own — not on a
+// cancellation and not on a takeover — which is the one respect the two
+// workers genuinely differ; it is a closure rather than a flag so that the
+// difference stays visible at the call site.
+func (q *Queue) Settle(ctx context.Context, job *Job, worker, noun string,
+	logger *slog.Logger, work error, taken error, recover func(context.Context) error) Ending {
+
+	// A shutdown cancels the work, and the cancellation must not also stop the
+	// job being handed back — otherwise it stays claimed by a process that has
+	// gone until the claim goes stale, half an hour later.
+	settled, done := Settling(ctx)
+	defer done()
+
+	var ended error
+	if work != nil {
+		if recover != nil && ctx.Err() == nil && taken == nil {
+			if err := recover(settled); err != nil && logger != nil {
+				logger.Warn("could not record why work failed",
+					"job", job.ID, noun, job.Reference, "error", err)
+			}
+		}
+		ended = q.Fail(settled, job.ID, worker, work)
+	} else {
+		ended = q.Succeed(settled, job.ID, worker)
+	}
+
+	out := Ending{Err: work}
+	switch {
+	case errors.Is(ended, ErrNoLongerHeld):
+		// The claim went stale while the work ran and another worker took the
+		// job over. What was done stands; the job's ending is the other
+		// worker's to write, so there is nothing to retry here — but work
+		// that outran its claim is worth knowing about.
+		if logger != nil {
+			logger.Warn("a job was finished by a worker that no longer held it",
+				"job", job.ID, noun, job.Reference)
+		}
+	case ended != nil:
+		if logger != nil {
+			logger.Warn("could not record how a job ended", "job", job.ID, "error", ended)
+		}
+		if work == nil {
+			out.Err = ended
+		}
+	}
+
+	if taken != nil {
+		// The work was stopped because the job went to another worker, so the
+		// error it ended with describes that rather than anything about the
+		// thing being worked on. There is nothing to retry and nothing to
+		// report: the job is in hand elsewhere. It is logged because a claim
+		// that went stale under running work means the renewals were not
+		// landing.
+		if logger != nil {
+			logger.Warn("work was stopped because another worker took its job over",
+				"job", job.ID, noun, job.Reference)
+		}
+		out.HandedOver = true
+		out.Err = nil
+	}
+	return out
+}
