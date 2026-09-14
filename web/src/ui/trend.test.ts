@@ -45,14 +45,20 @@ describe("what the trend panels say", () => {
   it("keeps an empty week that falls inside the history", () => {
     // Nothing opened and nothing closed is something that happened. Only a
     // leading empty step is the absence of us rather than a quiet week.
+    //
+    // The interior empty step is what makes this more than a test of the
+    // leading one: with every non-leading step non-empty, dropping every
+    // empty step rather than only the run at the front passes too, and a
+    // quiet week then disappears from the history it belongs to.
     const points = [
       { open: 0, opened: 0, resolved: 0 },
       { open: 50, opened: 50, resolved: 0 },
       { open: 50, opened: 0, resolved: 0 },
+      { open: 0, opened: 0, resolved: 0 },
       { open: 50, opened: 0, resolved: 0 },
       { open: 45, opened: 0, resolved: 5 },
     ];
-    expect(settled(points)).toHaveLength(4);
-    expect(paceReading(points)).toContain("of 4 weeks");
+    expect(settled(points)).toHaveLength(5);
+    expect(paceReading(points)).toContain("of 5 weeks");
   });
 });

@@ -69,14 +69,6 @@ export function Outcome({ outcome }: { outcome?: string }) {
   );
 }
 
-// The exchange format's own vocabulary, named as it is stored.
-export type Justification =
-  | "component_not_present"
-  | "vulnerable_code_not_present"
-  | "vulnerable_code_not_in_execute_path"
-  | "vulnerable_code_cannot_be_controlled_by_adversary"
-  | "inline_mitigations_already_exist";
-
 // Each one said in words, with a line saying what it claims.
 //
 // The vocabulary was adopted so that export would be nearly free, and CSAF is
@@ -89,7 +81,7 @@ export type Justification =
 // The stored token is still what an approver checks, so it stays reachable:
 // the visible text is the label, and the title carries the token beside the
 // meaning.
-export const JUSTIFICATIONS: { value: Justification; label: string; means: string }[] = [
+export const JUSTIFICATIONS = [
   {
     value: "component_not_present",
     label: "The component is not here",
@@ -115,7 +107,17 @@ export const JUSTIFICATIONS: { value: Justification; label: string; means: strin
     label: "Something already stops it",
     means: "a control elsewhere in the product prevents it, and saying which is required",
   },
-];
+] as const;
+
+// The exchange format's own vocabulary, named as it is stored.
+//
+// Derived from the list rather than written beside it. It was a second
+// hand-written copy, and a third lived in a test asserting the two agree — a
+// test that could not fail in one direction, because it was typed as a subset
+// of the union it was checking. Reading the type out of the list makes the
+// divergence unrepresentable, so the compiler enforces what the assertion
+// could not.
+export type Justification = (typeof JUSTIFICATIONS)[number]["value"];
 
 const because = new Map(JUSTIFICATIONS.map((each) => [each.value as string, each]));
 

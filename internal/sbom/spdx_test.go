@@ -128,8 +128,9 @@ func TestTheFormatsClaimNoKeyInCommon(t *testing.T) {
 	// puts one format's packages ahead of its own version statement. That is
 	// only safe while no key means two things.
 	shared := sbom.VocabularyOverlap()
-	if len(shared) > 0 {
-		t.Errorf("two formats claim the same top-level key(s): %v", shared)
+	for key, by := range shared {
+		t.Errorf("the top-level key %q is claimed by %v, so which one reads it "+
+			"is decided by whichever is tried first", key, by)
 	}
 }
 

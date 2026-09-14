@@ -67,8 +67,11 @@ func (f Faults) Error() string {
 	return strings.Join(reasons, "; ")
 }
 
-// maxFaults bounds how many problems one refusal reports.
-const maxFaults = 20
+// MaxFaults is how many problems one refusal names.
+//
+// Exported so a test can assert the cap fired rather than counting to a
+// number of its own, which would pass whatever the cap became.
+const MaxFaults = 20
 
 // ErrTooLong is returned for text past the bound.
 var ErrTooLong = errors.New("that is longer than a justification may be")
@@ -94,9 +97,9 @@ func Check(source string) error {
 	// and an answer many times the size of what was sent, which is a way to
 	// make a refusal expensive. Somebody with sixty problems does not need
 	// sixty told to them at once either.
-	if len(found) > maxFaults {
-		found = append(found[:maxFaults:maxFaults], Fault{
-			Reason: fmt.Sprintf("and more besides — fix these %d first", maxFaults),
+	if len(found) > MaxFaults {
+		found = append(found[:MaxFaults:MaxFaults], Fault{
+			Reason: fmt.Sprintf("and more besides — fix these %d first", MaxFaults),
 		})
 	}
 	return Faults(found)
