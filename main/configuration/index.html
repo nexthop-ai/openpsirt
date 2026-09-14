@@ -418,6 +418,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#encrypting-the-database-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encrypting the database connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -672,6 +689,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#encrypting-the-database-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encrypting the database connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -903,12 +937,12 @@ taken.</p>
 <tbody>
 <tr>
 <td><code>OPENPSIRT_DATABASE_URL</code></td>
-<td>Which database and how to reach it: <code>postgres://user:password@host:5432/name</code>, <code>mysql://…</code>, <code>mariadb://…</code>, or <code>sqlite:///absolute/path.db</code>. SQLite is for development and a single-pod trial, never production. <strong>Required</strong></td>
+<td>Which database and how to reach it: <code>postgres://user:password@host:5432/name</code>, <code>mysql://…</code>, <code>mariadb://…</code>, or <code>sqlite:///absolute/path.db</code>. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. <strong>Required</strong></td>
 <td>unset</td>
 </tr>
 <tr>
 <td><code>OPENPSIRT_AUTO_MIGRATE</code></td>
-<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose</td>
+<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and <code>openpsirt migrate status</code> says where both stand. That compares version numbers, not schema content: before the first release a schema change edits the migration that made the thing, so a database can be at the expected version and still hold what an earlier build created</td>
 <td><code>true</code></td>
 </tr>
 <tr>
@@ -933,6 +967,39 @@ taken.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="encrypting-the-database-connection">Encrypting the database connection<a class="headerlink" href="#encrypting-the-database-connection" title="Permanent link">&para;</a></h3>
+<p>The connection carries undisclosed findings, and by default it is encrypted
+only where the server offers it. Opportunistic is not the same as certain: a
+server that answers without TLS is accepted, and so is one whose certificate
+nobody checked. Ask for certainty in the URL.</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Default</th>
+<th>Ask for certainty with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PostgreSQL</td>
+<td><code>sslmode=prefer</code> — encrypted if the server offers it, no certificate checked</td>
+<td><code>?sslmode=verify-full</code>, with <code>sslrootcert</code> naming the authority</td>
+</tr>
+<tr>
+<td>MySQL, MariaDB</td>
+<td><code>tls=preferred</code> — encrypted if the server offers it, no certificate checked</td>
+<td><code>?tls=true</code>, which verifies the certificate against the system roots</td>
+</tr>
+<tr>
+<td>SQLite</td>
+<td>No connection to encrypt</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Anything the URL says about the transport is left alone, so <code>tls=skip-verify</code>
+or a <code>sslmode</code> of your own reaches the driver as written.</p>
 <h2 id="scanning">Scanning<a class="headerlink" href="#scanning" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
