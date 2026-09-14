@@ -21,17 +21,28 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		ctx := t.Context()
 		who := f.planner(t, access.PrivateTriage)
 
+		// The issue the statements are about. Asked for by identifier here
+		// and matched by name in the query, because which name a publisher
+		// used is theirs to choose — but who may be told about it is a
+		// question about the issue, so the read takes its identifier.
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := interned["CVE-2026-1"]
+
 		// A name with a letter outside ASCII, in capitals. This is the case
 		// the two folds disagree about.
 		const component = "libFÜNF"
-		recorded, superseded, err := f.store.RecordStatements(ctx, who, f.productID,
+		recorded, superseded, err2 := f.store.RecordStatements(ctx, who, f.productID,
 			"Debian", "dsa.json", "sha256:one", []finding.Statement{{
 				Vulnerability: "CVE-2026-1", Component: component,
 				Status: "not_affected", Justification: "vulnerable_code_not_in_execute_path",
 				Statement: "The affected function is never reached in our build.",
 			}})
-		if err != nil {
-			t.Fatal(err)
+		if err2 != nil {
+			t.Fatal(err2)
 		}
 		if recorded != 1 || superseded != 0 {
 			t.Fatalf("recording one statement reports %d recorded and %d set aside",
@@ -40,7 +51,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 
 		// Found however the asker spells it, on every engine.
 		for _, spelling := range []string{component, strings.ToLower(component), "LIBFÜNF"} {
-			said, err := f.store.SaidAbout(ctx, who, f.productID,
+			said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
 				[]string{"cve-2026-1", "CVE-2026-1"}, spelling)
 			if err != nil {
 				t.Fatal(err)
@@ -65,7 +76,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		if setAside != 1 {
 			t.Errorf("a second document set aside %d of the first's statements", setAside)
 		}
-		said, err := f.store.SaidAbout(ctx, who, f.productID,
+		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
 			[]string{"CVE-2026-1"}, component)
 		if err != nil {
 			t.Fatal(err)
@@ -77,7 +88,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// And a product the asker cannot see answers with a refusal rather
 		// than with somebody else's VEX evidence.
 		stranger := f.planner(t)
-		if _, err := f.store.SaidAbout(ctx, stranger, f.productID+9999,
+		if _, err := f.store.SaidAbout(ctx, stranger, f.productID+9999, issue,
 			[]string{"CVE-2026-1"}, component); err == nil {
 			t.Error("a product nobody holds anything on answered with statements")
 		}

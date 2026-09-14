@@ -308,3 +308,59 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 		}
 	})
 }
+
+func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testing.T) {
+	// "A grant that shows a row in a list and refuses it when opened is a
+	// grant with no content" — DESIGN-access.md says so, about the three reads
+	// by identifier that used to do exactly that. The finding detail was a
+	// fourth, through the graph.
+	//
+	// graph.visibleIn asks Sees and Reads product-wide with no case arm, and
+	// Detail calls Chains to build the way down to each place. So a
+	// collaborator holding no role on the product was refused the path to the
+	// component their own case sits in, and the route answered "no open
+	// finding is recorded there".
+	//
+	// Every existing collaborator test passes because it uses an identity that
+	// also holds a product role, which carries it through.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+
+		// Somebody with a role on the other product and nothing on this one,
+		// which is what a collaborator brought in from outside looks like.
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var detail struct {
+			Vulnerability string `json:"vulnerability"`
+			Places        []struct {
+				Place string `json:"place"`
+				Down  []struct {
+					Name string `json:"name"`
+				} `json:"down"`
+			} `json:"places"`
+		}
+		read(t, r, "outsider", findingAt(embargoed), &detail)
+		if detail.Vulnerability != embargoed {
+			t.Fatalf("the detail is about %q, want their case", detail.Vulnerability)
+		}
+		if len(detail.Places) == 0 {
+			t.Error("the finding says it sits nowhere")
+		}
+
+		// And the case grant is still not a role on the product: the rest of
+		// it stays out of reach.
+		for _, path := range []string{
+			"/v1/products/mine/findings",
+			"/v1/products/mine/streams/master/variants/broadcom/vex",
+		} {
+			if got := asPerson(t, r, "outsider", http.MethodGet, path, ""); got.Code < 400 {
+				t.Errorf("a case collaborator reached %s: %d", path, got.Code)
+			}
+		}
+	})
+}

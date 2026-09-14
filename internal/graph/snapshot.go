@@ -714,6 +714,29 @@ func ranks(n Neighbor) int {
 	return n.Findings
 }
 
+// knowsBuild refuses somebody who may not know this build exists.
+//
+// The weaker of the two questions here, and the right one for a read that
+// carries no findings: the way down to a component is the build's shape rather
+// than what is open against it. It admits a case collaborator, which is the
+// same rule the catalog's own lookup applies — the names their issue sits at
+// have to resolve, and so does the path to the component it sits in, or the
+// grant shows them a row they cannot open.
+//
+// visibleIn is the other question and stays where counts are answered. A count
+// of findings narrowed by a case grant would be a count of the product's work,
+// and that is what a collaborator may not have.
+func (s *Store) knowsBuild(ctx context.Context, subject access.Subject, targetID int64) error {
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+	if err != nil {
+		return err
+	}
+	if !subject.Sees(productID) && len(subject.Cases(productID)) == 0 {
+		return access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+	return nil
+}
+
 // visibleIn reports the visibilities this subject may read in a build, and
 // refuses where they may read none.
 //
