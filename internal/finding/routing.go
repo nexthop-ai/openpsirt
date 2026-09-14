@@ -59,12 +59,18 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 		return nil, fmt.Errorf("a rule that matches nothing places nothing: " +
 			"name a source package, a place in the tree, or both")
 	}
-	rule := &Routing{
-		ProductID: productID, TeamID: teamID, Name: strings.TrimSpace(name),
-		Upstream: strings.ToLower(upstream), Beneath: strings.ToLower(beneath),
-		CreatedBy: by.ID, CreatedAt: s.now().UTC().Truncate(time.Microsecond),
-	}
+	createdAt := s.now().UTC().Truncate(time.Microsecond)
+	var rule *Routing
 	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// Built inside, because an insert writes the generated identifier back
+		// into the model and the ordinal below is read from the database. A
+		// retry of a rolled-back attempt would re-insert a model carrying both
+		// of that attempt's answers.
+		rule = &Routing{
+			ProductID: productID, TeamID: teamID, Name: strings.TrimSpace(name),
+			Upstream: strings.ToLower(upstream), Beneath: strings.ToLower(beneath),
+			CreatedBy: by.ID, CreatedAt: createdAt,
+		}
 		// Scanned into a value rather than read through a cursor. A cursor
 		// left open on the transaction while the insert runs is two
 		// statements interleaved on one connection, which SQLite tolerates

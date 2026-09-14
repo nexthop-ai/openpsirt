@@ -594,14 +594,20 @@ same person as that username at the provider.
 
 ### Which provider issued an identifier
 
-The provider is recorded beside the identifier it issued, and written at the
+The issuer is recorded beside the identifier it minted, and written at the
 same moment.
+
+The issuer rather than the name the sign-in button carries. The name is a label
+an operator picks and may change without anything about the identities moving,
+and repointing a deployment at a different provider while leaving the label
+alone is the ordinary shape of a provider change — so a check on the name would
+miss the case this exists for and refuse the one it does not care about.
 
 | Rule | Reason |
 |---|---|
-| An identifier is read only as the provider that issued it meant it | Two providers issue into their own namespaces and neither knows the other's. The same string names different people at each, so reading one as the other hands somebody the roles of whoever held that string before |
+| An identifier is read only as the issuer that minted it meant it | Two providers issue into their own namespaces and neither knows the other's. The same string names different people at each, so reading one as the other hands somebody the roles of whoever held that string before |
 | An arrival that names no provider is refused | An identifier with no issuer names nobody, and binding one records a subject a later sign-in cannot tell apart from another provider's |
-| A bound identity under a provider that is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
+| A bound identity whose issuer is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
 | A row bound before the provider was recorded reads as the one configured now | There is nothing else it could mean, and refusing every one of them would lock out a deployment that never changed provider |
 | A row nobody has bound names no provider | Unbinding clears the identifier and the provider that issued it together. Left behind, a withdrawn binding still reads as a binding nobody withdrew, so unbinding everybody would not be enough to let the new provider start |
 
@@ -619,7 +625,7 @@ is what a provider change goes through.
 | Rule | Reason |
 |---|---|
 | A deployment configured for a provider its bound identities do not name refuses to start, and says how to undo it | The refusal is the only place anybody learns that the bindings need withdrawing, so stating the condition without the remedy leaves an operator with a process that will not start and no next step |
-| The window an unredeemed authorization lapses in does not apply to a proxy arrival | The window bounds who may redeem a name at a provider nobody here controls. A proxy is the deployment's own infrastructure, and it is the way back in when the provider is gone — expiring the grant there would close the door this exists to hold open |
+| The window an unredeemed authorization lapses in is charged on every path a name arrives by | The proxy path is the one where a name alone decides who gets the roles, so an authorization nobody redeemed matters most there. The deployment's own way back in is not what this closes: an administrator named in configuration is authorized again at every start, which restarts the window |
 
 ### How long a name is redeemable
 
@@ -629,7 +635,8 @@ it. That window ends.
 
 | Rule | Reason |
 |---|---|
-| An unredeemed authorization stops being redeemable | It is the one place where a name rather than an identifier decides who gets a set of roles. Left open, it waits for whoever turns up holding that name |
+| An unredeemed authorization stops being redeemable, on every path | It is the one place where a name rather than an identifier decides who gets a set of roles. Left open, it waits for whoever turns up holding that name |
+| Authorizing somebody again restarts it, and so does unbinding them | Otherwise the window is written once and never again: an authorization nobody redeemed could be reopened by no act at all, and the administrators named in configuration — whose authorization is written again at every start — would lose their way in on the day it lapsed, with nothing logged |
 | The window is written when the authorization is | It carries the window in force at the moment it was granted, the way a token carries the expiry it was minted with, so changing the setting does not silently extend what is already standing |
 | Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
 | A redeemed authorization is not held to it | The identifier decides from then on, and the window was only ever about the name |

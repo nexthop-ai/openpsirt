@@ -2,7 +2,6 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -121,20 +120,9 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	placed, filled, err := NewStore(s.db.DB).ApplyRules(working, productID, batch)
 	taken := release()
 
-	settled, done := queue.Settling(ctx)
-	defer done()
-	var ended error
-	if err != nil {
-		ended = s.queue.Fail(settled, job.ID, s.name, err)
-	} else {
-		ended = s.queue.Succeed(settled, job.ID, s.name)
-	}
-	if ended != nil && !errors.Is(ended, queue.ErrNoLongerHeld) {
-		s.logger.Warn("could not record how a routing sweep ended",
-			"job", job.ID, "error", ended)
-	}
-	if taken != nil || err != nil {
-		return placed, err
+	ending := s.queue.Settle(ctx, job, s.name, "product", s.logger, err, taken, nil)
+	if ending.HandedOver || ending.Err != nil {
+		return placed, ending.Err
 	}
 
 	// A full batch means there is more of the estate to walk. Queued again
@@ -146,6 +134,11 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	// batch already held, and reading that as the end stopped the sweep with
 	// the rest of the estate unrouted and the job reported successful.
 	if filled {
+		// Its own context that outlives a cancellation, for the same reason
+		// settling has one: a shutdown must not be what loses the rest of the
+		// estate.
+		settled, done := queue.Settling(ctx)
+		defer done()
 		if _, err := s.queue.Add(settled, queue.Route, job.Reference); err != nil {
 			s.logger.Warn("could not queue the rest of a routing sweep",
 				"product", productID, "error", err)

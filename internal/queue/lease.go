@@ -59,10 +59,7 @@ func (l *Leases) Take(ctx context.Context, name, holder string, until time.Durat
 	now := l.now().Truncate(time.Microsecond)
 	// The row is made on first use rather than seeded by the migration: what
 	// work exists is decided in code, and a migration listing the names would
-	// be a second place to change whenever a pass is added or retired. A
-	// second replica's insert is refused by the primary key, which is the
-	// answer rather than an error — both then go on to the update, and that is
-	// what decides between them.
+	// be a second place to change whenever a pass is added or retired.
 	// Outside the transaction below, and deliberately. A second replica's
 	// insert is refused by the primary key, which is the answer rather than an
 	// error — but on PostgreSQL a statement that fails inside a transaction

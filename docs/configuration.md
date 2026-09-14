@@ -205,16 +205,22 @@ issued it, and the same string names somebody else at another one, so a
 deployment configured for a provider its bound identities do not name refuses
 to start.
 
-1. Start with the **old** provider configured, or with the trusted header
-   where the old one cannot be reached either.
+1. Point `OPENPSIRT_OIDC_ISSUER` back at the **old** provider, or configure the
+   trusted header with no provider at all where the old one cannot be reached
+   either. A binding is withdrawn while the provider that made it is still
+   configured.
 2. `DELETE /v1/people/{identity}/identifier` for each person. The
    authorization and the roles stay; only the pin goes.
 3. Configure the new provider and restart. Each name is redeemed again by
    whoever next arrives holding it.
 
 Doing it the other way round — configuring the new provider first — leaves a
-process that will not start. The refusal names the old provider and the steps,
-so the way out is to put that value back and start at step 1.
+process that will not start. The refusal names the old issuer and the steps, so
+the way out is to put that value back and start at step 1.
+
+What is compared is the **issuer**, not `OPENPSIRT_OIDC_NAME`. Renaming the
+button changes nothing, and repointing the issuer while leaving the button
+alone is caught.
 
 
 

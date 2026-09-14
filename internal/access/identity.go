@@ -92,21 +92,36 @@ func (s *Store) Claim(ctx context.Context, personID int64, username string) erro
 		return fmt.Errorf("a way to sign in needs a username")
 	}
 
+	at := s.now().Truncate(time.Microsecond)
+	until := at.Add(s.window())
+
 	existing := new(Identity)
 	err := s.db.NewSelect().Model(existing).Where("username = ?", username).Scan(ctx)
 	if err == nil {
 		if existing.PersonID != personID {
 			return fmt.Errorf("%q is already somebody else here", username)
 		}
+		// Authorizing somebody again restarts the window. Without this the
+		// window is written once and never again, so an authorization nobody
+		// redeemed could not be reopened by any act at all — and the
+		// administrators named in configuration, whose authorization is
+		// written again at every start, would stop being able to sign in on
+		// the day it lapsed, with nothing logged and the deployment still
+		// reporting that somebody can administer it.
+		//
+		// A bound row is matched by its identifier and has no window, so it
+		// is left alone.
+		if existing.Subject == nil {
+			if _, err := s.db.NewUpdate().Model((*Identity)(nil)).
+				Set("claimable_until = ?", until).
+				Where("id = ?", existing.ID).Where("subject IS NULL").
+				Exec(ctx); err != nil {
+				return fmt.Errorf("renew the window on %q: %w", username, err)
+			}
+		}
 		return nil
 	}
 
-	at := s.now().Truncate(time.Microsecond)
-	window := s.claimWindow
-	if window <= 0 {
-		window = DefaultClaimWindow
-	}
-	until := at.Add(window)
 	claim := &Identity{
 		PersonID: personID, Username: username,
 		CreatedAt: at, ClaimableUntil: &until,
@@ -184,7 +199,7 @@ func (s *Store) MatchProvider(ctx context.Context, provider, subject, username s
 	}
 
 	if claimed.Subject == nil {
-		if claimed.ClaimableUntil != nil && !s.now().Before(*claimed.ClaimableUntil) {
+		if lapsed(claimed, s.now()) {
 			// Written for somebody who never came. The name is the only thing
 			// matching it, so leaving it redeemable for ever leaves a set of
 			// roles waiting for whoever turns up holding that name.
@@ -263,7 +278,26 @@ func (s *Store) MatchProxy(ctx context.Context, username string) (*Account, erro
 	if err != nil {
 		return nil, err
 	}
+	if lapsed(claimed, s.now()) {
+		// The same window the provider path charges. This is the path where a
+		// name alone decides who gets the roles, so it is where an
+		// authorization nobody redeemed matters most — and an administrator
+		// named in configuration is authorized again at every start, so the
+		// deployment's own way back in does not lapse under it.
+		return nil, ErrDenied
+	}
 	return s.byID(ctx, claimed.PersonID)
+}
+
+// lapsed says an authorization nobody has redeemed is past its window.
+//
+// A bound row is matched by its identifier and has no window: the window is
+// only ever about a name, which is the one thing somebody else can arrive
+// holding.
+func lapsed(claimed *Identity, now time.Time) bool {
+	return claimed.Subject == nil &&
+		claimed.ClaimableUntil != nil &&
+		!now.Before(*claimed.ClaimableUntil)
 }
 
 // claimedBy reads the authorization waiting under a username.
@@ -320,11 +354,24 @@ func (s *Store) UnbindIdentifier(ctx context.Context, personID int64) error {
 		// still names a provider this deployment is moving away from, and the
 		// startup check reads that as bindings nobody withdrew — so unbinding
 		// everybody would not be enough to let the new provider start.
+		//
+		// The window restarts with them. Unbinding says the authorization is
+		// standing and redeemable again, and a row that came back carrying a
+		// window which lapsed while it was bound is redeemable by nobody.
 		Set("subject = NULL").Set("provider = NULL").Set("bound_at = NULL").
+		Set("claimable_until = ?", s.now().Truncate(time.Microsecond).Add(s.window())).
 		Where("person_id = ?", personID).Exec(ctx); err != nil {
 		return fmt.Errorf("unbind how they sign in: %w", err)
 	}
 	return nil
+}
+
+// window is how long an authorization this store writes stays redeemable.
+func (s *Store) window() time.Duration {
+	if s.claimWindow <= 0 {
+		return DefaultClaimWindow
+	}
+	return s.claimWindow
 }
 
 // Identities lists the ways somebody may sign in.

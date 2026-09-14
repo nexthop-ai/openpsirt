@@ -25,7 +25,11 @@ import (
 // page: it would mean a second thing able to authenticate, verified by a
 // second path, and it would be readable by anything that got into the page.
 type OIDC struct {
-	name     string
+	name string
+	// issuer is who mints the identifiers this provider hands over, which is
+	// what an identity is recorded against. Kept apart from name, which is a
+	// label an operator picks and may change without anything moving.
+	issuer   string
 	config   oauth2.Config
 	verifier *oidc.IDTokenVerifier
 	// groupsClaim names where this provider puts group membership. There is no
@@ -139,7 +143,8 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	}
 
 	return &OIDC{
-		name: cfg.Name,
+		name:   cfg.Name,
+		issuer: strings.TrimRight(strings.TrimSpace(cfg.Issuer), "/"),
 		config: oauth2.Config{
 			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
 			Endpoint: endpoint, Scopes: scopes,
@@ -150,6 +155,9 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		client:        guarded,
 	}, nil
 }
+
+// Issuer is who mints the identifiers this provider hands over.
+func (o *OIDC) Issuer() string { return o.issuer }
 
 // Name is how a sign-in path names this provider.
 func (o *OIDC) Name() string { return o.name }
@@ -234,7 +242,7 @@ func (o *OIDC) Complete(ctx context.Context, code string, pending Pending, redir
 	}
 	return &Identity{
 		Subject:       verified.Subject,
-		Provider:      o.name,
+		Provider:      o.issuer,
 		Username:      username,
 		DisplayName:   text(claims["name"]),
 		Email:         text(claims["email"]),

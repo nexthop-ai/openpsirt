@@ -90,7 +90,7 @@ func aSeverity(name string) bool { return name == setting.TriageFloor }
 func aCount(name string) bool {
 	switch name {
 	case setting.TogetherCap, setting.AttachmentMaxSize, setting.AttachmentQuota,
-		setting.AttachmentShare, setting.RoutingBatch:
+		setting.AttachmentShare, setting.RoutingBatch, setting.QueueBacklog:
 		return true
 	}
 	return false

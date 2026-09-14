@@ -223,7 +223,7 @@ const choices: Record<string, string[]> = {
 // time. Named here because everything else here is a duration, and a duration
 // is composed rather than typed — asking somebody to write "8760h" is asking
 // for a mistake that is a factor of twenty-four.
-const counts = new Set(["triage.together-cap", "routing.batch"]);
+const counts = new Set(["triage.together-cap", "routing.batch", "queue.backlog"]);
 
 // The settings whose value is a number of bytes. Composed for the same reason
 // a duration is: 26214400 is twenty-five megabytes, and nobody reads it as

@@ -643,12 +643,15 @@ func TestSetAsideWorkCanBeSeenAndPutBack(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		aside, err := q.SetAside(ctx, 0)
+		aside, total, err := q.SetAside(ctx, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(aside) != 1 {
 			t.Fatalf("the set-aside list holds %d jobs, want one", len(aside))
+		}
+		if total != 1 {
+			t.Errorf("the list reports %d set aside in all, want one", total)
 		}
 		if aside[0].Reference != "unreadable" {
 			t.Errorf("the list names %q", aside[0].Reference)
@@ -839,6 +842,43 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 		case <-returned:
 		case <-time.After(10 * time.Second):
 			t.Error("the pass did not return when the context ended")
+		}
+	})
+}
+
+func TestAClippedSetAsideListSaysHowManyThereAre(t *testing.T) {
+	// A page that stops at the cap with nothing saying so cannot be told from
+	// a complete answer, and a restart loop sets aside far more than one page
+	// holds — which is the state somebody opens this in.
+	opts := queue.DefaultOptions()
+	opts.MaxAttempts = 1
+	opts.Backoff = 0
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		const set = 5
+		for i := range set {
+			ref := fmt.Sprintf("doomed-%d", i)
+			if _, err := q.Add(ctx, queue.Parse, ref); err != nil {
+				t.Fatal(err)
+			}
+			job, err := q.Claim(ctx, "worker", queue.Parse)
+			if err != nil || job == nil {
+				t.Fatalf("claiming %s: %v", ref, err)
+			}
+			if err := q.Fail(ctx, job.ID, "worker", errors.New("not an inventory")); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		page, total, err := q.SetAside(ctx, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page) != 2 {
+			t.Errorf("the page holds %d, want the two asked for", len(page))
+		}
+		if total != set {
+			t.Errorf("the list reports %d set aside in all, want %d", total, set)
 		}
 	})
 }

@@ -100,8 +100,12 @@ type Options struct {
 // producer that will retry on its own if we refuse.
 func DefaultOptions() Options {
 	return Options{
-		MaxAttempts:  5,
-		MaxBacklog:   1000,
+		MaxAttempts: 5,
+		// The same number the settings screen reports as shipped. Written in
+		// one place, because these are read by different things — the screen
+		// reports the setting package's, the queue falls back to this one —
+		// and two spellings disagree the first time either moves.
+		MaxBacklog:   setting.DefaultQueueBacklog,
 		ClaimTimeout: 30 * time.Minute,
 		Heartbeat:    5 * time.Minute,
 		Backoff:      30 * time.Second,
@@ -332,24 +336,32 @@ func (q *Queue) Bury(ctx context.Context) (int, error) {
 	now := q.now().Truncate(time.Microsecond)
 	stale := now.Add(-q.opts.ClaimTimeout)
 
-	res, err := q.db.NewUpdate().Model((*Job)(nil)).
-		Set("state = ?", Dead).
-		Set("last_error = ?", ErrWorkerGone.Error()).
-		Set("claimed_by = NULL").
-		Set("updated_at = ?", now).
-		Where("state = ?", Running).
-		Where("claimed_at < ?", stale).
-		Where("attempts >= max_attempts").
-		Exec(ctx)
+	var buried int
+	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		// Every attempt starts from nothing: a count from an attempt that was
+		// rolled back describes a queue that no longer exists.
+		buried = 0
+		res, err := tx.NewUpdate().Model((*Job)(nil)).
+			Set("state = ?", Dead).
+			Set("last_error = ?", ErrWorkerGone.Error()).
+			Set("claimed_by = NULL").
+			Set("updated_at = ?", now).
+			Where("state = ?", Running).
+			Where("claimed_at < ?", stale).
+			Where("attempts >= max_attempts").
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("set aside work whose worker never came back: %w", err)
+		}
+		if n, err := res.RowsAffected(); err == nil {
+			buried = int(n)
+		}
+		return nil
+	})
 	if err != nil {
-		return 0, fmt.Errorf("set aside work whose worker never came back: %w", err)
+		return 0, err
 	}
-	buried, err := res.RowsAffected()
-	if err != nil {
-		// The count is the only thing lost; the statement said it succeeded.
-		return 0, nil
-	}
-	return int(buried), nil
+	return buried, nil
 }
 
 // ErrWorkerGone is what a job records when the worker holding it never
@@ -613,7 +625,7 @@ func held(res sql.Result) error {
 // stopped, and evidence nobody can reach is evidence nobody has: a job that
 // stops being retried with nowhere to see it is the same silence as one that
 // is retried for ever.
-func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, error) {
+func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, int, error) {
 	if limit <= 0 || limit > setAsideCeiling {
 		limit = setAsideCeiling
 	}
@@ -622,9 +634,18 @@ func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, error) {
 		Where("state = ?", Dead).
 		OrderExpr("updated_at DESC, id DESC").
 		Limit(limit).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("list work that was set aside: %w", err)
+		return nil, 0, fmt.Errorf("list work that was set aside: %w", err)
 	}
-	return jobs, nil
+	// Counted as well as listed. A page that stops at the cap with nothing
+	// saying so cannot be told from a complete answer, and a restart loop
+	// sets aside far more than one page holds — which is exactly the state
+	// somebody opens this in.
+	total, err := q.db.NewSelect().Model((*Job)(nil)).
+		Where("state = ?", Dead).Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count work that was set aside: %w", err)
+	}
+	return jobs, total, nil
 }
 
 // setAsideCeiling bounds the set-aside listing. A read on an interactive route
@@ -644,27 +665,29 @@ var ErrNotSetAside = errors.New("that job was not set aside")
 // transient failure. The last error is kept until something overwrites it, so
 // the evidence of the previous run survives the decision to try again.
 func (q *Queue) Requeue(ctx context.Context, id int64) error {
-	now := q.now().Truncate(time.Microsecond)
-	res, err := q.db.NewUpdate().Model((*Job)(nil)).
-		Set("state = ?", Pending).
-		Set("attempts = ?", 0).
-		Set("run_after = ?", now).
-		Set("claimed_by = NULL").
-		Set("claimed_at = NULL").
-		Set("updated_at = ?", now).
-		Where("id = ?", id).
-		Where("state = ?", Dead).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("put job %d back: %w", id, err)
-	}
-	// Rows matched rather than rows changed, which the connection settings
-	// make true on every engine. Nothing matched means the job is not set
-	// aside — already running again, or never there.
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return ErrNotSetAside
-	}
-	return nil
+	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
+		now := q.now().Truncate(time.Microsecond)
+		res, err := tx.NewUpdate().Model((*Job)(nil)).
+			Set("state = ?", Pending).
+			Set("attempts = ?", 0).
+			Set("run_after = ?", now).
+			Set("claimed_by = NULL").
+			Set("claimed_at = NULL").
+			Set("updated_at = ?", now).
+			Where("id = ?", id).
+			Where("state = ?", Dead).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("put job %d back: %w", id, err)
+		}
+		// Rows matched rather than rows changed, which the connection settings
+		// make true on every engine. Nothing matched means the job is not set
+		// aside — already running again, or never there.
+		if n, err := res.RowsAffected(); err == nil && n == 0 {
+			return ErrNotSetAside
+		}
+		return nil
+	})
 }
 
 // Ending is how a worker settled one job, and whether the job had already gone

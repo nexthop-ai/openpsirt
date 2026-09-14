@@ -3668,6 +3668,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3687,6 +3690,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3706,6 +3712,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3725,6 +3734,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3744,6 +3756,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3763,6 +3778,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3782,6 +3800,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3801,6 +3822,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3820,6 +3844,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3839,6 +3866,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3858,6 +3888,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3877,6 +3910,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3896,6 +3932,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3915,6 +3954,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3934,6 +3976,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3953,6 +3998,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3972,6 +4020,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -3991,6 +4042,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4010,6 +4064,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4029,6 +4086,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4048,6 +4108,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4067,6 +4130,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4086,6 +4152,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4105,6 +4174,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4124,6 +4196,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4143,6 +4218,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4162,6 +4240,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4181,6 +4262,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4200,6 +4284,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4219,6 +4306,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4238,6 +4328,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4257,6 +4350,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4276,6 +4372,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4295,6 +4394,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4314,6 +4416,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -4333,6 +4438,9 @@ components:
           type:
             - array
             - "null"
+        total:
+          format: int64
+          type: integer
       required:
         - items
       type: object
@@ -18470,9 +18578,9 @@ paths:
   /v1/work/set-aside:
     get:
       description: |-
-        Returns background work the queue has set aside, newest first, with why each stopped where anything reported a reason.
+        Returns background work the queue has set aside, newest first, with why each stopped where anything reported a reason. A job is set aside once it has been tried as many times as it is allowed to be, whether it reported a failure or its worker stopped answering.
 
-        A job is set aside after it has been tried as many times as it is allowed to be. That includes a job whose worker was killed rather than one that reported a failure: nothing reports a worker that is gone, so the reason reads as the worker never having come back.
+        At most 200 are returned. `total` is how many are set aside in all, so a clipped page can be told from a complete one.
 
         **Requires:** administrator
       operationId: list-set-aside-work
@@ -18497,9 +18605,9 @@ paths:
   /v1/work/set-aside/{id}/retry:
     post:
       description: |-
-        Puts one set-aside job back in the queue with its attempts started again, for whichever worker takes it next.
+        Puts one set-aside job back in the queue for whichever worker takes it next, with its attempts reset to zero and its last error kept.
 
-        Whoever does this has decided the reason it kept failing is dealt with, so the count starts from nothing: a job put back with one attempt left would be set aside again by the next transient failure. A job that is not set aside is refused rather than moved.
+        A job that is not set aside is refused rather than moved.
 
         **Requires:** administrator
       operationId: retry-set-aside-work

@@ -145,12 +145,13 @@ The caller states whether a job commits with the rows it is about.
 | Queue afterwards | Work that merely follows a write, such as sweeping routing rules after a rule is recorded | None. A failure to queue is logged rather than returned, because the rule is recorded either way and an error would invite a retry that records it twice |
 
 Every write the queue makes of its own — queueing, claiming, renewing,
-finishing, failing, setting aside, and taking or handing back a lease — goes
-through the retry helper rather than running as a statement on its own.
+finishing, failing, setting aside, putting back, and taking or handing back a
+lease — goes through the retry helper rather than running as a statement on its
+own.
 
 | Rule | Reason |
 |---|---|
-| A cluster refuses at commit, not at the statement | A write whose statements all succeeded can still be rolled back under it, so a write outside a transaction cannot be retried at all: the failure arrives where there is nothing left to go again |
+| A cluster refuses at commit, not at the statement | See `DESIGN-database.md` § Retryable transactions. A write outside a transaction cannot be retried at all: the failure arrives where there is nothing left to go again |
 | Finishing is the write where it costs most | Reported up rather than retried, a job that finished is recorded by its caller as failed and handed out again. The work runs twice, which on an ingest looks like real change |
 | A finish whose commit was refused asks the row rather than assuming | A second attempt covers both "somebody else holds it now" and "the commit succeeded and the answer never arrived". Work that is finished is finished, and reporting a lost claim for it would record a failure against a job that succeeded |
 | A lease take that is refused would read as losing a race | A replica told it lost a race it never ran stops sweeping, with nothing logged, on every replica at once |

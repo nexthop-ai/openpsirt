@@ -42,12 +42,12 @@ func registerWork(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-set-aside-work", Method: http.MethodGet, Path: "/v1/work/set-aside",
 		Summary: "List work that stopped being retried",
-		Description: "Returns background work the queue has set aside, newest first, with " +
-			"why each stopped where anything reported a reason.\n\n" +
-			"A job is set aside after it has been tried as many times as it is allowed to be. " +
-			"That includes a job whose worker was killed rather than one that reported a " +
-			"failure: nothing reports a worker that is gone, so the reason reads as the worker " +
-			"never having come back.",
+		Description: "Returns background work the queue has set aside, newest first, with why " +
+			"each stopped where anything reported a reason. A job is set aside once it has " +
+			"been tried as many times as it is allowed to be, whether it reported a failure " +
+			"or its worker stopped answering.\n\n" +
+			"At most 200 are returned. `total` is how many are set aside in all, so a clipped " +
+			"page can be told from a complete one.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[SetAsideBody], error) {
 		if err := administrating(ctx); err != nil {
@@ -56,11 +56,12 @@ func registerWork(api huma.API, in Ingest) {
 		if in.Queue == nil {
 			return &listOutput[SetAsideBody]{}, nil
 		}
-		jobs, err := in.Queue.SetAside(ctx, 0)
+		jobs, total, err := in.Queue.SetAside(ctx, 0)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "work that was set aside could not be read", err)
 		}
 		out := &listOutput[SetAsideBody]{}
+		out.Body.Total = total
 		out.Body.Items = make([]SetAsideBody, 0, len(jobs))
 		for _, job := range jobs {
 			body := SetAsideBody{
@@ -79,12 +80,9 @@ func registerWork(api huma.API, in Ingest) {
 		OperationID: "retry-set-aside-work", Method: http.MethodPost,
 		Path:    "/v1/work/set-aside/{id}/retry",
 		Summary: "Retry work that was set aside",
-		Description: "Puts one set-aside job back in the queue with its attempts started " +
-			"again, for whichever worker takes it next.\n\n" +
-			"Whoever does this has decided the reason it kept failing is dealt with, so the " +
-			"count starts from nothing: a job put back with one attempt left would be set " +
-			"aside again by the next transient failure. A job that is not set aside is " +
-			"refused rather than moved.",
+		Description: "Puts one set-aside job back in the queue for whichever worker takes it " +
+			"next, with its attempts reset to zero and its last error kept.\n\n" +
+			"A job that is not set aside is refused rather than moved.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, in2 *struct {
 		ID int64 `path:"id" doc:"The job to put back"`

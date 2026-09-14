@@ -411,3 +411,108 @@ func TestChangingProviderIsUnbindThenSwitch(t *testing.T) {
 		}
 	})
 }
+
+func TestAuthorizingSomebodyAgainRestartsTheirWindow(t *testing.T) {
+	// The window is written when an authorization is, and without this it
+	// could be written once and never again: an authorization nobody redeemed
+	// would be un-reopenable by any act at all.
+	//
+	// The administrators named in configuration are the sharp end. Their
+	// authorization is written again at every start, so a window that never
+	// restarted would take the deployment's own way back in away on the day
+	// it lapsed — with nothing logged, and the deployment still reporting
+	// that somebody can administer it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "alice", "", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, person.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err == nil {
+			t.Fatal("the window did not lapse, so this test pins nothing")
+		}
+
+		// Written again, the way a start writes it for a named administrator.
+		if err := f.store.Claim(ctx, person.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
+			t.Errorf("authorizing somebody again left them unable to sign in: %v", err)
+		}
+	})
+}
+
+func TestUnbindingMakesAnAuthorizationRedeemableAgain(t *testing.T) {
+	// Unbinding says the authorization is standing and redeemable again. A
+	// row that came back carrying a window which lapsed while it was bound is
+	// redeemable by nobody, which would make a provider change a way to lock
+	// out everybody who had signed in more than a window ago.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person := authorized(t, f, "alice", "alice")
+		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
+			t.Fatal(err)
+		}
+		// Bound well inside the window, then unbound long after it would have
+		// lapsed had anybody been counting.
+		lapsed := f.store.ClaimingWithin(time.Nanosecond)
+		if err := lapsed.UnbindIdentifier(ctx, person.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.MatchProvider(ctx, "entra", "aad-9f2c", "alice"); err == nil {
+			t.Log("the window this store unbound with was tiny, so it lapsed at once")
+		}
+
+		// With the ordinary window it is redeemable again, which is what
+		// unbinding promises.
+		if err := f.store.UnbindIdentifier(ctx, person.ID); err != nil {
+			t.Fatal(err)
+		}
+		matched, err := f.store.MatchProvider(ctx, "entra", "aad-9f2c", "alice")
+		if err != nil {
+			t.Fatalf("an unbound authorization was not redeemable again: %v", err)
+		}
+		if matched.ID != person.ID {
+			t.Errorf("redeemed person %d, want %d", matched.ID, person.ID)
+		}
+	})
+}
+
+func TestAProxyChargesTheSameWindowAsAProvider(t *testing.T) {
+	// The window is about a name, and the proxy path is the one where a name
+	// alone decides who gets the roles. Charged on the provider path only, an
+	// authorization nobody redeemed stayed redeemable for ever through the
+	// header — which is the wider of the two doors, not the narrower.
+	//
+	// The deployment's own way back in is not what this closes: an
+	// administrator named in configuration is authorized again at every
+	// start, which restarts the window.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "alice", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, person.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := f.store.MatchProxy(ctx, "alice"); err == nil {
+			t.Error("an authorization nobody redeemed inside its window was redeemed by proxy")
+		}
+
+		// And authorizing again reopens it on this path as well.
+		if err := f.store.Claim(ctx, person.ID, "alice"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.MatchProxy(ctx, "alice"); err != nil {
+			t.Errorf("a reopened authorization was refused by proxy: %v", err)
+		}
+	})
+}

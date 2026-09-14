@@ -523,23 +523,38 @@ func onlyTheBoundProvider(ctx context.Context, rights *access.Store, providers m
 	if err != nil {
 		return err
 	}
+	// Compared on the issuer rather than the name. The name is a label an
+	// operator picks and may change without anything about the identities
+	// moving, and repointing the issuer at a different provider while leaving
+	// the label alone is the ordinary shape of a provider change — so
+	// comparing names would miss the case this exists for and refuse the one
+	// it does not care about.
+	issuers := make(map[string]bool, len(providers))
+	configured := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		issuers[provider.Issuer()] = true
+		configured = append(configured, provider.Issuer())
+	}
+	sort.Strings(configured)
+
 	for _, was := range bound {
-		if _, still := providers[was]; still {
+		if issuers[was] {
 			continue
 		}
-		configured := make([]string, 0, len(providers))
-		for name := range providers {
-			configured = append(configured, name)
-		}
-		sort.Strings(configured)
+		// The way out has to be in the message. By the time anybody reads
+		// this the provider has already changed and the process will not
+		// start, so the route that withdraws a binding is not serving — and
+		// naming the act without saying where it is reachable from leaves an
+		// operator with a stopped process and no next step.
 		return fmt.Errorf(
-			"identities here are bound to the %q provider and this deployment is configured for %s: "+
-				"an identifier one provider issued names somebody else at another, so the bindings "+
-				"are withdrawn deliberately before the provider changes. Start again naming %q, "+
-				"unbind each person (DELETE /v1/people/{identity}/identifier), then configure %s. "+
-				"Where the old provider cannot be reached either, configure the trusted header "+
-				"instead and do the same from there",
-			was, strings.Join(configured, ", "), was, strings.Join(configured, ", "))
+			"identities here are bound to %q and this deployment is configured for %s: "+
+				"an identifier one provider issued names somebody else at another. Point "+
+				"%sOIDC_ISSUER back at %[1]q, unbind each person under Administration "+
+				"(DELETE /v1/people/{identity}/identifier), and change the issuer after that "+
+				"— a binding is withdrawn while the provider that made it is still "+
+				"configured. Where %[1]q cannot be reached either, configure the trusted "+
+				"header with no provider at all and do the same from there",
+			was, strings.Join(configured, ", "), "OPENPSIRT_")
 	}
 	return nil
 }
