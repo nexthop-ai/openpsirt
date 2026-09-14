@@ -58,9 +58,28 @@ func upTrail(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "admin_change_by_fk" FOREIGN KEY ("by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// Newest first, which is the only order this is ever read in, and
-		// narrowed by kind because that is the only filter it takes.
-		`CREATE INDEX "admin_change_recent_idx" ON "admin_change" ("at", "kind")`,
+		// Three reads, three shapes. Every one of them orders by "at" and
+		// none of them constrains it, so a composite led by "at" can serve
+		// the ordering and nothing else — the filter behind it is applied to
+		// every row walked, on a table whose own reason for existing is that
+		// it only grows.
+		//
+		// The equality column leads and the ordering column trails, so the
+		// order is still satisfied from the index.
+
+		// The whole trail, newest first, which is the screen with no filter
+		// on it.
+		`CREATE INDEX "admin_change_recent_idx" ON "admin_change" ("at")`,
+
+		// The same screen narrowed to one kind of change.
+		`CREATE INDEX "admin_change_kind_idx" ON "admin_change" ("kind", "at")`,
+
+		// What one person's own history is read by, which had no index at
+		// all — so opening anybody's page read every row ever written. The
+		// query asks for the exact name or for every name beginning with it
+		// followed by " on ", which is left-anchored and so a range this can
+		// serve on all four engines.
+		`CREATE INDEX "admin_change_about_idx" ON "admin_change" ("about", "at")`,
 	}
 
 	for _, stmt := range statements {

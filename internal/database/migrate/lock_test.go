@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -100,18 +101,6 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 	}
 }
 
-func TestSQLiteNeedsNoAdvisoryLock(t *testing.T) {
-	db := open(t, "sqlite://"+t.TempDir()+"/lock.db")
-	release, err := acquire(context.Background(), db)
-	if err != nil {
-		t.Fatalf("acquire on sqlite: %v", err)
-	}
-	if err := release(context.Background()); err != nil {
-		t.Errorf("release on sqlite: %v", err)
-	}
-	_ = database.SQLite
-}
-
 func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
 	// The bound on the lock wait is a session setting, and Close returns the
 	// connection to the pool rather than closing it — which is why the
@@ -179,5 +168,67 @@ func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
 	}
 	if _, err := versionTableExists(ctx, closed); err == nil {
 		t.Error("a database that could not be read reported that the version table is simply absent")
+	}
+}
+
+func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
+	// The other three engines take a lock in the database. SQLite could not:
+	// its handle is capped at one connection, which the migration itself
+	// needs, so every in-database spelling deadlocks against that — and what
+	// stood instead was a comment saying SQLite "is only ever used by a single
+	// process", enforced by one Helm template while the binary accepts a
+	// SQLite URL with a warning.
+	//
+	// Two handles rather than two processes, because the lock is on the open
+	// file description rather than on the process: two descriptors conflict
+	// whether or not they are in the same program, which is what makes this
+	// testable at all. Six processes against one file were run by hand, and
+	// went from one migrating and three failing to one migrating and the rest
+	// waiting and finding the work done.
+	path := t.TempDir() + "/locked.db"
+	first := open(t, "sqlite://"+path)
+	second := open(t, "sqlite://"+path)
+	ctx := context.Background()
+
+	// Otherwise the second attempt waits five minutes.
+	restore := lockWaitSeconds
+	lockWaitSeconds = 1
+	t.Cleanup(func() { lockWaitSeconds = restore })
+
+	release, err := acquire(ctx, first)
+	if err != nil {
+		t.Fatalf("the first migration could not take the lock: %v", err)
+	}
+	if _, err := acquire(ctx, second); err == nil {
+		t.Error("two processes were allowed to migrate one file at the same time")
+	} else if !strings.Contains(err.Error(), "another process") {
+		t.Errorf("the refusal does not say what is in the way: %v", err)
+	}
+
+	// And once it is released, the next one gets it — a lock that is never
+	// handed on is a deployment that starts once.
+	if err := release(ctx); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+	again, err := acquire(ctx, second)
+	if err != nil {
+		t.Fatalf("the lock was not handed on after release: %v", err)
+	}
+	if err := again(ctx); err != nil {
+		t.Errorf("release by the second: %v", err)
+	}
+}
+
+func TestAnInMemoryDatabaseHasNoSecondProcessToExclude(t *testing.T) {
+	// It belongs to the process that opened it, so there is no file to lock
+	// and nothing that could reach it. Worth pinning because the lock is taken
+	// on a path, and an empty path is what this case gives it.
+	db := open(t, "sqlite://:memory:")
+	release, err := acquire(context.Background(), db)
+	if err != nil {
+		t.Fatalf("acquire against an in-memory database: %v", err)
+	}
+	if err := release(context.Background()); err != nil {
+		t.Errorf("release: %v", err)
 	}
 }

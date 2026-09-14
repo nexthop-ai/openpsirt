@@ -193,7 +193,7 @@ func typesFor(e database.Engine) *columnTypes {
 		// a four-byte character set.
 		return &columnTypes{
 			id: "BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY", ref: "BIGINT", refNull: "BIGINT",
-			name: "VARCHAR(191)", free: "TEXT", date: "DATE", timestamp: "DATETIME(6)",
+			name: "VARCHAR(191)", date: "DATE", timestamp: "DATETIME(6)",
 			// Sixteen megabytes for text somebody typed. The smaller type
 			// holds 65,535 bytes, and the policy that checks typed text
 			// before it is stored admits 65,536 — so a field that passed
@@ -201,7 +201,17 @@ func typesFor(e database.Engine) *columnTypes {
 			// recorded on the other two, or truncated silently outside
 			// strict mode, leaving an approver agreeing to words that are
 			// not the words that were written.
-			text:    "MEDIUMTEXT",
+			//
+			// **The producer-supplied slot is the same type, for a stronger
+			// reason.** Typed text is at least bounded at submission; this is
+			// text a producer put in a scan file, of no length anything here
+			// controls, and it was the *smaller* of the two — 64 KB against
+			// 16 MB, on these two engines only, which is the inversion of
+			// what the two slots are declared to mean. No column of this
+			// class is indexed or unique, so widening it widens no key: the
+			// names that are indexed are the folded ones beside them, which
+			// are short and stay short.
+			text: "MEDIUMTEXT", free: "MEDIUMTEXT",
 			boolean: "TINYINT(1)", kind: "VARCHAR(16)", hash: "VARCHAR(64)",
 			// Sixteen megabytes, which is far more than a chunk ever holds.
 			// The smaller type tops out at 64 KB, which is not.

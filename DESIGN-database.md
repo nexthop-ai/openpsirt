@@ -201,12 +201,28 @@ the collapse to unpick. Every migration now creates something.
 | Lock | Excludes | Mechanism |
 |---|---|---|
 | Migration mutex | Other goroutines in this process | An ordinary mutex |
-| Advisory lock | Other instances on the same database | `pg_advisory_lock`, which belongs to the database; `GET_LOCK` on a name carrying the database, since a MySQL named lock belongs to the server; nothing on SQLite |
+| Advisory lock | Other instances on the same database | `pg_advisory_lock`, which belongs to the database; `GET_LOCK` on a name carrying the database, since a MySQL named lock belongs to the server; an operating-system lock on a file beside a SQLite database |
 
 Both are required. The in-process mutex exists because the migration library
 keeps its dialect in package-level state, so two goroutines migrating at once
 race on it regardless of any database lock. The advisory lock exists because a
 rolling deployment starts several instances at once.
+
+**SQLite takes its lock outside the database, because it cannot take one
+inside.** The handle is capped at a single connection — the file has one writer
+— so a lock held on a pinned connection would be holding the only connection
+the migration needs. What stood instead was the assumption that SQLite is only
+ever used by one process, enforced by one chart template while the binary
+accepts a SQLite URL with a warning. Six processes against one file: one
+migrated and three failed, on the migration library's own bookkeeping. Nothing
+was corrupted and the schema ended correct, so what the lock buys is the other
+five waiting and finding the work already done.
+
+The operating system's own advisory locking rather than a lock file written and
+removed by hand, because the kernel drops it when a process ends however it
+ends. A file left behind by a crash is one nothing will ever remove, and every
+start afterwards refuses for a reason that stopped being true. A platform
+without that locking refuses rather than returning a lock that locks nothing.
 
 The advisory lock is taken on a pinned connection rather than on the pool. These
 are session locks: released from the pool, the release can land on a different

@@ -66,10 +66,11 @@ type unlock func(context.Context) error
 // process and every other instance would block on it.
 func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 	if db.Server.Engine == database.SQLite {
-		// SQLite has no advisory lock and needs none: it is only ever used by
-		// a single process, so there is no other process to exclude.
-		// Concurrency within this process is handled by the migration mutex.
-		return func(context.Context) error { return nil }, nil
+		// SQLite has no advisory lock and cannot take one on this handle: it
+		// is capped at a single connection, which the migration itself needs.
+		// The exclusion is a lock on a file beside the database — see
+		// filelock.go, which has the whole of why.
+		return sqliteLock(ctx, db)
 	}
 
 	conn, err := db.DB.DB.Conn(ctx)
