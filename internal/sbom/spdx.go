@@ -242,9 +242,6 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	// offers is prose about where the source came from — so the identifier is
 	// the only place left to ask, and it is where most producers put it.
 	described.UpstreamName, described.UpstreamVersion = graph.UpstreamFromPurl(described.Purl)
-	if strings.TrimSpace(described.Version) == "" {
-		c.doc.Unversioned++
-	}
 	return described, ref, nil
 }
 

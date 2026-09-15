@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // The page and the count are two questions, and the export asks only one.
@@ -143,4 +144,103 @@ func asText(row finding.Disposed) string {
 		row.Vulnerability, row.Severity, row.Component, row.Version, row.Place,
 		row.State, row.Outcome, row.Justification, row.ProposedBy, at(row.ProposedAt),
 		row.ApprovedBy, at(row.ApprovedAt), at(&row.OpenedAt), at(row.ClosedAt), met)
+}
+
+// A lapsed judgment is part of the record, and the register says so.
+//
+// The join asked for a live decision, and a lapse nulls the live key in the
+// same statement that marks it — so the place reported as never decided and
+// the register lost who proposed and who approved it, which is what a
+// compliance reader comes here for. The findings list calls the same place
+// lapsed, so the two surfaces disagreed about one build.
+func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		open := f.open(t)
+		if len(open) == 0 {
+			t.Fatal("nothing opened to decide about")
+		}
+		f.recorded(t, 1, "proposer")
+		f.recorded(t, 2, "approver")
+
+		decided := f.decidedAndLapsed(t, open[0])
+		rows, _, err := f.store.Register(ctx, f.holding(t, access.PublicRead), f.target, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var found *finding.Disposed
+		for i, row := range rows {
+			if row.Place == decided {
+				found = &rows[i]
+			}
+		}
+		if found == nil {
+			t.Fatalf("the place the decision was about is not in the register: %+v", rows)
+		}
+		if found.State != "lapsed" {
+			t.Errorf("a place whose judgment lapsed reads as %q", found.State)
+		}
+		if found.ProposedBy == "" || found.ApprovedBy == "" {
+			t.Errorf("the register lost who decided it: proposed by %q, approved by %q",
+				found.ProposedBy, found.ApprovedBy)
+		}
+		if found.Outcome == "" {
+			t.Error("the register lost what was decided")
+		}
+	})
+}
+
+// decidedAndLapsed puts an agreed judgment on a finding's place and then lets
+// it lapse, and answers with the place it was about.
+//
+// Written here rather than through the triage store because a lapse is what
+// the store does when the code moves, and what is being measured is what the
+// register says about the row that leaves behind: agreed, then not applying,
+// with both people still named.
+func (f *fixture) decidedAndLapsed(t *testing.T, at finding.Finding) string {
+	t.Helper()
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	claim := &triage.Claim{
+		Kind: triage.FindingClaim, ProposedBy: 1, ProposedAt: now,
+		Outcome: triage.WontFix,
+	}
+	if _, err := f.db.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	revision := &triage.Revision{
+		ClaimID: claim.ID, Ordinal: 1, Body: "Not worth the churn.",
+		WrittenBy: 1, WrittenAt: now,
+	}
+	if _, err := f.db.DB.NewInsert().Model(revision).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.DB.NewUpdate().Model((*triage.Claim)(nil)).
+		Set("revision_id = ?", revision.ID).Where("id = ?", claim.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.DB.NewInsert().Model(&triage.Approval{
+		ClaimID: claim.ID, RevisionID: revision.ID, ApprovedBy: 2, ApprovedAt: now,
+	}).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// Lapsed: the state a sweep writes when the last build holding the
+	// versions moves on, which nulls the live key in the same statement.
+	decision := &triage.Decision{
+		ClaimID: claim.ID, ProductID: f.productID, VulnerabilityID: at.VulnerabilityID,
+		PlaceIdentity: at.PlaceIdentity, Visibility: access.Public,
+		NeedsApproval: true, State: triage.LapsedState,
+		ProposedBy: 1, ProposedAt: now, EndedAt: &now,
+	}
+	if _, err := f.db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return at.PlaceIdentity
 }

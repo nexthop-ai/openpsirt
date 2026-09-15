@@ -46,8 +46,9 @@ func registerDue(api huma.API, in Ingest) {
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
-		Days  int `query:"days" default:"14" minimum:"0" maximum:"365" doc:"How far ahead to look"`
-		Limit int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Days   int `query:"days" default:"14" minimum:"0" maximum:"365" doc:"How far ahead to look"`
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0" doc:"Where in the list to start"`
 	}) (*listOutput[LateBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -57,8 +58,12 @@ func registerDue(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).RunningOut(ctx, subject, scope,
-			time.Duration(input.Days)*24*time.Hour, input.Limit)
+		// Paged, because this one grows with the estate: it is a deadline
+		// list across every product the subject can see, and with a ceiling
+		// and no offset what is past the ceiling could not be read through
+		// the API at all — not slowly, not at all.
+		rows, total, err := finding.NewStore(in.DB.DB).RunningOutPage(ctx, subject, scope,
+			time.Duration(input.Days)*24*time.Hour, input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is running out of time could not be read", err)
 		}

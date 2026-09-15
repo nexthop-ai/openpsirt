@@ -122,6 +122,17 @@ type Store struct{ db bun.IDB }
 // NewStore returns a store over db.
 func NewStore(db bun.IDB) *Store { return &Store{db: db} }
 
+// Within runs do inside one transaction, with this store rebuilt over it.
+//
+// For an act that is more than one statement: a handler doing two of these in
+// a row leaves the first standing when the second fails, and a caller already
+// inside a transaction joins it rather than opening a second.
+func (s *Store) Within(ctx context.Context, do func(context.Context, *Store) error) error {
+	return database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
+		return do(ctx, NewStore(db))
+	})
+}
+
 // maxNameLength matches the column width, which is bounded so a unique index
 // on it stays inside every engine's key-length limit.
 const maxNameLength = 191

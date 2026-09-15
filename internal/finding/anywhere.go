@@ -9,6 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -38,17 +39,6 @@ import (
 // forgotten, and the total leaks even when no row is shown. So the narrowing
 // is in the statement, and an issue that exists only in products somebody
 // holds nothing on answers as an issue that does not exist.
-
-// rankOf turns a severity word into a number, so a line and a rating can be
-// compared in the statement.
-//
-// The words rank; the column holds words. Inside one product the line is read
-// first and turned into a list of words the query admits, which cannot be done
-// across products — each row's line is its own — so the comparison happens in
-// SQL, and this is the same order severityOrder states.
-const rankOf = `CASE %s
-	WHEN 'critical' THEN 4 WHEN 'high' THEN 3
-	WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END`
 
 // Anywhere is what is open across every product this subject may see.
 //
@@ -149,7 +139,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// And whatever the row's own product rates it, for the same
 			// reason: a rating belongs to a product, so a list spanning them
 			// reads each row's against the product that row is in.
-			Join(RatedFor(RatedOnStream)).
+			Join(rating.For(rating.OnStream)).
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
@@ -260,7 +250,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
-		ColumnExpr(`MIN(f.fix_state) AS "fix_state"`).
+		// Both ends, because a group whose places disagree is mixed and a
+		// minimum alone answers with one of the disagreeing values.
+		ColumnExpr(`MIN(f.fix_state) AS "fix_state_least"`).
+		ColumnExpr(`MAX(f.fix_state) AS "fix_state_most"`).
 		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
 		ColumnExpr(`MIN(COALESCE(f.matched, '')) AS "matched"`).
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`).
@@ -349,11 +342,19 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 }
 
 // ratedAt is the rating in force, as a number that compares against a line.
-var ratedAt = fmt.Sprintf(rankOf, BandExpr)
+//
+// The words rank; the column holds words. Inside one product the line is read
+// first and turned into a list of words the query admits, which cannot be done
+// across products — each row's line is its own — so the comparison happens in
+// SQL, in the order the one list states.
+var ratedAt = rankCase(rating.BandExpr, 0)
 
 // lineAt is the line the row's own product holds, as the same number. A
 // product that states none inherits the deployment's, which is bound.
-var lineAt = fmt.Sprintf(rankOf, "COALESCE(NULLIF(p.triage_floor, ''), ?)")
+//
+// Zero for anything that is not a band, which is what makes the sentinel for
+// "no line" compare below every rating.
+var lineAt = rankCase("COALESCE(NULLIF(p.triage_floor, ''), ?)", 0)
 
 // sortedAcross is the ORDER BY the cross-product list is paged with.
 //

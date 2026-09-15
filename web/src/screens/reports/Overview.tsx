@@ -424,11 +424,16 @@ export function Overview() {
             </table>
           </Wide>
         )}
-        {/* The endpoint caps and reports no total, so the only honest thing to
-            say is that the cap was reached. A capped list drawn as the whole
-            of it is how "forty repeat deferrals" reads as the whole shape of a
-            program that has two hundred. */}
-        <Paged shown={(repeated.data?.items ?? []).length} limit={REPEATS} what="listed" />
+        {/* How many there are, not how many are listed. A capped list drawn as
+            the whole of it is how "forty repeat deferrals" reads as the whole
+            shape of a program that has two hundred — and the endpoint now says
+            what the whole is, so the footer says it too. */}
+        <Paged
+          shown={(repeated.data?.items ?? []).length}
+          total={repeated.data?.total}
+          limit={REPEATS}
+          what="listed"
+        />
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>

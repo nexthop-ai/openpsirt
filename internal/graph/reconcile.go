@@ -25,10 +25,18 @@ func reconcileNodes(ctx context.Context, tx bun.Tx, targetID, scanID int64, want
 	}
 
 	nodeIDs := make(map[int64]int64, len(wanted))
+	// Whether each kept node is the build's root, which the scan just said and
+	// the row may disagree with. Only ever written on an insert, a component
+	// promoted to the top of a graph it was already in kept its old answer —
+	// and the build then reported no root of its own.
+	reroot := map[int64]bool{}
 	var gone []int64
 	for _, node := range open {
-		if _, keep := wanted[node.ComponentID]; keep {
+		if isRoot, keep := wanted[node.ComponentID]; keep {
 			nodeIDs[node.ComponentID] = node.ID
+			if node.IsRoot != isRoot {
+				reroot[node.ID] = isRoot
+			}
 			continue
 		}
 		gone = append(gone, node.ID)
@@ -50,6 +58,29 @@ func reconcileNodes(ctx context.Context, tx bun.Tx, targetID, scanID int64, want
 		}
 		for _, node := range missing {
 			nodeIDs[node.ComponentID] = node.ID
+		}
+	}
+
+	// What the scan says is the root, where the row disagrees. Two statements
+	// at most, because a build has one root and at most one node loses it.
+	for _, isRoot := range []bool{true, false} {
+		var ids []int64
+		for id, becomes := range reroot {
+			if becomes == isRoot {
+				ids = append(ids, id)
+			}
+		}
+		if len(ids) == 0 {
+			continue
+		}
+		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			_, err := tx.NewUpdate().Model((*Node)(nil)).
+				Set("is_root = ?", isRoot).
+				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+			return err
+		})
+		if err != nil {
+			return nil, 0, 0, fmt.Errorf("record which node is the root: %w", err)
 		}
 	}
 

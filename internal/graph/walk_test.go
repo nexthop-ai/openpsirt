@@ -14,7 +14,6 @@ import (
 // component reached several ways, a component the inventory placed nowhere, a
 // subtree with a shared library in it counted once, and a document in a loop.
 
-// everyone reads everything, which is what these walks are narrowed by.
 // everyone is somebody granted reading on the product a fixture builds, for
 // the walks whose subject is incidental. An administrator used to stand here,
 // which stopped working when administering stopped meaning reading — and an
@@ -354,4 +353,122 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 			t.Errorf("the split sums to %d and the count says %d", sum, one.Beneath)
 		}
 	})
+}
+
+func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testing.T) {
+	// One rule for what a finding's severity is: this product's word where it
+	// has stated one, the published word otherwise. Nine queries read the
+	// published word alone with no rating joined, so a product that re-rated
+	// an issue saw its own decision in the findings list and the world's in
+	// the tree, the component strip and the document it publishes — three
+	// surfaces disagreeing with the list they summarize.
+	//
+	// The three are asserted together because what broke them is one thing:
+	// the expression is now spelled in one place and none of them can read it
+	// without joining the rating it comes from.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		lib := at("libshared", "1.0")
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root: root, Components: []graph.Described{lib},
+			Dependencies: []graph.Dependency{{Parent: root, Child: lib}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		findings := finding.NewStore(f.store.DB())
+		run, err := findings.Begin(ctx, finding.Run{
+			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			DatabaseVersion: "2026-08-28", RanHere: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := findings.Apply(ctx, f.targetID, run.ID, []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-9", Severity: "low"},
+			Component: lib, FixState: finding.FixedUpstream, FixedIn: "2.0",
+		}}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := everyone(f)
+		// What each of the three says the issue is rated, read the same way
+		// before and after.
+		treeBand := func(t *testing.T) string {
+			t.Helper()
+			_, kids, err := f.store.Roots(ctx, who, f.targetID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, kid := range kids {
+				if kid.Name == lib.Name {
+					return oneBand(t, "the tree", kid.BeneathBy)
+				}
+			}
+			t.Fatalf("the library is not under the root")
+			return ""
+		}
+		stripBand := func(t *testing.T) string {
+			t.Helper()
+			groups, _, err := findings.ComponentGroups(ctx, who, f.scope, 50, 0, finding.Filter{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(groups) != 1 {
+				t.Fatalf("the strip covers %d components, wanted the one", len(groups))
+			}
+			return oneBand(t, "the strip", groups[0].BySeverity)
+		}
+		noteBand := func(t *testing.T) string {
+			t.Helper()
+			// A build compared against itself: every row is unchanged, which
+			// is what carries the severity the document would publish.
+			changed, err := findings.Compare(ctx, who, f.targetID, f.targetID, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(changed.Still) != 1 {
+				t.Fatalf("the comparison holds %d rows, wanted the one", len(changed.Still))
+			}
+			return changed.Still[0].Severity
+		}
+
+		for what, band := range map[string]string{
+			"tree": treeBand(t), "strip": stripBand(t), "note": noteBand(t),
+		} {
+			if band != "low" {
+				t.Errorf("before anybody re-rated it, %s says %q, wanted the published \"low\"",
+					what, band)
+			}
+		}
+
+		// The product says it is worse than the world does, which is the
+		// whole point of being able to rate an issue here.
+		issue := f.anIssue(t, "CVE-2026-9")
+		if _, err := f.db.DB.NewInsert().Model(&finding.IssueRating{
+			VulnerabilityID: issue, ProductID: *f.scope.ProductID, Severity: "critical",
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		for what, band := range map[string]string{
+			"tree": treeBand(t), "strip": stripBand(t), "note": noteBand(t),
+		} {
+			if band != "critical" {
+				t.Errorf("after this product rated it critical, %s still says %q", what, band)
+			}
+		}
+	})
+}
+
+// oneBand is the single band a count is all of, named so a failure says which
+// of the three surfaces disagreed.
+func oneBand(t *testing.T, what string, counts map[string]int) string {
+	t.Helper()
+	if len(counts) != 1 {
+		t.Fatalf("%s is banded %v, wanted one band holding the one issue", what, counts)
+	}
+	for band := range counts {
+		return band
+	}
+	return ""
 }

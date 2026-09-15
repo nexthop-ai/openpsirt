@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -288,12 +289,21 @@ func itemOf(row finding.Owned) Item {
 // Read once for the whole digest rather than asked per row: a person holding
 // two hundred things would otherwise be two hundred queries to answer one
 // message.
+// **Bounded**, on a table nothing prunes. Every other read in this package
+// carries one, and this had neither a window nor a ceiling: it returned every
+// notification a person had ever received, once per person per digest cycle.
 func ToldAbout(ctx context.Context, db *bun.DB, personID int64) (map[string]bool, error) {
 	var concerns []string
 	if err := db.NewSelect().Model((*Notification)(nil)).
 		Column("concerns").
 		Where("person_id = ?", personID).
 		Where("concerns IS NOT NULL AND concerns <> ?", "").
+		// Newest first, because a ceiling that cuts the oldest is the right
+		// way round: what a digest must not repeat is what somebody was told
+		// recently, and a mention from two years ago that reappears once is
+		// the lesser fault.
+		OrderExpr("id DESC").
+		Limit(database.AList.Of(0)).
 		Scan(ctx, &concerns); err != nil {
 		return nil, fmt.Errorf("read what person %d was told: %w", personID, err)
 	}

@@ -357,9 +357,6 @@ func (c *reader) spdx3Package(e spdx3Element) error {
 		return fmt.Errorf("%w, so it cannot be tracked", err)
 	}
 	described.UpstreamName, described.UpstreamVersion = graph.UpstreamFromPurl(described.Purl)
-	if strings.TrimSpace(described.Version) == "" {
-		c.doc.Unversioned++
-	}
 	if err := c.add(described); err != nil {
 		return err
 	}

@@ -15,19 +15,19 @@ import (
 // DisposedBody is one known vulnerability in a build and what was decided
 // about it, including nothing.
 type DisposedBody struct {
-	Vulnerability string `json:"vulnerability"`
-	Severity      string `json:"severity,omitempty"`
-	Component     string `json:"component"`
-	Version       string `json:"version,omitempty"`
-	Place         string `json:"place" doc:"Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
-	Consumer      string `json:"consumer,omitempty" doc:"What pulls the component in. Absent where the build holds it directly"`
-	State         string `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Where this stands. undecided is the row every other report leaves out and the one an auditor is looking for"`
-	Outcome       string `json:"outcome,omitempty"`
-	Justification string `json:"justification,omitempty"`
-	ProposedBy    string `json:"proposed_by,omitempty"`
-	ProposedAt    string `json:"proposed_at,omitempty"`
-	ApprovedBy    string `json:"approved_by,omitempty" doc:"Who agreed. Two different people is the whole of the control, so both names are carried rather than a count"`
-	ApprovedAt    string `json:"approved_at,omitempty"`
+	Vulnerability string        `json:"vulnerability"`
+	Severity      string        `json:"severity,omitempty"`
+	Component     string        `json:"component"`
+	Version       string        `json:"version,omitempty"`
+	Place         string        `json:"place" doc:"Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
+	Consumer      string        `json:"consumer,omitempty" doc:"What pulls the component in. Absent where the build holds it directly"`
+	State         string        `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Where this stands. undecided is the row every other report leaves out and the one an auditor is looking for"`
+	Outcome       outcome       `json:"outcome,omitempty"`
+	Justification justification `json:"justification,omitempty"`
+	ProposedBy    string        `json:"proposed_by,omitempty"`
+	ProposedAt    string        `json:"proposed_at,omitempty"`
+	ApprovedBy    string        `json:"approved_by,omitempty" doc:"Who agreed. Two different people is the whole of the control, so both names are carried rather than a count"`
+	ApprovedAt    string        `json:"approved_at,omitempty"`
 	// AgreementCarried says the agreement was given for an earlier claim and
 	// carried onto this one, which is what a re-affirmation stands on. The
 	// person named read those words rather than these.
@@ -145,7 +145,7 @@ func registerRegister(api huma.API, in Ingest) {
 					}
 					return each([]string{
 						body.Vulnerability, body.Severity, body.Component, body.Version,
-						body.Place, body.Consumer, body.State, body.Outcome, body.Justification,
+						body.Place, body.Consumer, body.State, string(body.Outcome), string(body.Justification),
 						body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 						strconv.FormatBool(body.AgreementCarried),
 						body.Opened, body.Closed, body.Due, met,
@@ -165,8 +165,9 @@ func disposedBody(row finding.Disposed) DisposedBody {
 		Vulnerability: row.Vulnerability, Severity: row.Severity,
 		Component: row.Component, Version: row.Version, Place: row.Place,
 		Consumer: row.Consumer,
-		State:    row.State, Outcome: row.Outcome, Justification: row.Justification,
-		ProposedBy: row.ProposedBy, ApprovedBy: row.ApprovedBy,
+		State:    row.State, Outcome: outcome(row.Outcome),
+		Justification: justification(row.Justification),
+		ProposedBy:    row.ProposedBy, ApprovedBy: row.ApprovedBy,
 		AgreementCarried: row.AgreementCarried,
 		Opened:           row.OpenedAt.Format(time.DateOnly), Met: row.Met,
 	}

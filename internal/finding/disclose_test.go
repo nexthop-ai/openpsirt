@@ -39,7 +39,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 
 		// A month out it is not on a thirty-day list yet, because ninety days
 		// is further away than that.
-		soon, err := f.store.Disclosing(t.Context(), who, finding.Scope{},
+		soon, _, err := f.store.Disclosing(t.Context(), who, finding.Scope{},
 			30*24*time.Hour, 50)
 		if err != nil {
 			t.Fatal(err)
@@ -50,7 +50,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 
 		// Wider than the embargo, and it is there — before the date, with what
 		// somebody needs to act on it.
-		ahead, err := f.store.Disclosing(t.Context(), who, finding.Scope{},
+		ahead, _, err := f.store.Disclosing(t.Context(), who, finding.Scope{},
 			120*24*time.Hour, 50)
 		if err != nil {
 			t.Fatal(err)
@@ -101,7 +101,7 @@ func TestWhatIsApproachingDisclosureIsItselfUndisclosed(t *testing.T) {
 		}
 
 		for _, role := range []access.Role{access.PublicRead, access.PublicTriage} {
-			rows, err := f.store.Disclosing(t.Context(), f.planner(t, role),
+			rows, _, err := f.store.Disclosing(t.Context(), f.planner(t, role),
 				finding.Scope{}, 365*24*time.Hour, 50)
 			if err != nil {
 				t.Fatal(err)
@@ -111,7 +111,7 @@ func TestWhatIsApproachingDisclosureIsItselfUndisclosed(t *testing.T) {
 			}
 		}
 
-		rows, err := f.store.Disclosing(t.Context(), f.planner(t, access.PrivateRead),
+		rows, _, err := f.store.Disclosing(t.Context(), f.planner(t, access.PrivateRead),
 			finding.Scope{}, 365*24*time.Hour, 50)
 		if err != nil {
 			t.Fatal(err)

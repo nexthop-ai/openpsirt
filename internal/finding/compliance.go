@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Rate is how much of one severity's work met its deadline.
@@ -87,8 +88,8 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	group := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
-		ColumnExpr(BandExpr+` AS "band"`).
+		Join(rating.Here, productID).
+		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr("SUM(CASE WHEN f.closed_at IS NOT NULL AND f.due_at IS NOT NULL "+
 			`THEN 1 ELSE 0 END) AS "judged"`).
 		ColumnExpr("SUM(CASE WHEN f.closed_at IS NOT NULL AND f.due_at IS NOT NULL "+
@@ -101,7 +102,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 			append([]any{now}, covers...)...).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr(BandExpr + ", f.vulnerability_id, f.component_id")
+		GroupExpr(rating.BandExpr + ", f.vulnerability_id, f.component_id")
 
 	// What each of the four means about a group rather than about a row.
 	// Closed when no place is still open and at least one of them carried a

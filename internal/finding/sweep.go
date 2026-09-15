@@ -53,7 +53,10 @@ func NewSweeper(db *database.DB, q *queue.Queue, logger *slog.Logger, name strin
 func NewSweeperOfSize(db *database.DB, q *queue.Queue, logger *slog.Logger,
 	name string, batch int) *Sweeper {
 	if batch <= 0 {
-		batch = 2000
+		// The same number the production path falls back to, named rather
+		// than typed again: the decision that a bulk write's cap is a setting
+		// was taken for that path and this fallback was left holding a copy.
+		batch = setting.DefaultRoutingBatch
 	}
 	return &Sweeper{db: db, queue: q, logger: logger, name: name, batch: batch}
 }
@@ -111,7 +114,15 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	}
 
 	working, release := s.queue.Holding(ctx, job.ID, s.name, s.logger)
-	placed, filled, err := NewStore(s.db.DB).ApplyRules(working, productID, batch)
+	placed, filled, outgrown, err := NewStore(s.db.DB).ApplyRules(working, productID, batch)
+	// A rule that has outgrown the bound is named rather than left to be
+	// noticed. It ran when it was written and the tree grew under it, so the
+	// sweep carries on past it — but a rule that has silently stopped placing
+	// reads exactly like a rule nobody has needed.
+	for _, rule := range outgrown {
+		s.logger.Warn("a routing rule names too much of the tree to run",
+			"product", productID, "rule", rule)
+	}
 	taken := release()
 
 	ending := s.queue.Settle(ctx, job, s.name, "product", s.logger, err, taken, nil)

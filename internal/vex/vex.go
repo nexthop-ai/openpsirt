@@ -23,6 +23,7 @@ package vex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/version"
@@ -38,6 +40,15 @@ import (
 
 // The namespace the format states, and the one a reader matches on.
 const namespace = "https://openvex.dev/ns/v0.2.0"
+
+// ErrTooLarge is returned when a build stands on more dismissals than one
+// document carries.
+//
+// Named rather than answered as a fault, because it is something the caller
+// can act on: narrow to a variant, or ask about a build that argues less. A
+// bare error reached the route as "the document could not be generated" with a
+// 500, which reads as the tool being broken.
+var ErrTooLarge = errors.New("more dismissals than one document carries")
 
 // Statements is one VEX document about one build.
 //
@@ -101,11 +112,32 @@ type Inside struct {
 type Store struct {
 	db  *bun.DB
 	now func() time.Time
+	// most is how many statements one document carries, or zero for the
+	// shipped number. Carried on the store so a test can bring it down to a
+	// fixture rather than building a fixture up to it, which is how the
+	// routing reach is tested for the same reason.
+	most int
 }
 
 // NewStore returns a store over db.
 func NewStore(db *bun.DB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// NewStoreCarrying returns a store whose documents carry at most most
+// statements, for a test that wants the refusal rather than the document.
+func NewStoreCarrying(db *bun.DB, most int) *Store {
+	s := NewStore(db)
+	s.most = most
+	return s
+}
+
+// carrying is how many statements one document holds.
+func (s *Store) carrying() int {
+	if s.most > 0 {
+		return s.most
+	}
+	return database.AWholeDocument.Most
 }
 
 // For writes the document for one build.
@@ -166,9 +198,10 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		Component       string    `bun:"component"`
 		Purl            string    `bun:"purl"`
 		Outcome         string    `bun:"outcome"`
-		Justification   string    `bun:"justification"`
-		Reasoning       string    `bun:"reasoning"`
-		DecidedAt       time.Time `bun:"decided_at"`
+		DecidedBy       int64     `bun:"decided_by"`
+		Justification   string    `bun:"-"`
+		Reasoning       string    `bun:"-"`
+		DecidedAt       time.Time `bun:"-"`
 	}
 	// One statement per issue and component, from the claims that stand and
 	// have been agreed to. Joined from the findings this build actually holds:
@@ -201,15 +234,24 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		// Safe as an aggregate, because the grouping below refuses a component
+		// whose places disagree about the outcome.
 		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
-		// The words and the moment of the earliest of them, which is the claim
-		// that has stood longest about this component. Where several places
-		// were decided separately the document has one thing to say and has to
-		// choose which; the first is the one a reader can check against the
-		// record.
-		ColumnExpr(`COALESCE(MIN(cl.justification), '') AS "justification"`).
-		ColumnExpr(`COALESCE(MIN(dr.body), '') AS "reasoning"`).
-		ColumnExpr(`MIN(de.proposed_at) AS "decided_at"`).
+		// Which decision the words come from, rather than the words.
+		//
+		// The earliest of them, which is the claim that has stood longest
+		// about this component: where several places were decided separately
+		// the document has one thing to say and has to choose which, and the
+		// first is the one a reader can check against the record. A decision's
+		// identifier is assigned when it is written, so the lowest is the
+		// first written.
+		//
+		// **Read off one decision rather than taken column by column.** Three
+		// independent minima are three answers from three claims: a category
+		// from one, the prose explaining a different reason from another, and
+		// a timestamp from a third — published, machine-readable, to every
+		// customer running a scanner.
+		ColumnExpr(`MIN(de.id) AS "decided_by"`).
 		Where("f.target_id = ?", target.ID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -234,9 +276,46 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// published to every customer running a scanner.
 		Having("COUNT(cl.id) = COUNT(*)").
 		Having("COUNT(DISTINCT cl.outcome) = 1").
+		// One more than the ceiling, so that reaching it is distinguishable
+		// from landing on it exactly.
+		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
+	}
+	// Refused rather than truncated. There is no second request for the rest
+	// of a document, and one that stopped at a ceiling would say "nothing is
+	// claimed about this" by omission about everything past it — to every
+	// customer running a scanner, which is the one thing a document of
+	// dismissals must never say.
+	//
+	// Named, so the caller can answer it as something to narrow rather than as
+	// this being broken. Returned bare it fell through to "the document could
+	// not be generated" with a 500, and the sentence saying which build and
+	// what the limit is went to the log instead of to the person who can act
+	// on it.
+	if len(rows) > s.carrying() {
+		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed dismissals: a "+
+			"document that stopped at the limit would say nothing is claimed about "+
+			"everything past it",
+			ErrTooLarge, product, stream, variant, s.carrying())
+	}
+
+	// The words each of those decisions rests on, read off the decision the
+	// statement is about. One statement for the document rather than one per
+	// component.
+	decided := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		decided = append(decided, row.DecidedBy)
+	}
+	said, err := s.wordsOf(ctx, decided)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i].Justification = said[rows[i].DecidedBy].justification
+		rows[i].Reasoning = said[rows[i].DecidedBy].body
+		rows[i].DecidedAt = said[rows[i].DecidedBy].proposedAt
 	}
 
 	moment := s.now().UTC()
@@ -330,11 +409,15 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Identifier      string `bun:"identifier"`
 	}
+	// Split and OR-ed rather than one list. A build with a thousand agreed
+	// dismissals is a thousand identifiers here and a large one is far more,
+	// and a statement binding them all is refused by two of the four engines.
+	where, args := database.InAnyOf("va.vulnerability_id", issues)
 	err := s.db.NewSelect().Model((*finding.Alias)(nil)).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = va.vulnerability_id`).
 		ColumnExpr(`va.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`va.identifier AS "identifier"`).
-		Where("va.vulnerability_id IN (?)", bun.List(issues)).
+		Where(where, args...).
 		// The other names, so not the one the statement is already
 		// filed under. The alias table holds every name an issue
 		// answers to including its own, which is what makes identity
@@ -348,6 +431,51 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 	}
 	for _, row := range rows {
 		out[row.VulnerabilityID] = append(out[row.VulnerabilityID], row.Identifier)
+	}
+	return out, nil
+}
+
+// words are what one decision claimed, as a statement repeats it.
+type words struct {
+	justification string
+	body          string
+	proposedAt    time.Time
+}
+
+// wordsOf reads the argument each of these decisions rests on.
+//
+// One statement for the document rather than one per component, and one row per
+// decision rather than a column at a time: the category, the prose and the
+// moment have to come from the same claim, or the document says one thing in
+// the field a machine reads and another in the field a person does.
+func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words, error) {
+	out := map[int64]words{}
+	if len(decisions) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		ID            int64     `bun:"id"`
+		Justification string    `bun:"justification"`
+		Body          string    `bun:"body"`
+		ProposedAt    time.Time `bun:"proposed_at"`
+	}
+	where, args := database.InAnyOf("de.id", decisions)
+	if err := s.db.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
+		ColumnExpr(`de.id AS "id"`).
+		ColumnExpr(`COALESCE(cl.justification, '') AS "justification"`).
+		ColumnExpr(`COALESCE(dr.body, '') AS "body"`).
+		ColumnExpr(`de.proposed_at AS "proposed_at"`).
+		Where(where, args...).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what these claims say: %w", err)
+	}
+	for _, row := range rows {
+		out[row.ID] = words{
+			justification: row.Justification, body: row.Body, proposedAt: row.ProposedAt,
+		}
 	}
 	return out, nil
 }

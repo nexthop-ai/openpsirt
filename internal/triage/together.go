@@ -10,8 +10,8 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Deciding about everything at one component at once.
@@ -111,18 +111,12 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return 0, nil, fmt.Errorf("this store is already inside a transaction")
-	}
-
-	err = database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	err = s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		// Cleared on every attempt. A retry re-runs this against a database
 		// that has moved, and carrying identifiers over from the attempt that
 		// failed would report claims that no longer exist.
 		recorded = recorded[:0]
 		claimID = 0
-		within := &Store{db: tx, now: s.now}
 
 		places, err := placesWithin(ctx, tx, subject, at)
 		if err != nil {
@@ -203,7 +197,9 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Visibility        string `bun:"visibility"`
 		ComponentUpstream string `bun:"component_upstream"`
 		ConsumerUpstream  string `bun:"consumer_upstream"`
-		Severity          int    `bun:"severity_centi"`
+		Published         string `bun:"published_severity"`
+		Assessed          string `bun:"assessed_severity"`
+		ScoreCenti        int    `bun:"score_centi"`
 		OnTag             int    `bun:"on_tag"`
 	}
 	query := tx.NewSelect().
@@ -213,13 +209,23 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		// What this product rates the issue, which is the rating in force
+		// here. The read spans products, so each row reads its own stream's.
+		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`f.visibility AS "visibility"`).
 		ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "severity_centi"`).
+		// The three parts of a rating rather than the published score alone.
+		// The baseline stored with a claim is what a re-affirmation compares
+		// today's rating against, so storing the published number where this
+		// product has rated the issue lower left the comparison asking whether
+		// the severity had risen past a figure nobody was working to.
+		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
+		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed_severity"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		// Whether the release was built once, which decides what may be said
 		// about it. As an integer rather than a boolean: the four engines
 		// spell a boolean three ways.
@@ -229,7 +235,8 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Where("f.closed_at IS NULL").
 		Where("f.vulnerability_id IN (?)", bun.List(at.VulnerabilityIDs)).
 		GroupExpr("st.product_id, f.vulnerability_id, f.place_identity, f.visibility, " +
-			"c.upstream_version, c.version, uc.upstream_version, uc.version, v.score_centi").
+			"c.upstream_version, c.version, uc.upstream_version, uc.version, " +
+			"v.severity, ir.severity, v.score_centi").
 		OrderExpr("f.vulnerability_id, f.place_identity")
 	if err := onlyDecidable(query, subject).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where these issues sit: %w", err)
@@ -246,7 +253,9 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 				ConsumerUpstream:  row.ConsumerUpstream,
 				OnTag:             row.OnTag == 1,
 			},
-			SeverityCenti: row.Severity,
+			SeverityCenti: finding.Rating{
+				Published: row.Published, Assessed: row.Assessed, ScoreCenti: row.ScoreCenti,
+			}.Score(),
 		})
 	}
 	return places, nil

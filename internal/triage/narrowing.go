@@ -141,12 +141,27 @@ func sortedKeys(cases map[int64][]int64) []int64 {
 // joined that far, and the decision's where the match already requires the two
 // to agree.
 func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, product string) *bun.SelectQuery {
+	where, args := readableFindingsOn(subject, finding, product)
+	if where == "" {
+		return query
+	}
+	return query.Where(where, args...)
+}
+
+// readableFindingsOn is the same rule written as a condition rather than
+// applied to a query, for a join whose ON clause is where it has to go.
+//
+// An outer join to the findings a decision matches carries the rule on the ON
+// clause: in WHERE it is asked of the NULL row an unmatched decision produces,
+// which is never true, so the outer join quietly becomes an inner one. The
+// empty string means the subject reads everywhere and there is nothing to add.
+func readableFindingsOn(subject access.Subject, finding, product string) (string, []any) {
 	if subject.Kind != access.Person {
-		return query.Where("1 = 0")
+		return "1 = 0", nil
 	}
 	products, all := subject.Products()
 	if all {
-		return query
+		return "", nil
 	}
 	var private []int64
 	for _, id := range products {
@@ -155,12 +170,10 @@ func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, p
 		}
 	}
 	if len(private) == 0 {
-		return query.Where(finding+".visibility = ?", access.Public)
+		return finding + ".visibility = ?", []any{access.Public}
 	}
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.WhereOr(finding+".visibility = ?", access.Public).
-			WhereOr(product+" IN (?)", bun.List(private))
-	})
+	return "(" + finding + ".visibility = ? OR " + product + " IN (?))",
+		[]any{access.Public, bun.List(private)}
 }
 
 // onlyDecidable narrows a places query to what this subject may argue about.

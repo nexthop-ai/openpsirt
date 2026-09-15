@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // SavedBody is a narrowing somebody kept.
@@ -33,8 +34,8 @@ type SavedBody struct {
 // the record. The difference shows up on the day a dismissal turns out to have
 // been wrong and somebody asks who made it.
 type PreparedBody struct {
-	Outcome       string `json:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed" doc:"What it offers to say"`
-	Justification string `json:"justification,omitempty" doc:"The recognized reason it does not apply, where the outcome takes one"`
+	Outcome       outcomeInBulk `json:"outcome" doc:"What it offers to say"`
+	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, where the outcome takes one"`
 	// Reasoning is required, because it is what somebody will be putting
 	// their name to: a prefill with an empty argument is a button that
 	// proposes a dismissal saying nothing.
@@ -70,7 +71,12 @@ func registerSaved(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, err
 			}
-			kept, err := store.SavedFilters(ctx, who.ID, product)
+			cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.SavedPerPerson,
+				setting.DefaultSavedPerPerson)
+			if err != nil {
+				return nil, wentWrong(in.Logger, "what you have kept could not be read", err)
+			}
+			kept, err := store.SavedFilters(ctx, who.ID, product, cap)
 			if err != nil {
 				return nil, wentWrong(in.Logger, "what you have kept could not be read", err)
 			}
@@ -80,7 +86,7 @@ func registerSaved(api huma.API, in Ingest) {
 				body := SavedBody{Name: one.Called(), Query: one.Query}
 				if one.Prepares() {
 					body.Prepares = &PreparedBody{
-						Outcome: one.Outcome, Justification: one.Justification,
+						Outcome: outcomeInBulk(one.Outcome), Justification: justification(one.Justification),
 						Reasoning: one.Reasoning, DeferDays: one.DeferDays,
 					}
 				}
@@ -117,8 +123,8 @@ func registerSaved(api huma.API, in Ingest) {
 		var prepares saved.Filter
 		if input.Body.Prepares != nil {
 			prepares = saved.Filter{
-				Outcome:       input.Body.Prepares.Outcome,
-				Justification: input.Body.Prepares.Justification,
+				Outcome:       string(input.Body.Prepares.Outcome),
+				Justification: string(input.Body.Prepares.Justification),
 				Reasoning:     input.Body.Prepares.Reasoning,
 				DeferDays:     input.Body.Prepares.DeferDays,
 			}
@@ -127,8 +133,13 @@ func registerSaved(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.SavedPerPerson,
+			setting.DefaultSavedPerPerson)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "that filter could not be kept", err)
+		}
 		if _, err := store.SaveFilterPreparing(ctx, who.ID, product, input.Name,
-			input.Body.Query, prepares); err != nil {
+			input.Body.Query, prepares, cap); err != nil {
 			return nil, asked(in.Logger, err)
 		}
 		return &struct{}{}, nil

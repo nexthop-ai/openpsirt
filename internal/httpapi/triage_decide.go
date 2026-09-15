@@ -28,10 +28,10 @@ import (
 // FindingDecisionBody is one judgment about a finding, and which of its places
 // it covers.
 type FindingDecisionBody struct {
-	Outcome       string `json:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,patch-needed"`
-	Justification string `json:"justification,omitempty" enum:"component_not_present,vulnerable_code_not_present,vulnerable_code_not_in_execute_path,vulnerable_code_cannot_be_controlled_by_adversary,inline_mitigations_already_exist" doc:"Why it does not apply. Required when it does not"`
-	Mitigation    string `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other"`
-	DeferredUntil string `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
+	Outcome       outcomeOneAtATime `json:"outcome"`
+	Justification justification     `json:"justification,omitempty" doc:"Why it does not apply. Required when it does not"`
+	Mitigation    string            `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other"`
+	DeferredUntil string            `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 	// CommittedTo is when a promised backport lands. An upgrade is not
 	// recorded here at all: it answers a component rather than one
 	// finding, so it is recorded from the component.

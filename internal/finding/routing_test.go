@@ -1,6 +1,7 @@
 package finding_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -74,7 +75,7 @@ func TestARuleIsWrittenReadAndAppliedOnEveryEngine(t *testing.T) {
 		}
 
 		// And applying it places exactly that.
-		placed, filled, err := f.store.ApplyRules(ctx, f.productID, 100)
+		placed, filled, _, err := f.store.ApplyRules(ctx, f.productID, 100)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +97,7 @@ func TestARuleIsWrittenReadAndAppliedOnEveryEngine(t *testing.T) {
 
 		// Running it again places nothing: the rows are held, and a sweep
 		// that kept re-placing held work would never come to an end.
-		again, _, err := f.store.ApplyRules(ctx, f.productID, 100)
+		again, _, _, err := f.store.ApplyRules(ctx, f.productID, 100)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,12 +187,164 @@ func TestAComponentNamedOutsideASCIIMatchesTheSameOnEveryEngine(t *testing.T) {
 			t.Errorf("a rule spelled in lower case matched %d components named with a "+
 				"capital outside ASCII, want the one", caught.Total)
 		}
-		placed, _, err := f.store.ApplyRules(ctx, f.productID, 100)
+		placed, _, _, err := f.store.ApplyRules(ctx, f.productID, 100)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if placed == 0 {
 			t.Error("the rule placed nothing, so the fold disagreed with the sweep")
+		}
+	})
+}
+
+func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
+	// The binary packages one source was built at one version are one thing to
+	// a person, and the finding screen's rows are the whole fold — deliberately,
+	// so that a form recording twelve places does not show six. Who holds it
+	// and what placed it asked about one component instead, so the guarantee
+	// those two state — one name for the whole group, empty where its places
+	// disagree — was a guarantee about a group they could not see. A rule that
+	// placed a third of a fold reported as no rule under one name and as the
+	// whole thing under another.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// Two binaries of one source at one version, which is one fold.
+		lib := graph.Described{
+			Purl: "pkg:deb/debian/libcurl4t64@8.5.0", Name: "libcurl4t64", Version: "8.5.0",
+			UpstreamName: "curl", UpstreamVersion: "8.5.0",
+		}
+		tool := graph.Described{
+			Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0",
+			UpstreamName: "curl", UpstreamVersion: "8.5.0",
+		}
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{lib, tool},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: lib}, {Parent: root, Child: tool},
+			},
+		})
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-CURL", lib), found("CVE-2026-CURL", tool),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+		if _, err := f.store.AddRule(ctx, who, f.productID, where, "just the library",
+			"", "libcurl4t64"); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, _, err := f.store.ApplyRules(ctx, f.productID, 100); err != nil {
+			t.Fatal(err)
+		}
+
+		// Named either way, the screen says the same thing — and what it says
+		// is that the fold does not agree.
+		issue := f.issue(t, "CVE-2026-CURL")
+		for _, named := range []string{"libcurl4t64", "curl"} {
+			seen, err := f.store.Detail(ctx, who, f.target, issue, f.componentID(t, named))
+			if err != nil {
+				t.Fatalf("read the finding named %q: %v", named, err)
+			}
+			if seen.RoutedBy != "" {
+				t.Errorf("named %q, the screen says %q placed the whole fold, and it placed "+
+					"part of it", named, seen.RoutedBy)
+			}
+			if seen.AssignedTo != "" {
+				t.Errorf("named %q, the screen says %q is dealing with the whole fold",
+					named, seen.AssignedTo)
+			}
+		}
+	})
+}
+
+func TestARuleNamingMostOfABuildIsRefused(t *testing.T) {
+	// A rule says where in the tree something sits. A pattern matching most of
+	// a build is not that: a bare glob matched every open node, and each was a
+	// recursive walk of its own inside one request — from a route anybody who
+	// may triage the product can reach, and from the sweep that re-runs a
+	// saved rule on every pass.
+	//
+	// Refused rather than truncated, the way a rule matching nothing is
+	// refused: a rule quietly applying to part of what it names is worse than
+	// one nobody could save.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+
+		// The fixture is small, so the cap is brought down to it rather than
+		// the tree being grown to the cap: what is being checked is the
+		// refusal, and a fixture of two thousand components is a slow test
+		// that says the same thing.
+		narrow := finding.NewStoreReaching(f.db.DB, 1)
+		if _, err := narrow.AddRule(ctx, who, f.productID, where, "everything", "", "*"); err == nil {
+			t.Error("a rule naming most of the build was saved")
+		} else if !errors.Is(err, finding.ErrTooBroad) {
+			t.Errorf("refused with %q, which does not say what is wrong", err)
+		}
+		// And the preview says the same thing, so nobody is shown an answer
+		// for a rule they cannot save.
+		if _, err := narrow.WouldMatch(ctx, who, f.productID, "", "*", 20); err == nil {
+			t.Error("a preview answered for a rule that cannot be saved")
+		} else if !errors.Is(err, finding.ErrTooBroad) {
+			t.Errorf("the preview refused with %q", err)
+		}
+
+		// A pattern naming a place is still a rule.
+		if _, err := narrow.AddRule(ctx, who, f.productID, where, "the library",
+			"", "libnl-3-200"); err != nil {
+			t.Errorf("a rule naming one component was refused: %v", err)
+		}
+	})
+}
+
+func TestARuleThatOutgrewItsBoundDoesNotStopTheRestOfTheSweep(t *testing.T) {
+	// A rule is refused when it is written, but the tree grows under one that
+	// was accepted. That condition is permanent, so returned as a job failure
+	// it stopped the product's whole routing — every rule ordered after it
+	// included — and a retry could never clear it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", teamd),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+
+		// Saved while the bound still admits it, then applied by a store whose
+		// bound is lower — which is the tree growing under it, without a
+		// fixture of two thousand components to grow.
+		if _, err := f.store.AddRule(ctx, who, f.productID, where, "everything",
+			"", "*"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.AddRule(ctx, who, f.productID, where, "the library",
+			"", "libnl-3-200"); err != nil {
+			t.Fatal(err)
+		}
+
+		narrow := finding.NewStoreReaching(f.db.DB, 1)
+		placed, _, outgrown, err := narrow.ApplyRules(ctx, f.productID, 100)
+		if err != nil {
+			t.Fatalf("one outgrown rule failed the whole sweep: %v", err)
+		}
+		if len(outgrown) != 1 {
+			t.Errorf("%d rules came back named as outgrown, wanted the one", len(outgrown))
+		}
+		// The rule ordered after it still ran, which is the whole point.
+		if placed == 0 {
+			t.Error("nothing was placed, so the rule behind the outgrown one never ran")
 		}
 	})
 }

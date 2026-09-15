@@ -1,5 +1,7 @@
 package finding
 
+import "github.com/uptrace/bun"
+
 // What a fold is, in SQL.
 //
 // The binary packages one source package was built at one version are one
@@ -58,3 +60,19 @@ const (
 // groups on the fold. MIN rather than MAX for no reason beyond having to pick
 // one: within a fold every row answers the same.
 func PerFold(expression string) string { return "MIN(" + expression + ")" }
+
+// InTheFoldOf narrows to every finding in the fold the named component belongs
+// to, for a query over finding AS "f" that joins component AS "c".
+//
+// The unit a judgment covers, and the unit the finding screen's rows already
+// use. Three things reported beside those rows — who holds it, which rule
+// placed it, what it is tagged with — asked about one component instead, so a
+// guarantee written as "one name for the whole group, and empty where its
+// places disagree" was a guarantee about a group the query could not see: a
+// rule that placed a third of a fold reported as no rule at all under one
+// name and as the whole thing under another.
+func InTheFoldOf(q *bun.SelectQuery, componentID int64) *bun.SelectQuery {
+	return q.Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Where(FoldedOn+` = (SELECT "c2".fold_key FROM "component" AS "c2" WHERE "c2".id = ?)`,
+			componentID)
+}

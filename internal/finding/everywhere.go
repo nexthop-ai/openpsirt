@@ -115,15 +115,26 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS "private"`, access.Private).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
-		ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`)
+		// The version a fix arrived in, where any place knows one. Folded to
+		// the empty string first, a minimum answered "" whenever any place
+		// stated no version — which reads as no fix known, about a group where
+		// one is.
+		ColumnExpr(`COALESCE(MIN(NULLIF(f.fixed_in, '')), '') AS "fixed_in"`)
 	// How far each place has been decided, the same counts the findings list
 	// carries and by the same conditions, so the two agree about what
 	// "agreed" means. Nothing here asks whether a claim is with its author,
 	// so that column is not read and not computed.
 	err = decisionCounts(sightings, "st.product_id", nil,
 		claimWaiting, claimApproved, claimLapsed).
-		GroupExpr("p.name, p.display_name, st.name, va.name, c.name").
-		OrderExpr("p.name, st.name, va.name, c.name").
+		// Grouped on the component itself, not on its name. The total beside
+		// this list counts one sighting per component, and a build that ships
+		// two versions of a name — which is ordinary — folded them into one
+		// row here while the total counted both, so a page of nine rows said
+		// ten. Folding them was wrong on its own terms too: the row carries
+		// one version and one fix version, and two versions of a name are two
+		// different pieces of work.
+		GroupExpr("p.name, p.display_name, st.name, va.name, c.name, c.id").
+		OrderExpr("p.name, st.name, va.name, c.name, c.id").
 		Limit(limit).
 		Scan(ctx, &rows)
 	if err != nil {

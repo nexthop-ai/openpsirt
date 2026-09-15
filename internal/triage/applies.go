@@ -221,6 +221,15 @@ type Filter struct {
 	// question a deferral list is usually being asked — what did we put off
 	// that has come back — rather than a state anything records.
 	Expired bool
+	// Stopped is lapsed or expired, as one question: everything that has
+	// stopped standing on its own and needs a fresh reason.
+	//
+	// One filter rather than two lists added together, because a decision can
+	// be both — a deferral that ran out on code that then moved — and a sum of
+	// two overlapping counts is larger than the thing it labels. The screen
+	// that asks this asked both and added them, and said eleven over a list of
+	// ten.
+	Stopped bool
 	// Alone limits to judgments no second person has a standing agreement
 	// on.
 	//
@@ -275,6 +284,11 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 		}
 		if f.Expired {
 			q = saying(q, "fc.deferred_until IS NOT NULL AND fc.deferred_until <= ?", s.now())
+		}
+		if f.Stopped {
+			q = q.Where(`(de.state = ? OR EXISTS (SELECT 1 FROM "claim" AS "fc" `+
+				`WHERE fc.id = de.claim_id AND fc.deferred_until IS NOT NULL `+
+				`AND fc.deferred_until <= ?))`, LapsedState, s.now())
 		}
 		return q
 	}

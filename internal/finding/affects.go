@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
 // ErrNotOursToSay is what an issue a scanner reported answers.
@@ -53,6 +54,12 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		return nil, access.Denied(fmt.Sprintf("say what is affected in product %d", productID))
 	}
 	because = strings.TrimSpace(because)
+	// The submission policy, before the note is stored. It is the same column
+	// a person's closure writes, and both writers have to hold to it or the
+	// column is only as bounded as the laxer of the two.
+	if err := markdown.Check(because); err != nil {
+		return nil, err
+	}
 
 	wanted := make(map[int64]bool, len(targets))
 	for _, target := range targets {

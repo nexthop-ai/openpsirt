@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -109,18 +110,30 @@ func registerTeams(api huma.API, a Administering) {
 		}
 
 		_, before := store.TeamByName(ctx, in.Body.Name)
-		team, err := store.DeclareTeam(ctx, in.Body.Name, in.Body.DisplayName)
-		if err != nil {
-			return nil, asked(a.Logger, err)
+		// Declaring a team and putting people on it is one act. Written as a
+		// declaration and then a statement per member, a name nobody holds
+		// left the team standing with whoever came before it on it, and the
+		// caller a 404 saying nothing had happened.
+		var team *access.Team
+		if err := store.Within(ctx, func(ctx context.Context, store *access.Store, _ bun.IDB) error {
+			var err error
+			if team, err = store.DeclareTeam(ctx, in.Body.Name, in.Body.DisplayName); err != nil {
+				return asked(a.Logger, err)
+			}
+			for _, identity := range in.Body.Members {
+				person, err := store.ByIdentity(ctx, identity)
+				if err != nil {
+					return noSuchPerson()
+				}
+				if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
+					return wentWrong(a.Logger, "cannot put somebody on a team", err)
+				}
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
 		for _, identity := range in.Body.Members {
-			person, err := store.ByIdentity(ctx, identity)
-			if err != nil {
-				return nil, noSuchPerson()
-			}
-			if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
-				return nil, wentWrong(a.Logger, "cannot put somebody on a team", err)
-			}
 			// Recorded here as well as on the route that adds one later.
 			// Somebody put on a team at the moment it is declared is on it the
 			// same way, and a trail that has one and not the other is a trail

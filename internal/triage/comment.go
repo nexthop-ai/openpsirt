@@ -10,7 +10,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
@@ -74,10 +73,15 @@ func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, 
 		ClaimID: claimID, Body: body,
 		WrittenBy: subject.ID, WrittenAt: s.now().Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(comment).Exec(ctx); err != nil {
-		return nil, fmt.Errorf("record a comment: %w", err)
-	}
-	if err := noting(ctx, s.db, body, comment.WrittenAt); err != nil {
+	// Both writes or neither. Attaching is what makes a file listable and
+	// keeps it from the sweep, so a comment stored without it points at
+	// something already gone from the issue's file list.
+	if err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		if _, err := tx.NewInsert().Model(comment).Exec(ctx); err != nil {
+			return fmt.Errorf("record a comment: %w", err)
+		}
+		return noting(ctx, tx, body, comment.WrittenAt)
+	}); err != nil {
 		return nil, err
 	}
 	return comment, nil
@@ -130,11 +134,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 	// the record saying a comment was changed and nothing saying from what
 	// — which is worse than the state this replaces, because it looks like
 	// a history and is not.
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return 0, fmt.Errorf("this store is already inside a transaction")
-	}
-	if err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	if err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		// The ordinal is read inside the transaction, so two edits at once
 		// cannot be handed the same number: the unique index refuses the
 		// second, and the loser retries against a database that has moved.
@@ -169,14 +169,17 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 			Where("id = ?", commentID).Exec(ctx); err != nil {
 			return fmt.Errorf("change a comment: %w", err)
 		}
-		return nil
+		// An edit can add a reference the first version did not have, and it
+		// is attached in the same transaction as the text that refers to it:
+		// written afterwards and failing, the comment points at a file the
+		// issue's list no longer offers and the sweep deletes. It can also
+		// take one away, and that does not un-attach the file: the revision
+		// that referred to it is still on record.
+		return noting(ctx, tx, body, edited)
 	}); err != nil {
 		return 0, err
 	}
-	// An edit can add a reference the first version did not have. It can also
-	// take one away, and that does not un-attach the file: the revision that
-	// referred to it is still on record.
-	return comment.ClaimID, noting(ctx, s.db, body, edited)
+	return comment.ClaimID, nil
 }
 
 // Discussion returns what has been said about a claim, oldest first.

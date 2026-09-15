@@ -162,6 +162,23 @@ func NewStore(db bun.IDB) *Store {
 	}
 }
 
+// Within runs do inside one transaction, with this store rebuilt over it.
+//
+// For an act that is more than one statement: a handler declaring a team and
+// then adding its members left the team and whoever it reached standing when
+// a later name turned out not to be anybody. A caller already inside a
+// transaction joins it rather than opening a second.
+// The handle is passed alongside the store because an act that spans packages
+// needs it: recording somebody and granting them roles resolves product names,
+// which is a different store over the same transaction.
+func (s *Store) Within(ctx context.Context,
+	do func(context.Context, *Store, bun.IDB) error) error {
+
+	return database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
+		return do(ctx, &Store{db: db, now: s.now, claimWindow: s.claimWindow}, db)
+	})
+}
+
 // Ensure records somebody who has been granted access, or confirms one already
 // recorded.
 //
@@ -619,7 +636,6 @@ func hashSecret(secret string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// People lists everybody who has been granted something, with what they hold.
 // People lists everybody and what they hold, inactive grants included and
 // marked as such.
 //

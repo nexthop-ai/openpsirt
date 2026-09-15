@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Changed is one issue that differs between two builds.
@@ -60,11 +61,11 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// reach one product could read findings out of another through the
 	// comparison — enforcement lives in the data layer precisely so the next
 	// caller of this cannot open that.
-	visible, err := s.mayCompare(ctx, subject, toTarget)
+	toProduct, visible, err := s.mayCompare(ctx, subject, toTarget)
 	if err != nil {
 		return nil, err
 	}
-	earlier, err := s.mayCompare(ctx, subject, fromTarget)
+	fromProduct, earlier, err := s.mayCompare(ctx, subject, fromTarget)
 	if err != nil {
 		return nil, err
 	}
@@ -79,27 +80,33 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 		visible = []access.Visibility{access.Public}
 	}
 
-	at := func(targetID int64) *bun.SelectQuery {
+	at := func(productID, targetID int64) *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			// The rating this product holds where it has stated one. Read
+			// from the published word alone, a release note contradicted the
+			// findings list it was written from: a product that had re-rated
+			// an issue said one thing on screen and another in the document
+			// it publishes, which is the copy that leaves the building.
+			Join(rating.Here, productID).
 			ColumnExpr(`v.identifier AS "vulnerability"`).
 			ColumnExpr(`c.name AS "component"`).
-			ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).
 			ColumnExpr(`MIN(COALESCE(f.arrived_from, '')) AS "arrived_from"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.visibility IN (?)", bun.List(visible)).
-			GroupExpr("v.identifier, c.name, v.severity, f.closed_because")
+			GroupExpr("v.identifier, c.name, " + rating.EffectiveExpr + ", f.closed_because")
 		return q.Where("f.closed_at IS NULL")
 	}
 
 	var was, now []Changed
-	if err := at(fromTarget).Scan(ctx, &was); err != nil {
+	if err := at(fromProduct, fromTarget).Scan(ctx, &was); err != nil {
 		return nil, fmt.Errorf("read what the earlier build had: %w", err)
 	}
-	if err := at(toTarget).Scan(ctx, &now); err != nil {
+	if err := at(toProduct, toTarget).Scan(ctx, &now); err != nil {
 		return nil, fmt.Errorf("read what the later build has: %w", err)
 	}
 
@@ -173,7 +180,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	fromTarget, toTarget int64) (int, error) {
 
 	for _, targetID := range []int64{toTarget, fromTarget} {
-		visible, err := s.mayCompare(ctx, subject, targetID)
+		_, visible, err := s.mayCompare(ctx, subject, targetID)
 		if err != nil {
 			return 0, err
 		}
@@ -243,16 +250,19 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 
 // mayCompare reports what a subject may read of one build, refusing where they
 // may read nothing.
-func (s *Store) mayCompare(ctx context.Context, subject access.Subject, targetID int64) ([]access.Visibility, error) {
+func (s *Store) mayCompare(ctx context.Context, subject access.Subject, targetID int64) (int64, []access.Visibility, error) {
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	visible := access.Visible(subject, productID)
 	if !subject.Sees(productID) || len(visible) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
-	return visible, nil
+	// The product comes back with it, because the rating a row is reported at
+	// is that product's. The two builds compared can be in two products, and
+	// each half of the comparison is rated by its own.
+	return productID, visible, nil
 }
 
 // whyGone reads the explanations recorded when these findings closed in the

@@ -35,6 +35,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [A year of nightly scans](#a-year-of-nightly-scans)
 - [The total above a list](#the-total-above-a-list)
 - [The severity ladder](#the-severity-ladder)
+- [The rating in force](#the-rating-in-force)
 - [File organization](#file-organization)
 - [Limits](#limits)
 
@@ -92,6 +93,8 @@ names**: every name resolves to one row, and a decision holds across all of them
 | An issue is filed under the most widely recognized of its names | What a person sees is the name they will find in an advisory. The rest are kept, and any of them finds the row |
 | Identifiers are compared in one case | Every scheme treats them as case-insensitive and reports disagree about which case to write |
 | A report that would merge two held issues is refused | That is a merge of findings and decisions already made against both, and reading a scan is the wrong moment to do it quietly |
+| The filed name, folded, is what makes one issue one row | It was a hash of the unfolded name in a column of its own, which nothing read and which only one of the two paths that refile an issue under a better-known name maintained — so the key drifted away from the row it identified, and the collision when it came named a name neither issue was filed under |
+| The fold is what a screen reports about | The rows a finding screen shows are the whole fold, so who holds it, what rule placed it and everything else reported beside them is asked of the fold too. Asked of one component, a rule that placed a third of a fold reported as no rule under one name and as the whole thing under another — while the guarantee those reads state is "one name for the whole group, and empty where its places disagree" |
 | **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
 
 ## What a report supplies
@@ -118,7 +121,9 @@ being parsed and thrown away.
 | Field | Treatment |
 |---|---|
 | Severity | Stored as a word, which is what ranks and what sets a deadline. A number is taken where the report carries one — the first rating stating both a score and its vector, worst claim winning. The vector travels with the number |
+| What counts as a fix | One list, named once. A closure not on it is churn or a correction, never progress — it was a positive list of four words spliced into SQL, a negative list of three in Go, and a third list of the same four as a switch returning prose, none of them checked by the compiler and all three disagreeing about any closure added later |
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
+| A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered. It groups findings by the shape of the mistake rather than the package it landed in |
 
 ## Who supplied a component
@@ -607,6 +612,7 @@ bottom of the list, until somebody rescanned that tag, which for a tag is never.
 | The signals that moved are what decides who is re-ranked | The write that raises them reports whether any of them actually rose, so nothing is recomputed for a report that told us nothing new |
 | Only learning something is exploited moves a clock | Neither the score nor the likelihood is in the deadline, and a clock reset by a revised number would never arrive |
 | The clock runs from when it was learned | Counted from when the finding opened, an issue that became exploited after six months lands three days before it was known — a deadline nobody could have met |
+| The moment it was learned is kept on the row | Nothing else holds it, so every later recount had to guess and fell back to the opening — which moved the deadline back to a date already in the past, on any assessment, agreement or withdrawal that touched the issue, with nothing logged |
 | It is not a cache being refreshed | The stored order describes an issue rather than a moment, so it is rewritten when the signals move. What is stored because it cannot be worked out again is a different thing |
 
 Four signals, in this order:
@@ -782,6 +788,15 @@ the run is for is the *growth*, which is stable across both samples.
 | MySQL writes seven times slower than PostgreSQL and fifteen times slower than MariaDB | A nightly scan taking thirteen seconds is not an operational problem; the same code being fifteen times more expensive on one supported engine than on its own sibling is a fact to have before somebody chooses one |
 | The cost is per statement, not per row | A night issues **1,699 statements on every engine**. What differs is what one costs: **203 µs on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL**. The lever for making MySQL faster is issuing fewer statements |
 
+**Rewriting every deadline walks the identifier range once.** The moments a
+product's findings opened at ride inside the statement as a case over a batch of
+them, rather than one statement per moment. The other way round the count was
+moments × bands × identifier slices: a product scanned nightly for a year holds
+about 1,800 distinct moments, so five builds and twenty-one slices came to
+189,000 statements — almost all matching nothing, because one moment lives in
+one slice — and the half-hour the caller allows expired partway, leaving the
+estate split between the old policy and the new with nothing to retry it.
+
 A quiet night issues **more** statements than the first — 1,699 against 1,077 —
 because the first night is bulk inserts five hundred at a time and a quiet night
 is an update per finding that moved.
@@ -830,6 +845,8 @@ the list itself pages through.
 |---|---|
 | It rides on the page | Counted after the grouping and before the limit, in the statement that groups, so the number and the rows cannot describe different sets |
 | The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source counted as two where the page draws one, and the figure changed depending on which page was being looked at |
+| A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
+| Two overlapping lists are one question | The lapsed queue asked for lapsed decisions and for expired deferrals and added the totals. A deferral that ran out on code that then moved is both, so the figure was larger than the list beneath it and the list itself had to be deduplicated to draw at all. One filter answers both, and the number it comes back with is the number of rows |
 
 ## The severity ladder
 
@@ -840,8 +857,42 @@ added to one to be missing from the others.
 | List | Purpose |
 |---|---|
 | The four rated bands | The order a report reads in |
-| `negligible` and `none` | Answers a scanner gives and nobody ranks. They rank below every band, so they survive no floor at all |
+| `negligible` and `none` | Answers a scanner gives and no band holds. The fold reads them as lows, so scoring them anywhere else put them above unrated and below every low — and a stored score turned back into a word came out "low" regardless, which is a word nobody published about the issue |
 | `everything` | Not a severity: the absence of a floor, which is why it sits with the floor rather than the ladder |
+
+The ordering in SQL is built from the list rather than written out beside it,
+and the mapping back to a word is an index into the same list. The `ELSE` is
+the caller's: a cross-product page needs an unrecognized rating to compare
+below every band, so that the sentinel for "no line" does.
+
+## The rating in force
+
+What a finding's severity *is* has one rule: **this product's word where it has
+stated one, the published word otherwise.** Being able to say a published
+rating is wrong is pointless if the surfaces that count and rank then ignore
+us.
+
+Nine queries said it a second way. They selected the published column with no
+rating joined at all, so a product that re-rated an issue saw its own decision
+in the findings list, the severity filter, the triage floor and the deadline,
+and saw the world's in the component tree, the bundle band strip, the build
+comparison export, the remediation plan and the triage measures. Nothing
+errored; the screens simply disagreed with the list they summarize, and the
+comparison export is the copy that leaves the building.
+
+The join and the two expressions live in `internal/rating`, which is a leaf.
+That is the whole reason it exists: `internal/finding` imports `internal/graph`
+to walk a subtree, so `internal/graph` cannot import `internal/finding` to ask
+what a band is — and the band strip on the tree was drawn from the published
+rating for exactly that reason. The rating *row* did not move: it is proposed,
+agreed and put in force through `internal/finding`, which is where a second
+person is asked for. What moved is the spelling a query needs.
+
+| Rule | |
+|---|---|
+| A query presenting a severity joins the rating | The expression reads a column of the joined rating, so a statement that reads it without the join does not compile on any of the four engines. That is the failure being chosen; the alternative is a query that silently answers for the wrong product |
+| It says which product it is asking about | Bound where the scope names one product, read off the row's own stream where the list spans products, read off the decision where the row is a decision. Three named spellings rather than a string parameter, because a placeholder cannot bind a column name |
+| A query reading the published word says so | Five do, deliberately: what needs a second person is a rating milder than what the *world* called it, and a product that had already rated it milder would otherwise let the next step down through unwatched. Those alias the column `published`. Aliased `severity` they read as the rating in force, which is the one thing they must not be taken for |
 
 ## File organization
 

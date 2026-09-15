@@ -12,9 +12,9 @@ import (
 
 // UnagreedBody is risk standing with nobody's agreement behind it.
 type UnagreedBody struct {
-	Outcome string `json:"outcome" enum:"not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed"`
-	Claims  int    `json:"claims" doc:"How many acts"`
-	Rows    int    `json:"rows" doc:"How many decisions those acts wrote"`
+	Outcome outcomeHidingRisk `json:"outcome"`
+	Claims  int               `json:"claims" doc:"How many acts"`
+	Rows    int               `json:"rows" doc:"How many decisions those acts wrote"`
 }
 
 // BulkApprovalBody is one act of agreement covering many claims.
@@ -42,22 +42,22 @@ type PairingBody struct {
 // LapsedApprovalBody is an agreement standing from somebody who has since lost
 // the right to give one.
 type LapsedApprovalBody struct {
-	ClaimID    int64  `json:"claim_id"`
-	ApprovedBy string `json:"approved_by"`
-	ApprovedAt string `json:"approved_at"`
-	Product    string `json:"product"`
-	Outcome    string `json:"outcome"`
-	Rows       int    `json:"rows"`
+	ClaimID    int64   `json:"claim_id"`
+	ApprovedBy string  `json:"approved_by"`
+	ApprovedAt string  `json:"approved_at"`
+	Product    string  `json:"product"`
+	Outcome    outcome `json:"outcome"`
+	Rows       int     `json:"rows"`
 }
 
 // GrownBody is a claim covering more now than when it was agreed to.
 type GrownBody struct {
-	ClaimID    int64  `json:"claim_id"`
-	ApprovedBy string `json:"approved_by"`
-	ApprovedAt string `json:"approved_at"`
-	Outcome    string `json:"outcome"`
-	Covered    int    `json:"covered" doc:"What the claim covered when it was agreed to"`
-	CoversNow  int    `json:"covers_now" doc:"What it covers now, having reached it by matching rather than by anybody acting"`
+	ClaimID    int64   `json:"claim_id"`
+	ApprovedBy string  `json:"approved_by"`
+	ApprovedAt string  `json:"approved_at"`
+	Outcome    outcome `json:"outcome"`
+	Covered    int     `json:"covered" doc:"What the claim covered when it was agreed to"`
+	CoversNow  int     `json:"covers_now" doc:"What it covers now, having reached it by matching rather than by anybody acting"`
 }
 
 type scrutinyOutput struct {
@@ -72,6 +72,11 @@ type scrutinyOutput struct {
 		// own.
 		Agreed int `json:"agreed" doc:"Decisions a standing agreement covers in this period"`
 		Days   int `json:"days" doc:"How far back this looked"`
+		// Capped says a section reached the ceiling, so what is here is the
+		// worst of it rather than all of it. Said rather than implied: a
+		// report about a control that reads as complete while it is clipped
+		// misleads exactly the reader it is for.
+		Capped bool `json:"capped,omitempty" doc:"A section reached the limit, so this is the worst of it rather than all of it"`
 	}
 }
 
@@ -104,6 +109,7 @@ func registerScrutiny(api huma.API, in Ingest) {
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		Days    int    `query:"days" default:"90" minimum:"1" maximum:"3650" doc:"How far back to look, by when a claim was proposed"`
+		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500" doc:"How many rows each section carries at most. capped says a section reached it"`
 	}) (*scrutinyOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -125,17 +131,18 @@ func registerScrutiny(api huma.API, in Ingest) {
 		}
 		since := time.Now().UTC().AddDate(0, 0, -input.Days)
 
-		got, err := triage.NewStore(in.DB.DB).Scrutinize(ctx, subject, products, since)
+		got, err := triage.NewStore(in.DB.DB).Scrutinize(ctx, subject, products, since, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "how approvals are going could not be read", err)
 		}
 
 		out := &scrutinyOutput{}
 		out.Body.Days = input.Days
+		out.Body.Capped = got.Capped
 		out.Body.Alone = make([]UnagreedBody, 0, len(got.Alone))
 		for _, row := range got.Alone {
 			out.Body.Alone = append(out.Body.Alone, UnagreedBody{
-				Outcome: string(row.Outcome), Claims: row.Claims, Rows: row.Rows,
+				Outcome: outcomeHidingRisk(row.Outcome), Claims: row.Claims, Rows: row.Rows,
 			})
 		}
 		out.Body.Bulk = make([]BulkApprovalBody, 0, len(got.Bulk))
@@ -166,14 +173,14 @@ func registerScrutiny(api huma.API, in Ingest) {
 			out.Body.Lapsed = append(out.Body.Lapsed, LapsedApprovalBody{
 				ClaimID: row.ClaimID, ApprovedBy: row.ApprovedBy,
 				ApprovedAt: stamp(row.ApprovedAt), Product: row.Product,
-				Outcome: string(row.Outcome), Rows: row.Rows,
+				Outcome: outcome(row.Outcome), Rows: row.Rows,
 			})
 		}
 		out.Body.Grew = make([]GrownBody, 0, len(got.Grew))
 		for _, row := range got.Grew {
 			out.Body.Grew = append(out.Body.Grew, GrownBody{
 				ClaimID: row.ClaimID, ApprovedBy: row.ApprovedBy,
-				ApprovedAt: stamp(row.ApprovedAt), Outcome: string(row.Outcome),
+				ApprovedAt: stamp(row.ApprovedAt), Outcome: outcome(row.Outcome),
 				Covered: row.Covered, CoversNow: row.CoversNow,
 			})
 		}

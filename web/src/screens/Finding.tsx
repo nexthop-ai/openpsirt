@@ -673,6 +673,8 @@ export function Finding() {
               </>
             ) : it.fix_state === "wont-fix" ? (
               <>Upstream has declined to fix this.</>
+            ) : it.fix_state === "mixed" ? (
+              <>The places this sits at do not agree about what upstream did.</>
             ) : (
               <>No fix has been published.</>
             )}

@@ -76,9 +76,23 @@ export function asAsked(params: URLSearchParams, view: string): URLSearchParams 
 
 // withParam sets one value, or takes the key out where there is none.
 export function withParam(params: URLSearchParams, key: string, value: string): URLSearchParams {
+  return withEach(params, { [key]: value });
+}
+
+// withEach is several filters changed in one act.
+//
+// Two `withParam` calls in a row each build their change from the same
+// parameters, so the second writes over the first — which is why unticking a
+// box that also had to clear a shortcut could not turn the box off.
+export function withEach(
+  params: URLSearchParams,
+  changes: Record<string, string>,
+): URLSearchParams {
   const next = new URLSearchParams(params);
-  if (value) next.set(key, value);
-  else next.delete(key);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value) next.set(key, value);
+    else next.delete(key);
+  }
   return next;
 }
 
@@ -246,7 +260,7 @@ export function listQuery(params: URLSearchParams) {
     ...(hiding.length > 0 ? { exclude: hiding } : {}),
     ...(components.length > 0 ? { component: components } : {}),
     ...(tags.length > 0 ? { tag: tags } : {}),
-    ...(params.get("recorded") === "1" ? { recorded: true } : {}),
+    ...(params.get("origin") ? { origin: params.get("origin") as "scanner" | "manual" } : {}),
     ...(params.get("planned") && params.get("planned") !== "either"
       ? { planned: params.get("planned") as "planned" | "unplanned" }
       : {}),

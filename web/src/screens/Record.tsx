@@ -240,7 +240,7 @@ export function Record() {
           <span style={{ marginLeft: "auto" }}>
             <Link
               className="btn quiet"
-              to={`/products/${encodeURIComponent(scope.product)}/findings?recorded=1&below=yes`}
+              to={`/products/${encodeURIComponent(scope.product)}/findings?origin=manual&below=yes`}
             >
               What has been recorded here
             </Link>

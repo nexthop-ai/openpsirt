@@ -775,7 +775,7 @@ expects two. **One recursive statement for the row's whole set of children**:
 | A level is drawn whole | An honest inventory has tens of components at a level. The remaining cap is high and exists for the inventory that is not honest — a real image has been seen with 5,270 components directly under its root |
 | Arriving from a finding opens the tree on the component, with every parent expanded | The chain travels in the link rather than being walked upward here. Where a level is past its cap, the step on the path is kept whatever its position: a link that opens a tree without the component it was opened for shows the one thing it exists to show |
 | A version every component at a level shares is drawn once | Shared by components of different names, it is the producer describing the build — a switch image whose thirty containers carry one build stamp. The level says it above the rows |
-| A node says what its number is made of, as a short strip of the bands | Five thousand beneath a node says nothing about whether any of it matters. Rolled up in the statement that already counts the subtree, so the bands sum back to the total |
+| A node says what its number is made of, as a short strip of the bands | Five thousand beneath a node says nothing about whether any of it matters. Rolled up in the statement that already counts the subtree, so the bands sum back to the total. Banded by **the rating in force in this product**, which is the same word the list the number opens groups by — drawn from the published rating alone, a product that had re-rated an issue read its own decision in the list and the world's in the strip over it |
 | The node counts open their lists | A node saying "5,650 beneath · 0 here" and going nowhere is a figure nobody can act on from where they read it |
 | The count is every open issue, answered or not | A dismissal does not subtract from it. Written down because "what is open here" and "what is still to answer here" are both reasonable readings and the screen gives the first |
 | The marker that opens a row is a button | A span with a click handler leaves every node past the first level unreachable without a pointer, on the screen whose whole purpose is walking down |
@@ -798,6 +798,12 @@ distinct issues and the list is one row per issue and component. A name the
 build does not hold is refused rather than answered with an empty list, since an
 empty list is also what a clean subtree looks like.
 
+Searching the tree counts what the tree counts. Counted as finding rows rather
+than distinct issues, a library reachable under three parents reported three
+times its real number — and the results are **ordered** by that number, so
+deeply-vendored components with few real issues outranked shallow ones with
+many, which is the opposite of what a search of a build is for.
+
 ## The review queue
 
 One card per claim (REQ-28): one proposer's action, however many decisions it
@@ -812,7 +818,7 @@ adds:
 |---|---|
 | **Approving and rejecting** | Work on the claim, and rejecting needs a reason. Selecting several and naming a batch approves them together, so they can be undone together |
 | **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M". An extension says which claim it rests on |
-| **Lapsed decisions and deferrals that ran out sit underneath** | The row carries the decision and not the build it was made in, so reaffirming happens on the finding, where its locations are |
+| **Lapsed decisions and deferrals that ran out sit underneath** | The row carries the decision and not the build it was made in, so reaffirming happens on the finding, where its locations are. One list, because a deferral that ran out on code that then moved is both — asked as two, the section merged them by hand and the count over it added the two totals |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 
 The queue narrows to one product, which is what a figure on the home screen

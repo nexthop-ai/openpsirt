@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -245,6 +246,10 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			// Each row's own product rates its own findings. The list spans
+			// products, so the join reads the stream's product per row rather
+			// than binding one.
+			Join(rating.For(rating.OnStream)).
 			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 			// The consumer, for the versions a decision is keyed on.
 			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
@@ -273,7 +278,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`MIN(COALESCE(v.severity, '')) AS "severity"`).
+		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`p.display_name AS "product"`).
 		ColumnExpr(`st.display_name AS "stream"`).
@@ -333,6 +338,26 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	return late, total, nil
 }
 
+// whenOpened is the deadline each of these moments produces, as one
+// expression, so that a statement can carry a set of them rather than one.
+//
+// The arithmetic stays in Go, which is what keeps it portable — no engine
+// agrees on how to add days to a timestamp — and the statement writes
+// constants, which is what it did when it carried one moment.
+//
+// The caller types the result. A bound value arrives untyped, so a CASE
+// choosing between several of them is a string as far as the engine can tell,
+// and one of the four refuses to write a string into a timestamp column.
+func whenOpened(column string, moments []time.Time, window time.Duration) (string, []any) {
+	said := "CASE " + column
+	args := make([]any, 0, len(moments)*2)
+	for _, at := range moments {
+		said += " WHEN ? THEN ?"
+		args = append(args, at, at.Add(window))
+	}
+	return said + " END", args
+}
+
 // Recompute rewrites the deadline on every open finding.
 //
 // The one event that makes a stored deadline wrong is somebody changing the
@@ -346,7 +371,8 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 // opened by one run and rated the same way lands on the same instant: the
 // arithmetic happens here, in Go, and the statement writes a constant. That
 // keeps it portable — no engine agrees on how to add days to a timestamp — and
-// it is a handful of statements rather than hundreds of thousands.
+// it is a handful of statements rather than hundreds of thousands: the
+// identifier range is walked once and the moments ride inside the statement.
 func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	// A product at a time, because severity sets the deadline and a rating
 	// belongs to a product: the same issue rated critical in one product and
@@ -417,13 +443,18 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
 				return q.Where("urgency_exploited = ?", false).
 					Where(`vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v" `+
-						RatedHere+` WHERE `+BandExpr+` IN (?))`,
+						rating.Here+` WHERE `+rating.BandExpr+` IN (?))`,
 						productID, bun.List(words))
 			}
 		}
 		bands := []band{
+			// Exploited with nothing recorded to count from. The opening is
+			// what is left, which is what a row marked exploited before the
+			// moment was recorded falls back to; the rest are rewritten in a
+			// pass of their own below, keyed on the learning.
 			{windows.Exploited, func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Where("urgency_exploited = ?", true)
+				return q.Where("urgency_exploited = ?", true).
+					Where("exploited_learned_at IS NULL")
 			}},
 			{windows.Critical, rated("critical")},
 			{windows.High, rated("high")},
@@ -433,16 +464,28 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			{windows.Medium, rated("medium")},
 		}
 
-		for _, at := range opened {
+		// The slice is the outer loop, and the moments are carried into the
+		// statement rather than looped over.
+		//
+		// The other way round, the statement count was moments × bands ×
+		// slices: a product scanned nightly for a year holds about 1,800
+		// distinct moments, so five builds and twenty-one slices came to
+		// 189,000 statements — against this function's own note promising a
+		// handful — almost all of them matching nothing, because one moment
+		// lives in one slice. The half-hour the caller allows expired partway
+		// and left the estate split between the old policy and the new with
+		// nothing to retry it.
+		for from := int64(0); from <= highest; from += recomputeSlice {
 			for _, each := range bands {
-				due := at.Add(each.window)
-				for from := int64(0); from <= highest; from += recomputeSlice {
+				for start := 0; start < len(opened); start += database.BatchSize {
+					chunk := opened[start:min(start+database.BatchSize, len(opened))]
+					said, args := whenOpened("opened_at", chunk, each.window)
 					query := s.db.NewUpdate().
 						Model((*Finding)(nil)).
-						Set("due_at = ?", due).
+						Set("due_at = "+database.AsTimestamp(s.db, said), args...).
 						Where("id > ?", from).
 						Where("id <= ?", from+recomputeSlice).
-						Where("opened_at = ?", at).
+						Where("opened_at IN (?)", bun.List(chunk)).
 						Where("closed_at IS NULL").
 						Where(inThisProduct, productID)
 					result, err := each.where(query).Exec(ctx)
@@ -461,6 +504,52 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 					if err := ctx.Err(); err != nil {
 						return changed, err
 					}
+				}
+			}
+		}
+
+		// And the exploited rows, counted from when exploitation was learned
+		// rather than from when the finding opened. Six months after a
+		// finding opens, a few days from the learning is a deadline somebody
+		// can meet and a few days from the opening is one already in the past.
+		var learned []time.Time
+		err = s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			ColumnExpr("f.exploited_learned_at").
+			Where("f.closed_at IS NULL").
+			Where("f.urgency_exploited = ?", true).
+			Where("f.exploited_learned_at IS NOT NULL").
+			Where("st.product_id = ?", productID).
+			GroupExpr("f.exploited_learned_at").
+			Scan(ctx, &learned)
+		if err != nil {
+			return changed, fmt.Errorf("read when exploitation was learned: %w", err)
+		}
+		for from := int64(0); from <= highest; from += recomputeSlice {
+			for start := 0; start < len(learned); start += database.BatchSize {
+				chunk := learned[start:min(start+database.BatchSize, len(learned))]
+				said, args := whenOpened("exploited_learned_at", chunk, windows.Exploited)
+				result, err := s.db.NewUpdate().
+					Model((*Finding)(nil)).
+					Set("due_at = "+database.AsTimestamp(s.db, said), args...).
+					Where("id > ?", from).
+					Where("id <= ?", from+recomputeSlice).
+					Where("exploited_learned_at IN (?)", bun.List(chunk)).
+					Where("urgency_exploited = ?", true).
+					Where("closed_at IS NULL").
+					Where(inThisProduct, productID).Exec(ctx)
+				if err != nil {
+					return changed, fmt.Errorf("rewrite deadlines: %w", err)
+				}
+				n, err := database.Affected(result)
+				if err != nil {
+					return changed, fmt.Errorf("rewrite deadlines: %w", err)
+				}
+				changed += int(n)
+				if err := ctx.Err(); err != nil {
+					return changed, err
 				}
 			}
 		}
@@ -604,7 +693,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 			Where("urgency_exploited = ?", false).
 			Where(inThisProduct, productID).
 			Where(`vulnerability_id NOT IN (SELECT v.id FROM "vulnerability" AS "v" `+
-				RatedHere+` WHERE `+BandExpr+` IN (?))`, productID, bun.List(words)).
+				rating.Here+` WHERE `+rating.BandExpr+` IN (?))`, productID, bun.List(words)).
 			Exec(ctx)
 		if err != nil {
 			return cleared, fmt.Errorf("take the deadline off what is below the line: %w", err)

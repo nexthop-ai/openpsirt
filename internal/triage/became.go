@@ -248,10 +248,10 @@ func became(rows []Decision, agreed map[int64][]Approval) (WhatHappened, *time.T
 			case row.SentBackAt != nil:
 				sentBack++
 				at(row.SentBackAt, 0)
-			case tookBackAgreement(agreed[row.ClaimID]):
+			case tookBackAgreement(agreed[row.ClaimID], row.ProposedBy):
 				undone++
 				for _, one := range agreed[row.ClaimID] {
-					at(one.WithdrawnAt, one.ApprovedBy)
+					at(one.WithdrawnAt, orZero(one.WithdrawnBy))
 				}
 			default:
 				waiting++
@@ -285,14 +285,31 @@ func became(rows []Decision, agreed map[int64][]Approval) (WhatHappened, *time.T
 	}
 }
 
-// tookBackAgreement says somebody had agreed to this row and the agreement was
-// taken back — which is what tells "undone" from "never answered", since the
-// row reads as proposed either way.
-func tookBackAgreement(against []Approval) bool {
+// tookBackAgreement says somebody else had agreed to this row and the
+// agreement was taken back — which is what tells "undone" from "never
+// answered", since the row reads as proposed either way.
+//
+// A proposer revising their own claim withdraws every agreement standing on
+// the old words, so the withdrawal alone does not mean anybody undid anything:
+// stating the claim again is the proposer's own act and reads as waiting, not
+// as an agreement taken back.
+func tookBackAgreement(against []Approval, proposedBy int64) bool {
 	for _, one := range against {
-		if one.WithdrawnAt != nil {
-			return true
+		if one.WithdrawnAt == nil {
+			continue
 		}
+		if one.WithdrawnBy != nil && *one.WithdrawnBy == proposedBy {
+			continue
+		}
+		return true
 	}
 	return false
+}
+
+// orZero is a person who may not be recorded, as a number.
+func orZero(who *int64) int64 {
+	if who == nil {
+		return 0
+	}
+	return *who
 }

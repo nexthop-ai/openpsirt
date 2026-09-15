@@ -302,3 +302,57 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		}
 	})
 }
+
+func TestAGroupWhosePlacesDisagreeSaysSo(t *testing.T) {
+	// A row is an issue at a component across the builds that ship it, and
+	// asking what upstream did is asking about the whole of that. Where the
+	// builds disagree there is no single answer, which is what the mixed state
+	// is for — the filter selected exactly that set and every row it returned
+	// claimed a definite state, with a version taken from whichever of the
+	// disagreeing places sorted first.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		// A second branch of the same product where the scanner says upstream
+		// has published nothing.
+		branch := f.anotherBranchOf(t, f.productID, "2026.06")
+		f.shippedTo(t, branch, twoConsumers())
+		nothing := found("CVE-2026-1", libnl)
+		nothing.FixState, nothing.FixedIn = finding.NoFix, ""
+		if _, err := f.store.Apply(ctx, branch, f.runOn(t, branch),
+			[]finding.Reported{nothing}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicRead)
+		rows, _, err := f.store.Anywhere(ctx, who, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("%d rows, want the one issue at the one component", len(rows))
+		}
+		if rows[0].FixState != finding.FixMixed {
+			t.Errorf("a group whose builds disagree says upstream %q", rows[0].FixState)
+		}
+		if rows[0].FixedIn != "" {
+			t.Errorf("it names %q as the version that fixes it, which only one of its "+
+				"builds says", rows[0].FixedIn)
+		}
+
+		// And the filter that selects the set answers with the set.
+		narrowed, total, err := f.store.Anywhere(ctx, who, 50, 0,
+			finding.Filter{FixStates: []finding.FixState{finding.FixMixed}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || len(narrowed) != 1 || narrowed[0].FixState != finding.FixMixed {
+			t.Errorf("narrowing to mixed answered %d of %d: %+v", len(narrowed), total, narrowed)
+		}
+	})
+}

@@ -49,7 +49,7 @@ type VexSaidBody struct {
 	// Offers is the outcome this would prefill, where it offers one. A
 	// publisher saying they will not fix something is not the same as saying
 	// it does not apply, so that offers a will-not-fix and never a dismissal.
-	Offers string `json:"offers,omitempty" enum:"not-applicable,wont-fix,already-fixed" doc:"The outcome this offers as a prefill. Never applied by itself"`
+	Offers outcomeOffered `json:"offers,omitempty" doc:"The outcome this offers as a prefill. Never applied by itself"`
 }
 
 // counting is a reader that says how much has gone past it.

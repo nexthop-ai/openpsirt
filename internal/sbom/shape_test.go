@@ -127,6 +127,16 @@ func TestAFullSizeDocumentIntroducesNoUndecidedPath(t *testing.T) {
 	paths, shapes, components := documentPaths(t, path, f)
 	t.Logf("%s: %d components, %d distinct shapes, %d paths", path, components, len(shapes), len(paths))
 
+	// What it examined, asserted rather than logged. A gate that iterates
+	// counts what it examined: the make target selects this by name, and
+	// "go test -run" exits 0 when nothing matches, so renaming or splitting
+	// this function would retire the gate without a word — and a document
+	// that read as empty would pass it for the same reason.
+	if components == 0 || len(paths) == 0 {
+		t.Fatalf("%s: %d components and %d paths, so nothing was examined",
+			path, components, len(paths))
+	}
+
 	// The shapes carried by a single component are the ones a curated fixture
 	// would never think to include.
 	var once []string

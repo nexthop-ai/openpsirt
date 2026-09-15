@@ -32,16 +32,24 @@ func (f *fixture) secondIssue(t *testing.T) int64 {
 // disclosed ones.
 func (f *fixture) privately(t *testing.T) access.Subject {
 	t.Helper()
+	return f.privateTriager(t, "insider", "Insider")
+}
+
+// privateTriager is the same under a name of the caller's choosing, because a
+// claim that has to be agreed to needs two of them: the person who proposed
+// may never be the person who approves.
+func (f *fixture) privateTriager(t *testing.T, identity, display string) access.Subject {
+	t.Helper()
 	ctx := t.Context()
 	rights := access.NewStore(f.db.DB)
-	insider, err := rights.Ensure(ctx, "insider", "Insider", nil)
+	who, err := rights.Ensure(ctx, identity, display, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := rights.GrantRole(ctx, insider.ID, f.product, access.PrivateTriage); err != nil {
+	if err := rights.GrantRole(ctx, who.ID, f.product, access.PrivateTriage); err != nil {
 		t.Fatal(err)
 	}
-	resolved, err := rights.Resolve(ctx, "insider")
+	resolved, err := rights.Resolve(ctx, identity)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,8 +236,8 @@ func TestSendingAClaimBackTakesEveryRowOutOfTheQueue(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if back.Sent != 2 || len(back.Authors) != 1 || back.Authors[0] != f.proposer {
-			t.Errorf("sent %d rows back to %v; want 2 to %d", back.Sent, back.Authors, f.proposer)
+		if back.Sent != 2 || back.Author != f.proposer {
+			t.Errorf("sent %d rows back to %d; want 2 to %d", back.Sent, back.Author, f.proposer)
 		}
 		if back.Decision.ID != recorded[0].ID {
 			t.Errorf("the representative row is %d; want the earliest, %d", back.Decision.ID, recorded[0].ID)
@@ -850,6 +858,112 @@ func TestThePersonalPageCountsOnlyWhatIsStillReadable(t *testing.T) {
 		}
 		if page[0].Decision.PlaceIdentity == hidden.PlaceIdentity {
 			t.Error("an undisclosed place was handed back as the claim's representative")
+		}
+	})
+}
+
+func TestAnExtensionMayNotDuplicateAnyIssueItsSourceCovers(t *testing.T) {
+	// A claim covers as many issues as the action that wrote it. Asking only
+	// the first row's issue admitted an extension duplicating any of the
+	// others, so one issue at one place ended up under two live claims.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		another := f.at()
+		another.VulnerabilityID = f.secondIssue(t)
+		says := func(at triage.Place) triage.Proposal {
+			return triage.Proposal{
+				Place: at, Outcome: triage.NotApplicable,
+				Justification: triage.CodeNotInExecutePath,
+				Reasoning:     "The parser is never reached: we only call the encoder.",
+				By:            f.proposer, NeedsApproval: true,
+			}
+		}
+		source, err := f.store.ProposeMany(ctx, f.triager,
+			[]triage.Proposal{says(f.at()), says(another)}, triage.DefaultTogetherCap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.ApproveClaim(ctx, f.reviewer, source[0].ClaimID, "", nil, ""); err != nil {
+			t.Fatal(err)
+		}
+
+		// The second issue, which the source covers and its first row does not.
+		if _, err := f.store.Extend(ctx, f.triager, source[0].ClaimID,
+			[]triage.Proposal{says(another)}, triage.DefaultTogetherCap); !errors.Is(err, triage.ErrNotExtendable) {
+			t.Errorf("a claim was carried to an issue it already covers: %v", err)
+		}
+	})
+}
+
+func TestAnUndoReportsWhatReturnedToWaitingRatherThanWhatWasConsidered(t *testing.T) {
+	// A decision carrying a second standing agreement is left where it is,
+	// because undoing a batch is undoing that batch. Counting the candidates
+	// rather than the write told the proposer their claim had come back when
+	// nothing about it had moved.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		second := f.privateTriager(t, "second-approver", "Second Approver")
+		claimed := f.claims(t, f.at())
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, "one-afternoon"); err != nil {
+			t.Fatal(err)
+		}
+		// The second agreement is written directly. Approving twice is
+		// refused — the rows are no longer waiting — so this is the state the
+		// undo's own condition is written for, and the only way to reach it.
+		var given triage.Approval
+		if err := f.db.DB.NewSelect().Model(&given).
+			Where("claim_id = ?", claimed.ClaimID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		also := triage.Approval{
+			ClaimID: given.ClaimID, RevisionID: given.RevisionID,
+			ApprovedBy: second.ID, ApprovedAt: given.ApprovedAt,
+			Batch: func() *string { batch := "another-afternoon"; return &batch }(),
+		}
+		if _, err := f.db.DB.NewInsert().Model(&also).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		undone, err := f.store.UndoBatch(ctx, f.reviewer, "one-afternoon")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if undone.Rows != 0 {
+			t.Errorf("an undo reports %d rows returned to waiting while another agreement still stands",
+				undone.Rows)
+		}
+		if state := f.stateOf(t, claimed.ID); state != triage.Approved {
+			t.Errorf("the decision is %s while an agreement nobody took back still stands", state)
+		}
+	})
+}
+
+func TestRevisingYourOwnClaimIsNotSomebodyElseUndoingIt(t *testing.T) {
+	// Revising withdraws every agreement standing on the old words, which is
+	// the proposer's own act. Read off the withdrawal alone it came back as
+	// "undone" and named the approver, so a proposer restating their claim was
+	// told somebody had taken their agreement back.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		claimed := f.claims(t, f.at())
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Revise(ctx, f.triager, claimed.ClaimID,
+			"Restated: the encoder is the only caller."); err != nil {
+			t.Fatal(err)
+		}
+
+		page, _, err := f.store.Became(ctx, f.triager, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page) != 1 {
+			t.Fatalf("the page holds %d claims, want the one", len(page))
+		}
+		if page[0].Happened != triage.StillWaiting {
+			t.Errorf("a proposer restating their own claim reads as %q, want %q",
+				page[0].Happened, triage.StillWaiting)
 		}
 	})
 }

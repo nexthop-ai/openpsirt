@@ -43,6 +43,12 @@ when the committed copy has drifted.
 Without that check, regenerating is a step somebody skips, and a hand-kept
 document is wrong the first time somebody is in a hurry — silently.
 
+| Rule | |
+|---|---|
+| A closed vocabulary is the domain's list, not a literal beside the route | Retyped at the route, a word added to the domain is accepted by the store and refused by every route that takes it — and it was retyped in eight struct tags carrying four different memberships. The list comes from the package that owns the vocabulary, so the document and the store cannot disagree about what a word is |
+| A subset is a named rule in the domain package | Some routes take fewer words than the vocabulary has: one decision at a time offers what a person may propose there, and a bulk claim offers less again. Shortening the list at the route makes what is left out an accident; naming the subset where the vocabulary lives makes it a statement, with the reason beside it |
+| Every word in the built document is checked against the list that owns it | A test walks the document the server builds from its own registrations and requires each enumerated word to be one the domain holds. Asked of a hand-kept list it would only check that two copies match; asked of the domain it checks that the document is true |
+
 ## Unauthenticated surfaces
 
 The application serves no documentation of its own, leaving **no unauthenticated
@@ -179,6 +185,17 @@ refuse an absurd request rather than to cut a page.
 | What makes it correct | The ceiling is above anything the list can hold, so nobody is looking at a page |
 | What ends it | The list growing past the ceiling on a real deployment. It gains an offset then, and the screen gains the control to use it |
 
+Four of them had outgrown it and gained the offset: what is running out of
+time, what is approaching disclosure, the extensions waiting for a second
+person, and the deferrals that keep repeating. Each grows with the estate, and
+each now answers with a total as well — a caller holding a full page cannot
+otherwise tell a clipped page from the whole list, and two screens were
+printing the length of their own page as the figure.
+
+The three that keep a limit alone are the pickers: who holds something, who may
+be mentioned, and what sits at the top of one build's tree. Each is a list
+somebody scrolls once.
+
 The bound is stated twice:
 
 | Layer | Behavior | Reason |
@@ -223,6 +240,9 @@ a query string becomes part of the statement.
 | The direction is one of two words written here | Not a word that arrived |
 | A key that misses answers in the list's own order | An unknown sort is a mistake about a list, not a reason not to show it |
 | The issue table is joined only where the chosen order needs it | The ordinary page still reads one covering index |
+| A narrowing that cannot be applied answers nothing, never everything | "Assigned to me" from a credential that holds no party names nobody, and dropping the condition handed the caller every finding there is while the screen went on showing the filter as on. A filter asking for a set nothing is in answers with nothing |
+| A filter with three answers is a word, not a flag | Origin is one: the screen offered "Scanner" and could only send the absence of "entered by hand", so choosing it filtered nothing |
+| A repeated value is one value | A set of one word sent twice read as "both kinds, so no narrowing", which silently put tags back into a list somebody had asked to see branches of |
 
 This also prevents a sort exposing a column the caller was never meant to order
 by.

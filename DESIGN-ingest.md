@@ -157,6 +157,7 @@ optional by requirement, so ingest cannot make it mandatory.
 |---|---|
 | Content is split across rows | A single value of tens of megabytes runs into a maximum packet size on two of the four engines, and that limit is server configuration rather than anything a client can discover. Bounded rows stay inside every default in circulation and let a document be read as a stream |
 | Every statement is bounded, not only the one carrying a document | One real image opens tens of thousands of graph rows and produces over three hundred thousand findings. Sent as one statement each, those are tens of megabytes of SQL, which two engines refuse outright and all four hold in memory |
+| A membership test over a long list is split and OR-ed | A condition cannot be issued in pieces the way a write can, and a subtree or the aliases of a build's dismissals is thousands of identifiers. Split, each piece stays inside what all four accept |
 | The hash is computed from the bytes as they are stored | A hash the sender supplied describes the file they meant to send |
 
 ## Retention
@@ -426,7 +427,7 @@ they fill in. A document that is valid and sparse is not a broken one.
 | Tolerated | Behavior |
 |---|---|
 | The document names no component of its own | What the scan was filed against stands in. The root is excluded from identity and expiry anyway |
-| A component states no version | Kept and counted. What it costs is matching, and it ships either way |
+| A component states no version | Kept and counted. What it costs is matching, and it ships either way. Counted once over the deduplicated inventory rather than as each statement is read: a document naming the same unversioned component in ten relationships describes one component that ships without a version, and where a second description does state one the count is asked about the combination, which is what is stored |
 | An edge names something the document never describes | Dropped and counted. The missing component is not invented |
 | An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
 | An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |

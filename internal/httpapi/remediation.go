@@ -123,11 +123,8 @@ func registerRemediation(api huma.API, in Ingest) {
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
 		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"How many deferrals make something worth listing. One is an ordinary judgment"`
 		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500"`
-	}) (*struct {
-		Body struct {
-			Items []RepeatBody `json:"items"`
-		}
-	}, error) {
+		Offset  int    `query:"offset" minimum:"0" doc:"Where in the list to start"`
+	}) (*listOutput[RepeatBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -147,16 +144,15 @@ func registerRemediation(api huma.API, in Ingest) {
 			}
 			productID = named.ID
 		}
-		rows, err := triage.NewStore(in.DB.DB).Repeats(ctx, subject, productID,
-			input.AtLeast, input.Limit)
+		rows, total, err := triage.NewStore(in.DB.DB).RepeatsPage(ctx, subject, productID,
+			input.AtLeast, input.Limit, input.Offset)
 		if err != nil {
 			return nil, refused(in.Logger, err, "cannot read what keeps being put off")
 		}
-		out := &struct {
-			Body struct {
-				Items []RepeatBody `json:"items"`
-			}
-		}{}
+		out := &listOutput[RepeatBody]{}
+		// How many there are in all, so a caller holding a full page can tell
+		// a clipped page from the whole list.
+		out.Body.Total = total
 		out.Body.Items = make([]RepeatBody, 0, len(rows))
 		for _, row := range rows {
 			item := RepeatBody{

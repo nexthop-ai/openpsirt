@@ -39,14 +39,8 @@ import (
 // risk rather than hiding it, and the queue exists to stop risk being hidden
 // unseen.
 func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int64, reasoning string) (*Revision, error) {
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
-
 	var written *Revision
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		var err error
 		written, err = within.revise(ctx, subject, claimID, reasoning)
 		return err
@@ -114,6 +108,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	// saying the old thing under a claim that read as agreed.
 	if _, err := s.db.NewUpdate().Model((*Approval)(nil)).
 		Set("withdrawn_at = ?", now).
+		Set("withdrawn_by = ?", subject.ID).
 		Where("claim_id = ?", claimID).
 		Where("withdrawn_at IS NULL").Exec(ctx); err != nil {
 		return nil, fmt.Errorf("withdraw the approvals on what was revised: %w", err)
@@ -162,15 +157,10 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 // No approval needed, for the same reason revising needs none: it puts risk
 // back on the table rather than taking it off.
 func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID int64) error {
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return fmt.Errorf("this store is already inside a transaction")
-	}
 	// Both writes or neither. Half of this leaves a claim reading as agreed to
 	// with every agreement marked withdrawn — which is the state the whole
 	// approval record exists to make impossible.
-	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	return s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		_, rows, err := within.claimRows(ctx, subject, claimID, mayDecide)
 		if err != nil {
 			return err
@@ -183,6 +173,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 		now := s.now().Truncate(time.Microsecond)
 		if _, err := tx.NewUpdate().Model((*Approval)(nil)).
 			Set("withdrawn_at = ?", now).
+			Set("withdrawn_by = ?", subject.ID).
 			Where("claim_id = ?", claimID).
 			Where("withdrawn_at IS NULL").Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw a claim: %w", err)
@@ -206,17 +197,13 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 // available at the same size. Hunting for what a bulk approval touched, one
 // row at a time, is not an undo anybody will actually use.
 func (s *Store) UndoBatch(ctx context.Context, subject access.Subject, batch string) (Undone, error) {
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return Undone{}, fmt.Errorf("this store is already inside a transaction")
-	}
 	var undone Undone
 	// Applied whole, and every read it decides from is inside it. Reading
 	// which decisions a batch covered and then writing outside that read lets
 	// a decision withdrawn in between be flipped back to waiting.
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		var err error
-		undone, err = (&Store{db: tx, now: s.now}).undoBatch(ctx, subject, batch)
+		undone, err = within.undoBatch(ctx, subject, batch)
 		return err
 	})
 	return undone, err
@@ -276,6 +263,22 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		return Undone{}, nil
 	}
 
+	// A claim this person reaches only part of is left alone whole.
+	//
+	// The agreement is recorded against the claim, so taking it back takes it
+	// back for every row — and keying the two writes on different units left
+	// the rows outside this person's reach standing as approved under an
+	// agreement the record says was withdrawn, which is the state the approval
+	// record exists to make impossible. Withdraw refuses a claim it cannot act
+	// on whole for the same reason.
+	claims, decisions, err := s.wholeClaims(ctx, decisions)
+	if err != nil {
+		return Undone{}, err
+	}
+	if len(claims) == 0 {
+		return Undone{}, nil
+	}
+
 	// Who proposed them, read inside the same transaction as the writes
 	// that follow and before them, because what is being reported is who
 	// wrote the claims this batch agreed to — which is a fact about the
@@ -287,9 +290,9 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 
 	if _, err := s.db.NewUpdate().Model((*Approval)(nil)).
 		Set("withdrawn_at = ?", now).
+		Set("withdrawn_by = ?", subject.ID).
 		Where("batch = ?", batch).Where("withdrawn_at IS NULL").
-		Where(`claim_id IN (SELECT claim_id FROM "decision" WHERE id IN (?))`,
-			bun.List(decisions)).Exec(ctx); err != nil {
+		Where("claim_id IN (?)", bun.List(claims)).Exec(ctx); err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
 	// Back to proposed rather than withdrawn: the claims still stand, it is
@@ -299,20 +302,73 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	// agreement, and undoing a batch is undoing that batch — sending a
 	// decision back to the queue while somebody's standing agreement to it is
 	// still recorded would discard an agreement nobody took back.
-	if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
+	res, err := s.db.NewUpdate().Model((*Decision)(nil)).
 		Set("state = ?", Proposed).
 		// Cleared here as well as on a revision. A claim sent back and then
 		// approved under a batch, with the batch later undone, was left
 		// proposed, needing approval, and in no queue at all — visible to
 		// nobody but whoever knew its identifier.
 		Set("sent_back_at = ?", nil).
-		Where("id IN (?)", bun.List(decisions)).
+		Where("de.claim_id IN (?)", bun.List(claims)).
 		Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "still" ` +
 			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
-		Exec(ctx); err != nil {
+		Exec(ctx)
+	if err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
-	return Undone{Rows: int64(len(decisions)), Told: told}, nil
+	// Counted from the write rather than from the candidates. The condition
+	// above excludes any decision another agreement still stands on, so the
+	// number of candidates is not what returned to waiting — which is what
+	// Rows says it is.
+	rows, err := database.Affected(res)
+	if err != nil {
+		return Undone{}, fmt.Errorf("undo an approval: %w", err)
+	}
+	return Undone{Rows: rows, Told: told}, nil
+}
+
+// wholeClaims keeps only the claims every one of whose rows is in reached, and
+// returns those claims and their rows.
+//
+// The set is read with no narrowing, because the question is not which rows
+// this person reaches but whether they reach the whole claim: a claim is one
+// action over many places whose rows need not agree about visibility, and the
+// agreement given to it is one row keyed on the claim.
+func (s *Store) wholeClaims(ctx context.Context, reached []int64) ([]int64, []int64, error) {
+	var rows []struct {
+		ID      int64 `bun:"id"`
+		ClaimID int64 `bun:"claim_id"`
+	}
+	if err := s.db.NewSelect().Model((*Decision)(nil)).
+		Column("id", "claim_id").
+		Where(`de.claim_id IN (SELECT "sibling".claim_id FROM "decision" AS "sibling"
+			WHERE "sibling".id IN (?))`, bun.List(reached)).
+		Scan(ctx, &rows); err != nil {
+		return nil, nil, fmt.Errorf("read what that approval covered: %w", err)
+	}
+	within := make(map[int64]bool, len(reached))
+	for _, id := range reached {
+		within[id] = true
+	}
+	partial := map[int64]bool{}
+	for _, row := range rows {
+		if !within[row.ID] {
+			partial[row.ClaimID] = true
+		}
+	}
+	claims, kept := make([]int64, 0, len(rows)), make([]int64, 0, len(rows))
+	seen := map[int64]bool{}
+	for _, row := range rows {
+		if partial[row.ClaimID] {
+			continue
+		}
+		if !seen[row.ClaimID] {
+			seen[row.ClaimID] = true
+			claims = append(claims, row.ClaimID)
+		}
+		kept = append(kept, row.ID)
+	}
+	return claims, kept, nil
 }
 
 // proposersOf gathers who wrote a set of decisions, one entry each.

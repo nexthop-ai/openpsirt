@@ -63,4 +63,14 @@ var (
 	// to complete. Short by intent: a picker showing two hundred names is one
 	// nobody reads.
 	APicker = Page{Most: 100, ByDefault: 25}
+	// AWholeDocument is a machine-readable document generated in one piece: a
+	// build's VEX statements, which a customer's own scanner reads.
+	//
+	// **It is a refusal rather than a page.** There is no second request for
+	// the rest, and a document that quietly stopped at the ceiling would say
+	// "nothing is claimed about this" by omission — which is the one thing a
+	// document of dismissals must never say. Large, because a build with a
+	// thousand agreed dismissals is the designed-for case and this has to be
+	// above anything real before it refuses.
+	AWholeDocument = Page{Most: 20000, ByDefault: 20000}
 )

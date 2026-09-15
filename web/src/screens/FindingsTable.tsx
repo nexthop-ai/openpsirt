@@ -60,6 +60,11 @@ function upstreamSays(state: string | undefined, fixedIn: string | undefined) {
       return { text: "declined", kind: "note" as const };
     case "none":
       return { text: "none yet", kind: "note" as const };
+    case "mixed":
+      // The row is an issue at a component across builds, and its places do
+      // not agree about what upstream did. Saying one of their answers would
+      // be a claim about the world nobody made.
+      return { text: "differs by build", kind: "note" as const };
     default:
       return { text: "—", kind: "faint" as const };
   }

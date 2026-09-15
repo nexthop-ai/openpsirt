@@ -63,9 +63,19 @@ func Working(kinds, support []string) Workable {
 // nothing and say why nowhere.
 func kept(words []string, allowed ...string) []string {
 	out := make([]string, 0, len(words))
+	seen := make(map[string]bool, len(words))
 	for _, word := range words {
+		// Each at most once. A repeated value — `?on=branch&on=branch` — made
+		// a set of two out of one word, and every reader here asks how many
+		// there are: two reads as "both kinds, so no narrowing", which
+		// silently put tags back into a list somebody had asked to see
+		// branches of.
+		if seen[word] {
+			continue
+		}
 		for _, ok := range allowed {
 			if word == ok {
+				seen[word] = true
 				out = append(out, word)
 			}
 		}

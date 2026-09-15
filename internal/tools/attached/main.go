@@ -138,6 +138,143 @@ func detached(path string, source []byte, declared map[string]bool) []string {
 		bad = append(bad, fmt.Sprintf("%s:%d: the comment above %s describes %s",
 			path, fset.Position(block.doc.Pos()).Line, strings.Join(block.names, ", "), named))
 	}
+	bad = append(bad, glued(path, fset, file, declared)...)
+	bad = append(bad, floating(path, fset, file, declared)...)
+	return bad
+}
+
+// glued reports a doc comment that is two blocks with no blank line between
+// them, so Go hands both to the second one's declaration.
+//
+// The shape a block left behind takes once somebody corrects its opening word
+// to match: the first paragraph documents something else and reads as this
+// declaration's, and godoc renders both under one name. It is found by the
+// declaration's own name opening a line that is not the first — the real doc
+// starting part way down means everything above it belongs to somebody else.
+func glued(path string, fset *token.FileSet, file *ast.File,
+	declared map[string]bool) []string {
+	var bad []string
+	for _, block := range documented(file) {
+		// Only where the block above is itself somebody's doc comment, which
+		// is what makes this two blocks rather than one. A run of constants
+		// introduced by a paragraph about the run is the ordinary shape here,
+		// and its opening names no symbol.
+		opening := strings.TrimSpace(strings.TrimPrefix(
+			strings.TrimSpace(block.doc.List[0].Text), "//"))
+		if head := opens.FindStringSubmatch(opening); head == nil || !declared[head[1]] {
+			continue
+		}
+		for i, line := range block.doc.List {
+			if i == 0 {
+				continue
+			}
+			// Only where the line before it ended something. A doc comment
+			// wraps, and a wrapped line beginning with the symbol's own name
+			// mid-sentence is ordinary prose — "the published\n// score where
+			// there is not" is not a second block.
+			before := strings.TrimSpace(strings.TrimPrefix(
+				strings.TrimSpace(block.doc.List[i-1].Text), "//"))
+			if before != "" && !strings.HasSuffix(before, ".") {
+				continue
+			}
+			text := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line.Text), "//"))
+			match := opens.FindStringSubmatch(text)
+			if match == nil || !slicesContains(block.names, match[1]) {
+				continue
+			}
+			bad = append(bad, fmt.Sprintf(
+				"%s:%d: the doc for %s starts part way down its own comment, so the block "+
+					"above it is somebody else's", path, fset.Position(line.Pos()).Line,
+				strings.Join(block.names, ", ")))
+			break
+		}
+	}
+	return bad
+}
+
+// floating reports a comment block at file scope that Go attaches to nothing.
+//
+// A block separated from the declaration it describes by another comment block
+// is not a doc comment at all: godoc shows it nowhere, and the declaration it
+// was written for has none. The block reads as documentation to anybody
+// looking at the file, which is why it survives file splits and insertions.
+//
+// Only blocks opening with a name the package declares are reported, for the
+// reason the check above reads only that: a paragraph of prose between two
+// declarations is an ordinary thing to write.
+func floating(path string, fset *token.FileSet, file *ast.File,
+	declared map[string]bool) []string {
+
+	// Every group the tree hands to something: a declaration, a struct field,
+	// an interface method. A field's comment is documentation of that field
+	// and is not floating, and reading only declaration docs made every one
+	// of them a report.
+	attached := map[*ast.CommentGroup]bool{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch n := node.(type) {
+		case *ast.Field:
+			attached[n.Doc], attached[n.Comment] = true, true
+		case *ast.FuncDecl:
+			attached[n.Doc] = true
+		case *ast.GenDecl:
+			attached[n.Doc] = true
+		case *ast.TypeSpec:
+			attached[n.Doc], attached[n.Comment] = true, true
+		case *ast.ValueSpec:
+			attached[n.Doc], attached[n.Comment] = true, true
+		case *ast.ImportSpec:
+			attached[n.Doc], attached[n.Comment] = true, true
+		}
+		return true
+	})
+	// Everything inside a function body, which is where an ordinary comment
+	// lives and where none of this applies.
+	var bodies []*ast.BlockStmt
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+			bodies = append(bodies, fn.Body)
+		}
+	}
+	inside := func(at token.Pos) bool {
+		for _, body := range bodies {
+			if at > body.Pos() && at < body.End() {
+				return true
+			}
+		}
+		return false
+	}
+
+	// A file header, which this tree writes as a block between the package
+	// clause and the imports. It belongs to the file rather than to any
+	// declaration, and it opens by naming what the file is about — which is
+	// usually a symbol the file declares. The imports are what tell it from a
+	// block left floating above a declaration: nothing is documented by a
+	// comment that an import list follows.
+	var header token.Pos
+	if len(file.Decls) > 0 {
+		if imports, ok := file.Decls[0].(*ast.GenDecl); ok && imports.Tok == token.IMPORT {
+			header = imports.Pos()
+		}
+	}
+
+	var bad []string
+	for _, group := range file.Comments {
+		if attached[group] || group == file.Doc || inside(group.Pos()) {
+			continue
+		}
+		if group.Pos() < header {
+			continue
+		}
+		first := strings.TrimSpace(strings.TrimPrefix(
+			strings.TrimSpace(group.List[0].Text), "//"))
+		match := opens.FindStringSubmatch(first)
+		if match == nil || !declared[match[1]] {
+			continue
+		}
+		bad = append(bad, fmt.Sprintf(
+			"%s:%d: the comment about %s is attached to nothing, so %s has none",
+			path, fset.Position(group.Pos()).Line, match[1], match[1]))
+	}
 	return bad
 }
 

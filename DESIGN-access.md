@@ -169,6 +169,14 @@ rather than checked at each route, because the leak is the *ordering*. The
 identifier carries no sequence, so the names cannot be walked or counted even
 before a route is asked.
 
+Nobody learns what a build ships either. The graph reads that take a component
+*name* refuse before resolving it, for the same reason and with a sharper edge:
+a name the build does not hold answered one way, a name it holds at two versions
+answered with every version and ecosystem it holds, and a name it holds once
+answered a third — so a subject who may not read findings in the product could
+read the build's inventory back one guess at a time, and the two-version answer
+handed over versions as well as names.
+
 ## Assignment
 
 Deciding who deals with something is a different act from deciding what it is, so
@@ -355,6 +363,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | The order is settled | The ordinal is one past the highest under ordinary isolation, so two rules created at the same moment take the same number. Ties break by identifier rather than letting two rules swap places between batches |
 | Writing a rule asks for the assigner right | Reading the rules asks only for triage, because knowing where work goes is part of working it |
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
+| A pattern naming most of a build is refused | A rule says where in the tree something sits, and a bare glob is not that. Refused when it is written and again at the preview, the way a rule matching nothing is refused: a rule that quietly applied to part of what it names is worse than one nobody could save. The subtree is one recursive walk per build rather than one per named component — it was tens of thousands of round trips inside one request, from a route anybody who may triage the product can reach |
 
 A rule matches without regard to capitals and asks the engine to fold. It is the
 one place that does: everywhere a person types a name it is normalized on the

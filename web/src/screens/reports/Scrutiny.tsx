@@ -22,6 +22,12 @@ const WINDOWS = [30, 90, 365] as const;
 // standing alone, and the table has to say which it is looking at.
 const DISMISSALS = new Set(["not-applicable", "wont-fix", "already-fixed"]);
 
+// How many rows each section carries. Sent rather than left to the server's
+// default, because the number has to be the one the notice below quotes: a
+// sheet saying "a section reached the limit" without saying what the limit was
+// is a sheet nobody can check, and this is a printed record.
+const SECTION = 100;
+
 // How much a second pair of eyes actually did.
 //
 // **Not a list of people who broke the rule.** The rule cannot be broken:
@@ -40,7 +46,7 @@ export function Scrutiny() {
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/approvals/scrutiny", {
-          params: { query: { days, ...(product ? { product } : {}) } },
+          params: { query: { days, limit: SECTION, ...(product ? { product } : {}) } },
         }),
       ),
   });
@@ -81,6 +87,20 @@ export function Scrutiny() {
               form only.
             </p>
           </section>
+
+          {/* Said, not implied. Every row below is an exception to the
+              two-person rule, and a ninety-day window can hold more of them
+              than one section carries — so a sheet that read as complete while
+              it was clipped would mislead exactly the reader it is for. */}
+          {got.data?.capped && (
+            <p className="alert" style={{ marginTop: 14 }}>
+              <strong>Not all of it.</strong>
+              <span>
+                A section reached {SECTION.toLocaleString()} rows. What follows is the worst of it,
+                not the whole of it. Narrow the window or the product to see a section whole.
+              </span>
+            </p>
+          )}
 
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>Risk standing on one person</h3>

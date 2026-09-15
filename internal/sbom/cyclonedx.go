@@ -247,9 +247,6 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	if described.UpstreamName == "" {
 		described.UpstreamName, described.UpstreamVersion = graph.UpstreamFromPurl(described.Purl)
 	}
-	if strings.TrimSpace(described.Version) == "" {
-		c.doc.Unversioned++
-	}
 	// A claim the pedigree carries is about the component it was read from,
 	// which is only fully known now: key order is the producer's business, so
 	// the patches may well have been read before the name they belong to.

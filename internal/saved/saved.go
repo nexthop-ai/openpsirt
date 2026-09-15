@@ -19,6 +19,8 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -114,8 +116,11 @@ var ErrNoSuchFilter = errors.New("you have kept no filter by that name")
 // worked out from the length whenever somebody submits it, so a rule saved in
 // March means "put this off for a quarter" rather than "until 3 March".
 func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int64,
-	name, query string, prepares Filter) (*Filter, error) {
+	name, query string, prepares Filter, cap int) (*Filter, error) {
 
+	if cap <= 0 {
+		cap = setting.DefaultSavedPerPerson
+	}
 	matched := strings.ToLower(strings.TrimSpace(name))
 	if matched == "" {
 		return nil, fmt.Errorf("a saved filter needs a name")
@@ -123,9 +128,30 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 	prepares.Outcome = strings.TrimSpace(prepares.Outcome)
 	prepares.Justification = strings.TrimSpace(prepares.Justification)
 	prepares.Reasoning = strings.TrimSpace(prepares.Reasoning)
+	// The same policy every other typed field goes through, run before the
+	// text is stored rather than when it is read back. What is saved here
+	// prefills a claim, so text the decision store refuses saved cleanly and
+	// was refused when somebody pressed the button it filled in.
+	if err := markdown.Check(prepares.Reasoning); err != nil {
+		return nil, err
+	}
 	if prepares.Prepares() && prepares.Reasoning == "" {
 		return nil, fmt.Errorf("a filter that prepares a claim has to carry the reasoning " +
 			"somebody will be proposing, because they are the one putting their name to it")
+	}
+	if prepares.Prepares() {
+		// The submission rules, called rather than restated. A prefill the
+		// decision store refuses is a refusal that lands when somebody
+		// presses the button rather than when they saved the thing that
+		// fills it in — and a filter carries no mitigation text, so the one
+		// reason that asks for it cannot be prepared at all.
+		if !triage.Outcome(prepares.Outcome).Valid() {
+			return nil, fmt.Errorf("%q is not an outcome", prepares.Outcome)
+		}
+		if err := triage.Reasons(triage.Outcome(prepares.Outcome),
+			triage.Justification(prepares.Justification), ""); err != nil {
+			return nil, err
+		}
 	}
 	// The length is required where the outcome is a deferral, and refused
 	// beside any other outcome — the same answer a decision itself gives to a
@@ -188,6 +214,19 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 				Where("name = ?", matched).
 				Limit(1).Scan(ctx)
 		}
+		// Counted inside the same transaction as the write it bounds, and
+		// only on the path that adds a row: replacing one of your own is not
+		// how a table fills up.
+		held, err := db.NewSelect().Model((*Filter)(nil)).
+			Where("person_id = ?", personID).Where("product_id = ?", productID).
+			Count(ctx)
+		if err != nil {
+			return err
+		}
+		if held >= cap {
+			return fmt.Errorf("you are keeping %d filters for this product, which is the "+
+				"limit: forget one before keeping another", held)
+		}
 		_, err = db.NewInsert().Model(kept).Exec(ctx)
 		return err
 	}
@@ -204,12 +243,18 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 // usually exist in no other, so offering it elsewhere offers something that
 // matches nothing and says nothing about why — and picking it replaces what is
 // on screen with a narrowing built for somewhere else.
-func (s *Store) SavedFilters(ctx context.Context, personID, productID int64) ([]Filter, error) {
+func (s *Store) SavedFilters(ctx context.Context, personID, productID int64, cap int) ([]Filter, error) {
+	if cap <= 0 {
+		cap = setting.DefaultSavedPerPerson
+	}
 	var kept []Filter
+	// Bounded by the same number the write is. A read with no ceiling is what
+	// made the row count matter: the panel drew every row it found, on every
+	// open.
 	if err := s.db.NewSelect().Model(&kept).
 		Where("person_id = ?", personID).
 		Where("product_id = ?", productID).
-		Order("name").Scan(ctx); err != nil {
+		Order("name").Limit(cap).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what you have kept: %w", err)
 	}
 	return kept, nil

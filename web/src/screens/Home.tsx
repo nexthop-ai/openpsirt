@@ -683,12 +683,28 @@ function Lapsed() {
   // of it.
   const at = useScope();
   const product = at.product ? { product: at.product } : {};
+  // Lapsed and expired asked as one question rather than as two lists added
+  // together. A deferral that ran out on code that then moved is in both, so
+  // the sum is larger than the thing it labels — the tally said eleven over a
+  // queue of ten, on the screen people check first.
+  const stopped = useQuery({
+    queryKey: ["home", "stopped", product],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/decisions", {
+          params: { query: { stopped: true, limit: 3, ...product } },
+        }),
+      ),
+  });
+  // The two halves, for the two lines that name them. Their totals overlap and
+  // are never added: each says how many of its own kind there are, and the
+  // figure over the panel comes from the query above.
   const lapsed = useQuery({
     queryKey: ["home", "lapsed", product],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/decisions", {
-          params: { query: { state: "lapsed", limit: 3, ...product } },
+          params: { query: { state: "lapsed", limit: 1, ...product } },
         }),
       ),
   });
@@ -697,49 +713,55 @@ function Lapsed() {
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/decisions", {
-          params: { query: { expired: true, limit: 3, ...product } },
+          params: { query: { expired: true, limit: 1, ...product } },
         }),
       ),
   });
 
-  // The same two with the scope taken off, so the panel can say what the
+  // The same question with the scope taken off, so the panel can say what the
   // product costs. Decisions narrow by product and no finer, so a stream or a
   // variant in the scope changes nothing here.
-  const everywhereLapsed = useQuery({
-    queryKey: ["home", "lapsed", "all"],
+  const everywhere = useQuery({
+    queryKey: ["home", "stopped", "all"],
     enabled: !!at.product,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions", { params: { query: { state: "lapsed", limit: 1 } } })),
-  });
-  const everywhereExpired = useQuery({
-    queryKey: ["home", "expired", "all"],
-    enabled: !!at.product,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions", { params: { query: { expired: true, limit: 1 } } })),
+      unwrap(await api.GET("/v1/decisions", { params: { query: { stopped: true, limit: 1 } } })),
   });
 
+  const stoppedTotal = stopped.data?.total ?? 0;
   const lapsedTotal = lapsed.data?.total ?? 0;
   const expiredTotal = expired.data?.total ?? 0;
-  const allTotal = (everywhereLapsed.data?.total ?? 0) + (everywhereExpired.data?.total ?? 0);
+  const allTotal = everywhere.data?.total ?? 0;
   // A read that did not happen is not a count of nothing. Falling through, the
   // panel stated "Nothing has lapsed" over a failed read and the tally beside
   // the heading drew a confident zero — which is the defect this whole change
   // is about, on the busiest screen there is.
-  const unread = lapsed.isError || expired.isError;
+  const unread = stopped.isError || lapsed.isError || expired.isError;
 
   return (
     <div className="panel">
       <header>
         <h3>Lapsed decisions</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {at.product ? `${allTotal.toLocaleString()} all products` : "all products"}
+          {at.product
+            ? // The one read in this panel that is not part of `unread`,
+              // because it answers a different question and a scope with no
+              // product never makes it. A failed read of it drew a confident
+              // "0 all products" beside a tally that correctly read "—".
+              everywhere.isError
+              ? "— all products"
+              : `${allTotal.toLocaleString()} all products`
+            : "all products"}
         </span>
-        <span className={!unread && lapsedTotal + expiredTotal > 0 ? "tally urgent" : "tally"}>
-          {unread ? "—" : (lapsedTotal + expiredTotal).toLocaleString()}
+        <span className={!unread && stoppedTotal > 0 ? "tally urgent" : "tally"}>
+          {unread ? "—" : stoppedTotal.toLocaleString()}
         </span>
       </header>
       {unread && (
-        <Failed error={lapsed.error ?? expired.error} what="Lapsed decisions could not be read." />
+        <Failed
+          error={stopped.error ?? lapsed.error ?? expired.error}
+          what="Lapsed decisions could not be read."
+        />
       )}
       {!unread && lapsedTotal > 0 && (
         <div className="alert">
@@ -757,9 +779,7 @@ function Lapsed() {
           <span>The date they were put off until has passed.</span>
         </div>
       )}
-      {!unread && lapsedTotal + expiredTotal === 0 && (
-        <p className="reading">Nothing has lapsed.</p>
-      )}
+      {!unread && stoppedTotal === 0 && <p className="reading">Nothing has lapsed.</p>}
       <footer>
         <Link to="/review-queue#lapsed" className="linkish">
           View →

@@ -6,6 +6,7 @@ import { api, type Body } from "../api/client";
 type AssessmentRow = Body<"AssessmentBody">;
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
 
 // The two things waiting for a second person that are not claims.
@@ -15,6 +16,23 @@ import { Severity } from "../ui/Severity";
 // all — and neither is a claim about code, so neither shares the card, the
 // selection or the batch that the claims use. They are here together because
 // what they have in common is exactly that.
+
+// said is how many there are, or the page length where the server reported no
+// total.
+//
+// A page length printed bare is a count of the page rather than of the list,
+// and the reader has no way to tell which they are looking at — so where the
+// figure is the page's, the pager under the section is what says so. Both
+// routes here do report a total; the fallback is for a response that somehow
+// carries none, and it is never the whole story on its own.
+function said(shown: number, total?: number): string {
+  if (total != null && total > 0) return total.toLocaleString();
+  return shown.toLocaleString();
+}
+
+// How many rows one request of either section carries, matching what the queue
+// asks for. Named here so the pager and the request cannot disagree.
+export const PENDING_PAGE = 50;
 
 // Embargo extensions waiting for a second person.
 //
@@ -26,7 +44,26 @@ import { Severity } from "../ui/Severity";
 // asked may not be the one who agrees, which is the control the threshold
 // exists to reach; hiding it would leave somebody hunting for what is holding
 // their case up.
-export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[] }) {
+export function Embargoes({
+  waiting,
+  total,
+  offset = 0,
+  onGo,
+  error,
+}: {
+  waiting: Body<"PendingExtensionBody">[];
+  // How many are waiting in all. The page length was printed as the figure,
+  // so the fifty-first request was not in the number and nothing said so.
+  total?: number;
+  // Where in the list this page starts, and how to move. Without them the
+  // heading said the real total over fifty rows and the fifty-first was
+  // counted and unreachable.
+  offset?: number;
+  onGo?: (offset: number) => void;
+  // A failed read, so the section says so rather than drawing nothing. Absent
+  // and empty look identical, and empty is the ordinary state here.
+  error?: unknown;
+}) {
   const queries = useQueryClient();
   const agree = useMutation({
     mutationFn: async (id: number) =>
@@ -36,6 +73,13 @@ export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[]
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["extensions"] }),
   });
 
+  if (error != null) {
+    return (
+      <div style={{ marginTop: 22 }}>
+        <Failed error={error} what="Extension requests could not be read." />
+      </div>
+    );
+  }
   if (waiting.length === 0) return null;
 
   return (
@@ -43,9 +87,9 @@ export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[]
       <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
         <h2>Extension requests</h2>
         <p>
-          {waiting.length.toLocaleString()} · somebody has asked to keep something hidden longer
-          than this deployment allows on one person&rsquo;s word. Reaching the date discloses
-          nothing by itself; what is being agreed to is how long it stays hidden.
+          {said(waiting.length, total)} · somebody has asked to keep something hidden longer than
+          this deployment allows on one person&rsquo;s word. Reaching the date discloses nothing by
+          itself; what is being agreed to is how long it stays hidden.
         </p>
       </div>
       {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
@@ -85,6 +129,13 @@ export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[]
           </div>
         ))}
       </div>
+      <Paged
+        shown={waiting.length}
+        total={total}
+        offset={offset}
+        limit={PENDING_PAGE}
+        onGo={onGo}
+      />
     </>
   );
 }
@@ -107,7 +158,19 @@ export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[]
 // products may rate the same issue differently. A row saying only "CVE-… low"
 // is a word an approver cannot act on: what they are agreeing to is a deadline
 // and a triage line in one named place.
-export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
+export function Ratings({
+  waiting,
+  total,
+  offset = 0,
+  onGo,
+  error,
+}: {
+  waiting: AssessmentRow[];
+  total?: number;
+  offset?: number;
+  onGo?: (offset: number) => void;
+  error?: unknown;
+}) {
   const queries = useQueryClient();
   const agree = useMutation({
     mutationFn: async (id: number) =>
@@ -115,6 +178,13 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["queue"] }),
   });
 
+  if (error != null) {
+    return (
+      <div style={{ marginTop: 22 }}>
+        <Failed error={error} what="Ratings awaiting approval could not be read." />
+      </div>
+    );
+  }
   if (waiting.length === 0) return null;
 
   return (
@@ -122,8 +192,8 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
       <div className="screen-head" id="ratings" style={{ marginTop: 22 }}>
         <h2>Ratings awaiting approval</h2>
         <p>
-          {waiting.length.toLocaleString()} · somebody says an issue is milder than the world does.
-          A rating holds in every build of the product it was made for, so it waits for a second
+          {said(waiting.length, total)} · somebody says an issue is milder than the world does. A
+          rating holds in every build of the product it was made for, so it waits for a second
           person.
         </p>
       </div>
@@ -186,6 +256,13 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
           </div>
         ))}
       </div>
+      <Paged
+        shown={waiting.length}
+        total={total}
+        offset={offset}
+        limit={PENDING_PAGE}
+        onGo={onGo}
+      />
     </>
   );
 }

@@ -163,6 +163,16 @@ const (
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
 	RoutingBatch = "routing.batch"
+	// SavedPerPerson is how many filters one person may keep for one
+	// product.
+	//
+	// A ceiling on rows one person writes one at a time, which is the
+	// neighbouring case to a bulk write and is bounded for the same reason:
+	// nothing else stopped a script, or a keyboard shortcut held down, from
+	// filling the table — and the panel that lists them reads every row it
+	// finds on every open. Settable because how many narrowings a person
+	// genuinely keeps is a judgment about how they work.
+	SavedPerPerson = "saved.max-per-person"
 	// AttachmentShare is how much of that one person may hold, in bytes.
 	//
 	// The deployment-wide quota bounds the store and nothing bounded any
@@ -245,6 +255,15 @@ const (
 // write is something somebody triggers by accident, not because two thousand
 // is a suspicious number.
 const DefaultRoutingBatch = 2000
+
+// DefaultSavedPerPerson is how many filters one person may keep for one
+// product where nobody has said.
+//
+// A hundred: past anything somebody curates by hand, and low enough that a
+// list of them is still a list. The bound is there because an unbounded number
+// of rows one person can write is a table nobody meant to fill, not because a
+// hundred is a suspicious number.
+const DefaultSavedPerPerson = 100
 
 // DefaultQueueBacklog is how much work of one kind may wait where nobody has
 // said.

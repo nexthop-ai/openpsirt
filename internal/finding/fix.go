@@ -78,9 +78,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	// paths that drift.
 	remove := db.NewDelete().Model((*Upgrade)(nil)).
 		Where("fold_key = ?", fold).
-		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE st.product_id = ?)`, productID)
+		Where(inThisProduct, productID)
 	if len(wanted) > 0 {
 		remove = remove.Where("target_id NOT IN (?)", bun.List(wanted))
 	}
@@ -99,9 +97,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		TableExpr(`"upgrade" AS "ug"`).
 		ColumnExpr("ug.target_id").
 		Where("ug.fold_key = ?", fold).
-		Where(`ug.target_id IN (SELECT tg.id FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE st.product_id = ?)`, productID).
+		Where(inThisProductAs("ug.target_id"), productID).
 		Scan(ctx, &already); err != nil {
 		return 0, fmt.Errorf("read what is already committed: %w", err)
 	}

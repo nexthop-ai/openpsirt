@@ -74,94 +74,15 @@ type Match struct {
 //
 // What is skipped is the decision itself: the rows in this build at the very
 // versions being decided are what `at.Places` already counts.
-func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Deciding, hereTargetID int64) (Reach, error) {
-	// Asked about the issue rather than about the product, as every other
-	// read of one finding is (place.go, detail.go, vex.go): a collaborator was
-	// brought into one case and reads that case wherever it sits, and the
-	// question here is how far a decision about that case reaches. Asked of
-	// the product alone this refused them, and the route answers a refusal
-	// from here as a fault rather than as a refusal.
-	if !access.SeesOn(subject, at.ProductID, at.VulnerabilityID) {
-		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
-	}
-	visible := access.VisibleOn(subject, at.ProductID, at.VulnerabilityID)
-	if len(visible) == 0 {
-		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
-	}
+//
+// One place, answered by the read that takes many. The two were the same
+// statement written out twice, differing by a column, a predicate and a group
+// term — and only the many-place side had any coverage, so the one a route
+// calls was the untested copy.
+func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Deciding,
+	hereTargetID int64) (Reach, error) {
 
-	var rows []struct {
-		TargetID          int64  `bun:"target_id"`
-		Stream            string `bun:"stream"`
-		Variant           string `bun:"variant"`
-		Version           string `bun:"version"`
-		ComponentUpstream string `bun:"component_upstream"`
-		ConsumerUpstream  string `bun:"consumer_upstream"`
-		Places            int    `bun:"places"`
-	}
-	err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
-		ColumnExpr(`c.version AS "version"`).
-		// The same expressions the decision is keyed on (place.go). Read raw,
-		// the column is empty for everything that is not a patched fork, so
-		// every other build read as "differing" from one whose key had
-		// fallen back to the shipped version — including builds at the very
-		// same version, which the decision already reached by lookup.
-		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
-		// Exactly the grouped expression, not wrapped once more: MySQL's
-		// only_full_group_by matches a selected expression to a grouped one by
-		// text, and the expression already answers '' for no consumer.
-		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
-		ColumnExpr(`COUNT(*) AS "places"`).
-		Where("st.product_id = ?", at.ProductID).
-		Where("f.vulnerability_id = ?", at.VulnerabilityID).
-		Where("f.place_identity = ?", at.PlaceIdentity).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.target_id, st.display_name, va.display_name, c.version, "+
-			ComponentUpstreamExpr+", "+ConsumerUpstreamExpr).
-		OrderExpr("st.display_name, va.display_name, c.version").
-		Scan(ctx, &rows)
-	if err != nil {
-		return Reach{}, fmt.Errorf("look for the same issue elsewhere: %w", err)
-	}
-
-	reach := Reach{Here: at.Places}
-	for _, row := range rows {
-		match := Match{
-			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant, Version: row.Version,
-			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
-			Places: row.Places,
-			// Whether it is somewhere else or right here. A screen leads with
-			// the version, because that is what differs, and says where as an
-			// aside — but it still has to be able to say "here".
-			Here: row.TargetID == hereTargetID,
-		}
-		matches := row.ComponentUpstream == at.ComponentUpstream &&
-			row.ConsumerUpstream == at.ConsumerUpstream
-		if matches {
-			// In this build at these versions, this *is* what is being
-			// decided: at.Places already counts it, and listing it as
-			// somewhere the judgment travels to would count it twice.
-			if match.Here {
-				continue
-			}
-			// Elsewhere at these versions the decision reaches it by matching,
-			// so there is nothing to agree to — but somebody deciding should
-			// still be told, because it is how far their judgment travels.
-			reach.Automatic = append(reach.Automatic, match)
-			continue
-		}
-		reach.Differing = append(reach.Differing, match)
-	}
-	return reach, nil
+	return s.ReachingAcross(ctx, subject, []Deciding{at}, hereTargetID)
 }
 
 // ReachingAcross is Reaching for every place of one finding at once.

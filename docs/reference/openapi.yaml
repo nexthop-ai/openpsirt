@@ -315,6 +315,7 @@ components:
           type: string
         reasoning:
           description: Why. It outlives the version it was made about, so the next person needs the argument
+          maxLength: 65536
           minLength: 1
           type: string
         severity:
@@ -1536,6 +1537,12 @@ components:
           type: string
         justification:
           description: Required when it does not apply
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         outcome:
           enum:
@@ -1929,6 +1936,12 @@ components:
         due:
           type: string
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         met:
           description: Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question
@@ -1936,6 +1949,14 @@ components:
         opened:
           type: string
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         place:
           description: Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half
@@ -2019,8 +2040,22 @@ components:
           description: The package version the claim says the fix arrived in, where it claims one has
           type: string
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         proposed_at:
           type: string
@@ -2436,6 +2471,7 @@ components:
           type: string
         reason:
           description: Why it is being extended
+          maxLength: 65536
           minLength: 1
           type: string
         until:
@@ -2908,6 +2944,14 @@ components:
           format: int64
           type: integer
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
       required:
         - claim_id
@@ -3095,6 +3139,14 @@ components:
           description: What the new line has
           type: string
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         reasoning:
           description: The old words, to start from rather than start without
@@ -3291,6 +3343,12 @@ components:
           type: string
         justification:
           description: The recognized reason it does not apply
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         mitigation:
           description: What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks
@@ -3395,6 +3453,14 @@ components:
           format: int64
           type: integer
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         product:
           type: string
@@ -3630,25 +3696,6 @@ components:
         - total
         - findings
         - cap
-      type: object
-    List-repeated-deferralsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-repeated-deferralsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/RepeatBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
       type: object
     List-unassignedResponse:
       additionalProperties: false
@@ -4192,6 +4239,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/ReleaseBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyRepeatBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyRepeatBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/RepeatBody"
           type:
             - array
             - "null"
@@ -5440,6 +5509,12 @@ components:
           type: integer
         justification:
           description: The recognized reason it does not apply, where the outcome takes one
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         outcome:
           description: What it offers to say
@@ -6515,6 +6590,9 @@ components:
           type:
             - array
             - "null"
+        capped:
+          description: A section reached the limit, so this is the worst of it rather than all of it
+          type: boolean
         days:
           description: How far back this looked
           format: int64
@@ -6827,6 +6905,12 @@ components:
           format: int64
           type: integer
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         reasoning:
           type: string
@@ -6992,6 +7076,12 @@ components:
           description: The package version the claim says the fix arrived in, where it claims one has
           type: string
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         kind:
           enum:
@@ -7003,6 +7093,14 @@ components:
         needs_approval:
           type: boolean
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         places:
           description: How many of this finding's places the claim covers
@@ -8036,6 +8134,17 @@ paths:
             description: How far back to look, by when a claim was proposed
             format: int64
             maximum: 3650
+            minimum: 1
+            type: integer
+        - description: How many rows each section carries at most. capped says a section reached it
+          explode: false
+          in: query
+          name: limit
+          schema:
+            default: 100
+            description: How many rows each section carries at most. capped says a section reached it
+            format: int64
+            maximum: 500
             minimum: 1
             type: integer
       responses:
@@ -9215,6 +9324,8 @@ paths:
 
         Set `expired=true` to list deferrals whose date has passed — the findings that have come back and need judging again.
 
+        Set `stopped=true` for everything that has stopped standing — lapsed decisions and expired deferrals as one list. A decision can be both, so asking the two separately and adding the totals counts some of them twice.
+
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-decisions
       parameters:
@@ -9258,6 +9369,13 @@ paths:
           name: expired
           schema:
             description: Only deferrals whose date has passed
+            type: boolean
+        - description: Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up
+          explode: false
+          in: query
+          name: stopped
+          schema:
+            description: Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up
             type: boolean
         - explode: false
           in: query
@@ -9368,12 +9486,21 @@ paths:
             maximum: 500
             minimum: 1
             type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
+            type: integer
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-repeated-deferralsResponse"
+                $ref: "#/components/schemas/ListBodyRepeatBody"
           description: OK
         default:
           content:
@@ -9442,6 +9569,15 @@ paths:
             maximum: 500
             minimum: 1
             type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
+            type: integer
       responses:
         "200":
           content:
@@ -9487,6 +9623,15 @@ paths:
             format: int64
             maximum: 200
             minimum: 1
+            type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
             type: integer
       responses:
         "200":
@@ -9650,6 +9795,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -9858,13 +10004,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -10072,6 +10221,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -10280,13 +10430,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -11953,6 +12106,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -12161,13 +12315,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -12452,6 +12609,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -12660,13 +12818,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -12875,6 +13036,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -13083,13 +13245,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -13324,6 +13489,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -13532,13 +13698,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -17731,6 +17900,15 @@ paths:
             format: int64
             maximum: 200
             minimum: 1
+            type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
             type: integer
       responses:
         "200":

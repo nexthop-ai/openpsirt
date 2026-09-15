@@ -313,6 +313,51 @@ func TestAComponentWithoutAVersionIsKeptAndCounted(t *testing.T) {
 	}
 }
 
+func TestOneComponentNamedTwiceStatesNoVersionOnce(t *testing.T) {
+	// The count is over what shipped, not over how many times the producer
+	// mentioned it. A document that names the same unversioned component in
+	// two entries describes one component with no version, and counting as
+	// each entry was read reported two — a figure that moved with the
+	// producer's verbosity rather than with the inventory.
+	doc := read(t, strings.Replace(minimal,
+		`{"bom-ref": "a", "name": "libc", "version": "2.41", "purl": "pkg:deb/debian/libc6@2.41"}`,
+		`{"bom-ref": "a", "name": "libc", "purl": "pkg:deb/debian/libc6"},
+		 {"bom-ref": "b", "name": "libc", "purl": "pkg:deb/debian/libc6"}`, 1))
+	if len(doc.Components) != 1 {
+		t.Fatalf("read %d components, want the one they both describe", len(doc.Components))
+	}
+	if doc.Unversioned != 1 {
+		t.Errorf("%d components state no version, want 1", doc.Unversioned)
+	}
+}
+
+func TestAVersionStatedByTheSecondEntryTakesTheComponentOffTheCount(t *testing.T) {
+	// Two descriptions of one component are combined, so what the count is
+	// asked about is the combination. Counting as each entry was read answered
+	// about the first description alone, and reported a component as stating
+	// no version when the document did state one.
+	doc := read(t, strings.Replace(minimal,
+		`{"bom-ref": "a", "name": "libc", "version": "2.41", "purl": "pkg:deb/debian/libc6@2.41"}`,
+		`{"bom-ref": "a", "name": "libc", "purl": "pkg:deb/debian/libc6"},
+		 {"bom-ref": "b", "name": "libc", "version": "2.41", "purl": "pkg:deb/debian/libc6"}`, 1))
+	if doc.Unversioned != 0 {
+		t.Errorf("%d components state no version, want 0 — the document stated one", doc.Unversioned)
+	}
+}
+
+func TestARootWithoutAVersionIsNotCountedAsUnversioned(t *testing.T) {
+	// The root is not in Components and is excluded from matching on purpose:
+	// its version changes on every build and its name differs per variant. A
+	// count of what cannot be matched against a vulnerability database should
+	// not move because the producer left the build's own version off.
+	doc := read(t, strings.Replace(minimal,
+		`{"bom-ref": "root", "name": "product", "version": "1.0"}`,
+		`{"bom-ref": "root", "name": "product"}`, 1))
+	if doc.Unversioned != 0 {
+		t.Errorf("%d components state no version, want 0 — only the root did", doc.Unversioned)
+	}
+}
+
 func TestAComponentWithoutANameIsRefused(t *testing.T) {
 	// Nothing can identify it, so nothing can track it.
 	why := refuses(t, strings.Replace(minimal, `"name": "libc", `, "", 1))

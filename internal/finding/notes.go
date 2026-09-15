@@ -130,8 +130,11 @@ func omitted(n int) string {
 func onlyFixes(rows []Changed) []Changed {
 	var fixed []Changed
 	for _, row := range rows {
-		switch row.Because {
-		case Invalid, Superseded, Unexplained:
+		// An allow-list rather than three named exclusions, and the same list
+		// the remediation rate counts: a closure added later is not a fix on
+		// either surface until somebody says it is, rather than progress on
+		// one and churn on the other.
+		if !row.Because.Resolves() {
 			continue
 		}
 		fixed = append(fixed, row)
@@ -191,6 +194,10 @@ func how(row Changed) string {
 }
 
 // fixedBecause says how something was fixed, in the words a reader needs.
+//
+// Every closure in Resolving has a sentence here, which is what keeps a
+// release note from carrying a line with nothing after it. A table test over
+// Resolving is what holds that.
 func fixedBecause(because Closure) string {
 	switch because {
 	case Upgraded:
