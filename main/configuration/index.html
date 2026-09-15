@@ -592,6 +592,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#reading-what-the-scanner-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading what the scanner reported
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -874,6 +885,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#reading-what-the-scanner-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading what the scanner reported
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1057,6 +1079,11 @@ or a <code>sslmode</code> of your own reaches the driver as written.</p>
 <td>unset</td>
 </tr>
 <tr>
+<td><code>OPENPSIRT_SCANNER_TIMEOUT</code></td>
+<td>How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below the two hours a worker may hold one job for, and the process refuses to start where it does not</td>
+<td><code>30m</code></td>
+</tr>
+<tr>
 <td><code>GRYPE_DB_CACHE_DIR</code></td>
 <td>Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written</td>
 <td><code>/var/cache/openpsirt/grype</code></td>
@@ -1109,7 +1136,7 @@ refused over a connection the server would not secure with STARTTLS.</p>
 <tbody>
 <tr>
 <td><code>OPENPSIRT_MAIL_FROM</code></td>
-<td>The address messages are sent as. Set it and the server together, or neither</td>
+<td>The address messages are sent as. Set it and the server together, or neither: half of the pair is refused at startup, because a server with nobody to send as sends nothing and would say nothing about it</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -1164,7 +1191,7 @@ validation after you have sent it.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_PUBLISHER_CATEGORY</code></td>
-<td>What the standard calls the kind of publisher. A deployment publishing about its own product is a vendor</td>
+<td>What the standard calls the kind of publisher: <code>coordinator</code>, <code>discoverer</code>, <code>other</code>, <code>translator</code>, <code>user</code> or <code>vendor</code>. A deployment publishing about its own product is a vendor. Anything else is refused at startup — the value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them</td>
 <td><code>vendor</code></td>
 </tr>
 </tbody>
@@ -1527,6 +1554,50 @@ the container's memory limit with them.</p>
 <td><code>OPENPSIRT_INGEST_MAX_DEPTH</code></td>
 <td>How deeply it may nest</td>
 <td>64</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_DOCUMENTS</code></td>
+<td>How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<h2 id="reading-what-the-scanner-reported">Reading what the scanner reported<a class="headerlink" href="#reading-what-the-scanner-reported" title="Permanent link">&para;</a></h2>
+<p>The scanner's report is read in the same process, and its size is components ×
+matches × references — the first of which a producer controls by uploading a
+scan file. So it is bounded the way a scan file is, from the same budget, and
+each bound left unset keeps the built-in value.</p>
+<p>A report past its ceiling fails the run rather than being read in part: half a
+report reads as a product that stopped having problems. Complaints past theirs
+are dropped instead, because a scanner with a lot to say still scanned.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_OUTPUT</code></td>
+<td>How large one report may be. The load-bearing bound: every count below is bounded by it</td>
+<td>256 MB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_COMPLAINT</code></td>
+<td>How much of what a scanner said while running is kept</td>
+<td>1 MB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_MATCHES</code></td>
+<td>How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that</td>
+<td>500,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_REFERENCES</code></td>
+<td>How many addresses one match may point at. Bounded separately because the two multiply</td>
+<td>1,000</td>
 </tr>
 </tbody>
 </table>
