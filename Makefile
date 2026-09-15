@@ -1080,7 +1080,7 @@ else
 	helm template t deploy/helm/openpsirt --set database.existingSecret=s \
 	  --set auth.bootstrapAdmins='{admin}' --set auth.baseURL=https://psirt.example.com \
 	  --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc \
-	  --set auth.oidc.clientSecret=shh >/dev/null
+	  --set auth.oidc.clientSecret=shh --set auth.oidc.usernameClaim=sub >/dev/null
 	# An install that cannot reach a login is not an install, and mail that is
 	# half configured is mail nobody gets. Each of these refuses at template
 	# time rather than producing a deployment that starts, fails its own
