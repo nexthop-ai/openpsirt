@@ -299,6 +299,11 @@ on them. Saying which releases the work is meant to reach is done to the work.
 
 ## Publication
 
+**Not built, apart from the document.** A CSAF document is generated and
+reachable at the advisory routes; nothing sends it anywhere. The rules below are
+what publication would be, kept here because the document they are about exists
+and the shape it would be published in is what makes its content right.
+
 Publication covers a vulnerability in this deployment's own product. A known CVE
 in a shipped third-party component is dependency hygiene a consumer reads out of
 the inventory.
@@ -399,6 +404,10 @@ The tracker hand-off (REQ-36). What exists is the link somebody typed, stored
 and never fetched; what is missing is opening or updating an item in the system
 it points at. The signed outbound request is built and is described in
 `DESIGN-notifications.md`.
+
+Every adapter that would send an advisory somewhere, which is the whole of
+Publication above. The CSAF document is generated and served; no destination,
+no adapter and no route to one exists.
 
 ## Limits
 

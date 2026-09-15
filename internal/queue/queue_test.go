@@ -36,7 +36,24 @@ func TestWorkIsHandedOutOnce(t *testing.T) {
 	// The reason this package has engine-specific SQL in it. Two workers
 	// reading the same row and both updating it means the same scan ingested
 	// twice — and on a duplicate ingest that would look like real change.
+	//
+	// Run a second time with the row locking removed, because the design says
+	// locking is throughput and the conditional update is what makes the
+	// answer right. Said and never shown, that is a claim; the arm below is
+	// the demonstration, and it fails if the update ever stops carrying the
+	// state it expects to find.
+	for _, locking := range []bool{true, false} {
+		name := "with row locking"
+		if !locking {
+			name = "without row locking"
+		}
+		t.Run(name, func(t *testing.T) { handedOutOnce(t, locking) })
+	}
+}
+
+func handedOutOnce(t *testing.T, locking bool) {
 	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, q *queue.Queue) {
+		queue.SetLocking(q, locking)
 		ctx := t.Context()
 		const jobs = 12
 		for i := range jobs {

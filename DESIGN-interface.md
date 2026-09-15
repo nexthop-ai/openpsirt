@@ -865,7 +865,7 @@ with an avatar.
 | Rule | |
 |---|---|
 | Every figure counts pieces of work, and says so | A person's row and the list behind their name are one measurement, so clicking through never turns one number into a different one. The findings those cover are a second, quieter column, and the screen states in words what each counts |
-| Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. The finding carries "Take this" and the unassigned list's batch bar carries "Take", beside the picker rather than through it |
+| Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. On a finding it is the picker's first option, because taking work is the common case and should need no typing; the unassigned list carries a Take of its own on its batch bar |
 | Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The unassigned list spans every product somebody can see, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |

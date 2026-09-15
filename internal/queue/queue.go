@@ -137,11 +137,21 @@ type Queue struct {
 	db   *database.DB
 	opts Options
 	now  func() time.Time
+	// Whether the claim holds the row it is about to take. Always true for a
+	// queue anything but a test builds, and a field rather than an option
+	// because the only thing that turns it off is the test that demonstrates
+	// exclusivity does not rest on it.
+	locking bool
 }
 
 // New returns a queue over db.
 func New(db *database.DB, opts Options) *Queue {
-	return &Queue{db: db, opts: opts, now: func() time.Time { return time.Now().UTC() }}
+	return &Queue{
+		db:      db,
+		opts:    opts,
+		now:     func() time.Time { return time.Now().UTC() },
+		locking: true,
+	}
 }
 
 // Add puts work on the queue, refusing it when the backlog is already too deep.
@@ -292,7 +302,7 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 		// pointer set — so an attempt that finds nothing claimable returns no
 		// error and Claim hands back a claim the database does not have.
 		job = nil
-		id, err := claimableID(ctx, tx, q.db.Server.Engine, kind, now, staleBefore)
+		id, err := claimableID(ctx, tx, q.db.Server.Engine, q.locking, kind, now, staleBefore)
 		if err != nil || id == 0 {
 			return err
 		}

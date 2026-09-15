@@ -13,3 +13,13 @@ func SetClock(q *Queue, now func() time.Time) {
 func SetLeaseClock(l *Leases, now func() time.Time) {
 	l.now = now
 }
+
+// SetLocking turns the claim's row locking off, for the test that demonstrates
+// exclusivity does not rest on it.
+//
+// Here rather than on Options, because a switch that turns off the thing
+// keeping workers out of each other's way is one nothing outside a test should
+// be able to reach.
+func SetLocking(q *Queue, on bool) {
+	q.locking = on
+}

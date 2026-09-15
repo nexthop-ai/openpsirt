@@ -50,8 +50,15 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
+| `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
+| `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |
+| `internal/saved/` | A narrowing of a list somebody kept, and the claim it prepares. See `DESIGN-remediation.md` |
+| `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
+| `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `DESIGN-remediation.md` |
+| `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
+| `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |
 | `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
-| `internal/docs/`, `internal/tools/` | Document checks and the gates that are not linters |
+| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gates that are not linters |
 | `web/` | The interface source. See `DESIGN-interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
 | `docs/` | The published documentation site |
@@ -60,6 +67,14 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `Makefile.demo` | The image and what is built from it: the seeded demo deployment, the hot-reload loop, and the offline scanner bundle. Included by the makefile beside it, so every target is reached the same way. A file of its own because it shares nothing with the gate half but the names of the docker and npm commands, so the half that decides whether a change may be pushed reads without the half that stands an instance up. The scanner bundle is here because it is built from the demo image rather than because it is a demo target, and every variable these read is here with them |
 
 Everything is under `internal/`, so nothing is importable by another module.
+
+Two import constraints are worth stating, because a fix proposed without them
+cannot be written:
+
+| Constraint | Why |
+|---|---|
+| `internal/database` cannot read a setting | `internal/setting` imports `internal/database`, so a bound read from the settings store cannot live below it. Bounds that low come from the environment |
+| The schema's tests cannot reach the harness's table list | They are an external test package, and the list is the harness's own |
 
 ## Make targets
 
@@ -98,6 +113,9 @@ of ours needs no edit.
 | `make unreachable` | Exported code nothing reaches |
 | `make negatives` | A 404 built from an error's own text: it asserts a name reaches nothing, and publishes whatever the error carried |
 | `make granted` | Every query outside the access package asks both grant tables |
+| `make attached` | A doc comment describing something other than the declaration it sits on |
+| `make confined` | Engine-specific code outside the two places allowed to hold it |
+| `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
 | `make unclaimed` | Every requirement is named by a design document |
 | `make pins-check` | Every version pinned in two files still agrees |
 | `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
@@ -125,7 +143,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `test` |
+| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `attached`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
