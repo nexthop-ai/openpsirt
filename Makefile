@@ -1052,6 +1052,53 @@ else
 	  esac; \
 	done
 	@echo "the chart refuses every install that could not be signed into, and every mail configuration that would send nothing, each for the reason it names"
+	@# The refusals above assert that an install the chart cannot serve fails
+	@# at render. These assert the other half: that a legal one renders a
+	@# reference something answers. A secretKeyRef naming a Secret nothing
+	@# creates, or a key nothing writes, renders perfectly and leaves a pod
+	@# that can never start — the same failure the refusals exist to prevent,
+	@# one step later and with no message anybody reads.
+	@#
+	@# Each row is what to install, the variable to look at, and the Secret and
+	@# key its reference must name — or "none" where there must be no reference
+	@# at all, because a provider that takes no client secret is a
+	@# configuration the binary supports.
+	@base="--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://psirt.example.com"; \
+	for want in \
+	  "a provider with no client secret|OPENPSIRT_OIDC_CLIENT_SECRET|none|--set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc" \
+	  "a client secret the chart holds|OPENPSIRT_OIDC_CLIENT_SECRET|t-openpsirt-oidc oidc-client-secret|--set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.clientSecret=shh --set auth.oidc.existingSecretKey=theirs" \
+	  "a client secret the operator holds|OPENPSIRT_OIDC_CLIENT_SECRET|mine theirs|--set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.existingSecret=mine --set auth.oidc.existingSecretKey=theirs" \
+	  "a GitHub app with no client secret|OPENPSIRT_GITHUB_CLIENT_SECRET|none|--set auth.github.clientID=gh" \
+	  "a GitHub client secret the chart holds|OPENPSIRT_GITHUB_CLIENT_SECRET|t-openpsirt-github github-client-secret|--set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.existingSecretKey=theirs" \
+	  "a mail password the chart holds|OPENPSIRT_MAIL_PASSWORD|t-openpsirt-mail mail-password|--set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh --set mail.existingSecretKey=theirs"; do \
+	  what="$${want%%|*}"; rest="$${want#*|}"; \
+	  named="$${rest%%|*}"; rest="$${rest#*|}"; \
+	  expect="$${rest%%|*}"; args="$${rest#*|}"; \
+	  out=$$(helm template t deploy/helm/openpsirt $$base $$args) \
+	    || { echo "the chart refused $$what:"; echo "$$out"; exit 1; }; \
+	  got=$$(printf '%s\n' "$$out" | awk -v want="$$named" \
+	    '$$0 ~ "name: " want "$$" {f=1; next} \
+	     f && /secretKeyRef:/ {g=1; next} \
+	     g && /name:/ {n=$$2; next} \
+	     g && /key:/ {print n, $$2; exit}'); \
+	  [ -n "$$got" ] || got=none; \
+	  [ "$$got" = "$$expect" ] || { \
+	    echo "with $$what the chart asks for [$$got] where it should ask for [$$expect]"; \
+	    exit 1; }; \
+	done
+	@# The database has no "none" case: an install with no database is refused
+	@# above, so every render carries this one.
+	@out=$$(helm template t deploy/helm/openpsirt --set database.url=postgres://u:p@h:5432/d \
+	  --set database.existingSecretKey=theirs --set auth.bootstrapAdmins={admin} \
+	  --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}); \
+	  got=$$(printf '%s\n' "$$out" | awk \
+	    '$$0 ~ "name: OPENPSIRT_DATABASE_URL$$" {f=1; next} \
+	     f && /secretKeyRef:/ {g=1; next} \
+	     g && /name:/ {n=$$2; next} \
+	     g && /key:/ {print n, $$2; exit}'); \
+	  [ "$$got" = "t-openpsirt-database database-url" ] || { \
+	    echo "with a database URL the chart holds, it asks for [$$got]"; exit 1; }
+	@echo "every secret the chart renders a reference to is one it creates, under the key it wrote"
 endif
 
 run:

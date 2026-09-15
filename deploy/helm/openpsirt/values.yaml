@@ -49,6 +49,10 @@ database:
   # crossing anything it does not own says so in the URL: sslmode=verify-full
   # for PostgreSQL, tls=true for MySQL and MariaDB. Whatever the URL says
   # about the transport is left as written.
+  #
+  # existingSecretKey names the key inside a Secret you manage. It is read only
+  # when existingSecret is set: a Secret the chart creates holds the value
+  # under a key of the chart's own, and the same is true of every pair below.
   url: ""
   existingSecret: ""
   existingSecretKey: "database-url"
@@ -91,7 +95,8 @@ auth:
     clientID: ""
     # Set clientSecret here and the chart puts it in a Secret, or name one you
     # manage yourself. A secret in values.yaml ends up in your release history
-    # and probably in version control.
+    # and probably in version control. Leave both empty for a provider that
+    # takes no client secret — nothing is then asked for.
     clientSecret: ""
     existingSecret: ""
     existingSecretKey: "oidc-client-secret"
@@ -104,6 +109,7 @@ auth:
   # alongside oidc.issuer above.
   github:
     clientID: ""
+    # As above: set one here, name one you manage, or leave both empty.
     clientSecret: ""
     existingSecret: ""
     existingSecretKey: "github-client-secret"
@@ -152,6 +158,8 @@ autoMigrate: true
 
 log:
   level: info
+  # json rather than the binary's own default of text: a collector reads these,
+  # and the configuration reference says which default belongs to which.
   format: json
 
 service:

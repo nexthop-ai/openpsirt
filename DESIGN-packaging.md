@@ -14,6 +14,7 @@ Satisfies REQ-01, REQ-02, REQ-04, and the probe behavior REQ-72 requires.
 - [Starting and stopping](#starting-and-stopping)
 - [Chart security context](#chart-security-context)
 - [Render-time refusals](#render-time-refusals)
+- [Where a secret comes from](#where-a-secret-comes-from)
 - [Self-inventories](#self-inventories)
 - [Inventory composition](#inventory-composition)
 - [Release assets](#release-assets)
@@ -167,8 +168,25 @@ cannot work moves the failure to a crash-looping pod and a message nobody reads.
 Mail is opt-in, so refusing half of it costs a deployment that wants none of it
 nothing (REQ-49).
 
-Each refusal is tested by asserting that it fires, not by asserting that a good
-install renders.
+Each refusal is tested by asserting that it fires. A legal install is tested
+the other way round — that what it renders names something that exists.
+
+## Where a secret comes from
+
+| Value | Where it is read from |
+|---|---|
+| Set in the values | A Secret the chart creates, under a key of the chart's own |
+| A Secret the operator names | That Secret, under the key they name beside it |
+| Neither | Nothing is asked for. A sign-in provider that takes no client secret is a configuration the process supports |
+
+The key an operator names is read only where they also name the Secret. A
+Secret the chart created holds the value under the chart's key, and asking for
+the operator's key name there asks for a key that is not there — which renders
+perfectly and produces a pod that never starts.
+
+The same pair answers for the database URL, both client secrets and the mail
+password, because what differs between them is the name of the Secret and the
+key inside it rather than anything about how the question is answered.
 
 Bootstrap admins are applied at every startup rather than once, which makes them
 the recovery path: lose administrative access, add yourself, upgrade. The notes
