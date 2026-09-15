@@ -353,9 +353,8 @@ func References(source string) []string {
 	return referenced(source, Attachment, mintedToken)
 }
 
-
-// referenced is the walk both reference lists do, differing only in the scheme
-// they are about and what shape a destination has to be.
+// referenced is the walk a reference list does: a scheme, and what a
+// destination has to look like to count as one.
 func referenced(source, scheme string, shaped func(string) bool) []string {
 	if strings.TrimSpace(source) == "" {
 		return nil
