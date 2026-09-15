@@ -36,21 +36,6 @@ func (s *Store) AtComponent(ctx context.Context, subject access.Subject, targetI
 	return s.atComponent(ctx, subject, targetID, componentID, contains, limit, offset)
 }
 
-// SizeAtComponent is how large a claim over the whole narrowed set would be:
-// how many issues, and how many findings those sit at.
-//
-// The second number is the one that matters and the one nothing showed. The
-// bound on a bulk action is on rows written rather than on names typed , so a
-// screen counting issues against a cap counting findings tells somebody 44
-// when the answer is 2,000 — and it tells them after they have typed the
-// reasoning.
-func (s *Store) SizeAtComponent(ctx context.Context, subject access.Subject, targetID,
-	componentID int64, contains string) (issues, places int, err error) {
-
-	_, issues, places, err = s.atComponent(ctx, subject, targetID, componentID, contains, 1, 0)
-	return issues, places, err
-}
-
 func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetID,
 	componentID int64, contains string, limit, offset int) ([]Deciding, int, int, error) {
 
