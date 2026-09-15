@@ -42,6 +42,18 @@ RUN npm ci
 # the public directory by walking it.
 COPY assets/ /assets/
 
+# The shared XSS corpus, for the same reason and by the same arithmetic: the
+# interface's tsconfig includes `../testdata/*.json`, which against this
+# stage's /web is /testdata. The server's submission check reads the same file,
+# which is the point of it — one corpus, not two that drift.
+#
+# **The gate cannot catch a missing copy here.** `make check` type-checks from
+# a checkout where every path resolves, and `check-packaging` — which builds
+# this image — is skipped by it because it needs docker. So a path added to the
+# interface's tsconfig that reaches outside web/ breaks this build with the
+# gate green, and the way it is noticed is the image failing to build.
+COPY testdata/ /testdata/
+
 COPY web/ ./
 RUN npm run build
 
