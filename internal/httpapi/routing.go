@@ -192,7 +192,7 @@ func registerRouting(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, asked(in.Logger, err)
 		}
-		noteChange(ctx, in, trail.Role, "routing "+input.Product+" · "+rule.Name,
+		noteChange(ctx, in, trail.Routing, input.Product+" · "+rule.Name,
 			nil, trail.Said("to "+team.Called(), true))
 		queueSweep(ctx, in, product)
 
@@ -227,8 +227,8 @@ func registerRouting(api huma.API, in Ingest) {
 			if err := finding.NewStore(in.DB.DB).RetireRule(ctx, subject, product, input.ID); err != nil {
 				return nil, absent(in.Logger, err, "that rule could not be retired", noSuchRule)
 			}
-			noteChange(ctx, in, trail.Role,
-				"routing "+input.Product+" · "+strconv.FormatInt(input.ID, 10),
+			noteChange(ctx, in, trail.Routing,
+				input.Product+" · "+strconv.FormatInt(input.ID, 10),
 				trail.Said("in use", true), nil)
 			return &struct{}{}, nil
 		})

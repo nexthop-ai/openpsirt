@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
 // ReportBody is who told us about a flaw, and when.
@@ -137,6 +138,12 @@ func registerWhoTold(api huma.API, in Ingest) {
 		case err != nil:
 			return nil, asked(in.Logger, err)
 		}
+		// Recorded deployment-wide, because that is what it is: from here on a
+		// scan of any product reporting that name resolves to this issue. The
+		// issue it was recorded against is named too, since that is where the
+		// right to record it was held.
+		noteChange(ctx, in, trail.Alias, input.Vulnerability,
+			nil, trail.Said(input.Alias, true))
 		return &struct{}{}, nil
 	})
 }

@@ -37,6 +37,16 @@ const (
 	Account Kind = "account"
 	// Team is a team declared or retired, or somebody put on one or taken off.
 	Team Kind = "team"
+	// Routing is a standing rule that hands unheld work to a team, added or
+	// retired. Not a Role: a role is granted to a person against one product,
+	// and a routing rule grants nobody anything — it decides who is asked.
+	Routing Kind = "routing"
+	// Alias is another identifier an issue answers to. Deployment-wide and
+	// permanent: from the moment it is recorded, a scan of any product
+	// reporting that name resolves to this issue and inherits its decisions.
+	// Neither a setting nor a grant, and the one act here that changes what a
+	// later scan means.
+	Alias Kind = "alias"
 	// Release is when a tag went out and what it was cut from. Both are
 	// recorded after the fact and both change what a chart and a set of
 	// release notes say, so who moved them is the same question as who moved

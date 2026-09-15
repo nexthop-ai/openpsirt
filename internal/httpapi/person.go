@@ -280,6 +280,14 @@ func registerDeactivation(api huma.API, a Administering) {
 		}
 		out.Body.Since = time.Now().UTC().Format(time.RFC3339)
 
+		// Recorded as soon as it has happened, rather than after the two
+		// things that follow it. Both of those can fail and answer 500, and
+		// the deactivation has already been written by then — leaving a
+		// person who cannot sign in and nothing saying who stopped them.
+		// A second call finds nothing to move and writes no second row.
+		noteAdminChange(ctx, a, trail.Account, person.Identity,
+			trail.Said("active", true), trail.Said("deactivated", true))
+
 		// Ended rather than left to expire. Roles are re-read at sign-in, so
 		// withdrawing one takes effect then; this is what makes leaving
 		// immediate instead.
@@ -298,8 +306,6 @@ func registerDeactivation(api huma.API, a Administering) {
 				out.Body.Released = released
 			}
 		}
-		noteAdminChange(ctx, a, trail.Account, person.Identity,
-			trail.Said("active", true), trail.Said("deactivated", true))
 		return out, nil
 	})
 

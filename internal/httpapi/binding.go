@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
 // ModeBody is where this deployment's roles come from.
@@ -103,9 +104,15 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err := rights.SwitchTo(ctx, wanted); err != nil {
 			return nil, wentWrong(a.Logger, "cannot change where roles come from", err)
 		}
-		if err := store.Set(ctx, setting.RoleMode, string(wanted)); err != nil {
+		// Changed rather than set, because what it held is not derivable
+		// afterwards and is half of what the trail is asked: read in a
+		// statement of its own it would be the value at some earlier moment.
+		before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
+		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot record where roles come from", err)
 		}
+		noteAdminChange(ctx, a, trail.Setting, setting.RoleMode,
+			trail.Said(before, had), trail.Said(string(wanted), true))
 		return &struct{ Body ModeBody }{Body: ModeBody{Mode: string(wanted)}}, nil
 	})
 
@@ -179,6 +186,8 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 			if err := rights.BindAdmin(ctx, in.Body.Group); err != nil {
 				return nil, wentWrong(a.Logger, "cannot bind a group to administration", err)
 			}
+			noteAdminChange(ctx, a, trail.Role, in.Body.Group+" on every product",
+				nil, trail.Said(adminRole, true))
 			return &struct{ Body BindingBody }{Body: in.Body}, nil
 		}
 
@@ -193,6 +202,10 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
 			return nil, wentWrong(a.Logger, "cannot bind a group", err)
 		}
+		// Named by the product's address rather than its display name, because
+		// that is what a binding states and what the withdrawal resolves.
+		noteAdminChange(ctx, a, trail.Role, in.Body.Group+" on "+product.Name,
+			nil, trail.Said(in.Body.Role, true))
 		return &struct{ Body BindingBody }{Body: in.Body}, nil
 	})
 
@@ -226,6 +239,8 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 				}
 				return nil, err
 			}
+			noteAdminChange(ctx, a, trail.Role, in.Group+" on every product",
+				trail.Said(adminRole, true), nil)
 			return &struct{}{}, nil
 		}
 
@@ -236,6 +251,8 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err := rights.Unbind(ctx, in.Group, product.ID, access.Role(in.Role)); err != nil {
 			return nil, wentWrong(a.Logger, "cannot unbind a group", err)
 		}
+		noteAdminChange(ctx, a, trail.Role, in.Group+" on "+product.Name,
+			trail.Said(in.Role, true), nil)
 		return &struct{}{}, nil
 	})
 }
@@ -382,6 +399,8 @@ func registerRevocation(api huma.API, a Administering) {
 		if err := rights.RevokeToken(ctx, token.ID); err != nil {
 			return nil, wentWrong(a.Logger, "cannot revoke a token", err)
 		}
+		noteAdminChange(ctx, a, trail.Credential, in.Identity+" · "+in.Name,
+			trail.Said("in force", true), nil)
 		return &struct{}{}, nil
 	})
 
@@ -406,6 +425,8 @@ func registerRevocation(api huma.API, a Administering) {
 		if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
 			return nil, wentWrong(a.Logger, "cannot end the sessions", err)
 		}
+		noteAdminChange(ctx, a, trail.Account, in.Identity,
+			nil, trail.Said("sessions ended", true))
 		return &struct{}{}, nil
 	})
 }

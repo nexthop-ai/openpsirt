@@ -954,12 +954,14 @@ components:
           enum:
             - setting
             - role
+            - routing
             - support
             - release
             - credential
             - account
             - team
             - case
+            - alias
           type: string
         unset:
           description: Nobody had set it before this
@@ -7823,7 +7825,7 @@ paths:
   /v1/administration/changes:
     get:
       description: |-
-        Who changed a setting, a role grant, a support date, a credential, an account or a team — with what it held before and what it holds now.
+        Who changed a setting, a role grant, a routing rule, a support date, a credential, an account, a team or an issue's names — with what it held before and what it holds now.
 
         This is the layer above the triage record rather than part of it. Three of the things listed here silently rewrite what the tool reports: the deadline windows recompute every open finding's deadline, the triage floor takes the deadline off everything below it, and an end-of-life date takes it off everything past it.
 
@@ -7841,12 +7843,14 @@ paths:
             enum:
               - setting
               - role
+              - routing
               - support
               - release
               - credential
               - account
               - team
               - case
+              - alias
             type: string
         - explode: false
           in: query

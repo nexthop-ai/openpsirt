@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List administrative changes
-         * @description Who changed a setting, a role grant, a support date, a credential, an account or a team — with what it held before and what it holds now.
+         * @description Who changed a setting, a role grant, a routing rule, a support date, a credential, an account, a team or an issue's names — with what it held before and what it holds now.
          *
          *     This is the layer above the triage record rather than part of it. Three of the things listed here silently rewrite what the tool reports: the deadline windows recompute every open finding's deadline, the triage floor takes the deadline off everything below it, and an end-of-life date takes it off everything past it.
          *
@@ -4740,7 +4740,7 @@ export interface components {
              * @description What sort of thing changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "support" | "release" | "credential" | "account" | "team" | "case";
+            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
             /** @description Nobody had set it before this */
             unset?: boolean;
             was?: string;
@@ -8678,7 +8678,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "support" | "release" | "credential" | "account" | "team" | "case";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
                 limit?: number;
                 offset?: number;
             };

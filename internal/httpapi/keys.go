@@ -110,6 +110,11 @@ func registerKeys(api huma.API, a Administering) {
 		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot issue a credential", err)
 		}
+		// What it may send, never the secret or its digest: the trail is read
+		// by whoever may administer, and a credential store that hands back
+		// what it holds is what storing a digest exists to avoid.
+		noteAdminChange(ctx, a, trail.Credential, key.Name,
+			nil, trail.Said(keyScope(in.Body), true))
 		return answer(true, KeyBody{
 			Name: key.Name, Product: in.Body.Product, Stream: in.Body.Stream,
 			Variant: in.Body.Variant, Secret: secret,
@@ -146,4 +151,21 @@ func registerKeys(api huma.API, a Administering) {
 		}
 		return nil, noSuchKey()
 	})
+}
+
+// keyScope spells what a credential may send, for the trail.
+//
+// The whole scope rather than the product alone: "any branch, any variant" and
+// "one release only" are different credentials, and a record that spells both
+// the same way cannot be used to decide whether the one that was minted was
+// the one that was meant.
+func keyScope(key KeyBody) string {
+	scope := key.Product
+	if key.Stream != "" {
+		scope += " · " + key.Stream
+	}
+	if key.Variant != "" {
+		scope += " · " + key.Variant
+	}
+	return scope
 }
