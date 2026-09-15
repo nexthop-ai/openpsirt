@@ -1443,6 +1443,10 @@ components:
           type:
             - array
             - "null"
+        never:
+          description: How many in support have never been scanned, across every build and not only this page
+          format: int64
+          type: integer
         quiet:
           description: How many have gone quiet, across every build and not only this page
           format: int64
@@ -1455,9 +1459,15 @@ components:
           description: How many builds there are to report on
           format: int64
           type: integer
+        unsupported:
+          description: How many are out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
+          format: int64
+          type: integer
       required:
         - items
         - quiet
+        - never
+        - unsupported
         - total
         - quiet_after_days
       type: object

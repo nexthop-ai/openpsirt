@@ -15,6 +15,7 @@ import { Pace } from "../ui/Charts";
 import { upstream } from "../ui/upstream";
 import { ROLLED } from "../ui/severities";
 import { Severity } from "../ui/Severity";
+import { Wide } from "../ui/Wide";
 
 // One component, and the one piece of work it is.
 //
@@ -429,7 +430,7 @@ function Sits({
                   {(below.length - carrying.length).toLocaleString()} carry nothing
                 </span>
                 {carrying.length > 0 && (
-                  <div className="tablewrap plain">
+                  <Wide className="plain">
                     <table>
                       <tbody>
                         {carrying.slice(0, SHOWN).map((each, i) => (
@@ -466,7 +467,7 @@ function Sits({
                         )}
                       </tbody>
                     </table>
-                  </div>
+                  </Wide>
                 )}
               </>
             )}
@@ -542,7 +543,7 @@ function Landed({ here }: { here: Build }) {
         <p className="hint">Nothing fixes what is open here.</p>
       ) : (
         <>
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -577,7 +578,7 @@ function Landed({ here }: { here: Build }) {
                 </tr>
               </tbody>
             </table>
-          </div>
+          </Wide>
           <p
             className="hint"
             style={{ marginTop: 8 }}
@@ -874,7 +875,7 @@ function Ships({
           {rows.length} {rows.length === 1 ? "release" : "releases"}
         </span>
       </div>
-      <div className="tablewrap">
+      <Wide>
         <table>
           <thead>
             <tr>
@@ -924,7 +925,7 @@ function Ships({
             ))}
           </tbody>
         </table>
-      </div>
+      </Wide>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "./Failed";
 import { Outcome } from "./Outcome";
+import { Wide } from "./Wide";
 
 // What triage a line would inherit from another, and which of it to take .
 //
@@ -94,7 +95,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
           {moved.length === 0 && postponed.length === 0 ? (
             <p className="hint">Nothing here needs a fresh answer.</p>
           ) : (
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -136,7 +137,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
           )}
 
           {carry.error != null && <Failed error={carry.error} what="Those could not be carried." />}

@@ -12,6 +12,7 @@ import { Failed } from "../ui/Failed";
 import { Fab } from "../ui/Drawer";
 import { Icon } from "../ui/Icons";
 import { UploadDrawer } from "../ui/Upload";
+import { Wide } from "../ui/Wide";
 
 // What each build uploaded, and what the scan of it found. A scan is what the
 // deployment does to an inventory after it arrives; what a person uploads, and
@@ -99,7 +100,7 @@ export function Inventories() {
           detail="A build pipeline uploads an inventory, or somebody does from the button above, and what became of it appears here."
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -211,7 +212,7 @@ export function Inventories() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       {measured && (

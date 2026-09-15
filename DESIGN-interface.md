@@ -40,6 +40,8 @@ end rather than left to be found by clicking.
 - [Recording a flaw](#recording-a-flaw)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The editor](#the-editor)
+- [A read that failed](#a-read-that-failed)
+- [A render that threw](#a-render-that-threw)
 - [An expired session](#an-expired-session)
 - [Attaching a file](#attaching-a-file)
 - [Mentions and assignment pickers](#mentions-and-assignment-pickers)
@@ -225,6 +227,9 @@ screen answering the question just asked of it.
 | The picker stays open until the last level is chosen | Each pick applies at once, because a partial scope is a real answer, but the panel closes only on the variant, on Escape, or on a click elsewhere. Closing after every pick made choosing a build three openings of the same panel |
 | Changing scope keeps you where you are | A build-scoped screen swaps its build and stays the same screen |
 | A screen that names a build in its address is the authority for it | Everything else remembers the last one. That memory belongs to the tab rather than the browser: it is where somebody is working right now, not a preference, and a second tab looking at another product must not drag the first one with it |
+| **A screen whose address names the product has that address rewritten** | The same rule, one level up: the path is the authority, so remembering a different product and staying put lets the path put the old one back. The bar snapped to the product in the address and nothing said why. Choosing every product from one of these is the catalog |
+| **What sat below the product in the address is dropped where it belonged to it** | A branch is one product's and so is a component, so neither carries across. The address falls back to the new product's branch list, or to the product |
+| What comes back out of the tab's memory is checked, not cast | The value becomes a path segment and a query parameter. An entry an older build wrote, or one edited by hand, otherwise reaches the server as `[object Object]` |
 | A narrowed screen says what it is counting | A page answering for one product that looks exactly like a page answering for all of them is how two people quote different figures. That applies to the panels within it: a chart the picker has narrowed and a label reading "all products" state opposite things, and the label is the half a reader believes |
 | A selection the server would refuse is never sent | A branch or variant with no product above it is dropped on the way out |
 
@@ -1012,6 +1017,36 @@ the part of a decision that matters most.
 | A draft is kept under the identity that wrote it | Which covers the sign-out that never happened. A session can expire quietly, and the next person to sign in on that browser must not be handed somebody else's reasoning. Text typed before anybody is recognized is not kept at all |
 | Where a draft lives, and under whose name, is decided in one place | A control spelled at each of six call sites is a control that is missing at the seventh |
 
+## A read that failed
+
+A screen draws what it was told, and "I could not ask" is not one of the things
+it can be told. An empty list, a zero and a spinner are answers; a read that
+did not happen is none of them, and drawing it as one is a wrong answer with a
+right answer's confidence.
+
+| Rule | |
+|---|---|
+| Every read has an arm for its failure, beside the arm for its data | A 500 drawn as zero, as an empty list or as a spinner that never stops is a screen stating something nobody computed. "Nothing changed between those two releases" was what a failed release-note read said |
+| A refusal is an answer; a fault is not | 403 and 404 say this is not yours to see, and the card that shows it stays quiet. Anything else is a question nobody answered, and it is said. The two were one test — "the read failed" — so a card hiding itself for the first hid itself for the second |
+| A count from a page is not a count | Where the server reports how many there are, that is the figure. Where it only caps what it returns, the list says the cap was reached. A tile counting its own page said 200 over a list of 462 |
+| A set read under a cap is never written back whole | The affected-build editor sends the complete list and the server closes everything absent from it, so a page short of the answer is a write that closes the rest. It refuses to edit rather than editing part |
+| A printed sheet stamps the moment it was taken, so it prints only once every figure has arrived | A dated record of numbers nobody computed is worse than no record |
+| A failed identity read is not "signed out" | Where one provider is configured the sign-in screen forwards straight to it, so drawing a transient failure as signed out sends somebody through their identity provider over a hiccup |
+| What the server said is what is shown, and where it said nothing the status is | HTTP/2 carries no reason phrase, so the fallback was the empty string and a refusal reached the reader as no message at all |
+
+## A render that threw
+
+One boundary around the application and one around the routed screens, keyed on
+the address.
+
+| Rule | |
+|---|---|
+| The inner boundary is inside the frame | A screen that throws leaves the rail, the scope bar and the way to another screen where they are. Without one, React unmounts the whole tree and what is left is a blank page with nothing to press |
+| It is keyed on the address | Walking away from a screen that threw clears it, rather than carrying one screen's failure to every other |
+| It logs as well as drawing | A boundary that only draws swallows the stack that was going to the console, which takes away what a developer needs and leaves a sentence a reader cannot act on |
+| A number from the address is checked where it is read | `Number("lastweek")` is not a wrong figure — it is a date arithmetic that throws on the render path and takes the sheet down. The window a report is asked for is a whole number of days inside the range the sheets offer, or the sheet's own default |
+| A cookie is decoded where it can be and passed on where it cannot | The decode runs in the middleware every write goes through, so one malformed cookie set by anything on this host failed every write in the application |
+
 ## An expired session
 
 A write refused for want of a session offers the way back over the screen rather
@@ -1170,6 +1205,9 @@ since a person only ever sees products they hold a role on.
 | A name the catalog does not hold returns to the catalog, not to the front page | Somebody following a stale link is looking for a report, and the list of them is the nearest answer |
 | Every report states what it was asked of and when it was taken, and prints | The stylesheet is the record's: the shell, the rail and the controls drop out, and a row does not break across a page. A control that does not print has its value stated in the printed header instead |
 | A report that is a list exports as CSV and JSON; one that is figures prints, and every figure links to the list it counts | There is no stream behind an aggregate, and inventing one would publish a file nothing computed. The list a figure opens is the export, and it is also the traceable form of the number |
+| **A figure is the answer's, and the list under it is a page** | The estate figures on the coverage sheet come from the response rather than being recounted from the rows beneath them, and each list says how many there are. Recounted from a page, "being scanned" was a figure about two hundred builds under a heading about the estate |
+| **Print waits until every figure has arrived** | A printed sheet stamps the moment it was taken on itself, so one printed mid-read is a dated record of numbers nobody computed |
+| **A page past the end of a list says so, and keeps its footer** | The register holds its position when the build under it changes, and a footer drawn only where there are rows left nowhere to press Previous from — so an empty page read as "nothing is known about this build yet" |
 
 | Rule | |
 |---|---|
@@ -1291,7 +1329,7 @@ scroll sideways. That is why the tables here are written rather than installed.
 | Rule | |
 |---|---|
 | A small screen is shaped around review and respond, not bulk work | Read a finding, agree to one or send it back, see what is assigned to you. Nobody triages three hundred findings on a phone, so the wide-only screens stay wide and say so rather than being folded into something unusable |
-| Every table that scrolls says so | Thirty of thirty-one scrolled sideways inside their own frame and none mentioned it, which reads as a page cut off rather than as a table with more in it. Said above the table and pinned so it stays visible while the table moves |
+| Every table that is wider than the screen says so | Thirty of thirty-one scrolled sideways inside their own frame and none mentioned it, which reads as a page cut off rather than as a table with more in it. Said above the table and pinned so it stays visible while the table moves. **Only the ones that are wider**: a stylesheet cannot ask, so the table measures itself and says which it is — a note about scrolling over a two-column table that fits teaches people to stop reading the notes |
 | Headings and field labels are noun phrases (REQ-60) | The name of the thing, the way a settings screen anywhere else names one. Written as descriptions — "When somebody counts as absent" — they make somebody scanning for the one they came to change read thirty sentences instead of thirty names. The explanation stays underneath. Three had no name at all, falling through to the last segment of a configuration key: a card headed "After" |
 | Labels use the conventional word (REQ-60) | Reject, Trend, Assignments, Unassigned, Justification, Path, EPSS, Locations, Users and roles, Lapsed decisions, Submit. A caption on a screen is a sentence at most |
 | A form field is not a credential | Every text and number box says so in the four attributes the password managers actually read. They guess from shape and proximity, so a short box beside another short box is offered a saved login. `autocomplete` alone does not do it: browsers ignore it for saved logins by design. Nothing here is exempt, because nothing here is a credential — this deployment never holds a password |

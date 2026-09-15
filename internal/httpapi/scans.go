@@ -766,7 +766,12 @@ type coverageOutput struct {
 		Items []CoverageBody `json:"items"`
 		// Quiet is how many of the rows are, so a caller can say so without
 		// counting them again.
-		Quiet          int `json:"quiet" doc:"How many have gone quiet, across every build and not only this page"`
+		Quiet int `json:"quiet" doc:"How many have gone quiet, across every build and not only this page"`
+		// Never and Unsupported are counted here for the same reason, and
+		// because a caller recomputing either from the page it was handed
+		// states a figure about the page under a heading about the estate.
+		Never          int `json:"never" doc:"How many in support have never been scanned, across every build and not only this page"`
+		Unsupported    int `json:"unsupported" doc:"How many are out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet"`
 		Total          int `json:"total" doc:"How many builds there are to report on"`
 		QuietAfterDays int `json:"quiet_after_days" doc:"How long this deployment allows, in days"`
 	}
@@ -841,6 +846,13 @@ func registerCoverage(api huma.API, in Ingest) {
 		for _, row := range rows {
 			if row.Quiet {
 				out.Body.Quiet++
+			}
+			if row.Retired {
+				out.Body.Unsupported++
+				continue
+			}
+			if row.LastReceivedAt == nil {
+				out.Body.Never++
 			}
 		}
 		if input.Offset < len(rows) {

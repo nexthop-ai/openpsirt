@@ -11,9 +11,11 @@ import { Pace, Mix, Ring, Releases } from "../ui/Charts";
 import { paceReading, mixReading } from "../ui/trend";
 import { claimOf } from "../api/claims";
 import type { Who } from "../app/session";
+import { Wide } from "../ui/Wide";
 
-// The most the server returns of what is overdue. A cap with no total, so a
-// full list is a floor on the figure rather than the figure.
+// The most of the deadline list the tiles read. The response carries the
+// whole-answer count beside it, so the figures say when they are a floor
+// rather than leaving a page to pass for the answer.
 const OVERDUE_LIMIT = 200;
 
 // How far ahead "soon" looks. A fortnight is the window the deadline list
@@ -219,7 +221,7 @@ function Readiness({ at }: { at: Scoped }) {
           {/* Wrapped like every other table on the page: on a narrow screen a
               wide table scrolls sideways and says so, and this was the one
               that did neither — it was cut off with nothing explaining why. */}
-          <div className="tablewrap">
+          <Wide>
             <table className="plain">
               <thead>
                 <tr>
@@ -242,7 +244,7 @@ function Readiness({ at }: { at: Scoped }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
           <p className="reading">
             {reading(now?.critical ?? 0, shipped.critical ?? 0, shipped.stream ?? "")}
             {floor ? ` Counted at ${floor} and above.` : ""}
@@ -387,6 +389,13 @@ function Figures({
   const soonExploited = soon.filter((row) => row.exploited).length;
   const allRunning = allLate.data?.items ?? [];
   const allPoints = allOpen.data?.items ?? [];
+  // Whether the page in hand is the whole list. The two tiles below split one
+  // read into overdue and due-soon, so neither half can be compared against
+  // the cap on its own — a page that is entirely overdue would have to be a
+  // full page before the test fired, and the due-soon half had no test at all.
+  // The server says how many rows the question has; that is the test.
+  const cut = (late.data?.total ?? running.length) > running.length;
+  const cutEverywhere = (allLate.data?.total ?? allRunning.length) > allRunning.length;
 
   // What the same figure is without the scope. Nothing where no scope is
   // selected, because the two would be one number said twice.
@@ -470,18 +479,17 @@ function Figures({
         {/* The list behind this is capped, so a full one is said to be a
             floor rather than passed off as the count. */}
         <span className="n">
-          {overdue.length >= OVERDUE_LIMIT
-            ? `${OVERDUE_LIMIT.toLocaleString()}+`
-            : overdue.length.toLocaleString()}
+          {overdue.length.toLocaleString()}
+          {cut ? "+" : ""}
         </span>
         {everywhereAtLeast(
           allRunning.filter((row) => (row.days_left ?? 0) < 0).length,
-          allRunning.length >= OVERDUE_LIMIT,
+          cutEverywhere,
         ) ?? (
           <span className="d">
             {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
             deadline
-            {overdue.length >= OVERDUE_LIMIT ? " · at least" : ""}
+            {cut ? " · at least" : ""}
           </span>
         )}
       </button>
@@ -496,14 +504,18 @@ function Figures({
         <span className="l">
           <i style={{ background: "var(--wait)" }} /> Due soon
         </span>
-        <span className="n">{soon.length.toLocaleString()}</span>
+        <span className="n">
+          {soon.length.toLocaleString()}
+          {cut ? "+" : ""}
+        </span>
         {everywhereAtLeast(
           allRunning.filter((row) => (row.days_left ?? 0) >= 0).length,
-          allRunning.length >= OVERDUE_LIMIT,
+          cutEverywhere,
         ) ?? (
           <span className="d">
             {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
             {SOON_DAYS} days
+            {cut ? " · at least" : ""}
           </span>
         )}
       </button>
@@ -750,7 +762,14 @@ function Status() {
   });
   const builds = scanning.data?.items ?? [];
   const quiet = builds.filter((b) => b.quiet);
-  const last = builds.find((b) => b.last_received_at);
+  // The most recent arrival across every build, which is what the line says.
+  // The first row that has one is not it: this list is ordered longest-silent
+  // first, so the first match was among the oldest.
+  const last = builds.reduce<string>(
+    (newest, build) =>
+      build.last_received_at && build.last_received_at > newest ? build.last_received_at : newest,
+    "",
+  );
   const whole = !!(at.product && at.stream && at.variant);
 
   return (
@@ -784,7 +803,7 @@ function Status() {
         </li>
         <li>
           <span className="what">Last inventory received</span>
-          <span className="when">{on(last?.last_received_at) ?? "never"}</span>
+          <span className="when">{on(last) || "never"}</span>
         </li>
         <li>
           <span className="what">Quiet after</span>

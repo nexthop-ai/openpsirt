@@ -12,6 +12,7 @@ import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Failed } from "../ui/Failed";
+import { Wide } from "../ui/Wide";
 
 // A branch and a tag are different shapes of thing — one moves and is rebuilt,
 // one never changes again — so they are labeled rather than blended into a
@@ -96,13 +97,23 @@ export function Streams() {
         {who.data?.admin && <AddButton label="Add branch or tag" onClick={() => setAdding(true)} />}
       </div>
 
+      {/* A refused write is said. Without this the select snaps back to what
+          it held, the administrator reads that as their own mis-click, and
+          they try the same thing again. */}
+      {setEndOfLife.isError && (
+        <Failed error={setEndOfLife.error} what="That support date could not be set." />
+      )}
+      {setRelease.isError && (
+        <Failed error={setRelease.error} what="That release could not be recorded." />
+      )}
+
       {items.length === 0 ? (
         <Empty
           title="Nothing is declared here yet."
           detail="A branch or a tag is declared before a scan can be filed against it."
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -232,7 +243,7 @@ export function Streams() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       <Declare

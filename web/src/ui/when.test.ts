@@ -21,6 +21,24 @@ describe("how a moment is written", () => {
 
   it("says nothing about a moment it cannot read", () => {
     expect(since("last week", now)).toBe("");
+    // The absolute form asks the same question. Sixteen files call it, and a
+    // field that is not a moment was drawn as its own first ten characters —
+    // which reads like a date and is not one.
+    expect(on("last week")).toBe("");
+    expect(on("libnl-3-200")).toBe("");
+    expect(on("")).toBe("");
+    // A bare number parses as a year in this language, so it has to be turned
+    // away by shape rather than by whether a date can be made of it.
+    expect(on("42")).toBe("");
+  });
+
+  it("takes a day with no time on it", () => {
+    // Deadlines and end-of-life dates are stored as the day alone.
+    expect(on("2026-09-04")).toBe("2026-09-04");
+  });
+
+  it("turns away a day that is shaped right and is not one", () => {
+    expect(on("2026-13-45T00:00:00Z")).toBe("");
   });
 
   it("answers how long ago in the coarsest unit that still says something", () => {

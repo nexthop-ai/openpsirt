@@ -23,6 +23,11 @@ import { Failed } from "../ui/Failed";
 
 // The separator between a build's two names. Not a character either name can
 // hold, so a key cannot be two builds.
+// The most rows the issue read returns in one request. The editor needs all
+// of them or none, so this is compared against the whole-answer count rather
+// than used as a page size.
+const MOST = 200;
+
 const APART = "\u0000";
 
 export function AffectedBuilds({
@@ -56,11 +61,22 @@ export function AffectedBuilds({
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/issues/{vulnerability}", {
-          params: { path: { vulnerability }, query: { limit: 200 } },
+          params: { path: { vulnerability }, query: { limit: MOST } },
         }),
       ),
     retry: false,
   });
+
+  // Whether the page in hand is the whole answer.
+  //
+  // This editor sends the *complete* list of builds, and the server closes
+  // every build absent from it as never affected. So a set derived from a
+  // capped page is not a partial answer that loses a little — it is a write
+  // that closes the rows past the cap, with whatever reason was typed for a
+  // different build attached to them. There is no safe half: either the whole
+  // set is in hand or nothing is written.
+  const rows = holds.data?.items ?? [];
+  const partial = (holds.data?.total ?? rows.length) > rows.length;
 
   const now = useMemo(() => {
     const held = new Set<string>();
@@ -118,6 +134,20 @@ export function AffectedBuilds({
       </p>
       {!open ? null : builds.isPending || holds.isPending ? (
         <p className="hint">Reading what this is filed against…</p>
+      ) : builds.isError || holds.isError ? (
+        <Failed
+          error={builds.error ?? holds.error}
+          what="What this is filed against could not be read."
+        />
+      ) : partial ? (
+        <div className="alert">
+          <strong>This is open at more builds than this screen can set</strong>
+          <span>
+            {(holds.data?.total ?? 0).toLocaleString()} builds hold it, and this sends the whole
+            list — so writing from what is shown would close the rest as never affected. Close them
+            one build at a time from each build&rsquo;s own finding instead.
+          </span>
+        </div>
       ) : (
         <>
           {set.error != null && <Failed error={set.error} what="That could not be set." />}

@@ -37,10 +37,26 @@ function csrfCookie(): string {
   for (const part of document.cookie.split(";")) {
     const [name, ...rest] = part.trim().split("=");
     if (name === "__Host-openpsirt_csrf" || name === "openpsirt_csrf") {
-      return decodeURIComponent(rest.join("="));
+      return decoded(rest.join("="));
     }
   }
   return "";
+}
+
+// A cookie value the browser handed back, decoded where it can be.
+//
+// `decodeURIComponent` throws on a malformed percent escape, and this runs
+// inside the middleware every write goes through — so an unthrowing decode is
+// what stops one bad cookie, set by anything on this host, from failing every
+// write in the application with a message no screen can render. A value that
+// will not decode is passed on as it stands: the server compares it against
+// what it set, and a token that does not match is refused there.
+function decoded(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 // Every unsafe request carries the token. Registered as middleware rather than

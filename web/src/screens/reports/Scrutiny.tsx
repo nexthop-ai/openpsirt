@@ -9,7 +9,8 @@ import { Loading } from "../../ui/Loading";
 import { Outcome } from "../../ui/Outcome";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords } from "./Window";
+import { WindowPicker, coveringWords, daysAsked } from "./Window";
+import { Wide } from "../../ui/Wide";
 
 // How long back to look. Ninety days is a quarter, which is the period an
 // audit asks about; the other two are here because a control question is
@@ -31,7 +32,7 @@ const DISMISSALS = new Set(["not-applicable", "wont-fix", "already-fixed"]);
 export function Scrutiny() {
   const at = useScope();
   const [params] = useSearchParams();
-  const days = Number(params.get("days") ?? 90);
+  const days = daysAsked(params, 90);
   const product = at.product ?? "";
 
   const got = useQuery({
@@ -50,6 +51,7 @@ export function Scrutiny() {
 
   return (
     <Sheet
+      settled={got.isSuccess}
       name="Rubber-stamp"
       answers="how much a second pair of eyes actually did."
       asked={coveringWords(days)}
@@ -81,7 +83,7 @@ export function Scrutiny() {
                   Dismissals always need a second person. Every row here is a control that did not
                   hold.
                 </p>
-                <div className="tablewrap">
+                <Wide>
                   <table>
                     <thead>
                       <tr>
@@ -111,7 +113,7 @@ export function Scrutiny() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </Wide>
               </>
             ) : (
               <Empty
@@ -127,7 +129,7 @@ export function Scrutiny() {
             {exempt.length === 0 ? (
               <p className="hint">Nothing stands on one person in this window.</p>
             ) : (
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -148,7 +150,7 @@ export function Scrutiny() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
             )}
           </section>
 
@@ -163,7 +165,7 @@ export function Scrutiny() {
             {(got.data?.pairs ?? []).length === 0 ? (
               <p className="hint">Nobody has agreed to anything in this window.</p>
             ) : (
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -186,7 +188,7 @@ export function Scrutiny() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
             )}
           </section>
 
@@ -198,7 +200,7 @@ export function Scrutiny() {
             {(got.data?.bulk ?? []).length === 0 ? (
               <p className="hint">Nothing was agreed to in bulk in this window.</p>
             ) : (
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -221,7 +223,7 @@ export function Scrutiny() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
             )}
           </section>
 
@@ -233,7 +235,7 @@ export function Scrutiny() {
             {(got.data?.grew ?? []).length === 0 ? (
               <p className="hint">Nothing covers more than it did when it was agreed to.</p>
             ) : (
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -262,7 +264,7 @@ export function Scrutiny() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
             )}
           </section>
 
@@ -275,7 +277,7 @@ export function Scrutiny() {
             {(got.data?.lapsed ?? []).length === 0 ? (
               <p className="hint">Everyone whose agreement stands could still give it.</p>
             ) : (
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -306,7 +308,7 @@ export function Scrutiny() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
             )}
           </section>
         </>

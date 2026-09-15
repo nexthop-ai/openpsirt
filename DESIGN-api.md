@@ -155,6 +155,13 @@ walks the document and fails a declared limit that is not one of them.
 
 Ceilings vary by list. Which list allows what is a judgment about each list.
 
+| Rule | |
+|---|---|
+| A capped listing carries the whole-answer count | A caller cannot tell a clipped page from a complete answer otherwise, and every reader that recounted its own page stated a figure about the page under a heading about the whole. What is running out of time reported none, so a tile said 200 over a list of 462 |
+| A figure counted over the whole answer is returned beside the rows, not recomputed from them | Coverage reports how many builds there are, how many have gone quiet, how many have never been scanned and how many are out of support, each counted before the page is cut |
+| A bound declared for a listing bounds the whole listing | The holder picker declared twenty-five and applied it to the people alone, appending every team there is after them |
+| What a request asked for and could not be acted on comes back | A note naming more people than one act may tell reached some of them and said nothing about the rest, in the response or anywhere else |
+
 ## Sorting and filtering
 
 Filters are named fields with fixed meanings, bound as parameters.

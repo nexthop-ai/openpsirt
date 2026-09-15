@@ -9,6 +9,7 @@ import { Editor } from "../ui/Editor";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Severity } from "../ui/Severity";
+import { Wide } from "../ui/Wide";
 
 // What is approaching disclosure, and where an embargo is moved (a finding
 // saying whether it is disclosed, an extension needing agreement).
@@ -99,7 +100,7 @@ export function Disclosing() {
           detail="Recorded flaws under embargo appear here before their date, not on it."
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -202,7 +203,7 @@ export function Disclosing() {
               })}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
     </>
   );

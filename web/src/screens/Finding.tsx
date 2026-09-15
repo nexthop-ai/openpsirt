@@ -34,8 +34,6 @@ import { fromAt, listQuery, pathTo, where, windowFor } from "./list";
 // timeline, the revision history, the comments, and the decisions made at this
 // place before, whose reasoning is offered back.
 
-type Detail = Body<"DecisionDetail">;
-
 // What a step lands on, said in the hover rather than on the button: the
 // button says which direction, and which finding is what somebody checks
 // before taking it.
@@ -284,7 +282,16 @@ export function Finding() {
   }
   if (!it) return null;
 
-  const claims = standing.map((q) => q.data).filter((d): d is Detail => !!d);
+  // Each claim kept with the summary it came from, paired before anything is
+  // dropped. Filtering first and indexing the summary list afterwards paired
+  // a claim with another claim's summary the moment one of the parallel reads
+  // was slow or failed — and the summary is where the identifier the reasoning
+  // editor writes to comes from, so a revision landed on the wrong claim.
+  const pairs = standingIds.slice(0, SAMPLE).flatMap((_, i) => {
+    const claim = standing[i]?.data;
+    return claim ? [{ claim, summary: it.standing?.[i] }] : [];
+  });
+  const claims = pairs.map((pair) => pair.claim);
   const placeOf = new Map<number, string>();
   history.forEach((q, i) => {
     for (const d of q.data?.previously ?? []) {
@@ -727,11 +734,11 @@ export function Finding() {
       </div>
 
       <div className="acting">
-        {claims.map((claim, i) => (
+        {pairs.map(({ claim, summary }) => (
           <Standing
             key={claim.decision?.id}
             claim={claim}
-            summary={it.standing?.[i]}
+            summary={summary}
             places={places}
             mine={mine(claim.proposed_by ?? "")}
             mayApprove={!!who.data?.reach.find((r) => r.product === product)?.may_agree}
@@ -950,17 +957,17 @@ export function Finding() {
 
         {/* Keyed on the claim, not on the row: the reasoning, the agreement
             and the conversation belong to the action that made the judgment. */}
-        {claims.length > 0 && claims[0]?.decision?.claim_id && (
+        {pairs[0]?.claim.decision?.claim_id && (
           <>
             <Activity
-              claimId={claims[0].decision.claim_id}
-              claim={claims[0]}
-              places={it.standing?.[0]?.places}
+              claimId={pairs[0].claim.decision.claim_id}
+              claim={pairs[0].claim}
+              places={pairs[0].summary?.places}
               previous={previous}
             />
-            <Revisions claimId={claims[0].decision.claim_id} />
+            <Revisions claimId={pairs[0].claim.decision.claim_id} />
             <Comments
-              claimId={claims[0].decision.claim_id}
+              claimId={pairs[0].claim.decision.claim_id}
               mine={mine}
               about={{ product, vulnerability }}
               undisclosed={!!it.undisclosed}

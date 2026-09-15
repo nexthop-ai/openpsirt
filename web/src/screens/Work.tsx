@@ -9,6 +9,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited } from "../ui/Severity";
+import { Wide } from "../ui/Wide";
 
 // The most the server returns of what is running out. A cap rather than a
 // page — the list has no total — so a full list is said to be a cap and not
@@ -195,7 +196,7 @@ function ByPerson({
       {release.error != null && (
         <Failed error={release.error} what="Their work could not be released." />
       )}
-      <div className="tablewrap">
+      <Wide>
         <table>
           <thead>
             <tr>
@@ -256,7 +257,7 @@ function ByPerson({
             ))}
           </tbody>
         </table>
-      </div>
+      </Wide>
       <p className="hint" style={{ marginTop: 10 }}>
         <b>Open</b> is one issue in one component. <b>Findings</b> is the rows those cover across
         every build.
@@ -292,7 +293,7 @@ function Held({
 
   return (
     <>
-      <div className="tablewrap">
+      <Wide>
         <table>
           <thead>
             <tr>
@@ -350,7 +351,7 @@ function Held({
             ))}
           </tbody>
         </table>
-      </div>
+      </Wide>
       <div className="filters" style={{ margin: "10px 0 0" }}>
         <span className="hint">
           Showing {rows.length.toLocaleString()} of {total.toLocaleString()}

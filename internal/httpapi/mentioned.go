@@ -119,7 +119,14 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	if len(names) == 0 || about.ProductID == 0 {
 		return nil, nil
 	}
+	// Past the cap, the surplus is reported rather than discarded. It was cut
+	// before the loop that builds the list of names that did not land, so a
+	// note mentioning more people than one act may tell reached some of them
+	// and said nothing at all about the rest — not in what comes back, and
+	// not anywhere else.
+	var over []string
 	if len(names) > mentionCap {
+		over = names[mentionCap:]
 		names = names[:mentionCap]
 	}
 
@@ -140,7 +147,7 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	}
 
 	told := map[int64]bool{subject.ID: true}
-	var dropped []string
+	dropped := append([]string(nil), over...)
 	for _, name := range names {
 		who, known := byName[strings.ToLower(name)]
 		// A name nobody holds, and a name held by somebody who may not read

@@ -91,10 +91,14 @@
   /* A wide table stays wide on a narrow screen and says so, rather than being
      folded into something that reads badly and works worse. It scrolls
      sideways, which is discoverable once somebody knows it is a table and not
-     once they think the page is cut off — so the table says which it is. The
-     findings list is exempt: it has cards on this width and its table is
-     hidden above. */
-  .tablewrap::before {
+     once they think the page is cut off — so the table says which it is.
+
+     Only the ones that are actually wider. The attribute is set by the
+     component when it measures itself past its box, because a stylesheet
+     cannot ask: saying it over a two-column table that fits is a note about
+     scrolling on something nobody can scroll, which teaches people to stop
+     reading the notes. */
+  .tablewrap[data-wider]::before {
     content: "Wider than the screen — scroll it sideways.";
     display: block;
     padding: 8px 12px;
@@ -103,9 +107,6 @@
     font-size: var(--step--1);
     position: sticky;
     left: 0;
-  }
-  .findings .tablewrap::before {
-    content: none;
   }
   .tabbar {
     display: flex;

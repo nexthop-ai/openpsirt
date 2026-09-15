@@ -86,21 +86,19 @@ export function Scope() {
   // three openings of the same panel.
   function apply(chosen: Scoped, close = false) {
     if (close) setOpen(false);
+    remember(chosen);
     // Stay where you are. A screen that names a build swaps its build and
     // keeps doing whatever it was doing; anything else simply remembers the
     // choice, because changing scope is not a reason to move somebody.
-    if (chosen.product && chosen.stream && chosen.variant) {
-      const next = rescoped(pathname, {
-        product: chosen.product,
-        stream: chosen.stream,
-        variant: chosen.variant,
-      });
-      if (next) {
-        navigate(next);
-        return;
-      }
+    //
+    // Partial selections go through the same question, because an address
+    // that names a product is the authority for that product: remembering
+    // another one and staying put lets the path put the old one back.
+    const next = rescoped(pathname, chosen);
+    if (next) {
+      navigate(next);
+      return;
     }
-    remember(chosen);
     // The findings list answers for whatever is selected rather than declining
     // a partial one, and its address carries the selection — so it moves to
     // the wider list rather than leaving the narrower one on screen. This is

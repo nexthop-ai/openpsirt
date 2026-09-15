@@ -89,6 +89,11 @@ const fetchAround =
 // exploration.
 //
 // Which component is selected lives in the URL, so a link carries it.
+// What sits under one node, in whichever of the three states the read is in:
+// nothing yet, refused, or the rows themselves. Two of them are not the same
+// answer, and drawing them alike is what left a node spinning for ever.
+type Under = { kids?: Node[]; error?: unknown };
+
 export function Tree() {
   const { product = "" } = useParams();
   const who = useWho();
@@ -99,6 +104,12 @@ export function Tree() {
   // say how much sits under it, and opening one is the question they may not
   // ask.
   if (who.isPending) return <Loading />;
+  // Which of the two trees somebody gets turns on what they may read, so a
+  // failed identity read is not an answer: falling through drew the whole
+  // build's inventory for a subject nobody had established may see it.
+  if (who.isError) {
+    return <Failed error={who.error} what="What you may see here could not be read." />;
+  }
   if (who.data && !who.data.reach.some((each) => each.product === product)) return <Yours />;
   return <Whole />;
 }
@@ -294,12 +305,18 @@ function Whole() {
     })),
   });
 
+  // What sits under each opened node, and which of the three states that is
+  // in. A read that failed and a read still in flight both had no rows, and
+  // both were drawn as the second — so a container whose children could not be
+  // read spun for ever with nothing said.
   const below = useMemo(() => {
-    const map = new Map<string, Node[] | undefined>();
-    if (rootName) map.set(rootName, (top.data?.items ?? []) as Node[]);
+    const map = new Map<string, Under>();
+    if (rootName) map.set(rootName, { kids: (top.data?.items ?? []) as Node[] });
     wanted.forEach((name, i) => {
-      const answer = branches[i]?.data;
-      map.set(name, answer ? ((answer.below ?? []) as Node[]) : undefined);
+      const asked = branches[i];
+      if (asked?.data) map.set(name, { kids: (asked.data.below ?? []) as Node[] });
+      else if (asked?.isError) map.set(name, { error: asked.error });
+      else map.set(name, {});
     });
     return map;
   }, [rootName, top.data, wanted, branches]);
@@ -555,7 +572,7 @@ function Branches({
 }: {
   at: At;
   root: Node;
-  below: Map<string, Node[] | undefined>;
+  below: Map<string, Under>;
   opened: Set<string>;
   widened: Set<string>;
   onPath: Set<string>;
@@ -580,7 +597,8 @@ function Branches({
 
     const isOpen = opened.has(name);
     const openable = node.children > 0 && !repeated;
-    const kids = below.get(name);
+    const under = below.get(name);
+    const kids = under?.kids;
 
     rows.push(
       <div
@@ -690,7 +708,13 @@ function Branches({
       rows.push(
         <div key={`${path}/…`} className="node" style={{ paddingLeft: (depth + 1) * 20 }}>
           <span className="rule">·</span>
-          <Loading inline />
+          {under?.error !== undefined ? (
+            <span className="hint" style={{ color: "var(--sev-high)" }}>
+              What sits under {name} could not be read.
+            </span>
+          ) : (
+            <Loading inline />
+          )}
         </div>,
       );
       return;

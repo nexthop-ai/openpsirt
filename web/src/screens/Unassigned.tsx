@@ -13,6 +13,7 @@ import { Holder } from "../ui/Holder";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
+import { Wide } from "../ui/Wide";
 
 // A page of what nobody holds. The head says the total; the page says what
 // of it is in front of somebody.
@@ -26,7 +27,16 @@ export function Unassigned() {
   const scope = scopeQuery(useScope());
   const { offset, go } = usePaging();
   const queries = useQueryClient();
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  // The rows themselves, not just their keys.
+  //
+  // The selection survives paging and the page does not, so a loop built from
+  // what is on screen acts on a part of what was ticked — and then reports and
+  // clears the whole of it. Holding the row is what lets the action iterate
+  // the selection.
+  const [picked, setPicked] = useState<Map<string, Owned>>(new Map());
+  // Which of them were refused, so a second press retries those and not the
+  // ones already recorded.
+  const [refused, setRefused] = useState<unknown>(null);
   const { cap, over } = useBulkCap(picked.size);
   const [person, setPerson] = useState("");
   const rows = useQuery({
@@ -84,13 +94,27 @@ export function Unassigned() {
   const keyOf = (row: Owned) =>
     `${row.product} ${row.vulnerability} ${row.component} ${row.version}`;
 
+  // The same action repeated, not a different one — each finding records who
+  // it went to and when.
+  //
+  // Over the selection rather than over the page, and every refusal is carried
+  // to the end rather than stopping at the first: a partial run that stops
+  // leaves some rows recorded and some not, with nothing on screen saying
+  // which. What is left ticked afterwards is exactly what was refused, so
+  // pressing again retries those alone.
   async function assignTo(to: string, team?: boolean) {
-    // The same action repeated, not a different one — each finding records
-    // who it went to and when.
-    for (const row of items.filter((r) => picked.has(keyOf(r)))) {
-      await assign.mutateAsync({ row, person: to, team });
+    const left = new Map<string, Owned>();
+    let failure: unknown = null;
+    for (const [key, row] of picked) {
+      try {
+        await assign.mutateAsync({ row, person: to, team });
+      } catch (error) {
+        left.set(key, row);
+        failure ??= error;
+      }
     }
-    setPicked(new Set());
+    setPicked(left);
+    setRefused(failure);
   }
 
   return (
@@ -98,7 +122,7 @@ export function Unassigned() {
       <div className="screen-head">
         <h2>Unassigned</h2>
         <p>
-          Undecided findings with nobody assigned,{" "}
+          Open findings with nobody assigned,{" "}
           {scope.product
             ? [scope.product, scope.stream, scope.variant].filter(Boolean).join(" · ")
             : "across every product you can see"}{" "}
@@ -106,7 +130,9 @@ export function Unassigned() {
         </p>
       </div>
 
-      {assign.error != null && <Failed error={assign.error} what="That could not be assigned." />}
+      {refused != null && (
+        <Failed error={refused} what="Some of those could not be assigned, and stay selected." />
+      )}
 
       {items.length === 0 ? (
         <Empty title="Everything open has somebody on it." />
@@ -165,7 +191,7 @@ export function Unassigned() {
             </button>
           </div>
 
-          <div className="tablewrap" style={{ marginTop: 10 }}>
+          <Wide style={{ marginTop: 10 }}>
             <table>
               <thead>
                 <tr>
@@ -173,10 +199,17 @@ export function Unassigned() {
                     <input
                       type="checkbox"
                       aria-label="Select every row shown"
-                      checked={picked.size > 0 && picked.size === items.length}
-                      onChange={(event) =>
-                        setPicked(event.target.checked ? new Set(items.map(keyOf)) : new Set())
-                      }
+                      checked={picked.size > 0 && items.every((row) => picked.has(keyOf(row)))}
+                      onChange={(event) => {
+                        // The page, added to or taken out of the selection —
+                        // which spans pages, so this cannot replace it.
+                        const next = new Map(picked);
+                        for (const row of items) {
+                          if (event.target.checked) next.set(keyOf(row), row);
+                          else next.delete(keyOf(row));
+                        }
+                        setPicked(next);
+                      }}
                     />
                   </th>
                   <th>Severity</th>
@@ -195,8 +228,8 @@ export function Unassigned() {
                         aria-label={`Select ${row.vulnerability}`}
                         checked={picked.has(keyOf(row))}
                         onChange={(event) => {
-                          const next = new Set(picked);
-                          if (event.target.checked) next.add(keyOf(row));
+                          const next = new Map(picked);
+                          if (event.target.checked) next.set(keyOf(row), row);
                           else next.delete(keyOf(row));
                           setPicked(next);
                         }}
@@ -247,7 +280,7 @@ export function Unassigned() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
           <Paged
             shown={items.length}
             total={rows.data?.total}

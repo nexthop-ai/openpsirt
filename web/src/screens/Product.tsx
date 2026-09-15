@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Wide } from "../ui/Wide";
 
 // One product's own page.
 //
@@ -88,7 +89,7 @@ export function Product() {
             detail="A build is a branch or tag and a variant. Declare them, and an upload can be filed against one."
           />
         ) : (
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -177,7 +178,7 @@ export function Product() {
                 })}
               </tbody>
             </table>
-          </div>
+          </Wide>
         )}
         <p className="hint" style={{ marginTop: 8 }}>
           Issues at components, the same unit the findings list uses. <b>Undecided</b> means no

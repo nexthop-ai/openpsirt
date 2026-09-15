@@ -150,11 +150,32 @@ func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
 }
 
 // Teams lists the teams in use, by name.
-func (s *Store) Teams(ctx context.Context) ([]Team, error) {
+//
+// Bounded like every other listing. A picker declaring that it returns
+// twenty-five names appended every team there is after them, so a deployment
+// with two hundred teams answered a bounded question with an unbounded list.
+//
+// The term narrows in the statement rather than after it: filtering a bounded
+// read in the caller cuts before the match is looked for, so a team whose name
+// sorts late would be missing from a search that names it exactly.
+func (s *Store) Teams(ctx context.Context, term string, limit int) ([]Team, error) {
 	var teams []Team
-	if err := s.db.NewSelect().Model(&teams).
+	query := s.db.NewSelect().Model(&teams).
 		Where("retired_at IS NULL").
-		Order("name").Scan(ctx); err != nil {
+		Order("name").
+		Limit(database.AList.Of(limit))
+	if wanted := strings.TrimSpace(term); wanted != "" {
+		// Matched without regard to capitals, the way every name a person
+		// types is matched here, and escaped: a search box is not a pattern
+		// language, and a term of "%" would answer with every team there is.
+		like := database.LikeContains(wanted)
+		query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr(`LOWER("name") LIKE ?`+database.LikeClause, like).
+				WhereOr(`LOWER(COALESCE(NULLIF("display_name", ''), "name")) LIKE ?`+
+					database.LikeClause, like)
+		})
+	}
+	if err := query.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which teams there are: %w", err)
 	}
 	return teams, nil

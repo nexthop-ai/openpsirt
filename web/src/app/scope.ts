@@ -96,11 +96,30 @@ export function remember(scope: Scoped) {
   }
 }
 
+// What was kept, checked rather than asserted.
+//
+// The value reaches a URL path segment and a request's query string, and it
+// comes from browser storage — which an older build of this application wrote,
+// which a person can edit, and which a cast does not examine. A number or an
+// object there would become `[object Object]` in a query parameter. So each
+// level is taken only when it is a non-empty string, and anything else is
+// forgotten.
 function remembered(): Scoped {
   try {
     const kept = window.sessionStorage.getItem(KEPT);
-    return kept ? (JSON.parse(kept) as Scoped) : {};
+    if (!kept) return {};
+    const raw: unknown = JSON.parse(kept);
+    if (typeof raw !== "object" || raw === null) return {};
+    const at = raw as Record<string, unknown>;
+    const scope: Scoped = {};
+    for (const level of ["product", "stream", "variant"] as const) {
+      const value = at[level];
+      if (typeof value === "string" && value) scope[level] = value;
+    }
+    return scope;
   } catch {
+    // A malformed entry is not something a reader can act on, and throwing
+    // here would take the screen down over a remembered preference.
     return {};
   }
 }
@@ -146,22 +165,60 @@ export function useScope(): Scoped {
   return remembered();
 }
 
+// What survives a product change, per address that names a product.
+//
+// The name in the path is what these screens read, so remembering a different
+// product and staying put means the path re-supplies the old one and the
+// picker snaps back with nothing said. Each is rewritten instead — and what
+// sits below the product in the address is dropped where it belongs to the
+// product that was there: a branch is one product's, and so is a component.
+const UNDER_PRODUCT: { shape: string; carries: "nothing" | "stream" | "tail" }[] = [
+  { shape: "/products/:product/streams/:stream", carries: "stream" },
+  { shape: "/products/:product/streams", carries: "tail" },
+  { shape: "/products/:product/variants", carries: "tail" },
+  { shape: "/products/:product/comparison", carries: "tail" },
+  { shape: "/products/:product/components/:component", carries: "nothing" },
+  { shape: "/products/:product", carries: "tail" },
+];
+
 // where a scope change should land, given where somebody already is.
 //
 // Staying put is the point: changing what you are looking at is a property of
 // the screen rather than a journey to another one, so a build-scoped screen
 // swaps its build and everything else stays exactly where it was.
-export function rescoped(pathname: string, to: Required<Scoped>): string | null {
-  const hit = matchPath(`${BUILD}/*`, pathname) ?? matchPath(BUILD, pathname);
-  if (!hit) {
-    // The wider list, handed a whole build, becomes that build's own list —
-    // which is the same screen at the address the rest of the build shares.
-    return matchPath(LIST, pathname) ? findingsPath(to) : null;
+//
+// Null means stay exactly where you are, which is right for every address that
+// names nothing that changed — the review queue is nobody's product, and
+// rewriting it would turn a filter into a jump.
+export function rescoped(pathname: string, to: Scoped): string | null {
+  const build = matchPath(`${BUILD}/*`, pathname) ?? matchPath(BUILD, pathname);
+  if (build) {
+    // A build-scoped screen exists for one build and no other, so a partial
+    // selection has nowhere to land. The picker disables those levels while
+    // somebody stands on one, so this is the belt rather than the braces.
+    if (!to.product || !to.stream || !to.variant) return null;
+    const rest = (build.params as { "*"?: string })["*"] ?? "";
+    const base =
+      `/products/${encodeURIComponent(to.product)}` +
+      `/streams/${encodeURIComponent(to.stream)}` +
+      `/variants/${encodeURIComponent(to.variant)}`;
+    return rest ? `${base}/${rest}` : `${base}/findings`;
   }
-  const rest = (hit.params as { "*"?: string })["*"] ?? "";
-  const base =
-    `/products/${encodeURIComponent(to.product)}` +
-    `/streams/${encodeURIComponent(to.stream)}` +
-    `/variants/${encodeURIComponent(to.variant)}`;
-  return rest ? `${base}/${rest}` : `${base}/findings`;
+  // The wider list carries the whole selection in its own address.
+  if (matchPath(LIST, pathname)) return findingsPath(to);
+  for (const { shape, carries } of UNDER_PRODUCT) {
+    const hit = matchPath(shape, pathname);
+    if (!hit) continue;
+    // Every product, chosen from one product's screen, is the catalog.
+    if (!to.product) return "/products";
+    const base = `/products/${encodeURIComponent(to.product)}`;
+    if (carries === "nothing") return base;
+    if (carries === "tail") {
+      const tail = shape.slice("/products/:product".length);
+      return hit.params.product === to.product ? null : `${base}${tail}`;
+    }
+    if (hit.params.product === to.product && hit.params.stream === to.stream) return null;
+    return to.stream ? `${base}/streams/${encodeURIComponent(to.stream)}` : `${base}/streams`;
+  }
+  return null;
 }

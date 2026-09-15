@@ -115,6 +115,10 @@ type Late struct {
 	// for the group. They are read and then discarded.
 	AssignedHigh  *int64 `bun:"assigned_high"`
 	AssignedCount int    `bun:"assigned_count"`
+	// Total is how many rows the question has in all, counted after the
+	// grouping and before the limit. It rides on the page rather than being
+	// asked for separately, and it is read off the first row and discarded.
+	Total int `bun:"total"`
 }
 
 // OffTheClock is the condition under which a decision standing at a finding
@@ -203,7 +207,7 @@ func InForce() (string, []any) {
 // which is honestly "not known yet" rather than "not due", and either way not
 // something to interrupt anybody about.
 func (s *Store) RunningOut(ctx context.Context, subject access.Subject, scope Scope,
-	within time.Duration, limit int) ([]Late, error) {
+	within time.Duration, limit int) ([]Late, int, error) {
 
 	return s.RunningOutPage(ctx, subject, scope, within, limit, 0)
 }
@@ -216,31 +220,56 @@ func (s *Store) RunningOut(ctx context.Context, subject access.Subject, scope Sc
 // what somebody exports a deadline report for is precisely the part they have
 // not read.
 func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scope Scope,
-	within time.Duration, limit, offset int) ([]Late, error) {
+	within time.Duration, limit, offset int) ([]Late, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second. A person holding
 	// nothing is the first, and is answered below.
 	if subject.Kind != access.Person {
-		return nil, access.Denied("read what is running out of time")
+		return nil, 0, access.Denied("read what is running out of time")
 	}
 	products, all := subject.Products()
 	if !all && len(products) == 0 {
-		return nil, nil
+		return nil, 0, nil
 	}
 	limit = database.AList.Of(limit)
 
 	standing, args := OffTheClock("st.product_id", s.now())
-	query := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN product AS "p" ON p.id = st.product_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		// The consumer, for the versions a decision is keyed on.
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+	// The narrowing, on its own, so the page and the count ask the same
+	// question of the same joins. Two spellings of one predicate is how a
+	// total stops describing the list it sits under.
+	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+			Join(`JOIN product AS "p" ON p.id = st.product_id`).
+			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			// The consumer, for the versions a decision is keyed on.
+			Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+			Where("f.closed_at IS NULL").
+			Where("f.due_at IS NOT NULL").
+			Where("f.due_at <= ?", s.now().UTC().Add(within)).
+			// Nothing the build already argued away, and nothing a decision
+			// takes off the clock. Not merely a claim: a proposal waiting for
+			// a second person suppresses nothing, and it took findings off
+			// this list for as long as it sat in the queue — a quarter, on
+			// one — while the same findings still counted as overdue against
+			// whoever held them.
+			Where("f.suppressed_by IS NULL").
+			Where("NOT "+standing, args...)
+		if !all {
+			q = q.Where("st.product_id IN (?)", bun.List(products))
+		}
+		return scope.Narrow(onlyVisible(q, subject, products, all))
+	}
+	// The grouping, which decides what one row is: an issue at a component in
+	// one build, however many places it sits at there.
+	const grouping = "v.identifier, c.name, c.version, f.urgency_exploited, p.display_name, " +
+		"st.display_name, va.display_name, f.target_id, f.vulnerability_id, f.component_id"
+
+	query := narrow(s.db.NewSelect()).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
@@ -259,33 +288,21 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
 		ColumnExpr(`MAX(f.assigned_to) AS "assigned_high"`).
 		ColumnExpr(`COUNT(f.assigned_to) AS "assigned_count"`).
-		Where("f.closed_at IS NULL").
-		Where("f.due_at IS NOT NULL").
-		Where("f.due_at <= ?", s.now().UTC().Add(within)).
-		// Nothing the build already argued away, and nothing a decision
-		// takes off the clock. Not merely a claim: a proposal waiting for a
-		// second person suppresses nothing, and it took findings off this list
-		// for as long as it sat in the queue — a quarter, on one — while the
-		// same findings still counted as overdue against whoever held them.
-		Where("f.suppressed_by IS NULL").
-		Where("NOT "+standing, args...).
-		GroupExpr("v.identifier, c.name, c.version, f.urgency_exploited, p.display_name, " +
-			"st.display_name, va.display_name, f.target_id, f.vulnerability_id, f.component_id").
+		// How many groups the question has, counted over the grouped result
+		// and before the limit. A screen that counted its own page said two
+		// hundred over a list of four hundred and sixty-two.
+		ColumnExpr(`COUNT(*) OVER () AS "total"`).
+		GroupExpr(grouping).
 		// The build is in the order as well as in the grouping. Without it two
 		// rows identical down to the component name order arbitrarily, and an
 		// arbitrary order between pages is how a paged read repeats one row
 		// and skips another.
 		OrderExpr("due, v.identifier, c.name, f.target_id").
 		Limit(limit).Offset(offset)
-	if !all {
-		query = query.Where("st.product_id IN (?)", bun.List(products))
-	}
-	query = onlyVisible(query, subject, products, all)
-	query = scope.Narrow(query)
 
 	var late []Late
 	if err := query.Scan(ctx, &late); err != nil {
-		return nil, fmt.Errorf("read what is running out of time: %w", err)
+		return nil, 0, fmt.Errorf("read what is running out of time: %w", err)
 	}
 	for i := range late {
 		if late[i].AssignedCount != late[i].Places || late[i].AssignedTo == nil ||
@@ -293,7 +310,27 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			late[i].AssignedTo = nil
 		}
 	}
-	return late, nil
+	// A page past the end of the answer carries no row to read the count off.
+	// The groups are counted on their own in that case, which is the one call
+	// that costs a second statement.
+	total := 0
+	if len(late) > 0 {
+		total = late[0].Total
+	} else if offset > 0 {
+		// The derived table is named "grouped" and quoted: GROUPS names a
+		// window frame type on MySQL 8, so the obvious alias is a syntax
+		// error on one engine and fine on the other three.
+		count, err := s.db.NewSelect().
+			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
+				ColumnExpr("f.vulnerability_id").
+				GroupExpr(grouping)).
+			Count(ctx)
+		if err != nil {
+			return nil, 0, fmt.Errorf("count what is running out of time: %w", err)
+		}
+		total = count
+	}
+	return late, total, nil
 }
 
 // Recompute rewrites the deadline on every open finding.

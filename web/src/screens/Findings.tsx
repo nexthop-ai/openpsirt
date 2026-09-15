@@ -38,6 +38,7 @@ import {
   type Row,
   usePaging,
 } from "./list";
+import { Wide } from "../ui/Wide";
 
 // The filters the by-bump view can apply, by the key their chip carries.
 //
@@ -800,7 +801,7 @@ export function Findings() {
         <Empty title="Nothing matches these filters." />
       ) : (
         <div className="findings">
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -1156,7 +1157,7 @@ export function Findings() {
                 })}
               </tbody>
             </table>
-          </div>
+          </Wide>
 
           <div className="cards">
             {rows.map((row) => {

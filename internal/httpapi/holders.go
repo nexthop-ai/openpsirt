@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"sort"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -87,7 +86,10 @@ func registerHolders(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who may hold this could not be read", err)
 		}
-		teams, err := store.Teams(ctx)
+		// Narrowed and bounded by the same term and the same limit the people
+		// were. The declared bound was applied to the people alone, so every
+		// team there is followed them however many that was.
+		teams, err := store.Teams(ctx, input.Term, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "which teams there are could not be read", err)
 		}
@@ -97,23 +99,20 @@ func registerHolders(api huma.API, in Ingest) {
 		// Teams first. There are few of them beside the people, and a picker
 		// that buries three teams under twenty-five names is one where the
 		// team is never found.
-		wantedTerm := strings.ToLower(strings.TrimSpace(input.Term))
 		named := make([]HolderBody, 0, len(teams))
 		for _, team := range teams {
 			shown := team.DisplayName
 			if shown == "" {
 				shown = team.Name
 			}
-			if wantedTerm != "" &&
-				!strings.Contains(strings.ToLower(team.Name), wantedTerm) &&
-				!strings.Contains(strings.ToLower(shown), wantedTerm) {
-				continue
-			}
 			named = append(named, HolderBody{Kind: "team", Identity: team.Name, Name: shown})
 		}
 		sort.Slice(named, func(i, j int) bool { return named[i].Identity < named[j].Identity })
 		out.Body.Items = append(out.Body.Items, named...)
 		for _, person := range people {
+			if len(out.Body.Items) >= input.Limit {
+				break
+			}
 			out.Body.Items = append(out.Body.Items, HolderBody{
 				Kind: "person", Identity: person.Identity, Name: person.Name,
 			})

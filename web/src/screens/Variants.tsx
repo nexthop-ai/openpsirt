@@ -10,6 +10,7 @@ import { AddButton, Declare, Field } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Wide } from "../ui/Wide";
 
 // A variant is the same code built a different way — a chip, an architecture,
 // an operating system. It belongs to the product and is declared once, not
@@ -93,7 +94,7 @@ export function Variants() {
           }
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -137,7 +138,7 @@ export function Variants() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       <Declare

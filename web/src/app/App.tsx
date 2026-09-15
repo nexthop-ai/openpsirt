@@ -1,9 +1,11 @@
 import { Suspense, lazy, useEffect, useSyncExternalStore } from "react";
 import { Loading } from "../ui/Loading";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Failed } from "../ui/Failed";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useWho } from "./session";
 import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
+import { Boundary } from "./Boundary";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
@@ -103,6 +105,10 @@ export const ROUTES = {
 export function App() {
   const who = useWho();
   const ended = useSyncExternalStore(subscribe, snapshot, snapshot);
+  // The boundary around the screens is keyed on the address, so walking away
+  // from one that threw clears it. A boundary that held its error until
+  // somebody pressed Try again would follow them to every other screen.
+  const { pathname } = useLocation();
 
   // Whose drafts this page reads and writes, decided here because this is the
   // one place that knows who is signed in and every screen below it takes the
@@ -123,6 +129,28 @@ export function App() {
 
   if (who.isPending) return <Waiting />;
 
+  // A failed read is not an answer about who is signed in.
+  //
+  // The identity read resolves a 401 to "nobody", so anything that reaches
+  // here is a server that could not be asked. Drawing that as signed out
+  // sends somebody who is signed in back through their identity provider —
+  // where there is exactly one, without even a button to press — over what is
+  // usually a transient failure.
+  if (who.isError) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <div style={{ maxWidth: 520 }}>
+          <Failed error={who.error} what="Who is signed in could not be read." />
+          <div className="actions" style={{ marginTop: 12 }}>
+            <button type="button" className="btn" onClick={() => void who.refetch()}>
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Nobody signed in. Not an error state — it is what a fresh browser looks
   // like, and the only thing to offer is a way in.
   if (!who.data) return <SignIn />;
@@ -131,57 +159,62 @@ export function App() {
     <>
       {ended && <Resume />}
       <Shell who={who.data}>
-        <Suspense fallback={<Loading />}>
-          <Routes>
-            <Route path={ROUTES.home} element={<Home who={who.data} />} />
-            <Route path={ROUTES.reviewQueue} element={<Queue />} />
-            <Route path={ROUTES.unassigned} element={<Unassigned />} />
-            <Route path={ROUTES.findings} element={<Findings />} />
-            {/* One claim, whole, and every act at that grain. A decision's
+        {/* Inside the frame rather than around it: a screen that throws should
+            leave the rail, the scope bar and the way to another screen where
+            they are. The one around the whole application is in `main.tsx`,
+            for the frame's own throws. */}
+        <Boundary key={pathname} where={pathname} what="This screen could not be drawn.">
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              <Route path={ROUTES.home} element={<Home who={who.data} />} />
+              <Route path={ROUTES.reviewQueue} element={<Queue />} />
+              <Route path={ROUTES.unassigned} element={<Unassigned />} />
+              <Route path={ROUTES.findings} element={<Findings />} />
+              {/* One claim, whole, and every act at that grain. A decision's
                 address resolves to it: what a judgment says belongs to the
                 action that made it, not to any one of its rows. */}
-            <Route path={ROUTES.claim} element={<Claim who={who.data} />} />
-            <Route path={ROUTES.decision} element={<Decision />} />
-            {/* One issue, everywhere it sits. Not under a product,
+              <Route path={ROUTES.claim} element={<Claim who={who.data} />} />
+              <Route path={ROUTES.decision} element={<Decision />} />
+              {/* One issue, everywhere it sits. Not under a product,
                 because the question it answers spans them. */}
-            <Route path={ROUTES.issue} element={<Issue />} />
-            <Route path={ROUTES.products} element={<Products who={who.data} />} />
-            <Route path={ROUTES.product} element={<Product />} />
-            <Route path={ROUTES.streams} element={<Streams />} />
-            {/* A branch and a tag share this address and are different
+              <Route path={ROUTES.issue} element={<Issue />} />
+              <Route path={ROUTES.products} element={<Products who={who.data} />} />
+              <Route path={ROUTES.product} element={<Product />} />
+              <Route path={ROUTES.streams} element={<Streams />} />
+              {/* A branch and a tag share this address and are different
                 questions, so it resolves to whichever screen answers the one
                 that line poses. */}
-            <Route path={ROUTES.stream} element={<Stream />} />
-            <Route path={ROUTES.variants} element={<Variants />} />
-            {/* The list at whatever the picker selects, and the same screen at the
+              <Route path={ROUTES.stream} element={<Stream />} />
+              <Route path={ROUTES.variants} element={<Variants />} />
+              {/* The list at whatever the picker selects, and the same screen at the
             address a build's other screens share. */}
-            <Route path={ROUTES.productFindings} element={<Findings />} />
-            <Route path={ROUTES.productComponent} element={<Component />} />
-            <Route path={ROUTES.buildFindings} element={<Findings />} />
-            <Route path={ROUTES.finding} element={<Finding />} />
-            <Route path={ROUTES.tree} element={<Tree />} />
-            <Route path={ROUTES.decide} element={<Together />} />
-            <Route path={ROUTES.inventories} element={<Inventories />} />
-            <Route path={ROUTES.run} element={<Run />} />
-            <Route path={ROUTES.upgrades} element={<Upgrades />} />
-            <Route path={ROUTES.comparison} element={<Compare />} />
-            {/* A person's own page: what they reach, what is sent to them,
+              <Route path={ROUTES.productFindings} element={<Findings />} />
+              <Route path={ROUTES.productComponent} element={<Component />} />
+              <Route path={ROUTES.buildFindings} element={<Findings />} />
+              <Route path={ROUTES.finding} element={<Finding />} />
+              <Route path={ROUTES.tree} element={<Tree />} />
+              <Route path={ROUTES.decide} element={<Together />} />
+              <Route path={ROUTES.inventories} element={<Inventories />} />
+              <Route path={ROUTES.run} element={<Run />} />
+              <Route path={ROUTES.upgrades} element={<Upgrades />} />
+              <Route path={ROUTES.comparison} element={<Compare />} />
+              {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}
-            <Route path={ROUTES.me} element={<Me />} />
-            <Route path={ROUTES.people} element={<People />} />
-            {/* One person, whole. An administrator's surface: it carries what
+              <Route path={ROUTES.me} element={<Me />} />
+              <Route path={ROUTES.people} element={<People />} />
+              {/* One person, whole. An administrator's surface: it carries what
                 somebody was told, which is the question asked after a leak. */}
-            <Route path={ROUTES.person} element={<Person />} />
-            <Route path={ROUTES.teams} element={<Teams />} />
-            <Route path={ROUTES.work} element={<Work />} />
-            <Route path={ROUTES.audit} element={<Audit />} />
-            <Route path={ROUTES.reports} element={<Reports />} />
-            <Route path={ROUTES.report} element={<Report />} />
-            <Route path={ROUTES.record} element={<Record />} />
-            <Route path={ROUTES.disclosing} element={<Disclosing />} />
-            <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
-            <Route path={ROUTES.settings} element={<Settings />} />
-            {/* A path the page does not know either. Sending somebody home is
+              <Route path={ROUTES.person} element={<Person />} />
+              <Route path={ROUTES.teams} element={<Teams />} />
+              <Route path={ROUTES.work} element={<Work />} />
+              <Route path={ROUTES.audit} element={<Audit />} />
+              <Route path={ROUTES.reports} element={<Reports />} />
+              <Route path={ROUTES.report} element={<Report />} />
+              <Route path={ROUTES.record} element={<Record />} />
+              <Route path={ROUTES.disclosing} element={<Disclosing />} />
+              <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
+              <Route path={ROUTES.settings} element={<Settings />} />
+              {/* A path the page does not know either. Sending somebody home is
             better than a dead end — and the replace is what stops the back
             button returning to an address that only redirects again.
             
@@ -191,9 +224,10 @@ export function App() {
             `/products//components/NAME` — a component link built with no
             product selected — was reported as "it brings you back to the
             homepage". */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </Boundary>
       </Shell>
     </>
   );

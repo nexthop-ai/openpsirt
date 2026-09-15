@@ -6,6 +6,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
 import { BANDS } from "../ui/severities";
+import { Wide } from "../ui/Wide";
 
 // One release, gathered.
 //
@@ -73,7 +74,11 @@ export function Release({ product, stream }: { product: string; stream: string }
   }
 
   const bands = totalled(counts.map((one) => one.data?.now));
-  const settled = counts.every((one) => !one.isPending);
+  // Every variant answered, not merely every variant finished asking. A read
+  // that failed is not pending either, so the weaker test drew the totals as a
+  // finished answer with the failed variants counted as zero.
+  const settled = counts.every((one) => one.isSuccess);
+  const unread = counts.filter((one) => one.isError).length;
 
   return (
     <>
@@ -110,7 +115,7 @@ export function Release({ product, stream }: { product: string; stream: string }
             detail="No scan has ever named a build of this release, so there is nothing here to say what it shipped."
           />
         ) : (
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -140,6 +145,8 @@ export function Release({ product, stream }: { product: string; stream: string }
                       <td>
                         {counts[at_]?.isPending ? (
                           <span className="hint">…</span>
+                        ) : counts[at_]?.isError ? (
+                          <span className="hint">could not be read</span>
                         ) : (
                           (mine?.total ?? 0).toLocaleString()
                         )}
@@ -155,7 +162,7 @@ export function Release({ product, stream }: { product: string; stream: string }
                 })}
               </tbody>
             </table>
-          </div>
+          </Wide>
         )}
       </section>
 
@@ -164,8 +171,17 @@ export function Release({ product, stream }: { product: string; stream: string }
         <p className="hint" style={{ marginTop: 0 }}>
           Open across every variant, by severity. Tags never change, so nothing here has a deadline.
         </p>
-        {!settled ? (
+        {counts.some((one) => one.isPending) ? (
           <p className="hint">…</p>
+        ) : !settled ? (
+          <Failed
+            error={counts.find((one) => one.isError)?.error}
+            what={
+              unread === counts.length
+                ? "What is open here could not be read."
+                : `${unread} of these variants could not be read, so there is no total to give.`
+            }
+          />
         ) : (
           <ul className="files catalog">
             {BANDS.map((band) => (

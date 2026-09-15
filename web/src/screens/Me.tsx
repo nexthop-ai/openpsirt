@@ -9,6 +9,7 @@ import { useWho } from "../app/session";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { UNITS, write, type Unit } from "./duration";
+import { Wide } from "../ui/Wide";
 
 // A person's own page: what they can reach, what is sent to them, and the
 // credentials they hold.
@@ -25,6 +26,9 @@ export function Me() {
   const queries = useQueryClient();
 
   if (who.isPending) return <Loading />;
+  if (who.isError) {
+    return <Failed error={who.error} what="Your own details could not be read." />;
+  }
   if (!who.data) return null;
   const me = who.data;
 
@@ -48,7 +52,7 @@ export function Me() {
         {(me.reach ?? []).length === 0 ? (
           <p className="reading">Nothing yet. An administrator grants access.</p>
         ) : (
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -80,7 +84,7 @@ export function Me() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
         )}
         <p className="hint" style={{ marginTop: 8 }}>
           Shown as what you may do, not the roles behind it.
@@ -259,7 +263,7 @@ function Tokens() {
       {rows.length === 0 ? (
         <Empty title="You hold no tokens." detail="Make one for a script that reads as you." />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -308,7 +312,7 @@ function Tokens() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       <div className="filters" style={{ marginTop: 10 }}>

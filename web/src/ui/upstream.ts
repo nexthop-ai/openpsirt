@@ -48,11 +48,9 @@ export function named(purl: string | undefined | null): string {
 function readPurl(purl: string | undefined | null): { ecosystem: string; name: string } | null {
   const written = String(purl ?? "").trim();
   if (!written.toLowerCase().startsWith("pkg:")) return null;
-  // The version and any qualifiers say nothing about where to read. The
-  // version follows the *last* separator, because a scoped package name begins
-  // with one: splitting on the first leaves "@types/node" as no name at all.
+  // The version and any qualifiers say nothing about where to read.
   let body = written.slice(4).split("?")[0] ?? "";
-  const version = body.lastIndexOf("@");
+  const version = versionAt(body);
   if (version > 0) body = body.slice(0, version);
   const parts = body.split("/").filter((each) => each !== "");
   if (parts.length < 2) return null;
@@ -64,6 +62,20 @@ function readPurl(purl: string | undefined | null): { ecosystem: string; name: s
     ecosystem === "deb" || ecosystem === "rpm" ? (rest[rest.length - 1] ?? "") : rest.join("/");
   if (!name) return null;
   return { ecosystem, name: decode(name) };
+}
+
+// versionAt is where the version begins, or -1 where there is none.
+//
+// The last separator rather than the first, because a Go module path may carry
+// several segments — but not every "@" is one: a scoped npm package's
+// namespace begins with one, so "npm/@scope/name" has no version at all and
+// cutting at its "@" leaves no name to read about and nothing to link to.
+// A separator is an "@" that opens neither the identifier nor a segment of it.
+function versionAt(body: string): number {
+  for (let at = body.length - 1; at > 0; at--) {
+    if (body[at] === "@" && body[at - 1] !== "/") return at;
+  }
+  return -1;
 }
 
 function decode(name: string): string {

@@ -11,6 +11,7 @@ import { Paged } from "../../ui/Paged";
 import { Severity } from "../../ui/Severity";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { Wide } from "../../ui/Wide";
 
 // How much of the register one page holds. The server's own ceiling is five
 // hundred; this is what somebody reads before paging, and the file is what
@@ -41,6 +42,16 @@ export function Register() {
     stream: at.stream ?? "",
     variant: at.variant ?? "",
   };
+  // Back to the first page whenever the build changes. The offset is in the
+  // query key, so carrying page nine onto a build with two pages asks for rows
+  // that are not there — and the empty answer draws as "nothing is known about
+  // this build yet", with the footer inside the rows branch and so no way back.
+  const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}`;
+  const [shown, setShown] = useState(showing);
+  if (shown !== showing) {
+    setShown(showing);
+    setOffset(0);
+  }
 
   const register = useQuery({
     enabled: whole,
@@ -58,6 +69,7 @@ export function Register() {
 
   return (
     <Sheet
+      settled={register.isSuccess}
       name="Disposition register"
       answers="every vulnerability known in one build, and what became of it."
     >
@@ -84,12 +96,16 @@ export function Register() {
           </p>
           {rows.length === 0 ? (
             <Empty
-              title="Nothing is known about this build yet."
-              detail="No scan has been applied to it, or nothing here is yours to read."
+              title={total > 0 ? "Nothing on this page." : "Nothing is known about this build yet."}
+              detail={
+                total > 0
+                  ? "The register has rows before this point."
+                  : "No scan has been applied to it, or nothing here is yours to read."
+              }
             />
           ) : (
             <>
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -178,19 +194,22 @@ export function Register() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="noprint">
-                <Paged
-                  shown={rows.length}
-                  total={total}
-                  offset={offset}
-                  limit={PAGE}
-                  onGo={setOffset}
-                  what="listed"
-                />
-              </div>
+              </Wide>
             </>
           )}
+          {/* Outside the rows branch: a page past the end has no rows, and a
+              footer that only draws where there are rows leaves nowhere to
+              press Previous from. */}
+          <div className="noprint">
+            <Paged
+              shown={rows.length}
+              total={total}
+              offset={offset}
+              limit={PAGE}
+              onGo={setOffset}
+              what="listed"
+            />
+          </div>
         </section>
       )}
     </Sheet>

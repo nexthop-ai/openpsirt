@@ -4,13 +4,14 @@ import { on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { usePaging } from "./list";
-import { unwrap } from "../api/queries";
+import { notYours, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Because, labeled } from "../ui/Outcome";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
+import { Wide } from "../ui/Wide";
 
 // How much of the record one page holds. The server's own ceiling is five
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -334,7 +335,19 @@ function Administered() {
     retry: false,
   });
   const rows = changes.data?.items ?? [];
-  if (changes.isError || rows.length === 0) return null;
+  // Absent for somebody who is not an administrator, which is the refusal this
+  // section expects. A read that failed for any other reason is said, because
+  // an audit screen silently missing half of what it is for is the one place
+  // a quiet absence costs the most.
+  if (changes.isError) {
+    return notYours(changes.error) ? null : (
+      <div style={{ marginTop: 24 }}>
+        <h3>Change history</h3>
+        <Failed error={changes.error} what="The change history could not be read." />
+      </div>
+    );
+  }
+  if (rows.length === 0) return null;
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -342,7 +355,7 @@ function Administered() {
       <p className="hint">
         Settings, roles, support dates, credentials, accounts and teams, with what each held before.
       </p>
-      <div className="tablewrap">
+      <Wide>
         <table>
           <thead>
             <tr>
@@ -367,7 +380,7 @@ function Administered() {
             ))}
           </tbody>
         </table>
-      </div>
+      </Wide>
       {(changes.data?.total ?? 0) > rows.length && (
         <p className="hint noprint">
           Showing the newest {rows.length.toLocaleString()} of{" "}

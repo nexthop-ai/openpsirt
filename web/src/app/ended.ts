@@ -1,15 +1,19 @@
 // Whether the session ended under somebody who is still on a screen.
 //
-// A 401 from a read that a screen is waiting on already resolves to "nobody is
-// signed in", and the sign-in page takes over. A 401 from a *write* is
-// different: the screen is drawn, the person is looking at it, and quite
-// possibly halfway through typing into it. Replacing all of that with a sign-in
-// page loses their place for no reason — the words are safe either way, because
-// a draft is written as it is typed, but the finding they were reading, the
-// filters they had set and the row they had open are not.
+// The person is looking at a drawn screen, and quite possibly halfway through
+// typing into it. Replacing all of that with a sign-in page loses their place
+// for no reason — the words are safe either way, because a draft is written as
+// it is typed, but the finding they were reading, the filters they had set and
+// the row they had open are not.
 //
 // So it is recorded here and offered over the screen rather than instead of
-// it.
+// it. Both halves of the query client notice it: a read that comes back 401
+// and a write that does. Only the first arrival counts, so a screen with six
+// reads in flight raises one banner.
+//
+// The identity read is the exception, and resolves its own 401 to "nobody is
+// signed in" rather than raising this — a fresh browser has no session, and
+// offering to resume one that never began is not an answer to anything.
 //
 // A module rather than React state because the thing that notices is the query
 // client, which is created outside the tree and has no way to reach into it.

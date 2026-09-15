@@ -25,6 +25,14 @@ describe("where a package is read about", () => {
     );
   });
 
+  it("does not read a scope as a version", () => {
+    // An identifier with no version is ordinary — a component the scan named
+    // without one. Cutting at the scope's own separator left no name at all,
+    // so the row showed neither a name nor a link.
+    expect(named("pkg:npm/@types/node")).toBe("@types/node");
+    expect(upstream("pkg:npm/@types/node")).toBe("https://www.npmjs.com/package/%40types/node");
+  });
+
   it("offers nothing for an ecosystem it has no address for", () => {
     // A private registry and a vendored fork both look like this, and a guessed
     // address is worse than none.

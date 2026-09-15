@@ -8,6 +8,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -53,7 +54,7 @@ func registerTeams(api huma.API, a Administering) {
 			if store == nil {
 				return nil, noDatabase(a.Logger)
 			}
-			teams, err := store.Teams(ctx)
+			teams, err := store.Teams(ctx, "", database.InBulk.Most)
 			if err != nil {
 				return nil, wentWrong(a.Logger, "cannot list teams", err)
 			}

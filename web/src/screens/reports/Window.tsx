@@ -12,16 +12,36 @@ import { useSearchParams } from "react-router-dom";
 // asking over genuinely differs: a triage-latency figure over ten years says
 // nothing, and an advisory count over a week says nothing either.
 
+// The longest window any sheet offers. Ten years reads as "everything" and is
+// also the bound on what the address may ask for: a date arithmetic that runs
+// on a number from a query string is one edited address away from a throw.
+const LONGEST = 3650;
+
+// daysAsked is the window the address asks for, checked rather than trusted.
+//
+// The value goes into date arithmetic on the render path, so `Number("x")` is
+// not a wrong figure — it is `new Date(NaN).toISOString()`, which throws and
+// takes the sheet down with it. It also goes to the server, which refuses a
+// window it cannot answer for. So anything that is not a whole number of days
+// inside the range any sheet offers falls back to what the sheet asked for.
+export function daysAsked(params: URLSearchParams, fallback: number): number {
+  const asked = params.get("days");
+  if (asked === null) return fallback;
+  const days = Number(asked);
+  if (!Number.isFinite(days) || days < 1 || days > LONGEST) return fallback;
+  return Math.floor(days);
+}
+
 // wordsFor is what one window is called, wherever it is named.
 export function wordsFor(days: number): string {
-  if (days >= 3650) return "everything";
+  if (days >= LONGEST) return "everything";
   if (days === 365) return "a year";
   return `${days} days`;
 }
 
 // coveringWords is the same window as the phrase a sheet's heading takes.
 export function coveringWords(days: number): string {
-  if (days >= 3650) return "everything";
+  if (days >= LONGEST) return "everything";
   if (days === 365) return "the last year";
   return `the last ${days} days`;
 }

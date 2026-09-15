@@ -5021,6 +5021,11 @@ export interface components {
             items: components["schemas"]["CoverageBody"][] | null;
             /**
              * Format: int64
+             * @description How many in support have never been scanned, across every build and not only this page
+             */
+            never: number;
+            /**
+             * Format: int64
              * @description How many have gone quiet, across every build and not only this page
              */
             quiet: number;
@@ -5034,6 +5039,11 @@ export interface components {
              * @description How many builds there are to report on
              */
             total: number;
+            /**
+             * Format: int64
+             * @description How many are out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
+             */
+            unsupported: number;
         };
         CoveredBuild: {
             /**

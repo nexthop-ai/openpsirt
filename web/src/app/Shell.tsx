@@ -417,6 +417,10 @@ function Search({ at }: { at: Scoped }) {
   const navigate = useNavigate();
   const [typed, setTyped] = useState("");
   const [looking, setLooking] = useState(false);
+  // Said under the box when the lookup did not happen. A read that failed is
+  // not "no such issue", and falling through to the component search sent
+  // somebody to a narrowed findings list as though their issue did not exist.
+  const [unread, setUnread] = useState(false);
   const box = useRef<HTMLInputElement>(null);
 
   // "/" focuses it, unless somebody is already typing somewhere.
@@ -443,6 +447,7 @@ function Search({ at }: { at: Scoped }) {
         const term = typed.trim();
         if (term === "" || looking) return;
         setLooking(true);
+        setUnread(false);
         void api
           .GET("/v1/issues/{vulnerability}", {
             params: { path: { vulnerability: term }, query: { limit: 1 } },
@@ -453,13 +458,23 @@ function Search({ at }: { at: Scoped }) {
               navigate(`/issues/${encodeURIComponent(term)}`);
               return;
             }
+            // Only a 404 means nobody here carries it. A 500 or a 503 is a
+            // question that was never answered, and treating it as an absence
+            // is a wrong answer with a right answer's confidence.
+            if (answer.response.status !== 404) {
+              setUnread(true);
+              return;
+            }
             // Not an issue anybody here carries, so it is a component search,
             // and that is a question about one product's contents.
             if (!at.product) return;
             const path = findingsPath(at);
             navigate(`${path}${path.includes("?") ? "&" : "?"}q=${encodeURIComponent(term)}`);
           })
-          .catch(() => setLooking(false));
+          .catch(() => {
+            setLooking(false);
+            setUnread(true);
+          });
       }}
     >
       <Icon name="search" />
@@ -475,6 +490,11 @@ function Search({ at }: { at: Scoped }) {
         onChange={(event) => setTyped(event.target.value)}
       />
       <kbd>/</kbd>
+      {unread && (
+        <span className="hint" role="status" style={{ color: "var(--sev-high)" }}>
+          could not be looked up
+        </span>
+      )}
     </form>
   );
 }

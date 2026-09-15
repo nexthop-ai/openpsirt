@@ -89,12 +89,17 @@ export function Standing({
   // The claim, not the row. What a judgment says — its reasoning, the
   // agreement given for it, the conversation about it — belongs to the action
   // that made it, so revising, withdrawing and commenting all name the claim.
-  const id = summary?.claim_id ?? claim.decision?.claim_id ?? 0;
+  //
+  // Taken from the claim rather than from the summary beside it, so that every
+  // write on this card names the claim the card is drawing. The two hold the
+  // same number; one call here used the claim's and the rest used the
+  // summary's, which is a disagreement waiting for the day the pair is wrong.
+  const id = claim.decision?.claim_id ?? summary?.claim_id ?? 0;
   // Which places this claim covers, named rather than counted. A count says
   // how big the judgment was and not which code it was about, and on a finding
   // that is only partly decided that is the question somebody has.
   const covers = places
-    .filter((place) => summary?.claim_id != null && place.claim === summary.claim_id)
+    .filter((place) => id !== 0 && place.claim === id)
     .map((place) => place.consumer || UNPLACED);
   // The claim's state as a whole, not its representative row's: a claim with
   // one row approved and forty sent back is not approved.
@@ -110,7 +115,7 @@ export function Standing({
     mutationFn: async (where: string) =>
       unwrap(
         await api.PUT("/v1/claims/{id}/elsewhere", {
-          params: { path: { id: claim.decision?.claim_id ?? 0 } },
+          params: { path: { id } },
           body: { elsewhere: where },
         }),
       ),
@@ -136,7 +141,7 @@ export function Standing({
     <div className={`card standing ${stripe}`}>
       <header className="dhead">
         <h3>
-          Decision <span className="id">#{summary?.claim_id ?? id}</span>
+          Decision <span className="id">#{id}</span>
         </h3>
         <span className="hint">
           proposed by <b>{claim.proposed_by}</b>

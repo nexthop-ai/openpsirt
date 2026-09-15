@@ -14,7 +14,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { notYours, unwrap } from "../api/queries";
 import { useEditNote, useNote } from "../api/mutations";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
@@ -57,6 +57,11 @@ export function Notes({
   });
   const items = notes.data?.items ?? [];
   const about = { product, vulnerability };
+  // A refusal is an answer — somebody may not read notes here — and the card
+  // stays quiet about it. A read that failed is not, and drawing an empty
+  // thread with a live composer above it invites somebody to write into a
+  // conversation whose existing notes they were never shown.
+  const unread = notes.isError && !notYours(notes.error);
 
   return (
     <div className="card">
@@ -65,6 +70,7 @@ export function Notes({
         <b>{vulnerability}</b> in <b>{product}</b>, all builds. Not tied to a component, and changes
         nothing.
       </p>
+      {unread && <Failed error={notes.error} what="The notes on this issue could not be read." />}
       {items.length > 0 && (
         <div className="thread">
           {items.map((each) => (

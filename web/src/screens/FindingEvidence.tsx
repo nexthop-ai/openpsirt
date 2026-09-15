@@ -9,7 +9,7 @@ import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { notYours, unwrap } from "../api/queries";
 import { linkable } from "../ui/addressable";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
@@ -282,6 +282,8 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
       <h3>Reported by</h3>
       {told.isPending ? (
         <Loading />
+      ) : told.isError && !notYours(told.error) ? (
+        <Failed error={told.error} what="Who reported this could not be read." />
       ) : !report ? (
         <p className="reading">No outside reporter recorded.</p>
       ) : (

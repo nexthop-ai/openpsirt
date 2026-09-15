@@ -25,6 +25,7 @@ import { Exploited, Severity } from "../ui/Severity";
 // row after. Fifty rows is 153 pages of one product's findings, which is not a
 // list anybody assembles a day's work out of.
 import { PAGE, type Row } from "./list";
+import { Wide } from "../ui/Wide";
 
 // Where a component sits, as the two ends that differ between sibling rows —
 // or, where the selection spans builds, which build the row is being read in.
@@ -172,7 +173,7 @@ export function ByComponent({
         <a href={componentsFile(at, query, "json")}>JSON</a>
       </p>
 
-      <div className="tablewrap">
+      <Wide>
         <table>
           <thead>
             <tr>
@@ -297,7 +298,7 @@ export function ByComponent({
             })}
           </tbody>
         </table>
-      </div>
+      </Wide>
 
       <div className="filters" style={{ margin: "10px 0 0" }}>
         <span className="hint">
@@ -401,7 +402,7 @@ export function ByBump({
         )}
       </p>
 
-      <div className="tablewrap">
+      <Wide>
         <table>
           <thead>
             <tr>
@@ -458,7 +459,7 @@ export function ByBump({
             ))}
           </tbody>
         </table>
-      </div>
+      </Wide>
 
       <div className="filters" style={{ margin: "10px 0 0" }}>
         <span className="hint">

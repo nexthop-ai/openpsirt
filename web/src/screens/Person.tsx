@@ -6,6 +6,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
 import { called } from "../ui/roles";
+import { Wide } from "../ui/Wide";
 
 // One person, whole.
 //
@@ -62,6 +63,12 @@ export function Person() {
         </p>
       </div>
 
+      {/* Both directions of the same act, so it is said once and above both
+          — the way back in sits in the "they have left" panel and the way out
+          sits below it, and an error rendered inside either is an error
+          rendered in the branch that is not showing. */}
+      {leaving.isError && <Failed error={leaving.error} what="That could not be recorded." />}
+
       {/* Said at the top rather than in a panel below: every other number on
           this screen reads differently once somebody has gone. */}
       {who.deactivated_at && (
@@ -98,7 +105,7 @@ export function Person() {
                 nothing.
               </p>
             )}
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -119,7 +126,7 @@ export function Person() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
           </>
         ) : (
           <Empty
@@ -164,7 +171,7 @@ export function Person() {
         <h3>Roles granted and withdrawn</h3>
         {who.held?.length ? (
           <>
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -194,7 +201,7 @@ export function Person() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
             {who.held_total > who.held.length && (
               <p className="hint" style={{ marginTop: 6 }}>
                 The most recent {who.held.length} of {who.held_total.toLocaleString()}.
@@ -217,7 +224,7 @@ export function Person() {
         </p>
         {who.told?.length ? (
           <>
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -243,7 +250,7 @@ export function Person() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
             {who.told_total > who.told.length && (
               <p className="hint" style={{ marginTop: 6 }}>
                 The most recent {who.told.length} of {who.told_total.toLocaleString()}.
@@ -265,7 +272,6 @@ export function Person() {
           <p className="hint">
             Not a deletion. Roles are kept, so reinstating does not mean granting again.
           </p>
-          {leaving.isError && <p className="hint">That could not be recorded.</p>}
           <button type="button" onClick={() => leaving.mutate(true)} disabled={leaving.isPending}>
             Record that they have left
           </button>

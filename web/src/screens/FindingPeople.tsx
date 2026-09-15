@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { notYours, unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
@@ -87,7 +87,17 @@ export function Collaborators({
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["collaborators"] }),
   });
 
-  if (on.isError) return null;
+  // Quiet for somebody the server refuses, which is the case this card
+  // expects. Anything else is a read that did not happen, and a case whose
+  // collaborators cannot be read is not a case with none on it.
+  if (on.isError) {
+    return notYours(on.error) ? null : (
+      <div className="card">
+        <h3>On this case</h3>
+        <Failed error={on.error} what="Who is on this case could not be read." />
+      </div>
+    );
+  }
   const rows = on.data?.items ?? [];
   const already = new Set(rows.map((row) => row.identity));
   // Whoever may be offered and is not already on the case.
@@ -355,6 +365,14 @@ export function Attachments({
     },
   });
 
+  if (listed.isError) {
+    return notYours(listed.error) ? null : (
+      <section className="panel" style={{ marginTop: 14 }}>
+        <h3>Attached files</h3>
+        <Failed error={listed.error} what="What is attached could not be read." />
+      </section>
+    );
+  }
   const files = listed.data?.items ?? [];
   // Nothing attached is the ordinary case, and a heading over an empty list
   // is a screen asking a question nobody had.

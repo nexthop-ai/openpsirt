@@ -13,16 +13,25 @@
 // reads differently for two people looking at the same row is worse than one
 // that reads unfamiliarly for both.
 
+// The shape a stored moment has: a calendar day, optionally followed by a time.
+// Checked rather than assumed, because this takes whatever a caller hands it
+// and sixteen files call it — a field that is not a moment at all would
+// otherwise be drawn as its own first ten characters, which reads like a date
+// and is not one.
+const STORED = /^\d{4}-\d{2}-\d{2}(?:[T ]|$)/;
+
 // on is the absolute form: the calendar day, as stored.
 //
 // Empty in, empty out. A moment that is not there is a different thing from one
 // at the start of the epoch, and every caller of this has somewhere to say so
-// in its own words.
+// in its own words — and so is a value that is not a moment, which is the same
+// answer for the same reason.
 export function on(moment: string | null | undefined): string {
-  if (!moment) {
+  if (!moment || !STORED.test(moment)) {
     return "";
   }
-  return moment.slice(0, 10);
+  const day = moment.slice(0, 10);
+  return Number.isNaN(new Date(day).getTime()) ? "" : day;
 }
 
 // since is the relative form: how long ago, in the coarsest unit that still
