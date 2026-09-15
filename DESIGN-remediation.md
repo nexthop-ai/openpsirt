@@ -16,6 +16,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
 - [Pending upgrades](#pending-upgrades)
+- [Asking upstream what is current](#asking-upstream-what-is-current)
 - [Ordering the versions a scanner named](#ordering-the-versions-a-scanner-named)
 - [Promise states](#promise-states)
 - [Build-declared suppressions](#build-declared-suppressions)
@@ -174,6 +175,40 @@ What each row reports is what is still open under it, counted from the findings
 rather than from anything written down: the distinct issues the bump would close
 here, and how many places those sit at. Nothing is declared done by hand — a
 build is clear when it stops holding them.
+
+## Asking upstream what is current
+
+What the public index for an ecosystem says the newest version is, for the
+components this deployment builds rather than the ones a distribution
+maintains. Off unless an administrator turns it on: it is the one thing here
+that reaches the network.
+
+| Rule | Reason |
+|---|---|
+| One replica asks, settled by a lease | These are free services somebody else runs, and the politeness the pass is built around — two hundred at a time, a quarter of a second apart — is a rate per deployment rather than per replica |
+| The lease is taken again as the pass runs | Sized from the interval between cycles it was a guess at how long a pass takes, and the arithmetic beside it said so: two hundred requests with a timeout each is far past several intervals. A slow index handed the pass to a second replica mid-flight and both asked |
+| A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
+| The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
+| A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
+
+What comes back is classified, because the classes want opposite treatment.
+
+| Answer | Recorded | Reason |
+|---|---|---|
+| A version | Yes | The thing being asked for |
+| The index has never heard of it | Asked, with no version | A private module and a vendored fork both look like this, and neither is a fault. Recorded so the question is not asked again tomorrow |
+| A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read. An answer we will never get is still an answer about this component |
+| A bad day — too many requests, or the index itself unwell | Nothing | The one class worth coming back to: it stays due and the next pass asks again |
+
+**Everything that is not a bad day is recorded.** Read as one, a refusal the
+index repeats every time left the component unrecorded — and the window takes
+the never-asked first, so it held the head of every pass afterwards for ever,
+with the components behind it never reached.
+
+A previous answer is never overwritten by an empty one. An index returns
+not-found for a renamed package and for some transient conditions, and letting
+one of those destroy a version already in hand would sit on the hole for a
+month.
 
 ## Ordering the versions a scanner named
 

@@ -70,9 +70,12 @@ type Refresher struct {
 	// without waiting a month.
 	Now func() time.Time
 	// leases is how the replicas decide which of them asks. replica names this
-	// one in the lease it takes.
-	leases  *queue.Leases
-	replica string
+	// one in the lease it takes, and interval is how long it is taken for —
+	// remembered by Run so the pass can take it again as it goes rather than
+	// guessing at its own length.
+	leases   *queue.Leases
+	replica  string
+	interval time.Duration
 }
 
 // NewRefresher returns a refresher over db, asking the real public indexes as
@@ -122,6 +125,7 @@ func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 			// tries again next time, which is the right answer for
 			// a pass whose work is never urgent: whoever holds it
 			// is doing it.
+			r.interval = interval
 			mine, err := r.asking(ctx, interval)
 			if err != nil {
 				r.logger.Error("deciding which replica asks upstream", "error", err)
@@ -145,11 +149,17 @@ func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 
 // asking reports whether this replica is the one that asks this cycle.
 //
-// The lease covers several cycles rather than one. It is taken again at the
-// top of each, so the holder keeps it simply by still running, and a lease
-// long enough to outlast a cycle means a pass that overruns is not handed to
-// somebody else halfway through — a pass is up to 200 requests with a timeout
-// each, which is a great deal longer than the interval between cycles.
+// The lease covers several cycles rather than one, and is taken again inside
+// the pass as well as at the top of it. Sized from the interval alone it was
+// a guess at how long a pass takes, and the arithmetic beside it said the
+// guess was wrong: a pass is up to 200 requests with a timeout each, which is
+// far past five intervals. So a slow index handed the pass to a second replica
+// mid-flight and both asked — which is the thing a lease exists to prevent,
+// and the asking is at somebody else's expense.
+//
+// Taken again rather than sized larger, because how long a pass takes is not
+// a number anybody can name: it depends on an index this deployment does not
+// run.
 func (r *Refresher) asking(ctx context.Context, interval time.Duration) (bool, error) {
 	if r.leases == nil {
 		// Nothing to coordinate with. A refresher built without leases is one
@@ -163,12 +173,22 @@ func (r *Refresher) asking(ctx context.Context, interval time.Duration) (bool, e
 // released, so that one replica does it.
 const AskingLease = "upstream.currency"
 
+// renewEvery is how many components a pass gets through before it asks for
+// the lease again.
+//
+// Often enough that a slow index cannot outlast the lease between renewals —
+// twenty-five requests at the outward timeout is well inside it — and rarely
+// enough that the pass is not a conditional update every time it asks a
+// question.
+const renewEvery = 25
+
 // leaseFor is how long to hold the lease, given how often the pass runs.
 //
 // Several cycles, so a replica that is briefly slow does not lose the work to
 // another and then take it back; bounded below so a very short interval in a
 // test does not produce a lease that has already lapsed by the time it is
-// read.
+// read. What keeps it alive across a long pass is the renewal inside the pass
+// rather than this number.
 func leaseFor(interval time.Duration) time.Duration {
 	held := 5 * interval
 	if held < time.Minute {
@@ -202,9 +222,22 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	asked := 0
-	for _, component := range due {
+	for at, component := range due {
 		if ctx.Err() != nil {
 			return asked, nil
+		}
+		// The lease is asked for again as the pass runs, rather than sized
+		// from a guess at how long the pass will take. It also stops a pass
+		// that has already lost the lease from going on asking: two replicas
+		// asking is the thing the lease exists to prevent, and the asking is
+		// at somebody else's expense.
+		if at > 0 && at%renewEvery == 0 {
+			switch mine, err := r.asking(ctx, r.interval); {
+			case err != nil:
+				return asked, fmt.Errorf("keep the lease on asking upstream: %w", err)
+			case !mine:
+				return asked, nil
+			}
 		}
 		// Read every time round rather than once per cycle. A pass is up to
 		// 200 requests with a timeout each, so reading it only at the top
@@ -248,18 +281,27 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			// never get is still an answer about this component.
 			latest = Latest{}
 		case errors.Is(err, ErrUnaskable):
-			// The name cannot be turned into a request at all. That is a fact
-			// about this component rather than a bad day at the index, so it
-			// is recorded — left unrecorded it starves the queue exactly as
-			// above, and one uploaded document full of them stops the worker.
-			r.logger.Warn("a component's name cannot be asked about",
+			// A refusal the index will repeat every time: a name that cannot
+			// be turned into a request at all, a package withdrawn, a region
+			// blocked, a document nothing can read. That is a fact about this
+			// component rather than a bad day, so it is recorded — left
+			// unrecorded it starves the window exactly as below, and one
+			// uploaded document full of them stops the worker.
+			r.logger.Warn("an index will not answer about this component",
 				"ecosystem", ecosystem, "package", name, "error", err)
 			latest = Latest{}
 		case ctx.Err() != nil:
 			return asked, nil
 		default:
-			// One index failing is not the pass failing. Nothing is written,
-			// so it stays due and the next pass tries again.
+			// A bad day at the index, and the only class worth coming back
+			// to. One index failing is not the pass failing: nothing is
+			// written, so it stays due and the next pass tries again.
+			//
+			// Everything else reaches the arm above rather than this one.
+			// Read as a bad day, a refusal the index repeats every time left
+			// the component unrecorded — and the window takes the never-asked
+			// first, so it held the head of every pass afterwards for ever,
+			// with the components behind it never reached.
 			r.logger.Warn("an index did not answer",
 				"ecosystem", ecosystem, "package", name, "error", err)
 			r.pause(ctx)
@@ -302,16 +344,29 @@ func (r *Refresher) due(ctx context.Context) ([]stale, error) {
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.purl AS "purl"`).
 		Where("c.purl <> ''").
-		// Only what we build ourselves. For a distribution package the
-		// distribution is the maintainer, and the date it released says
-		// nothing about the age of the software inside it — Debian shipping a
-		// security update today does not mean upstream is moving.
+		// Only what there is an index for, built from the list of those
+		// rather than from its complement. Maintained as a complement — one
+		// entry excluding distribution packages — every other unaskable
+		// ecosystem passed this filter, reached the asker, found none and was
+		// recorded empty, spending one of the two hundred slots a pass has.
+		//
+		// A distribution package is the case the complement was written for
+		// and is still excluded by being absent from the list: for one of
+		// those the distribution is the maintainer, and the date it released
+		// says nothing about the age of the software inside it — Debian
+		// shipping a security update today does not mean upstream is moving.
+		//
 		// Lowercased, because `Asked` lowercases the ecosystem and these two
-		// have to agree. They did not: `pkg:DEB/...` is excluded by SQLite's
+		// have to agree. They did not: `pkg:DEB/...` was excluded by SQLite's
 		// case-insensitive LIKE and kept by PostgreSQL's and MariaDB's, so the
 		// same document behaved differently per engine — and the row that got
 		// through then had no index and stuck.
-		Where("LOWER(c.purl) NOT LIKE 'pkg:deb/%'").
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			for _, each := range Askable() {
+				q = q.WhereOr("LOWER(c.purl) LIKE ?", "pkg:"+each+"/%")
+			}
+			return q
+		}).
 		// Never asked, or asked long enough ago — where "long enough" depends
 		// on whether we got an answer. A version we have goes stale in a day;
 		// a package the index has never heard of is left for a month.
@@ -401,16 +456,32 @@ func clip(text string, most int) string {
 	return strings.TrimSpace(string([]rune(text)[:most]))
 }
 
-// addressable is an address from an index, judged before it is stored.
+// MostAddress bounds an address an index hands over.
+//
+// Refused rather than shortened, unlike the summary beside it: a cut address
+// is a different address, and this one becomes somewhere to click. In bytes
+// rather than characters, because an address is carried as bytes and this is a
+// bound on what travels rather than on what is read.
+//
+// Generous — no index here serves one a tenth this long — because what it is
+// for is a document nobody meant rather than a long address.
+const MostAddress = 2048
+
+// addressable is an address from an index, bounded and judged before it is
+// stored.
 //
 // The same two schemes anything else typed into this deployment may link to. An
 // index is a third party, and what it hands over goes into an `href`: a scheme
 // a browser acts on is not encoded output. Judged here as well as where it is
 // drawn, because a value that never should have been stored is one somebody
 // later reads out of the database by another route.
+//
+// The bound is the half that was missing. The comment beside the two values
+// said both were bounded and only the summary was, so the column took whatever
+// arrived — bounded by nothing but the ceiling on the whole document.
 func addressable(url string) string {
 	at := strings.TrimSpace(url)
-	if at == "" {
+	if at == "" || len(at) > MostAddress {
 		return ""
 	}
 	if err := markdown.Addressable(at); err != nil {

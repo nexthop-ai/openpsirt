@@ -72,6 +72,10 @@ type Component struct {
 	// LatestCheckedAt is when we last asked, whatever came back, so that
 	// "we asked and there is nothing" is distinguishable from "we have not
 	// asked".
+	//
+	// Null for ever on a component of an ecosystem there is no index for,
+	// which is the second of those and is true: those are not selected to be
+	// asked about at all.
 	LatestVersion    *string    `bun:"latest_version"`
 	LatestReleasedAt *time.Time `bun:"latest_released_at"`
 	LatestCheckedAt  *time.Time `bun:"latest_checked_at"`

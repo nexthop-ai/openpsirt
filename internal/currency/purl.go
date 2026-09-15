@@ -40,14 +40,29 @@ func Asked(purl string) (ecosystem, name string, ok bool) {
 		path = path[:at]
 	}
 
-	// Each segment is decoded on its own, because the separator between them
-	// is structure rather than content — a name containing an escaped "/" is
-	// one segment, and decoding the whole path first would make it two.
+	// Each segment is decoded on its own, so the separators between them
+	// survive as separators: each asker then joins the name the way its own
+	// protocol requires — the module proxy keeps them, and the npm registry
+	// escapes every one, which is what a scoped package needs.
+	//
+	// An escaped separator inside a segment does not survive that, and the
+	// comment here used to claim it did. It cannot: the parts are rejoined
+	// with the character that was escaped, so nothing downstream can tell
+	// which of them was content. No ecosystem asked here has a name
+	// containing one — a module path's slashes are all separators and an npm
+	// scope is two segments — so the ambiguity is stated rather than solved.
+	//
+	// A segment that will not decode is a refusal rather than a segment kept
+	// raw. Kept, a malformed escape became part of the name asked about, and
+	// what came back was an answer about a different package or no package at
+	// all — recorded either way as this component's upstream version.
 	segments := strings.Split(path, "/")
 	for i, segment := range segments {
-		if unescaped, err := url.PathUnescape(segment); err == nil {
-			segments[i] = unescaped
+		unescaped, err := url.PathUnescape(segment)
+		if err != nil {
+			return "", "", false
 		}
+		segments[i] = unescaped
 	}
 	name = strings.Join(segments, "/")
 	if name == "" {
