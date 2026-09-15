@@ -353,27 +353,6 @@ func References(source string) []string {
 	return referenced(source, Attachment, mintedToken)
 }
 
-// Issues lists the vulnerabilities a piece of text refers to, in the order it
-// refers to them and without repeats.
-//
-// Read from the parsed document for the reason attachment references are: an
-// identifier inside a fenced block or a code span is being shown rather than
-// cited, and somebody explaining how to write one of these should not thereby
-// cite it.
-//
-// **Nothing is checked against the database here.** Whether we have that issue
-// is a question with a subject attached, and this package holds no subject and
-// reaches no rows. What it answers is what the text refers to.
-//
-// **And nothing calls it.** `DESIGN-text.md` records why an issue reference may
-// need no resolving — an identifier is the address, reachable with no lookup,
-// unlike a mention needing the person table — so this is either a function to
-// delete or the half of REQ-65 that is not built. `TODO.md` carries the
-// question; what this comment must not do is claim a consumer that is not
-// there.
-func Issues(source string) []string {
-	return referenced(source, Issue, namedIssue)
-}
 
 // referenced is the walk both reference lists do, differing only in the scheme
 // they are about and what shape a destination has to be.
