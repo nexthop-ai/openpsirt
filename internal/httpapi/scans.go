@@ -273,6 +273,23 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	}
 	parts := input.RawBody.Data()
 
+	// How many documents may arrive with one scan, refused before any row is
+	// written. Each one is read within the bounds a document is read within,
+	// and without a ceiling on the count those bounds are multiplied by a
+	// number nothing decides.
+	limits := in.Limits.OrDefault()
+	var sent int
+	for _, part := range parts.Suppressions {
+		if part.IsSet {
+			sent++
+		}
+	}
+	if sent > limits.MaxDocuments {
+		return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+			"that scan carries %d suppression documents, and this deployment reads %d",
+			sent, limits.MaxDocuments))
+	}
+
 	// Who is sending, before anything is read or written.
 	subject, err := requester(ctx)
 	if err != nil {

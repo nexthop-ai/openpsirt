@@ -103,7 +103,7 @@ func registerVexImport(api huma.API, in Ingest) {
 		Middlewares:  huma.Middlewares{boundedForm(api, maxUpload(in.Limits))},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Publisher string `query:"publisher" doc:"Who published it, where the document does not name itself"`
+		Publisher string `query:"publisher" maxLength:"191" doc:"Who published it, where the document does not name itself. At most 191 characters"`
 		RawBody   huma.MultipartFormFiles[statementParts]
 	}) (*struct{ Body StatementsTakenBody }, error) {
 		if err := administrating(ctx); err != nil {
@@ -147,13 +147,17 @@ func registerVexImport(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, asked(in.Logger, err)
 		}
-		// Whatever the parser left. It reads this format to the end today, so
-		// there is nothing here to find and no test can make this line matter
-		// — it is here because the digest is the whole document by definition
-		// and a reader that answered early would otherwise record a hash of
-		// the part it read, which is the failure the scan upload copies past
-		// its own digest to avoid.
-		if _, err := io.Copy(digest, counted); err != nil {
+		// Whatever the parser left, read past the digest exactly once. The
+		// digest is the whole document by definition, and a reader that
+		// answered early would otherwise record a hash of the part it read.
+		//
+		// Drained into nothing, because the reader above already tees into
+		// the digest: copying into it here hashed every drained byte a second
+		// time, so a document with anything after the closing brace — a
+		// trailing newline is enough — recorded a digest that is not the
+		// document's, which is what says whether a publisher has revised what
+		// an approval was granted against.
+		if _, err := io.Copy(io.Discard, counted); err != nil {
 			return nil, huma.Error400BadRequest("that document could not be read")
 		}
 		if counted.n > most {
@@ -161,9 +165,23 @@ func registerVexImport(api huma.API, in Ingest) {
 				"that document is larger than the %d bytes this deployment reads", most))
 		}
 
+		// Who published it is the key a later upload supersedes on, and it is
+		// an indexed column of a fixed width. Refused rather than shortened:
+		// two publishers agreeing for the width of the column would collapse
+		// into one, and the later upload would set aside statements it has
+		// nothing to do with.
+		//
+		// The fallback is the name the client gave the file it uploaded, so
+		// the bound has to hold there too — that is the path with nothing
+		// else guarding it.
 		publisher := strings.TrimSpace(input.Publisher)
 		if publisher == "" {
-			publisher = file.Filename
+			publisher = strings.TrimSpace(file.Filename)
+		}
+		if len(publisher) > finding.MostPublisher {
+			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+				"who published it is longer than the %d characters this records; "+
+					"name it with ?publisher=", finding.MostPublisher))
 		}
 		statements := make([]finding.Statement, 0, len(said))
 		for _, one := range said {

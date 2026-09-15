@@ -13954,7 +13954,7 @@ export interface operations {
     "upload-vex-statements": {
         parameters: {
             query?: {
-                /** @description Who published it, where the document does not name itself */
+                /** @description Who published it, where the document does not name itself. At most 191 characters */
                 publisher?: string;
             };
             header?: never;

@@ -355,6 +355,7 @@ the container's memory limit with them.
 | `OPENPSIRT_INGEST_MAX_FILES` | How many files a document may catalog. Not covered by the component count: a real scan catalogs forty-five to fifty-six files per package, so one bound cannot size both | 500,000 |
 | `OPENPSIRT_INGEST_MAX_STATEMENTS` | How many claims a suppression document may make | 100,000 |
 | `OPENPSIRT_INGEST_MAX_DEPTH` | How deeply it may nest | 64 |
+| `OPENPSIRT_INGEST_MAX_DOCUMENTS` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
 
 ## Reading what the scanner reported
 

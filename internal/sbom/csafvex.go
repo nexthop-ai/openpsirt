@@ -61,6 +61,30 @@ type csafReader struct {
 	tree     map[string]named
 	claims   []*claimed
 	statuses map[string]Status
+	// named counts every identifier this document makes the reader hold: a
+	// product the tree defines, a product a claim lists, and an identifier an
+	// issue also goes by. Charged as each is read.
+	named int
+}
+
+// name charges one more identifier this document makes the reader hold.
+//
+// Charged on the way in, before anything is kept. The claim count is the only
+// bound either VEX reader had, and it counts vulnerability objects — so one
+// claim listing ten million product identifiers was under it, and the map
+// holding them was charged against nothing. What a bound has to stop is the
+// walk, and a count taken after the walk has already done the work.
+//
+// Against the component bound, because these are what a suppression document
+// describes and they cost what a component costs to hold. A ceiling of its own
+// would be a setting nobody could reason about separately.
+func (r *csafReader) name() error {
+	r.named++
+	if r.named > r.lim.MaxComponents {
+		return fmt.Errorf("suppression document names more than the %d product limit",
+			r.lim.MaxComponents)
+	}
+	return nil
 }
 
 // csafStatuses maps a product-status list to what it claims. The four the
@@ -183,12 +207,20 @@ func (r *csafReader) product() error {
 		return err
 	}
 	if id != "" && (one.purl != "" || one.name != "") {
+		if err := r.name(); err != nil {
+			return err
+		}
 		r.tree[id] = one
 	}
 	return nil
 }
 
 func (r *csafReader) vulnerability() error {
+	// Compared before the object is read, so that the claim past the limit is
+	// refused rather than walked in full and then refused.
+	if len(r.claims) >= r.lim.MaxStatements {
+		return fmt.Errorf("more claims than the %d limit", r.lim.MaxStatements)
+	}
 	one := &claimed{
 		byProduct: map[string]Status{},
 		flagged:   map[string]string{},
@@ -222,9 +254,6 @@ func (r *csafReader) vulnerability() error {
 	if one.vulnerability == "" {
 		return fmt.Errorf("a claim names no vulnerability, so there is nothing it could be about")
 	}
-	if len(r.claims) >= r.lim.MaxStatements {
-		return fmt.Errorf("more claims than the %d limit", r.lim.MaxStatements)
-	}
 	r.claims = append(r.claims, one)
 	return nil
 }
@@ -252,6 +281,9 @@ func (r *csafReader) ids(one *claimed) error {
 			one.vulnerability = text
 			return nil
 		}
+		if err := r.name(); err != nil {
+			return err
+		}
 		one.aliases = append(one.aliases, text)
 		return nil
 	})
@@ -272,6 +304,9 @@ func (r *csafReader) productStatus(one *claimed) error {
 				return err
 			}
 			if id != "" {
+				if err := r.name(); err != nil {
+					return err
+				}
 				one.byProduct[id] = status
 			}
 			return nil
@@ -301,6 +336,9 @@ func (r *csafReader) flags(one *claimed) error {
 						return err
 					}
 					if id != "" {
+						if err := r.name(); err != nil {
+							return err
+						}
 						ids = append(ids, id)
 					}
 					return nil

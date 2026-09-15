@@ -29,7 +29,10 @@ import (
 type Limits struct {
 	// MaxBytes is how large a document may be.
 	MaxBytes int64
-	// MaxComponents is how many components it may describe.
+	// MaxComponents is how many components it may describe — and, in a
+	// suppression document, how many products and other identifiers it may
+	// name. The two are one bound because they are the same shape and the
+	// same cost: one retained entry per identifier the document states.
 	MaxComponents int
 	// MaxEdges is how many dependency edges it may declare. Component count
 	// alone does not bound this — a document with a thousand components can
@@ -42,6 +45,11 @@ type Limits struct {
 	MaxFiles int
 	// MaxStatements is how many claims a suppression document may make.
 	MaxStatements int
+	// MaxDocuments is how many suppression documents may arrive with one
+	// scan. Without it the per-document budget is spent again for each one,
+	// so the ceiling on what a producer can make this process hold is the
+	// per-document figure multiplied by a number nothing bounds.
+	MaxDocuments int
 	// MaxDepth is how deeply it may nest.
 	MaxDepth int
 }
@@ -93,6 +101,10 @@ func DefaultLimits() Limits {
 		MaxFiles:      500_000,
 		MaxStatements: 100_000,
 		MaxDepth:      64,
+		// A build states its claims in one document or a handful. Eight is
+		// well above every producer seen and low enough that the ceiling on
+		// one scan stays a number somebody can hold in their head.
+		MaxDocuments: 8,
 	}
 }
 
@@ -117,6 +129,9 @@ func (l Limits) OrDefault() Limits {
 	}
 	if l.MaxDepth <= 0 {
 		l.MaxDepth = d.MaxDepth
+	}
+	if l.MaxDocuments <= 0 {
+		l.MaxDocuments = d.MaxDocuments
 	}
 	return l
 }

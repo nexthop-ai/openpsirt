@@ -255,12 +255,14 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 	case spdx3Document:
 		c.doc.Serial = e.id
 		c.spdx3DocumentCreation = e.creationInfo
+		c.spdx3DocumentRefs[e.id] = true
 		if c.headerOnly {
 			return nil
 		}
 		c.rootRefs = append(c.rootRefs, e.rootElements...)
 		return nil
 	case spdx3Sbom:
+		c.spdx3DocumentRefs[e.id] = true
 		if c.headerOnly {
 			return nil
 		}
@@ -372,9 +374,24 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 	}
 	switch {
 	case e.kinds == "describes":
+		// From the document itself, and from nothing else. The second version
+		// names a constant for the document's own identifier precisely so
+		// that a describes relationship from anything else is not taken as a
+		// root claim, and without the same test here any element could make
+		// itself the build's root and re-parent the whole inventory under it.
+		//
+		// A relationship this refuses is not a fault in the document: it is a
+		// statement about something other than what the build ships, which
+		// this reader has nothing to do with.
+		//
+		// Kept until the walk is over rather than tested here: which element
+		// is the document is stated by an element, in no fixed position, so
+		// a relationship can be read before the answer exists.
+		//
 		// Already charged where the ends were read, so these are recorded
 		// rather than charged a second time.
-		c.rootRefs = append(c.rootRefs, e.to...)
+		c.spdx3Describes = append(c.spdx3Describes,
+			spdx3Describes{from: e.from, to: e.to})
 		return nil
 	case spdx3Edges[e.kinds]:
 		if e.scope == spdx3TestScope {
@@ -403,6 +420,32 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 		return nil
 	}
 	return nil
+}
+
+// spdx3Describes is one describes relationship as it was read.
+type spdx3Describes struct {
+	from string
+	to   []string
+}
+
+// spdx3Roots folds the describes relationships that came from the document
+// into what the build's roots are.
+//
+// From the document itself, and from nothing else. The second version names a
+// constant for the document's own identifier precisely so that a describes
+// relationship from anything else is not taken as a root claim, and without
+// the same test here any element could make itself the build's root and
+// re-parent the whole inventory under it.
+//
+// A relationship this leaves out is not a fault in the document: it is a
+// statement about something other than what the build ships, which this
+// reader has nothing to do with.
+func (c *reader) spdx3Roots() {
+	for _, one := range c.spdx3Describes {
+		if c.spdx3DocumentRefs[one.from] {
+			c.rootRefs = append(c.rootRefs, one.to...)
+		}
+	}
 }
 
 // spdx3Settle fills in the build time from the creation information the

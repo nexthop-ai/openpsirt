@@ -673,3 +673,42 @@ func TestABuildTimeThatIsNotATimeSaysSo(t *testing.T) {
 		t.Errorf("refused with %q", why)
 	}
 }
+
+func TestOnlyTheDocumentSaysWhatABuildIsAbout(t *testing.T) {
+	// The second version names a constant for the document's own identifier
+	// precisely so a describes relationship from anything else is not taken
+	// as a root claim. Without the same test here any element could make
+	// itself the build's root and re-parent the whole inventory under it.
+	//
+	// The order is the other half: which element is the document is itself
+	// stated by an element, in no fixed position, so the relationship can be
+	// read before the answer exists.
+	describing := func(from string, elements ...string) string {
+		return `{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+		  "@graph": [
+		    {"spdxId": "urn:rel", "type": "Relationship", "creationInfo": "_:c",
+		     "from": "` + from + `", "relationshipType": "describes", "to": ["urn:a"]},
+		    {"@id": "_:c", "type": "CreationInfo", "specVersion": "3.0.1",
+		     "created": "2026-08-14T09:12:33Z"},` + strings.Join(elements, ",") + `,
+		    {"spdxId": "urn:a", "type": "software_Package", "creationInfo": "_:c",
+		     "name": "libc", "software_packageVersion": "2.41",
+		     "software_packageUrl": "pkg:deb/debian/libc6@2.41"},
+		    {"spdxId": "urn:other", "type": "software_Package", "creationInfo": "_:c",
+		     "name": "unrelated", "software_packageVersion": "1.0"}]}`
+	}
+	const document = `{"spdxId": "urn:doc", "type": "SpdxDocument", "creationInfo": "_:c"}`
+
+	// From the document, read before the element that says which identifier
+	// the document is.
+	doc := read(t, describing("urn:doc", document))
+	if doc.Root.Name != "libc" || !doc.RootDeclared {
+		t.Errorf("the document said what it is about and the root is %q (declared: %v)",
+			doc.Root.Name, doc.RootDeclared)
+	}
+
+	// From another element, which says nothing about what this build is.
+	doc = read(t, describing("urn:other", document))
+	if doc.RootDeclared {
+		t.Errorf("an element that is not the document made %q the build's root", doc.Root.Name)
+	}
+}

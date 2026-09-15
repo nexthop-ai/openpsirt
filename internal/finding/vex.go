@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // Statement is what a VEX document says about a component we ship.
@@ -91,6 +92,13 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	if publisher == "" {
 		return 0, 0, fmt.Errorf("a statement is somebody's, and this document names nobody")
 	}
+	// Refused here as well as at the endpoint, because this is reachable from
+	// any other caller and what it is refusing is a key collapsing into
+	// somebody else's.
+	if len(publisher) > MostPublisher {
+		return 0, 0, fmt.Errorf(
+			"who published it is longer than the %d characters this records", MostPublisher)
+	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
 		recorded, superseded = 0, 0
@@ -132,7 +140,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 // Matched on the issue's name and its aliases, because which identifier a
 // publisher chose is a preference of whichever database they consulted.
 func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID,
-	vulnerabilityID int64, names []string, component string) ([]Statement, error) {
+	vulnerabilityID int64, names []string, component, purl string) ([]Statement, error) {
 
 	// Asked about the issue rather than about the product, because what comes
 	// back is narrowed to this issue's names and this component — it is
@@ -159,8 +167,47 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	if err != nil {
 		return nil, fmt.Errorf("read what publishers have said about this: %w", err)
 	}
-	return said, nil
+	return namingTheSamePackage(said, purl), nil
 }
+
+// namingTheSamePackage drops statements whose package identifier names
+// something other than this component.
+//
+// The stored name is the short one, because that is what a component in the
+// graph is called and matching on anything else would match nothing. A short
+// name is not a package, though: two registries and two namespaces hold
+// different packages under one, so a publisher's statement about
+// `pkg:npm/@acme/parser` was shown against every component called `parser`,
+// from anywhere, with that publisher's name on it.
+//
+// Compared in the type and the namespace, never the version: a statement says
+// which versions it is about in its own terms, and this only asks whether the
+// two are the same package. A statement that carries no identifier is kept —
+// that is the claim against a source tree, which the name is all there is of.
+func namingTheSamePackage(said []Statement, purl string) []Statement {
+	here := graph.PartsOfPurl(purl)
+	if here.Name == "" {
+		return said
+	}
+	kept := make([]Statement, 0, len(said))
+	for _, one := range said {
+		there := graph.PartsOfPurl(one.Purl)
+		if there.Name != "" && (there.Type != here.Type ||
+			!strings.EqualFold(there.Namespace, here.Namespace)) {
+			continue
+		}
+		kept = append(kept, one)
+	}
+	return kept
+}
+
+// MostPublisher is how long the name of whoever published a statement may be.
+//
+// The width of the column, which carries an index. Refused rather than
+// shortened: it is the key a later upload supersedes on, so two publishers
+// agreeing for that many characters would collapse into one and the second
+// upload would set aside statements it has nothing to do with.
+const MostPublisher = 191
 
 // folded is how a name is stored so that every engine compares it alike.
 //

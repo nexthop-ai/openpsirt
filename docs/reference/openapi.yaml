@@ -17162,12 +17162,13 @@ paths:
           required: true
           schema:
             type: string
-        - description: Who published it, where the document does not name itself
+        - description: Who published it, where the document does not name itself. At most 191 characters
           explode: false
           in: query
           name: publisher
           schema:
-            description: Who published it, where the document does not name itself
+            description: Who published it, where the document does not name itself. At most 191 characters
+            maxLength: 191
             type: string
       requestBody:
         content:

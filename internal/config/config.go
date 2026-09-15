@@ -131,6 +131,7 @@ type Config struct {
 	IngestMaxFiles      int
 	IngestMaxStatements int
 	IngestMaxDepth      int
+	IngestMaxDocuments  int
 	// BootstrapAdmins are granted administrator at every startup, not only the
 	// first. Applying it every time makes it the way back in for an operator
 	// who has locked themselves out: add yourself, restart. For software
@@ -222,6 +223,7 @@ func Load() (Config, error) {
 		IngestMaxFiles:      r.number("INGEST_MAX_FILES", 0),
 		IngestMaxStatements: r.number("INGEST_MAX_STATEMENTS", 0),
 		IngestMaxDepth:      r.number("INGEST_MAX_DEPTH", 0),
+		IngestMaxDocuments:  r.number("INGEST_MAX_DOCUMENTS", 0),
 
 		ScannerMaxOutput:     r.number("SCANNER_MAX_OUTPUT", 0),
 		ScannerMaxComplaint:  r.number("SCANNER_MAX_COMPLAINT", 0),
