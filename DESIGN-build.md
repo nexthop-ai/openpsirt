@@ -15,6 +15,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Database engines](#database-engines)
 - [Test databases](#test-databases)
 - [Pinned pairs](#pinned-pairs)
+- [Every ecosystem is pinned by hash](#every-ecosystem-is-pinned-by-hash)
 - [Static analysis](#static-analysis)
 - [What a gate reads](#what-a-gate-reads)
 - [Licenses](#licenses)
@@ -338,8 +339,9 @@ servers, and two minutes forty-five against cold ones.
 
 A version written in two files is a version somebody moves in one of them: the Go
 toolchain the container builds with against the one the module declares, the Node
-the image uses against the one CI runs, the SBOM generator in the image against
-the one the SBOM target invokes.
+the image uses against the one every workflow runs, the SBOM generator in the
+image against the one the SBOM target invokes, and the Python the documentation
+closure was resolved on against the one the workflows build it with.
 
 A check of its own rather than part of the engine check: that answers what the
 tests run against, this answers what the release is built from. It found drift on
@@ -357,6 +359,37 @@ version.
 |---|---|
 | The image no longer picks up a Go release by itself | Dependabot watches the images and a bump arrives as a pull request |
 | A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities, and now reports them about the toolchain both artifacts are built with rather than about one of the two |
+
+## Every ecosystem is pinned by hash
+
+| Ecosystem | What names the bytes |
+|---|---|
+| Go | `go.sum`, through the checksum database |
+| Node | `package-lock.json`, by integrity |
+| Python, for the documentation | `docs/requirements.txt`, a lock with a hash for every package in the closure, installed with `--require-hashes` |
+| The scanner and the cataloger | A version and a per-architecture hash in the image |
+| Actions | A commit, never a tag |
+
+The Python closure was the exception, and it is the one that runs beside a
+token that can write to the repository. Three packages were pinned and the
+thirty or so they pull in were not, so a republished transitive release
+executed on the next push.
+
+Direct versions are written in `docs/requirements.in` and the lock beside it is
+generated, never edited:
+
+```
+pip-compile --generate-hashes --output-file docs/requirements.txt docs/requirements.in
+```
+
+`pins-check` asks that every package in the lock carries a hash, that each
+direct version is the one the lock resolved, that every workflow installing it
+passes `--require-hashes`, and that they agree on one Python — the lock was
+resolved on one, and a second would resolve a different closure.
+
+A hash-pinned install fails closed when an upstream republishes, which is a
+refusal to install rather than something executing unnoticed, and it is
+answered by regenerating the lock in a commit somebody reviews.
 
 ## Static analysis
 

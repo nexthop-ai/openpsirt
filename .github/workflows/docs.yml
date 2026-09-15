@@ -5,8 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Read at the top, so a job added later starts with no write token and has to
+# ask. The one job here pushes the documentation branch and says so.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: docs
@@ -15,6 +17,9 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      # mike pushes the built set to the documentation branch.
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -23,7 +28,10 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -r docs/requirements.txt
+      # --require-hashes refuses any distribution the lock does not name by
+      # hash, transitive ones included — the guarantee go.sum and the npm
+      # lockfile already give the other two ecosystems here.
+      - run: pip install --require-hashes -r docs/requirements.txt
       - name: Configure committer
         run: |
           git config user.name  "github-actions[bot]"

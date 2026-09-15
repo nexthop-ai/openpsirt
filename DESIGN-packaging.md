@@ -261,7 +261,7 @@ with its leading `v` removed (REQ-01 and REQ-02).
 | Binary inventory | `openpsirt_<version>.cdx.json` | What the binary was linked from |
 | Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | What the image ships. One per architecture, because it is read off an assembled filesystem |
 | Checksums | `SHA256SUMS` | Every file above, so a download is checkable without holding a signature |
-| Signatures | A cosign bundle beside each file | |
+| Signature | `SHA256SUMS.cosign.bundle` | One signature over the checksum file rather than one per asset: the file already covers every asset, so a verifier checks one signature and then the hashes |
 
 Both inventories are published rather than left as a workflow artifact that
 expires. We ingest these for other people's software; REQ-04 is the same
@@ -336,8 +336,22 @@ the inventories and `openpsirt -version` cannot disagree about one build.
 | | |
 |---|---|
 | Keyless signatures | cosign, against the workflow's own identity. No key to hold, rotate, or lose to whoever holds it next |
+| What is signed | The image, the chart in the registry, and the checksum file that covers every attached asset. The chart is signed where it is installed from, which is the registry copy rather than the archive |
 | Build provenance | An attestation naming the repository, the workflow file and the tag that produced the asset |
 | What it proves | That an asset came out of this repository at that tag. Not that what is inside it is correct — that is what the inventories and the scan are for |
+
+**Every signature is verified in the workflow that makes it**, with the
+command and the identity a third party would use. A signature nobody has
+verified is a signature nobody has tested, and the first person to find out is
+otherwise somebody who downloaded it.
+
+The identity to pin is published in the release notes, with the two commands
+that check a download:
+
+| | |
+|---|---|
+| Issuer | `https://token.actions.githubusercontent.com` |
+| Identity | The release workflow in this repository, at a tag |
 
 ## Cutting a release
 
@@ -356,7 +370,7 @@ git push origin v0.2.0
 | Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
 | Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything |
 | Pushes the image and the chart to `ghcr.io` | |
-| Signs the image and the checksum file, and attests provenance for both | Keyless, against the workflow's own identity |
+| Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |
 | Creates the release and uploads every asset | |
 | Publishes the documentation under the version | And moves `latest`, unless this is a prerelease |
 

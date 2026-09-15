@@ -927,6 +927,30 @@ pins-check:
 	  echo "the image has $$defaults version defaults and they differ, so an"; \
 	  echo "unpassed build says one thing in the binary and another in its SBOM."; \
 	  fail=1; }; \
+	pinned=$$(grep -cE '^[A-Za-z0-9][^ ]*==' docs/requirements.txt); \
+	hashed=$$(grep -cE '^[A-Za-z0-9][^ ]*==.*\\$$' docs/requirements.txt); \
+	[ "$$pinned" -gt 0 ] || { \
+	  echo "docs/requirements.txt names no packages, so nothing about it is pinned."; fail=1; }; \
+	[ "$$pinned" = "$$hashed" ] || { \
+	  echo "$$pinned packages are named in docs/requirements.txt and $$hashed carry a hash."; \
+	  echo "Regenerate it from docs/requirements.in rather than editing it:"; \
+	  echo "  pip-compile --generate-hashes --output-file docs/requirements.txt docs/requirements.in"; \
+	  fail=1; }; \
+	for wanted in $$(grep -E '^[A-Za-z0-9]' docs/requirements.in); do \
+	  grep -q "^$$wanted " docs/requirements.txt || { \
+	    echo "docs/requirements.in asks for $$wanted and the lock beside it does not."; fail=1; }; \
+	done; \
+	for flow in .github/workflows/*.yml; do \
+	  grep -q 'pip install' "$$flow" || continue; \
+	  grep -q 'pip install --require-hashes' "$$flow" || { \
+	    echo "$$flow installs the documentation closure without --require-hashes,"; \
+	    echo "so the hashes beside every package buy that job nothing."; fail=1; }; \
+	done; \
+	python=$$(awk -F"'" '/python-version:/{print $$2}' .github/workflows/*.yml | sort -u | tr '\n' ' '); \
+	case "$$python" in \
+	  *" "*" "*) echo "the workflows build the documentation on more than one Python: $$python."; \
+	    echo "The lock was resolved on one of them."; fail=1 ;; \
+	esac; \
 	kept=$$(mktemp -d); \
 	trap 'cp "$$kept"/go.mod go.mod; cp "$$kept"/go.sum go.sum; rm -rf "$$kept"' EXIT INT TERM; \
 	cp go.mod go.sum "$$kept"/; \

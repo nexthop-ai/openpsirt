@@ -211,5 +211,8 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -r docs/requirements.txt
+      # --require-hashes refuses any distribution the lock does not name by
+      # hash, transitive ones included — the guarantee go.sum and the npm
+      # lockfile already give the other two ecosystems here.
+      - run: pip install --require-hashes -r docs/requirements.txt
       - run: make docs-site

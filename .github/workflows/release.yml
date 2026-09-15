@@ -45,11 +45,16 @@ jobs:
       # something nothing gated. Everything on main arrived through the merge
       # queue with CI green; a tag on a side branch did not, and the assets
       # would be indistinguishable afterwards.
+      # The tag is read from the environment rather than substituted into the
+      # script. A ${{ }} value is expanded when the script is written, so a tag
+      # name carrying shell syntax — which the ref format permits — would run
+      # here, in a job holding the write, package and signing permissions, on
+      # the failure path of the check meant to refuse it.
       - name: Confirm the tag is on main
         run: |
           git fetch origin main --quiet
           git merge-base --is-ancestor "${{ github.sha }}" origin/main \
-            || { echo "::error::${{ github.ref_name }} points at a commit that is not on main"; exit 1; }
+            || { echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"; exit 1; }
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
@@ -111,15 +116,29 @@ jobs:
           digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image:$version" | cut -d@ -f2)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
+      # The digest is kept because the copy operators are told to install is
+      # this one, and a registry copy is signed by digest. The identical
+      # archive attached to the release is covered by SHA256SUMS; this one was
+      # covered by nothing.
       - name: Push the chart
+        id: chart
         run: |
-          helm push "bin/dist/openpsirt-${{ steps.release.outputs.version }}.tgz" \
-            "oci://ghcr.io/${{ github.repository_owner }}/charts"
+          out=$(helm push "bin/dist/openpsirt-${{ steps.release.outputs.version }}.tgz" \
+            "oci://ghcr.io/${{ github.repository_owner }}/charts" 2>&1)
+          echo "$out"
+          digest=$(printf '%s\n' "$out" | awk '/^Digest: /{print $2}')
+          [ -n "$digest" ] || { echo "::error::helm push named no digest, so the chart cannot be signed"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - name: Sign the image
         run: |
           cosign sign --yes \
             "ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}"
+
+      - name: Sign the chart
+        run: |
+          cosign sign --yes \
+            "ghcr.io/${{ github.repository_owner }}/charts/openpsirt@${{ steps.chart.outputs.digest }}"
 
       # One signature over the checksum file rather than one per asset: the
       # file already covers every asset, so a verifier checks one signature
@@ -139,7 +158,24 @@ jobs:
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/" \
             "ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}" > /dev/null
-          echo "the image verifies against this workflow's identity at ${{ github.ref_name }}"
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/" \
+            "ghcr.io/${{ github.repository_owner }}/charts/openpsirt@${{ steps.chart.outputs.digest }}" > /dev/null
+          echo "the image and the chart verify against this workflow's identity at $GITHUB_REF_NAME"
+
+      # The same principle as the step above, for the signature that covers
+      # everything a person downloads rather than the image. It was produced
+      # and never read back, so a bundle signed over the wrong file, or one an
+      # option change left empty, would have been found by a downloader.
+      - name: Verify the checksums the way somebody else would
+        run: |
+          cosign verify-blob \
+            --bundle bin/dist/SHA256SUMS.cosign.bundle \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/" \
+            bin/dist/SHA256SUMS
+          echo "SHA256SUMS verifies against this workflow's identity at $GITHUB_REF_NAME"
 
       - name: Attest the image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
@@ -177,6 +213,19 @@ jobs:
             echo
             echo "The binaries, both CycloneDX inventories, \`SHA256SUMS\` and its cosign bundle are attached."
             echo "Inventories are published because this tool ingests them for other people's software."
+            echo
+            echo "### Checking what you downloaded"
+            echo
+            echo '```'
+            echo "cosign verify-blob \\"
+            echo "  --bundle SHA256SUMS.cosign.bundle \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+            echo "  --certificate-identity-regexp '^https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/' \\"
+            echo "  SHA256SUMS"
+            echo "sha256sum -c SHA256SUMS"
+            echo '```'
+            echo
+            echo "The signature covers \`SHA256SUMS\`, which covers every file above."
           } > /tmp/notes.md
           gh release create "$GITHUB_REF_NAME" \
             --title "$version" \
@@ -204,7 +253,10 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -r docs/requirements.txt
+      # --require-hashes refuses any distribution the lock does not name by
+      # hash, transitive ones included — the guarantee go.sum and the npm
+      # lockfile already give the other two ecosystems here.
+      - run: pip install --require-hashes -r docs/requirements.txt
       - name: Configure committer
         run: |
           git config user.name  "github-actions[bot]"
