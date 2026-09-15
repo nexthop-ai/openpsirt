@@ -460,6 +460,18 @@ gets ticked without being read.
  including counts, aggregates, search and exports.
 - Regression tests are named for the invariant they pin.
 
+**A gate that iterates a collection counts what it examined and fails on
+zero.** The form is `internal/config/documented_test.go:44-45` — `if len(reads)
+== 0 { t.Fatal("no settings were found in the source, so this checked
+nothing") }` — and its two-direction join is the standard: it reports both a
+setting documented and not read, and one read and not documented. Sixteen gates
+were scoped so that they could not go red for the failure they name, and the
+shapes are worth knowing because they recur: a loop over a collection that may
+be empty, an assertion that is a hand-written list of what to check, and an
+exit code with the message thrown away. A gate reached only by running the
+program over the tree is the third of those — lift the detection into a
+function and give it one input that must be reported and one that must not.
+
 **A test named for an arm has an input that reaches only that arm**, and the
 check is coverage of the named line rather than the test passing. Eighteen
 tests ran on a corpus that was a strict subset of the domain their own name

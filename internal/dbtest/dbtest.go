@@ -580,6 +580,16 @@ func migrateFresh(url string) error {
 	return db.Close()
 }
 
+// Tables is every table the migrations make, in an order safe to delete from.
+//
+// Exported so that a test about the schema as a whole can be about the schema
+// as a whole. The full-rollback test named four of them by hand and passed
+// over the other fifty-three, so a Down that forgot its DROP was caught for
+// 7% of the tables — and the list this returns is the one a test in this
+// package holds to the migrated schema in both directions, which is what makes
+// it the whole of them rather than what somebody remembered.
+func Tables() []string { return slices.Clone(tables) }
+
 // tables lists every table, in an order safe to delete from: children before
 // the rows they reference.
 //

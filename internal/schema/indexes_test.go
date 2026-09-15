@@ -39,14 +39,20 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 			t.Fatalf("migrate up: %v", err)
 		}
 
-		for _, table := range dbtest.TablesIn(t, ctx, db) {
+		tables := dbtest.TablesIn(t, ctx, db)
+		read, seen := 0, 0
+		for _, table := range tables {
 			indexes := indexesOn(t, ctx, db, table)
+			if len(indexes) > 0 {
+				read++
+			}
+			seen += len(indexes)
 			for name, columns := range indexes {
 				for other, wider := range indexes {
-					if name == other || len(columns) >= len(wider) {
+					if name == other {
 						continue
 					}
-					if !prefixOf(columns, wider) {
+					if !leads(columns, wider) {
 						continue
 					}
 					// finding_open_idx is the one deliberate exception, and it
@@ -58,12 +64,21 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 					if name == "finding_open_idx" {
 						continue
 					}
-					t.Errorf("%s.%s is (%s), a leading prefix of %s (%s) — "+
-						"the wider one already answers every lookup the narrower one does",
+					t.Errorf("%s.%s is (%s), which %s (%s) already answers — "+
+						"the wider one serves every lookup the narrower one does",
 						table, name, strings.Join(columns, ", "),
 						other, strings.Join(wider, ", "))
 				}
 			}
+		}
+
+		// A sweep that read nothing looks exactly like a sweep that found
+		// nothing wrong. The table list has a guard of its own and this did
+		// not, so introspection answering nothing ran the double loop zero
+		// times and reported the invariant held.
+		if read == 0 || seen < len(tables) {
+			t.Fatalf("read %d indexes across %d of %d tables, so this checked nothing",
+				seen, read, len(tables))
 		}
 	})
 }
@@ -120,9 +135,16 @@ func columnsOf(ctx context.Context, db *database.DB, index string) ([]string, er
 	return columns, rows.Err()
 }
 
-// prefixOf reports whether one column list leads another.
-func prefixOf(shorter, longer []string) bool {
-	if len(shorter) >= len(longer) {
+// leads reports whether one column list is answered by another: the same
+// columns in the same order, for as far as the first one goes.
+//
+// **Equal lengths count.** Skipped, the commonest accidental duplicate there
+// is — a hand-written index repeating a UNIQUE constraint — was the one shape
+// this could not see, and it was skipped twice: once by the caller's length
+// test and once here. An identical pair now reports in both directions, which
+// names both indexes and is what somebody has to read to decide which goes.
+func leads(shorter, longer []string) bool {
+	if len(shorter) > len(longer) {
 		return false
 	}
 	for i, column := range shorter {

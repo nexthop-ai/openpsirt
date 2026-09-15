@@ -36,37 +36,8 @@ func main() {
 	var bad []string
 	// web holds the interface, which is TypeScript: nothing under it parses
 	// as Go, so reading it is work with no answer.
-	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
-		fset := token.NewFileSet()
-		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
-		if err != nil {
-			// Not this program's business: the build says so, and better.
-			return nil //nolint:nilerr // a file that does not parse is the compiler's to report
-		}
-		for _, decl := range file.Decls {
-			doc, names := documented(decl)
-			if doc == nil || len(names) == 0 {
-				continue
-			}
-			first := strings.TrimSpace(doc.List[0].Text)
-			first = strings.TrimPrefix(first, "//")
-			match := opens.FindStringSubmatch(strings.TrimSpace(first))
-			if match == nil {
-				continue
-			}
-			named := match[1]
-			if slicesContains(names, named) {
-				continue
-			}
-			// A comment naming some other symbol entirely is the accident.
-			// One naming nothing in this file is prose that happens to start
-			// with a capitalized word, and is left alone.
-			if !declaredIn(file, named) {
-				continue
-			}
-			bad = append(bad, fmt.Sprintf("%s:%d: the comment above %s describes %s",
-				path, fset.Position(doc.Pos()).Line, strings.Join(names, ", "), named))
-		}
+	read, err := walk.Only(".go", []string{"web"}, func(path string, source []byte) error {
+		bad = append(bad, detached(path, source)...)
 		return nil
 	})
 	if err != nil {
@@ -84,6 +55,48 @@ func main() {
 	fmt.Fprintf(os.Stderr, "\n%d doc comment(s) left on the wrong declaration. "+
 		"Move the block, or delete it where it survives on the symbol it moved with.\n", len(bad))
 	os.Exit(1)
+}
+
+// detached reports every doc comment in one file that sits on a declaration it
+// does not describe.
+//
+// Lifted out of the walk so that it can be asked a question. A gate whose
+// detection is reachable only by running the program over the tree is one
+// whose only consumer is an exit code, and an exit code cannot tell a check
+// that found nothing from a check that looked at nothing.
+func detached(path string, source []byte) []string {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, source, parser.ParseComments)
+	if err != nil {
+		// Not this program's business: the build says so, and better.
+		return nil
+	}
+	var bad []string
+	for _, decl := range file.Decls {
+		doc, names := documented(decl)
+		if doc == nil || len(names) == 0 {
+			continue
+		}
+		first := strings.TrimSpace(doc.List[0].Text)
+		first = strings.TrimPrefix(first, "//")
+		match := opens.FindStringSubmatch(strings.TrimSpace(first))
+		if match == nil {
+			continue
+		}
+		named := match[1]
+		if slicesContains(names, named) {
+			continue
+		}
+		// A comment naming some other symbol entirely is the accident. One
+		// naming nothing in this file is prose that happens to start with a
+		// capitalized word, and is left alone.
+		if !declaredIn(file, named) {
+			continue
+		}
+		bad = append(bad, fmt.Sprintf("%s:%d: the comment above %s describes %s",
+			path, fset.Position(doc.Pos()).Line, strings.Join(names, ", "), named))
+	}
+	return bad
 }
 
 // documented is a declaration's doc comment and the names it declares.

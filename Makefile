@@ -1002,20 +1002,30 @@ check-packaging:
 	# time rather than producing a deployment that starts, fails its own
 	# administration check, and crash-loops with the reason in a log nobody is
 	# watching yet — or one that comes up healthy and quietly tells nobody.
+	@# Each case names the substring the chart's own fail must carry. Branching
+	@# on the exit status alone with both streams discarded, any template error
+	@# read as the refusal — so an unrelated fault reachable under one value
+	@# combination looked exactly like the guard working, and the success line
+	@# below printed anyway.
 	@for missing in \
-	  "no database:" \
-	  "nobody can administer:--set database.existingSecret=s" \
-	  "no way to sign in:--set database.existingSecret=s --set auth.bootstrapAdmins={admin}" \
-	  "no address to return to:--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.oidc.issuer=https://id.example.com" \
-	  "a header anybody can set:--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User" \
-	  "half a mail configuration:--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587" \
-	  "a password that is never sent:--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.password=shh"; do \
-	  what="$${missing%%:*}"; args="$${missing#*:}"; \
-	  if helm template t deploy/helm/openpsirt $$args >/dev/null 2>&1; then \
-	    echo "the chart accepted an install with $$what"; exit 1; \
-	  fi; \
+	  "no database|needs a database|" \
+	  "nobody can administer|set auth.bootstrapAdmins|--set database.existingSecret=s" \
+	  "no way to sign in|configure a way to sign in|--set database.existingSecret=s --set auth.bootstrapAdmins={admin}" \
+	  "no address to return to|set auth.baseURL|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.oidc.issuer=https://id.example.com" \
+	  "a header anybody can set|set auth.trustedHeader.sources|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User" \
+	  "half a mail configuration|set mail.server and mail.from together|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587" \
+	  "a password that is never sent|set mail.username|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.password=shh"; do \
+	  what="$${missing%%|*}"; rest="$${missing#*|}"; \
+	  expect="$${rest%%|*}"; args="$${rest#*|}"; \
+	  out=$$(helm template t deploy/helm/openpsirt $$args 2>&1) && { \
+	    echo "the chart accepted an install with $$what"; exit 1; }; \
+	  case "$$out" in \
+	    *"$$expect"*) ;; \
+	    *) echo "the chart refused an install with $$what for the wrong reason:"; \
+	       echo "$$out"; exit 1;; \
+	  esac; \
 	done
-	@echo "the chart refuses every install that could not be signed into, and every mail configuration that would send nothing"
+	@echo "the chart refuses every install that could not be signed into, and every mail configuration that would send nothing, each for the reason it names"
 
 run:
 	$(GO) run ./cmd/openpsirt
