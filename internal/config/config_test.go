@@ -195,3 +195,42 @@ func TestASignInLifetimeOverTheCeilingIsRefusedAtStartup(t *testing.T) {
 		}
 	}
 }
+
+func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
+	// It was the one string setting with a required shape that nothing
+	// parsed, and the failure was silent exactly where it mattered:
+	// `psirt.example.com` — the form the value takes in a DNS record or an
+	// Ingress host field — parses, puts the whole string in Path and leaves
+	// Host empty. The same-origin check then fell through to origins derived
+	// from the request's own Host header, so the guard echoed what the request
+	// said and the operator believed the origin was pinned.
+	for _, c := range []struct {
+		what    string
+		base    string
+		refused bool
+	}{
+		{"nothing at all, which is how a deployment with no provider runs", "", false},
+		{"an address", "https://psirt.example.com", false},
+		{"one without encryption, for a deployment behind something", "http://psirt.internal", false},
+		{"one with a port", "https://psirt.example.com:8443", false},
+		{"one with a trailing slash", "https://psirt.example.com/", false},
+
+		{"a bare host, which is the way this goes wrong", "psirt.example.com", true},
+		{"a host with a port and no scheme", "psirt.example.com:8443", true},
+		{"a scheme a browser does not speak", "ftp://psirt.example.com", true},
+		{"a scheme and no host", "https://", true},
+		{"a path below the address", "https://psirt.example.com/psirt", true},
+		{"something that is not an address", "https://%zz", true},
+	} {
+		t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://test.db")
+		t.Setenv("OPENPSIRT_BASE_URL", c.base)
+		_, err := Load()
+		if (err != nil) != c.refused {
+			t.Errorf("%s (%q): refused = %v, want %v (%v)",
+				c.what, c.base, err != nil, c.refused, err)
+		}
+		if err != nil && !strings.Contains(err.Error(), "OPENPSIRT_BASE_URL") {
+			t.Errorf("%s (%q): the refusal does not name the variable: %v", c.what, c.base, err)
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -291,7 +292,48 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("%sSESSION_LIFETIME: want at most %s, got %q",
 			envPrefix, access.MaxSessionLifetime, c.SessionLifetime)
 	}
+	if err := absoluteBase(c.BaseURL); err != nil {
+		return Config{}, err
+	}
 	return c, nil
+}
+
+// absoluteBase refuses a deployment address that is not one.
+//
+// **Checked here so that every consumer may assume it is absolute**, which
+// four of them already did. It was the one string setting with a required
+// shape that nothing parsed, and the failure was silent where it mattered
+// most: `OPENPSIRT_BASE_URL=psirt.example.com` — the form the value takes in a
+// DNS record or an Ingress host field — parses, puts the whole string in Path
+// and leaves Host empty, so the same-origin check fell through to origins
+// derived from the request's own Host header. The guard became an echo of what
+// the request said, with nothing logged, while the operator believed they had
+// pinned the origin.
+//
+// The other consequences were loud and self-correcting, which is what hid it:
+// the OIDC redirect address is not absolute either, so every sign-in fails at
+// the provider — naming the provider rather than this deployment.
+func absoluteBase(base string) error {
+	if base == "" {
+		return nil
+	}
+	parsed, err := url.Parse(base)
+	switch {
+	case err != nil:
+		return fmt.Errorf("%sBASE_URL: not an address at all: %q", envPrefix, base)
+	case parsed.Scheme != "http" && parsed.Scheme != "https":
+		return fmt.Errorf(
+			"%sBASE_URL: want an absolute address such as https://psirt.example.com, got %q",
+			envPrefix, base)
+	case parsed.Host == "":
+		return fmt.Errorf("%sBASE_URL: names no host: %q", envPrefix, base)
+	case strings.Trim(parsed.Path, "/") != "":
+		// A path below the address would make every link this deployment
+		// writes point somewhere it does not answer.
+		return fmt.Errorf("%sBASE_URL: names the address, not a path below it: %q",
+			envPrefix, base)
+	}
+	return nil
 }
 
 // reader reads typed settings and keeps the first value it could not read.
