@@ -8015,10 +8015,17 @@ export interface components {
         SettingBody: {
             /** @description Nobody has set this; the shipped value is in use */
             default?: boolean;
+            /**
+             * @description What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off
+             * @enum {string}
+             */
+            kind: "duration" | "count" | "size" | "word" | "switch";
             /** @description What it decides */
             means: string;
             name: string;
             value: string;
+            /** @description For a word setting, the values it takes, in the order to offer them */
+            words?: string[] | null;
         };
         Shipped: {
             "@id": string;

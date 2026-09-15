@@ -6690,6 +6690,15 @@ components:
         default:
           description: Nobody has set this; the shipped value is in use
           type: boolean
+        kind:
+          description: "What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off"
+          enum:
+            - duration
+            - count
+            - size
+            - word
+            - switch
+          type: string
         means:
           description: What it decides
           type: string
@@ -6697,10 +6706,18 @@ components:
           type: string
         value:
           type: string
+        words:
+          description: For a word setting, the values it takes, in the order to offer them
+          items:
+            type: string
+          type:
+            - array
+            - "null"
       required:
         - name
         - value
         - means
+        - kind
       type: object
     Shipped:
       additionalProperties: false

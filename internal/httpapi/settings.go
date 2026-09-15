@@ -27,6 +27,17 @@ type SettingBody struct {
 	Value   string `json:"value"`
 	Default bool   `json:"default,omitempty" doc:"Nobody has set this; the shipped value is in use"`
 	Means   string `json:"means" doc:"What it decides"`
+	// Kind is what the value is, so a client offers the control the value
+	// takes rather than a text field somebody types a refused value into.
+	//
+	// Served rather than kept client-side: it was three tables in the
+	// interface keyed on setting names, beside the server's own — five copies
+	// of one fact, and a setting added to any of them was a control that
+	// offered the wrong thing or none.
+	Kind string `json:"kind" enum:"duration,count,size,word,switch" doc:"What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off"`
+	// Words is what a word setting may be set to, in the order to offer them.
+	// Empty for every other kind.
+	Words []string `json:"words,omitempty" doc:"For a word setting, the values it takes, in the order to offer them"`
 }
 
 // settingKind is what a value of a setting is.
@@ -41,8 +52,14 @@ type settingKind string
 const (
 	aDuration settingKind = "duration"
 	aCount    settingKind = "count"
-	aWord     settingKind = "word"
-	aSwitch   settingKind = "switch"
+	// aSize is a count of bytes. Checked exactly as a count is — the write
+	// path cannot tell them apart and does not need to — and named separately
+	// because a screen must: 26214400 is twenty-five megabytes and nobody
+	// reads it as that, so the mistake available in a raw byte field is a
+	// factor of a thousand.
+	aSize   settingKind = "size"
+	aWord   settingKind = "word"
+	aSwitch settingKind = "switch"
 )
 
 // windows is the shipped deadline policy, read from the package that applies
@@ -121,15 +138,15 @@ var settable = []struct {
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else",
 		aSwitch, func(Ingest) string { return setting.Off }, false},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time",
-		aCount, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
+		aSize, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it",
-		aCount, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentQuota) }, false},
+		aSize, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentQuota) }, false},
 	{setting.QueueBacklog, "How much background work of one kind may be waiting before more of that kind is refused. A whole number, not a length of time. Counted per kind, so a producer that has filled its own queue does not refuse everybody else's work",
 		aCount, func(Ingest) string { return strconv.Itoa(setting.DefaultQueueBacklog) }, false},
 	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog",
 		aCount, func(Ingest) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
 	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload",
-		aCount, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentShare) }, false},
+		aSize, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentShare) }, false},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here",
 		aDuration, func(Ingest) string { return setting.DefaultAbsentAfter.String() }, false},
 	{setting.WaitingAfter, "How long a claim may wait on a second person before whoever can approve it is told. What is wrong is that nothing has happened, which is the one thing no message driven by an event can report",
@@ -192,6 +209,7 @@ func registerSettings(api huma.API, in Ingest) {
 			}
 			out.Body.Items = append(out.Body.Items, SettingBody{
 				Name: each.name, Value: value, Default: !set, Means: each.means,
+				Kind: string(each.kind), Words: wordsFor(each.kind, each.name),
 			})
 		}
 		return out, nil
@@ -237,7 +255,7 @@ func registerSettings(api huma.API, in Ingest) {
 					fmt.Sprintf("%q is not a line to triage from — write one of %s",
 						input.Body.Value, strings.Join(theFloor, ", ")))
 			}
-		case aCount:
+		case aCount, aSize:
 			n, err := strconv.Atoi(input.Body.Value)
 			if err != nil || n <= 0 {
 				return nil, huma.Error422UnprocessableEntity(
@@ -395,7 +413,23 @@ const betweenTries = 2 * time.Second
 // that is not answering cannot hold a goroutine open.
 const settleLease = 5 * time.Second
 
-// setting finds a setting's row, and whether it is one.
+// wordsFor is what a word or on-and-off setting may be set to, in the order to
+// offer them.
+//
+// Here rather than on the row because the lists already live where the write
+// path checks against them — so an offered word and an accepted word cannot
+// differ, which is the failure a second copy in the interface produced.
+func wordsFor(kind settingKind, name string) []string {
+	switch {
+	case kind == aSwitch:
+		return theSwitch
+	case kind == aWord && name == setting.TriageFloor:
+		return theFloor
+	}
+	return nil
+}
+
+// settingRow finds a setting's row, and whether it is one.
 //
 // A name with no row is impossible rather than a fall-through: the struct
 // literal will not compile without every field, so a setting added to the list

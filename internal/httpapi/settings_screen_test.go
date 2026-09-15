@@ -14,82 +14,80 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// A setting checked here as a number is one the screen composes as a number.
+// What a value is, said once.
 //
-// The two are the same fact in two languages. Everything else here is a
-// duration, which the screen composes without being told — so a setting that
-// is a count or a size and is not named on that side renders as a raw field:
-// 26214400 typed by hand, where the mistake available is a factor of a
-// thousand, which is the reason the composing exists.
+// It was five tables keyed on setting names — the server's own, and three in
+// `Settings.tsx` — and a setting added to one and not the others rendered as a
+// raw text field somebody typed a refused value into: 26214400 by hand, where
+// the mistake available is a factor of a thousand, which is the reason the
+// composing exists. The pairing test that stood here checked the copies
+// against each other, which is the shape a rule takes when it has two homes.
 //
-// Both settings this branch added were missing on the screen's side, so this
-// checks the pair rather than either list. The card *heading* is not checked:
-// which group a setting is drawn in is a judgment about the screen, and a
-// proxy for it here would be a rule about nothing.
-func TestASettingCheckedAsANumberIsComposedAsOne(t *testing.T) {
+// The kind is served now, so the screen has nothing to key on a name. What is
+// left to hold is that it stays that way.
+func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 	screen, err := os.ReadFile(filepath.Join("..", "..", "web", "src", "screens", "Settings.tsx"))
 	if err != nil {
 		t.Skipf("the interface is not in this checkout: %v", err)
 	}
 	body := string(screen)
 
-	named := func(declaration string) map[string]bool {
-		at := strings.Index(body, declaration)
-		if at < 0 {
-			t.Fatalf("the screen no longer declares %q, so this checks nothing", declaration)
-		}
-		end := strings.Index(body[at:], ";")
-		if end < 0 {
-			t.Fatalf("%q is not a declaration this can read", declaration)
-		}
-		out := map[string]bool{}
-		for _, quoted := range regexp.MustCompile(`"([a-z0-9.-]+)"`).
-			FindAllStringSubmatch(body[at:at+end], -1) {
-			out[quoted[1]] = true
-		}
-		return out
-	}
-	composed := named("const counts = new Set(")
-	for name := range named("const sizes = new Set(") {
-		composed[name] = true
+	// It reads the kind rather than deciding it.
+	if !strings.Contains(body, "setting.kind") {
+		t.Error("the settings screen does not read the kind the server serves")
 	}
 
-	// A setting absent from both lists passes the pairing below, because the
-	// pairing only sees disagreement. That is how a whole number came to be
-	// validated as a length of time with the suite green and every value an
-	// operator typed refused, so the description is read as well: a setting
-	// that calls itself a whole number is checked as one.
-	for _, each := range settable {
-		if strings.Contains(each.means, "A whole number") && each.kind != aCount {
-			t.Errorf("%s is offered as a whole number and the write path checks it as a "+
-				"length of time, so every number an operator types is refused", each.name)
+	// And it holds no collection keyed on setting names, which is the shape
+	// the three tables took. **Naming a setting is not the same thing**: the
+	// screen groups settings into cards and gives them labels, and which card
+	// a setting is drawn in is a judgment about the screen. What must not come
+	// back is a *lookup* that answers what a value is.
+	for _, shape := range []*regexp.Regexp{
+		regexp.MustCompile(`new Set\(\[[^]]*"[a-z][a-z0-9]*[.-]`),
+		regexp.MustCompile(`Record<string, string\[\]>`),
+	} {
+		if at := shape.FindString(body); at != "" {
+			t.Errorf("the settings screen declares %q, which is a table keyed on a setting "+
+				"name coming back — the server serves what the value is", at)
 		}
+	}
+	// It reads the words a word setting takes rather than listing them, for
+	// the same reason: an offered word the write path refuses is what a second
+	// copy produces.
+	if !strings.Contains(body, "setting.words") && !strings.Contains(body, "words") {
+		t.Error("the settings screen does not read the words a word setting takes")
 	}
 
+	// The sanity check that this read the right file at all.
+	if !strings.Contains(body, "settings") {
+		t.Fatal("the file read does not look like the settings screen")
+	}
+}
+
+// A setting that calls itself a whole number is checked as one.
+//
+// The description and the kind are two statements about one setting, written
+// in different places by different people. Disagreeing, a whole number was
+// validated as a length of time with the suite green and every value an
+// operator typed refused.
+//
+// One direction only. A description that says "a whole number" is a promise to
+// an operator and has to hold; a count described without that phrase is prose
+// somebody chose, and requiring the phrase would be a rule about wording.
+func TestASettingThatCallsItselfANumberIsCheckedAsOne(t *testing.T) {
+	said := 0
 	for _, each := range settable {
-		if each.kind == aCount && !composed[each.name] {
-			t.Errorf("%s is checked as a number here and the screen draws it as a raw text "+
-				"field, which is where a factor of a thousand comes from", each.name)
+		if !strings.Contains(each.means, "A whole number") {
+			continue
 		}
-		if each.kind != aCount && composed[each.name] {
-			t.Errorf("%s is composed as a number on the screen and checked as something else "+
-				"here, so what the screen offers is refused", each.name)
-		}
-	}
-	// And nothing the screen composes is a name this deployment does not
-	// offer at all, which would be a rule about nothing.
-	offered := map[string]bool{}
-	for _, each := range settable {
-		offered[each.name] = true
-	}
-	for name := range composed {
-		if !offered[name] {
-			t.Errorf("the screen composes %q as a number and no setting of that name is offered", name)
+		said++
+		if each.kind != aCount && each.kind != aSize {
+			t.Errorf("%s is offered as a whole number and checked as %q, so every "+
+				"number an operator types is refused", each.name, each.kind)
 		}
 	}
-	// The sanity check that this is reading the right file at all.
-	if !composed[setting.TogetherCap] {
-		t.Fatal("the screen composes no count at all, so this read the wrong thing")
+	if said == 0 {
+		t.Error("no setting describes itself as a whole number, so this checked nothing")
 	}
 }
 
@@ -124,7 +122,7 @@ func TestEverySettingOfferedReportsWhatIsInForce(t *testing.T) {
 				t.Errorf("%s ships %q, which the write path refuses as a length of time",
 					each.name, value)
 			}
-		case aCount:
+		case aCount, aSize:
 			if n, err := strconv.Atoi(value); err != nil || n <= 0 {
 				t.Errorf("%s ships %q, which the write path refuses as a count",
 					each.name, value)
