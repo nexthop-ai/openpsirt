@@ -2,12 +2,14 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -46,7 +48,11 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		if _, _, err := administerable(ctx, a); err != nil {
 			return nil, err
 		}
-		rows, err := notify.NewStore(in.DB.DB).Destinations(ctx)
+		by, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := notify.NewStore(in.DB.DB).Destinations(ctx, by)
 		if err != nil {
 			return nil, wentWrong(a.Logger, "the destinations could not be read", err)
 		}
@@ -100,27 +106,16 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		if err != nil {
 			return nil, err
 		}
-		// Checked here as well as refused at the request, because a
-		// destination that can never be reached is a configuration mistake
-		// somebody should learn about while they are still typing it.
+		// Normalized here so what is stored is the address as it parses. What
+		// may be stored is decided by the store, where the rest of this
+		// table's rules live.
 		parsed, err := url.Parse(strings.TrimSpace(input.Body.URL))
-		if err == nil && parsed.User != nil {
-			// A name and password in the address is a credential this would
-			// store and send, and it makes the address read as one host while
-			// reaching another: `https://hooks.slack.com@127.0.0.1/x` is a
-			// request to loopback that says Slack in every list and every
-			// record of it.
-			return nil, huma.Error422UnprocessableEntity(
-				"an address here carries no name or password in it: put the secret " +
-					"in the field for it, so what is signed and what is sent are separate")
+		address := strings.TrimSpace(input.Body.URL)
+		if err == nil {
+			address = parsed.String()
 		}
-		if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-			return nil, huma.Error422UnprocessableEntity(
-				"a destination is an https address: the body is signed and not encrypted, " +
-					"and what it carries is what somebody is being told about a vulnerability")
-		}
-		row, err := notify.NewStore(in.DB.DB).AddDestination(ctx,
-			input.Body.Name, input.Body.Kind, parsed.String(), input.Body.Secret, by.ID)
+		row, err := notify.NewStore(in.DB.DB).AddDestination(ctx, by,
+			input.Body.Name, input.Body.Kind, address, input.Body.Secret)
 		if err != nil {
 			return nil, asked(in.Logger, err)
 		}
@@ -155,8 +150,18 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		if _, _, err := administerable(ctx, a); err != nil {
 			return nil, err
 		}
-		if err := notify.NewStore(in.DB.DB).
-			RetireDestination(ctx, input.Name, input.Kind); err != nil {
+		by, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Mapped before the trail row, which would otherwise record a
+		// retirement that did not happen — and the destination goes on
+		// receiving everything it takes.
+		switch err := notify.NewStore(in.DB.DB).
+			RetireDestination(ctx, by, input.Name, input.Kind); {
+		case errors.Is(err, access.ErrNothingMatched):
+			return nil, huma.Error404NotFound("no destination is recorded under that name and kind")
+		case err != nil:
 			return nil, wentWrong(a.Logger, "that could not be retired", err)
 		}
 		noteAdminChange(ctx, a, trail.Setting, "outbound · "+input.Name+" · "+input.Kind,

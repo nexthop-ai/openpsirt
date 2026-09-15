@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -63,8 +66,8 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 
 		store := notify.NewStore(db.DB)
 		const secret = "a-shared-secret-long-enough"
-		if _, err := store.AddDestination(ctx, "chat", notify.Everything,
-			server.URL, secret, who.ID); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat", notify.Everything,
+			server.URL, secret); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Tell(ctx, notify.Telling{
@@ -170,8 +173,8 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 		defer server.Close()
 
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, "chat", notify.Everything,
-			server.URL, "a-shared-secret-long-enough", who.ID); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat", notify.Everything,
+			server.URL, "a-shared-secret-long-enough"); err != nil {
 			t.Fatal(err)
 		}
 		// The shape a disclosure notice takes: every part of what it is about
@@ -246,8 +249,8 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 		store := notify.NewStore(db.DB)
 		// Paging takes what is worth interrupting somebody for, and nothing
 		// else — which is the whole reason a destination names a kind.
-		if _, err := store.AddDestination(ctx, "paging", string(notify.CriticalOnRelease),
-			server.URL, "a-shared-secret-long-enough", who.ID); err != nil {
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "paging", string(notify.CriticalOnRelease),
+			server.URL, "a-shared-secret-long-enough"); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Tell(ctx, notify.Telling{
@@ -284,8 +287,20 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		defer server.Close()
 
 		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, "plain", notify.Everything,
-			server.URL, "a-shared-secret-long-enough", who.ID); err != nil {
+		// Refused where it is configured, which is the first of the two.
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "plain", notify.Everything,
+			server.URL, "a-shared-secret-long-enough"); err == nil {
+			t.Fatal("a plain http destination was accepted")
+		}
+		// And refused again where the request is made, which is the one that
+		// holds for a row that reached the table any other way — an upgrade
+		// from a build that did not refuse it, or somebody editing the
+		// database. The row is written directly here for exactly that reason.
+		if _, err := db.DB.NewInsert().Model(&notify.Outbound{
+			Name: "plain", Kind: notify.Everything, URL: server.URL,
+			Secret: "a-shared-secret-long-enough", CreatedBy: who.ID,
+			CreatedAt: time.Now().UTC().Truncate(time.Microsecond),
+		}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Tell(ctx, notify.Telling{
@@ -304,6 +319,127 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		}
 		if saw.requests != 0 {
 			t.Errorf("something reached a plain http destination: %d", saw.requests)
+		}
+	})
+}
+
+func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
+	// The window was the oldest two hundred uncleared notifications, and an
+	// event row is never cleared — only a condition is. So once two hundred
+	// events existed the same two hundred were re-read on every cycle and
+	// nothing created afterwards was ever signalled, with no error, no log
+	// and no counter. A deployment reaches that in the first two hundred
+	// events of its life.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "everything", string(notify.Everything),
+			server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+
+		// A backlog the size of one sweep, so the next thing said falls
+		// outside the window the sweep reads.
+		for i := range notify.SweepBatch {
+			if err := store.Tell(ctx, notify.Telling{
+				PersonID: who.ID, Kind: notify.Assigned,
+				Body: fmt.Sprintf("backlog %d", i), Link: "/x",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		if sent, _, err := signal.Once(ctx); err != nil || sent != notify.SweepBatch {
+			t.Fatalf("the backlog carried %d of %d (%v)", sent, notify.SweepBatch, err)
+		}
+
+		if err := store.Tell(ctx, notify.Telling{
+			PersonID: who.ID, Kind: notify.Assigned, Body: "the newest one", Link: "/x",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		sent, _, err := signal.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sent != 1 {
+			t.Fatalf("the sweep carried %d after the backlog, want the one created since", sent)
+		}
+		saw.mu.Lock()
+		defer saw.mu.Unlock()
+		if last := saw.bodies[len(saw.bodies)-1]; !strings.Contains(last, "the newest one") {
+			t.Errorf("what went was %q, want the notification created after the backlog", last)
+		}
+	})
+}
+
+func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T) {
+	// These three carried no subject at all, in a package that enforces its
+	// own authorization for this table in the same file with the reasoning
+	// written out. What kept the signing secret off the wire was one handler
+	// copying the fields it wanted by name — a second caller that marshalled
+	// what came back would have published a shared secret, and nothing would
+	// have said so.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		other, err := rights.Ensure(ctx, "bo@example.com", "Bo", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, admin), "chat", notify.Everything,
+			"https://chat.example.test/hook", "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+
+		// Nothing about a destination is anybody else's to read or to change.
+		if _, err := store.Destinations(ctx, asks(t, db, other)); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("reading where things go as a non-administrator answered %v", err)
+		}
+		if _, err := store.AddDestination(ctx, asks(t, db, other), "theirs", notify.Everything,
+			"https://elsewhere.example.test/hook", "a-shared-secret-long-enough"); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("configuring a destination as a non-administrator answered %v", err)
+		}
+		if err := store.RetireDestination(ctx, asks(t, db, other), "chat",
+			notify.Everything); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("retiring a destination as a non-administrator answered %v", err)
+		}
+
+		// And what an administrator does read carries no secret to leave
+		// behind — the type has no field for one.
+		rows, err := store.Destinations(ctx, asks(t, db, admin))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("%d destinations came back, want the one", len(rows))
+		}
+		shown, err := json.Marshal(rows[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(shown), "a-shared-secret-long-enough") {
+			t.Errorf("the signing secret crossed the store boundary: %s", shown)
 		}
 	})
 }

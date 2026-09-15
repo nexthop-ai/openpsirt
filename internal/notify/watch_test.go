@@ -469,3 +469,105 @@ func asksByID(t *testing.T, db *database.DB, who int64) access.Subject {
 	return access.NewPerson(person.ID, person.Identity, person.IsAdmin,
 		grants, person.PartyID).OnCases(cases)
 }
+
+func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
+	// The coming and the arrived conditions are one function apart, told apart
+	// by a lead time — and it read the people already being told about the
+	// arrived one whichever it was computing. Reconcile makes a person's open
+	// set exactly what it is handed, so anybody who was neither an
+	// administrator nor currently holding the finding was never handed a list
+	// for this kind, was never reconciled, and their alert stood indefinitely
+	// with nothing able to clear it. That alert names the issue and the
+	// product, and the link is the embargoed path.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		held, err := rights.Ensure(ctx, "held@example.com", "Held", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		next, err := rights.Ensure(ctx, "next@example.com", "Next", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, who := range []*access.Account{held, next} {
+			if err := rights.GrantRole(ctx, who.ID, product.ID, access.PrivateTriage); err != nil {
+				t.Fatal(err)
+			}
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewUpdate().Table("target").
+			Set("created_at = ?", time.Now().UTC()).
+			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// Inside the lead time and not yet arrived, which is the coming
+		// condition and not the arrived one.
+		embargoed(t, db, target.ID, "SONIC-2026-0003", held.ID,
+			time.Now().UTC().Add(24*time.Hour))
+
+		watch := notify.NewWatch(db.DB, quiet)
+		seeing := func(who *access.Account) int {
+			t.Helper()
+			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return total
+		}
+
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := seeing(held); n != 1 {
+			t.Fatalf("whoever holds it was told %d things about a date coming, want 1", n)
+		}
+		if n := seeing(admin); n != 1 {
+			t.Errorf("the administrator was told %d things, want 1", n)
+		}
+
+		// The work is handed on. The previous holder is now neither an
+		// administrator nor holding it, so nothing else will ever hand them a
+		// list for this kind.
+		if _, err := db.DB.NewUpdate().Table("finding").
+			Set("assigned_to = ?", next.PartyID).
+			Where("kind = ?", finding.Entered).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := seeing(held); n != 0 {
+			t.Errorf("the previous holder still sees %d alerts about an embargo "+
+				"that is no longer theirs", n)
+		}
+		if n := seeing(next); n != 1 {
+			t.Errorf("whoever holds it now was told %d things, want 1", n)
+		}
+	})
+}

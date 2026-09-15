@@ -79,27 +79,17 @@ func (w *Watch) Run(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// Once derives every condition and reconciles it against what is being said.
-func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
-	admins, err := w.administrators(ctx)
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(admins) == 0 {
-		// Nothing to say and nobody to say it to. Not an error: a deployment
-		// with no administrator recorded cannot start, so this is the window
-		// between the table existing and the first sign-in.
-		return 0, 0, nil
-	}
-
+// tellAdministrators derives the two conditions that go to administrators and
+// to nobody else.
+//
+// The same list to each of them. An alert about the tool's health is not
+// somebody's personal work item, and the first administrator to look should
+// not be the only one who ever sees it.
+func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened, cleared int, err error) {
 	quiet, err := w.quietBuilds(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
-
-	// The same conditions to each of them. An alert about the tool's health is
-	// not somebody's personal work item, and the first administrator to look
-	// should not be the only one who ever sees it.
 	for _, admin := range admins {
 		o, c, err := NewStore(w.db).Reconcile(ctx, admin, BuildQuiet, quiet)
 		if err != nil {
@@ -109,9 +99,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		cleared += c
 	}
 
-	// Somebody away and still holding work. The same list to every
-	// administrator, for the same reason the quiet builds are: whichever
-	// of them looks first should not be the only one who ever sees it.
+	// Somebody away and still holding work.
 	away, err := w.holdingAbsent(ctx)
 	if err != nil {
 		return opened, cleared, err
@@ -123,6 +111,30 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		}
 		opened += o
 		cleared += c
+	}
+	return opened, cleared, nil
+}
+
+// Once derives every condition and reconciles it against what is being said.
+func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
+	admins, err := w.administrators(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// The two conditions that go to administrators and to nobody else are
+	// skipped where none is recorded, and nothing else is. Returning here
+	// skipped the nine per-person conditions as well — every alert a triager
+	// holds, neither derived nor cleared, each one standing with nothing able
+	// to resolve it. A deployment with no administrator recorded cannot
+	// start, so this is the window between the table existing and the first
+	// sign-in, and the rest of the sweep has work to do in it.
+	if len(admins) > 0 {
+		o, c, err := w.tellAdministrators(ctx, admins)
+		opened, cleared = opened+o, cleared+c
+		if err != nil {
+			return opened, cleared, err
+		}
 	}
 
 	// An embargo whose date has arrived is not a fact about the tool's health,
@@ -298,18 +310,9 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 	// included. Reconcile makes one person's open set exactly what it is
 	// given, so somebody who is never handed a list is never reconciled, and
 	// their alert would stand after the thing it was about had been answered.
-	out := map[int64][]Holds{}
-	told, err := w.beingTold(ctx, CriticalOnRelease)
+	out, err := w.everybody(ctx, CriticalOnRelease, acts)
 	if err != nil {
 		return nil, err
-	}
-	for _, person := range told {
-		out[person] = nil
-	}
-	for personID := range acts {
-		if _, already := out[personID]; !already {
-			out[personID] = nil
-		}
 	}
 
 	for _, row := range rows {

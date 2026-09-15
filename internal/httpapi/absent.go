@@ -50,6 +50,17 @@ func noSuchPerson() error {
 	return huma.Error404NotFound("nobody here is called that")
 }
 
+// noSuchGrant is what withdrawing something nobody holds answers.
+//
+// A 404 rather than a 200: "this grant does not exist" and "this grant has
+// been removed" are different answers, and only one of them means the caller
+// should go on to record what it did. Answered as success, the trail gained a
+// row saying a role was withdrawn that never existed, and every finding the
+// person was dealing with in that product was handed back.
+func noSuchGrant() error {
+	return huma.Error404NotFound("they do not hold that")
+}
+
 func noSuchKey() error {
 	return huma.Error404NotFound("no credential is recorded under that name")
 }

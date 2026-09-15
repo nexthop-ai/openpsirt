@@ -99,6 +99,18 @@ func (w *Watch) whoActs(ctx context.Context) (map[int64]map[int64]acts, error) {
 func (w *Watch) everybody(ctx context.Context, kind Kind,
 	reach map[int64]map[int64]acts) (map[int64][]Holds, error) {
 
+	return w.everybodyAnd(ctx, kind, reach, nil)
+}
+
+// everybodyAnd is everybody, plus people named directly.
+//
+// The conditions about an embargo go to whoever holds it and to every
+// administrator, and an administrator is not in the reach map: that map
+// answers who may act on a product, and administration is not held per
+// product.
+func (w *Watch) everybodyAnd(ctx context.Context, kind Kind,
+	reach map[int64]map[int64]acts, also []int64) (map[int64][]Holds, error) {
+
 	out := map[int64][]Holds{}
 	told, err := w.beingTold(ctx, kind)
 	if err != nil {
@@ -106,6 +118,11 @@ func (w *Watch) everybody(ctx context.Context, kind Kind,
 	}
 	for _, person := range told {
 		out[person] = nil
+	}
+	for _, person := range also {
+		if _, already := out[person]; !already {
+			out[person] = nil
+		}
 	}
 	for personID := range reach {
 		if _, already := out[personID]; !already {

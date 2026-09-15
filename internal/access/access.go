@@ -17,6 +17,13 @@
 // Naming somebody in configuration readmits them, because that is the
 // documented way back into a deployment nobody can administer and nothing else
 // clears the date.
+//
+// **A revocation that matched nothing is ErrNothingMatched, never success.**
+// Four writes that take access away bound only the error from the statement
+// and never read how many rows it matched, so withdrawing a role somebody does
+// not hold, or a role that does not exist, answered as though it had been
+// withdrawn — and the caller then wrote a trail row saying so and handed back
+// every finding the person was dealing with in that product.
 package access
 
 import (
@@ -121,6 +128,13 @@ var ErrNoSubject = errors.New("no subject: a query was attempted without saying 
 // granted something that does not cover this. Telling an outsider which of
 // those applies is free reconnaissance.
 var ErrDenied = errors.New("not authorized")
+
+// ErrNothingMatched is a write that found nothing to act on.
+//
+// A revocation is the case it exists for: "this grant does not exist" and
+// "this grant has been removed" are different answers, and only one of them
+// means the caller should go on to record what it did.
+var ErrNothingMatched = errors.New("nothing matched")
 
 // Subject is who is asking.
 type Subject struct {

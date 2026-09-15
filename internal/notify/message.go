@@ -28,24 +28,34 @@ type Message struct {
 // Deliberately plain and deliberately uninformative about which finding: a
 // subject is shown by a preview without anybody opening anything, so it says
 // what kind of thing this is and never what it is about.
+//
+// Kept against Kinds by a test, because this is a hand-maintained table over a
+// closed vocabulary and it was one row short.
 var called = map[Kind]string{
-	Assigned:         "Work assigned to you",
-	SentBack:         "A claim of yours was sent back",
-	BuildQuiet:       "A build has stopped being scanned",
-	HoldingAbsent:    "Somebody away is holding work",
-	Mentioned:        "You were named in a note",
-	DisclosureDue:    "An embargo has reached its date",
-	DisclosureNear:   "An embargo is running out",
-	StatementRevised: "A VEX publisher changed what a decision cited",
-	ClaimWaiting:     "A claim is waiting for a second person",
-	SentBackWaiting:  "A claim of yours is waiting on you",
-	DeferralEnding:   "A deferral is running out",
-	QueueUntaken:     "Work is sitting in a team's queue",
-	ApprovalUndone:   "An agreement to a claim of yours was taken back",
-	ClaimLapsed:      "A decision of yours stopped applying",
-	BroughtIn:        "You have been brought into a case",
-	Unanswered:       "Somebody's report has not been answered",
+	Assigned:      "Work assigned to you",
+	SentBack:      "A claim of yours was sent back",
+	BuildQuiet:    "A build has stopped being scanned",
+	HoldingAbsent: "Somebody away is holding work",
+	// The one kind whose purpose is a specific sentence — "this release has a
+	// critical, we need to cut a new one" — and the one this table was
+	// missing, so it shipped as the fallback below.
+	CriticalOnRelease: "A release carries an unaddressed critical",
+	Mentioned:         "You were named in a note",
+	DisclosureDue:     "An embargo has reached its date",
+	DisclosureNear:    "An embargo is running out",
+	StatementRevised:  "A VEX publisher changed what a decision cited",
+	ClaimWaiting:      "A claim is waiting for a second person",
+	SentBackWaiting:   "A claim of yours is waiting on you",
+	DeferralEnding:    "A deferral is running out",
+	QueueUntaken:      "Work is sitting in a team's queue",
+	ApprovalUndone:    "An agreement to a claim of yours was taken back",
+	ClaimLapsed:       "A decision of yours stopped applying",
+	BroughtIn:         "You have been brought into a case",
+	Unanswered:        "Somebody's report has not been answered",
 }
+
+// generalSubject is what a notification of no known kind is called.
+const generalSubject = "Something needs your attention"
 
 // Compose turns a notification into what a channel carries.
 //
@@ -65,7 +75,10 @@ var called = map[Kind]string{
 func Compose(n Notification, baseURL string) Message {
 	subject := called[n.Kind]
 	if subject == "" {
-		subject = "Something needs your attention"
+		// Every kind has a line of its own, which a test holds, so this is a
+		// belt for a kind that does not exist rather than a shape anything
+		// ships under.
+		subject = generalSubject
 	}
 	where := link(baseURL, n.Link)
 

@@ -411,3 +411,41 @@ func TestADigestCarriesOnlyWhatNothingElseSaid(t *testing.T) {
 		}
 	})
 }
+
+func TestNothingIsMailedAboutAConditionThatHasAlreadyCleared(t *testing.T) {
+	// A condition that opens and stops being true inside one sweep interval
+	// is withdrawn by the pass that derives it, and the area inside the
+	// application stops showing it — so mail about it arrives with nothing to
+	// reconcile it against. For a private condition the message says only
+	// that there is something undisclosed needing attention: a message about
+	// nothing at all.
+	//
+	// The sibling sweep that carries notifications to configured destinations
+	// has had this rule all along, with the reason written beside it.
+	eachWithDB(t, func(t *testing.T, db *database.DB, s *notify.Store, me, _ access.Subject) {
+		ctx := t.Context()
+		if err := access.NewStore(db.DB).SetEmail(ctx, me.ID, "ana@example", access.Recorded); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := s.Reconcile(ctx, me.ID, notify.BuildQuiet, []notify.Holds{{
+			About: "build-quiet sonic master broadcom",
+			Body:  "Nothing has been filed against sonic master broadcom.",
+			Link:  "/builds/1",
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		// It stops being true before the next sweep: a scan arrived.
+		if _, cleared, err := s.Reconcile(ctx, me.ID, notify.BuildQuiet, nil); err != nil || cleared != 1 {
+			t.Fatalf("clearing the condition: cleared=%d err=%v", cleared, err)
+		}
+
+		sender := &recorder{}
+		post := notify.NewPost(db.DB, sender, "https://psirt.example", discard(), "test")
+		if sent, failed, err := post.Once(ctx); err != nil || sent != 0 || failed != 0 {
+			t.Fatalf("a cleared condition was mailed: sent=%d failed=%d err=%v", sent, failed, err)
+		}
+		if len(sender.sent) != 0 {
+			t.Errorf("what was sent about a condition that had already cleared: %+v", sender.sent)
+		}
+	})
+}

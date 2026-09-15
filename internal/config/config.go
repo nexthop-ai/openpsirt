@@ -295,6 +295,16 @@ func Load() (Config, error) {
 	if err := (access.Trust{Header: c.TrustedHeader, From: c.TrustedSources}).Configured(); err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_HEADER: %w", err)
 	}
+	// The same rule, for the same reason. A server with nobody to send as is
+	// not a configuration, it is half of one — and half of one answered as
+	// "no mail configured", which is a choice an operator is entitled to make
+	// and is indistinguishable from the mistake. Embargo mail is what a
+	// coordinated disclosure runs on, and it was silently off.
+	if (strings.TrimSpace(c.MailServer) == "") != (strings.TrimSpace(c.MailFrom) == "") {
+		return Config{}, fmt.Errorf(
+			"OPENPSIRT_MAIL_SERVER and OPENPSIRT_MAIL_FROM: set both or neither — " +
+				"a server with nobody to send as sends nothing, and says nothing about it")
+	}
 
 	if err := c.LogLevel.UnmarshalText([]byte(env("LOG_LEVEL", "info"))); err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_LOG_LEVEL: %w", err)

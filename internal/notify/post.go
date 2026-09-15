@@ -163,6 +163,14 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 		ColumnExpr(`pe.email AS "email"`).
 		Join(`JOIN "person" AS "pe" ON pe.id = nt.person_id`).
 		Where("nt.sent_at IS NULL").
+		// A condition the application has already withdrawn is not news. The
+		// sibling sweep carries the rule and this one did not, so mail went
+		// about a build that had resumed being scanned or an embargo whose
+		// date had moved — and the area inside the application does not show
+		// it, so there is nothing to reconcile the message against. For a
+		// private condition the message says only that there is something
+		// undisclosed needing attention: a message about nothing at all.
+		Where("nt.cleared_at IS NULL").
 		Where("nt.attempts < ?", tries).
 		// Somebody with no address is told nothing outside the
 		// application and keeps the area inside it. Excluded in the

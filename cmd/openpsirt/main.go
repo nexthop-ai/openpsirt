@@ -301,7 +301,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// What leaves the application, where an operator configured somewhere for
 	// it to go. Nil when they did not, which is ordinary rather than broken:
 	// the notification area is the channel that always exists.
-	post := notify.NewPost(db.DB, mailChannel(cfg), cfg.BaseURL, logger, name)
+	post := notify.NewPost(db.DB, mailChannel(cfg, logger), cfg.BaseURL, logger, name)
 	// One signed request per notification, to whatever destinations an
 	// administrator configured. Started whatever is configured and does
 	// nothing where nothing is: the destinations are read each cycle, so
@@ -830,11 +830,17 @@ func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 // Returned as the interface rather than the concrete type, and deliberately
 // through a function that can answer nil: a typed nil pointer handed to an
 // interface is not nil, and the sweep asks whether it has a channel.
-func mailChannel(cfg config.Config) notify.Channel {
+// Which of the two it got is logged, the way the attachment store logs what it
+// chose. Half a configuration is refused where it is read, so what reaches
+// here is either a whole one or none — and "none" is ordinary rather than a
+// fault, which is exactly why it has to be said out loud.
+func mailChannel(cfg config.Config, logger *slog.Logger) notify.Channel {
 	mail := notify.NewMail(cfg.MailServer, cfg.MailFrom, cfg.MailUsername, cfg.MailPassword)
 	if mail == nil {
+		logger.Info("mail is not configured, so nothing is sent outside the application")
 		return nil
 	}
+	logger.Info("mail is configured", "server", cfg.MailServer, "from", cfg.MailFrom)
 	return mail
 }
 

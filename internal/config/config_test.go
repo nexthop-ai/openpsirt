@@ -43,6 +43,13 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		// them.
 		{"TRUSTED_HEADER", "X-User"},
 		{"TRUSTED_SOURCES", "not-an-address"},
+		// The mail pair, on the same rule. A server with nobody to send as is
+		// not a configuration, it is half of one — and half of one answered
+		// as "no mail configured", which is a choice an operator is entitled
+		// to make and is indistinguishable from the mistake. Embargo mail is
+		// what a coordinated disclosure runs on, and it was silently off.
+		{"MAIL_SERVER", "smtp.example.test:587"},
+		{"MAIL_FROM", "psirt@example.test"},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)
@@ -93,6 +100,21 @@ func TestATrustedHeaderAndTheSourcesItIsReadFromAreAcceptedTogether(t *testing.T
 	}
 	if c.TrustedHeader != "X-User" || len(c.TrustedSources) != 2 {
 		t.Errorf("read the header as %q from %v", c.TrustedHeader, c.TrustedSources)
+	}
+}
+
+func TestAMailServerAndWhoItSendsAsAreAcceptedTogether(t *testing.T) {
+	// The other side, so the refusals above cannot be satisfied by refusing
+	// the pair outright — and so that configuring neither stays the ordinary
+	// case it is.
+	t.Setenv(envPrefix+"MAIL_SERVER", "smtp.example.test:587")
+	t.Setenv(envPrefix+"MAIL_FROM", "psirt@example.test")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("a server with somebody to send as was refused: %v", err)
+	}
+	if c.MailServer == "" || c.MailFrom == "" {
+		t.Errorf("read the server as %q sending as %q", c.MailServer, c.MailFrom)
 	}
 }
 

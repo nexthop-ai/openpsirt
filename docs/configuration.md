@@ -123,7 +123,7 @@ refused over a connection the server would not secure with STARTTLS.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_MAIL_FROM` | The address messages are sent as. Set it and the server together, or neither | unset |
+| `OPENPSIRT_MAIL_FROM` | The address messages are sent as. Set it and the server together, or neither: half of the pair is refused at startup, because a server with nobody to send as sends nothing and would say nothing about it | unset |
 | `OPENPSIRT_MAIL_SERVER` | The SMTP server as `host:port`, e.g. `smtp.example.com:587` | unset |
 | `OPENPSIRT_MAIL_USERNAME` | Username, where the server wants one. Sent only after STARTTLS | unset |
 | `OPENPSIRT_MAIL_PASSWORD` | Password for that username. Sent only after STARTTLS | unset |

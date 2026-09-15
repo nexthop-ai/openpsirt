@@ -304,6 +304,8 @@ of this table's rules are.
 | Rule | Reason |
 |---|---|
 | A sweep reconciles everybody it has told, not only everybody it should tell | Reconcile makes one person's open set exactly what it is handed, so somebody never handed a list is never reconciled and their alert stands after the thing was answered. This arises the moment who hears about something depends on who holds it |
+| Who it has told is read for the kind being derived | Two conditions one argument apart read the same list, so for one of them anybody who was neither an administrator nor currently holding the thing was never handed a list and never reconciled. The list is one call for every condition now, which is what stops a third from spelling it a third way |
+| A sweep with no administrator recorded still derives everything that is not an administrator's | Returning early skipped the nine per-person conditions as well, so every alert a triager held stood with nothing able to resolve it. Only the two conditions addressed to administrators alone depend on there being one |
 | Nobody is told they were unassigned | A name being removed is not an action directed at the person who held it, and a queue that gets shorter says so already |
 | A failure to tell somebody is logged, not returned | The assignment happened and the claim was sent back; answering the caller with an error invites a retry that does the first thing twice |
 | More than one process sweeps | The chart ships two replicas, each running its own watch. The unique index makes a duplicate one row, and the pass treats a duplicate as the answer already being there — without that it would abort, and every administrator after the one it failed on would be told nothing that cycle |
@@ -318,6 +320,8 @@ channel there will be. Mail carries the markdown as its text part.
 | Rule | Reason |
 |---|---|
 | What is unsent is the work list | A sweep reads notifications nobody has carried out yet, sends them, and marks them. A failed message needs no state of its own; a deployment that configures mail after a week finds the week waiting |
+| A condition the application has withdrawn is not carried | The area inside the application stops showing it, so a message about it arrives with nothing to reconcile it against — and for a private condition the message says only that there is something undisclosed needing attention, which is a message about nothing at all |
+| A server and somebody to send as are configured together or not at all | Half of the pair answered as no mail configured, which is a choice an operator is entitled to make and is indistinguishable from the mistake. Refused at startup, and which of the two the process got is logged |
 | Tried five times, then left alone | A mailbox that refuses every time has gone. The row stays unsent and stays readable |
 | Somebody with no address is sent nothing | Expressed in the query rather than the loop, so a deployment where nobody has one does no work |
 | Credentials are refused over a connection the server would not secure | The sweep offers STARTTLS and will not send a password without it |
@@ -345,6 +349,9 @@ request-forgery primitive unless governed (REQ-69):
 | What it carries is what the channel rules already allow | Composed by the same code that composes a mail, the address included. A rule enforced in two places is enforced in one and a half, and the address is the part a channel would otherwise build for itself |
 | Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event has no such identity and is tracked by its own |
 | The claim is staked before the request is made | A row with no sent-at stops a second replica, or the next sweep, sending the same thing while the first is in flight |
+| What a sweep reads is what this destination has not settled | Read as "everything not cleared", the window was the oldest two hundred — and an event is never cleared, because only a condition is. So once two hundred events existed the same two hundred were re-read every cycle and nothing created afterwards was ever carried, with no error, no log and no counter |
+| A destination's kind is normalized where it is written | It was stored as typed and compared loosely, so a destination added under one spelling was retired by another only by accident — and a destination believed retired goes on receiving everything it takes, undisclosed findings included |
+| Reading and changing where things go is refused in the data layer | It is this table's own rule and the rest of them live there (REQ-42 and REQ-43). What an operator's question needs is named field by field rather than embedding the row, so the signing secret cannot reach a caller that forgets to drop it |
 
 ## Embargo notices
 

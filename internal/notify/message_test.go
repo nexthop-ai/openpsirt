@@ -1,6 +1,9 @@
 package notify
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"strings"
 	"testing"
 )
@@ -154,5 +157,66 @@ func TestADigestWithNothingToSayIsNotAMessage(t *testing.T) {
 	}
 	if (Digest{Withheld: Withheld{Count: 1}}).Empty() {
 		t.Error("a digest with something withheld reads as empty, so nobody is told it exists")
+	}
+}
+
+func TestEveryKindOfNotificationHasASubjectOfItsOwn(t *testing.T) {
+	// The table is hand-maintained over a closed vocabulary with nothing
+	// asserting that the two agree, and it was one row short. The kind it was
+	// missing shipped under the generic fallback — and it is the one whose
+	// whole purpose is a specific sentence, so a destination subscribed to it
+	// alone received an alert indistinguishable from any other.
+	for _, kind := range Kinds() {
+		got := Compose(Notification{Kind: kind}, "https://psirt.example.test")
+		if got.Subject == "" {
+			t.Errorf("%s has no subject at all", kind)
+		}
+		if got.Subject == generalSubject {
+			t.Errorf("%s has no subject of its own", kind)
+		}
+	}
+}
+
+func TestTheListOfKindsIsEveryKindDeclared(t *testing.T) {
+	// The enumeration is hand-maintained too, so a kind added to the constants
+	// and not to it would leave the check above passing while the new kind
+	// shipped under the fallback — the same accident one step further back.
+	//
+	// Read from the source rather than from a second hand-written list, which
+	// would be a third copy to keep in step.
+	file, err := parser.ParseFile(token.NewFileSet(), "notify.go", nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declared := map[string]bool{}
+	for _, decl := range file.Decls {
+		group, ok := decl.(*ast.GenDecl)
+		if !ok || group.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range group.Specs {
+			value, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			named, ok := value.Type.(*ast.Ident)
+			if !ok || named.Name != "Kind" {
+				continue
+			}
+			for _, name := range value.Names {
+				declared[name.Name] = true
+			}
+		}
+	}
+	if len(declared) == 0 {
+		t.Fatal("no kind constants were found in the source, so this checked nothing")
+	}
+
+	listed := map[Kind]bool{}
+	for _, kind := range Kinds() {
+		listed[kind] = true
+	}
+	if len(listed) != len(declared) {
+		t.Errorf("Kinds() lists %d and the source declares %d", len(listed), len(declared))
 	}
 }
