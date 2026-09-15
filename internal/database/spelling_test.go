@@ -33,10 +33,15 @@ func TestAColumnReferenceIsQuotedForWhicheverEngineIsAsked(t *testing.T) {
 			t.Errorf("a quoted column reference did not run: %v", err)
 		}
 
-		// A name carrying the quote character is escaped rather than closed.
-		odd := string(database.Column(db.DB, `we"ird`))
-		if strings.Count(odd, `"`) != 4 && !strings.Contains(odd, "``") {
-			t.Errorf("a name holding a quote came back as %s", odd)
+		// A name carrying this engine's own quote character is escaped rather
+		// than closed. Which character that is, is the engine's answer: two
+		// of the four name the backtick, and both take it beside the standard
+		// quote the schema is written in.
+		quote := quoted[:1]
+		odd := string(database.Column(db.DB, "we"+quote+"ird"))
+		if !strings.Contains(odd, quote+quote) {
+			t.Errorf("a name holding %s came back as %s, which closes the identifier early",
+				quote, odd)
 		}
 	})
 }

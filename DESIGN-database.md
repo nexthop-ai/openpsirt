@@ -312,7 +312,10 @@ likely to be developing against. A column named `rank` was accepted by three
 engines and refused by the fourth, where it had become a window function.
 
 A column reference a statement composes is quoted through one function, which
-is the package's to own. It owned none, so every caller wrote identifiers bare
+is the package's to own. The character it uses is the engine's own answer
+rather than the standard quote the schema is written in: two of the four name
+the backtick and take both, so either works today, and asking makes it true of
+an engine that does not. It owned none, so every caller wrote identifiers bare
 and two helpers took a column name as an ordinary string parameter — with
 nothing between them and a name arriving from a query parameter except that
 every caller happened to pass a literal. What a caller may pass is a named type

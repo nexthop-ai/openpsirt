@@ -18,8 +18,11 @@ type Expr string
 // Column quotes a possibly qualified column reference for every engine.
 //
 // The quoting the package that owns engine-specific SQL is supposed to own and
-// did not, so every caller hand-wrote its identifiers. MySQL and MariaDB take
-// the double quote because the connection forces ANSI_QUOTES into sql_mode.
+// did not, so every caller hand-wrote its identifiers.
+//
+// The character is the engine's own answer rather than the standard quote the
+// schema is written in. Two of the four name the backtick and take both, so
+// either would work today — asking makes it true of an engine that does not.
 func Column(db bun.IDB, name string) Expr {
 	quote := string([]byte{db.Dialect().IdentQuote()})
 	parts := strings.Split(name, ".")
