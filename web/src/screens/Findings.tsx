@@ -9,7 +9,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
@@ -436,10 +436,16 @@ export function Findings() {
           </button>
         )}
         <span className="seg">
+          {/* Across every product there is no by-component or by-bump answer
+              to give: both ask a product-scoped endpoint, and asked with no
+              product they are refused for a path parameter that is missing.
+              Offered anyway, the two buttons were controls that could only
+              produce an error — and switching to one and back is how somebody
+              loses the question they had built. */}
           {[
             ["issues", "By issue"],
-            ["components", "By component"],
-            ["bumps", "By bump"],
+            ...(spanning ? [] : [["components", "By component"] as const]),
+            ...(spanning ? [] : [["bumps", "By bump"] as const]),
           ].map(([value, label]) => (
             <button
               key={value}
@@ -584,6 +590,15 @@ export function Findings() {
       )}
     </>
   );
+
+  // A view the query string still asks for after the product went away —
+  // somebody narrowing a product's list by component and then clearing the
+  // product. The list is the one that spans, rather than an error.
+  if (spanning && view !== "issues") {
+    const asking = new URLSearchParams(params);
+    asking.delete("view");
+    return <Navigate replace to={`/findings?${asking}`} />;
+  }
 
   if (view === "bumps") {
     return (
@@ -962,7 +977,15 @@ export function Findings() {
                             <Link
                               className="linkish id compname"
                               title={`Open ${row.component}`}
-                              to={`/products/${encodeURIComponent(product)}/components/${encodeURIComponent(row.component ?? "")}`}
+                              // The row's own product, not the selection's.
+                              // Across every product there is no selection, so
+                              // this built `/products//components/NAME` — a
+                              // path that matches no route, and the app fell
+                              // back to the home screen. The source-package
+                              // link four rows down already asked the row.
+                              to={`/products/${encodeURIComponent(
+                                buildOf(row).product,
+                              )}/components/${encodeURIComponent(row.component ?? "")}`}
                               onClick={(event) => event.stopPropagation()}
                             >
                               {row.component}
