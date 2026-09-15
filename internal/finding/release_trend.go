@@ -86,10 +86,10 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	// over two columns has no spelling all four engines share.
 	inner := s.db.NewSelect().
 		Distinct().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedFor(RatedOnStream)).
 		ColumnExpr(`st.display_name AS "stream"`).
 		// When it went out, where somebody said, and when it was declared

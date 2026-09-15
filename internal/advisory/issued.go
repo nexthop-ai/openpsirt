@@ -51,7 +51,7 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	}
 
 	q := s.db.NewSelect().
-		TableExpr(`advisory_issuance AS "ai"`).
+		TableExpr(`"advisory_issuance" AS "ai"`).
 		Join(`JOIN "product" AS "pd" ON pd.id = ai.product_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = ai.vulnerability_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ai.issued_by`).

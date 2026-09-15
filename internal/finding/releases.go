@@ -69,11 +69,11 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// concatenating them into one string is a portability trap of its own.
 	inner := s.db.NewSelect().
 		Distinct().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`st.kind AS "kind"`).
@@ -117,9 +117,9 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		Variant string `bun:"variant"`
 	}
 	builds := s.db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`st.kind AS "kind"`).
 		ColumnExpr(`va.name AS "variant"`).
@@ -227,8 +227,8 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 	}
 	err = s.db.NewSelect().
 		Distinct().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
 		Where("f.target_id = ?", targetID).

@@ -270,8 +270,8 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// When it was first said and when it stopped, read off the scans the
 		// interval is held against: the claim itself carries scan identifiers,
 		// and a screen needs moments.
-		Join(`JOIN scan AS "opened" ON opened.id = sup.opened_scan_id`).
-		Join(`LEFT JOIN scan AS "closed" ON closed.id = sup.closed_scan_id`).
+		Join(`JOIN "scan" AS "opened" ON opened.id = sup.opened_scan_id`).
+		Join(`LEFT JOIN "scan" AS "closed" ON closed.id = sup.closed_scan_id`).
 		ColumnExpr(`sup.vulnerability AS "vulnerability"`).
 		ColumnExpr(`COALESCE(NULLIF(sup.subject_name, ''), sup.subject_purl) AS "subject"`).
 		ColumnExpr(`sup.status AS "status"`).

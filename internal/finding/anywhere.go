@@ -137,7 +137,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 				q = q.Where("st.id NOT IN (?)", bun.List(pastEOL))
 			}
 		}
-		q = q.TableExpr(`finding AS "f"`).
+		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).

@@ -127,7 +127,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows    int    `bun:"written"`
 	}
 	err := narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`cl.outcome AS "outcome"`).
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
@@ -156,7 +156,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
 		ColumnExpr(`ap.batch AS "batch"`).
@@ -187,7 +187,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows     int    `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pr" ON pr.id = de.proposed_by`).
 		Join(`JOIN "person" AS "ape" ON ape.id = ap.approved_by`).
@@ -221,7 +221,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
@@ -275,7 +275,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Covered    int       `bun:"covered"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
@@ -323,7 +323,7 @@ func (s *Store) decisionsOf(ctx context.Context, subject access.Subject,
 
 	var ids []int64
 	err := readableBy(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		ColumnExpr("de.id").
 		Where("de.claim_id = ?", claimID), subject, "de").Scan(ctx, &ids)
 	if err != nil {

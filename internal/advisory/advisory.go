@@ -398,8 +398,8 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 	// flaw with one discovery.
 	var row finding.Finding
 	err = s.db.NewSelect().Model(&row).
-		Join(`JOIN target AS "t" ON t.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = t.stream_id`).
+		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", issue.ID).
 		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
@@ -435,8 +435,8 @@ func (s *Store) here(ctx context.Context, subject access.Subject,
 	productID, issueID int64) (bool, error) {
 
 	count, err := s.db.NewSelect().Model((*finding.Finding)(nil)).
-		Join(`JOIN target AS "t" ON t.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = t.stream_id`).
+		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", issueID).
 		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
@@ -461,10 +461,10 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 	// would otherwise be thirty round trips to write one document, and the
 	// answer would be assembled from thirty moments rather than one.
 	err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "t" ON t.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = t.variant_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`va.name AS "variant"`).
 		// Counted rather than filtered, so a release that held the flaw and no

@@ -239,15 +239,15 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	// question of the same joins. Two spellings of one predicate is how a
 	// total stops describing the list it sits under.
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-			Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
-			Join(`JOIN product AS "p" ON p.id = st.product_id`).
-			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		q = q.TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 			// The consumer, for the versions a decision is keyed on.
-			Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			Where("f.closed_at IS NULL").
 			Where("f.due_at IS NOT NULL").
 			Where("f.due_at <= ?", s.now().UTC().Add(within)).
@@ -390,9 +390,9 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		// more rows.
 		var opened []time.Time
 		err := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("f.opened_at").
 			Where("f.closed_at IS NULL").
 			Where("st.product_id = ?", productID).
@@ -633,7 +633,7 @@ const recomputeSlice = 20_000
 func (s *Store) everyProduct(ctx context.Context) ([]int64, error) {
 	var products []int64
 	if err := s.db.NewSelect().
-		TableExpr(`product AS "p"`).
+		TableExpr(`"product" AS "p"`).
 		ColumnExpr("p.id").
 		OrderExpr("p.id").
 		Scan(ctx, &products); err != nil {

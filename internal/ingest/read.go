@@ -371,7 +371,7 @@ func (r *Reader) reinstate(ctx context.Context, reference string) error {
 
 	var shown int64
 	if err := r.db.NewSelect().
-		TableExpr(`target AS "t"`).
+		TableExpr(`"target" AS "t"`).
 		ColumnExpr("COALESCE(t.last_scan_id, 0)").
 		Where("t.id = ?", failed.TargetID).
 		Scan(ctx, &shown); err != nil {

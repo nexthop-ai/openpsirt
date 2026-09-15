@@ -101,10 +101,10 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 
 	var rows []placeRow
 	err = s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
 		ColumnExpr(`f.visibility AS "visibility"`).
 		// The upstream version where one is stated, and the
@@ -144,8 +144,8 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		// be said about a finding on one is narrower, and that is a fact about
 		// the build rather than about who is asking.
 		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.place_identity = ?", placeIdentity).
@@ -253,7 +253,7 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 		DueAt           *time.Time `bun:"due_at"`
 	}
 	if err := db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
@@ -384,10 +384,10 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		FixedIn         string `bun:"fixed_in"`
 	}
 	query := db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
@@ -407,8 +407,8 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		ColumnExpr(`COALESCE(f.fixed_in, '') AS "fixed_in"`).
 		ColumnExpr(`f.due_at AS "due_at"`).
 		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -511,10 +511,10 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		FixedIn       string `bun:"fixed_in"`
 	}
 	err = s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(RatedHere, productID).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
@@ -532,8 +532,8 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		// The deadline each place carries, for the reason PlaceFor reads it.
 		ColumnExpr(`f.due_at AS "due_at"`).
 		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		// The fold rather than the one component named. One judgment covers

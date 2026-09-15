@@ -186,7 +186,7 @@ func (s *Store) Unacknowledged(ctx context.Context) ([]Unanswered, error) {
 		Private         int        `bun:"private"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`flaw_report AS "fr"`).
+		TableExpr(`"flaw_report" AS "fr"`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = fr.vulnerability_id`).
 		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = fr.vulnerability_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).

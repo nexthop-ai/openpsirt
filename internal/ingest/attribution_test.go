@@ -119,9 +119,9 @@ func TestARunIsAttributedToOneUploadHoweverThePageFalls(t *testing.T) {
 func quietTarget(t *testing.T, s *ingest.Store, productID int64) int64 {
 	t.Helper()
 	var id int64
-	if err := s.DB().NewSelect().TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
-		Join("JOIN variant AS v ON v.id = tg.variant_id").
+	if err := s.DB().NewSelect().TableExpr("\"target\" AS tg").
+		Join("JOIN \"stream\" AS st ON st.id = tg.stream_id").
+		Join("JOIN \"variant\" AS v ON v.id = tg.variant_id").
 		Column("tg.id").
 		Where("st.product_id = ?", productID).
 		Where("v.name = ?", "mellanox").

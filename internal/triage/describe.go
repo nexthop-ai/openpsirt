@@ -91,7 +91,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 
 	var rows []describedRow
 	err := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		// The decision is on the outside of this join by construction, and
 		// the spelling is the instruction. CROSS JOIN ... WHERE is an inner
 		// join on every engine; on SQLite, which plans without statistics
@@ -100,14 +100,14 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		// equality that matches ten rows when it matches every open row in
 		// the deployment, and probed the decisions once per row: 0.46 s to
 		// describe a page of thirty-two, against 0.1 ms the other way round.
-		Join(`CROSS JOIN finding AS "f"`).
+		Join(`CROSS JOIN "finding" AS "f"`).
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN product AS "pr" ON pr.id = st.product_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN "product" AS "pr" ON pr.id = st.product_id`).
 		ColumnExpr(`de.id AS "decision_id"`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr("CASE WHEN COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr+
@@ -194,7 +194,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Places      int   `bun:"places"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
@@ -230,14 +230,14 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Decided     int   `bun:"decided"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		// The decision on the outside, as above.
-		Join(`CROSS JOIN finding AS "f"`).
+		Join(`CROSS JOIN "finding" AS "f"`).
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).

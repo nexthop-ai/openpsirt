@@ -439,7 +439,7 @@ func identify(what string) string {
 func (w *Watch) beingTold(ctx context.Context, kind Kind) ([]int64, error) {
 	var people []int64
 	err := w.db.NewSelect().
-		TableExpr(`notification AS "n"`).
+		TableExpr(`"notification" AS "n"`).
 		ColumnExpr("n.person_id").
 		Where("n.kind = ?", kind).
 		Where("n.cleared_at IS NULL").
@@ -489,7 +489,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	// number that makes somebody's absence look like a catastrophe.
 	held := w.db.NewSelect().
 		Distinct().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.assigned_to AS "person_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
@@ -497,7 +497,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 		Where("f.closed_at IS NULL")
 
 	if err := w.db.NewSelect().
-		TableExpr(`person AS "p"`).
+		TableExpr(`"person" AS "p"`).
 		// Joined on the party a person is assignable as, because that
 		// is what the assignment column holds.
 		Join(`JOIN (?) AS "work" ON work.person_id = p.party_id`, held).

@@ -213,8 +213,8 @@ func TestANewFindingIsClockedByTheRatingInForce(t *testing.T) {
 			StartedAt time.Time  `bun:"started_at"`
 		}
 		err := f.db.DB.NewSelect().
-			TableExpr("finding AS f").
-			Join("JOIN scan_run AS r ON r.id = f.opened_run_id").
+			TableExpr("\"finding\" AS f").
+			Join("JOIN \"scan_run\" AS r ON r.id = f.opened_run_id").
 			ColumnExpr("f.due_at AS due_at").
 			ColumnExpr("r.started_at AS started_at").
 			Where("f.target_id = ?", other).
@@ -440,8 +440,8 @@ func (f *fixture) urgencyIn(t *testing.T, target int64, identifier string) int64
 	t.Helper()
 	var rank int64
 	err := f.db.DB.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr("\"finding\" AS f").
+		Join("JOIN \"vulnerability\" AS v ON v.id = f.vulnerability_id").
 		ColumnExpr("MAX(f.urgency)").
 		Where("v.identifier = ?", identifier).
 		Where("f.target_id = ?", target).

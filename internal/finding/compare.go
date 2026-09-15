@@ -81,9 +81,9 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 
 	at := func(targetID int64) *bun.SelectQuery {
 		q := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 			ColumnExpr(`v.identifier AS "vulnerability"`).
 			ColumnExpr(`c.name AS "component"`).
 			ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
@@ -185,9 +185,9 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	at := func(targetID int64) ([]Changed, error) {
 		var rows []Changed
 		err := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-			Join(`JOIN component AS "c" ON c.id = f.component_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 			ColumnExpr(`v.identifier AS "vulnerability"`).
 			ColumnExpr(`c.name AS "component"`).
 			Where("f.target_id = ?", targetID).
@@ -307,9 +307,9 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 			MovedTo       string `bun:"moved_to"`
 		}
 		err := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-			Join(`JOIN component AS "cp" ON cp.id = f.component_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN "component" AS "cp" ON cp.id = f.component_id`).
 			ColumnExpr(`v.identifier AS "vulnerability"`).
 			ColumnExpr(`cp.name AS "component"`).
 			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).

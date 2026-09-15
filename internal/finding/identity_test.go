@@ -136,8 +136,8 @@ func TestWhatKindOfFlawAnIssueIsIsAddedToAndNeverTakenAway(t *testing.T) {
 		kinds := func() []string {
 			t.Helper()
 			var rows []string
-			if err := f.db.DB.NewSelect().TableExpr("vulnerability_weakness AS vw").
-				Join("JOIN vulnerability AS v ON v.id = vw.vulnerability_id").
+			if err := f.db.DB.NewSelect().TableExpr("\"vulnerability_weakness\" AS vw").
+				Join("JOIN \"vulnerability\" AS v ON v.id = vw.vulnerability_id").
 				ColumnExpr("vw.cwe").Where("v.identifier = ?", "CVE-2026-1").
 				Order("vw.cwe").Scan(ctx, &rows); err != nil {
 				t.Fatal(err)

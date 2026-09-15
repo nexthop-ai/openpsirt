@@ -69,8 +69,8 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = w.db.NewSelect().
-		TableExpr(`decision AS "de"`).
-		Join(`JOIN product AS "p" ON p.id = de.product_id`).
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		ColumnExpr(`de.proposed_by AS "proposed_by"`).
@@ -162,8 +162,8 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = w.db.NewSelect().
-		TableExpr(`decision AS "de"`).
-		Join(`JOIN product AS "p" ON p.id = de.product_id`).
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		ColumnExpr(`de.proposed_by AS "proposed_by"`).
@@ -242,10 +242,10 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = w.db.NewSelect().
-		TableExpr(`decision AS "de"`).
-		Join(`JOIN product AS "p" ON p.id = de.product_id`).
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 		// The argument, which is where the date lives.
-		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		ColumnExpr(`de.proposed_by AS "proposed_by"`).
@@ -345,12 +345,12 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	// and dozens of finding rows.
 	work := w.db.NewSelect().
 		Distinct().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN team AS "tm" ON tm.party_id = f.assigned_to`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "team" AS "tm" ON tm.party_id = f.assigned_to`).
 		ColumnExpr(`tm.id AS "team_id"`).
 		ColumnExpr(`tm.display_name AS "team_display"`).
 		ColumnExpr(`tm.name AS "team_name"`).
@@ -363,7 +363,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		Where("f.assigned_at <= ?", since).
 		Where("tm.retired_at IS NULL").
 		Where("NOT EXISTS (?)", w.db.NewSelect().
-			TableExpr(`decision AS "de"`).
+			TableExpr(`"decision" AS "de"`).
 			ColumnExpr("1").
 			Where("de.product_id = st.product_id").
 			Where("de.vulnerability_id = f.vulnerability_id").
@@ -383,7 +383,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		ColumnExpr(`COUNT(*) AS "waiting"`).
 		ColumnExpr(`SUM(CASE WHEN q.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
 			access.Private).
-		Join(`JOIN product AS "p" ON p.id = q.product_id`).
+		Join(`JOIN "product" AS "p" ON p.id = q.product_id`).
 		GroupExpr("q.team_id, q.product_id").
 		Scan(ctx, &rows)
 	if err != nil {

@@ -394,8 +394,8 @@ func (f *fixture) deadline(t *testing.T, identifier string) time.Time {
 	t.Helper()
 	var due time.Time
 	err := f.db.DB.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr("\"finding\" AS f").
+		Join("JOIN \"vulnerability\" AS v ON v.id = f.vulnerability_id").
 		ColumnExpr("f.due_at").
 		Where("v.identifier = ?", identifier).
 		Where("f.closed_at IS NULL").
@@ -523,8 +523,8 @@ func (f *fixture) deadlineOrZero(t *testing.T, identifier string) time.Time {
 	t.Helper()
 	var due *time.Time
 	err := f.db.DB.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr("\"finding\" AS f").
+		Join("JOIN \"vulnerability\" AS v ON v.id = f.vulnerability_id").
 		ColumnExpr("f.due_at").
 		Where("v.identifier = ?", identifier).
 		Where("f.closed_at IS NULL").
@@ -543,8 +543,8 @@ func (f *fixture) urgency(t *testing.T, identifier string) int64 {
 	t.Helper()
 	var rank int64
 	err := f.db.DB.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr("\"finding\" AS f").
+		Join("JOIN \"vulnerability\" AS v ON v.id = f.vulnerability_id").
 		ColumnExpr("MAX(f.urgency)").
 		Where("v.identifier = ?", identifier).
 		Where("f.closed_at IS NULL").
@@ -570,7 +570,7 @@ func (f *fixture) ratingsIn(t *testing.T, productID int64, identifier string) (s
 		Assessed  string `bun:"assessed"`
 	}
 	err := f.db.DB.NewSelect().
-		TableExpr("vulnerability AS v").
+		TableExpr("\"vulnerability\" AS v").
 		Join(finding.RatedHere, productID).
 		ColumnExpr("COALESCE(v.severity, '') AS published").
 		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
@@ -599,7 +599,7 @@ func (f *fixture) issue(t *testing.T, identifier string) int64 {
 	t.Helper()
 	var id int64
 	err := f.db.DB.NewSelect().
-		TableExpr("vulnerability AS v").
+		TableExpr("\"vulnerability\" AS v").
 		ColumnExpr("v.id").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &id)

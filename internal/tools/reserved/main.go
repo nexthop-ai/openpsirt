@@ -87,6 +87,30 @@ var statement = regexp.MustCompile(`(?i)\b(?:FROM|JOIN)\s+"`)
 var declared = regexp.MustCompile(
 	`(?i)\b(?:TABLE|INDEX|COLUMN|CONSTRAINT|REFERENCES)\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
 
+// creating matches a table the migrations declare, quoted as they all are.
+//
+// Read so that the check below can tell a schema name from a keyword without
+// a list of keywords somebody typed: what this schema calls its tables is what
+// the migrations made, and nothing else needs recognizing.
+var creating = regexp.MustCompile(`(?i)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"([A-Za-z_][A-Za-z0-9_]*)"`)
+
+// named matches a table a query names, quoted or bare — after FROM, JOIN,
+// INTO or UPDATE, or opening a table expression that goes on to alias it.
+//
+// The alias pattern above sees only the names a query invents. A table is
+// declared rather than invented, and outside the migrations nothing looked at
+// one: they were written bare in four hundred and eighty-eight places and
+// quoted in a handful, so no reader could tell which was the convention and a
+// table whose name an engine reserves would be refused by that engine alone.
+var named = regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE)\s+("?)([A-Za-z_][A-Za-z0-9_]*)`)
+
+// opening matches a table expression, which names its table first and then
+// aliases it. The alias is what tells it from a condition: a literal beginning
+// with a word this schema has a table of is usually a column of that name or a
+// qualified one, and only "<table> AS" is the table itself.
+
+var opening = regexp.MustCompile(`(?i)\A\s*("?)([A-Za-z_][A-Za-z0-9_]*)"?\s+AS\b`)
+
 // aliased matches the table alias a model declares in its struct tag.
 //
 // Read because a tag is where an alias is written for most of this codebase's
@@ -123,6 +147,9 @@ type found struct {
 	// bare says the name is unquoted, which is the whole complaint. Without
 	// it the complaint is that a declared name collides with a reserved word.
 	bare bool
+	// table says the name is one the schema declares rather than one the
+	// query invents, which is a different sentence to fix it by.
+	table bool
 }
 
 func main() {
@@ -137,6 +164,27 @@ func main() {
 	reserved := map[string]bool{}
 	for _, word := range reservedWords() {
 		reserved[word] = true
+	}
+
+	// What the migrations made, read first, because the check below tells a
+	// table from a keyword by asking whether this schema has one of that name.
+	schema := map[string]bool{}
+	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
+		if !strings.Contains(path, "database/migrate/migrations/") {
+			return nil
+		}
+		for _, match := range creating.FindAllStringSubmatch(string(body), -1) {
+			schema[strings.ToLower(match[1])] = true
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if len(schema) == 0 {
+		fmt.Fprintln(os.Stderr, "the migrations declare no tables, so half of this would check nothing")
+		os.Exit(2)
 	}
 
 	var bad []found
@@ -176,6 +224,9 @@ func main() {
 			seen[at] = true
 			for _, match := range invented.FindAllStringSubmatch(withoutSQLComments(text), -1) {
 				bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
+			}
+			if !definitions {
+				bad = append(bad, unquotedTables(withoutSQLComments(text), schema, path, at)...)
 			}
 			return true
 		})
@@ -231,9 +282,50 @@ func main() {
 				for _, match := range invented.FindAllStringSubmatch(text, -1) {
 					bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
 				}
+				if !definitions {
+					bad = append(bad, unquotedTables(text, schema, path, at)...)
+				}
 			}
 			return true
 		})
+		// A clause handed over as a variable rather than written at the call.
+		// literal() reads what it can see and returns nothing for the rest,
+		// so a fragment assembled a line earlier was skipped in silence —
+		// which is precisely the fragment nobody has read.
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			pieces := assembled(fset, fn, seen)
+			ast.Inspect(fn.Body, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				method, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || !writing[method.Sel.Name] {
+					return true
+				}
+				for _, arg := range call.Args {
+					if _, _, readable := literal(fset, arg); readable {
+						continue // read at the call, above
+					}
+					text, ok := pieces[assembledFrom(arg)]
+					if !ok {
+						continue
+					}
+					at := fset.Position(arg.Pos()).Line
+					for _, match := range invented.FindAllStringSubmatch(text, -1) {
+						bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
+					}
+					if !definitions {
+						bad = append(bad, unquotedTables(text, schema, path, at)...)
+					}
+				}
+				return true
+			})
+		}
 		return nil
 	})
 	if err != nil {
@@ -242,9 +334,10 @@ func main() {
 	}
 
 	if len(bad) == 0 {
-		fmt.Printf("every name a query invents in a literal is quoted, and no name a "+
-			"migration declares collides with a word any of the four engines reserves "+
-			"(%d words checked over %d files)\n", len(reservedWords()), read)
+		fmt.Printf("every name a query invents in a literal is quoted, every table "+
+			"one names is quoted, and no name a migration declares collides with a "+
+			"word any of the four engines reserves (%d words checked over %d files, "+
+			"%d tables)\n", len(reservedWords()), read, len(schema))
 		return
 	}
 	sort.Slice(bad, func(i, j int) bool {
@@ -254,6 +347,11 @@ func main() {
 		return bad[i].line < bad[j].line
 	})
 	for _, one := range bad {
+		if one.table {
+			fmt.Fprintf(os.Stderr, "%s:%d: the table %q is named bare. "+
+				"Quote it: %q\n", one.file, one.line, one.word, one.word)
+			continue
+		}
 		if one.bare {
 			fmt.Fprintf(os.Stderr, "%s:%d: the name %q is written bare. "+
 				"Quote it: AS %q\n", one.file, one.line, one.word, one.word)
@@ -264,6 +362,114 @@ func main() {
 	}
 	fmt.Fprintf(os.Stderr, "\n%d name(s) an engine may refuse to parse.\n", len(bad))
 	os.Exit(1)
+}
+
+// assembledFrom names the variable a clause was built in, where the argument
+// is one: the variable itself, or the slice a join reads.
+func assembledFrom(arg ast.Expr) string {
+	switch typed := arg.(type) {
+	case *ast.Ident:
+		return typed.Name
+	case *ast.CallExpr:
+		// strings.Join(pieces, " OR ") and anything shaped like it: what the
+		// engine sees is every piece, so every piece is what to read.
+		if len(typed.Args) == 0 {
+			return ""
+		}
+		if inner, ok := typed.Args[0].(*ast.Ident); ok {
+			return inner.Name
+		}
+	}
+	return ""
+}
+
+// assembled gathers, per variable, every string literal a function puts in it.
+//
+// Deliberately more than any one run would produce: a variable assigned in one
+// arm and appended to in another yields both here, and the engine sees one of
+// them. Reading too much can only report a name that is written somewhere in
+// this function, which is a name somebody wrote bare either way — and reading
+// too little is what left three assembled clauses unread.
+//
+// What the statement pass has already read is left out, so a clause written
+// whole and then handed over as a variable is one defect and not two.
+func assembled(fset *token.FileSet, fn *ast.FuncDecl, seen map[int]bool) map[string]string {
+	pieces := map[string]string{}
+	keep := func(name string, from ast.Expr) {
+		if name == "" || from == nil {
+			return
+		}
+		ast.Inspect(from, func(node ast.Node) bool {
+			lit, ok := node.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			// Already read where it is written, as a statement in its own
+			// right. Reading it again here would name one defect twice, at
+			// the line it was written and at the line it was handed over.
+			if seen[fset.Position(lit.Pos()).Line] {
+				return true
+			}
+			text, err := strconv.Unquote(lit.Value)
+			if err != nil {
+				text = lit.Value
+			}
+			pieces[name] += " " + text
+			return true
+		})
+	}
+	ast.Inspect(fn.Body, func(node ast.Node) bool {
+		switch typed := node.(type) {
+		case *ast.AssignStmt:
+			for i, target := range typed.Lhs {
+				ident, ok := target.(*ast.Ident)
+				if !ok || i >= len(typed.Rhs) {
+					continue
+				}
+				keep(ident.Name, typed.Rhs[i])
+			}
+		case *ast.ValueSpec:
+			for i, ident := range typed.Names {
+				if i < len(typed.Values) {
+					keep(ident.Name, typed.Values[i])
+				}
+			}
+		case *ast.CallExpr:
+			// append(pieces, "…"), which is how a list of conditions is built.
+			if ident, ok := typed.Fun.(*ast.Ident); ok && ident.Name == "append" && len(typed.Args) > 1 {
+				if into, ok := typed.Args[0].(*ast.Ident); ok {
+					for _, arg := range typed.Args[1:] {
+						keep(into.Name, arg)
+					}
+				}
+			}
+		}
+		return true
+	})
+	return pieces
+}
+
+// unquotedTables reports every table of this schema that the text names bare.
+//
+// Quoted or bare is the whole question: a quoted name is safe on all four
+// engines whatever any of them reserves, and a bare one is safe until somebody
+// renames the table or an engine adds a keyword. A word this schema has no
+// table of is not a table — which is how a clause keyword is told from a name
+// without a list of keywords somebody typed and nothing refreshes.
+func unquotedTables(text string, schema map[string]bool, path string, line int) []found {
+	var bare []found
+	matches := named.FindAllStringSubmatch(text, -1)
+	if match := opening.FindStringSubmatch(text); match != nil {
+		matches = append(matches, match)
+	}
+	for _, match := range matches {
+		word := strings.ToLower(match[2])
+		if match[1] == `"` || !schema[word] {
+			continue
+		}
+		bare = append(bare, found{word: word, file: path, line: line, table: true, bare: true})
+	}
+	return bare
 }
 
 // withoutSQLComments drops what a migration says about its own columns.

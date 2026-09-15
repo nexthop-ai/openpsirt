@@ -115,8 +115,8 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// first known about this issue here.
 		var rows []Finding
 		err := tx.NewSelect().Model(&rows).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Where("st.product_id = ?", productID).
 			Where("f.vulnerability_id = ?", vulnerabilityID).
 			Where("f.closed_at IS NULL").
@@ -235,8 +235,8 @@ func openIn(targetID, vulnerabilityID, componentID int64, name string,
 func (s *Store) filedAgainst(ctx context.Context, productID, vulnerabilityID int64) ([]Finding, error) {
 	var rows []Finding
 	err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").

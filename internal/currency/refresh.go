@@ -340,7 +340,7 @@ func (r *Refresher) pause(ctx context.Context) {
 func (r *Refresher) due(ctx context.Context) ([]stale, error) {
 	var rows []stale
 	err := r.db.NewSelect().
-		TableExpr(`component AS "c"`).
+		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.purl AS "purl"`).
 		Where("c.purl <> ''").

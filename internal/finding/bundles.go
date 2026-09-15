@@ -115,9 +115,9 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 
 	bundled := func(q *bun.SelectQuery) *bun.SelectQuery {
 		return filter.narrow(q.
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN component AS "c" ON c.id = f.component_id`).
-			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 			Join(RatedHere, productID).
 			Where("f.target_id IN (?)", bun.List(targets)).
 			Where("f.closed_at IS NULL").
@@ -231,12 +231,12 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		Variant string `bun:"variant"`
 	}
 	q := filter.narrow(s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -298,7 +298,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	// walk of it however large the build is; whether anything is exploited
 	// is read off the urgency, which ranks it in a band of its own.
 	page := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		// Distinct issues rather than rows, because that is what the findings
 		// list shows and therefore what hiding this component would remove
@@ -329,7 +329,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		total = rows[0].Total
 	} else {
 		counted := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
+			TableExpr(`"finding" AS "f"`).
 			ColumnExpr("f.component_id").
 			Where("f.target_id IN (?)", bun.List(targets)).
 			Where("f.closed_at IS NULL").
@@ -418,8 +418,8 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 		Issues      int    `bun:"issues"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`COALESCE(v.severity, '') AS "band"`).
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
@@ -469,8 +469,8 @@ func (s *Store) upgradesFor(ctx context.Context, ids []int64, targets []int64,
 		Purl        string `bun:"purl"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.fixed_in AS "fixed_in"`).
@@ -633,7 +633,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	// presence of a component is readable to anybody who may read the build
 	// while what is open against it is not.
 	open := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
@@ -652,8 +652,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	// open. A component nothing pulls in is contained by the build itself,
 	// which counts as the one thing pulling it in.
 	pullers := s.db.NewSelect().
-		TableExpr(`graph_edge AS "e"`).
-		Join(`JOIN graph_node AS "ch" ON ch.id = e.child_id`).
+		TableExpr(`"graph_edge" AS "e"`).
+		Join(`JOIN "graph_node" AS "ch" ON ch.id = e.child_id`).
 		ColumnExpr(`ch.target_id AS "target_id"`).
 		ColumnExpr(`ch.component_id AS "component_id"`).
 		ColumnExpr(`COUNT(DISTINCT e.parent_id) AS "consumers"`).
@@ -663,11 +663,11 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		GroupExpr("ch.target_id, ch.component_id")
 
 	err = s.db.NewSelect().
-		TableExpr(`graph_node AS "n"`).
-		Join(`JOIN component AS "c" ON c.id = n.component_id`).
-		Join(`JOIN target AS "tg" ON tg.id = n.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = n.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`LEFT JOIN (?) AS "op" ON "op".target_id = n.target_id AND "op".component_id = n.component_id`, open).
 		Join(`LEFT JOIN (?) AS "pl" ON "pl".target_id = n.target_id AND "pl".component_id = n.component_id`, pullers).
 		ColumnExpr(`n.target_id AS "target_id"`).
@@ -768,8 +768,8 @@ func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 	// One row per finding rather than a grouped count, because the grouping is
 	// per version and a version has to be read out of the string first.
 	err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
@@ -927,16 +927,16 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 	// A product is reached through the build rather than carried on the
 	// finding, which is where the correlation everywhere else starts from.
 	err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`JOIN decision AS "de" ON de.product_id = st.product_id`+
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "decision" AS "de" ON de.product_id = st.product_id`+
 			" AND de.vulnerability_id = f.vulnerability_id"+
 			" AND de.place_identity = f.place_identity").
 		// The argument, which is where the outcome and the promise live: one
 		// act is one argument, and the rows underneath say where it lands.
-		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`MAX(cl.committed_to) AS "committed_to"`).
@@ -979,9 +979,9 @@ func (s *Store) bandsPerBuild(ctx context.Context, targets []int64,
 		Issues      int    `bun:"issues"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`COALESCE(v.severity, '') AS "band"`).

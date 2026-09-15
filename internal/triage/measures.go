@@ -129,16 +129,16 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 		ApprovedAt *time.Time `bun:"approved_at"`
 	}
 	q := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		// The finding this was a claim about, for when it was first seen and
 		// how it was rated. Joined on the same three columns a decision is
 		// matched by, and left-joined: a claim about a place that has since
 		// closed still happened, and dropping it would make the figures
 		// flatter exactly where work was finished.
-		Join(`LEFT JOIN finding AS "f" ON f.vulnerability_id = de.vulnerability_id
+		Join(`LEFT JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id
 			AND f.place_identity = de.place_identity`).
-		Join(`LEFT JOIN vulnerability AS "v" ON v.id = de.vulnerability_id`).
-		Join(`LEFT JOIN claim_approval AS "da" ON da.claim_id = de.claim_id
+		Join(`LEFT JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
+		Join(`LEFT JOIN "claim_approval" AS "da" ON da.claim_id = de.claim_id
 			AND da.withdrawn_at IS NULL`).
 		ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
@@ -188,7 +188,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 	// How much came back. Sending a claim back is the approver's other answer
 	// and nothing counted it, so a queue that is moving because claims are
 	// good and one that is moving because nobody reads them looked alike.
-	back := s.db.NewSelect().TableExpr(`decision AS "de"`).
+	back := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 		ColumnExpr(`COUNT(*) AS "number"`).
 		Where("de.sent_back_at IS NOT NULL").
 		Where("de.sent_back_at >= ?", since).
@@ -236,7 +236,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 	// dated by the proposal for the same reason the audit is: a claim belongs
 	// to the window it was argued in.
 	if err := count(func() *bun.SelectQuery {
-		q := s.db.NewSelect().TableExpr(`decision AS "de"`).
+		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 			ColumnExpr(`de.proposed_by AS "person"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
 			Where("de.proposed_at >= ?", since).
@@ -247,7 +247,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	if err := count(func() *bun.SelectQuery {
-		q := s.db.NewSelect().TableExpr(`decision AS "de"`).
+		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 			ColumnExpr(`de.proposed_by AS "person"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
 			Where("de.state = ?", Withdrawn).
@@ -264,8 +264,8 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 		// Counted distinctly, because the join is one approval to every row of
 		// the claim it was given for: an approver agreeing to one argument
 		// covering forty-four places did one piece of work, not forty-four.
-		q := s.db.NewSelect().TableExpr(`claim_approval AS "da"`).
-			Join(`JOIN decision AS "de" ON de.claim_id = da.claim_id`).
+		q := s.db.NewSelect().TableExpr(`"claim_approval" AS "da"`).
+			Join(`JOIN "decision" AS "de" ON de.claim_id = da.claim_id`).
 			ColumnExpr(`da.approved_by AS "person"`).
 			ColumnExpr(`COUNT(DISTINCT da.id) AS "number"`).
 			Where("da.withdrawn_at IS NULL").
@@ -287,7 +287,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 		ID       int64  `bun:"id"`
 		Identity string `bun:"identity"`
 	}
-	if err := s.db.NewSelect().TableExpr(`person AS "p"`).
+	if err := s.db.NewSelect().TableExpr(`"person" AS "p"`).
 		ColumnExpr(`p.id AS "id"`).ColumnExpr(`p.identity AS "identity"`).
 		Where("p.id IN (?)", bun.List(ids)).
 		Scan(ctx, &people); err != nil {

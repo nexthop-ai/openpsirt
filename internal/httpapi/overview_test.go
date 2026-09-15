@@ -146,7 +146,7 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		var runID int64
-		if err := r.db.DB.NewSelect().TableExpr("scan_run AS sr").
+		if err := r.db.DB.NewSelect().TableExpr("\"scan_run\" AS sr").
 			ColumnExpr("MAX(sr.id)").Scan(t.Context(), &runID); err != nil {
 			t.Fatal(err)
 		}
@@ -219,8 +219,8 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 		// cannot be doing the authorizing while the identifier does the
 		// reading.
 		var elsewhere int64
-		if err := r.db.DB.NewSelect().TableExpr("target AS tg").ColumnExpr("tg.id").
-			Where("tg.id <> (SELECT sr.target_id FROM scan_run AS sr WHERE sr.id = ?)", runID).
+		if err := r.db.DB.NewSelect().TableExpr("\"target\" AS tg").ColumnExpr("tg.id").
+			Where("tg.id <> (SELECT sr.target_id FROM \"scan_run\" AS sr WHERE sr.id = ?)", runID).
 			Limit(1).Scan(t.Context(), &elsewhere); err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +233,7 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		var theirs int64
-		if err := r.db.DB.NewSelect().TableExpr("scan_run AS sr").ColumnExpr("MAX(sr.id)").
+		if err := r.db.DB.NewSelect().TableExpr("\"scan_run\" AS sr").ColumnExpr("MAX(sr.id)").
 			Where("sr.target_id = ?", elsewhere).Scan(t.Context(), &theirs); err != nil {
 			t.Fatal(err)
 		}

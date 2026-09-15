@@ -159,7 +159,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 			t.Fatal(err)
 		}
 		var issueID int64
-		if err := f.db.DB.NewSelect().TableExpr("vulnerability AS v").
+		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS v").
 			Column("v.id").Where("v.identifier = ?", "CVE-2026-1").
 			Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)
@@ -410,7 +410,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 			t.Fatal(err)
 		}
 		var issueID int64
-		if err := f.db.DB.NewSelect().TableExpr("vulnerability AS v").
+		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS v").
 			Column("v.id").Where("v.identifier = ?", "CVE-2026-1").
 			Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)

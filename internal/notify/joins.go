@@ -19,19 +19,19 @@ import (
 // so the condition that asks about decisions needs it and the one that does
 // not, does not.
 func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
-	q = q.TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN product AS "p" ON p.id = st.product_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+	q = q.TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		// And whatever the row's own product rates the issue. Every watch
 		// spans products, and a rating belongs to one — so what an alert
 		// calls critical is what the product it is about calls critical.
 		Join(finding.RatedFor(finding.RatedOnStream))
 	if consumer {
-		q = q.Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`)
+		q = q.Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`)
 	}
 	return q.
 		ColumnExpr(`p.name AS "product"`).

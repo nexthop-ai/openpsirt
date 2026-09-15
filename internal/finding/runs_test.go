@@ -316,7 +316,7 @@ func (f *fixture) issueID(t *testing.T, identifier string) int64 {
 func (f *fixture) backdate(t *testing.T, runID int64, by time.Duration) {
 	t.Helper()
 	var started time.Time
-	if err := f.db.DB.NewSelect().TableExpr("scan_run AS r").
+	if err := f.db.DB.NewSelect().TableExpr("\"scan_run\" AS r").
 		ColumnExpr("r.started_at").Where("r.id = ?", runID).
 		Scan(t.Context(), &started); err != nil {
 		t.Fatal(err)
@@ -332,7 +332,7 @@ func (f *fixture) backdate(t *testing.T, runID int64, by time.Duration) {
 func (f *fixture) startedAt(t *testing.T, runID int64) time.Time {
 	t.Helper()
 	var started time.Time
-	if err := f.db.DB.NewSelect().TableExpr("scan_run AS r").
+	if err := f.db.DB.NewSelect().TableExpr("\"scan_run\" AS r").
 		ColumnExpr("r.started_at").Where("r.id = ?", runID).
 		Scan(t.Context(), &started); err != nil {
 		t.Fatal(err)
@@ -398,8 +398,8 @@ func (f *fixture) productOf(t *testing.T, target int64) int64 {
 	t.Helper()
 	var productID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr("\"target\" AS tg").
+		Join("JOIN \"stream\" AS st ON st.id = tg.stream_id").
 		ColumnExpr("st.product_id").
 		Where("tg.id = ?", target).
 		Scan(t.Context(), &productID); err != nil {
@@ -413,7 +413,7 @@ func (f *fixture) streamOf(t *testing.T, target int64) int64 {
 	t.Helper()
 	var streamID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("target AS tg").
+		TableExpr("\"target\" AS tg").
 		ColumnExpr("tg.stream_id").
 		Where("tg.id = ?", target).
 		Scan(t.Context(), &streamID); err != nil {
@@ -434,7 +434,7 @@ func (f *fixture) anotherVariant(t *testing.T, name string) int64 {
 	}
 	var streamID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("target AS tg").ColumnExpr("tg.stream_id").
+		TableExpr("\"target\" AS tg").ColumnExpr("tg.stream_id").
 		Where("tg.id = ?", f.target).Scan(ctx, &streamID); err != nil {
 		t.Fatal(err)
 	}
@@ -455,8 +455,8 @@ func (f *fixture) scopeOf(t *testing.T, targetID int64) finding.Scope {
 		VariantID int64 `bun:"variant_id"`
 	}
 	if err := f.db.DB.NewSelect().
-		TableExpr("target AS tg").
-		Join("JOIN stream AS st ON st.id = tg.stream_id").
+		TableExpr("\"target\" AS tg").
+		Join("JOIN \"stream\" AS st ON st.id = tg.stream_id").
 		ColumnExpr("st.product_id AS product_id").
 		ColumnExpr("tg.stream_id AS stream_id").
 		ColumnExpr("tg.variant_id AS variant_id").

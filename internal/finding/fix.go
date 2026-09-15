@@ -96,7 +96,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	// core.
 	var already []int64
 	if err := db.NewSelect().
-		TableExpr(`upgrade AS "ug"`).
+		TableExpr(`"upgrade" AS "ug"`).
 		ColumnExpr("ug.target_id").
 		Where("ug.fold_key = ?", fold).
 		Where(`ug.target_id IN (SELECT tg.id FROM "target" AS "tg"
@@ -274,8 +274,8 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 		Places int    `bun:"places"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
@@ -373,8 +373,8 @@ func (s *Store) packagesIn(ctx context.Context, targetID int64,
 		Name     string `bun:"name"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
 		ColumnExpr(`c.name AS "name"`).
@@ -415,8 +415,8 @@ func (s *Store) heldPerFold(ctx context.Context, targetID int64,
 		Held   int    `bun:"held"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		// The party rather than a name: the column holds a party, which may be
 		// a person or a team, and the name is looked up once for the few that
@@ -508,7 +508,7 @@ func (s *Store) partiesNamed(ctx context.Context, parties map[int64]bool) (map[i
 		Name    string `bun:"name"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`person AS "p"`).
+		TableExpr(`"person" AS "p"`).
 		ColumnExpr(`p.party_id AS "party_id"`).
 		ColumnExpr(`p.identity AS "name"`).
 		Where("p.party_id IN (?)", bun.List(ids)).
@@ -525,7 +525,7 @@ func (s *Store) partiesNamed(ctx context.Context, parties map[int64]bool) (map[i
 		Name    string `bun:"name"`
 	}
 	err = s.db.NewSelect().
-		TableExpr(`team AS "t"`).
+		TableExpr(`"team" AS "t"`).
 		ColumnExpr(`t.party_id AS "party_id"`).
 		ColumnExpr(`t.name AS "name"`).
 		Where("t.party_id IN (?)", bun.List(ids)).
@@ -591,8 +591,8 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	}
 	var here []int64
 	err := db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("tg.id").
 		Where("st.product_id = ?", productID).
 		Where("tg.id IN (?)", bun.List(builds)).
@@ -622,7 +622,7 @@ func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64
 	}
 	var retired []int64
 	err = db.NewSelect().
-		TableExpr(`target AS "tg"`).
+		TableExpr(`"target" AS "tg"`).
 		ColumnExpr("tg.id").
 		Where("tg.id IN (?)", bun.List(ids)).
 		Where("tg.stream_id IN (?)", bun.List(past)).

@@ -196,7 +196,7 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("f.urgency >= ?", int64(exploitedBand)).
 				WhereOr("f.vulnerability_id IN (?)",
-					q.NewSelect().TableExpr(`vulnerability AS "v"`).
+					q.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 						Join(RatedHere, f.ProductID).
 						Column("v.id").
 						Where(BandExpr+" IN (?)", bun.List(words)))
@@ -230,7 +230,7 @@ func FloorFor(ctx context.Context, db bun.IDB, productID int64) (Floor, error) {
 		Floor *string `bun:"triage_floor"`
 	}
 	err := db.NewSelect().
-		TableExpr(`product AS "p"`).
+		TableExpr(`"product" AS "p"`).
 		ColumnExpr("p.triage_floor").
 		Where("p.id = ?", productID).
 		Scan(ctx, &stated)

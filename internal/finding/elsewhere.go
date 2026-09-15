@@ -99,12 +99,12 @@ func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Decidin
 		Places            int    `bun:"places"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "t" ON t.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = t.variant_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`st.display_name AS "stream"`).
 		ColumnExpr(`va.display_name AS "variant"`).
@@ -237,12 +237,12 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Places            int    `bun:"places"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "t" ON t.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = t.variant_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`st.display_name AS "stream"`).

@@ -169,7 +169,7 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		OnTag int `bun:"on_tag"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).

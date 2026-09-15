@@ -267,9 +267,9 @@ func noteVisibility(ctx context.Context, db bun.IDB, productID,
 	vulnerabilityID int64) (access.Visibility, error) {
 
 	hidden, err := db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.id").
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("st.product_id = ?", productID).

@@ -104,10 +104,10 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		ClosedBecause   string     `bun:"closed_because"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		// An issue with no published severity is stored as '', not NULL, so
 		// the empty string is what has to be named — a COALESCE alone never
