@@ -61,9 +61,9 @@ export function Embargoes({
       <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
         <h2>Extension requests</h2>
         <p>
-          {said(waiting.length, total)} · somebody has asked to keep something hidden longer
-          than this deployment allows on one person&rsquo;s word. Reaching the date discloses
-          nothing by itself; what is being agreed to is how long it stays hidden.
+          {said(waiting.length, total)} · somebody has asked to keep something hidden longer than
+          this deployment allows on one person&rsquo;s word. Reaching the date discloses nothing by
+          itself; what is being agreed to is how long it stays hidden.
         </p>
       </div>
       {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
@@ -140,8 +140,8 @@ export function Ratings({ waiting, total }: { waiting: AssessmentRow[]; total?: 
       <div className="screen-head" id="ratings" style={{ marginTop: 22 }}>
         <h2>Ratings awaiting approval</h2>
         <p>
-          {said(waiting.length, total)} · somebody says an issue is milder than the world does.
-          A rating holds in every build of the product it was made for, so it waits for a second
+          {said(waiting.length, total)} · somebody says an issue is milder than the world does. A
+          rating holds in every build of the product it was made for, so it waits for a second
           person.
         </p>
       </div>
