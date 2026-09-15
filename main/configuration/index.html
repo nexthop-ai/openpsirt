@@ -399,6 +399,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#serving" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -670,6 +681,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#serving" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -883,6 +905,20 @@ refusal to start.</p>
 duration is written as Go reads it: <code>30s</code>, <code>5m</code>, <code>12h</code>. A number is a positive
 whole number; zero reads as unset everywhere, so it is refused rather than
 taken.</p>
+<h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
+<p><strong><code>OPENPSIRT_BASE_URL</code> is checked at startup</strong>, and a value with no scheme is
+now refused where it used to be accepted. <code>psirt.example.com</code> has to become
+<code>https://psirt.example.com</code>.</p>
+<p>It was accepted and did nothing useful: with no scheme there is no host to
+read, so the same-origin check on every state-changing browser request fell
+back to the address the request itself claimed — the guard ran and guarded
+nothing — and the address a sign-in provider is sent back to was not absolute,
+which the provider refuses. A deployment reaching this has not been protected
+by that check for as long as the value has been wrong.</p>
+<p>A path below the address is refused for the same reason:
+<code>https://psirt.example.com/psirt</code> makes every link this deployment writes point
+somewhere it does not answer. If this deployment is served under a path, that
+is a thing to raise rather than to configure here.</p>
 <h2 id="serving">Serving<a class="headerlink" href="#serving" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -900,7 +936,7 @@ taken.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_BASE_URL</code></td>
-<td>The address people arrive on. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured</td>
+<td>The address people arrive on, <strong>written in full and with no path below it</strong>: <code>https://psirt.example.com</code>. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -912,6 +948,11 @@ taken.</p>
 <td><code>OPENPSIRT_SHUTDOWN_GRACE</code></td>
 <td>How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that</td>
 <td><code>15s</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_STARTUP_TIMEOUT</code></td>
+<td>How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on</td>
+<td><code>60s</code></td>
 </tr>
 <tr>
 <td><code>OPENPSIRT_LOG_LEVEL</code></td>
