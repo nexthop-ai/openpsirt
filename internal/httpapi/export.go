@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
@@ -95,9 +94,14 @@ const exportStall = 2 * time.Minute
 // Returns a no-op where the writer underneath cannot take a deadline, which
 // is what a test harness looks like: an export that cannot move the deadline
 // behaves exactly as it did before this existed.
+//
+// Asked of the body writer rather than through the adapter's own unwrap, which
+// panics on a context it did not make — so the sentence above was not true of
+// the one harness that would ever exercise this, and nothing could drive an
+// export but the server itself.
 func writing(ctx huma.Context) func() {
-	_, w := humachi.Unwrap(ctx)
-	if w == nil {
+	w, ok := ctx.BodyWriter().(http.ResponseWriter)
+	if !ok {
 		return func() {}
 	}
 	control := http.NewResponseController(w)
