@@ -106,7 +106,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		// by dividing. A cost that is flat in rows and proportional to
 		// statements is paid per statement.
 		statements := &counting{}
-		db.DB.AddQueryHook(statements)
+		db.AddQueryHook(statements)
 
 		built := time.Now().UTC().Add(-time.Duration(nights) * 24 * time.Hour)
 		seq := 0

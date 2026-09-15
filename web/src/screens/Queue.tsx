@@ -3,7 +3,7 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { Became } from "./QueueMine";
-import { Embargoes, Ratings } from "./QueuePending";
+import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
@@ -128,19 +128,27 @@ export function Queue() {
   // person, and it is a separate list rather than a queue card because what is
   // agreed to is not a claim about code — it is how long something stays
   // hidden, and nothing about a claim's shape fits it.
+  const [embargoAt, setEmbargoAt] = useState(0);
+  const [ratingAt, setRatingAt] = useState(0);
   const embargoes = useQuery({
-    queryKey: ["extensions", "pending"],
+    queryKey: ["extensions", "pending", embargoAt],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/disclosure-extensions", { params: { query: { limit: 50 } } })),
+      unwrap(
+        await api.GET("/v1/disclosure-extensions", {
+          params: { query: { limit: PENDING_PAGE, offset: embargoAt } },
+        }),
+      ),
     // Somebody who may read nothing undisclosed gets an empty list rather than
     // a refusal, so this is quiet on their screen rather than an error on it.
     retry: false,
   });
   const ratings = useQuery({
-    queryKey: ["queue", "assessments"],
+    queryKey: ["queue", "assessments", ratingAt],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/assessments", { params: { query: { state: "proposed", limit: 50 } } }),
+        await api.GET("/v1/assessments", {
+          params: { query: { state: "proposed", limit: PENDING_PAGE, offset: ratingAt } },
+        }),
       ),
   });
 
@@ -413,20 +421,37 @@ export function Queue() {
       <Ratings
         waiting={(ratings.data?.items ?? []).filter((each) => each.needs_approval)}
         total={ratings.data?.total}
+        offset={ratingAt}
+        onGo={setRatingAt}
+        error={ratings.isError ? ratings.error : undefined}
       />
 
-      <Embargoes waiting={embargoes.data?.items ?? []} total={embargoes.data?.total} />
+      {/* The extension read is deliberately quiet for somebody who may read
+          nothing undisclosed — an empty list rather than a refusal — so only a
+          real failure is handed on. */}
+      <Embargoes
+        waiting={embargoes.data?.items ?? []}
+        total={embargoes.data?.total}
+        offset={embargoAt}
+        onGo={setEmbargoAt}
+      />
 
       <div className="screen-head" id="lapsed" style={{ marginTop: 22 }}>
         <h2>Lapsed decisions</h2>
         <p>
-          {(stopped.data?.total ?? 0).toLocaleString()} · nobody has to agree to these again — two
-          people already did — but each needs a fresh reason, because what it was a claim about has
-          moved.
+          {stopped.isError ? "—" : (stopped.data?.total ?? 0).toLocaleString()} · nobody has to
+          agree to these again — two people already did — but each needs a fresh reason, because
+          what it was a claim about has moved.
         </p>
       </div>
+      {/* A read that did not happen is not a list of nothing. Without this the
+          section drew "0 ·" over "Nothing has lapsed." on a failed read, which
+          is the defect this whole change is about, one screen along from where
+          it was fixed. */}
       <Paged shown={rows.length} total={stopped.data?.total} limit={50} />
-      {rows.length === 0 ? (
+      {stopped.isError ? (
+        <Failed error={stopped.error} what="Lapsed decisions could not be read." />
+      ) : rows.length === 0 ? (
         <Empty
           title="Nothing has lapsed."
           detail="A decision the code moved out from under, or a deferral whose date has passed, would appear here."

@@ -75,7 +75,7 @@ func TestARuleIsWrittenReadAndAppliedOnEveryEngine(t *testing.T) {
 		}
 
 		// And applying it places exactly that.
-		placed, filled, err := f.store.ApplyRules(ctx, f.productID, 100)
+		placed, filled, _, err := f.store.ApplyRules(ctx, f.productID, 100)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,7 +97,7 @@ func TestARuleIsWrittenReadAndAppliedOnEveryEngine(t *testing.T) {
 
 		// Running it again places nothing: the rows are held, and a sweep
 		// that kept re-placing held work would never come to an end.
-		again, _, err := f.store.ApplyRules(ctx, f.productID, 100)
+		again, _, _, err := f.store.ApplyRules(ctx, f.productID, 100)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -187,7 +187,7 @@ func TestAComponentNamedOutsideASCIIMatchesTheSameOnEveryEngine(t *testing.T) {
 			t.Errorf("a rule spelled in lower case matched %d components named with a "+
 				"capital outside ASCII, want the one", caught.Total)
 		}
-		placed, _, err := f.store.ApplyRules(ctx, f.productID, 100)
+		placed, _, _, err := f.store.ApplyRules(ctx, f.productID, 100)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -236,7 +236,7 @@ func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
 			"", "libcurl4t64"); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := f.store.ApplyRules(ctx, f.productID, 100); err != nil {
+		if _, _, _, err := f.store.ApplyRules(ctx, f.productID, 100); err != nil {
 			t.Fatal(err)
 		}
 
@@ -302,6 +302,49 @@ func TestARuleNamingMostOfABuildIsRefused(t *testing.T) {
 		if _, err := narrow.AddRule(ctx, who, f.productID, where, "the library",
 			"", "libnl-3-200"); err != nil {
 			t.Errorf("a rule naming one component was refused: %v", err)
+		}
+	})
+}
+
+func TestARuleThatOutgrewItsBoundDoesNotStopTheRestOfTheSweep(t *testing.T) {
+	// A rule is refused when it is written, but the tree grows under one that
+	// was accepted. That condition is permanent, so returned as a job failure
+	// it stopped the product's whole routing — every rule ordered after it
+	// included — and a retry could never clear it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", teamd),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+
+		// Saved while the bound still admits it, then applied by a store whose
+		// bound is lower — which is the tree growing under it, without a
+		// fixture of two thousand components to grow.
+		if _, err := f.store.AddRule(ctx, who, f.productID, where, "everything",
+			"", "*"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.AddRule(ctx, who, f.productID, where, "the library",
+			"", "libnl-3-200"); err != nil {
+			t.Fatal(err)
+		}
+
+		narrow := finding.NewStoreReaching(f.db.DB, 1)
+		placed, _, outgrown, err := narrow.ApplyRules(ctx, f.productID, 100)
+		if err != nil {
+			t.Fatalf("one outgrown rule failed the whole sweep: %v", err)
+		}
+		if len(outgrown) != 1 {
+			t.Errorf("%d rules came back named as outgrown, wanted the one", len(outgrown))
+		}
+		// The rule ordered after it still ran, which is the whole point.
+		if placed == 0 {
+			t.Error("nothing was placed, so the rule behind the outgrown one never ran")
 		}
 	})
 }

@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
@@ -89,14 +89,29 @@ export type Recorded = {
 // "patch-needed" is the answer a version comparison cannot see: the fix is
 // carried in and the version stays where it was, so unless somebody can say so
 // the row sits open with nothing true to say about it.
-const OFFERED = [
-  "affected",
-  "not-applicable",
-  "deferred",
-  "wont-fix",
-  "already-fixed",
-  "patch-needed",
-] as const;
+//
+// Driven off the generated request type rather than retyped: the server
+// generates these words from the domain vocabulary, and a third copy here is
+// the shape that change removed from eight struct tags. Written as a record so
+// the check runs both ways — a word the domain gains and this does not is a
+// missing key, and a word this keeps after the domain drops it is an excess
+// one. Both are compile errors rather than a screen offering something the
+// route refuses.
+type OneAtATime = Body<"FindingDecisionBody">["outcome"];
+
+const OFFERS: Record<OneAtATime, true> = {
+  affected: true,
+  "not-applicable": true,
+  deferred: true,
+  "wont-fix": true,
+  "already-fixed": true,
+  "patch-needed": true,
+};
+
+// The order they are drawn in is this object's, which is its declaration
+// order: what a person reads first is a decision about the screen rather than
+// about the vocabulary.
+const OFFERED = Object.keys(OFFERS) as OneAtATime[];
 
 // The last pair somebody chose, for the session they are in.
 //
@@ -356,8 +371,7 @@ export function Decide({
 
   function body() {
     return {
-      outcome: outcome as
-        "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "patch-needed",
+      outcome: outcome as OneAtATime,
       // Narrowed rather than asserted: submit is disabled until one is
       // chosen, so the empty case cannot reach here.
       ...(needsJustification && justification !== "" ? { justification } : {}),

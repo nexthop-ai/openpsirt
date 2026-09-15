@@ -23,6 +23,7 @@ package vex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -39,6 +40,15 @@ import (
 
 // The namespace the format states, and the one a reader matches on.
 const namespace = "https://openvex.dev/ns/v0.2.0"
+
+// ErrTooLarge is returned when a build stands on more dismissals than one
+// document carries.
+//
+// Named rather than answered as a fault, because it is something the caller
+// can act on: narrow to a variant, or ask about a build that argues less. A
+// bare error reached the route as "the document could not be generated" with a
+// 500, which reads as the tool being broken.
+var ErrTooLarge = errors.New("more dismissals than one document carries")
 
 // Statements is one VEX document about one build.
 //
@@ -102,11 +112,32 @@ type Inside struct {
 type Store struct {
 	db  *bun.DB
 	now func() time.Time
+	// most is how many statements one document carries, or zero for the
+	// shipped number. Carried on the store so a test can bring it down to a
+	// fixture rather than building a fixture up to it, which is how the
+	// routing reach is tested for the same reason.
+	most int
 }
 
 // NewStore returns a store over db.
 func NewStore(db *bun.DB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// NewStoreCarrying returns a store whose documents carry at most most
+// statements, for a test that wants the refusal rather than the document.
+func NewStoreCarrying(db *bun.DB, most int) *Store {
+	s := NewStore(db)
+	s.most = most
+	return s
+}
+
+// carrying is how many statements one document holds.
+func (s *Store) carrying() int {
+	if s.most > 0 {
+		return s.most
+	}
+	return database.AWholeDocument.Most
 }
 
 // For writes the document for one build.
@@ -247,7 +278,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		Having("COUNT(DISTINCT cl.outcome) = 1").
 		// One more than the ceiling, so that reaching it is distinguishable
 		// from landing on it exactly.
-		Limit(database.AWholeDocument.Most+1).
+		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
@@ -257,11 +288,17 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	// claimed about this" by omission about everything past it — to every
 	// customer running a scanner, which is the one thing a document of
 	// dismissals must never say.
-	if len(rows) > database.AWholeDocument.Most {
-		return nil, fmt.Errorf("%s %s %s stands on more than %d agreed dismissals, which is "+
-			"more than one document carries: a document that stopped at the limit would say "+
-			"nothing is claimed about everything past it",
-			product, stream, variant, database.AWholeDocument.Most)
+	//
+	// Named, so the caller can answer it as something to narrow rather than as
+	// this being broken. Returned bare it fell through to "the document could
+	// not be generated" with a 500, and the sentence saying which build and
+	// what the limit is went to the log instead of to the person who can act
+	// on it.
+	if len(rows) > s.carrying() {
+		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed dismissals: a "+
+			"document that stopped at the limit would say nothing is claimed about "+
+			"everything past it",
+			ErrTooLarge, product, stream, variant, s.carrying())
 	}
 
 	// The words each of those decisions rests on, read off the decision the

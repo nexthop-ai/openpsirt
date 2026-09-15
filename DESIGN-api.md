@@ -43,6 +43,12 @@ when the committed copy has drifted.
 Without that check, regenerating is a step somebody skips, and a hand-kept
 document is wrong the first time somebody is in a hurry — silently.
 
+| Rule | |
+|---|---|
+| A closed vocabulary is the domain's list, not a literal beside the route | Retyped at the route, a word added to the domain is accepted by the store and refused by every route that takes it — and it was retyped in eight struct tags carrying four different memberships. The list comes from the package that owns the vocabulary, so the document and the store cannot disagree about what a word is |
+| A subset is a named rule in the domain package | Some routes take fewer words than the vocabulary has: one decision at a time offers what a person may propose there, and a bulk claim offers less again. Shortening the list at the route makes what is left out an accident; naming the subset where the vocabulary lives makes it a statement, with the reason beside it |
+| Every word in the built document is checked against the list that owns it | A test walks the document the server builds from its own registrations and requires each enumerated word to be one the domain holds. Asked of a hand-kept list it would only check that two copies match; asked of the domain it checks that the document is true |
+
 ## Unauthenticated surfaces
 
 The application serves no documentation of its own, leaving **no unauthenticated

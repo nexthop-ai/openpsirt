@@ -154,7 +154,8 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // **First match wins**, which is why the rules are applied in order
 // and each one only ever sees what the ones before it left.
 //
-// Returns how many findings it placed, and whether the batch filled.
+// Returns how many findings it placed, whether the batch filled, and the rules
+// it could not run.
 //
 // **Filling is measured by what was read, not by what was written.** The two
 // differ: the page is bounded on rows read and the write re-checks the holder,
@@ -163,23 +164,32 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // therefore stopped the sweep one human action into a product with fifty
 // thousand findings in it, silently, with the job reported successful and the
 // rest never routed.
-func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, error) {
+//
+// **A rule that has outgrown the bound places nothing and stops nothing else.**
+// It was accepted when it was written and the tree grew under it, which is not
+// a fault of the sweep's — and the condition is permanent, so returning it as a
+// job failure stopped that product's routing entirely, every rule ordered after
+// it included, with a retry that could never clear it. They come back named so
+// the caller can say which, because a rule that silently stopped placing is the
+// same shape as a rule nobody notices is wrong.
+func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, []int64, error) {
 	if cap <= 0 {
 		cap = setting.DefaultRoutingBatch
 	}
 	rules, err := s.Rules(ctx, productID)
 	if err != nil {
-		return 0, false, err
+		return 0, false, nil, err
 	}
 	if len(rules) == 0 {
-		return 0, false, nil
+		return 0, false, nil, nil
 	}
 	teams, err := s.partiesOf(ctx, rules)
 	if err != nil {
-		return 0, false, err
+		return 0, false, nil, err
 	}
 
 	placed, seen := 0, 0
+	var outgrown []int64
 	for _, rule := range rules {
 		if seen >= cap {
 			break
@@ -196,13 +206,17 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 		// undone for that batch: work the earlier rule had claimed went to a
 		// later one instead.
 		read, n, err := s.applyOne(ctx, productID, rule, party, cap-seen)
+		if errors.Is(err, ErrTooBroad) {
+			outgrown = append(outgrown, rule.ID)
+			continue
+		}
 		if err != nil {
-			return placed, false, err
+			return placed, false, outgrown, err
 		}
 		placed += n
 		seen += read
 	}
-	return placed, seen >= cap, nil
+	return placed, seen >= cap, outgrown, nil
 }
 
 // applyOne is one rule's share of a batch.
@@ -492,8 +506,11 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 				return q.Where("c.name_folded = ?", name)
 			}).
 			// One more than the cap, so that reaching it is distinguishable
-			// from landing on it exactly.
-			Limit(RoutingReach+1).
+			// from landing on it exactly. The cap is the store's, not the
+			// constant: a store built with a smaller reach truncated at the
+			// shipped number and never tripped its own refusal, which is
+			// quietly applying to part of what a rule names.
+			Limit(s.reaching()+1).
 			Scan(ctx, &roots); err != nil {
 			return nil, fmt.Errorf("look for that component: %w", err)
 		}

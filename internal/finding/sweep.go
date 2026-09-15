@@ -114,7 +114,15 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	}
 
 	working, release := s.queue.Holding(ctx, job.ID, s.name, s.logger)
-	placed, filled, err := NewStore(s.db.DB).ApplyRules(working, productID, batch)
+	placed, filled, outgrown, err := NewStore(s.db.DB).ApplyRules(working, productID, batch)
+	// A rule that has outgrown the bound is named rather than left to be
+	// noticed. It ran when it was written and the tree grew under it, so the
+	// sweep carries on past it — but a rule that has silently stopped placing
+	// reads exactly like a rule nobody has needed.
+	for _, rule := range outgrown {
+		s.logger.Warn("a routing rule names too much of the tree to run",
+			"product", productID, "rule", rule)
+	}
 	taken := release()
 
 	ending := s.queue.Settle(ctx, job, s.name, "product", s.logger, err, taken, nil)

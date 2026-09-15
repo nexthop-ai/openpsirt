@@ -573,7 +573,7 @@ func (f *fixture) ratingsIn(t *testing.T, productID int64, identifier string) (s
 	err := f.db.DB.NewSelect().
 		TableExpr("vulnerability AS v").
 		Join(rating.Here, productID).
-		ColumnExpr("COALESCE(v.severity, '') AS published").
+		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &row)

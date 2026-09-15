@@ -96,7 +96,13 @@ func IDsInBatches(ctx context.Context, ids []int64, fn func(context.Context, []i
 //
 // Answers a condition that is never true for an empty list, which is what an
 // empty set means — and what `IN ()` is a syntax error for on two of the four.
-func InAnyOf(column string, ids []int64) (string, []any) {
+//
+// The column is an Expr rather than a plain string, for the reason Expr exists:
+// a placeholder cannot bind a column name, so this one is spliced into
+// statement text, and taking it as an ordinary string leaves nothing between
+// that splice and a name arriving from a query parameter except that today's
+// callers all pass literals (REQ-66).
+func InAnyOf(column Expr, ids []int64) (string, []any) {
 	if len(ids) == 0 {
 		return "1 = 0", nil
 	}
@@ -104,7 +110,7 @@ func InAnyOf(column string, ids []int64) (string, []any) {
 	args := make([]any, 0, len(ids)/BatchSize+1)
 	for start := 0; start < len(ids); start += BatchSize {
 		end := min(start+BatchSize, len(ids))
-		said = append(said, column+" IN (?)")
+		said = append(said, string(column)+" IN (?)")
 		args = append(args, bun.List(ids[start:end]))
 	}
 	return "(" + strings.Join(said, " OR ") + ")", args

@@ -35,6 +35,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [A year of nightly scans](#a-year-of-nightly-scans)
 - [The total above a list](#the-total-above-a-list)
 - [The severity ladder](#the-severity-ladder)
+- [The rating in force](#the-rating-in-force)
 - [File organization](#file-organization)
 - [Limits](#limits)
 
@@ -864,7 +865,7 @@ and the mapping back to a word is an index into the same list. The `ELSE` is
 the caller's: a cross-product page needs an unrecognized rating to compare
 below every band, so that the sentinel for "no line" does.
 
-### The rating in force
+## The rating in force
 
 What a finding's severity *is* has one rule: **this product's word where it has
 stated one, the published word otherwise.** Being able to say a published

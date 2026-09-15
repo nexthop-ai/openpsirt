@@ -743,7 +743,15 @@ function Lapsed() {
       <header>
         <h3>Lapsed decisions</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {at.product ? `${allTotal.toLocaleString()} all products` : "all products"}
+          {at.product
+            ? // The one read in this panel that is not part of `unread`,
+              // because it answers a different question and a scope with no
+              // product never makes it. A failed read of it drew a confident
+              // "0 all products" beside a tally that correctly read "—".
+              everywhere.isError
+              ? "— all products"
+              : `${allTotal.toLocaleString()} all products`
+            : "all products"}
         </span>
         <span className={!unread && stoppedTotal > 0 ? "tally urgent" : "tally"}>
           {unread ? "—" : stoppedTotal.toLocaleString()}

@@ -10,12 +10,14 @@ import (
 // The closed vocabularies the API offers, built from the package that owns
 // them.
 //
-// They were retyped as literals in struct tags, at eight sites with four
-// memberships, so an outcome added to the domain was accepted by the store and
-// refused by every route — and one route carried no list at all, which typed
-// its field as a bare string where its neighbours gave a union. A subset is a
-// named rule in `internal/triage` rather than a shorter literal here, so what
-// is left out is stated and stays stated.
+// A vocabulary retyped beside a route is a second copy of it: a word the domain
+// gains is then accepted by the store and refused by the route, and a route
+// that carries no list at all types its field as a bare string where its
+// neighbours give a union. Asked of the package that owns the words, the
+// document cannot say something the store does not mean.
+//
+// A subset is a named rule in `internal/triage` rather than a shorter literal
+// here, so what is left out is stated and stays stated.
 
 // words is a closed vocabulary as a schema, in the order the domain lists it.
 func words[T ~string](all []T) *huma.Schema {

@@ -283,7 +283,12 @@ export function activeFilters(params: URLSearchParams): Active[] {
   oneOf("support", "Support", SUPPORT, ["in-support", "past-eol"]);
   each("assigned", "Assigned to", ASSIGNED);
   if (at("reassessed") === "1") add("reassessed", "Rated differently here", "only");
-  oneOf("origin", "Origin", ORIGINS, ["scanner", "manual"]);
+  // Not oneOf: `on` and `support` are read off the address with getAll, so
+  // naming both values means both, and origin is a single enum the reader
+  // takes with get — the both-values spelling came back as "scanner" alone and
+  // clearing the chip hid every hand-recorded finding with nothing left saying
+  // so. Leaving the parameter out already means both, on the wire and here.
+  pick("origin", "Origin", ORIGINS);
   if (at("unconfirmed") === "1") add("unconfirmed", "Not confirmed by a packager", "only");
   each("vex_publisher", "VEX publisher", []);
   each("vex_status", "VEX status", VEX_STATUS);

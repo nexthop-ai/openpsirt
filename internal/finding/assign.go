@@ -827,6 +827,21 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	if err != nil {
 		return nil, 0, err
 	}
+	// And what each product rates them, which is what the row shows. The
+	// names come back with the published word only, by design — one issue is
+	// read once for a page that can span products, and each of them may rate
+	// it differently — so the rating is read alongside and put on the copy.
+	// Without it the assignment lists and the nightly digest reported the
+	// world's severity for a finding whose own product had said otherwise,
+	// and the findings list beside them said the other thing.
+	within := make([]int64, 0, len(heads))
+	for _, head := range heads {
+		within = append(within, head.ProductID)
+	}
+	rated, err := RatingsIn(ctx, s.db, within, issues)
+	if err != nil {
+		return nil, 0, err
+	}
 	shipped, err := componentsNamed(ctx, s.db, components)
 	if err != nil {
 		return nil, 0, err
@@ -846,7 +861,9 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 			Exploited: Rank(head.Urgency).Exploited(),
 		}
 		if issue, held := named[head.VulnerabilityID]; held {
-			row.Vulnerability, row.Severity = issue.Identifier, issue.Severity
+			issue = issue.RatedIn(rated[RatedKey{
+				ProductID: head.ProductID, VulnerabilityID: head.VulnerabilityID}])
+			row.Vulnerability, row.Severity = issue.Identifier, issue.InForce()
 		}
 		if component, held := shipped[head.ComponentID]; held {
 			row.Component, row.Version = component.Name, component.Version

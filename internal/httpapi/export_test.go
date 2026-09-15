@@ -384,7 +384,7 @@ func TestAnExportAnswersTheSameQuestionAsTheListItCameFrom(t *testing.T) {
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "epss_at_least=0.9"},
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "under_build=true"},
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "opened_after=2099-01-01"},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "recorded=true"},
+			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "origin=manual"},
 			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", ""},
 			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "tag=nothing-is-marked-this"},
 			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "assigned=nobody"},

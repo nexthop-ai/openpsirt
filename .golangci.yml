@@ -10,8 +10,15 @@ version: "2"
 # "measure" guards a file no ordinary build loads, so without this the linter
 # never read it — and the one target that does pass the tag refuses unless
 # three server engines are configured.
-build-tags:
-  - measure
+#
+# Under "run", which is where the key lives. Spelled at the root it is not a
+# key this tool has: the loader drops what it does not recognize without a
+# word, so the file read as configured and the tagged file went on being
+# unlinted. "golangci-lint config verify" is what says so, and the gate runs
+# it now.
+run:
+  build-tags:
+    - measure
 
 linters:
   default: none

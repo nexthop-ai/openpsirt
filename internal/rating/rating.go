@@ -4,15 +4,15 @@
 // rule — the product's word where it has stated one, the published word
 // otherwise — and the two packages that have to apply it cannot both own it:
 // internal/finding imports internal/graph to walk a subtree, so internal/graph
-// cannot import internal/finding to ask what a band is. The band strip on the
-// component tree was drawn from the published rating alone for exactly that
-// reason, and a product that re-rated an issue saw its own decision in five
-// screens and the world's in four others.
+// cannot import internal/finding to ask what a band is. A rule one side cannot
+// say is a rule that side answers some other way, and a screen reading the
+// published word while the list beside it reads the product's is two answers to
+// one question.
 //
 // So the join and the two expressions live here, where neither side owns them
 // and both may say them. The rating *row* does not: it is written and read
 // through internal/finding, which is where a rating is proposed, agreed and
-// put in force. What moved is only the spelling a query needs.
+// put in force. What lives here is only the spelling a query needs.
 package rating
 
 // On is where a query finds the product it is asking about.

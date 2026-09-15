@@ -239,6 +239,11 @@ measure-builds:
 	$(GO) vet -tags measure ./internal/finding/
 
 lint:
+# Verified before it is run. The loader drops a key it does not recognize
+# without a word, so a setting spelled at the wrong level reads as configured
+# and does nothing — which is how the "measure"-tagged file went on being
+# unlinted under a comment saying it was not.
+	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) config verify
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) run
 
 fmt:
