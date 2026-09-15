@@ -151,7 +151,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check clean-web
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves
 
 all: check build
 
@@ -267,12 +267,24 @@ sbom:
 #
 # The order matters: the directory is emptied first, so an asset left by an
 # earlier version cannot be checksummed and published alongside this one.
+#
+# The interface is built before the binaries, because the binary embeds a
+# git-ignored directory and a fresh checkout's is empty — archives built
+# without this step carry every API route and no page at all.
+#
+# The image is gated after it is built rather than only in CI. A release
+# builds it from a fresh checkout, and the base image is upgraded as it
+# builds, so it is a different set of bytes from the one CI checked: the
+# scanner it bundles can stop working between the merge queue and the tag,
+# and a deployment that cannot scan ingests inventories it never reads.
 dist:
 	@$(MAKE) --no-print-directory dist-version
 	@$(MAKE) --no-print-directory dist-clean
+	@$(MAKE) --no-print-directory web
 	@$(MAKE) --no-print-directory dist-binaries
 	@$(MAKE) --no-print-directory dist-chart
 	@$(MAKE) --no-print-directory dist-inventories
+	@$(MAKE) --no-print-directory check-packaging CHECK_IMAGE=$(DIST_IMAGE):$(DIST_VERSION)
 	@$(MAKE) --no-print-directory dist-sums
 	@$(MAKE) --no-print-directory dist-verify
 	@echo "$(DIST_DIR) holds $$(ls -1 $(DIST_DIR) | wc -l) files for $(DIST_VERSION)"
@@ -392,9 +404,12 @@ dist-verify:
 	  if [ -f "$$archive" ]; then \
 	    work=$$(mktemp -d); trap 'rm -rf "$$work"' EXIT; \
 	    tar -C "$$work" -xzf "$$archive"; \
-	    said=$$("$$work"/openpsirt_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH)/openpsirt -version | awk '{print $$2}'); \
+	    binary="$$work"/openpsirt_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH)/openpsirt; \
+	    said=$$("$$binary" -version | awk '{print $$2}'); \
 	    [ "$$said" = "$(DIST_VERSION)" ] \
 	      || { echo "the binary reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
+	    $(MAKE) --no-print-directory dist-serves BINARY="$$binary" \
+	      || fail=1; \
 	  else skipped="$$skipped the binary (no archive for $(DIST_IMAGE_ARCH))"; fi; \
 	  chart=$(DIST_DIR)/openpsirt-$(DIST_VERSION).tgz; \
 	  if [ ! -f "$$chart" ]; then skipped="$$skipped the chart (not packaged)"; \
@@ -417,6 +432,50 @@ dist-verify:
 	  [ "$$fail" = 0 ] || exit 1; \
 	  echo "  every asset names $(DIST_VERSION), and every one that carries it inside agrees"; \
 	  [ -z "$$skipped" ] || echo "  not checked:$$skipped"
+
+# That a released binary serves the interface, asked of the binary rather than
+# of the tree it was built from.
+#
+# The same question "check-packaging" asks of the image, for the same reason
+# and in the same words: the Go build embeds a git-ignored directory, so a
+# binary built from a clean checkout answers every API route and no page. The
+# image grew this check when that happened; the archives a person downloads
+# did not have it, and are the half somebody runs by hand.
+#
+# The port is chosen here and moved when it is taken. A fixed one collides
+# with whatever else is on this machine, and the release path is not the place
+# to discover that.
+dist-serves:
+	@test -n "$(BINARY)" || { echo "dist-serves needs BINARY=<path>"; exit 1; }
+	@set -e; \
+	  dir=$$(mktemp -d); pid=; answered=; port=$$((20000 + $$$$ % 20000)); \
+	  trap '[ -z "$$pid" ] || kill $$pid 2>/dev/null || true; rm -rf "$$dir"' EXIT; \
+	  attempt=0; \
+	  while [ $$attempt -lt 5 ]; do \
+	    OPENPSIRT_DATABASE_URL="sqlite://$$dir/serves.db" \
+	    OPENPSIRT_ADDR="127.0.0.1:$$port" \
+	    OPENPSIRT_PLAIN_HTTP=1 \
+	    OPENPSIRT_BOOTSTRAP_ADMINS=check \
+	      "$(BINARY)" >"$$dir/log" 2>&1 & \
+	    pid=$$!; \
+	    waited=0; \
+	    while kill -0 $$pid 2>/dev/null; do \
+	      if curl -fsS --noproxy '*' "http://127.0.0.1:$$port/readyz" >/dev/null 2>&1; then \
+	        answered=yes; break; \
+	      fi; \
+	      waited=$$((waited + 1)); \
+	      [ $$waited -gt 60 ] && break; \
+	      sleep 1; \
+	    done; \
+	    [ -n "$$answered" ] && break; \
+	    kill $$pid 2>/dev/null || true; wait $$pid 2>/dev/null || true; pid=; \
+	    attempt=$$((attempt + 1)); port=$$((port + 1)); \
+	  done; \
+	  [ -n "$$answered" ] \
+	    || { echo "the archive's binary never answered on five ports:"; \
+	         sed 's/^/    /' "$$dir/log"; exit 1; }; \
+	  curl -fsS --noproxy '*' "http://127.0.0.1:$$port/" | grep -qi '<!doctype html' \
+	    || { echo "the archive's binary serves no interface: it was built without one"; exit 1; }
 
 # The document is generated from the running registrations, never hand-written.
 openapi:
@@ -450,6 +509,8 @@ web: web-deps
 # Reproducible, like every other dependency here: npm ci installs exactly what
 # the lockfile pins rather than re-resolving ranges at build time.
 web-deps:
+	@command -v $(NPM) >/dev/null 2>&1 \
+	  || { echo "$(NPM) is needed to build the interface"; exit 1; }
 	$(NPM) --prefix web ci
 
 # The client is generated from the committed document, so a drifted
@@ -842,9 +903,13 @@ pins-check:
 	[ "$$here" = "$$there" ] || { \
 	  echo "the SBOM generator is $$here here and $$there in the image."; fail=1; }; \
 	node=$$(awk -F'[:-]' '/^FROM node:/{print $$2}' Dockerfile); \
-	ci=$$(awk -F': ' '/node-version:/{print $$2}' .github/workflows/ci.yml | tr -d ' '); \
-	[ "$$node" = "$$ci" ] || { \
-	  echo "the image builds the interface with Node $$node and CI uses $$ci."; fail=1; }; \
+	for flow in .github/workflows/*.yml; do \
+	  for said in $$(awk -F': ' '/node-version:/{print $$2}' "$$flow" | tr -d ' '); do \
+	    [ "$$said" = "$$node" ] || { \
+	      echo "the image builds the interface with Node $$node and $$flow uses $$said."; \
+	      fail=1; }; \
+	  done; \
+	done; \
 	defaults=$$(grep -c '^ARG VERSION=' Dockerfile); \
 	distinct=$$(grep '^ARG VERSION=' Dockerfile | sort -u | wc -l); \
 	[ "$$distinct" -le 1 ] || { \

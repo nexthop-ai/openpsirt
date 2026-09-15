@@ -9,7 +9,7 @@ Satisfies REQ-01, REQ-02, REQ-04, and the probe behavior REQ-72 requires.
 - [Image structure](#image-structure)
 - [Base version](#base-version)
 - [Bundled scanner](#bundled-scanner)
-- [Image checks in CI](#image-checks-in-ci)
+- [Image and archive checks](#image-and-archive-checks)
 - [Chart probes](#chart-probes)
 - [Starting and stopping](#starting-and-stopping)
 - [Chart security context](#chart-security-context)
@@ -83,7 +83,7 @@ chart mounts a volume. The default is scratch space living as long as the pod,
 which re-downloads on every start; a deployment that restarts often points it at
 a claim. The image and the chart read the directory from one value in the chart.
 
-## Image checks in CI
+## Image and archive checks
 
 These are the only places these claims are tested rather than asserted.
 
@@ -93,6 +93,17 @@ These are the only places these claims are tested rather than asserted.
 | It is not running as root | A security context regression |
 | The bundled scanner runs | A scanner binary that does not execute in this base |
 | It serves the interface | An image built with no interface, which answers the page's path with a credential refusal rather than a page |
+| The archive's binary serves the interface | The same build with no interface in it, in the form somebody runs by hand |
+
+**They run against a release as well as against a change.** The image a
+release publishes is built from a fresh checkout with its base upgraded as it
+builds, so it is a different set of bytes from the one a merge was gated on,
+and the scanner it bundles can stop working in between. A deployment that
+cannot scan ingests inventories it never reads.
+
+The archive is asked the same question as the image and in the same words, so
+the two cannot drift: it is started on a port nothing else holds, with a
+throwaway database, and asked for the page.
 
 ## Chart probes
 
@@ -228,7 +239,7 @@ with its leading `v` removed (REQ-01 and REQ-02).
 |---|---|---|
 | Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. Everything else here supports it. `linux/amd64` today — see below |
 | Helm chart | `openpsirt-<version>.tgz`, pushed to `oci://ghcr.io/nexthop-ai/charts` | The registry that already holds the image, rather than an index somebody has to host and keep |
-| Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
+| Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. The interface is inside the binary, so the archive serves the same pages the image does. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
 | Binary inventory | `openpsirt_<version>.cdx.json` | What the binary was linked from |
 | Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | What the image ships. One per architecture, because it is read off an assembled filesystem |
 | Checksums | `SHA256SUMS` | Every file above, so a download is checkable without holding a signature |
@@ -325,7 +336,7 @@ git push origin v0.2.0
 | The workflow then | |
 |---|---|
 | Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
-| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log |
+| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything |
 | Pushes the image and the chart to `ghcr.io` | |
 | Signs the image and the checksum file, and attests provenance for both | Keyless, against the workflow's own identity |
 | Creates the release and uploads every asset | |

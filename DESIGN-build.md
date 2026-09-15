@@ -104,7 +104,7 @@ of ours needs no edit.
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
 | `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
 | `make check-packaging` | The container image and the Helm chart. Needs docker and helm |
-| `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker and helm. See `DESIGN-packaging.md` |
+| `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `DESIGN-packaging.md` |
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
 | `make measure` | Measurements rather than gates. Behind a build tag |
