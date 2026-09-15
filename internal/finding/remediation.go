@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Remediation is how fast things are being fixed, and what is aging.
@@ -120,8 +121,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedFor(RatedOnStream)).
-		ColumnExpr(BandExpr+` AS "band"`).
+		Join(rating.For(rating.OnStream)).
+		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`MAX(f.closed_at) AS "closed_at"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
@@ -197,7 +198,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		}
 		byBand := q.NewSelect().
 			TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(
-				byBandOf(q, s.db), subject, products, all))).
+				byBandOf(q), subject, products, all))).
 			ColumnExpr(`grouped.band AS "band"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
 			GroupExpr("grouped.band")
@@ -253,9 +254,13 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 // The band is taken as the strictest across the rows an issue groups to, which
 // is one value by construction: severity belongs to the issue rather than to
 // the place, and MIN over one value is that value.
-func byBandOf(from *bun.SelectQuery, db bun.IDB) *bun.SelectQuery {
+func byBandOf(from *bun.SelectQuery) *bun.SelectQuery {
 	return from.Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		ColumnExpr(`MIN(COALESCE(v.severity, '')) AS "band"`)
+		// Each row's own product rates it, read through the stream this query
+		// already joins. Without it the plan reported the published rating
+		// while the list it is a summary of reported the product's own.
+		Join(rating.For(rating.OnStream)).
+		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "band"`)
 }
 
 // secondsBetween averages how long an issue was open, through the one place an

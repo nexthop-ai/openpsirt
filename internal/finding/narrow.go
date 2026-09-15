@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // What a list is narrowed to before it is paged.
@@ -411,13 +412,13 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			// already, so the condition is asked of the row. Asked as a set
 			// of issues there is no one set: an issue rated critical in one
 			// product and low in another belongs to both answers.
-			q = q.Where(EffectiveSeverityExpr+" IN (?)", bun.List(words))
+			q = q.Where(rating.EffectiveExpr+" IN (?)", bun.List(words))
 		} else {
 			q = q.Where("f.vulnerability_id IN (?)",
 				q.NewSelect().TableExpr(`vulnerability AS "v"`).
-					Join(RatedHere, f.ProductID).
+					Join(rating.Here, f.ProductID).
 					Column("v.id").
-					Where(EffectiveSeverityExpr+" IN (?)", bun.List(words)))
+					Where(rating.EffectiveExpr+" IN (?)", bun.List(words)))
 		}
 	}
 	if f.Exploited {
@@ -854,9 +855,9 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		counted = counted.Where("f.urgency < ?", int64(exploitedBand)).
 			Where("f.vulnerability_id IN (?)",
 				counted.NewSelect().TableExpr(`vulnerability AS "v"`).
-					Join(RatedHere, productID).
+					Join(rating.Here, productID).
 					Column("v.id").
-					Where(BandExpr+" NOT IN (?)", bun.List(words)))
+					Where(rating.BandExpr+" NOT IN (?)", bun.List(words)))
 	}
 	n, err := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, below.narrow(counted)).

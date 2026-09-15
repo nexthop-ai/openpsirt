@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -903,12 +904,18 @@ func firstLineOf(description string) string {
 	if stop := strings.Index(said, ". "); stop > 0 {
 		said = said[:stop+1]
 	}
+	// Measured in characters, which is what a reader sees. Measured in bytes,
+	// a summary written in a script taking three bytes a character was cut to
+	// a third of the line — and the search for a space to break at was a byte
+	// index into it, so a line with no space in its first 160 bytes reached
+	// the client cut inside a character.
 	const most = 160
-	if len(said) > most {
-		if space := strings.LastIndex(said[:most], " "); space > 0 {
-			return strings.TrimSpace(said[:space]) + "…"
+	if utf8.RuneCountInString(said) > most {
+		cut := bound.HeadRunes(said, most)
+		if space := strings.LastIndex(cut, " "); space > 0 {
+			return strings.TrimSpace(cut[:space]) + "…"
 		}
-		return bound.Head(said, most) + "…"
+		return cut + "…"
 	}
 	return strings.TrimSpace(said)
 }

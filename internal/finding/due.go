@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -245,6 +246,10 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
 			Join(`JOIN product AS "p" ON p.id = st.product_id`).
 			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+			// Each row's own product rates its own findings. The list spans
+			// products, so the join reads the stream's product per row rather
+			// than binding one.
+			Join(rating.For(rating.OnStream)).
 			Join(`JOIN component AS "c" ON c.id = f.component_id`).
 			// The consumer, for the versions a decision is keyed on.
 			Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
@@ -273,7 +278,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`MIN(COALESCE(v.severity, '')) AS "severity"`).
+		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`p.display_name AS "product"`).
 		ColumnExpr(`st.display_name AS "stream"`).
@@ -438,7 +443,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
 				return q.Where("urgency_exploited = ?", false).
 					Where(`vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v" `+
-						RatedHere+` WHERE `+BandExpr+` IN (?))`,
+						rating.Here+` WHERE `+rating.BandExpr+` IN (?))`,
 						productID, bun.List(words))
 			}
 		}
@@ -688,7 +693,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 			Where("urgency_exploited = ?", false).
 			Where(inThisProduct, productID).
 			Where(`vulnerability_id NOT IN (SELECT v.id FROM "vulnerability" AS "v" `+
-				RatedHere+` WHERE `+BandExpr+` IN (?))`, productID, bun.List(words)).
+				rating.Here+` WHERE `+rating.BandExpr+` IN (?))`, productID, bun.List(words)).
 			Exec(ctx)
 		if err != nil {
 			return cleared, fmt.Errorf("take the deadline off what is below the line: %w", err)

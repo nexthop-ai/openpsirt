@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Assessment is what one product thinks of an issue, as against what was
@@ -132,11 +133,15 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 			return ErrUnknownIssue
 		}
 		var issue struct {
-			Published string `bun:"severity"`
+			Published string `bun:"published"`
 		}
+		// The published word, aliased as what it is. Named "severity" it read
+		// as *the* severity of the issue here, which it is not — what the
+		// product holds is what everything else judges by — and the two sites
+		// below that do want the effective rating are a join away.
 		err = tx.NewSelect().
 			TableExpr(`vulnerability AS "v"`).
-			ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+			ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 			Where("v.id = ?", vulnerabilityID).
 			Scan(ctx, &issue)
 		if err != nil {
@@ -403,13 +408,17 @@ func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
 	assessed string) error {
 
 	var issue struct {
-		Severity   string `bun:"severity"`
+		Published  string `bun:"published"`
 		ScoreCenti int    `bun:"score_centi"`
 		Likelihood int    `bun:"likelihood_ppm"`
 	}
+	// The published word, aliased as what it is: this product's own rating
+	// arrives as the assessed argument, and Rating is what decides between
+	// them. Named "severity" it read as the rating in force, which is the one
+	// thing it must not be taken for here.
 	err := tx.NewSelect().
 		TableExpr(`vulnerability AS "v"`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
 		Where("v.id = ?", vulnerabilityID).
@@ -422,15 +431,15 @@ func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
 	// through — the rule for which of a published score, a published word and
 	// a rating of ours decides the number is one fact, and this project's bugs
 	// have all come from letting one fact into two rules.
-	rating := Rating{
-		Published: issue.Severity, Assessed: assessed,
+	inForce := Rating{
+		Published: issue.Published, Assessed: assessed,
 		ScoreCenti: issue.ScoreCenti, LikelihoodPPM: issue.Likelihood,
 	}
 
 	// Everything below the two flags, packed by the same function that packs
 	// it at ingest. The flags themselves are per finding, so they stay in the
 	// statement.
-	rest := Ranked{ScoreCenti: rating.Score(), LikelihoodPPM: rating.LikelihoodPPM}.Rank()
+	rest := Ranked{ScoreCenti: inForce.Score(), LikelihoodPPM: inForce.LikelihoodPPM}.Rank()
 	_, err = tx.NewUpdate().
 		Model((*Finding)(nil)).
 		Set("urgency = (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
@@ -605,7 +614,7 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+		Join(rating.Here, productID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		// Grouped on the learning as well, because it is the base an
@@ -613,12 +622,12 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 		// recount fell back to the opening and moved every exploited
 		// deadline back to a date that was already in the past.
 		ColumnExpr(`f.exploited_learned_at AS "learned_at"`).
-		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
 		GroupExpr("f.urgency_exploited, f.opened_at, f.exploited_learned_at, "+
-			EffectiveSeverityExpr).
+			rating.EffectiveExpr).
 		Scan(ctx, &groups)
 	if err != nil {
 		return fmt.Errorf("read what this issue is open against: %w", err)
@@ -841,14 +850,14 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, claim.ProductID).
+		Join(rating.Here, claim.ProductID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
-		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
 		Where("f.vulnerability_id = ?", claim.VulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", claim.ProductID).
-		GroupExpr("f.urgency_exploited, " + EffectiveSeverityExpr)
+		GroupExpr("f.urgency_exploited, " + rating.EffectiveExpr)
 	// The visibility half as well as the product. The visibility half alone
 	// admits every disclosed finding in the deployment, so an approver holding
 	// one product was told how many findings this issue has in products they

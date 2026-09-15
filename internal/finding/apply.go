@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
@@ -224,11 +225,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					OpenedAt:     startedAt,
 					OpenedRunID:  &runID,
 				}
-				rating := ratings[vulnerabilityID]
+				rated := ratings[vulnerabilityID]
 				ranked := Ranked{
-					Exploited: rating.Exploited, Shipped: shipped,
-					LikelihoodPPM: rating.LikelihoodPPM,
-					ScoreCenti:    rating.Score(),
+					Exploited: rated.Exploited, Shipped: shipped,
+					LikelihoodPPM: rated.LikelihoodPPM,
+					ScoreCenti:    rated.Score(),
 				}
 				entry := wanted[key{vulnerabilityID, at}]
 				entry.Urgency = int64(ranked.Rank())
@@ -237,9 +238,9 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				// first seen; for one already open the update below takes it
 				// only where the clock itself changed, so a deadline does not
 				// restart every night and never arrive.
-				severity := rating.Severity()
-				if onTheClock && floor.Admits(rating.Exploited, severity) {
-					due := startedAt.Add(windows.For(rating.Exploited, severity))
+				severity := rated.Severity()
+				if onTheClock && floor.Admits(rated.Exploited, severity) {
+					due := startedAt.Add(windows.For(rated.Exploited, severity))
 					entry.DueAt = &due
 				}
 				// A finding that opens already exploited was learned about
@@ -546,7 +547,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 		}
 		err := tx.NewSelect().
 			TableExpr(`vulnerability AS "v"`).
-			Join(RatedHere, productID).
+			Join(rating.Here, productID).
 			ColumnExpr(`v.id AS "id"`).
 			ColumnExpr(`COALESCE(v.severity, ?) AS "published"`, "").
 			ColumnExpr(`COALESCE(ir.severity, ?) AS "assessed"`, "").

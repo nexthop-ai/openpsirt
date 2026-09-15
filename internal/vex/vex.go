@@ -167,9 +167,10 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		Component       string    `bun:"component"`
 		Purl            string    `bun:"purl"`
 		Outcome         string    `bun:"outcome"`
-		Justification   string    `bun:"justification"`
-		Reasoning       string    `bun:"reasoning"`
-		DecidedAt       time.Time `bun:"decided_at"`
+		DecidedBy       int64     `bun:"decided_by"`
+		Justification   string    `bun:"-"`
+		Reasoning       string    `bun:"-"`
+		DecidedAt       time.Time `bun:"-"`
 	}
 	// One statement per issue and component, from the claims that stand and
 	// have been agreed to. Joined from the findings this build actually holds:
@@ -202,15 +203,24 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		// Safe as an aggregate, because the grouping below refuses a component
+		// whose places disagree about the outcome.
 		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
-		// The words and the moment of the earliest of them, which is the claim
-		// that has stood longest about this component. Where several places
-		// were decided separately the document has one thing to say and has to
-		// choose which; the first is the one a reader can check against the
-		// record.
-		ColumnExpr(`COALESCE(MIN(cl.justification), '') AS "justification"`).
-		ColumnExpr(`COALESCE(MIN(dr.body), '') AS "reasoning"`).
-		ColumnExpr(`MIN(de.proposed_at) AS "decided_at"`).
+		// Which decision the words come from, rather than the words.
+		//
+		// The earliest of them, which is the claim that has stood longest
+		// about this component: where several places were decided separately
+		// the document has one thing to say and has to choose which, and the
+		// first is the one a reader can check against the record. A decision's
+		// identifier is assigned when it is written, so the lowest is the
+		// first written.
+		//
+		// **Read off one decision rather than taken column by column.** Three
+		// independent minima are three answers from three claims: a category
+		// from one, the prose explaining a different reason from another, and
+		// a timestamp from a third — published, machine-readable, to every
+		// customer running a scanner.
+		ColumnExpr(`MIN(de.id) AS "decided_by"`).
 		Where("f.target_id = ?", target.ID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -252,6 +262,23 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 			"more than one document carries: a document that stopped at the limit would say "+
 			"nothing is claimed about everything past it",
 			product, stream, variant, database.AWholeDocument.Most)
+	}
+
+	// The words each of those decisions rests on, read off the decision the
+	// statement is about. One statement for the document rather than one per
+	// component.
+	decided := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		decided = append(decided, row.DecidedBy)
+	}
+	said, err := s.wordsOf(ctx, decided)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i].Justification = said[rows[i].DecidedBy].justification
+		rows[i].Reasoning = said[rows[i].DecidedBy].body
+		rows[i].DecidedAt = said[rows[i].DecidedBy].proposedAt
 	}
 
 	moment := s.now().UTC()
@@ -367,6 +394,51 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 	}
 	for _, row := range rows {
 		out[row.VulnerabilityID] = append(out[row.VulnerabilityID], row.Identifier)
+	}
+	return out, nil
+}
+
+// words are what one decision claimed, as a statement repeats it.
+type words struct {
+	justification string
+	body          string
+	proposedAt    time.Time
+}
+
+// wordsOf reads the argument each of these decisions rests on.
+//
+// One statement for the document rather than one per component, and one row per
+// decision rather than a column at a time: the category, the prose and the
+// moment have to come from the same claim, or the document says one thing in
+// the field a machine reads and another in the field a person does.
+func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words, error) {
+	out := map[int64]words{}
+	if len(decisions) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		ID            int64     `bun:"id"`
+		Justification string    `bun:"justification"`
+		Body          string    `bun:"body"`
+		ProposedAt    time.Time `bun:"proposed_at"`
+	}
+	where, args := database.InAnyOf("de.id", decisions)
+	if err := s.db.NewSelect().
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
+		ColumnExpr(`de.id AS "id"`).
+		ColumnExpr(`COALESCE(cl.justification, '') AS "justification"`).
+		ColumnExpr(`COALESCE(dr.body, '') AS "body"`).
+		ColumnExpr(`de.proposed_at AS "proposed_at"`).
+		Where(where, args...).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what these claims say: %w", err)
+	}
+	for _, row := range rows {
+		out[row.ID] = words{
+			justification: row.Justification, body: row.Body, proposedAt: row.ProposedAt,
+		}
 	}
 	return out, nil
 }

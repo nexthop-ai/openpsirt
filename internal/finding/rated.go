@@ -30,46 +30,6 @@ type IssueRating struct {
 	Severity        string `bun:"severity,notnull"`
 }
 
-// RatedOn is where a query finds the product it is asking about.
-//
-// The two spellings are named rather than passed as text. A placeholder cannot
-// bind a column name, so the product half of this join is spliced in — and a
-// function taking a string would leave nothing between it and a column name
-// arriving from a query parameter except that today's callers all pass a
-// literal. Naming them is what makes that structural rather than a habit
-// (REQ-66).
-type RatedOn string
-
-const (
-	// RatedOnStream is the product the row's stream belongs to, for a query
-	// that spans products and reads each row's own.
-	RatedOnStream RatedOn = "st.product_id"
-	// RatedOnDecision is the product a decision was recorded in.
-	RatedOnDecision RatedOn = "de.product_id"
-	// ratedOnBound is one product, bound. Used through RatedHere.
-	ratedOnBound RatedOn = "?"
-)
-
-// RatedFor is the left join that brings a product's own rating into a query
-// that already joins vulnerability AS v.
-//
-// Left, because most issues are rated by nobody and those are the rows every
-// list is mostly made of.
-//
-// Every caller already joined the vulnerability, because that is where the
-// rating used to be. So this swaps a column for a join rather than adding one
-// where none existed.
-func RatedFor(product RatedOn) string {
-	return `LEFT JOIN "issue_rating" AS "ir" ON ir.vulnerability_id = v.id` +
-		` AND ir.product_id = ` + string(product)
-}
-
-// RatedHere is RatedFor with the product bound.
-//
-// The same join rather than a second spelling of it: written out twice, a
-// change to one is a change the other quietly does not make.
-var RatedHere = RatedFor(ratedOnBound)
-
 // RatedKey is one issue in one product, which is what a rating is about.
 type RatedKey struct {
 	ProductID       int64

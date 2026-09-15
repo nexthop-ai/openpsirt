@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -110,22 +111,29 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		Join(`JOIN product AS "p" ON p.id = st.product_id`).
 		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedFor(RatedOnStream)).
+		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`v.description AS "summary"`).
-		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`p.display_name AS "product"`).
 		ColumnExpr(`st.display_name AS "stream"`).
 		ColumnExpr(`va.display_name AS "variant"`).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
-		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
+		// Whoever is dealing with it, and nobody where the places disagree.
+		// A minimum named one of them: a partly assigned embargo read as one
+		// person's, which is a list of what is coming that names the wrong
+		// person to ask. The same reconciliation the deadline list does, in
+		// the statement rather than after it.
+		ColumnExpr(`CASE WHEN COUNT(f.assigned_to) = COUNT(*)
+			AND MIN(f.assigned_to) = MAX(f.assigned_to)
+			THEN MIN(f.assigned_to) END AS "assigned_to"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		Where("f.visibility = ?", access.Private).
 		Where("f.closed_at IS NULL").
 		Where("f.disclose_at IS NOT NULL").
 		Where("f.disclose_at <= ?", s.now().UTC().Add(within)).
-		GroupExpr("v.identifier, v.description, " + EffectiveSeverityExpr +
+		GroupExpr("v.identifier, v.description, " + rating.EffectiveExpr +
 			", c.name, p.display_name, st.display_name, va.display_name").
 		OrderExpr("disclose_at, v.identifier")
 	if len(private) > 0 {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -571,7 +572,7 @@ func (f *fixture) ratingsIn(t *testing.T, productID int64, identifier string) (s
 	}
 	err := f.db.DB.NewSelect().
 		TableExpr("vulnerability AS v").
-		Join(finding.RatedHere, productID).
+		Join(rating.Here, productID).
 		ColumnExpr("COALESCE(v.severity, '') AS published").
 		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
 		Where("v.identifier = ?", identifier).

@@ -587,7 +587,12 @@ func Folded(name string) string {
 	// because it carries an index. The name itself is stored unbounded, so
 	// nothing is lost — this is the lookup key, and two names agreeing for a
 	// hundred and ninety-one characters are the same name by any reading.
-	return bound.Head(folded, foldedWidth)
+	//
+	// Characters rather than bytes, which is how the column is declared. Cut
+	// at the same number of bytes, a name written in a script taking three
+	// bytes a character kept a third of them — and this feeds the fold key's
+	// hash, so two components differing only past that third folded together.
+	return bound.HeadRunes(folded, foldedWidth)
 }
 
 // foldedWidth is the column's width, which is what every indexed name column

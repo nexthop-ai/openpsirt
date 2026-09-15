@@ -7,6 +7,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // depth bounds every recursive walk over a build's edges.
@@ -95,8 +96,8 @@ func WithinAny(db *bun.DB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // the bands partition the distinct issues and their counts sum back to the
 // total — one query answers both, and two queries would be two chances for the
 // number and its parts to disagree.
-func (s *Store) beneath(ctx context.Context, targetID int64, visible []access.Visibility,
-	of []int64) (map[int64]map[string]int, error) {
+func (s *Store) beneath(ctx context.Context, productID, targetID int64,
+	visible []access.Visibility, of []int64) (map[int64]map[string]int, error) {
 
 	totals := map[int64]map[string]int{}
 	if len(of) == 0 {
@@ -123,14 +124,15 @@ func (s *Store) beneath(ctx context.Context, targetID int64, visible []access.Vi
 	JOIN "graph_node" AS "sn" ON sn.id = w.start
 	JOIN "graph_node" AS "n" ON n.id = w.node
 	JOIN (SELECT f.component_id AS "component_id", f.vulnerability_id AS "vulnerability_id",
-	             COALESCE(v.severity, '') AS "band"
+	             `+rating.EffectiveExpr+` AS "band"
 	      FROM "finding" AS "f"
 	      JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id
+	      `+rating.Here+`
 	      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-	      GROUP BY f.component_id, f.vulnerability_id, COALESCE(v.severity, '')) AS "p"
+	      GROUP BY f.component_id, f.vulnerability_id, `+rating.EffectiveExpr+`) AS "p"
 	  ON p.component_id = n.component_id
 	GROUP BY sn.component_id, p.band`,
-		targetID, bun.List(of), targetID, depth, targetID, bun.List(visible)).
+		targetID, bun.List(of), targetID, depth, productID, targetID, bun.List(visible)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("count what is open beneath each component: %w", err)

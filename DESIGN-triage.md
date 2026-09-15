@@ -882,6 +882,14 @@ moved out from under, and those land in the review queue as work.
 | Failing to mark is reported and not fatal | What the scan found is recorded and correct; the marking is a prompt, and losing a scan over a prompt is the wrong trade |
 | A decision lapses when *either* version moves | Marked once the last build in the product holding its versions has moved, not when the first does |
 
+What has **stopped standing** is one question, not two. A lapsed decision and a
+deferral whose date has passed are separate mechanisms — a version bump does not
+change a judgment about priority, and a calendar does not change one about
+applicability — but a deferral that ran out on code that then moved is both.
+Asked as two lists, the queue had to merge and deduplicate them to draw at all,
+while the figure over them added the two totals and counted the overlap twice.
+One filter answers both.
+
 ## Re-affirmation
 
 Two people already agreed to the claim. A version bump is a prompt to re-check

@@ -129,6 +129,7 @@ last release a customer actually has, which is rarely the previous one.
 | A fixed entry states what it moved to | "The component was upgraded, 3.7.0 → 3.9.0". That pair is written when the scan closes the finding, because the component that carried the issue is gone from the inventory by then and anything asking later holds one version and not two |
 | Each still-present entry states whether somebody tried | It carries the version its place arrived from where the version moved since. On the still-present column only: a fixed entry's closure reason already says what happened, and a new one had nothing to bump |
 | Explanations are read once for the whole list, not once per entry | A comparison against a release a customer has been on for a year has as many fixed entries as the note is long. The statement narrows by the issues and the components separately rather than by the pairs, because no engine here spells a comparison against a pair of columns the same way, so what comes back is a superset and the pairing is done on the way out |
+| Each entry is rated as its own product rates it | Read from the published rating alone, the document contradicted the findings list it was written from wherever a product had re-rated an issue — and this is the copy that leaves the building. The two builds can be in two products, so each half of the comparison is rated by its own |
 
 ## The release note
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Repeated is one place that keeps being put off.
@@ -94,7 +94,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		// The report is per product already, and a rating belongs to one — so
 		// the word beside a repeated deferral is the word the team doing the
 		// deferring holds.
-		Join(finding.RatedFor(finding.RatedOnDecision)).
+		Join(rating.For(rating.OnDecision)).
 		// The argument, which is where the outcome and the date live.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		// Grouped on the product's identifier and the issue's, with the names
@@ -106,7 +106,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		// unique, and it is not the one anybody reads.
 		ColumnExpr(`MIN(p.display_name) AS "product"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
-		ColumnExpr("MIN("+finding.EffectiveSeverityExpr+`) AS "severity"`).
+		ColumnExpr("MIN("+rating.EffectiveExpr+`) AS "severity"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).
 		// Counted over the deferrals that actually held. One taken back
 		// before it took effect put nothing off, and counting it would make

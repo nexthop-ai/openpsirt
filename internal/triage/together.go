@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Deciding about everything at one component at once.
@@ -210,7 +211,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
 		// What this product rates the issue, which is the rating in force
 		// here. The read spans products, so each row reads its own stream's.
-		Join(finding.RatedFor(finding.RatedOnStream)).
+		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).

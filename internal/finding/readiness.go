@@ -8,6 +8,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Standing is what one build holds now, split by severity band.
@@ -146,8 +147,8 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
-		ColumnExpr(BandExpr+` AS "band"`).
+		Join(rating.Here, productID).
+		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("f.closed_at IS NULL").

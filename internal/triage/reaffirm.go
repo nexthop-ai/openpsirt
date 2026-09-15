@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Reaffirmation is somebody saying a lapsed claim still holds.
@@ -229,7 +230,7 @@ func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`vulnerability AS "v"`).
-		Join(finding.RatedHere, productID).
+		Join(rating.Here, productID).
 		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed"`).
 		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).

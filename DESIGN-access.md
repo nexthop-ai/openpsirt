@@ -169,6 +169,14 @@ rather than checked at each route, because the leak is the *ordering*. The
 identifier carries no sequence, so the names cannot be walked or counted even
 before a route is asked.
 
+Nobody learns what a build ships either. The graph reads that take a component
+*name* refuse before resolving it, for the same reason and with a sharper edge:
+a name the build does not hold answered one way, a name it holds at two versions
+answered with every version and ecosystem it holds, and a name it holds once
+answered a third — so a subject who may not read findings in the product could
+read the build's inventory back one guess at a time, and the two-version answer
+handed over versions as well as names.
+
 ## Assignment
 
 Deciding who deals with something is a different act from deciding what it is, so

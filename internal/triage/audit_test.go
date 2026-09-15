@@ -399,3 +399,94 @@ func TestTheRecordNamesOneFindingRatherThanTheLeastOfEach(t *testing.T) {
 		}
 	})
 }
+
+// Lapsed and expired asked as one question, because they overlap.
+//
+// A deferral that ran out on code that then moved is in both lists, and two
+// screens asked for both and added the totals — which says eleven over a list
+// of ten, and the taller the overlap the worse it reads. Watched failing by
+// adding them.
+func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		soon := time.Now().UTC().Add(24 * time.Hour)
+		past := time.Now().UTC().Add(-time.Hour)
+
+		// A deferral is written with a date still to come — one already gone
+		// is refused — and the date then arrives.
+		ranOut := func(t *testing.T, identity string) *triage.Decision {
+			t.Helper()
+			at := f.at()
+			at.PlaceIdentity = identity
+			made, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+				Place: at, Outcome: triage.Deferred, DeferredUntil: &soon,
+				Reasoning: "Not this sprint.", By: f.proposer,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.db.DB.NewUpdate().Table("claim").
+				Set("deferred_until = ?", past).
+				Where("id = ?", made.ClaimID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			return made
+		}
+		lapse := func(t *testing.T, id int64) {
+			t.Helper()
+			if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
+				Set("state = ?", triage.LapsedState).
+				Where("id = ?", id).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// One in both lists, one in each.
+		both := ranOut(t, "deferred-and-then-moved")
+		lapse(t, both.ID)
+		ranOut(t, "deferred-and-ran-out")
+		onlyLapsed := f.at()
+		onlyLapsed.PlaceIdentity = "moved-out-from-under"
+		lapse(t, f.claims(t, onlyLapsed).ID)
+		// And one that still stands, so that answering with everything is a
+		// different answer from answering with what has stopped.
+		stillStands := f.at()
+		stillStands.PlaceIdentity = "still-true"
+		f.claims(t, stillStands)
+
+		count := func(t *testing.T, filter triage.Filter) int {
+			t.Helper()
+			_, _, total, err := f.store.List(ctx, f.reviewer, filter, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return total
+		}
+		lapsed := count(t, triage.Filter{States: []triage.State{triage.LapsedState}})
+		expired := count(t, triage.Filter{Expired: true})
+		if lapsed != 2 || expired != 2 {
+			t.Fatalf("%d lapsed and %d expired, wanted two of each with one in both",
+				lapsed, expired)
+		}
+		if stopped := count(t, triage.Filter{Stopped: true}); stopped != 3 {
+			t.Errorf("%d have stopped standing, want 3 — adding the two lists says %d",
+				stopped, lapsed+expired)
+		}
+
+		// And the rows are the same three, once each.
+		rows, _, _, err := f.store.List(ctx, f.reviewer, triage.Filter{Stopped: true}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 3 {
+			t.Fatalf("listed %d rows behind a total of 3", len(rows))
+		}
+		seen := map[int64]bool{}
+		for _, row := range rows {
+			if seen[row.ID] {
+				t.Errorf("decision %d is listed twice", row.ID)
+			}
+			seen[row.ID] = true
+		}
+	})
+}

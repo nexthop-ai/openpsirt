@@ -7,6 +7,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -53,7 +54,7 @@ func Recordable() []string {
 //
 // No floor is enforced through this. What a line lets through goes through
 // Band, which folds an unrated issue to medium rather than below everything —
-// see BandExpr for why, and for what reading it the other way cost.
+// see rating.BandExpr for why, and for what reading it the other way cost.
 func Ranks(word string) int {
 	for i, known := range ranked {
 		if strings.EqualFold(word, known) {
@@ -118,36 +119,7 @@ func BandOf(word string) string {
 	return strings.ToLower(strings.TrimSpace(word))
 }
 
-// BandExpr is the rating a finding is judged by, folded to one of the four
-// words that rank.
-//
-// Spelled once, and used by both the line and the deadline, because they were
-// briefly two rules reading the same fact and they disagreed: the deadline
-// treats an unrated issue as a medium, on the grounds that unknown is not
-// harmless, while the line was treating it as below everything. On a real
-// image that was **91,040 findings rated "unknown"** dropping out of the
-// working list *and* off any clock, which is the opposite of what an unknown
-// rating should cause. Every bug in this project's identity and expiry rules
-// came from letting one fact into two rules; this is that lesson arriving in a
-// third place. This product's where it has stated one, the published one
-// otherwise: being able to say a published rating is wrong is pointless if
-// everything that ranks and filters then ignores us.
-//
-// Read off the rating joined by RatedFor, so a query using this joins that
-// too and says which product it is asking about. A statement that reads the
-// expression without the join does not compile on any of the four engines,
-// which is the failure being chosen — the alternative is a query that silently
-// answers for the wrong product.
-const BandExpr = `CASE
-	WHEN COALESCE(ir.severity, v.severity, '') = 'critical' THEN 'critical'
-	WHEN COALESCE(ir.severity, v.severity, '') = 'high' THEN 'high'
-	WHEN COALESCE(ir.severity, v.severity, '') IN ('low', 'negligible', 'none') THEN 'low'
-	ELSE 'medium' END`
-
-// EffectiveSeverityExpr is the rating in force in one product, as a word.
-const EffectiveSeverityExpr = `COALESCE(ir.severity, v.severity, '')`
-
-// Band folds a severity word the same way BandExpr does.
+// Band folds a severity word the same way rating.BandExpr does.
 func Band(severity string) string {
 	switch severity {
 	case "critical", "high":
@@ -262,9 +234,9 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("f.urgency >= ?", int64(exploitedBand)).
 				WhereOr("f.vulnerability_id IN (?)",
 					q.NewSelect().TableExpr(`vulnerability AS "v"`).
-						Join(RatedHere, f.ProductID).
+						Join(rating.Here, f.ProductID).
 						Column("v.id").
-						Where(BandExpr+" IN (?)", bun.List(words)))
+						Where(rating.BandExpr+" IN (?)", bun.List(words)))
 		})
 	}
 	return q

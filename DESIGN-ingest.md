@@ -427,7 +427,7 @@ they fill in. A document that is valid and sparse is not a broken one.
 | Tolerated | Behavior |
 |---|---|
 | The document names no component of its own | What the scan was filed against stands in. The root is excluded from identity and expiry anyway |
-| A component states no version | Kept and counted. What it costs is matching, and it ships either way |
+| A component states no version | Kept and counted. What it costs is matching, and it ships either way. Counted once over the deduplicated inventory rather than as each statement is read: a document naming the same unversioned component in ten relationships describes one component that ships without a version, and where a second description does state one the count is asked about the combination, which is what is stored |
 | An edge names something the document never describes | Dropped and counted. The missing component is not invented |
 | An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
 | An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |

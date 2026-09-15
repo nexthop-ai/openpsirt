@@ -9,6 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -138,7 +139,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// And whatever the row's own product rates it, for the same
 			// reason: a rating belongs to a product, so a list spanning them
 			// reads each row's against the product that row is in.
-			Join(RatedFor(RatedOnStream)).
+			Join(rating.For(rating.OnStream)).
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
@@ -346,7 +347,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 // first and turned into a list of words the query admits, which cannot be done
 // across products — each row's line is its own — so the comparison happens in
 // SQL, in the order the one list states.
-var ratedAt = rankCase(BandExpr, 0)
+var ratedAt = rankCase(rating.BandExpr, 0)
 
 // lineAt is the line the row's own product holds, as the same number. A
 // product that states none inherits the deployment's, which is bound.

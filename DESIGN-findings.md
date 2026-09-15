@@ -844,6 +844,8 @@ the list itself pages through.
 |---|---|
 | It rides on the page | Counted after the grouping and before the limit, in the statement that groups, so the number and the rows cannot describe different sets |
 | The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source counted as two where the page draws one, and the figure changed depending on which page was being looked at |
+| A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
+| Two overlapping lists are one question | The lapsed queue asked for lapsed decisions and for expired deferrals and added the totals. A deferral that ran out on code that then moved is both, so the figure was larger than the list beneath it and the list itself had to be deduplicated to draw at all. One filter answers both, and the number it comes back with is the number of rows |
 
 ## The severity ladder
 
@@ -861,6 +863,35 @@ The ordering in SQL is built from the list rather than written out beside it,
 and the mapping back to a word is an index into the same list. The `ELSE` is
 the caller's: a cross-product page needs an unrecognized rating to compare
 below every band, so that the sentinel for "no line" does.
+
+### The rating in force
+
+What a finding's severity *is* has one rule: **this product's word where it has
+stated one, the published word otherwise.** Being able to say a published
+rating is wrong is pointless if the surfaces that count and rank then ignore
+us.
+
+Nine queries said it a second way. They selected the published column with no
+rating joined at all, so a product that re-rated an issue saw its own decision
+in the findings list, the severity filter, the triage floor and the deadline,
+and saw the world's in the component tree, the bundle band strip, the build
+comparison export, the remediation plan and the triage measures. Nothing
+errored; the screens simply disagreed with the list they summarize, and the
+comparison export is the copy that leaves the building.
+
+The join and the two expressions live in `internal/rating`, which is a leaf.
+That is the whole reason it exists: `internal/finding` imports `internal/graph`
+to walk a subtree, so `internal/graph` cannot import `internal/finding` to ask
+what a band is — and the band strip on the tree was drawn from the published
+rating for exactly that reason. The rating *row* did not move: it is proposed,
+agreed and put in force through `internal/finding`, which is where a second
+person is asked for. What moved is the spelling a query needs.
+
+| Rule | |
+|---|---|
+| A query presenting a severity joins the rating | The expression reads a column of the joined rating, so a statement that reads it without the join does not compile on any of the four engines. That is the failure being chosen; the alternative is a query that silently answers for the wrong product |
+| It says which product it is asking about | Bound where the scope names one product, read off the row's own stream where the list spans products, read off the decision where the row is a decision. Three named spellings rather than a string parameter, because a placeholder cannot bind a column name |
+| A query reading the published word says so | Five do, deliberately: what needs a second person is a rating milder than what the *world* called it, and a product that had already rated it milder would otherwise let the next step down through unwatched. Those alias the column `published`. Aliased `severity` they read as the rating in force, which is the one thing they must not be taken for |
 
 ## File organization
 

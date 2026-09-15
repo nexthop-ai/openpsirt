@@ -364,6 +364,16 @@ Where several places were decided in separate sittings the document states the
 against the record. Grouping on the words and the moment emitted the same claim
 twice.
 
+**The earliest decision is picked first, and then read.** Each column had its own
+minimum over the group, and nothing tied them to one row: with two claims
+standing at a component — "component_not_present / we removed it in the patch"
+and "vulnerable_code_not_in_execute_path / the path is unreachable" — the
+machine-readable category came from one and the prose from the other, and the
+published statement said the component was not present with reasoning explaining
+that a code path is unreachable. That is a composite no record ever held, going
+to every customer running a scanner. The group answers with the earliest
+decision's identifier and its words are read by that identifier.
+
 ## Issuance records
 
 An advisory records when it went out, by whom, and a digest of what went out.

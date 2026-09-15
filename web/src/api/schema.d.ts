@@ -671,6 +671,8 @@ export interface paths {
          *
          *     Set `expired=true` to list deferrals whose date has passed — the findings that have come back and need judging again.
          *
+         *     Set `stopped=true` for everything that has stopped standing — lapsed decisions and expired deferrals as one list. A decision can be both, so asking the two separately and adding the totals counts some of them twice.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-decisions"];
@@ -9649,6 +9651,8 @@ export interface operations {
                 state?: "proposed" | "approved" | "withdrawn" | "lapsed";
                 /** @description Only deferrals whose date has passed */
                 expired?: boolean;
+                /** @description Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up */
+                stopped?: boolean;
                 limit?: number;
                 offset?: number;
             };

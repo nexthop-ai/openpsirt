@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Disposed is one known vulnerability in one build, and what was decided about
@@ -244,7 +245,7 @@ func (s *Store) registerQuery(productID int64,
 
 	return narrow(s.db.NewSelect()).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+		Join(rating.Here, productID).
 		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		// What pulls the component in. Left, because a build holds some
 		// components directly and those have no consumer at all.
@@ -261,7 +262,7 @@ func (s *Store) registerQuery(productID int64,
 		Join(`LEFT JOIN claim AS "cl" ON cl.id = de.claim_id`).
 		Join(`LEFT JOIN person AS "pp" ON pp.id = de.proposed_by`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(EffectiveSeverityExpr + ` AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).

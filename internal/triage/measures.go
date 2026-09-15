@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Measures are the numbers about how this deployment is working, as opposed to
@@ -151,15 +152,20 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 		Join(`LEFT JOIN finding AS "f" ON f.vulnerability_id = de.vulnerability_id
 			AND f.place_identity = de.place_identity `+sameProduct, readArgs...).
 		Join(`LEFT JOIN vulnerability AS "v" ON v.id = de.vulnerability_id`).
+		// Rated as the product that made the decision rates it, which is the
+		// band every other surface groups this issue under. Read from the
+		// published word alone, a product that re-rated an issue measured its
+		// own turnaround under a severity nobody there uses.
+		Join(rating.For(rating.OnDecision)).
 		Join(`LEFT JOIN claim_approval AS "da" ON da.claim_id = de.claim_id
 			AND da.withdrawn_at IS NULL`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`de.proposed_at AS "proposed_at"`).
 		ColumnExpr(`MIN(da.approved_at) AS "approved_at"`).
 		Where("de.proposed_at >= ?", since).
 		Where("de.proposed_at < ?", until).
-		GroupExpr("de.id, de.proposed_at, COALESCE(v.severity, '')").
+		GroupExpr("de.id, de.proposed_at, " + rating.EffectiveExpr).
 		OrderExpr("de.proposed_at DESC").
 		Limit(measuredAtMost + 1)
 	q = readableBy(q, subject, "de")

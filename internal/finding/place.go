@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // The upstream version a decision is keyed on, as SQL, so that everything
@@ -510,7 +511,7 @@ func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+		Join(rating.Here, productID).
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`f.visibility AS "visibility"`).

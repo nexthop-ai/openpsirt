@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // What one run of the scanner did.
@@ -118,8 +119,8 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			Distinct().
 			TableExpr(`finding AS "f"`).
 			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-			Join(RatedHere, productID).
-			ColumnExpr(BandExpr+` AS "band"`).
+			Join(rating.Here, productID).
+			ColumnExpr(rating.BandExpr+` AS "band"`).
 			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 			ColumnExpr(`f.component_id AS "component_id"`).
 			ColumnExpr(`CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END AS "exploited"`,
