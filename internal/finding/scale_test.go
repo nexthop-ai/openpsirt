@@ -322,7 +322,7 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 	list := time.Since(start)
 
 	start = time.Now()
-	due, err := store.RunningOut(ctx, who, finding.Scope{}, 30*24*time.Hour, 50)
+	due, _, err := store.RunningOut(ctx, who, finding.Scope{}, 30*24*time.Hour, 50)
 	if err != nil {
 		t.Fatalf("running out: %v", err)
 	}
