@@ -70,17 +70,16 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 	}
 	shown := strings.TrimSpace(displayName)
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
-
 	team := new(Team)
 	// Both statements or neither, for the reason a person and their party
 	// are written together: a team nothing can be routed to is not a team.
 	// And the lookup is inside, because a retry runs against a database
 	// that has moved and what it decides is whether to insert.
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	//
+	// A caller already inside a transaction joins it rather than being
+	// refused: declaring a team and putting people on it is one act, and what
+	// this asks for is met by the caller's transaction.
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		*team = Team{}
 		found := new(Team)
 		err := tx.NewSelect().Model(found).

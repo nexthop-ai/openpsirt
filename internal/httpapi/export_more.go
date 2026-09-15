@@ -278,7 +278,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 					rows = append(rows, []string{
 						strconv.FormatInt(body.ID, 10), body.ProposedAt, body.Product,
 						body.Issue, body.Component, body.Version, body.Consumer,
-						body.Outcome, body.Justification, body.DeferredUntil,
+						string(body.Outcome), string(body.Justification), body.DeferredUntil,
 						body.FixedVersion, body.State,
 						strconv.FormatBool(body.Standing),
 						body.ProposedBy, strings.Join(agreed, "; "),

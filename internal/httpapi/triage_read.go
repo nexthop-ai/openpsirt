@@ -82,9 +82,9 @@ type ClaimDetail struct {
 // identifier and its state belong to the row, and a claim page that carried
 // either would be offering an act at the wrong grain.
 func claimArgument(c triage.Claim, reasoning string) DecisionBody {
-	body := DecisionBody{ClaimID: c.ID, Outcome: string(c.Outcome), Reasoning: reasoning}
+	body := DecisionBody{ClaimID: c.ID, Outcome: outcome(c.Outcome), Reasoning: reasoning}
 	if c.Justification != nil {
-		body.Justification = *c.Justification
+		body.Justification = justification(*c.Justification)
 	}
 	if c.Mitigation != nil {
 		body.Mitigation = *c.Mitigation
@@ -154,12 +154,12 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"come back and need judging again.",
 		Tags: []string{"Triage"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `query:"product" doc:"Limit to one product, by name"`
-		Outcome string `query:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Limit to one outcome"`
-		State   string `query:"state" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to one state"`
-		Expired bool   `query:"expired" doc:"Only deferrals whose date has passed"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset  int    `query:"offset" minimum:"0"`
+		Product string  `query:"product" doc:"Limit to one product, by name"`
+		Outcome outcome `query:"outcome" doc:"Limit to one outcome"`
+		State   string  `query:"state" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to one state"`
+		Expired bool    `query:"expired" doc:"Only deferrals whose date has passed"`
+		Limit   int     `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset  int     `query:"offset" minimum:"0"`
 	}) (*DecisionsOutput, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {

@@ -102,7 +102,9 @@ export function Saved({
                     // hides the Because select and would otherwise keep what
                     // was chosen in it, storing a reason the decision endpoint
                     // refuses.
-                    ...(outcome === "not-applicable" && justification ? { justification } : {}),
+                    ...(outcome === "not-applicable" && justification
+                      ? { justification: justification as Prepared["justification"] }
+                      : {}),
                     reasoning: reasoning.trim(),
                     ...(outcome === "deferred" ? { defer_days: Number(days) } : {}),
                   },

@@ -5078,8 +5078,11 @@ export interface components {
             deferred_until?: string;
             /** @description Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them */
             fixed_version?: string;
-            /** @description Required when it does not apply */
-            justification?: string;
+            /**
+             * @description Required when it does not apply
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
             /** @description Why this holds for every issue named */
@@ -5308,11 +5311,13 @@ export interface components {
             /** @description What pulls the component in. Absent where the build holds it directly */
             consumer?: string;
             due?: string;
-            justification?: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question */
             met?: boolean;
             opened: string;
-            outcome?: string;
+            /** @enum {string} */
+            outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half */
             place: string;
             proposed_at?: string;
@@ -5355,8 +5360,10 @@ export interface components {
             ended_at?: string;
             /** @description The package version the claim says the fix arrived in, where it claims one has */
             fixed_version?: string;
-            justification?: string;
-            outcome: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             proposed_at: string;
             proposed_by: string;
             /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away */
@@ -5880,7 +5887,8 @@ export interface components {
              * @description What it covers now, having reached it by matching rather than by anybody acting
              */
             covers_now: number;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
         };
         "Hand-back-assignmentsRequest": {
             /**
@@ -5992,7 +6000,8 @@ export interface components {
             deferred_days?: number;
             /** @description What the new line has */
             now: string;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The old words, to start from rather than start without */
             reasoning: string;
             vulnerability: string;
@@ -6080,8 +6089,11 @@ export interface components {
             id: number;
             /** @description The vulnerability, under the name it is filed here */
             issue: string;
-            /** @description The recognized reason it does not apply */
-            justification?: string;
+            /**
+             * @description The recognized reason it does not apply
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
@@ -6128,7 +6140,8 @@ export interface components {
             approved_by: string;
             /** Format: int64 */
             claim_id: number;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             product: string;
             /** Format: int64 */
             rows: number;
@@ -7235,8 +7248,11 @@ export interface components {
              * @description How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else
              */
             defer_days?: number;
-            /** @description The recognized reason it does not apply, where the outcome takes one */
-            justification?: string;
+            /**
+             * @description The recognized reason it does not apply, where the outcome takes one
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /**
              * @description What it offers to say
              * @enum {string}
@@ -8074,7 +8090,8 @@ export interface components {
              * @description How many distinct issues the claim covers
              */
             issues: number;
-            justification?: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             reasoning: string;
         };
         SittingBody: {
@@ -8174,11 +8191,13 @@ export interface components {
             elsewhere?: string;
             /** @description The package version the claim says the fix arrived in, where it claims one has */
             fixed_version?: string;
-            justification?: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
             kind: "finding" | "together" | "extension" | "returned";
             needs_approval?: boolean;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
              * @description How many of this finding's places the claim covers

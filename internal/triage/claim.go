@@ -251,14 +251,9 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return nil, err
 	}
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
 
 	var recorded []*Decision
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
 
 		source, err := within.extendable(ctx, subject, from, proposals)
@@ -306,7 +301,12 @@ func (s *Store) extendable(ctx context.Context, subject access.Subject, from int
 	if len(rows) == 0 {
 		return nil, ErrNotTheirs
 	}
+	// Asked of every row rather than of the first. A claim is one action over
+	// many places and may cover more than one issue, so comparing against the
+	// head accepted an extension duplicating any issue the source already
+	// covers but did not happen to be written first.
 	places := map[string]bool{}
+	issues, products := map[int64]bool{}, map[int64]bool{}
 	for _, row := range rows {
 		if !readable(subject, row.ProductID, row.Visibility) {
 			return nil, ErrNotTheirs
@@ -315,16 +315,17 @@ func (s *Store) extendable(ctx context.Context, subject access.Subject, from int
 			return nil, fmt.Errorf("%w: it is %s, and only an approved claim carries", ErrNotExtendable, row.State)
 		}
 		places[row.PlaceIdentity] = true
+		issues[row.VulnerabilityID] = true
+		products[row.ProductID] = true
 	}
-	first := rows[0]
 	for _, p := range proposals {
-		if p.Place.ProductID != first.ProductID {
+		if !products[p.Place.ProductID] {
 			return nil, fmt.Errorf("%w: it is about a different product", ErrNotExtendable)
 		}
 		if !places[p.Place.PlaceIdentity] {
 			return nil, fmt.Errorf("%w: it is about a different component or consumer", ErrNotExtendable)
 		}
-		if p.Place.VulnerabilityID == first.VulnerabilityID {
+		if issues[p.Place.VulnerabilityID] {
 			return nil, fmt.Errorf("%w: it already covers this issue", ErrNotExtendable)
 		}
 		if p.Outcome != source.Outcome || string(p.Justification) != orEmpty(source.Justification) {
@@ -367,14 +368,9 @@ func (s *Store) ApproveClaim(ctx context.Context, subject access.Subject, claimI
 			return nil, err
 		}
 	}
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
 
 	var result *ClaimApproved
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		var err error
 		result, err = within.approveClaim(ctx, subject, claimID, batch, except, because)
 		return err
@@ -611,13 +607,8 @@ func (s *Store) Split(ctx context.Context, subject access.Subject, claimID int64
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
 	var held *Claim
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		var err error
 		held, err = within.split(ctx, subject, claimID, rows, because)
 		return err
@@ -700,10 +691,13 @@ func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64
 
 // SentBack is what sending a claim back did.
 type SentBack struct {
-	// Authors is everybody whose words were sent back, each once, in the
-	// order of the rows. Usually one person; a claim revised row by row can
-	// rest on several people's words, and each of them is waiting to hear.
-	Authors []int64
+	// Author is whose words were sent back, and who is waiting to hear.
+	//
+	// One person, because one act is one argument: a revision is keyed on the
+	// claim, so a claim rests on exactly one revision and that revision has
+	// one writer. It was a set of several, from the shape before the reasoning
+	// moved onto the claim.
+	Author int64
 	// Sent is how many rows went back.
 	Sent int
 	// Decision is a representative of what went back: the earliest row.
@@ -735,13 +729,8 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
 	var result *SentBack
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		result = &SentBack{}
 		claim, rows, err := within.claimRows(ctx, subject, claimID, mayApprove)
 		if err != nil {
@@ -756,8 +745,8 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 		if author == subject.ID {
 			return fmt.Errorf("that is your own claim to revise, not one to send back")
 		}
+		result.Author = author
 		var ids []int64
-		told := map[int64]bool{}
 		for _, row := range rows {
 			if row.State != Proposed || row.SentBackAt != nil {
 				continue
@@ -773,10 +762,6 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			// claim's identity and not for this.
 			if row.Visibility == access.Private {
 				result.Undisclosed = true
-			}
-			if author != 0 && !told[author] {
-				told[author] = true
-				result.Authors = append(result.Authors, author)
 			}
 			ids = append(ids, row.ID)
 		}

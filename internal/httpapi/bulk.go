@@ -149,13 +149,13 @@ func registerBulk(api huma.API, in Ingest) {
 		Variant   string `path:"variant"`
 		Component string `path:"component"`
 		Body      struct {
-			Vulnerabilities []string `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this claim covers, by name"`
-			SelectedBy      string   `json:"selected_by" minLength:"1" maxLength:"500" doc:"How you narrowed this set. Recorded, and never part of the claim"`
-			Outcome         string   `json:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed"`
-			Justification   string   `json:"justification,omitempty" doc:"Required when it does not apply"`
-			DeferredUntil   string   `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
-			FixedVersion    string   `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them"`
-			Reasoning       string   `json:"reasoning" minLength:"1" doc:"Why this holds for every issue named"`
+			Vulnerabilities []string      `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this claim covers, by name"`
+			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"How you narrowed this set. Recorded, and never part of the claim"`
+			Outcome         outcomeInBulk `json:"outcome"`
+			Justification   justification `json:"justification,omitempty" doc:"Required when it does not apply"`
+			DeferredUntil   string        `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
+			FixedVersion    string        `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them"`
+			Reasoning       string        `json:"reasoning" minLength:"1" doc:"Why this holds for every issue named"`
 		}
 	}) (*struct {
 		Body struct {
@@ -177,7 +177,7 @@ func registerBulk(api huma.API, in Ingest) {
 			return nil, noSuchFinding()
 		}
 
-		until, err := deferredUntil(input.Body.Outcome, input.Body.DeferredUntil)
+		until, err := deferredUntil(string(input.Body.Outcome), input.Body.DeferredUntil)
 		if err != nil {
 			return nil, err
 		}

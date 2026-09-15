@@ -8,7 +8,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -42,14 +41,9 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			"once", len(chosen), cap)
 	}
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return 0, fmt.Errorf("this store is already inside a transaction")
-	}
 	carried := 0
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		carried = 0
-		within := &Store{db: tx, now: s.now}
 
 		// What the new line would inherit, read through the same rule
 		// that shows it — so a caller cannot carry something the

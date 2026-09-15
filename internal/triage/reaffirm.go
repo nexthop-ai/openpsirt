@@ -58,15 +58,10 @@ func (s *Store) Reaffirm(ctx context.Context, subject access.Subject, r Reaffirm
 		return nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
-
 	var made *Decision
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		var err error
-		made, err = (&Store{db: tx, now: s.now}).reaffirm(ctx, subject, r)
+		made, err = within.reaffirm(ctx, subject, r)
 		return err
 	})
 	if err != nil {
@@ -459,9 +454,9 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Limit(database.InBulk.Most)
 	}
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return Lapsed{}, fmt.Errorf("this store is already inside a transaction")
+	db, err := s.pool()
+	if err != nil {
+		return Lapsed{}, err
 	}
 
 	// **Marked and read back as one act, a bounded batch at a time.** It was

@@ -264,6 +264,19 @@ func (s *Store) AdmitByGroups(ctx context.Context, who Arrival, groups []string)
 	if err != nil {
 		return Subject{}, err
 	}
+
+	// Somebody who has left is refused before anything is written.
+	//
+	// Whether anybody else gets in is settled after the writes, deliberately,
+	// because their roles are what this sign-in derives. Deactivation is not
+	// that: it is a standing fact about the account, unchanged by the groups
+	// they arrived with, so rewriting their derived grants on the way to
+	// turning them away is a write with no reader — and it rewrites the record
+	// of what somebody who has left held.
+	if known, err := s.match(ctx, who); err == nil && known.DeactivatedAt != nil {
+		return Subject{}, ErrDenied
+	}
+
 	var person *Account
 	if err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		var err error

@@ -367,3 +367,35 @@ func TestTheRecordIsBoundedByWhenAJudgmentWasProposed(t *testing.T) {
 		}
 	})
 }
+
+func TestTheRecordNamesOneFindingRatherThanTheLeastOfEach(t *testing.T) {
+	// A decision is keyed on a place, and a place sits in more than one build:
+	// the same pair of names at two components is the ordinary shape of a
+	// version bump. A minimum per column over that set is five independent
+	// answers, so the row named a component, a version and a consumer that no
+	// finding ever had — which is exactly what an auditor cannot check.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		at := f.at()
+		first := f.build(t, f.product, "2026.03")
+		second := f.build(t, f.product, "2026.06")
+		// The earliest row is libfoo; the alphabetically-least component name
+		// and the least version belong to the other one.
+		f.finds(t, first, f.component(t, "libfoo", "9.9.9"), at.PlaceIdentity, access.Public)
+		f.finds(t, second, f.component(t, "libbar", "1.0.0"), at.PlaceIdentity, access.Public)
+		f.agreed(t, at)
+
+		rows, _, err := f.store.Audit(ctx, f.reviewer, triage.Filter{},
+			time.Time{}, time.Time{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("the record holds %d judgments, want the one", len(rows))
+		}
+		if rows[0].Component != "libfoo" || rows[0].Version != "9.9.9" {
+			t.Errorf("the record says %q at %q, which is not a pair any finding had",
+				rows[0].Component, rows[0].Version)
+		}
+	})
+}

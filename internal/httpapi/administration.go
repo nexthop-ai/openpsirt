@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -329,7 +330,7 @@ func registerAdministration(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Body RecordBody
 	}) (*declaredOutput[PersonBody], error) {
-		store, names, err := mintable(ctx, a)
+		store, _, err := mintable(ctx, a)
 		if err != nil {
 			return nil, err
 		}
@@ -359,10 +360,99 @@ func registerAdministration(api huma.API, a Administering) {
 		// knows that — computed here from a read taken before the write, two
 		// requests at once would have the second write back the value it saw
 		// before the first.
-		person, err := store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName, in.Body.Admin)
-		if err != nil {
-			return nil, huma.Error400BadRequest(err.Error())
+		// An authorization is matched by name until somebody redeems it, so
+		// it carries the window in force when it was written.
+		window := access.DefaultClaimWindow
+		if a.Settings != nil {
+			if settings := a.Settings(); settings != nil {
+				window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
+				if err != nil {
+					return nil, wentWrong(a.Logger, "cannot read how long an authorization stays redeemable", err)
+				}
+			}
 		}
+
+		// Recording somebody, how they may be reached and what they hold is
+		// one act. Written as a statement each, a product name nobody has
+		// declared answered 422 with the person recorded and the roles named
+		// before it granted — so an administrator correcting a typo and
+		// sending the request again granted the earlier ones twice, and a
+		// request they gave up on left access nobody asked for.
+		var person *access.Account
+		var granted []func()
+		// The request's own context, so that a trail row written after the
+		// commit still knows who asked: the closure below runs under the
+		// transaction's.
+		asking := ctx
+		if err := store.Within(ctx, func(ctx context.Context, store *access.Store,
+			db bun.IDB) error {
+
+			granted = granted[:0]
+			names := catalog.NewStore(db)
+			var err error
+			if person, err = store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName,
+				in.Body.Admin); err != nil {
+				return huma.Error400BadRequest(err.Error())
+			}
+			if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {
+				return asked(a.Logger, err)
+			}
+			// Recorded here, so it outranks whatever a provider states
+			// later . A request that says nothing about an address leaves
+			// the stored one alone rather than clearing it: this endpoint
+			// records somebody, and an omission is silence rather than an
+			// instruction. An address stated is recorded; an address
+			// stated as empty is cleared, which is how somebody comes off
+			// mail without coming off the tool.
+			if in.Body.Email != nil {
+				if err := store.SetEmail(ctx, person.ID, *in.Body.Email, access.Recorded); err != nil {
+					return wentWrong(a.Logger, "where to reach them could not be recorded", err)
+				}
+			}
+			if len(in.Body.Holds) > 0 {
+				// Roles come from one place at a time. Assigning one while
+				// groups decide would produce exactly the hybrid that has no
+				// answer to "where did this access come from" — and worse than
+				// the drift that rule anticipates, since nothing re-derives an
+				// assignment, so it would outlive every group change without
+				// ever having had a group behind it.
+				if a.Mode != nil && a.Mode(ctx) == access.GroupBound {
+					return huma.Error409Conflict(
+						"roles are derived from groups here, so they are granted by binding a group rather than a person")
+				}
+			}
+			for _, hold := range in.Body.Holds {
+				if hold.Everywhere {
+					if hold.Product != "" {
+						return huma.Error422UnprocessableEntity(
+							"a role is held against one product or across every product, not both")
+					}
+					if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
+						return huma.Error400BadRequest(err.Error())
+					}
+					granted = append(granted, noting(asking, a, in.Body.Identity+" on every product", hold.Role))
+					continue
+				}
+				if hold.Product == "" {
+					return huma.Error422UnprocessableEntity(
+						"say which product the role is held against, or set everywhere")
+				}
+				product, err := names.ProductByName(ctx, hold.Product)
+				if err != nil {
+					return undeclared(a.Logger, err, "that product could not be looked up")
+				}
+				if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
+					return huma.Error400BadRequest(err.Error())
+				}
+				granted = append(granted, noting(asking, a, in.Body.Identity+" on "+hold.Product, hold.Role))
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+
+		// The trail rows follow the commit. Written inside it they would
+		// describe grants a later refusal rolled back.
 		if before == nil {
 			noteAdminChange(ctx, a, trail.Account, in.Body.Identity, nil,
 				trail.Said("recorded", true))
@@ -376,74 +466,8 @@ func registerAdministration(api huma.API, a Administering) {
 				trail.Said("administrator", before.IsAdmin),
 				trail.Said("administrator", *in.Body.Admin))
 		}
-		// An authorization is matched by name until somebody redeems it, so
-		// it carries the window in force when it was written.
-		window := access.DefaultClaimWindow
-		if a.Settings != nil {
-			if settings := a.Settings(); settings != nil {
-				window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
-				if err != nil {
-					return nil, wentWrong(a.Logger, "cannot read how long an authorization stays redeemable", err)
-				}
-			}
-		}
-		if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {
-			return nil, asked(a.Logger, err)
-		}
-		// Recorded here, so it outranks whatever a provider states
-		// later . A request that says nothing about an address leaves
-		// the stored one alone rather than clearing it: this endpoint
-		// records somebody, and an omission is silence rather than an
-		// instruction. An address stated is recorded; an address
-		// stated as empty is cleared, which is how somebody comes off
-		// mail without coming off the tool. A request that does not
-		// mention one at all leaves the stored address alone: this
-		// endpoint records somebody, and an omission is silence rather
-		// than an instruction.
-		if in.Body.Email != nil {
-			if err := store.SetEmail(ctx, person.ID, *in.Body.Email, access.Recorded); err != nil {
-				return nil, wentWrong(a.Logger, "where to reach them could not be recorded", err)
-			}
-		}
-
-		if len(in.Body.Holds) > 0 {
-			// Roles come from one place at a time. Assigning one while groups
-			// decide would produce exactly the hybrid that has no answer to
-			// "where did this access come from" — and worse than the drift
-			// that rule anticipates, since nothing re-derives an assignment,
-			// so it would outlive every group change without ever having had
-			// a group behind it.
-			if a.Mode != nil && a.Mode(ctx) == access.GroupBound {
-				return nil, huma.Error409Conflict(
-					"roles are derived from groups here, so they are granted by binding a group rather than a person")
-			}
-		}
-		for _, hold := range in.Body.Holds {
-			if hold.Everywhere {
-				if hold.Product != "" {
-					return nil, huma.Error422UnprocessableEntity(
-						"a role is held against one product or across every product, not both")
-				}
-				if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
-					return nil, huma.Error400BadRequest(err.Error())
-				}
-				noteAdminChange(ctx, a, trail.Role, in.Body.Identity+" on every product",
-					nil, trail.Said(hold.Role, true))
-				continue
-			}
-			if hold.Product == "" {
-				return nil, huma.Error422UnprocessableEntity(
-					"say which product the role is held against, or set everywhere")
-			}
-			product, err := names.ProductByName(ctx, hold.Product)
-			if err != nil {
-				return nil, undeclared(a.Logger, err, "that product could not be looked up")
-			}
-			if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
-				return nil, huma.Error400BadRequest(err.Error())
-			}
-			noteAdminChange(ctx, a, trail.Role, in.Body.Identity+" on "+hold.Product,
-				nil, trail.Said(hold.Role, true))
+		for _, note := range granted {
+			note()
 		}
 
 		// Read back rather than echoed. What is in force and where a role came
@@ -656,6 +680,17 @@ func registerAdministration(api huma.API, a Administering) {
 		}
 		return out, nil
 	})
+}
+
+// noting holds a trail row back until the transaction that earned it commits.
+//
+// A grant recorded inside the transaction would describe access a later
+// refusal rolled back, and the trail is append-only: a line saying somebody was
+// granted something nobody granted cannot be taken out again.
+func noting(ctx context.Context, a Administering, name, role string) func() {
+	return func() {
+		noteAdminChange(ctx, a, trail.Role, name, nil, trail.Said(role, true))
+	}
 }
 
 // timeFormat is how a moment is reported.

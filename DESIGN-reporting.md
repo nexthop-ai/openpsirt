@@ -283,6 +283,8 @@ had.
 | Rule | Reason |
 |---|---|
 | The arithmetic is in Go rather than SQL | Subtracting two moments is spelled four ways across these engines, and so is a percentile |
+| Nearest rank is the first observation at or past that position | Three waits of one, two and thirty days have a median of two. Truncating instead of rounding up picks the one below, which for an odd count is not the middle and for a tail figure is not the tail |
+| A wait is measured from the finding the claim is about | A place is a pair of names with no product in it, so the same place sits in every product shipping that component. Matching on the place alone took the figure from another product's finding, and from findings the reader may not see |
 | Bounded, and it says so | At most the most recent few thousand claims in the window, with the answer stating how many and whether the ceiling was reached |
 | Throughput is per person, counted where the work happened | A claim belongs to the window it was proposed in, and an agreement to the window it was given in |
 | Send-backs are counted for the deployment, not per person | The record holds that a claim came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |

@@ -49,6 +49,30 @@ type Statement struct {
 	Superseded *time.Time `bun:"superseded_at"`
 }
 
+// VexStatuses are the statuses the exchange format defines, in its own order.
+//
+// The format's vocabulary rather than ours, named here because two things
+// depend on it: what a caller may narrow a list by, and which of them offers a
+// prefill.
+func VexStatuses() []string {
+	return []string{"not_affected", "affected", "fixed", "under_investigation"}
+}
+
+// OutcomesOffered are the outcomes a publisher's statement can prefill.
+//
+// Derived from the mapping rather than listed beside it: a status that starts
+// offering something, or stops, changes this without anybody remembering to
+// edit a second list.
+func OutcomesOffered() []string {
+	var offered []string
+	for _, status := range VexStatuses() {
+		if outcome, offers := (Statement{Status: status}).Prefills(); offers {
+			offered = append(offered, outcome)
+		}
+	}
+	return offered
+}
+
 // Prefills is the outcome a statement offers, and whether it offers one.
 //
 // **A distribution saying it will not fix something is not the distribution

@@ -154,6 +154,8 @@ var settable = []struct {
 		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultQueueBacklog) }, false},
 	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog",
 		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
+	{setting.SavedPerPerson, "How many saved filters one person may keep for one product. A whole number, not a length of time. The panel that lists them reads every one on every open, so the ceiling is what keeps that a list rather than a table scan",
+		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultSavedPerPerson) }, false},
 	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload",
 		aSize, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentShare) }, false},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here",

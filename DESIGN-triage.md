@@ -149,6 +149,7 @@ deployment with one person cannot approve anything.
 | Withdrawing, revising and sending back need no approval | Hiding risk needs a second person; putting it back on the table does not |
 | Undoing works at the size it was done | A bulk approval records what it covered; undoing takes the whole batch back to *proposed*. The claims still stand — it is the agreement that was taken back |
 | A withdrawn approval stays on the record | It says a second person did once agree, and to which words |
+| A withdrawal records who made it, which is not who gave the agreement | A proposer revising their own claim withdraws every agreement standing on the old words. Read off the withdrawal alone, restating a claim came back to its author as somebody else having undone their agreement |
 | **A carried agreement says it was carried** | A re-affirmation stands on the agreement its predecessor had and states its own reasoning, so the approver named read the earlier words. Written as an ordinary approval it said they had agreed, today, to text they have never seen — and the register, the audit list and the claim's own approvals all reported it that way |
 
 ## Rights
@@ -206,6 +207,8 @@ holds the ones nobody has agreed to yet.
 |---|---|
 | Each list carries the reasoning and the names with the row | A list where seeing why means opening every entry is a list nobody reads before acting. A row saying product 4, issue 91 is two more requests to understand, fifty times a page |
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
+| A claim it reaches only part of is left alone whole | The agreement is one row keyed on the claim, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
+| What an undo reports is what returned to waiting | A decision another agreement still stands on is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
 ## Reading a claim whole
@@ -412,9 +415,11 @@ carry agreed claims, and each arrives as a blank decision.
 Three things hold, read inside the transaction that writes:
 
 1. **The source is approved** — every row of it, none withdrawn or lapsed.
-2. **The new rows sit at places the source sits at, in the same product.** A
-   place is the component and its consumer, and "the same argument" is about the
-   same code.
+2. **The new rows sit at places the source sits at, in the same product, and
+   name an issue the source does not already cover.** A place is the component
+   and its consumer, and "the same argument" is about the same code. Each is
+   asked of every row of the source rather than of its first: a claim covers as
+   many issues as the act that wrote it.
 3. **The outcome and justification are the source's.** A different conclusion is
    a different claim.
 
@@ -906,6 +911,7 @@ above.
 |---|---|
 | A changed justification is not a trigger, because it cannot happen | A re-affirmation copies the justification off the claim it re-makes. Changing the reason is proposing a new claim |
 | How bad it was judged to be is kept with the decision | An issue's severity is rewritten in place as reports revise it, so reading it now would compare a number against itself |
+| What is kept is the rating in force here, never the published score | A product that assessed an issue down held a baseline nobody was working to, so the comparison asked whether the severity had risen past a figure that was never the one in force — and a dismissal carried, with nobody else reading it, after the rating here rose |
 | A count of re-affirmations deliberately does not trigger it | That would fire on nothing having changed |
 | What may be carried is read from the row, not from what a caller supplied | A caller holding a stale copy would carry an agreement since withdrawn; a caller inventing one would carry an agreement that never existed. A withdrawn decision keeps its approval rows, so without this a version bump would undo a withdrawal |
 | All of it is one transaction | Written as three steps, a process stopping in the middle left a claim standing that nobody had agreed to and that no review queue would show |
@@ -1096,6 +1102,9 @@ approves it (REQ-27).
 | Saving over a name takes the old prefill with it | The act is deciding what that name means now, and one that survived would fire on a filter somebody had made ordinary |
 | It proposes nothing by itself, and the screen says so | Picking the filter fills the decision form; submitting it is a person's act, and the record carries their name |
 | A deferral is prepared as a length, never a date | Required where the outcome is a deferral and refused where it is not: a deferral with no length fills a form that cannot be submitted, and a length beside any other outcome is a value nothing reads. `DESIGN-interface.md` says how the length becomes a date |
+| What a filter prepares passes the rules a decision passes | The same submission gate, called rather than restated: an outcome that is recognized, a reason where the outcome takes one and none where it does not, and the markdown policy on the reasoning. A prefill the decision store refuses is a refusal that lands when somebody presses the button rather than when they saved the thing that fills it in |
+| A prefill cannot claim that mitigations already exist | That reason asks what stops it, in words, and a filter carries no such text. Refused where it is prepared rather than accepted and then refused on submission |
+| How many filters one person keeps is capped, and the list is bounded by the same number | Many acts writing one row each fill a table the way one act writing many does, and the panel reads every row it finds on every open. `saved.max-per-person` is the setting |
 
 The wider form — a rule proposing a pending claim of its own, marked as proposed
 by that rule — leaves the approver as the only human judgment on the claim, and

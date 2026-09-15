@@ -137,7 +137,8 @@ func registerClaims(api huma.API, in Ingest) {
 			in.logger().Error("could not say which finding a sent-back claim is about",
 				"error", err, "claim", input.ID)
 		}
-		for _, author := range back.Authors {
+		{
+			author := back.Author
 			tell(ctx, in, "could not say that a claim was sent back", notify.Telling{
 				PersonID: author, Kind: notify.SentBack,
 				Body: "A claim of yours was sent back: " + input.Body.Because,
@@ -241,10 +242,10 @@ type StandingClaimBody struct {
 	State string           `json:"state" enum:"proposed,approved" doc:"The claim's state as a whole: approved only when every live row here is approved, otherwise proposed"`
 	Rows  RowsStandingBody `json:"rows" doc:"How the claim's rows here stand"`
 	// What an approver asked for, where rows were sent back.
-	SentBackAt      string `json:"sent_back_at,omitempty" doc:"When rows were last sent back to the author"`
-	SentBackBecause string `json:"sent_back_because,omitempty" doc:"The reason given when they were, in markdown"`
-	Outcome         string `json:"outcome"`
-	Justification   string `json:"justification,omitempty"`
+	SentBackAt      string        `json:"sent_back_at,omitempty" doc:"When rows were last sent back to the author"`
+	SentBackBecause string        `json:"sent_back_because,omitempty" doc:"The reason given when they were, in markdown"`
+	Outcome         outcome       `json:"outcome"`
+	Justification   justification `json:"justification,omitempty"`
 	// FixedVersion is the evidence for a claim that the fix is already
 	// here, on the screen the claim is read from. The audit trail carried
 	// it and this did not, which puts the checkable part of the claim
@@ -270,11 +271,11 @@ type RowsStandingBody struct {
 
 // EarlierBody is a decision once made here that no longer applies.
 type EarlierBody struct {
-	DecisionID    int64  `json:"decision_id"`
-	ClaimID       int64  `json:"claim_id"`
-	Outcome       string `json:"outcome"`
-	Justification string `json:"justification,omitempty"`
-	DeferredUntil string `json:"deferred_until,omitempty"`
+	DecisionID    int64         `json:"decision_id"`
+	ClaimID       int64         `json:"claim_id"`
+	Outcome       outcome       `json:"outcome"`
+	Justification justification `json:"justification,omitempty"`
+	DeferredUntil string        `json:"deferred_until,omitempty"`
 	// FixedVersion is what an approver checks the already-fixed claim
 	// against. Agreeing to a claim of fact without being shown the fact is
 	// the failure this outcome is most exposed to.
@@ -291,13 +292,13 @@ type EarlierBody struct {
 // SimilarBody is an approved claim at the same places about another issue,
 // which may reach this one.
 type SimilarBody struct {
-	ClaimID       int64  `json:"claim_id" doc:"Pass as extends when deciding to carry it to this issue"`
-	DecisionID    int64  `json:"decision_id"`
-	Justification string `json:"justification,omitempty"`
-	Reasoning     string `json:"reasoning"`
-	ApprovedBy    string `json:"approved_by,omitempty"`
-	ApprovedAt    string `json:"approved_at,omitempty"`
-	Issues        int    `json:"issues" doc:"How many distinct issues the claim covers"`
+	ClaimID       int64         `json:"claim_id" doc:"Pass as extends when deciding to carry it to this issue"`
+	DecisionID    int64         `json:"decision_id"`
+	Justification justification `json:"justification,omitempty"`
+	Reasoning     string        `json:"reasoning"`
+	ApprovedBy    string        `json:"approved_by,omitempty"`
+	ApprovedAt    string        `json:"approved_at,omitempty"`
+	Issues        int           `json:"issues" doc:"How many distinct issues the claim covers"`
 }
 
 // decidedAbout gathers what has been decided at a finding's places: what
@@ -349,12 +350,12 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	for _, one := range standing {
 		body := StandingClaimBody{
 			ClaimID: one.Claim.ID, Kind: string(one.Claim.Kind), DecisionID: one.Decision.ID,
-			State: string(one.State), Outcome: string(one.Claim.Outcome),
+			State: string(one.State), Outcome: outcome(one.Claim.Outcome),
 			Rows: RowsStandingBody{
 				Proposed: one.Rows.Proposed, SentBack: one.Rows.SentBack, Approved: one.Rows.Approved,
 			},
 			SentBackBecause: one.SentBackBecause,
-			Justification:   orBlank(one.Claim.Justification),
+			Justification:   justification(orBlank(one.Claim.Justification)),
 			FixedVersion:    orBlank(one.Claim.FixedVersion),
 			NeedsApproval:   one.Decision.NeedsApproval,
 			ProposedBy:      names[one.Claim.ProposedBy],
@@ -381,8 +382,8 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 		// What it said is the claim's; where it landed is the row's.
 		said := d.Claim
 		body := EarlierBody{
-			DecisionID: d.ID, ClaimID: d.ClaimID, Outcome: string(said.Outcome),
-			Justification: orBlank(said.Justification),
+			DecisionID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome),
+			Justification: justification(orBlank(said.Justification)),
 			ProposedBy:    names[d.ProposedBy], ProposedAt: d.ProposedAt.Format(time.RFC3339),
 			Ended:     string(d.State),
 			About:     orBlank(d.ComponentUpstreamVersion),
@@ -407,7 +408,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	for _, one := range similar {
 		body := SimilarBody{
 			ClaimID: one.Claim.ID, DecisionID: one.Decision.ID,
-			Justification: orBlank(one.Claim.Justification),
+			Justification: justification(orBlank(one.Claim.Justification)),
 			Reasoning:     one.Reasoning, Issues: one.Issues,
 		}
 		if one.ApprovedAt != nil {

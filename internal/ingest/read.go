@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -267,10 +268,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// version are excluded from identity and expiry anyway, so what matters is
 	// only that it is stable for this variant.
 	stand := graph.Described{Name: target.Product}
-	applied, err := graph.NewStore(r.db.DB).Apply(ctx, scan.TargetID, scanID, doc.Snapshot(stand))
-	if err != nil {
-		return nil, fmt.Errorf("scan %d: %w", scanID, err)
-	}
+	snapshot := doc.Snapshot(stand)
 
 	// What the build argued is stored against the target, not against the
 	// scan, because it is what the next scan run has to apply.
@@ -285,8 +283,31 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		sbom.FromStatement: true,
 		sbom.FromPedigree:  doc.Format.StatesCarriedPatches(),
 	}
-	claimed, err := finding.NewStore(r.db.DB).RecordClaims(ctx, scan.TargetID, scanID, claims, stated)
-	if err != nil {
+	// What the inventory was made of, kept on the scan so a receipt can say
+	// it. The log line said it and nothing else did, which meant an operator
+	// could only learn that a document placed none of its components by going
+	// and finding the line — on the screen that exists to answer what became
+	// of an upload.
+	components, placed := len(doc.Components), len(doc.Components)-doc.Unrooted
+
+	// The three writes are one act. Applied separately, a graph stored beside
+	// claims that were not recorded reads as a build that has withdrawn every
+	// patch it carries, and reopens every finding those patches suppressed —
+	// with the scan marked failed and the graph it described current.
+	var applied graph.Applied
+	var claimed finding.ClaimsApplied
+	if err := database.InTransaction(ctx, r.db.DB,
+		func(ctx context.Context, tx bun.Tx) error {
+			var err error
+			if applied, err = graph.ApplyWithin(ctx, tx, scan.TargetID, scanID, snapshot); err != nil {
+				return err
+			}
+			if claimed, err = finding.RecordClaimsWithin(ctx, tx, scan.TargetID, scanID,
+				claims, stated); err != nil {
+				return err
+			}
+			return NewStore(tx).Made(ctx, scanID, components, placed)
+		}); err != nil {
 		return nil, fmt.Errorf("scan %d: %w", scanID, err)
 	}
 
@@ -303,23 +324,25 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		Retained:       !target.Moves,
 	}
 
-	// What the inventory was made of, kept on the scan so a receipt can say
-	// it. The log line said it and nothing else did, which meant an operator
-	// could only learn that a document placed none of its components by going
-	// and finding the line — on the screen that exists to answer what became
-	// of an upload.
-	components, placed := len(doc.Components), len(doc.Components)-doc.Unrooted
-	if err := scans.Made(ctx, scanID, components, placed); err != nil {
-		return nil, fmt.Errorf("scan %d: %w", scanID, err)
-	}
-
 	// What was just stored has to be scanned: the inventory is new, and the
 	// vulnerability data has moved since whatever last looked at this target.
 	// The work is left behind rather than done here because it is a different
 	// job with a different rhythm — an inventory is read once and scanned
 	// again and again.
+	//
+	// Asked for after the writes have committed, because a job queued against
+	// an uncommitted graph is worse than one queued a moment late.
 	if _, err := r.queue.Add(ctx, queue.Scan, strconv.FormatInt(scan.TargetID, 10)); err != nil {
-		return nil, fmt.Errorf("scan %d: leave the scanning to be done: %w", scanID, err)
+		// A full backlog is not this scan's failure. The inventory was read
+		// and is stored, so marking the scan failed would contradict what is
+		// in the database — and what is due stays due: the periodic pass asks
+		// again once the queue has drained, which is what it does for a
+		// re-scan it could not queue either.
+		if !errors.Is(err, queue.ErrBacklogFull) {
+			return nil, fmt.Errorf("scan %d: leave the scanning to be done: %w", scanID, err)
+		}
+		r.logger.Warn("an inventory was stored with nothing queued to scan it because the "+
+			"queue is full", "scan", scanID, "build", scan.TargetID)
 	}
 
 	// A branch is superseded by the next night's build, so what it sent is not

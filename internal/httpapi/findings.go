@@ -252,7 +252,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		Under:         n.Under,
 		UnderTheBuild: n.UnderBuild,
 		States:        n.State,
-		Outcomes:      n.Outcome,
+		Outcomes:      plainly(n.Outcome),
 		Assigned:      n.Assigned,
 		Reassessed:    n.Reassessed,
 		Recorded:      n.Recorded,
@@ -277,7 +277,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		Weaknesses:        n.Weakness,
 		SentBack:          n.SentBack,
 		Publishers:        n.Publisher,
-		VexStatus:         n.Said,
+		VexStatus:         plainly(n.Said),
 	}
 	for _, each := range []struct {
 		text string
@@ -326,32 +326,32 @@ type Narrowing struct {
 	// the working population, and both say so on the screen: a default that
 	// narrows silently makes the count something other than the whole count
 	// with nothing saying so.
-	On           []string  `query:"on,explode" enum:"branch,tag" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
-	Support      []string  `query:"support,explode" enum:"in-support,past-eol" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
-	Under        string    `query:"under" maxLength:"191" doc:"Keep only what sits inside the container of this name"`
-	UnderBuild   bool      `query:"under_build" doc:"Keep only what the build holds directly, which is what has no container above it"`
-	State        []string  `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"`
-	Outcome      []string  `query:"outcome,explode" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"`
-	Assigned     []string  `query:"assigned,explode" enum:"me,somebody,nobody" doc:"Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"`
-	Likelihood   float64   `query:"epss_at_least" minimum:"0" maximum:"1" doc:"Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1"`
-	OpenFor      int       `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
-	DueWithin    int       `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
-	Overdue      bool      `query:"overdue" doc:"Keep only what is already past its deadline"`
-	FixState     []string  `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in"`
-	Weakness     []string  `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
-	SentBack     bool      `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
-	Publisher    []string  `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
-	OpenedAfter  string    `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
-	ClosedAfter  string    `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
-	DecidedAfter string    `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
-	Said         []string  `query:"vex_status,explode" enum:"not_affected,affected,fixed,under_investigation" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
-	Reassessed   bool      `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`
-	Recorded     bool      `query:"recorded" doc:"Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before"`
-	Planned      string    `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`
-	Unconfirmed  bool      `query:"unconfirmed" doc:"Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does"`
-	Exclude      []string  `query:"exclude,explode" maxItems:"200" maxLength:"191" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
-	Sort         sortOrder `query:"sort" doc:"Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
-	Ascending    bool      `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
+	On           []string    `query:"on,explode" enum:"branch,tag" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
+	Support      []string    `query:"support,explode" enum:"in-support,past-eol" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
+	Under        string      `query:"under" maxLength:"191" doc:"Keep only what sits inside the container of this name"`
+	UnderBuild   bool        `query:"under_build" doc:"Keep only what the build holds directly, which is what has no container above it"`
+	State        []string    `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"`
+	Outcome      []outcome   `query:"outcome,explode" doc:"Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"`
+	Assigned     []string    `query:"assigned,explode" enum:"me,somebody,nobody" doc:"Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question"`
+	Likelihood   float64     `query:"epss_at_least" minimum:"0" maximum:"1" doc:"Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1"`
+	OpenFor      int         `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
+	DueWithin    int         `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
+	Overdue      bool        `query:"overdue" doc:"Keep only what is already past its deadline"`
+	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in"`
+	Weakness     []string    `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
+	SentBack     bool        `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
+	Publisher    []string    `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
+	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
+	ClosedAfter  string      `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
+	DecidedAfter string      `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
+	Said         []vexStatus `query:"vex_status,explode" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
+	Reassessed   bool        `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`
+	Recorded     bool        `query:"recorded" doc:"Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before"`
+	Planned      string      `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`
+	Unconfirmed  bool        `query:"unconfirmed" doc:"Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does"`
+	Exclude      []string    `query:"exclude,explode" maxItems:"200" maxLength:"191" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
+	Sort         sortOrder   `query:"sort" doc:"Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
+	Ascending    bool        `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
 }
 
 // Paging is how much of a list to return, kept apart from the filters so that
@@ -877,7 +877,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 				ID: one.ID, Publisher: one.Publisher, Status: one.Status,
 				Justification: one.Justification, Statement: one.Statement,
 				Document: one.Document, At: one.UploadedAt.Format(time.DateOnly),
-				Offers: offers,
+				Offers: outcomeOffered(offers),
 			})
 		}
 		return &struct{ Body EvidenceBody }{Body: body}, nil

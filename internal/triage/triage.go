@@ -64,6 +64,48 @@ func Outcomes() []Outcome {
 		UpgradeNeeded, PatchNeeded}
 }
 
+// OutcomesOneAtATime are the outcomes one act may record against one finding.
+//
+// Everything but a promised upgrade. A bump answers many issues at once and is
+// written from the upgrade that promises it, so offering it here would be a
+// second way to record the same thing with no upgrade behind it.
+func OutcomesOneAtATime() []Outcome {
+	kept := make([]Outcome, 0, len(Outcomes()))
+	for _, each := range Outcomes() {
+		if each != UpgradeNeeded {
+			kept = append(kept, each)
+		}
+	}
+	return kept
+}
+
+// OutcomesInBulk are the outcomes one act may record against many issues.
+//
+// Everything that is not a commitment: a commitment names one component or one
+// issue, a party and a date the work lands by, and a bulk write names none of
+// those.
+func OutcomesInBulk() []Outcome {
+	kept := make([]Outcome, 0, len(Outcomes()))
+	for _, each := range Outcomes() {
+		if !each.Commits() {
+			kept = append(kept, each)
+		}
+	}
+	return kept
+}
+
+// OutcomesThatHideRisk are the outcomes that take something out of the working
+// queue, which is what needing a second person turns on.
+func OutcomesThatHideRisk() []Outcome {
+	kept := make([]Outcome, 0, len(Outcomes()))
+	for _, each := range Outcomes() {
+		if each.HidesRisk() {
+			kept = append(kept, each)
+		}
+	}
+	return kept
+}
+
 // Valid reports whether o is one we recognize.
 func (o Outcome) Valid() bool {
 	for _, known := range Outcomes() {

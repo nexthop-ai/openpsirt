@@ -1526,6 +1526,12 @@ components:
           type: string
         justification:
           description: Required when it does not apply
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         outcome:
           enum:
@@ -1919,6 +1925,12 @@ components:
         due:
           type: string
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         met:
           description: Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question
@@ -1926,6 +1938,14 @@ components:
         opened:
           type: string
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         place:
           description: Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half
@@ -2009,8 +2029,22 @@ components:
           description: The package version the claim says the fix arrived in, where it claims one has
           type: string
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         proposed_at:
           type: string
@@ -2898,6 +2932,14 @@ components:
           format: int64
           type: integer
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
       required:
         - claim_id
@@ -3085,6 +3127,14 @@ components:
           description: What the new line has
           type: string
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         reasoning:
           description: The old words, to start from rather than start without
@@ -3281,6 +3331,12 @@ components:
           type: string
         justification:
           description: The recognized reason it does not apply
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         mitigation:
           description: What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks
@@ -3385,6 +3441,14 @@ components:
           format: int64
           type: integer
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         product:
           type: string
@@ -5424,6 +5488,12 @@ components:
           type: integer
         justification:
           description: The recognized reason it does not apply, where the outcome takes one
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         outcome:
           description: What it offers to say
@@ -6809,6 +6879,12 @@ components:
           format: int64
           type: integer
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         reasoning:
           type: string
@@ -6974,6 +7050,12 @@ components:
           description: The package version the claim says the fix arrived in, where it claims one has
           type: string
         justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         kind:
           enum:
@@ -6985,6 +7067,14 @@ components:
         needs_approval:
           type: boolean
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         places:
           description: How many of this finding's places the claim covers

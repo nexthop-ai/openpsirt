@@ -411,14 +411,14 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 
 // InheritedBody is one claim a new line could take on.
 type InheritedBody struct {
-	Decision      int64  `json:"decision"`
-	Vulnerability string `json:"vulnerability"`
-	Component     string `json:"component"`
-	Outcome       string `json:"outcome"`
-	Was           string `json:"was" doc:"The version the claim was made against"`
-	Now           string `json:"now" doc:"What the new line has"`
-	Reasoning     string `json:"reasoning" doc:"The old words, to start from rather than start without"`
-	DeferredDays  int    `json:"deferred_days,omitempty" doc:"How long this has already been put off, across every line it has been carried through"`
+	Decision      int64   `json:"decision"`
+	Vulnerability string  `json:"vulnerability"`
+	Component     string  `json:"component"`
+	Outcome       outcome `json:"outcome"`
+	Was           string  `json:"was" doc:"The version the claim was made against"`
+	Now           string  `json:"now" doc:"What the new line has"`
+	Reasoning     string  `json:"reasoning" doc:"The old words, to start from rather than start without"`
+	DeferredDays  int     `json:"deferred_days,omitempty" doc:"How long this has already been put off, across every line it has been carried through"`
 }
 
 // CarriedBody is what a new line would inherit.
@@ -564,7 +564,7 @@ func inherited(rows []triage.Inherited) []InheritedBody {
 	for _, row := range rows {
 		out = append(out, InheritedBody{
 			Decision: row.DecisionID, Vulnerability: row.Vulnerability,
-			Component: row.Component, Outcome: string(row.Outcome),
+			Component: row.Component, Outcome: outcome(row.Outcome),
 			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
 			DeferredDays: row.DeferredDays,
 		})

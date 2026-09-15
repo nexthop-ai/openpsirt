@@ -96,8 +96,25 @@ func NewStore(db *bun.DB) *Store {
 // findings that are still present.
 func (s *Store) Apply(ctx context.Context, targetID, scanID int64, snap Snapshot) (Applied, error) {
 	var applied Applied
-
 	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		var err error
+		applied, err = ApplyWithin(ctx, tx, targetID, scanID, snap)
+		return err
+	})
+	return applied, err
+}
+
+// ApplyWithin is the same, inside a transaction the caller opened.
+//
+// Ingest stores a graph, what the build argued about its own patches and what
+// the inventory was made of, and those three are one act: a graph applied
+// beside claims that were not recorded reads as a build that withdrew every
+// patch it carries, and reopens every finding they suppressed.
+func ApplyWithin(ctx context.Context, tx bun.Tx, targetID, scanID int64,
+	snap Snapshot) (Applied, error) {
+
+	var applied Applied
+	err := func() error {
 		// Taken first, before anything is read. Two scans of one target can be
 		// in flight at once — the queue hands different jobs to different
 		// workers by design — and without this both would read the same open
@@ -163,7 +180,7 @@ func (s *Store) Apply(ctx context.Context, targetID, scanID int64, snap Snapshot
 
 		applied.EdgesOpened, applied.EdgesClosed, err = reconcileEdges(ctx, tx, targetID, scanID, wantedEdges)
 		return err
-	})
+	}()
 	return applied, err
 }
 

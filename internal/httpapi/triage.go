@@ -24,12 +24,12 @@ type DecisionBody struct {
 	ID int64 `json:"id,omitempty" doc:"What to name this decision in a later request"`
 	// ClaimID is the action this row was written by. The review queue lists
 	// claims and approval works on them; a decision is one row of one.
-	ClaimID int64  `json:"claim_id,omitempty" doc:"The claim this decision is one row of: the action that wrote it, which is what the review queue lists and what is approved"`
-	Outcome string `json:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"What was decided"`
+	ClaimID int64   `json:"claim_id,omitempty" doc:"The claim this decision is one row of: the action that wrote it, which is what the review queue lists and what is approved"`
+	Outcome outcome `json:"outcome" doc:"What was decided"`
 	// Justification is required for not-applicable and meaningless elsewhere:
 	// the claim that something does not affect us is which of the recognized
 	// reasons applies.
-	Justification string `json:"justification,omitempty" enum:"component_not_present,vulnerable_code_not_present,vulnerable_code_not_in_execute_path,vulnerable_code_cannot_be_controlled_by_adversary,inline_mitigations_already_exist" doc:"Why it does not apply. Required when it does not"`
+	Justification justification `json:"justification,omitempty" doc:"Why it does not apply. Required when it does not"`
 	// Mitigation is the one claim here that rests on configuration rather
 	// than on code, so it is the one thing nothing will notice going away.
 	// Naming it does not fix that; it makes the claim checkable.
@@ -821,13 +821,13 @@ func decisionBody(d triage.Decision) DecisionBody {
 	// left to fail here rather than rendered as an outcome nobody chose.
 	said := d.Claim
 	body := DecisionBody{
-		ID: d.ID, ClaimID: d.ClaimID, Outcome: string(said.Outcome), State: string(d.State),
+		ID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome), State: string(d.State),
 	}
 	if said.Mitigation != nil {
 		body.Mitigation = *said.Mitigation
 	}
 	if said.Justification != nil {
-		body.Justification = *said.Justification
+		body.Justification = justification(*said.Justification)
 	}
 	if said.FixedVersion != nil {
 		body.FixedVersion = *said.FixedVersion

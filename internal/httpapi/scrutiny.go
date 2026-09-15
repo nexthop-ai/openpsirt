@@ -12,9 +12,9 @@ import (
 
 // UnagreedBody is risk standing with nobody's agreement behind it.
 type UnagreedBody struct {
-	Outcome string `json:"outcome" enum:"not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed"`
-	Claims  int    `json:"claims" doc:"How many acts"`
-	Rows    int    `json:"rows" doc:"How many decisions those acts wrote"`
+	Outcome outcomeHidingRisk `json:"outcome"`
+	Claims  int               `json:"claims" doc:"How many acts"`
+	Rows    int               `json:"rows" doc:"How many decisions those acts wrote"`
 }
 
 // BulkApprovalBody is one act of agreement covering many claims.
@@ -42,22 +42,22 @@ type PairingBody struct {
 // LapsedApprovalBody is an agreement standing from somebody who has since lost
 // the right to give one.
 type LapsedApprovalBody struct {
-	ClaimID    int64  `json:"claim_id"`
-	ApprovedBy string `json:"approved_by"`
-	ApprovedAt string `json:"approved_at"`
-	Product    string `json:"product"`
-	Outcome    string `json:"outcome"`
-	Rows       int    `json:"rows"`
+	ClaimID    int64   `json:"claim_id"`
+	ApprovedBy string  `json:"approved_by"`
+	ApprovedAt string  `json:"approved_at"`
+	Product    string  `json:"product"`
+	Outcome    outcome `json:"outcome"`
+	Rows       int     `json:"rows"`
 }
 
 // GrownBody is a claim covering more now than when it was agreed to.
 type GrownBody struct {
-	ClaimID    int64  `json:"claim_id"`
-	ApprovedBy string `json:"approved_by"`
-	ApprovedAt string `json:"approved_at"`
-	Outcome    string `json:"outcome"`
-	Covered    int    `json:"covered" doc:"What the claim covered when it was agreed to"`
-	CoversNow  int    `json:"covers_now" doc:"What it covers now, having reached it by matching rather than by anybody acting"`
+	ClaimID    int64   `json:"claim_id"`
+	ApprovedBy string  `json:"approved_by"`
+	ApprovedAt string  `json:"approved_at"`
+	Outcome    outcome `json:"outcome"`
+	Covered    int     `json:"covered" doc:"What the claim covered when it was agreed to"`
+	CoversNow  int     `json:"covers_now" doc:"What it covers now, having reached it by matching rather than by anybody acting"`
 }
 
 type scrutinyOutput struct {
@@ -135,7 +135,7 @@ func registerScrutiny(api huma.API, in Ingest) {
 		out.Body.Alone = make([]UnagreedBody, 0, len(got.Alone))
 		for _, row := range got.Alone {
 			out.Body.Alone = append(out.Body.Alone, UnagreedBody{
-				Outcome: string(row.Outcome), Claims: row.Claims, Rows: row.Rows,
+				Outcome: outcomeHidingRisk(row.Outcome), Claims: row.Claims, Rows: row.Rows,
 			})
 		}
 		out.Body.Bulk = make([]BulkApprovalBody, 0, len(got.Bulk))
@@ -166,14 +166,14 @@ func registerScrutiny(api huma.API, in Ingest) {
 			out.Body.Lapsed = append(out.Body.Lapsed, LapsedApprovalBody{
 				ClaimID: row.ClaimID, ApprovedBy: row.ApprovedBy,
 				ApprovedAt: stamp(row.ApprovedAt), Product: row.Product,
-				Outcome: string(row.Outcome), Rows: row.Rows,
+				Outcome: outcome(row.Outcome), Rows: row.Rows,
 			})
 		}
 		out.Body.Grew = make([]GrownBody, 0, len(got.Grew))
 		for _, row := range got.Grew {
 			out.Body.Grew = append(out.Body.Grew, GrownBody{
 				ClaimID: row.ClaimID, ApprovedBy: row.ApprovedBy,
-				ApprovedAt: stamp(row.ApprovedAt), Outcome: string(row.Outcome),
+				ApprovedAt: stamp(row.ApprovedAt), Outcome: outcome(row.Outcome),
 				Covered: row.Covered, CoversNow: row.CoversNow,
 			})
 		}

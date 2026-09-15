@@ -265,7 +265,11 @@ type what struct {
 // open findings would leave the oldest and most interesting rows unnamed.
 //
 // The earliest matching finding, so the answer is stable between reads rather
-// than moving as rows open and close underneath it.
+// than moving as rows open and close underneath it. **One finding, chosen
+// first, and all five names read off it**: a minimum per column over the
+// matching set is five independent answers, so a decision matching findings at
+// two components produced a row naming a component, a version and a consumer
+// that never appeared together.
 func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]what, error) {
 	keys := make([]int64, 0, len(decisions))
 	for _, decision := range decisions {
@@ -281,22 +285,26 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id`+
-			` AND f.place_identity = de.place_identity`).
+		Join(`JOIN "finding" AS "f" ON f.id = (
+			SELECT MIN(f2.id) FROM "finding" AS "f2"
+			JOIN "target" AS "tg2" ON tg2.id = f2.target_id
+			JOIN "stream" AS "st2" ON st2.id = tg2.stream_id
+			WHERE f2.vulnerability_id = de.vulnerability_id
+				AND f2.place_identity = de.place_identity
+				AND st2.product_id = de.product_id)`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`de.id AS "decision_id"`).
-		ColumnExpr(`MIN(v.identifier) AS "issue"`).
-		ColumnExpr(`MIN(c.name) AS "component"`).
-		ColumnExpr(`MIN(c.version) AS "version"`).
-		ColumnExpr(`MIN(COALESCE(uc.name, ?)) AS "consumer"`, "").
-		ColumnExpr(`MIN(p.display_name) AS "product"`).
+		ColumnExpr(`v.identifier AS "issue"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`COALESCE(uc.name, ?) AS "consumer"`, "").
+		ColumnExpr(`p.display_name AS "product"`).
 		Where("de.id IN (?)", bun.List(keys)).
-		GroupExpr("de.id").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these judgments were about: %w", err)

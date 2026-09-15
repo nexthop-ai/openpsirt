@@ -9,6 +9,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -162,25 +163,36 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		product, err := store.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-		stream, err := store.StreamByName(ctx, product.ID, in.Stream)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-		if named := strings.TrimSpace(in.Body.CutFrom); named != "" {
-			from, err := store.StreamByName(ctx, product.ID, named)
-			if err != nil {
-				return nil, undeclared(d.Logger, err, "that product could not be looked up")
+		// Both writes or neither, and every name they turn on resolved inside
+		// the transaction that acts on it. Written apart, a date that could
+		// not be recorded left the parent filled in permanently — and the
+		// parent is what a comparison walks, so the caller's refusal described
+		// a state the database no longer had.
+		var product *catalog.Product
+		var stream *catalog.Stream
+		if err := store.Within(ctx, func(ctx context.Context, store *catalog.Store) error {
+			var err error
+			if product, err = store.ProductByName(ctx, in.Product); err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
-			if err := store.FillInParent(ctx, stream.ID, from.ID); err != nil {
-				return nil, asked(d.Logger, err)
+			if stream, err = store.StreamByName(ctx, product.ID, in.Stream); err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
-		}
-		if err := store.SetReleasedOn(ctx, stream.ID, on); err != nil {
-			return nil, wentWrong(d.Logger, "that date could not be recorded", err)
+			if named := strings.TrimSpace(in.Body.CutFrom); named != "" {
+				from, err := store.StreamByName(ctx, product.ID, named)
+				if err != nil {
+					return undeclared(d.Logger, err, "that product could not be looked up")
+				}
+				if err := store.FillInParent(ctx, stream.ID, from.ID); err != nil {
+					return asked(d.Logger, err)
+				}
+			}
+			if err := store.SetReleasedOn(ctx, stream.ID, on); err != nil {
+				return wentWrong(d.Logger, "that date could not be recorded", err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
 		noteDeclared(ctx, d, trail.Release, product.Name+" "+stream.Name,
 			onDay(stream.ReleasedOn), onDay(on))
