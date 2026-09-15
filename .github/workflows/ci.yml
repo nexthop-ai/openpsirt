@@ -150,6 +150,11 @@ jobs:
       # Written by "make check" above, by way of the sbom target. Published
       # because we ingest these for other people's software and publishing one
       # for our own is the same promise kept.
+      #
+      # It describes a binary built from this tree, and is not the inventory a
+      # release publishes — that one is read out of the image, is attached to
+      # the release, and does not expire. Two documents of one name invites
+      # somebody to treat this one as the release's.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: openpsirt-sbom

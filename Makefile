@@ -151,7 +151,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -250,6 +250,13 @@ licenses:
 
 # We ingest SBOMs, so we publish one for ourselves. CycloneDX because that is
 # the format this project treats as authoritative on the way in.
+#
+# It describes the source tree and is not what a release publishes: that
+# document is read out of the image by "dist-inventories". This generator is
+# asked about a module directory rather than about a compiled binary, so the
+# version comes from the checkout's own history and is a commit where there is
+# no tag to name — never the empty version a binary's build information
+# carries, which is why the image's invocation has to be told one.
 sbom:
 	@mkdir -p bin
 	$(GO) run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CDXGOMOD_VERSION) \
@@ -886,6 +893,10 @@ docs-site:
 #
 # Named rather than folded into engines-check, because that one is about what
 # the tests run against and this is about what the release is built from.
+# The tidy run rewrites the tree, so what it found there is put back on every
+# exit path — including an interrupt, which used to leave the tree as tidy had
+# made it and the copies behind under a name every checkout on the machine
+# shared.
 .PHONY: pins-check
 pins-check:
 	@fail=0; \
@@ -916,15 +927,16 @@ pins-check:
 	  echo "the image has $$defaults version defaults and they differ, so an"; \
 	  echo "unpassed build says one thing in the binary and another in its SBOM."; \
 	  fail=1; }; \
-	cp go.mod $${TMPDIR:-/tmp}/openpsirt-go.mod.was && cp go.sum $${TMPDIR:-/tmp}/openpsirt-go.sum.was; \
+	kept=$$(mktemp -d); \
+	trap 'cp "$$kept"/go.mod go.mod; cp "$$kept"/go.sum go.sum; rm -rf "$$kept"' EXIT INT TERM; \
+	cp go.mod go.sum "$$kept"/; \
 	$(GO) mod tidy; \
-	cmp -s go.mod $${TMPDIR:-/tmp}/openpsirt-go.mod.was && cmp -s go.sum $${TMPDIR:-/tmp}/openpsirt-go.sum.was || { \
+	cmp -s go.mod "$$kept"/go.mod && cmp -s go.sum "$$kept"/go.sum || { \
 	  echo "go.mod or go.sum is not what go mod tidy produces: a dependency is"; \
 	  echo "declared that nothing imports, or one is imported and not declared."; \
 	  echo "A requirement nothing uses stays in the vulnerability and licence"; \
 	  echo "surface for code that never runs. Run go mod tidy and commit it."; \
-	  cp $${TMPDIR:-/tmp}/openpsirt-go.mod.was go.mod; cp $${TMPDIR:-/tmp}/openpsirt-go.sum.was go.sum; fail=1; }; \
-	rm -f $${TMPDIR:-/tmp}/openpsirt-go.mod.was $${TMPDIR:-/tmp}/openpsirt-go.sum.was; \
+	  fail=1; }; \
 	[ "$$fail" = 0 ] || exit 1
 
 # Measurements, not gates.
