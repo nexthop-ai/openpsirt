@@ -38,6 +38,23 @@ export const THE_LINE = ["everything", ...FLOORS] as const;
 
 export type Band = (typeof BANDS)[number];
 
+// COLORS is the token each band is drawn in.
+//
+// Written out rather than composed from the word. A name built at run time is
+// one no check can follow — the token gate reads `var(--name)` literally, and
+// `var(--sev-${band})` is a reference it cannot put to the set of definitions,
+// so a renamed token would be dropped by CSS in silence.
+//
+// Keyed on Band, so a rung added above with no color here does not compile.
+// That is a stronger guarantee than the gate: it is the compiler rather than a
+// script somebody has to run.
+export const COLORS: Record<Band, string> = {
+  critical: "var(--sev-critical)",
+  high: "var(--sev-high)",
+  medium: "var(--sev-medium)",
+  low: "var(--sev-low)",
+};
+
 // isBand reports whether a word is one of the four, which is what decides
 // whether it gets a color of its own.
 export function isBand(word: string): word is Band {
