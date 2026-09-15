@@ -665,7 +665,15 @@ func registerReceipts(api huma.API, in Ingest) {
 		}
 		scans := ingest.NewStore(in.DB.DB)
 		receipts, total, err := scans.Receipts(ctx, subject, target.ID, sender, input.Limit, input.Offset)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			// The answer a build nobody declared gets. A 500 here against a
+			// 404 for a stranger said which builds exist, one name at a time
+			// — and the reach that meets it is a case collaborator, who holds
+			// nothing on the product and may reach the one finding they were
+			// brought in on.
+			return nil, nothingScannedThere()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "the scans could not be read", err)
 		}
 		// What each run changed, in one pair of statements for the page. A
@@ -678,7 +686,10 @@ func registerReceipts(api huma.API, in Ingest) {
 			}
 		}
 		changed, err := finding.NewStore(in.DB.DB).Changes(ctx, subject, target.ID, runs)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, nothingScannedThere()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "what the scans changed could not be read", err)
 		}
 

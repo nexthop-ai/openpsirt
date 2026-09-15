@@ -123,7 +123,13 @@ type Group struct {
 	// beside it comes from whichever scoring generation the source used — a
 	// 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under
 	// v3 — so a row showing only the word looks mis-sorted when two tie.
+	//
+	// Scored says whether there is one at all, because the column is nullable
+	// and zero is a real score. Published as a zero, an unscored finding sorted
+	// with the genuinely 0.0-rated ones at the bottom of a spreadsheet and was
+	// included by every filter asking for a score below anything.
 	ScoreCenti int
+	Scored     bool
 	// Owner and Parent are the two ends of the way down to this component:
 	// the part of the product it belongs to, and what directly pulls it in
 	// . Those two are what differ between sibling rows — the top says
@@ -454,6 +460,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		Places: row.Places, Answered: row.Answered,
 		Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
+		Scored:   row.Scored == 1,
 		FixState: FixState(row.FixState), FixedIn: row.FixedIn,
 		Matched:  Matched(row.Matched),
 		State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
@@ -606,6 +613,7 @@ type decorated struct {
 	DiscloseAt    *time.Time `bun:"disclose_at"`
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ScoreCenti    int        `bun:"score_centi"`
+	Scored        int        `bun:"scored"`
 	FixState      string     `bun:"fix_state"`
 	FixedIn       string     `bun:"fixed_in"`
 	Matched       string     `bun:"matched"`
@@ -757,6 +765,10 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
+		// Whether any of the issues folded here carries a score at all.
+		// Written as a sum rather than as a boolean, because the four engines
+		// do not agree about what a boolean out of an aggregate is.
+		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
 		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
 		// When the earliest of these places opened, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not

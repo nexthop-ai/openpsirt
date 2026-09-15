@@ -629,51 +629,67 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 //
 // Narrowed to one product where the caller names one, which is how the screen
 // reaches a product's own ratings.
+//
+// Paged, with the total counted over the same narrowing rather than summed
+// from the page. Capped at two hundred with no offset and no total, a
+// deployment past that could not read the rest through the API at all and the
+// screen showed a subset and reported it as the list.
 func (s *Store) Assessments(ctx context.Context, subject access.Subject, productID int64,
-	state string, limit int) ([]Assessment, map[int64]string, error) {
+	state string, limit, offset int) ([]Assessment, map[int64]string, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, nil, access.Denied("read what has been assessed")
+		return nil, nil, 0, access.Denied("read what has been assessed")
 	}
 	if productID != 0 && !subject.Sees(productID) {
 		// A product somebody holds nothing on does not exist as far as they
 		// are concerned, and an empty list is a different statement from a
 		// refusal.
-		return nil, nil, access.Denied(fmt.Sprintf("read ratings in product %d", productID))
+		return nil, nil, 0, access.Denied(fmt.Sprintf("read ratings in product %d", productID))
 	}
 	limit = database.AList.Of(limit)
-	q := s.db.NewSelect().Model((*Assessment)(nil)).
-		OrderExpr("proposed_at DESC, id DESC").
-		Limit(limit)
-	if state != "" {
-		q = q.Where("state = ?", state)
-	}
-	if productID != 0 {
-		q = q.Where("asm.product_id = ?", productID)
-	}
 	products, all := subject.Products()
-	if !all {
-		if len(products) == 0 {
-			return nil, map[int64]string{}, nil
+	if !all && len(products) == 0 {
+		return nil, map[int64]string{}, 0, nil
+	}
+	// The narrowing, written once so that the page and the count cannot come
+	// to answer different questions: a total summed from the page is the
+	// length of the page.
+	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
+		if state != "" {
+			q = q.Where("state = ?", state)
 		}
-		// The row-by-row form of mayBeToldOfHere: a claim is shown where its
-		// issue reaches something the reader may read in the claim's own
-		// product.
-		readable := onlyReadable(s.db.NewSelect().
-			ColumnExpr("1").
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-			Where("f.vulnerability_id = asm.vulnerability_id").
-			Where("st.product_id = asm.product_id"),
-			subject, products, all)
-		q = q.Where("EXISTS (?)", readable)
+		if productID != 0 {
+			q = q.Where("asm.product_id = ?", productID)
+		}
+		if !all {
+			// The row-by-row form of mayBeToldOfHere: a claim is shown where
+			// its issue reaches something the reader may read in the claim's
+			// own product.
+			readable := onlyReadable(s.db.NewSelect().
+				ColumnExpr("1").
+				TableExpr(`finding AS "f"`).
+				Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+				Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+				Where("f.vulnerability_id = asm.vulnerability_id").
+				Where("st.product_id = asm.product_id"),
+				subject, products, all)
+			q = q.Where("EXISTS (?)", readable)
+		}
+		return q
+	}
+
+	total, err := narrow(s.db.NewSelect().Model((*Assessment)(nil))).Count(ctx)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("count what we have said: %w", err)
 	}
 	var claims []Assessment
-	if err := q.Scan(ctx, &claims); err != nil {
-		return nil, nil, fmt.Errorf("read what we have said: %w", err)
+	if err := narrow(s.db.NewSelect().Model(&claims)).
+		OrderExpr("proposed_at DESC, id DESC").
+		Limit(limit).Offset(offset).
+		Scan(ctx); err != nil {
+		return nil, nil, 0, fmt.Errorf("read what we have said: %w", err)
 	}
 
 	ids := make([]int64, 0, len(claims))
@@ -686,13 +702,13 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 		if err := s.db.NewSelect().Model(&issues).
 			Column("id", "identifier").
 			Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
-			return nil, nil, fmt.Errorf("read what these issues are called: %w", err)
+			return nil, nil, 0, fmt.Errorf("read what these issues are called: %w", err)
 		}
 		for _, issue := range issues {
 			named[issue.ID] = issue.Identifier
 		}
 	}
-	return claims, named, nil
+	return claims, named, total, nil
 }
 
 // Consequence is what agreeing to a milder rating would do, beyond moving

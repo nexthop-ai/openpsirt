@@ -50,6 +50,13 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		// what a coordinated disclosure runs on, and it was silently off.
 		{"MAIL_SERVER", "smtp.example.test:587"},
 		{"MAIL_FROM", "psirt@example.test"},
+		// The standard permits exactly six words here and the value reaches
+		// the document verbatim, so a typo produced advisories that fail
+		// validation wherever anybody takes them — the one use a generated
+		// advisory has.
+		{"PUBLISHER_CATEGORY", "vendo"},
+		{"PUBLISHER_CATEGORY", "Vendor"},
+		{"PUBLISHER_CATEGORY", ""},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)

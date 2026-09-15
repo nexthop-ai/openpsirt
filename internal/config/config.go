@@ -314,6 +314,18 @@ func Load() (Config, error) {
 	default:
 		return Config{}, fmt.Errorf("OPENPSIRT_LOG_FORMAT: want \"text\" or \"json\", got %q", c.LogFormat)
 	}
+	// The standard permits exactly six words here and the value reaches the
+	// document verbatim, so a typo produced advisories that fail validation
+	// wherever anybody takes them — which is the one use a generated advisory
+	// has. Refused at startup, beside the setting above that is checked the
+	// same way for the same reason.
+	switch c.PublisherCategory {
+	case "coordinator", "discoverer", "other", "translator", "user", "vendor":
+	default:
+		return Config{}, fmt.Errorf("OPENPSIRT_PUBLISHER_CATEGORY: want one of "+
+			"\"coordinator\", \"discoverer\", \"other\", \"translator\", \"user\" or "+
+			"\"vendor\", got %q", c.PublisherCategory)
+	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
 	}

@@ -324,6 +324,8 @@ held. Nothing is sent anywhere.
 | A document about an undisclosed flaw is a draft, and says so | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either |
 | Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
+| The document's version is the last number its own revision history states | Counted separately the two disagreed the moment an advisory had been issued once, and a validator compares them. The two agreed by accident only for a document nobody had published, which is why it went unseen |
+| The publisher's category is one of the six the standard names, refused at startup otherwise | The value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them — which is the one use a generated advisory has |
 
 ## The VEX document
 

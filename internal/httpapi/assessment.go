@@ -204,7 +204,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		"flaw nobody has announced is not public knowledge."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		State   string `query:"state" enum:"proposed,live,withdrawn" doc:"Limit to one state"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Paging
 	}) (*listOutput[AssessmentBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -222,7 +222,8 @@ func registerAssessment(api huma.API, in Ingest) {
 			within = product.ID
 		}
 		store := finding.NewStore(in.DB.DB)
-		claims, named, err := store.Assessments(ctx, subject, within, input.State, input.Limit)
+		claims, named, total, err := store.Assessments(ctx, subject, within, input.State,
+			input.Limit, input.Offset)
 		if err != nil {
 			if errors.Is(err, access.ErrDenied) {
 				return nil, noSuchProduct()
@@ -236,6 +237,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what these ratings belong to could not be read", err)
 		}
 		out := &listOutput[AssessmentBody]{}
+		out.Body.Total = total
 		out.Body.Items = make([]AssessmentBody, 0, len(claims))
 		for _, claim := range claims {
 			body := assessmentBody(claim, named[claim.VulnerabilityID], subject.ID)

@@ -118,7 +118,11 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		return nil, 0, err
 	}
 	if !subject.Sees(productID) {
-		return nil, 0, fmt.Errorf("no build is declared there")
+		// A typed refusal, so the handler answers it the way a build nobody
+		// declared is answered rather than as a fault. A plain error became a
+		// 500 — and a 500 where a stranger gets a 404 says the build is
+		// there, one name at a time.
+		return nil, 0, access.Denied(fmt.Sprintf("read what was filed against product %d", productID))
 	}
 
 	// Clamped here rather than trusted from the caller. The handler above

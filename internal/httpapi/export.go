@@ -202,17 +202,25 @@ var asCSV = exportFormat{
 	extension:   "csv",
 	open: func(ctx huma.Context, out Exporting) sink {
 		w := csv.NewWriter(ctx.BodyWriter())
+		width := len(out.Header)
 		// What the file says about itself, above the column names, because a
 		// spreadsheet has nowhere else to carry it.
+		//
+		// Padded to the header's width, like every other record that is not a
+		// row. CSV has no comment convention — the `#` is a data character —
+		// so a two-field record above a fifteen-field header is a document a
+		// conformant reader refuses. Every test here had the field-count
+		// check turned off, which is the check that would have said so.
 		if out.About[0] != "" {
-			_ = w.Write([]string{"# " + out.About[0], out.About[1]})
+			_ = w.Write(padded([]string{"# " + out.About[0], out.About[1]}, width))
 		}
 		_ = w.Write(out.Header)
 		return sink{
 			row:   func(row []string) { _ = w.Write(inert(row)) },
 			flush: w.Flush,
 			cutShort: func() {
-				_ = w.Write([]string{"# this export stopped early and is incomplete"})
+				_ = w.Write(padded(
+					[]string{"# this export stopped early and is incomplete"}, width))
 				w.Flush()
 			},
 			done: w.Flush,
@@ -250,7 +258,7 @@ var asJSON = exportFormat{
 					if i < len(row) {
 						value = row[i]
 					}
-					_, _ = fmt.Fprintf(body, "%s:%s", quoted(column), quoted(value))
+					_, _ = fmt.Fprintf(body, "%s:%s", quoted(asKey(column)), quoted(value))
 				}
 				_, _ = fmt.Fprint(body, "}")
 			},
@@ -333,8 +341,39 @@ func inert(row []string) []string {
 	return out
 }
 
+// scoreCell is a severity score as a file states it, and nothing where there
+// is none.
+//
+// Written as a zero, an unscored finding sorted with the genuinely 0.0-rated
+// ones at the bottom of a release meeting's spreadsheet, and a filter for
+// "below four" took every one of them. Empty is the only thing a column of
+// numbers has for "there is no number".
+func scoreCell(scored bool, centi int) string {
+	if !scored {
+		return ""
+	}
+	return strconv.FormatFloat(float64(centi)/100, 'f', -1, 64)
+}
+
+// padded fills a record out to the width the header states.
+//
+// A record narrower than the header is a document a conformant CSV reader
+// refuses, because the format has no comment convention and no notion of a
+// short row — the `#` that opens the two records this applies to is a data
+// character like any other.
+func padded(cells []string, width int) []string {
+	for len(cells) < width {
+		cells = append(cells, "")
+	}
+	return cells
+}
+
 // asKey is what a stated fact is called in JSON: the words it is written in on
 // paper, joined the way every other field here is named.
+//
+// Applied to the column names too. Written without it, one document used two
+// conventions: the stated fact's key had underscores and every column name
+// kept the spaces it is read with on paper.
 func asKey(label string) string {
 	return strings.ReplaceAll(label, " ", "_")
 }
@@ -409,8 +448,7 @@ func registerExport(api huma.API, in Ingest) {
 						opened = g.OpenedAt.Format("2006-01-02")
 					}
 					rows = append(rows, []string{
-						g.Vulnerability, g.Severity,
-						strconv.FormatFloat(float64(g.ScoreCenti)/100, 'f', -1, 64),
+						g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),
 						strconv.FormatBool(g.Exploited),
 						g.Component, g.Version, g.Ecosystem, g.FixedIn,
 						strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
@@ -497,8 +535,7 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 						opened = g.OpenedAt.Format("2006-01-02")
 					}
 					rows = append(rows, []string{
-						g.Product, g.Vulnerability, g.Severity,
-						strconv.FormatFloat(float64(g.ScoreCenti)/100, 'f', -1, 64),
+						g.Product, g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),
 						strconv.FormatBool(g.Exploited),
 						g.Component, g.Version, g.Ecosystem, g.FixedIn,
 						strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),

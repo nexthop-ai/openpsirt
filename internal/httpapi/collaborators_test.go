@@ -429,3 +429,47 @@ func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
 		}
 	})
 }
+
+func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing.T) {
+	// A store refusal with no arm for it in the handler falls through to the
+	// fault answer, so a route answered 500 where a stranger got 404. The
+	// pair says the build is there, one name at a time — and the error text
+	// names which of product, stream and variant was undeclared, which is the
+	// list REQ-42 makes secret.
+	//
+	// A case collaborator is the reach that meets it: they hold nothing on
+	// the product and may open exactly one finding, so every product-wide
+	// read refuses them and each refusal has to look like the refusal a
+	// stranger gets.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		build := "/v1/products/mine/streams/master/variants/broadcom"
+		for _, path := range []string{
+			build + "/scans",
+			build + "/components",
+			build + "/register",
+			build + "/register.csv",
+		} {
+			collaborator := asPerson(t, r, "outsider", http.MethodGet, path, "")
+			stranger := asPerson(t, r, "reader", http.MethodGet,
+				"/v1/products/theirs/streams/master/variants/broadcom"+
+					path[len(build):], "")
+			if collaborator.Code != stranger.Code {
+				t.Errorf("%s answers a collaborator %d and a stranger %d, so the pair "+
+					"says which builds exist: %s",
+					path, collaborator.Code, stranger.Code, collaborator.Body.String())
+			}
+			if collaborator.Code >= 500 {
+				t.Errorf("%s answers a refusal as a fault: %d %s",
+					path, collaborator.Code, collaborator.Body.String())
+			}
+		}
+	})
+}

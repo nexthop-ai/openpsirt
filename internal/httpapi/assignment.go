@@ -133,7 +133,15 @@ func registerAssigning(api huma.API, in Ingest) {
 			(input.Body.Person != "" &&
 				!strings.EqualFold(strings.TrimSpace(input.Body.Person), subject.Identity))
 		if givingAway && !subject.Holds(access.Assigner, product) {
-			return nil, noSuchFinding()
+			// An act they may not do on a finding they are already looking
+			// at, which is the rule this package states: a 404 answers a
+			// *name*, and this one answers an act on something already shown.
+			// The component path refuses the identical condition in these
+			// words; this one answered a 404 and the two contradicted each
+			// other about what had happened.
+			return nil, huma.Error422UnprocessableEntity(
+				"you may take what nobody owns and hand back your own; giving this to " +
+					"somebody else needs the right that names it")
 		}
 
 		var to *int64

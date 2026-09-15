@@ -97,6 +97,30 @@ differ, somebody holding one product learns the name of every other by guessing.
 The sentences are kept in one place. There were six spellings, two of which
 described the wrong thing.
 
+**A store's refusal that no handler has an arm for is an oracle too.** It falls
+through to the fault answer, so the route says 500 where a stranger is told
+404, and the pair says the build is there — one name at a time, and the fault's
+own text named which of product, stream and variant was undeclared. Every store
+refusal is typed and every handler that can meet one answers it the way a name
+that reaches nothing is answered.
+
+The reach that meets them is a case collaborator: they hold nothing on the
+product and may open exactly one finding, so every product-wide read refuses
+them, and each of those refusals has to look like a stranger's.
+
+| A refusal answers | |
+|---|---|
+| 404 | A name that reaches nothing, including one that reaches something they may not have |
+| 403 or 422 | An act they may not do on something already shown to them |
+
+The second is the one that was answered both ways: handing work to somebody
+else needs a right, and one route said 404 while the other said 422 about the
+identical condition.
+
+**A streamed answer is refused before its first byte.** Once the status has
+gone the only place left to say anything is the file, and what it said was that
+the export stopped early — behind a 200.
+
 ## Refusal shape
 
 `application/problem+json`, for everything, including the handlers in front of
@@ -141,7 +165,11 @@ did not cause it and cannot fix it.
 
 ## Paging
 
-`limit` and `offset`, with a total. The bound is stated twice:
+`limit` and `offset`, with a total, on every list. One list declared a limit
+alone: past its ceiling the rest could not be read through the API at all, and
+the screen showed a subset and reported it as the list.
+
+The bound is stated twice:
 
 | Layer | Behavior | Reason |
 |---|---|---|

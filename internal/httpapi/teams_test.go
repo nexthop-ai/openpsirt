@@ -193,9 +193,12 @@ func TestATeamQueueIsTakenFromWithTriageAndFilledWithDispatch(t *testing.T) {
 		at := "/v1/products/mine/streams/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
-		// Filling the queue is dispatching.
+		// Filling the queue is dispatching. Refused as an act rather than as
+		// a name that is not there: the finding is one they are already
+		// looking at, and the same condition on the component path has always
+		// been answered this way.
 		if got := asPerson(t, r, "triager", http.MethodPut, at,
-			`{"team":"kernel"}`); got.Code != http.StatusNotFound {
+			`{"team":"kernel"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a triager routed work to a team, answering %d: %s",
 				got.Code, got.Body.String())
 		}

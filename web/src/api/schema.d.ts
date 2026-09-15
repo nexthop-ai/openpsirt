@@ -8817,7 +8817,10 @@ export interface operations {
                 product?: string;
                 /** @description Limit to one state */
                 state?: "proposed" | "live" | "withdrawn";
+                /** @description How many to return */
                 limit?: number;
+                /** @description How many to skip */
+                offset?: number;
             };
             header?: never;
             path?: never;

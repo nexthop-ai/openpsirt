@@ -64,7 +64,14 @@ func TestAnUnknownEndpointStaysAnEndpoint(t *testing.T) {
 	// JSON as a parse failure rather than as the 404 it is — which is a long
 	// way from the mistake that caused it.
 	handler := serving(t, built())
-	for _, path := range []string{"/v1/nonesuch", "/v1"} {
+	for _, path := range []string{
+		"/v1/nonesuch", "/v1",
+		// The same paths spelled the two ways the test on the raw path
+		// missed: a dot segment, and different capitals. Both named
+		// something the API owns and both were answered with the page.
+		"/v1/./nonesuch", "/v1/findings/../nonesuch", "/V1/nonesuch",
+		"/Docs", "/OpenAPI.json",
+	} {
 		got := fetch(t, handler, http.MethodGet, path)
 		if got.Code == http.StatusOK {
 			t.Errorf("GET %s answered %d with %q", path, got.Code, got.Body.String())

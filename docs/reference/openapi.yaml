@@ -8069,14 +8069,25 @@ paths:
               - live
               - withdrawn
             type: string
-        - explode: false
+        - description: How many to return
+          explode: false
           in: query
           name: limit
           schema:
             default: 50
+            description: How many to return
             format: int64
             maximum: 200
             minimum: 1
+            type: integer
+        - description: How many to skip
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: How many to skip
+            format: int64
+            minimum: 0
             type: integer
       responses:
         "200":

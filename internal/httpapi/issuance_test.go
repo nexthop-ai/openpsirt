@@ -66,12 +66,15 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 			} `json:"document"`
 		}
 		read(t, r, "private-triage", at, &second)
-		if second.Document.Tracking.Version != "2" {
-			t.Errorf("the next document is version %q, want 2",
-				second.Document.Tracking.Version)
-		}
+		// Three entries — the flaw recorded, the issuance, and this document
+		// being generated — so the version is 3. Counted separately from the
+		// history it said 2, and a CSAF validator compares the two.
 		if len(second.Document.Tracking.History) != 3 {
 			t.Fatalf("its history reads as %+v", second.Document.Tracking.History)
+		}
+		if newest := second.Document.Tracking.History[2].Number; second.Document.Tracking.Version != newest {
+			t.Errorf("the next document is version %q and its history ends at %q",
+				second.Document.Tracking.Version, newest)
 		}
 		if second.Document.Tracking.History[1].Summary != "Initial publication" {
 			t.Errorf("the history does not say what the issuance said: %+v",
@@ -85,9 +88,13 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 			t.Fatalf("recording a second issuance answered %d: %s", got.Code, got.Body.String())
 		}
 		read(t, r, "private-triage", at, &second)
-		if second.Document.Tracking.Version != "3" {
-			t.Errorf("after two issuances the document is version %q",
-				second.Document.Tracking.Version)
+		if len(second.Document.Tracking.History) != 4 {
+			t.Fatalf("after two issuances its history reads as %+v",
+				second.Document.Tracking.History)
+		}
+		if newest := second.Document.Tracking.History[3].Number; second.Document.Tracking.Version != newest {
+			t.Errorf("after two issuances the document is version %q and its history ends at %q",
+				second.Document.Tracking.Version, newest)
 		}
 
 		// The digest is of what we generate rather than of anything sent, so

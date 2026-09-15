@@ -348,3 +348,44 @@ func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.
 		}
 	})
 }
+
+func TestTheDocumentsVersionIsTheLastNumberItsHistoryStates(t *testing.T) {
+	// The two were counted separately and disagreed the moment an advisory
+	// had been issued once: the history numbered this document N+2 and the
+	// version said N+1. A CSAF validator compares them, and a document that
+	// fails validation is one a customer's tooling drops — which is the one
+	// use a generated advisory has.
+	//
+	// Checked at each of the three states an advisory passes through, because
+	// the two agreed by accident at the first of them.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		matches := func(t *testing.T, when string) {
+			t.Helper()
+			doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+			if err != nil {
+				t.Fatal(err)
+			}
+			history := doc.Document.Tracking.RevisionHistory
+			if len(history) == 0 {
+				t.Fatalf("%s: the document states no history at all", when)
+			}
+			newest := history[len(history)-1].Number
+			if doc.Document.Tracking.Version != newest {
+				t.Errorf("%s: the document is version %q and its history ends at %q",
+					when, doc.Document.Tracking.Version, newest)
+			}
+		}
+
+		matches(t, "before anything has gone out")
+		if _, err := f.store.Issued(ctx, f.who, issuer, "sonic", identifier, "First"); err != nil {
+			t.Fatal(err)
+		}
+		matches(t, "after one issuance")
+		if _, err := f.store.Issued(ctx, f.who, issuer, "sonic", identifier, "Second"); err != nil {
+			t.Fatal(err)
+		}
+		matches(t, "after two")
+	})
+}
