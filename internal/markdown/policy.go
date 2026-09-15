@@ -20,8 +20,17 @@ import (
 // `attachment:` is a file held here, referred to by an opaque identifier and
 // never by an address. It resolves through a path that asks who is looking,
 // which is what makes it the one scheme an image may also use.
-var Schemes = map[string]bool{
-	"http": true, "https": true, "mailto": true, Attachment: true, Issue: true,
+// **Not a map anybody can widen.** An exported map is a value every importer
+// shares and any of them may write to at init, so one line in an unrelated
+// package could add a scheme to the link policy for the whole process, with
+// nothing in this file changed and no test here failing. Asked as a function
+// over a closed list instead, which is a policy rather than a variable.
+func allowedScheme(scheme string) bool {
+	switch scheme {
+	case "http", "https", "mailto", Attachment, Issue:
+		return true
+	}
+	return false
 }
 
 // Attachment is the scheme a file held here is referred to by.
@@ -119,6 +128,18 @@ func inspect(source string) []Fault {
 func destinationFault(line int, destination string) (Fault, bool) {
 	scheme, ok := schemeOf(destination)
 	if !ok {
+		// An address on another host has no scheme to name — schemeOf returns
+		// nothing for it, deliberately, because what is wrong is the two
+		// separators rather than a word — so a message built around the scheme
+		// read "and this uses \"\"". The two cases are told apart here.
+		if scheme == "" {
+			return Fault{
+				Line: line, Offending: destination,
+				Reason: "a link starting with two separators goes to another host, whatever " +
+					"scheme the page was served over. Write the address in full, or make it " +
+					"relative to this deployment",
+			}, true
+		}
 		return Fault{
 			Line: line, Offending: destination,
 			Reason: fmt.Sprintf(
@@ -244,7 +265,7 @@ func schemeOf(destination string) (string, bool) {
 	}
 
 	lowered := strings.ToLower(scheme)
-	return lowered, Schemes[lowered]
+	return lowered, allowedScheme(lowered)
 }
 
 // lineIndex maps a position in the source to the line it is on.
@@ -466,16 +487,19 @@ func Mentions(source string) []string {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
-		// Only prose. A code span and a fenced block are both showing text
-		// rather than saying it, and the walk does not descend into either
-		// for the same reason References does not.
+		// Only prose, and a code span is the only thing that has to be
+		// skipped to get that.
+		//
+		// A fenced or indented block keeps its content in Lines() with no
+		// child text node, so the walk never descends into one and the two
+		// guards that stood here decided nothing — a control that does not
+		// control, and one somebody reading this would take for the reason a
+		// pasted log line names nobody. That reason is goldmark's node
+		// layout, and the rows in the test are what would catch an upgrade
+		// that changes it. A code span is the case that differs:
+		// parseCodeSpan appends text segments as children, so without this
+		// the `@ana` in `look at @ana` would be read as a mention.
 		if _, code := node.(*ast.CodeSpan); code {
-			return ast.WalkSkipChildren, nil
-		}
-		if _, fenced := node.(*ast.FencedCodeBlock); fenced {
-			return ast.WalkSkipChildren, nil
-		}
-		if _, block := node.(*ast.CodeBlock); block {
 			return ast.WalkSkipChildren, nil
 		}
 		words, ok := node.(*ast.Text)

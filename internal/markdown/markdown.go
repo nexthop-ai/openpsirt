@@ -40,7 +40,20 @@ type Fault struct {
 	// Offending is the text that caused it, so the reader can search for it.
 	Offending string
 	Reason    string
+	// err is the sentinel this fault is one of, where there is one.
+	//
+	// Kept beside the sentence rather than instead of it: the reason is
+	// written for a person to read and the sentinel is for a caller to match,
+	// and a package that exports one has said callers may match it.
+	err error
 }
+
+// Unwrap answers the sentinel a fault carries, so errors.Is can match it.
+//
+// ErrTooLong was exported — which announces exactly that — and formatted into
+// a string with no wrapping, so no caller could ever match it. An exported
+// sentinel nothing can use as one is a contract stated and not kept.
+func (f Fault) Unwrap() error { return f.err }
 
 func (f Fault) Error() string {
 	if f.Line == 0 {
@@ -58,6 +71,16 @@ func (f Fault) Error() string {
 // find the next is how a person learns to write nothing but plain sentences,
 // which loses the reason markdown is here at all.
 type Faults []Fault
+
+// Unwrap answers every fault, so errors.Is over the whole refusal matches a
+// sentinel any one of them carries.
+func (f Faults) Unwrap() []error {
+	all := make([]error, 0, len(f))
+	for _, fault := range f {
+		all = append(all, fault)
+	}
+	return all
+}
 
 func (f Faults) Error() string {
 	reasons := make([]string, 0, len(f))
@@ -83,7 +106,10 @@ var ErrTooLong = errors.New("that is longer than a justification may be")
 // which is why rendering sanitizes as well.
 func Check(source string) error {
 	if len(source) > MaxBytes {
-		return Faults{{Reason: fmt.Sprintf("%s (%d bytes, limit %d)", ErrTooLong, len(source), MaxBytes)}}
+		return Faults{{
+			Reason: fmt.Sprintf("%s (%d bytes, limit %d)", ErrTooLong, len(source), MaxBytes),
+			err:    ErrTooLong,
+		}}
 	}
 	if !utf8.ValidString(source) {
 		return Faults{{Reason: "that is not text this can read"}}

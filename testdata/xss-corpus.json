@@ -1,0 +1,233 @@
+{
+  "note": [
+    "The corpus that has been used to get script past sanitizers, and the shapes",
+    "specific to markdown itself. One file, read by both halves: the server's",
+    "submission check and the interface's renderer.",
+    "",
+    "It was two hand-kept lists, and the Go one called itself 'the same corpus'",
+    "while being 27 payloads shorter. Two copies of a security corpus diverge in",
+    "the direction of the one nobody is adding to.",
+    "",
+    "'submission' is what internal/markdown.Check must answer. Not every payload",
+    "is refusable there and saying so is the point: a fenced block holds whatever",
+    "it holds, and escaped text is text. Every payload, refused or not, must",
+    "render inert — that half is asked of the renderer, in web/src/ui."
+  ],
+  "payloads": [
+    {
+      "text": "<script>alert(1)</script>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<img src=x onerror=alert(1)>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<iframe src=\"javascript:alert(1)\"></iframe>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<body onload=alert(1)>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<a href=\"javascript:alert(1)\">click</a>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "[click](javascript:alert(1))",
+      "submission": "refused",
+      "why": "a scheme a link may not use"
+    },
+    {
+      "text": "[click](JaVaScRiPt:alert(1))",
+      "submission": "refused",
+      "why": "the same scheme, spelled to get past a comparison"
+    },
+    {
+      "text": "[click](java&#115;cript:alert(1))",
+      "submission": "refused",
+      "why": "the same scheme, entity-encoded — judged decoded"
+    },
+    {
+      "text": "[click](\tjavascript:alert(1))",
+      "submission": "refused",
+      "why": "the same scheme behind whitespace a browser strips"
+    },
+    {
+      "text": "[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)",
+      "submission": "refused",
+      "why": "a link that becomes a page we appear to have served"
+    },
+    {
+      "text": "![img](javascript:alert(1))",
+      "submission": "refused",
+      "why": "a scheme an image may not use either"
+    },
+    {
+      "text": "![img](https://evil.example/pixel.gif)",
+      "submission": "refused",
+      "why": "a remote image is a request a reader's browser makes to a third party"
+    },
+    {
+      "text": "<a href=\"vbscript:msgbox(1)\">x</a>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<div style=\"background:url(javascript:alert(1))\">x</div>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<object data=\"data:text/html,<script>alert(1)</script>\"></object>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<embed src=\"data:text/html,<script>alert(1)</script>\">",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<base href=\"https://evil.example/\">",
+      "submission": "refused",
+      "why": "raw markup, and one that repoints every relative link on the page"
+    },
+    {
+      "text": "<meta http-equiv=\"refresh\" content=\"0;url=javascript:alert(1)\">",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<link rel=stylesheet href=\"https://evil.example/x.css\">",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<form action=\"javascript:alert(1)\"><button>go</button></form>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<button formaction=\"javascript:alert(1)\">go</button>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<iframe srcdoc=\"&lt;script&gt;alert(1)&lt;/script&gt;\"></iframe>",
+      "submission": "refused",
+      "why": "raw markup carrying an escaped payload it un-escapes itself"
+    },
+    {
+      "text": "<p onmouseover=\"alert(1)\">hover</p>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<a href=\"#\" onclick=\"alert(1)\">x</a>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<input type=\"text\" onfocus=\"alert(1)\" autofocus>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<style>@import 'https://evil.example/x.css';</style>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<!--<script>alert(1)</script>-->",
+      "submission": "refused",
+      "why": "raw markup, and a comment a parser may close early"
+    },
+    {
+      "text": "<math><mtext><script>alert(1)</script></mtext></math>",
+      "submission": "refused",
+      "why": "raw markup, in a namespace that parses differently"
+    },
+    {
+      "text": "<xmp><script>alert(1)</script></xmp>",
+      "submission": "refused",
+      "why": "raw markup, in an element with its own text rules"
+    },
+    {
+      "text": "<noscript><p title=\"</noscript><script>alert(1)</script>\">",
+      "submission": "refused",
+      "why": "raw markup, spelled to end an element early"
+    },
+    {
+      "text": "<scr<script>ipt>alert(1)</scr</script>ipt>",
+      "submission": "refused",
+      "why": "raw markup, spelled to survive one pass of removal"
+    },
+    {
+      "text": "<a href=\" javascript:alert(1)\">x</a>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "<a href=\"jav&#x0A;ascript:alert(1)\">x</a>",
+      "submission": "refused",
+      "why": "raw markup"
+    },
+    {
+      "text": "[click](//evil.example/x)",
+      "submission": "refused",
+      "why": "two separators is another host, whatever the missing scheme suggests"
+    },
+    {
+      "text": "[click](/\\evil.example/x)",
+      "submission": "refused",
+      "why": "the same thing, in the spelling a browser also accepts"
+    },
+    {
+      "text": "[click](ms-msdt:calc)",
+      "submission": "refused",
+      "why": "an application scheme, which hands a click to a program on the reader's machine"
+    },
+    {
+      "text": "[click](attachment:../../etc/passwd)",
+      "submission": "refused",
+      "why": "an attachment is named by the identifier this deployment minted, and nothing else"
+    },
+    {
+      "text": "[click](issue:../../secret)",
+      "submission": "refused",
+      "why": "an issue is named by its identifier"
+    },
+    {
+      "text": "<svg/onload=alert(1)>",
+      "submission": "accepted",
+      "why": "not a tag: CommonMark's open-tag production does not take a slash there, so this is text and every renderer escapes it"
+    },
+    {
+      "text": "```<script>alert(1)</script>\ncode\n```",
+      "submission": "accepted",
+      "why": "a fenced block holds whatever it holds; the language tag is the input, and the renderer allowlists it before it reaches a class"
+    },
+    {
+      "text": "```javascript:alert(1)\ncode\n```",
+      "submission": "accepted",
+      "why": "the same: a language tag, not a destination"
+    },
+    {
+      "text": "``` \"><script>alert(1)</script>\ncode\n```",
+      "submission": "accepted",
+      "why": "the same, spelled to break out of an attribute the renderer is what writes"
+    },
+    {
+      "text": "&lt;script&gt;alert(1)&lt;/script&gt;",
+      "submission": "accepted",
+      "why": "escaped text is text, and a person quoting a tag is writing something true"
+    }
+  ]
+}

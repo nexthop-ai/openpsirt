@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render } from "./markdown";
 
 // The live markup a rendering produced. Checked instead of the whole string
@@ -40,49 +42,29 @@ const forbidden = [
   "formaction",
 ];
 
-// The same corpus the server's renderer is held to, because the control moved
-// here when rendering did. Markup and markdown that has been used to get
-// script past sanitizers, plus the shapes specific to markdown itself.
-const corpus = [
-  `<script>alert(1)</script>`,
-  `<img src=x onerror=alert(1)>`,
-  `<svg/onload=alert(1)>`,
-  `<iframe src="javascript:alert(1)"></iframe>`,
-  `<body onload=alert(1)>`,
-  `<a href="javascript:alert(1)">click</a>`,
-  `[click](javascript:alert(1))`,
-  `[click](JaVaScRiPt:alert(1))`,
-  `[click](java&#115;cript:alert(1))`,
-  `[click](\tjavascript:alert(1))`,
-  `[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)`,
-  `![img](javascript:alert(1))`,
-  `![img](https://evil.example/pixel.gif)`,
-  `<a href="vbscript:msgbox(1)">x</a>`,
-  `<div style="background:url(javascript:alert(1))">x</div>`,
-  `<object data="data:text/html,<script>alert(1)</script>"></object>`,
-  `<embed src="data:text/html,<script>alert(1)</script>">`,
-  `<base href="https://evil.example/">`,
-  `<meta http-equiv="refresh" content="0;url=javascript:alert(1)">`,
-  `<link rel=stylesheet href="https://evil.example/x.css">`,
-  `<form action="javascript:alert(1)"><button>go</button></form>`,
-  `<button formaction="javascript:alert(1)">go</button>`,
-  `<iframe srcdoc="&lt;script&gt;alert(1)&lt;/script&gt;"></iframe>`,
-  "```<script>alert(1)</script>\ncode\n```",
-  "```javascript:alert(1)\ncode\n```",
-  '``` "><script>alert(1)</script>\ncode\n```',
-  `<p onmouseover="alert(1)">hover</p>`,
-  `<a href="#" onclick="alert(1)">x</a>`,
-  `<input type="text" onfocus="alert(1)" autofocus>`,
-  `<style>@import 'https://evil.example/x.css';</style>`,
-  `<!--<script>alert(1)</script>-->`,
-  `<math><mtext><script>alert(1)</script></mtext></math>`,
-  `<xmp><script>alert(1)</script></xmp>`,
-  `<noscript><p title="</noscript><script>alert(1)</script>">`,
-  `&lt;script&gt;alert(1)&lt;/script&gt;`,
-  `<scr<script>ipt>alert(1)</scr</script>ipt>`,
-  `<a href=" javascript:alert(1)">x</a>`,
-  `<a href="jav&#x0A;ascript:alert(1)">x</a>`,
-];
+// The corpus, read from the one file the server's submission check reads.
+//
+// **One file, because it was two.** The Go list called itself "the same
+// corpus" as this one and was 27 payloads shorter — two copies of a security
+// corpus diverge in the direction of the one nobody is adding to, and the
+// comment saying they were the same is what stopped anybody checking.
+//
+// Every payload must render inert, whether or not the server refuses it: a
+// fenced block holds whatever it holds and escaped text is text, and both
+// still reach a browser.
+const corpus: string[] = (() => {
+  // From the vitest root, which is `web/`. `import.meta.url` is not a file URL
+  // under the jsdom environment these tests run in, so it cannot be resolved
+  // from this file.
+  const at = resolve(process.cwd(), "../testdata/xss-corpus.json");
+  const doc = JSON.parse(readFileSync(at, "utf8")) as {
+    payloads: { text: string }[];
+  };
+  if (doc.payloads.length < 40) {
+    throw new Error(`the corpus holds ${doc.payloads.length} payloads, so this checks almost nothing`);
+  }
+  return doc.payloads.map((one) => one.text);
+})();
 
 describe("the renderer", () => {
   it("lets nothing in the corpus through", () => {

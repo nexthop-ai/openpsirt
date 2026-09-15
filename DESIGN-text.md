@@ -51,9 +51,14 @@ browser, an email and an export.
 
 ## Raw markup
 
-Raw markup is refused at the parser rather than stripped afterwards. The parser
-drops a raw block and escapes an inline one. The assertion is that nothing
-arrives as live markup, not which of the two mechanisms ran.
+Raw markup is **refused at submission**, naming the line it is on. Not dropped,
+not escaped: a person told while they are still writing can fix it, and a tag
+silently escaped is somebody who typed one thing and was shown another.
+
+| Rule | Reason |
+|---|---|
+| Refused rather than allowlisted | An allowlist of permitted tags is a thing that can be wrong, and every interesting attack lives in the gap between what such a list permits and what a browser does. Nothing triage needs requires markup, so the category goes rather than being bounded |
+| Refused rather than turned off at the parser | A parser that produced no markup nodes would leave nothing to report, and the point is to report it. This was described as parser configuration and was not: the option that reads that way is a *renderer* option, and nothing here renders |
 
 There is no second pass. A sanitizer ran over the parser's output once, and it
 was the only reader of the rendering this server no longer does — so what

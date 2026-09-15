@@ -98,6 +98,14 @@ func TestMentionsAreReadFromProseAndNotFromCode(t *testing.T) {
 		{"one at the start", "@ana asked.", []string{"ana"}},
 		{"inside a code span", "Write it as `@ana` to call somebody", nil},
 		{"inside a fenced block", "```\nfrom @ana to @ben\n```\n", nil},
+		{"inside a fenced block with a language", "```log\nfrom @ana\n```\n", nil},
+		// The shape a pasted stack trace actually takes, and the one nothing
+		// covered. What keeps these out is that goldmark holds a block's
+		// content in Lines() with no child text node, so the walk never
+		// reaches it — these rows are what would catch an upgrade that
+		// changes that, now that the guards that looked like the reason are
+		// gone.
+		{"inside an indented block", "A log:\n\n    from @ana to @ben\n", nil},
 		{"an email address", "Mail ops@example.com about it", nil},
 		{"trailing punctuation is not part of the name", "Thanks @ana.", []string{"ana"}},
 		// A sign-in through a trusted header mints identities like this, and
