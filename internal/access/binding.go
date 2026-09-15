@@ -161,17 +161,33 @@ var ErrLastAdministrator = errors.New("nothing would be left to administer this 
 // back is editing the database by hand. Rolling back is also what puts the
 // original row back: BindAdmin stamps a fresh CreatedAt, so a "restored"
 // binding was not the row that had been there.
-func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mode Mode) error {
+// modeIn reads where roles come from, against whichever handle it is given.
+//
+// Taken as a function because this package does not read settings — the one
+// that does sits above it — and the mode has to be read inside the transaction
+// that acts on it rather than handed in already stale.
+type modeIn func(context.Context, bun.IDB) (Mode, error)
+
+func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mode modeIn) error {
 	db, ok := database.Handle(s.db)
 	if !ok {
 		return fmt.Errorf("this store is already inside a transaction")
 	}
 	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+		// Read here, not by the caller. A retry re-runs this closure against a
+		// database somebody else has moved, so a mode fetched before it began
+		// describes a world that is gone (REQ-71) — and judging by the old one
+		// keeps a delete that leaves nobody able to administer the deployment,
+		// which is the state this function exists to prevent.
+		in, err := mode(ctx, tx)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.NewDelete().Model((*AdminBinding)(nil)).
 			Where("group_name = ?", group).Exec(ctx); err != nil {
 			return fmt.Errorf("unbind %q from administration: %w", group, err)
 		}
-		switch can, err := canAdminister(ctx, tx, mode); {
+		switch can, err := canAdminister(ctx, tx, in); {
 		case err != nil:
 			return err
 		case !can:

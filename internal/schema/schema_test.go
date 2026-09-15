@@ -167,11 +167,11 @@ func TestEveryMigrationRollsBack(t *testing.T) {
 		if final, err := schema.Version(ctx, db); err != nil || final != 0 {
 			t.Fatalf("after rolling everything back: version %d, err %v", final, err)
 		}
-		// Every table the migrations make, not four of them. Named by hand,
-		// this passed over fifty-three of fifty-seven — so a Down that forgot
-		// its DROP was caught for 7% of the schema and left behind for the
-		// rest, where it shows up as the next Up failing on a table that is
-		// already there.
+		// Every table the migrations make, not the handful somebody named.
+		// Written out by hand, this passed over most of the schema — so a Down
+		// that forgot its DROP was caught for the few that were listed and
+		// left behind for the rest, where it shows up as the next Up failing
+		// on a table that is already there.
 		left := dbtest.Tables()
 		if len(left) < 50 {
 			t.Fatalf("the table list holds %d names, so this checked almost nothing", len(left))

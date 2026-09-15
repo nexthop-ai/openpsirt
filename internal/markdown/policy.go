@@ -11,7 +11,8 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// Schemes are the only ones a link may use.
+// allowedScheme reports whether a link may use this scheme. These are the only
+// ones.
 //
 // `javascript:` in a link is the oldest attack there is, and a `data:` address
 // lets a link become a page we appear to have served. Everything else is
@@ -20,6 +21,7 @@ import (
 // `attachment:` is a file held here, referred to by an opaque identifier and
 // never by an address. It resolves through a path that asks who is looking,
 // which is what makes it the one scheme an image may also use.
+//
 // **Not a map anybody can widen.** An exported map is a value every importer
 // shares and any of them may write to at init, so one line in an unrelated
 // package could add a scheme to the link policy for the whole process, with
@@ -361,8 +363,14 @@ func References(source string) []string {
 //
 // **Nothing is checked against the database here.** Whether we have that issue
 // is a question with a subject attached, and this package holds no subject and
-// reaches no rows. What it answers is what the text refers to; what that
-// resolves to travels beside the text (REQ-65).
+// reaches no rows. What it answers is what the text refers to.
+//
+// **And nothing calls it.** `DESIGN-text.md` records why an issue reference may
+// need no resolving — an identifier is the address, reachable with no lookup,
+// unlike a mention needing the person table — so this is either a function to
+// delete or the half of REQ-65 that is not built. `TODO.md` carries the
+// question; what this comment must not do is claim a consumer that is not
+// there.
 func Issues(source string) []string {
 	return referenced(source, Issue, namedIssue)
 }

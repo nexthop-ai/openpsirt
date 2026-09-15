@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
@@ -254,6 +256,10 @@ func TestSwitchingBackToDirectClearsWhatGroupsDerived(t *testing.T) {
 	})
 }
 
+// groupBound is the mode read, for a test that is about the counting rather
+// than about where the mode comes from.
+func groupBound(context.Context, bun.IDB) (access.Mode, error) { return access.GroupBound, nil }
+
 func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 	// The only route back is editing the database by hand, and nobody
 	// discovers that at a good moment.
@@ -279,7 +285,7 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 		// refused, and the row is still there afterwards. Refused inside the
 		// write rather than deleted and put back: a compensating re-insert
 		// that failed left the binding gone and nobody able to administer.
-		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", access.GroupBound); !errors.Is(
+		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); !errors.Is(
 			err, access.ErrLastAdministrator) {
 			t.Errorf("unbinding the last administrators' group answered %v, want a refusal", err)
 		}
@@ -296,7 +302,7 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", access.GroupBound); err != nil {
+		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); err != nil {
 			t.Fatal(err)
 		}
 		for _, mode := range []access.Mode{access.Direct, access.GroupBound} {

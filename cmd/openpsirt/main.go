@@ -100,11 +100,13 @@ func run(args []string, stdout, stderr *os.File) error {
 	// process was up, no port was listening, and not one log line had been
 	// written — from outside, the same thing as a slow image pull. A crash
 	// loop that names what it could not reach is the failure a supervisor can
-	// act on. Migrating is deliberately outside it, above: a schema change on
-	// a large table legitimately takes longer than a deployment starts in.
+	// act on. Migrating is outside it — both the subcommand above and the
+	// auto-migration below — because a schema change on a large table
+	// legitimately takes longer than a deployment starts in.
 	//
 	// Each step says what it is about to do, for the same reason: a hang has
 	// to name what it is hanging on.
+	migrating := ctx
 	startup, settled := context.WithTimeout(ctx, cfg.StartupTimeout)
 	defer settled()
 	ctx = startup
@@ -119,10 +121,20 @@ func run(args []string, stdout, stderr *os.File) error {
 
 	// Migrating before serving means a request never arrives against a schema
 	// the code does not expect.
+	//
+	// **Outside the startup deadline**, and the deadline is why: a migration
+	// adding an index to a large finding table takes longer than a deployment
+	// starts in, so bounded at 60s it gives up, restarts, and begins the
+	// migration again — for ever. A second replica waits on the advisory lock
+	// and dies under the same bound. What bounds this instead is the chart's
+	// startup probe, which allows ten minutes and says so.
+	//
+	// The `migrate` subcommand above returns before any of this; what runs
+	// here is the same work under `auto-migrate`, which the chart defaults on.
 	if cfg.AutoMigrate {
 		logger.Info("applying the schema")
-		if err := schema.Up(ctx, db, logger); err != nil {
-			return startupFailed(err, "applying the schema", cfg)
+		if err := schema.Up(migrating, db, logger); err != nil {
+			return fmt.Errorf("applying the schema: %w", err)
 		}
 	} else if err := schemaIsCurrent(ctx, db, logger); err != nil {
 		return startupFailed(err, "checking the schema version", cfg)
@@ -484,14 +496,13 @@ func newLogger(cfg config.Config, w *os.File) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, opts))
 }
 
-// passes is what runs beside the server: ten background loops, two of which
-// may be absent because the thing they work on is not configured — the mail
-// sender where no channel is configured, and the attachment sweeper where no
-// store is.
+// passes is what runs beside the server.
 //
-// The other eight always run. Guarding all of them read as though any could be
-// missing, and made the reader open six packages to find out that four of the
-// guards could never be false.
+// Two of them may be absent because the thing they work on is not configured:
+// the mail sender where no channel is, and the attachment sweeper where no
+// store is. The rest always run. Guarding all of them read as though any could
+// be missing, and made the reader open a package per pass to find out that
+// most of the guards could never be false.
 //
 // Grouped rather than passed one at a time. Twelve parameters is past what a
 // call site can be read at, and they divide cleanly into what to serve and
@@ -542,9 +553,11 @@ type loop struct {
 // A list rather than a run of if statements, so that what a given deployment
 // starts can be read — and held to — without starting any of it.
 func (p passes) loops() []loop {
-	// The eight that always run. Their constructors return a value
-	// unconditionally, so a guard here would be a condition a reader has to go
-	// and disprove — which is what four of them were.
+	// The ones that always run. Seven of these constructors return a value
+	// unconditionally; NewUndertaker returns nil only for a nil queue, which
+	// queue.New never produces, and Undertaker.Run answers a nil receiver. So
+	// a guard on any of them is a condition a reader has to go and disprove —
+	// which is what four of them were.
 	all := []loop{
 		{"read what arrived", p.reader.Run, readInterval},
 		{"scan what arrived", p.runner.Run, readInterval},

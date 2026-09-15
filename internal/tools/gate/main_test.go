@@ -142,12 +142,17 @@ func TestEverythingDelegatesToTheWholeGate(t *testing.T) {
 	// and the hazard is the reverse of the one below: reduced to a subset, the
 	// checks it stopped choosing pass by not running.
 	whole := targets(map[tier]bool{everything: true})
-	if !slices.Contains(whole, "check") || !slices.Contains(whole, "check-engines") {
-		t.Fatalf("the everything tier chose %v, want the whole gate", whole)
+	// `check-packaging` among them, because it is the one tier CI runs and
+	// the local gate did not — which is how a web build reaching outside
+	// `web/` passed every check here and failed the image.
+	for _, want := range []string{"check", "check-engines", "check-packaging"} {
+		if !slices.Contains(whole, want) {
+			t.Errorf("the everything tier chose %v, which leaves out %q", whole, want)
+		}
 	}
-	// And it is only those two: a narrower target chosen beside `check` is the
-	// same work twice, which is what teaches people the gate is expensive.
-	if len(whole) != 2 {
+	// And only those: a narrower target chosen beside `check` is the same work
+	// twice, which is what teaches people the gate is expensive.
+	if len(whole) != 3 {
 		t.Errorf("the everything tier chose %v alongside the whole gate", whole)
 	}
 

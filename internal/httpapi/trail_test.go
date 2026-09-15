@@ -458,6 +458,17 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 						seen.fill(act.body))
 				}
 			}
+			// Counted before and after, not read off the top.
+			//
+			// Reading only the newest row let an act pass with its own write
+			// deleted wherever the act above it had left a row saying the same
+			// three things — which is true of unbinding a group, of
+			// withdrawing one's own token, and of taking somebody off a team
+			// twice. Three of the nine writes this exists to hold were held
+			// by the row before them.
+			var before changed
+			read(t, r, "admin", "/v1/administration/changes?limit=1", &before)
+
 			answered := got(t, r, seen)
 			if answered.Code >= 300 {
 				t.Fatalf("%s (%s) answered %d: %s",
@@ -469,6 +480,10 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 
 			var trail changed
 			read(t, r, "admin", "/v1/administration/changes?limit=1", &trail)
+			if trail.Total != before.Total+1 {
+				t.Fatalf("%s (%s) left %d rows, want 1",
+					act.what, act.id, trail.Total-before.Total)
+			}
 			if len(trail.Items) == 0 {
 				t.Fatalf("%s (%s) left no record of who changed it", act.what, act.id)
 			}

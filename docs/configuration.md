@@ -12,12 +12,30 @@ duration is written as Go reads it: `30s`, `5m`, `12h`. A number is a positive
 whole number; zero reads as unset everywhere, so it is refused rather than
 taken.
 
+## Upgrading
+
+**`OPENPSIRT_BASE_URL` is checked at startup**, and a value with no scheme is
+now refused where it used to be accepted. `psirt.example.com` has to become
+`https://psirt.example.com`.
+
+It was accepted and did nothing useful: with no scheme there is no host to
+read, so the same-origin check on every state-changing browser request fell
+back to the address the request itself claimed — the guard ran and guarded
+nothing — and the address a sign-in provider is sent back to was not absolute,
+which the provider refuses. A deployment reaching this has not been protected
+by that check for as long as the value has been wrong.
+
+A path below the address is refused for the same reason:
+`https://psirt.example.com/psirt` makes every link this deployment writes point
+somewhere it does not answer. If this deployment is served under a path, that
+is a thing to raise rather than to configure here.
+
 ## Serving
 
 | Variable | Meaning | Default |
 |---|---|---|
 | `OPENPSIRT_ADDR` | The `host:port` the HTTP server listens on | `:8080` |
-| `OPENPSIRT_BASE_URL` | The address people arrive on. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
+| `OPENPSIRT_BASE_URL` | The address people arrive on, **written in full and with no path below it**: `https://psirt.example.com`. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
 | `OPENPSIRT_PLAIN_HTTP` | Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not | `false` |
 | `OPENPSIRT_SHUTDOWN_GRACE` | How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that | `15s` |
 | `OPENPSIRT_STARTUP_TIMEOUT` | How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on | `60s` |

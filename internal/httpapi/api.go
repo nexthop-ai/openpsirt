@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -485,6 +486,15 @@ func wentWrong(logger *slog.Logger, what string, err error) error {
 // direction that is already safe, because a store's own sentences are the only
 // thing that reaches the caller.
 func asked(logger *slog.Logger, err error) error {
+	// An authorization refusal is not somebody having asked for the
+	// impossible. Without this arm it fell to the sentence below and came back
+	// 422 carrying the store's own words — which name the product identifier
+	// the refusal exists to withhold. `add-alias` is the live case: recording
+	// another name asks for triage in every product the issue is open in, and
+	// the route guard can only authorize the one in the path.
+	if errors.Is(err, access.ErrDenied) {
+		return huma.Error403Forbidden("not authorized")
+	}
 	if database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
 	}

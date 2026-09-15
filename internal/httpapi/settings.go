@@ -96,73 +96,82 @@ var settable = []struct {
 	// kind is what a value of this setting is, which decides how it is
 	// checked at the write and how the screen offers it.
 	kind settingKind
+	// words is what this setting may be set to, in the order to offer them,
+	// and is the list the write path checks against. Nil for every kind but a
+	// word or a switch.
+	//
+	// On the row rather than in a second table keyed on the name: keyed that
+	// way, the next word setting anybody adds is offered nothing and then
+	// checked against the triage floor's list, which is the shape the rest of
+	// this commit removes.
+	words []string
 	// shipped is the value in force where nobody has set one, read from the
 	// package that reads it rather than respelled here — five of them were
 	// respelled, and a shipped number written twice is one that disagrees with
 	// itself the first time anybody moves it.
 	//
-	// Empty for the one setting whose shipped value is not a constant: a
-	// sign-in's length falls back to the environment before the built-in, so
-	// it is answered by shippedFor.
+	// A function rather than a constant for the one setting whose shipped
+	// value is not one: a sign-in's length falls back to the environment
+	// before the built-in, which is why this takes the Ingest.
 	shipped func(Ingest) string
 	// movesDeadlines says changing this invalidates every stored deadline,
 	// so they are rewritten away from the request.
 	movesDeadlines bool
 }{
 	{setting.DueExploited, "How long a known-exploited finding may stay open. Its own window, and the shortest: severity is how bad a flaw is, being exploited is a fact about the world",
-		aDuration, func(Ingest) string { return windows.Exploited.String() }, true},
+		aDuration, nil, func(Ingest) string { return windows.Exploited.String() }, true},
 	{setting.DueCritical, "How long a critical may stay open",
-		aDuration, func(Ingest) string { return windows.Critical.String() }, true},
+		aDuration, nil, func(Ingest) string { return windows.Critical.String() }, true},
 	{setting.DueHigh, "How long a high may stay open",
-		aDuration, func(Ingest) string { return windows.High.String() }, true},
+		aDuration, nil, func(Ingest) string { return windows.High.String() }, true},
 	{setting.DueMedium, "How long a medium may stay open",
-		aDuration, func(Ingest) string { return windows.Medium.String() }, true},
+		aDuration, nil, func(Ingest) string { return windows.Medium.String() }, true},
 	{setting.DueLow, "How long a low may stay open",
-		aDuration, func(Ingest) string { return windows.Low.String() }, true},
+		aDuration, nil, func(Ingest) string { return windows.Low.String() }, true},
 	{setting.DeferralThreshold, "How long something may be put off before a second person has to agree. Measured against everything the finding has already been put off for, not against the postponement being asked for",
-		aDuration, func(Ingest) string { return triage.DefaultDeferralThreshold.String() }, false},
+		aDuration, nil, func(Ingest) string { return triage.DefaultDeferralThreshold.String() }, false},
 	{setting.SessionLifetime, "How long a sign-in lasts",
-		aDuration, sessionLifetime, false},
+		aDuration, nil, sessionLifetime, false},
 	{setting.MaxTokenLifetime, "The longest a personal token may be valid for",
-		aDuration, func(Ingest) string { return access.MaxTokenLifetime.String() }, false},
+		aDuration, nil, func(Ingest) string { return access.MaxTokenLifetime.String() }, false},
 	{setting.ClaimWindow, "How long an authorization written for somebody who has never signed in stays redeemable. It is the one window where a name rather than an identifier decides who gets a set of roles, so it ends",
-		aDuration, func(Ingest) string { return access.DefaultClaimWindow.String() }, false},
+		aDuration, nil, func(Ingest) string { return access.DefaultClaimWindow.String() }, false},
 	{setting.TogetherCap, "How many findings one action may claim about at once. A whole number, not a length of time",
-		aCount, func(Ingest) string { return strconv.Itoa(triage.DefaultTogetherCap) }, false},
+		aCount, nil, func(Ingest) string { return strconv.Itoa(triage.DefaultTogetherCap) }, false},
 	{setting.TriageFloor, "What counts as worth triaging: everything, or a severity word below which findings are still recorded and counted but kept out of the working list. A product may state its own instead",
-		aWord, func(Ingest) string { return theFloor[0] }, true},
+		aWord, theFloor, func(Ingest) string { return theFloor[0] }, true},
 	{setting.QuietAfter, "How long a build may go without a scan arriving before it is reported as having gone quiet. Measured from the last arrival, or from when the build was declared where nothing has ever arrived",
-		aDuration, func(Ingest) string { return setting.DefaultQuietAfter.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultQuietAfter.String() }, false},
 	{setting.ScanEvery, "How often everything tracked is scanned again against the vulnerability data of the day. A release that is never rebuilt has the same components it always had and a different answer every month, so this is what finds an advisory published after it shipped",
-		aDuration, func(Ingest) string { return setting.DefaultScanEvery.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultScanEvery.String() }, false},
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else",
-		aSwitch, func(Ingest) string { return setting.Off }, false},
+		aSwitch, theSwitch, func(Ingest) string { return setting.Off }, false},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time",
-		aSize, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
+		aSize, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it",
-		aSize, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentQuota) }, false},
+		aSize, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentQuota) }, false},
 	{setting.QueueBacklog, "How much background work of one kind may be waiting before more of that kind is refused. A whole number, not a length of time. Counted per kind, so a producer that has filled its own queue does not refuse everybody else's work",
-		aCount, func(Ingest) string { return strconv.Itoa(setting.DefaultQueueBacklog) }, false},
+		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultQueueBacklog) }, false},
 	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog",
-		aCount, func(Ingest) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
+		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
 	{setting.AttachmentShare, "How much of that total any one person may hold, in bytes. A ceiling on the whole store is one person's to reach, and what it costs is everybody else's next upload",
-		aSize, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentShare) }, false},
+		aSize, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentShare) }, false},
 	{setting.AbsentAfter, "How long somebody may go without signing in before work they are holding is raised with administrators. It only ever asks: long leave and having left look the same from here",
-		aDuration, func(Ingest) string { return setting.DefaultAbsentAfter.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultAbsentAfter.String() }, false},
 	{setting.WaitingAfter, "How long a claim may wait on a second person before whoever can approve it is told. What is wrong is that nothing has happened, which is the one thing no message driven by an event can report",
-		aDuration, func(Ingest) string { return setting.DefaultWaitingAfter.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultWaitingAfter.String() }, false},
 	{setting.SentBackAfter, "How long a claim an approver asked more of may sit untouched before its proposer is told again. Shorter than the wait above: the question was asked of the person already holding it",
-		aDuration, func(Ingest) string { return setting.DefaultSentBackAfter.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultSentBackAfter.String() }, false},
 	{setting.DeferralLead, "How long before a deferral's end date its proposer hears that it is coming. The date arriving puts the finding back in the queue, which is the last moment rather than the first useful warning",
-		aDuration, func(Ingest) string { return setting.DefaultDeferralLead.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultDeferralLead.String() }, false},
 	{setting.QueuedAfter, "How long work may sit in a team's queue with nobody having taken it. Neither owned nor unowned, which is the gap where it looks handled and is not",
-		aDuration, func(Ingest) string { return setting.DefaultQueuedAfter.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultQueuedAfter.String() }, false},
 	{setting.DiscloseAfter, "How long a finding nobody has announced stays that way before its date. What a deployment's coordinated-disclosure policy says, which is the deployment's to state rather than ours: an embargo somebody outside can hold us to is one they were told the length of",
-		aDuration, func(Ingest) string { return setting.DefaultDiscloseAfter.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultDiscloseAfter.String() }, false},
 	{setting.ExtensionThreshold, "How much an embargo may be moved by in total before a second person has to agree. Measured against everything the date has already been moved by, not against the extension being asked for",
-		aDuration, func(Ingest) string { return setting.DefaultExtensionThreshold.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultExtensionThreshold.String() }, false},
 	{setting.DisclosureLead, "How long before an embargo's date the people who could still move it are told it is coming. An extension nobody can agree to in time is an approval in name only",
-		aDuration, func(Ingest) string { return setting.DefaultDisclosureLead.String() }, false},
+		aDuration, nil, func(Ingest) string { return setting.DefaultDisclosureLead.String() }, false},
 }
 
 // theSwitch is what an on-or-off setting may be set to.
@@ -209,7 +218,7 @@ func registerSettings(api huma.API, in Ingest) {
 			}
 			out.Body.Items = append(out.Body.Items, SettingBody{
 				Name: each.name, Value: value, Default: !set, Means: each.means,
-				Kind: string(each.kind), Words: wordsFor(each.kind, each.name),
+				Kind: string(each.kind), Words: each.words,
 			})
 		}
 		return out, nil
@@ -243,17 +252,14 @@ func registerSettings(api huma.API, in Ingest) {
 		// quietly stopped applying — and every reader here treats zero and
 		// negative as unset, so those would do the same while looking set.
 		switch settable[row].kind {
-		case aSwitch:
-			if !slices.Contains(theSwitch, input.Body.Value) {
+		case aSwitch, aWord:
+			// Against the row's own list, which is the one the response
+			// offers. Two tables keyed on the name is how an offered word and
+			// an accepted word come to differ.
+			if !slices.Contains(settable[row].words, input.Body.Value) {
 				return nil, huma.Error422UnprocessableEntity(
-					fmt.Sprintf("%q is not on or off — write one of %s",
-						input.Body.Value, strings.Join(theSwitch, ", ")))
-			}
-		case aWord:
-			if !slices.Contains(theFloor, input.Body.Value) {
-				return nil, huma.Error422UnprocessableEntity(
-					fmt.Sprintf("%q is not a line to triage from — write one of %s",
-						input.Body.Value, strings.Join(theFloor, ", ")))
+					fmt.Sprintf("%q is not one this setting takes — write one of %s",
+						input.Body.Value, strings.Join(settable[row].words, ", ")))
 			}
 		case aCount, aSize:
 			n, err := strconv.Atoi(input.Body.Value)
@@ -412,22 +418,6 @@ const betweenTries = 2 * time.Second
 // settleLease bounds handing a lease back once the work is over, so a database
 // that is not answering cannot hold a goroutine open.
 const settleLease = 5 * time.Second
-
-// wordsFor is what a word or on-and-off setting may be set to, in the order to
-// offer them.
-//
-// Here rather than on the row because the lists already live where the write
-// path checks against them — so an offered word and an accepted word cannot
-// differ, which is the failure a second copy in the interface produced.
-func wordsFor(kind settingKind, name string) []string {
-	switch {
-	case kind == aSwitch:
-		return theSwitch
-	case kind == aWord && name == setting.TriageFloor:
-		return theFloor
-	}
-	return nil
-}
 
 // settingRow finds a setting's row, and whether it is one.
 //

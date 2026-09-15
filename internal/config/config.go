@@ -262,26 +262,26 @@ func Load() (Config, error) {
 
 	sources, err := access.ParseSources(env("TRUSTED_SOURCES", ""))
 	if err != nil {
-		return Config{}, fmt.Errorf("%sTRUSTED_SOURCES: %w", envPrefix, err)
+		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_SOURCES: %w", err)
 	}
 	c.TrustedSources = sources
 	// A half-configuration is the dangerous state, so it stops the process
 	// rather than being quietly ignored: a header named with nothing to trust
 	// it from is either a mistake or the first half of one.
 	if err := (access.Trust{Header: c.TrustedHeader, From: c.TrustedSources}).Configured(); err != nil {
-		return Config{}, fmt.Errorf("%sTRUSTED_HEADER: %w", envPrefix, err)
+		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_HEADER: %w", err)
 	}
 
 	if err := c.LogLevel.UnmarshalText([]byte(env("LOG_LEVEL", "info"))); err != nil {
-		return Config{}, fmt.Errorf("%sLOG_LEVEL: %w", envPrefix, err)
+		return Config{}, fmt.Errorf("OPENPSIRT_LOG_LEVEL: %w", err)
 	}
 	switch c.LogFormat {
 	case "text", "json":
 	default:
-		return Config{}, fmt.Errorf("%sLOG_FORMAT: want \"text\" or \"json\", got %q", envPrefix, c.LogFormat)
+		return Config{}, fmt.Errorf("OPENPSIRT_LOG_FORMAT: want \"text\" or \"json\", got %q", c.LogFormat)
 	}
 	if strings.TrimSpace(c.Addr) == "" {
-		return Config{}, fmt.Errorf("%sADDR: must not be empty", envPrefix)
+		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
 	}
 	// Refused at startup rather than at the first sign-in. The API write path
 	// bounds this setting and the environment path did not, so a deployment
@@ -289,8 +289,8 @@ func Load() (Config, error) {
 	// every browser sign-in — and the way back needed an administrator's key,
 	// because nobody could sign in.
 	if c.SessionLifetime > access.MaxSessionLifetime {
-		return Config{}, fmt.Errorf("%sSESSION_LIFETIME: want at most %s, got %q",
-			envPrefix, access.MaxSessionLifetime, c.SessionLifetime)
+		return Config{}, fmt.Errorf("OPENPSIRT_SESSION_LIFETIME: want at most %s, got %q",
+			access.MaxSessionLifetime, c.SessionLifetime)
 	}
 	if err := absoluteBase(c.BaseURL); err != nil {
 		return Config{}, err
@@ -320,18 +320,18 @@ func absoluteBase(base string) error {
 	parsed, err := url.Parse(base)
 	switch {
 	case err != nil:
-		return fmt.Errorf("%sBASE_URL: not an address at all: %q", envPrefix, base)
+		return fmt.Errorf("OPENPSIRT_BASE_URL: not an address at all: %q", base)
 	case parsed.Scheme != "http" && parsed.Scheme != "https":
 		return fmt.Errorf(
-			"%sBASE_URL: want an absolute address such as https://psirt.example.com, got %q",
-			envPrefix, base)
+			"OPENPSIRT_BASE_URL: want an absolute address such as "+
+				"https://psirt.example.com, got %q", base)
 	case parsed.Host == "":
-		return fmt.Errorf("%sBASE_URL: names no host: %q", envPrefix, base)
+		return fmt.Errorf("OPENPSIRT_BASE_URL: names no host: %q", base)
 	case strings.Trim(parsed.Path, "/") != "":
 		// A path below the address would make every link this deployment
 		// writes point somewhere it does not answer.
-		return fmt.Errorf("%sBASE_URL: names the address, not a path below it: %q",
-			envPrefix, base)
+		return fmt.Errorf("OPENPSIRT_BASE_URL: names the address, not a path below it: %q",
+			base)
 	}
 	return nil
 }
@@ -344,6 +344,11 @@ type reader struct {
 	err error
 }
 
+// The one refusal here that composes the prefix rather than writing a name
+// whole: the name is what it is given, one message for every setting, so there
+// is no literal to write. What keeps a variable findable in this file is the
+// call site — `r.duration("SHUTDOWN_GRACE", …)` — which is also what
+// `documented_test.go` reads to hold the set against the page.
 func (r *reader) refuse(key, want, got string) {
 	if r.err == nil {
 		r.err = fmt.Errorf("%s%s: want %s, got %q", envPrefix, key, want, got)

@@ -63,9 +63,17 @@ var runs = map[tier][]string{
 	web:       {"web-check"},
 	code: {"build", "vet", "lint", "unreachable", "readable", "negatives", "confined", "granted",
 		"attached", "test"},
-	api:        {"openapi-current", "web-api"},
-	engines:    {"reserved", "test-all", "check-engines"},
-	everything: {"check", "check-engines"},
+	api:     {"openapi-current", "web-api"},
+	engines: {"reserved", "test-all", "check-engines"},
+	// Everything, the container and the chart included. Those are the one
+	// tier CI runs and the local gate did not, which is how a web build
+	// reaching outside `web/` passed every check here and failed the image:
+	// `check` type-checks from a checkout where the path resolves, and
+	// nothing before the push built the thing that could not.
+	//
+	// It skips itself, loudly, where docker or helm is absent, so a checkout
+	// without them still passes rather than being unable to run the gate.
+	everything: {"check", "check-engines", "check-packaging"},
 }
 
 // The order targets are printed in, which is the order make runs them.
@@ -73,7 +81,7 @@ var order = []string{
 	"build", "vet", "lint", "unreachable", "readable", "negatives", "reserved", "confined", "granted",
 	"attached",
 	"docs-check", "unclaimed", "openapi-current",
-	"test", "test-all", "check-engines", "web-check", "web-api", "check",
+	"test", "test-all", "check-engines", "web-check", "web-api", "check", "check-packaging",
 }
 
 func main() {

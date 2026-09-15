@@ -50,6 +50,32 @@ export function withoutComments(text) {
     .join("\n");
 }
 
+// tokensIn reads one file as the tokens it defines and the tokens it names.
+//
+// Lifted out of the walk so a test can reach the comment stripping *through*
+// the thing that broke. Asked of `withoutComments` directly, a test passes
+// while the three calls to it are deleted — which is the missing-call shape
+// this gate exists to catch, in the gate itself.
+export function tokensIn(text, at = "") {
+  const source = withoutComments(text);
+  const lines = source.split("\n");
+  const defined = new Map();
+  const named = new Map();
+  for (let i = 0; i < lines.length; i++) {
+    for (const [, name] of lines[i].matchAll(/(?:^|[;{,]|\s)["']?(--[a-zA-Z0-9_-]+)["']?\s*:/g)) {
+      if (!defined.has(name)) defined.set(name, `${at}:${i + 1}`);
+    }
+    // A reference carrying its own fallback is a deliberate default, and the
+    // author said what happens when it is absent.
+    for (const [, name, fallback] of lines[i].matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)\s*(,?)/g)) {
+      if (fallback === ",") continue;
+      if (!named.has(name)) named.set(name, []);
+      named.get(name).push(`${at}:${i + 1}`);
+    }
+  }
+  return { defined, named };
+}
+
 async function sources(dir) {
   const found = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -77,31 +103,18 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   // per element is as defined as one set on a selector, and the swatch that
   // draws two colors is exactly that.
   const definedAt = new Map();
+  const namedAt = new Map();
   for (const file of files) {
-    const text = withoutComments(await readFile(file, "utf8"));
-    const lines = text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      for (const [, name] of lines[i].matchAll(/(?:^|[;{,]|\s)["']?(--[a-zA-Z0-9_-]+)["']?\s*:/g)) {
-        if (!definedAt.has(name)) {
-          definedAt.set(name, `${path.relative(path.join(here, ".."), file)}:${i + 1}`);
-        }
-      }
-    }
+    const at = path.relative(path.join(here, ".."), file);
+    const { defined, named } = tokensIn(await readFile(file, "utf8"), at);
+    for (const [name, where] of defined) if (!definedAt.has(name)) definedAt.set(name, where);
+    for (const [name, where] of named) namedAt.set(name, [...(namedAt.get(name) ?? []), ...where]);
   }
 
-  // What is referred to, minus the ones carrying their own fallback.
+  // What is referred to and defined nowhere.
   const missing = new Map();
-  for (const file of files) {
-    const text = withoutComments(await readFile(file, "utf8"));
-    const lines = text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      for (const [, name, rest] of lines[i].matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)\s*(,?)/g)) {
-        if (rest === "," || definedAt.has(name)) continue;
-        const at = `${path.relative(path.join(here, ".."), file)}:${i + 1}`;
-        if (!missing.has(name)) missing.set(name, []);
-        missing.get(name).push(at);
-      }
-    }
+  for (const [name, where] of namedAt) {
+    if (!definedAt.has(name)) missing.set(name, where);
   }
 
   if (missing.size > 0) {
@@ -120,12 +133,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   // The bundle is self-contained and embedded in the binary, so there is no
   // consumer outside this directory for one to be defined for — which the check
   // above already assumes in the other direction.
-  const named = new Set();
+  // Through the same reader, so both directions strip comments by the same
+  // call rather than by two that can drift apart. A reference carrying its own
+  // fallback still counts as naming the token here: what this asks is whether
+  // anybody refers to it at all.
+  const refersToIt = new Set();
   for (const file of files) {
     const text = withoutComments(await readFile(file, "utf8"));
-    for (const [, name] of text.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)/g)) named.add(name);
+    for (const [, name] of text.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)/g)) refersToIt.add(name);
   }
-  const orphaned = [...definedAt].filter(([name]) => !named.has(name)).sort();
+  const orphaned = [...definedAt].filter(([name]) => !refersToIt.has(name)).sort();
   if (orphaned.length > 0) {
     for (const [name, at] of orphaned) {
       console.error(`${name} is defined at ${at} and named nowhere`);
@@ -137,6 +154,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   // The count is the referenced set rather than the defined one, so the number
   // reported is the number vouched for.
   console.log(
-    `every token is defined where it is named and named where it is defined (${named.size})`,
+    `every token is defined where it is named and named where it is defined (${refersToIt.size})`,
   );
 }

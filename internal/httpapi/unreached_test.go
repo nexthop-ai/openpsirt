@@ -161,6 +161,13 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 		if body := listed.Body.String(); strings.Contains(body, secret) {
 			t.Errorf("the listing hands back the signing secret: %s", body)
 		}
+		// **The secret, and not the address.** For Slack and for Teams the
+		// path carries the token and there is no other authentication, which
+		// is why the trail row beside the create records the host alone — and
+		// the listing hands the whole URL back regardless. That is not
+		// asserted here because it is not true: `outbound.go` predates this
+		// branch, and a test claiming a redaction nothing does would be worse
+		// than none. `TODO.md` carries it.
 
 		// And the rules on a destination are enforced here and nowhere else.
 		for _, c := range []struct {

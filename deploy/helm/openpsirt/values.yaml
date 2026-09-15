@@ -70,10 +70,16 @@ auth:
   # name from the trusted header is the same person. Naming somebody grants
   # them a role; it does not let them in without signing in.
   bootstrapAdmins: []
-  # Where this deployment answers, as people reach it. A provider sends
-  # somebody back to an address and compares it against what it was registered
-  # with, so it is stated rather than taken from whatever a request claims its
-  # host is. Required once any provider is configured.
+  # Where this deployment answers, as people reach it — written in full, with
+  # a scheme and no path below it: https://psirt.example.com
+  #
+  # A provider sends somebody back to an address and compares it against what
+  # it was registered with, so it is stated rather than taken from whatever a
+  # request claims its host is. Required once any provider is configured.
+  #
+  # A bare host is refused at startup. With no scheme there is no host to read,
+  # so the same-origin check on every state-changing browser request fell back
+  # to the address the request itself claimed.
   baseURL: ""
 
   # Sign-in through an OpenID Connect provider. Leave issuer empty to skip.

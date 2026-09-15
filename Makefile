@@ -958,7 +958,19 @@ endif
 # in both places rather than being written twice and drifting.
 CHECK_IMAGE ?= openpsirt:check
 
+# Whether the two tools this needs are here, asked once rather than per line.
+PACKAGING_TOOLS := $(shell command -v docker >/dev/null 2>&1 && \
+                     command -v helm >/dev/null 2>&1 && echo yes)
+
 check-packaging:
+ifeq ($(PACKAGING_TOOLS),)
+	@# Said rather than passed silently. The gate runs this now, so a machine
+	@# without docker or helm must still be able to run the gate — and a skip
+	@# that looks like a pass is what every other check here is written to
+	@# avoid, which is why it names what it did not do.
+	@echo "docker or helm is not installed, so the image and the chart are unchecked here."
+	@echo "CI runs both on every push; install them to run these before one."
+else
 	@# Not quiet, for the reason dist-inventories is not: a build that fails
 	@# without saying why is diagnosed by running it again differently.
 	@if [ "$(CHECK_IMAGE)" = "openpsirt:check" ]; then \
@@ -1026,6 +1038,7 @@ check-packaging:
 	  esac; \
 	done
 	@echo "the chart refuses every install that could not be signed into, and every mail configuration that would send nothing, each for the reason it names"
+endif
 
 run:
 	$(GO) run ./cmd/openpsirt

@@ -3,9 +3,11 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -232,11 +234,8 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 			// same reason the mode change is — and decided inside the write,
 			// so a refusal rolls the delete back rather than being undone by
 			// a second statement that could itself fail.
-			mode, err := roleMode(ctx, a, settings)
-			if err != nil {
-				return nil, err
-			}
-			switch err := rights.UnbindAdminIfOthersRemain(ctx, in.Group, mode); {
+			switch err := rights.UnbindAdminIfOthersRemain(ctx, in.Group,
+				roleModeIn(settings)); {
 			case errors.Is(err, access.ErrLastAdministrator):
 				return nil, huma.Error409Conflict(
 					"that was the last thing granting administration: bind another group " +
@@ -266,22 +265,24 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 // against a product, so it is not one of the roles.
 const adminRole = "admin"
 
-// roleMode reads where roles actually come from.
+// roleModeIn reads where roles actually come from, against whichever handle it
+// is given — which is the transaction deciding, rather than this.
 //
 // Asked because unbinding the last administrators' group matters while roles
 // are derived from groups and does not while they are assigned: refusing in
 // both would leave a deployment that has never turned group binding on unable
 // to tidy up a mapping it is not using.
-func roleMode(ctx context.Context, a Administering, settings func() *setting.Store) (access.Mode, error) {
-	store := settings()
-	if store == nil {
-		return access.Direct, nil
+func roleModeIn(settings func() *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
+	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
+		if settings() == nil {
+			return access.Direct, nil
+		}
+		stored, _, err := setting.NewStore(db).Get(ctx, setting.RoleMode)
+		if err != nil {
+			return "", fmt.Errorf("read where roles come from: %w", err)
+		}
+		return access.AsMode(stored), nil
 	}
-	stored, _, err := store.Get(ctx, setting.RoleMode)
-	if err != nil {
-		return "", wentWrong(a.Logger, "cannot read where roles come from", err)
-	}
-	return access.AsMode(stored), nil
 }
 
 // named is the two names a product answers to, which are different strings

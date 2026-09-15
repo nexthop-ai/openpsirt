@@ -54,7 +54,7 @@ func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 	// It reads the words a word setting takes rather than listing them, for
 	// the same reason: an offered word the write path refuses is what a second
 	// copy produces.
-	if !strings.Contains(body, "setting.words") && !strings.Contains(body, "words") {
+	if !strings.Contains(body, "setting.words") {
 		t.Error("the settings screen does not read the words a word setting takes")
 	}
 
@@ -153,5 +153,88 @@ func TestASignInsLengthReportsWhatTheDeploymentSet(t *testing.T) {
 	}
 	if got := settable[row].shipped(Ingest{}); got != access.DefaultSessionLifetime.String() {
 		t.Errorf("with nothing set, the screen reports %q rather than the built-in", got)
+	}
+}
+
+func TestAWordSettingOffersTheListItIsCheckedAgainst(t *testing.T) {
+	// The offered list and the accepted list were two tables keyed on the
+	// setting's name, so the second word setting anybody adds is offered
+	// nothing and then checked against the triage floor's words.
+	said := 0
+	for _, each := range settable {
+		switch each.kind {
+		case aWord, aSwitch:
+			said++
+			if len(each.words) == 0 {
+				t.Errorf("%s takes one of a few words and offers none", each.name)
+			}
+			// The shipped value has to be one of them, or an operator
+			// pressing their own default back is refused it.
+			if !slices.Contains(each.words, each.shipped(Ingest{})) {
+				t.Errorf("%s ships %q, which is not one of %v",
+					each.name, each.shipped(Ingest{}), each.words)
+			}
+		default:
+			if len(each.words) != 0 {
+				t.Errorf("%s is a %s and offers words, which nothing checks against",
+					each.name, each.kind)
+			}
+		}
+	}
+	if said < 2 {
+		t.Errorf("%d settings take a word, so this checked almost nothing", said)
+	}
+}
+
+func TestEverySettingNameThePackageDeclaresIsOfferedOrExempt(t *testing.T) {
+	// The three disclosure settings were read by the application and could not
+	// be set, and nothing caught it because the test named them by hand — so
+	// the twenty-eighth would have gone the same way.
+	//
+	// Read out of the package that declares them, the way the rollback test in
+	// this same branch reads `dbtest.Tables()`: a name added there and left out
+	// of `settable` fails this rather than waiting for somebody to notice.
+	source, err := os.ReadFile(filepath.Join("..", "setting", "setting.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A name, not a value: every setting is named in dotted parts, and the
+	// only constants here that are not are `on` and `off` — what a switch
+	// setting may be set to rather than a setting.
+	declared := map[string]bool{}
+	for _, found := range regexp.MustCompile(`\n\t([A-Z][A-Za-z]*)\s*=\s*"([a-z0-9-]+(?:\.[a-z0-9-]+)+)"`).
+		FindAllStringSubmatch(string(source), -1) {
+		declared[found[2]] = true
+	}
+	if len(declared) < 20 {
+		t.Fatalf("%d setting names were read out of the package, so this checked almost nothing",
+			len(declared))
+	}
+
+	// The two an operator does not set here, each for a reason.
+	exempt := map[string]string{
+		"roles.mode": "set through /v1/roles/mode, which refuses a mode nothing " +
+			"can derive roles in — a plain value write cannot ask that",
+		"signin.key": "generated and rotated by the deployment; an operator " +
+			"setting one would be choosing this deployment's signing key",
+	}
+	offered := map[string]bool{}
+	for _, each := range settable {
+		offered[each.name] = true
+	}
+	for name := range declared {
+		if offered[name] || exempt[name] != "" {
+			continue
+		}
+		t.Errorf("%s is declared as a setting and is neither offered nor exempt: "+
+			"add it to settable with its kind and shipped value, or say here why not", name)
+	}
+	for name, why := range exempt {
+		if !declared[name] {
+			t.Errorf("%s is exempt (%s) and no longer declared", name, why)
+		}
+		if offered[name] {
+			t.Errorf("%s is exempt (%s) and is offered anyway", name, why)
+		}
 	}
 }

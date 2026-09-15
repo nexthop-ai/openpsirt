@@ -10,10 +10,10 @@ import (
 // TestUnbindingTheLastAdministratorsGroupIsRefusedAndChangesNothing drives the
 // guard through the route.
 //
-// It had never executed. `stillAdministrable` sat at 0.0% of its statements,
-// and what stood behind it was a delete, a count and a compensating re-insert
-// — so a re-insert that failed left the binding gone and nobody able to
-// administer, a state whose only route back is editing the database by hand.
+// It had never executed. Nothing drove the guard at all, and what stood behind
+// it was a delete, a count and a compensating re-insert — so a re-insert that
+// failed left the binding gone and nobody able to administer, a state whose
+// only route back is editing the database by hand.
 //
 // Group-bound, because that is the mode the question matters in: with roles
 // assigned directly the administrators are people, and a mapping nobody is
