@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { render } from "./markdown";
+import shared from "../../../testdata/xss-corpus.json";
 
 // The live markup a rendering produced. Checked instead of the whole string
 // because escaped text is the correct outcome and contains the same words:
@@ -53,17 +52,12 @@ const forbidden = [
 // fenced block holds whatever it holds and escaped text is text, and both
 // still reach a browser.
 const corpus: string[] = (() => {
-  // From the vitest root, which is `web/`. `import.meta.url` is not a file URL
-  // under the jsdom environment these tests run in, so it cannot be resolved
-  // from this file.
-  const at = resolve(process.cwd(), "../testdata/xss-corpus.json");
-  const doc = JSON.parse(readFileSync(at, "utf8")) as {
-    payloads: { text: string }[];
-  };
-  if (doc.payloads.length < 40) {
-    throw new Error(`the corpus holds ${doc.payloads.length} payloads, so this checks almost nothing`);
+  if (shared.payloads.length < 40) {
+    throw new Error(
+      `the corpus holds ${shared.payloads.length} payloads, so this checks almost nothing`,
+    );
   }
-  return doc.payloads.map((one) => one.text);
+  return shared.payloads.map((one) => one.text);
 })();
 
 describe("the renderer", () => {

@@ -13,7 +13,8 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "resolveJsonModule": true,
     "types": []
   },
-  "include": ["src"]
+  "include": ["src", "../testdata/*.json"]
 }

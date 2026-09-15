@@ -111,17 +111,6 @@ func registerBundles(api huma.API, in Ingest) {
 	})
 }
 
-// DeclareBumpBody is one upstream bump being declared.
-type DeclareBumpBody struct {
-	Upstream string `json:"upstream" minLength:"1" doc:"The bundle's own key, as the list gave it"`
-	From     string `json:"from" doc:"The version in hand, as the list gave it"`
-	To       string `json:"to" minLength:"1" doc:"The version that fixes it, as the list gave it"`
-	// Builds is where the fix is intended. Empty withdraws the intent, which
-	// is the same act as declaring it.
-	Builds    []BuildName `json:"builds,omitempty" doc:"The releases this is to be fixed in. Empty withdraws the intent"`
-	Reasoning string      `json:"reasoning" minLength:"1" doc:"Why this is being fixed. Required, like every other judgment"`
-}
-
 // BuildName is a release and variant, as the catalog names them.
 type BuildName struct {
 	Stream  string `json:"stream"`

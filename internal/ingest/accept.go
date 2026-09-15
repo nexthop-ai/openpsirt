@@ -46,6 +46,11 @@ const (
 )
 
 // String names the outcome for logs and errors.
+//
+// Read by the refusals below and by the line the API writes when an upload is
+// turned away. It was declared and reached by nothing, while those refusals
+// spelled the same words inline — so the producer's words and this method's
+// could drift, and the deployment logged nothing at all.
 func (o Outcome) String() string {
 	switch o {
 	case Accept:
@@ -209,13 +214,14 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 			held = newest.BuiltAt.Format(time.RFC3339Nano)
 		}
 		return nil, NotNewer, fmt.Errorf(
-			"%w: built %s, but this variant already holds a scan built %s",
-			ErrRejected, a.BuiltAt.Format(time.RFC3339Nano), held)
+			"%w (%s): built %s, but this variant already holds a scan built %s",
+			ErrRejected, NotNewer, a.BuiltAt.Format(time.RFC3339Nano), held)
 
 	case BuiltInFuture:
 		return nil, BuiltInFuture, fmt.Errorf(
-			"%w: built %s, which is ahead of this server's clock. Accepting it would mean no later scan is ever newer",
-			ErrRejected, a.BuiltAt.Format(time.RFC3339Nano))
+			"%w (%s): built %s, which is ahead of this server's clock. "+
+				"Accepting it would mean no later scan is ever newer",
+			ErrRejected, BuiltInFuture, a.BuiltAt.Format(time.RFC3339Nano))
 	}
 
 	scan := &Scan{

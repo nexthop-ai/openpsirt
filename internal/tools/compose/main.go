@@ -31,15 +31,14 @@ import (
 // document is as much of CycloneDX as composing needs. Everything else in an
 // input is carried through untouched on the components themselves.
 type document struct {
-	Schema       string          `json:"$schema,omitempty"`
-	BOMFormat    string          `json:"bomFormat"`
-	SpecVersion  string          `json:"specVersion"`
-	SerialNumber string          `json:"serialNumber,omitempty"`
-	Version      int             `json:"version"`
-	Metadata     *metadata       `json:"metadata,omitempty"`
-	Components   []component     `json:"components,omitempty"`
-	Dependencies []dependency    `json:"dependencies,omitempty"`
-	Rest         json.RawMessage `json:"-"`
+	Schema       string       `json:"$schema,omitempty"`
+	BOMFormat    string       `json:"bomFormat"`
+	SpecVersion  string       `json:"specVersion"`
+	SerialNumber string       `json:"serialNumber,omitempty"`
+	Version      int          `json:"version"`
+	Metadata     *metadata    `json:"metadata,omitempty"`
+	Components   []component  `json:"components,omitempty"`
+	Dependencies []dependency `json:"dependencies,omitempty"`
 }
 
 type metadata struct {

@@ -396,6 +396,14 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	case errors.Is(err, queue.ErrBacklogFull):
 		return nil, huma.NewError(http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, ingest.ErrRejected):
+		// Recorded here, because nothing else records it. A refused upload
+		// left no server-side trace of why: the producer was told and the
+		// deployment was not, so "our scans stopped arriving" had nowhere to
+		// be looked up. Info rather than a warning — a producer refusing to
+		// stop retrying writes a line per attempt, and the serial is what
+		// makes those readable rather than alarming.
+		in.Logger.InfoContext(ctx, "an upload was refused",
+			"outcome", outcome, "serial", header.Serial, "product", input.Product)
 		return nil, rejection(outcome, err)
 	case err != nil:
 		return nil, wentWrong(in.Logger, "the upload could not be recorded", err)
