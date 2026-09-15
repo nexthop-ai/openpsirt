@@ -466,15 +466,6 @@ func same(held, found Finding) bool {
 		equalRef(held.SuppressedBy, found.SuppressedBy)
 }
 
-// ranking reports whether an open finding's place in the order has moved, and
-// whether its clock has changed with it.
-//
-// The two are separate, and deliberately: **every** ranking signal moves the
-// order, and **only** exploitation moves the deadline. A score somebody
-// revised upward is worth reordering the list for and is not worth resetting a
-// clock over — likelihood and score are not in the deadline at all, and a
-// deadline recounted whenever a number was revised would never arrive, which
-// is the same failure as recounting it nightly.
 // learnedExploitation is the moment to record beside a clock that just moved,
 // or nothing where the row is no longer exploited.
 //
@@ -487,6 +478,15 @@ func learnedExploitation(f Finding, startedAt time.Time) *time.Time {
 	return &startedAt
 }
 
+// ranking reports whether an open finding's place in the order has moved, and
+// whether its clock has changed with it.
+//
+// The two are separate, and deliberately: **every** ranking signal moves the
+// order, and **only** exploitation moves the deadline. A score somebody
+// revised upward is worth reordering the list for and is not worth resetting a
+// clock over — likelihood and score are not in the deadline at all, and a
+// deadline recounted whenever a number was revised would never arrive, which
+// is the same failure as recounting it nightly.
 func ranking(held, found Finding) (moved, reclocked bool) {
 	moved = held.Urgency != found.Urgency ||
 		held.RankExploited != found.RankExploited ||
