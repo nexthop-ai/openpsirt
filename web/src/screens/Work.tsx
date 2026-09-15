@@ -10,10 +10,11 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
+import { Paged } from "../ui/Paged";
+import { pathTo, usePaging } from "./list";
 
-// The most the server returns of what is running out. A cap rather than a
-// page — the list has no total — so a full list is said to be a cap and not
-// a count.
+// One page of what somebody holds. The answer carries a total, so this is a
+// page rather than a cap and the footer pages through the rest.
 const PAGE = 50;
 
 // Assignments: what is running out of time undecided, and what each person
@@ -31,29 +32,38 @@ export function Work() {
 
   const at = useScope();
   const scope = scopeQuery(at);
+  const { offset, go: goTo } = usePaging();
+  // The product the picker is on, which is the whole of what this answers for.
+  // It read across every product while the picker was set, so somebody scoped
+  // to one was shown and counted work from products they were not looking at.
   const holdings = useQuery({
-    queryKey: ["holdings"],
-    queryFn: async () => unwrap(await api.GET("/v1/assignments", {})),
+    queryKey: ["holdings", scope.product ?? ""],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/assignments", {
+          params: { query: scope.product ? { product: scope.product } : {} },
+        }),
+      ),
   });
   // Whose work is being looked at on the second tab. Empty is the roll-up of
   // everybody; a name is that person's list.
   const person = params.get("person") ?? "";
   const mine = useQuery({
-    queryKey: ["assigned", "me", scope],
+    queryKey: ["assigned", "me", scope, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/people/{identity}/assignments", {
-          params: { path: { identity: "me" }, query: { limit: PAGE, ...scope } },
+          params: { path: { identity: "me" }, query: { limit: PAGE, offset, ...scope } },
         }),
       ),
   });
   const theirs = useQuery({
     enabled: person !== "",
-    queryKey: ["assigned", person, scope],
+    queryKey: ["assigned", person, scope, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/people/{identity}/assignments", {
-          params: { path: { identity: person }, query: { limit: PAGE, ...scope } },
+          params: { path: { identity: person }, query: { limit: PAGE, offset, ...scope } },
         }),
       ),
   });
@@ -103,11 +113,23 @@ export function Work() {
         </button>
       </div>
 
+      {/* Said rather than discovered. Who holds what is answered per product,
+          so a branch or a variant in the picker narrows the other two tabs and
+          not this one. */}
+      {tab === "people" && (scope.stream || scope.variant) && (
+        <p className="hint">
+          Across every build of {scope.product}. The branch and the variant do not narrow who holds
+          what.
+        </p>
+      )}
+
       {tab === "due" ? (
         <Held
           rows={mine.data?.items ?? []}
           total={mine.data?.total ?? 0}
           query={mine}
+          offset={offset}
+          onGo={goTo}
           empty="Nothing is assigned to you."
           detail="Work you take on from a finding, or that somebody hands you, appears here."
         />
@@ -133,6 +155,8 @@ export function Work() {
             rows={theirs.data?.items ?? []}
             total={theirs.data?.total ?? 0}
             query={theirs}
+            offset={offset}
+            onGo={goTo}
             empty="They are not holding anything."
             detail="Either it has been decided, or somebody handed it back."
           />
@@ -239,12 +263,16 @@ function ByPerson({
                   )}
                 </td>
                 <td>
+                  {/* A team queue is not emptied here. What this calls is a
+                      route per person, and a team is not one — so the control
+                      says what is true rather than offering an act it never
+                      performs. */}
                   <button
                     type="button"
                     className="btn quiet"
                     title={
                       row.team
-                        ? "Empty this queue back into the unassigned list"
+                        ? "A team queue empties as people take the work, not from here"
                         : "Put everything they hold back into the unassigned list"
                     }
                     disabled={release.isPending || row.team}
@@ -276,12 +304,16 @@ function Held({
   rows,
   total,
   query,
+  offset,
+  onGo,
   empty,
   detail,
 }: {
   rows: Body<"UnassignedBody">[];
   total: number;
   query: Query;
+  offset: number;
+  onGo: (offset: number) => void;
   empty: string;
   detail: string;
 }) {
@@ -315,14 +347,14 @@ function Held({
                 </td>
                 <td>
                   <Link
-                    to={
-                      `/products/${encodeURIComponent(row.product ?? "")}` +
-                      `/streams/${encodeURIComponent(row.stream ?? "")}` +
-                      `/variants/${encodeURIComponent(row.variant ?? "")}` +
-                      `/findings/${encodeURIComponent(row.vulnerability ?? "")}` +
-                      `/components/${encodeURIComponent(row.component ?? "")}` +
-                      (row.version ? `?version=${encodeURIComponent(row.version)}` : "")
-                    }
+                    to={pathTo(
+                      {
+                        product: row.product ?? "",
+                        stream: row.stream ?? "",
+                        variant: row.variant ?? "",
+                      },
+                      row,
+                    )}
                     className="id"
                   >
                     {row.vulnerability}
@@ -352,11 +384,7 @@ function Held({
           </tbody>
         </table>
       </Wide>
-      <div className="filters" style={{ margin: "10px 0 0" }}>
-        <span className="hint">
-          Showing {rows.length.toLocaleString()} of {total.toLocaleString()}
-        </span>
-      </div>
+      <Paged shown={rows.length} total={total} offset={offset} limit={PAGE} onGo={onGo} />
     </>
   );
 }

@@ -30,7 +30,7 @@ const SOON_DAYS = 14;
 // running out inside the window. Built here so the figure and the screen it
 // opens ask the same question.
 function runningOut(at: Parameters<typeof findingsPath>[0], within: string): string {
-  return `${findingsPath(at)}?running=${within}&state=undecided`;
+  return `${findingsPath(at, true)}&running=${within}&state=undecided`;
 }
 
 function withOnly(path: string, only: string): string {
@@ -419,7 +419,11 @@ function Figures({
 
   return (
     <div className="kpis">
-      <button type="button" className="kpi" onClick={() => navigate(findingsPath(at))}>
+      {/* Unnarrowed, because the figure is. The list writes three narrowings
+          into its own address when the address says nothing, and none of them
+          was applied to the count — so every figure here opened a list with
+          fewer rows in it than the number said. */}
+      <button type="button" className="kpi" onClick={() => navigate(findingsPath(at, true))}>
         <span className="l">Open issues · {counting}</span>
         <span className="n">{openCount === undefined ? "—" : openCount.toLocaleString()}</span>
         {everywhere(allPoints[allPoints.length - 1]?.open) ?? (
@@ -430,7 +434,7 @@ function Figures({
         <button
           type="button"
           className={`kpi${(exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
-          onClick={() => navigate(withOnly(findingsPath(at), "exploited"))}
+          onClick={() => navigate(withOnly(findingsPath(at, true), "exploited"))}
         >
           <span className="l">
             <i style={{ background: "var(--sev-exploited)" }} /> Known exploited

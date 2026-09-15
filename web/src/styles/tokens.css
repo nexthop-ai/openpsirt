@@ -68,6 +68,29 @@
   --radius-lg: 12px;
   --pill: 999px;
 
+  /* The stacking ladder, in the order things actually stack.
+     Six values were hand-picked across four stylesheets with nothing to read
+     to decide a seventh, and two unrelated overlays claimed 45 — the drawer
+     and the rail's scrim, which resolve in the same context, so the drawer won
+     on document order and the rail's click-to-dismiss stopped working wherever
+     the two overlapped.
+     The floating action sits below the dropdowns on purpose: a suggestion list
+     opening over it is right, and it over a dropdown is not. */
+  --z-fab: 20;
+  --z-dropdown: 30;
+  --z-menu: 40;
+  --z-scrim: 44;
+  --z-drawer: 46;
+  --z-rail-scrim: 48;
+  --z-rail: 50;
+  --z-modal: 60;
+
+  /* How far a disabled control is faded. One ratio rather than two: a disabled
+     chip at 0.45 and a disabled button at 0.55 meant one strength for one
+     meaning, and the weaker one composited to about 2.2:1 against white —
+     below the floor for text. No dark-look override, because it is a ratio. */
+  --dim: 0.55;
+
   --step--1: 12.5px;
   --step-0: 13.5px;
   --step-1: 15px;

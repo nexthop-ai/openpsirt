@@ -11,7 +11,7 @@ import { Assess } from "./FindingAssess";
 import { Notes } from "./FindingNotes";
 import { HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useQueries, useQuery } from "@tanstack/react-query";
@@ -69,6 +69,10 @@ export function Finding() {
   const who = useWho();
   const at = { product, stream, variant, vulnerability, component };
   const [recorded, setRecorded] = useState<Recorded | null>(null);
+  // The decision form, for the one act that has to put it in front of
+  // somebody: reusing an earlier reasoning fills it in and then has to show
+  // them what it filled in.
+  const form = useRef<HTMLDivElement>(null);
   // Which finding the screen is on. A params-only change does not remount it,
   // so anything below that belongs to one finding has to say which.
   const oneFinding = `${vulnerability}|${component}|${version}`;
@@ -314,6 +318,11 @@ export function Finding() {
     place: placeOf.get(p.decision_id) ?? "",
   }));
   const similar: Similar[] = it.similar ?? [];
+  // Whether anything here is still to answer. One named predicate rather than
+  // the same test written at four sites: the fifth was written in a different
+  // unit — a count of distinct places against a count of chain rows — and
+  // could never be false, which read as a second safety check and was none.
+  const undecided = places.some((place) => place.decision == null);
   // What VEX documents say: a third layer beside what the build claims and
   // what we decided. Shown, offered as a prefill, never applied.
   const vex = it.vex ?? [];
@@ -607,7 +616,7 @@ export function Finding() {
                 Published <Severity word={it.severity} />
               </>
             )}
-            {places.some((p) => p.decision == null) && !reclassifying && (
+            {undecided && !reclassifying && (
               <button
                 type="button"
                 className="linkish"
@@ -757,7 +766,7 @@ export function Finding() {
           <LookItUp links={it.links ?? []} />
         </div>
 
-        {places.some((p) => p.decision == null) && (
+        {undecided && (
           <>
             {/* Said when there is nothing, because the difference matters:
                 an empty panel reads as "nobody has an opinion about this",
@@ -804,7 +813,7 @@ export function Finding() {
                         <p style={{ whiteSpace: "pre-wrap" }}>{one.statement}</p>
                       </div>
                     )}
-                    {one.offers && decided < places.length && (
+                    {one.offers && (
                       <div className="actions">
                         <button
                           type="button"
@@ -914,33 +923,35 @@ export function Finding() {
               </div>
             )}
             {settled && (
-              <Decide
-                at={{ ...at, version }}
-                places={places}
-                undisclosed={!!it.undisclosed}
-                assigning={
-                  <Assignee
-                    at={at}
-                    assigned={it.assigned_to ?? ""}
-                    undisclosed={!!it.undisclosed}
-                    routedBy={it.routed_by ?? ""}
-                  />
-                }
-                onDone={(r) => {
-                  setRecorded(r);
-                  startFrom(null);
-                  setExtending(null);
-                }}
-                extending={extending}
-                prefill={opening}
-                // Remounted when what is being decided changes, not only when
-                // a prefill arrives. Changing scope on a build-scoped screen
-                // is a parameter change rather than a navigation, so the form
-                // stayed mounted and kept the previous build's answers in its
-                // fields — an outcome and a justification about one variant,
-                // offered against another.
-                key={`${opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
-              />
+              <div ref={form}>
+                <Decide
+                  at={{ ...at, version }}
+                  places={places}
+                  undisclosed={!!it.undisclosed}
+                  assigning={
+                    <Assignee
+                      at={at}
+                      assigned={it.assigned_to ?? ""}
+                      undisclosed={!!it.undisclosed}
+                      routedBy={it.routed_by ?? ""}
+                    />
+                  }
+                  onDone={(r) => {
+                    setRecorded(r);
+                    startFrom(null);
+                    setExtending(null);
+                  }}
+                  extending={extending}
+                  prefill={opening}
+                  // Remounted when what is being decided changes, not only when
+                  // a prefill arrives. Changing scope on a build-scoped screen
+                  // is a parameter change rather than a navigation, so the form
+                  // stayed mounted and kept the previous build's answers in its
+                  // fields — an outcome and a justification about one variant,
+                  // offered against another.
+                  key={`${opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
+                />
+              </div>
             )}
           </>
         )}
@@ -994,7 +1005,7 @@ export function Finding() {
             of the same pane, because triage is both questions — who is on it
             and what was decided. Here there is nothing left to decide, and
             reassigning a decided finding is still ordinary. */}
-        {!places.some((p) => p.decision == null) && (
+        {!undecided && (
           <Assignee
             at={at}
             assigned={it.assigned_to ?? ""}
@@ -1032,12 +1043,15 @@ export function Finding() {
           <PreviousCard
             items={previous}
             at={at}
-            undecided={places.some((p) => p.decision == null)}
+            undecided={undecided}
             onReuse={(reasoning, outcome, justification) => {
               startFrom({ reasoning, outcome, justification });
-              document
-                .querySelector(".acting .card")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              // The form, by identity. A CSS selector matched the first card
+              // inside the acting column, which is the standing claim's
+              // wherever one stands — so the act filled the form in correctly
+              // and scrolled somewhere above it, and on a long finding the
+              // form the person is now meant to submit was off screen.
+              form.current?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
           />
         )}

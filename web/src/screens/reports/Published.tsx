@@ -83,6 +83,10 @@ export function Published() {
                   <th>Revision</th>
                   <th>Published</th>
                   <th>By</th>
+                  {/* What the sentence above promises. It is what makes "is
+                      what is published still what we would generate" a
+                      question anybody can answer. */}
+                  <th>Digest</th>
                   <th>Said</th>
                 </tr>
               </thead>
@@ -104,6 +108,9 @@ export function Published() {
                     </td>
                     <td>{on(row.issued_at)}</td>
                     <td className="id">{row.issued_by}</td>
+                    <td className="id" title={row.digest}>
+                      {row.digest ? row.digest.slice(0, 12) : <span className="hint">—</span>}
+                    </td>
                     <td className="hint" style={{ maxWidth: "40ch" }}>
                       {row.summary || "—"}
                     </td>

@@ -1,5 +1,4 @@
-/* What a narrow screen changes, and the names older code still uses.
-   Last, because these override. */
+/* What a narrow screen changes. Last, because these override. */
 
 /* ---------- a narrow screen ---------- */
 /* The mockup's phone shaping: no rail, a tab bar, the findings table as
@@ -32,7 +31,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: var(--z-rail-scrim);
   background: rgb(8 12 20 / 35%);
 }
 
@@ -56,7 +55,7 @@
     top: 0;
     left: 0;
     bottom: 0;
-    z-index: 46;
+    z-index: var(--z-rail);
     width: min(280px, 86vw);
     overflow-y: auto;
     box-shadow: var(--shadow-lg);
@@ -138,14 +137,10 @@
 :root[data-look="dark"] {
   --sev-exploited-bg: color-mix(in oklab, var(--sev-exploited) 12%, transparent);
   --ok-bg: color-mix(in oklab, var(--ok) 12%, transparent);
-  --paper: var(--canvas);
 }
 
 * {
   box-sizing: border-box;
-}
-html {
-  color-scheme: light;
 }
 body {
   margin: 0;
@@ -177,7 +172,7 @@ a {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  z-index: 40;
+  z-index: var(--z-menu);
   width: min(420px, 90vw);
   max-height: 60vh;
   overflow-y: auto;
@@ -239,7 +234,7 @@ a {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  z-index: 40;
+  z-index: var(--z-menu);
   min-width: 220px;
   background: var(--surface);
   color: var(--ink);
@@ -440,8 +435,8 @@ a {
   background: var(--raised);
   border: 1px solid var(--line);
   border-radius: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12.5px;
+  font-family: var(--mono);
+  font-size: var(--step--1);
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-x: auto;
@@ -489,7 +484,7 @@ a {
   border-radius: var(--pill);
   padding: 1px 4px 1px 9px;
   color: var(--ink);
-  background: var(--paper);
+  background: var(--canvas);
   white-space: nowrap;
 }
 .mark button {
@@ -526,7 +521,7 @@ a {
   min-width: 220px;
 }
 
-/* The tree seen upward, for somebody narrowed to their own work (ACC-77).
+/* The tree seen upward, for somebody narrowed to their own work.
    Indented rather than expandable: every row is already on the page, because
    what is drawn is the chains their own findings sit on and there is nothing
    under them to open. */

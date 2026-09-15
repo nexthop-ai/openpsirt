@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
+import { UNNARROWED } from "../app/scope";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 
@@ -54,22 +55,27 @@ export function Product() {
 
       {/* The four numbers somebody asks for, each a link to the list that
           produced it. Overdue and waiting are the two that decide whether
-          anything needs doing today. */}
+          anything needs doing today.
+
+          Each opens the list unnarrowed. The list writes three narrowings into
+          its own address when the address says nothing, and the figures are
+          counted with none of them — so without this every number here opened
+          a list with fewer rows in it than the number said. */}
       <div className="kpis">
-        <Link className="kpi" to={`${at}/findings`}>
+        <Link className="kpi" to={`${at}/findings?${UNNARROWED}`}>
           <span className="l">Open · {it.name}</span>
           <span className="n">{(it.open ?? 0).toLocaleString()}</span>
           <span className="d">issues at components, as the list counts them</span>
         </Link>
         <Link
           className={`kpi${(it.overdue ?? 0) > 0 ? " urgent" : ""}`}
-          to={`${at}/findings?running=overdue`}
+          to={`${at}/findings?${UNNARROWED}&running=overdue`}
         >
           <span className="l">Past a deadline</span>
           <span className="n">{(it.overdue ?? 0).toLocaleString()}</span>
           <span className="d">already late, across every build</span>
         </Link>
-        <Link className="kpi" to={`${at}/findings?state=undecided`}>
+        <Link className="kpi" to={`${at}/findings?${UNNARROWED}&state=undecided`}>
           <span className="l">Nobody has argued about</span>
           <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
           <span className="d">no place has a decision of any kind</span>
@@ -110,7 +116,7 @@ export function Product() {
                   return (
                     <tr key={`${row.stream} ${row.variant}`} className="row">
                       <td>
-                        <Link to={`${build}/findings`} className="id">
+                        <Link to={`${build}/findings?${UNNARROWED}`} className="id">
                           {row.stream}
                         </Link>{" "}
                         <span className="hint">·</span> <span className="id">{row.variant}</span>
@@ -129,7 +135,10 @@ export function Product() {
                       <td className="num">{(row.open ?? 0).toLocaleString()}</td>
                       <td className="num">
                         {row.overdue ? (
-                          <Link to={`${build}/findings?running=overdue`} className="due over">
+                          <Link
+                            to={`${build}/findings?${UNNARROWED}&running=overdue`}
+                            className="due over"
+                          >
                             {row.overdue.toLocaleString()}
                           </Link>
                         ) : (
@@ -138,7 +147,7 @@ export function Product() {
                       </td>
                       <td className="num">
                         {row.exploited ? (
-                          <Link to={`${build}/findings?only=exploited`}>
+                          <Link to={`${build}/findings?${UNNARROWED}&only=exploited`}>
                             {row.exploited.toLocaleString()}
                           </Link>
                         ) : (
@@ -147,7 +156,7 @@ export function Product() {
                       </td>
                       <td className="num">
                         {row.undecided ? (
-                          <Link to={`${build}/findings?state=undecided`}>
+                          <Link to={`${build}/findings?${UNNARROWED}&state=undecided`}>
                             {row.undecided.toLocaleString()}
                           </Link>
                         ) : (
@@ -156,7 +165,7 @@ export function Product() {
                       </td>
                       <td className="num">
                         {row.agreed ? (
-                          <Link to={`${build}/findings?state=agreed`}>
+                          <Link to={`${build}/findings?${UNNARROWED}&state=agreed`}>
                             {row.agreed.toLocaleString()}
                           </Link>
                         ) : (

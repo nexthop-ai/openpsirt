@@ -6,6 +6,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
 import { called } from "../ui/roles";
+import { useWho } from "../app/session";
 import { Wide } from "../ui/Wide";
 
 // One person, whole.
@@ -22,6 +23,10 @@ import { Wide } from "../ui/Wide";
 // asked by somebody who administers the deployment.
 export function Person() {
   const { identity = "" } = useParams();
+  // The way back to the list of everybody is offered to somebody who may open
+  // it, which is an administrator. A link that lands on a screen whose every
+  // control is refused is a door into a room with nothing in it.
+  const me = useWho();
   const queries = useQueryClient();
   const about = useQuery({
     queryKey: ["person", identity],
@@ -59,7 +64,13 @@ export function Person() {
         <h2>{who.display_name || who.identity}</h2>
         <p>
           <span className="id">{who.identity}</span>
-          {who.admin && <> · administers this deployment</>} · <Link to="/people">All users</Link>
+          {who.admin && <> · administers this deployment</>}
+          {me.data?.admin && (
+            <>
+              {" "}
+              · <Link to="/people">All users</Link>
+            </>
+          )}
         </p>
       </div>
 

@@ -11,7 +11,7 @@ import { Empty } from "../../ui/Empty";
 import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords, daysAsked } from "./Window";
+import { WindowPicker, coveringWords, daysAsked, windowStart } from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // How long the figures cover. Thirty days is the window the remediation
@@ -39,11 +39,6 @@ const DISMISSALS: ("not-applicable" | "wont-fix" | "already-fixed")[] = [
 function bandOrder(band: string): number {
   const at = (BANDS as readonly string[]).indexOf(band);
   return at < 0 ? BANDS.length : at;
-}
-
-// When the window this report is reading started, as a date the list takes.
-function windowStart(days: number): string {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
 
 // The findings list, narrowed to what one aging bucket counts. Built here
@@ -168,7 +163,11 @@ export function Overview() {
             ) : (
               <ul className="files">
                 {Object.entries(pace.data?.time_to_fix ?? {})
-                  .sort()
+                  // Worst first, the way every other list here orders them.
+                  // A bare sort is alphabetical, which printed low above
+                  // medium under a heading the aging table forty lines down
+                  // orders correctly.
+                  .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
                   .map(([band, hours]) => (
                     <li key={band}>
                       <Severity word={band} /> <b>{Math.round((hours as number) / 24)}</b> days
@@ -256,6 +255,13 @@ export function Overview() {
           quarter. */}
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>How long triage is taking</h3>
+        {/* Said inside the printing area rather than behind noprint: the
+            printed header states the sheet's scope over every section, and
+            this one does not take it. A sheet that states a scope three of its
+            four sections do not honour is one nobody can check. */}
+        <p className="hint" style={{ marginTop: 0 }}>
+          Every product in this deployment, whatever is picked above.
+        </p>
         {measures.isPending ? (
           <Loading />
         ) : measures.isError ? (
@@ -371,8 +377,8 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Repeated deferrals</h3>
         <p className="hint">
-          One item deferred three times is a judgment; forty is an undocumented policy. Over the
-          whole record, not the window above.
+          One item deferred three times is a judgment; forty is an undocumented policy. This
+          product, not this build — and over the whole record, not the window above.
         </p>
         {repeated.isPending ? (
           <Loading />
@@ -428,9 +434,9 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Dismissals</h3>
         <p className="hint">
-          Approved dismissals in this window, newest first. One row per place, the way{" "}
-          <Link to="/audit">the record</Link> lists them, so a judgment covering forty places is
-          forty rows. All three dismissal outcomes are here.
+          Approved dismissals in this window, newest first. This product, not this build. One row
+          per place, the way <Link to="/audit">the record</Link> lists them, so a judgment covering
+          forty places is forty rows. All three dismissal outcomes are here.
         </p>
         {argued.isPending ? (
           <Loading />

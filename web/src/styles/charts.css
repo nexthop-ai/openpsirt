@@ -1,0 +1,116 @@
+/* Charts.
+
+   SVG element vocabulary — gridlines, axes, series, the key beside a ring —
+   which shares no selector and no token group with the DOM components beside
+   it. A file of its own for that reason rather than for its length.
+
+   Imported after the components and before the screens, which is where it sat
+   when they were one file.
+
+   The rules here came from the per-screen sheet: they style components in
+   `ui/` that many screens draw, and a chart drawn by the front page, four
+   report sheets and a component page belongs to no one screen. */
+
+.chart {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+.chart .gridline {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.chart .axis {
+  fill: var(--faint);
+  font-size: 9.5px;
+  font-family: var(--mono);
+}
+.chart .open-area {
+  fill: var(--accent-soft);
+}
+.chart .open-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.chart .tip {
+  fill: var(--accent);
+}
+.chart .bar-new {
+  fill: var(--sev-high);
+}
+.chart .bar-res {
+  fill: var(--ok);
+}
+.chart .zero {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-wide);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+  font-style: normal;
+}
+.sevring {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.sevring svg {
+  flex: none;
+}
+.ringkey {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 150px;
+  flex: 1;
+}
+.ringkey li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: var(--step--1);
+}
+.ringkey i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+.ringkey .n {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ringkey .d {
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  width: 30px;
+  text-align: right;
+}
+.ringkey .d.up {
+  color: var(--sev-exploited);
+}
+.ringkey .d.down {
+  color: var(--ok);
+}

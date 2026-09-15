@@ -201,7 +201,7 @@ export function App() {
               {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}
               <Route path={ROUTES.me} element={<Me />} />
-              <Route path={ROUTES.people} element={<People />} />
+              <Route path={ROUTES.people} element={<People who={who.data} />} />
               {/* One person, whole. An administrator's surface: it carries what
                 somebody was told, which is the question asked after a leak. */}
               <Route path={ROUTES.person} element={<Person />} />

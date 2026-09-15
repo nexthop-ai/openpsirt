@@ -282,6 +282,12 @@ a.kpi:hover {
 .sev.low {
   --c: var(--sev-low);
 }
+/* The word every unrated finding is drawn with. Without an arm it fell to the
+   neutral base, so a badge reading "Unrated" was painted as a low — and the
+   chart beside it counts the same row as a medium. */
+.sev.unrated {
+  --c: var(--sev-unrated);
+}
 
 .kev {
   display: inline-flex;
@@ -378,6 +384,19 @@ a.kpi:hover {
 .claimed.affected {
   --c: var(--ok);
 }
+/* The three that had no arm and fell through to the neutral base. All six
+   non-affected outcomes hide risk, which is the distinction this queue is built
+   around — so three of them drew the same as a claim that hides none, and an
+   approver scanning the queue could not tell them apart at a glance. */
+.claimed.already-fixed {
+  --c: var(--sev-high);
+}
+.claimed.upgrade-needed {
+  --c: var(--wait);
+}
+.claimed.patch-needed {
+  --c: var(--wait);
+}
 
 /* One judgment, as an auditor reads it. */
 .judgment {
@@ -399,7 +418,7 @@ a.kpi:hover {
   grid-template-columns: max-content minmax(0, 1fr);
   gap: 4px 12px;
   margin: 0 0 8px;
-  font-size: 12.5px;
+  font-size: var(--step--1);
 }
 .facts dt {
   color: var(--muted);
@@ -458,7 +477,7 @@ a.kpi:hover {
   background: none;
   cursor: pointer;
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--step--1);
 }
 .tomove button:hover {
   background: var(--raised);
@@ -630,7 +649,7 @@ tr.row.on > td {
   grid-template-columns: max-content 1fr;
   gap: 3px 12px;
   margin: 0 0 8px;
-  font-size: 12.5px;
+  font-size: var(--step--1);
 }
 .judgment .facts dt {
   color: var(--muted);
@@ -649,86 +668,6 @@ tr.row.on > td {
 /* Only on paper. */
 .printhead {
   display: none;
-}
-
-/* The printed record.
-   An auditor takes a copy away, so what prints is the record rather than a
-   photograph of an application: the shell, the controls and anything that only
-   works by being clicked go, and a judgment does not break across a page —
-   half a judgment on each side of a fold is the one thing a record must not
-   do. */
-@media print {
-  :root {
-    color-scheme: light;
-  }
-  body {
-    background: #fff;
-  }
-  .rail,
-  .chrome,
-  .noprint,
-  .filters,
-  .controls,
-  .tabs2,
-  .screen-head > span {
-    display: none !important;
-  }
-  .shell,
-  .page {
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  .printhead {
-    display: block;
-    margin: 0 0 12px;
-  }
-  .printhead h1 {
-    font-size: 16px;
-    margin: 0 0 2px;
-  }
-  .printhead p {
-    font-size: 11px;
-    color: #444;
-    margin: 0;
-  }
-  .screen-head h2 .n {
-    display: none;
-  }
-  .judgment {
-    break-inside: avoid;
-    border: 1px solid #bbb;
-    background: #fff;
-    box-shadow: none;
-  }
-  /* A report is sections of tables rather than one judgment per block, and
-     the same rule holds: a row split across a fold is a figure nobody can
-     read. The header repeats on every page it carries onto, because a column
-     of numbers with no heading above it is a column of numbers. */
-  .panel {
-    border: 1px solid #bbb;
-    background: #fff;
-    box-shadow: none;
-  }
-  .tablewrap {
-    overflow: visible;
-  }
-  thead {
-    display: table-header-group;
-  }
-  tr {
-    break-inside: avoid;
-  }
-  a {
-    text-decoration: none;
-    color: inherit;
-  }
-  .state,
-  .claimed {
-    border: 1px solid #bbb;
-    background: #fff !important;
-    color: #000 !important;
-  }
 }
 
 .vchip {
@@ -867,8 +806,11 @@ button.vchip {
   color: var(--accent);
   font-weight: 600;
 }
+/* The same strength a disabled button gets, because it is the same meaning.
+   At 0.45 a muted label composited to about 2.2:1 against white, below the
+   floor for text, and two controls side by side said one thing two ways. */
 .chip[disabled] {
-  opacity: 0.45;
+  opacity: var(--dim);
   cursor: not-allowed;
 }
 .seg {
@@ -950,6 +892,13 @@ button.vchip {
   fill: none;
   stroke-width: 2;
   flex: none;
+}
+/* The ring is on the box rather than on the input, which has no border of its
+   own to show one — the same shape the frame's own search already has. Taken
+   off the input and put nowhere, there was no focus state at all. */
+.searchbox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .searchbox input {
   border: 0;
@@ -1187,7 +1136,7 @@ button.edited {
 }
 .suggestions {
   position: absolute;
-  z-index: 30;
+  z-index: var(--z-dropdown);
   top: calc(100% + 3px);
   left: 0;
   right: 0;
@@ -1317,11 +1266,25 @@ input[type="date"] {
   padding: 7px 10px;
   width: 100%;
 }
+/* The accent border and the wash around it are an addition to the global focus
+   ring, never a replacement — and they are for the controls that have a border
+   to change.
+
+   A checkbox and a radio are painted by the browser and by `accent-color`, so a
+   border declaration reaches nothing on them and all that is left is a wash at
+   a tenth of full strength: 1.16:1 against the surface in the light look,
+   1.25:1 in the dark one, where 3:1 is the floor. Tabbing into the permission
+   grid, which writes a grant per product per press, there was nothing on screen
+   saying which box had focus. */
 select:focus,
 textarea:focus,
-input:focus {
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="url"]:focus,
+input[type="email"]:focus {
   border-color: var(--accent);
-  outline: 0;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 textarea {
@@ -1366,7 +1329,7 @@ input[type="checkbox"] {
   filter: none;
 }
 .btn[disabled] {
-  opacity: 0.55;
+  opacity: var(--dim);
   cursor: not-allowed;
   filter: none;
 }
@@ -1437,40 +1400,6 @@ textarea:disabled {
   border-color: var(--line-strong);
   color: var(--ink);
   font-weight: 600;
-}
-.editor {
-  border: 1px solid var(--line-strong);
-  border-radius: 0 var(--radius) var(--radius) var(--radius);
-  background: var(--surface);
-}
-.bar {
-  display: flex;
-  gap: 1px;
-  flex-wrap: wrap;
-  padding: 5px;
-  border-bottom: 1px solid var(--line);
-  background: var(--raised);
-  border-radius: 0 var(--radius) 0 0;
-}
-.bar button {
-  border: 0;
-  background: none;
-  cursor: pointer;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: var(--step--1);
-  color: var(--muted);
-  min-width: 30px;
-  font-family: inherit;
-}
-.bar button:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.editor textarea {
-  border: 0;
-  border-radius: 0 0 var(--radius) var(--radius);
-  box-shadow: none;
 }
 .rendered {
   padding: 11px 12px;
@@ -1692,12 +1621,11 @@ textarea:disabled {
 }
 .choicesat:focus-visible {
   border-color: var(--accent);
-  outline: 0;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .choicelist {
   position: absolute;
-  z-index: 30;
+  z-index: var(--z-dropdown);
   top: calc(100% + 3px);
   left: 0;
   min-width: 100%;
@@ -1785,312 +1713,10 @@ textarea:disabled {
    cascade changes nothing unless a per-screen rule of equal specificity was
    relying on losing to one of them, which was checked rule by rule. */
 
-/* ---------- charts ---------- */
-
-.chart {
-  width: 100%;
-  display: block;
-  overflow: visible;
-}
-.chart .gridline {
-  stroke: var(--line);
-  stroke-width: 1;
-}
-.chart .axis {
-  fill: var(--faint);
-  font-size: 9.5px;
-  font-family: var(--mono);
-}
-.chart .open-area {
-  fill: var(--accent-soft);
-}
-.chart .open-line {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-}
-.chart .tip {
-  fill: var(--accent);
-}
-.chart .bar-new {
-  fill: var(--sev-high);
-}
-.chart .bar-res {
-  fill: var(--ok);
-}
-.chart .zero {
-  stroke: var(--line-strong);
-  stroke-width: 1;
-}
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap-wide);
-  font-size: var(--step--1);
-  color: var(--muted);
-}
-.legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  display: inline-block;
-  font-style: normal;
-}
-.sevring {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-.sevring svg {
-  flex: none;
-}
-.ringkey {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 150px;
-  flex: 1;
-}
-.ringkey li {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  font-size: var(--step--1);
-}
-.ringkey i {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  flex: none;
-}
-.ringkey .n {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-.ringkey .d {
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  width: 30px;
-  text-align: right;
-}
-.ringkey .d.up {
-  color: var(--sev-exploited);
-}
-.ringkey .d.down {
-  color: var(--ok);
-}
 .readiness {
   display: flex;
   flex-direction: column;
   gap: 11px;
-}
-/* ---------- sheet ---------- */
-
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgb(8 12 20 / 55%);
-  display: none;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 5vh 16px;
-  overflow-y: auto;
-}
-.backdrop.open {
-  display: flex;
-}
-.sheet {
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  width: min(680px, 100%);
-  max-height: 90vh;
-  overflow-y: auto;
-  font-family: var(--font);
-  font-size: var(--step-0);
-}
-.sheet > header {
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  padding: 14px 16px;
-  display: flex;
-  gap: var(--gap-loose);
-  align-items: center;
-  flex-wrap: wrap;
-}
-.sheet > header h3 {
-  margin: 0;
-  font-size: var(--step-1);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.sheet .shut {
-  margin-left: auto;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  border-radius: var(--radius);
-  cursor: pointer;
-  padding: 3px 9px;
-  font-size: var(--step--1);
-  color: var(--muted);
-}
-.sheet .body {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.sheet > footer {
-  position: sticky;
-  bottom: 0;
-  background: var(--surface);
-  border-top: 1px solid var(--line);
-  padding: 12px 16px;
-  display: flex;
-  gap: var(--gap);
-  align-items: center;
-  flex-wrap: wrap;
-}
-.sheet > footer .note {
-  font-size: var(--step--1);
-  color: var(--muted);
-  margin-left: auto;
-}
-/* ---------- adding something: a floating action and a drawer ---------- */
-
-.fab {
-  position: absolute;
-  right: 26px;
-  bottom: 26px;
-  z-index: 30;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
-  border: 0;
-  cursor: pointer;
-  box-shadow:
-    0 8px 22px color-mix(in oklab, var(--accent) 45%, transparent),
-    0 1px 2px rgb(0 0 0 / 20%);
-  display: grid;
-  place-items: center;
-  transition: transform 0.12s ease;
-}
-.fab:hover {
-  transform: translateY(-1px) scale(1.04);
-}
-.fab svg {
-  width: 22px;
-  height: 22px;
-  stroke: currentcolor;
-  fill: none;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-}
-
-.scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 44;
-  background: rgb(8 12 20 / 35%);
-  display: none;
-}
-.scrim.open {
-  display: block;
-}
-
-.drawer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 45;
-  width: min(440px, 100%);
-  background: var(--surface);
-  color: var(--ink);
-  border-left: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  transform: translateX(104%);
-  transition: transform 0.18s ease;
-  font-family: var(--font);
-  font-size: var(--step-0);
-}
-.drawer.open {
-  transform: none;
-}
-.drawer:not(.open) {
-  visibility: hidden;
-}
-.drawer > header {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-loose);
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--line);
-}
-.drawer > header h3 {
-  margin: 0;
-  font-size: var(--step-1);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.drawer .shut {
-  margin-left: auto;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  border-radius: var(--radius);
-  cursor: pointer;
-  padding: 3px 9px;
-  font-size: var(--step--1);
-  color: var(--muted);
-  font-family: inherit;
-}
-.drawer .dbody {
-  padding: 18px;
-  overflow-y: auto;
-  flex: 1;
-}
-.drawer .dbody .field {
-  margin-bottom: 16px;
-}
-.drawer .dbody .hint {
-  display: block;
-  margin-top: 2px;
-}
-.drawer .dbody .reading {
-  margin-top: 4px;
-}
-.drawer > footer {
-  display: flex;
-  gap: var(--gap);
-  align-items: center;
-  padding: 14px 18px;
-  border-top: 1px solid var(--line);
-  background: var(--raised);
-}
-@media (prefers-reduced-motion: reduce) {
-  .drawer {
-    transition: none;
-  }
 }
 /* ---------- which locations a decision covers ---------- */
 

@@ -10,6 +10,7 @@ import { Failed } from "../ui/Failed";
 import { called, ROLES, type Role } from "../ui/roles";
 import { Access } from "./Access";
 import { Wide } from "../ui/Wide";
+import type { Who } from "../app/session";
 
 // Users and roles: who can see what, and who can decide about it.
 //
@@ -17,7 +18,7 @@ import { Wide } from "../ui/Wide";
 // so this is what an administrator decided rather than who has turned up — and
 // being recorded grants a role, it does not let anybody in. They still sign in
 // through a configured provider.
-export function People() {
+export function People({ who: me }: { who: Who }) {
   const queries = useQueryClient();
   const [adding, setAdding] = useState(false);
   // Whose grid is open. One at a time: the grid is as wide as the table and
@@ -127,7 +128,10 @@ export function People() {
       <div className="screen-head">
         <h2>Users and roles</h2>
         <p>Who can read and decide what</p>
-        <AddButton label="Add user" onClick={() => setAdding(true)} />
+        {/* Offered only to somebody the server will take it from. A control
+            that changes nothing is worse than a control that is not there,
+            because pressing it looks like it worked. */}
+        {me.admin && <AddButton label="Add user" onClick={() => setAdding(true)} />}
       </div>
 
       {grant.error != null && <Failed error={grant.error} what="That role could not be granted." />}
@@ -253,13 +257,15 @@ export function People() {
                         type="button"
                         className="linkish"
                         aria-expanded={openFor === person.identity}
-                        disabled={cannotManage}
+                        disabled={!me.admin || cannotManage}
                         title={
-                          derived
-                            ? "Roles come from provider groups and would be overwritten"
-                            : unreadMode
-                              ? "Where roles come from could not be read"
-                              : "Every product against every capability, as a grid"
+                          !me.admin
+                            ? "Only an administrator grants and withdraws roles"
+                            : derived
+                              ? "Roles come from provider groups and would be overwritten"
+                              : unreadMode
+                                ? "Where roles come from could not be read"
+                                : "Every product against every capability, as a grid"
                         }
                         onClick={() =>
                           setOpenFor(openFor === person.identity ? "" : (person.identity ?? ""))
@@ -273,7 +279,12 @@ export function People() {
                         type="button"
                         className="linkish"
                         style={{ color: "var(--muted)" }}
-                        title="Sign them out everywhere"
+                        disabled={!me.admin}
+                        title={
+                          me.admin
+                            ? "Sign them out everywhere"
+                            : "Only an administrator ends somebody else's sessions"
+                        }
                         onClick={() => endSessions.mutate({ identity: person.identity ?? "" })}
                       >
                         End sessions

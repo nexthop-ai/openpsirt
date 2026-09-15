@@ -663,7 +663,6 @@ export function Decide({
     total: open.length,
     matching,
     offered,
-    blocked: [],
     reasoning,
     versionHere: at.version,
   };

@@ -166,6 +166,14 @@ Ceilings vary by list. Which list allows what is a judgment about each list.
 
 Filters are named fields with fixed meanings, bound as parameters.
 
+**A filter over an open set says so.** The kind of package is read out of the
+identifier a producer wrote, so the set is whatever producers emit and the
+parameter carries any string: one nothing carries matches nothing. Two
+descriptions named eight kinds as though that were the vocabulary, and the
+interface offered exactly those eight — so on an image whose packages are
+`apk` or `rpm`, most of the inventory could not be narrowed to at all while the
+server would have answered either correctly.
+
 Sorting was refused outright and is now permitted (REQ-66). A value in a query
 can be bound as a parameter; a column name cannot, so a sort column arriving from
 a query string becomes part of the statement.

@@ -40,6 +40,7 @@ end rather than left to be found by clicking.
 - [Recording a flaw](#recording-a-flaw)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The editor](#the-editor)
+- [Reachable from a keyboard](#reachable-from-a-keyboard)
 - [A read that failed](#a-read-that-failed)
 - [A render that threw](#a-render-that-threw)
 - [An expired session](#an-expired-session)
@@ -1030,6 +1031,18 @@ the part of a decision that matters most.
 | **Signing out also clears what the tab remembers** | The scope somebody picked and the last judgment they recorded. Sign-out is a same-tab navigation, so the session store survives it by construction: the next person was handed the previous person's product in the scope bar — a name they may hold no grant on — and their last outcome in the decision form. The look and the rail stay, because a preference surviving a sign-out is what a preference is |
 | Where a draft lives, and under whose name, is decided in one place | A control spelled at each of six call sites is a control that is missing at the seventh |
 
+## Reachable from a keyboard
+
+A control somebody can see and cannot reach is a control that is not there.
+
+| Rule | |
+|---|---|
+| The focus ring is added to, never replaced | An accent border and a wash around it are an addition to the global ring. A checkbox and a radio are painted by the browser, so a border declaration reaches nothing on them and a wash at a tenth of full strength is 1.16:1 against the surface — where 3:1 is the floor. Tabbing into the permission grid, where one press writes a grant per product, nothing on screen said which box had focus |
+| Where a control has no border of its own, the ring goes on the box around it | The two search boxes draw their own frame and the input inside has none, so the ring taken off the input had nowhere to go |
+| Nothing a person operates is hidden with `display: none` | It leaves the tab order. The upload drop zone's file input was hidden that way and nothing else reached it — no focusable label, no drag handler, and the Upload button disabled until a file is chosen — so filing an inventory by hand was pointer-only |
+| Text on a severity colour reads the token that flips with the look | Every severity token in the dark look is a light tint, so white on one of them is 2.54:1. One rule hardcoded white over the critical token at nine and a half pixels |
+| One ratio for one meaning | A disabled chip and a disabled button said the same thing at two strengths, and the weaker composited to about 2.2:1 against white |
+
 ## A read that failed
 
 A screen draws what it was told, and "I could not ask" is not one of the things
@@ -1217,6 +1230,7 @@ since a person only ever sees products they hold a role on.
 | An entry that cannot answer at the current selection is still listed, saying which picker to touch | A report missing from a list reads as a report that does not exist |
 | A name the catalog does not hold returns to the catalog, not to the front page | Somebody following a stale link is looking for a report, and the list of them is the nearest answer |
 | Every report states what it was asked of and when it was taken, and prints | The stylesheet is the record's: the shell, the rail and the controls drop out, and a row does not break across a page. A control that does not print has its value stated in the printed header instead |
+| **A figure opens the list it was counted with** | The findings list writes three narrowings into its own address when the address says nothing, and the figures on the home and product screens are counted with none of them — so every number opened a list with fewer rows in it than the number said. Those links carry the three turned off, and a sheet's figures carry its window and its product for the same reason |
 | A report that is a list exports as CSV and JSON; one that is figures prints, and every figure links to the list it counts | There is no stream behind an aggregate, and inventing one would publish a file nothing computed. The list a figure opens is the export, and it is also the traceable form of the number |
 | **A figure is the answer's, and the list under it is a page** | The estate figures on the coverage sheet come from the response rather than being recounted from the rows beneath them, and each list says how many there are. Recounted from a page, "being scanned" was a figure about two hundred builds under a heading about the estate |
 | **Print waits until every figure has arrived** | A printed sheet stamps the moment it was taken on itself, so one printed mid-read is a dated record of numbers nobody computed |
@@ -1349,6 +1363,10 @@ scroll sideways. That is why the tables here are written rather than installed.
 | A control carries no prose, and names itself | Saying a field is not a credential is not enough where the field's own words read as one. A manager reads whatever text it can reach through a control, and three settings were offered a saved login with all four attributes set: their explanation sat on the control as a tooltip, and it said sign-in, account and date. So the explanation sits on the label, where a person hovering still finds it, and each control is named for what it holds rather than left for a manager to name from its surroundings |
 | Two rows are only ambiguous when both ends match (REQ-57) | The same subproject reaching the same component twice by different routes. Rare, and visible when it happens: expanding the row, or the tree, resolves it. Nothing is invented to disambiguate a case the reader can see |
 | Panel order and what is left out are decided rather than accumulated | The risk in a page that gathers everything is that it succeeds at nothing |
+| **What sits over the page is positioned against the viewport** | The nearest positioned ancestor is the frame, which grows with the content — so on a tall page the drawer's height became the whole document: Close at the top of it, submit at the bottom, and neither on screen. A floating action that is not fixed does not float |
+| **Stacking is a named scale, not six hand-picked numbers** | Four stylesheets held them with nothing to read to decide a seventh, and two unrelated overlays claimed the same step: the drawer and the rail's scrim resolve in one context, so the drawer won on document order and the rail's click-to-dismiss stopped working wherever they overlapped |
+| **A closed vocabulary the server owns is rendered from the generated client** | Five were hand-kept tables here, and every one had a member it could not label: an outcome drew an empty cell in five tables, three register states printed as wire tokens, and a narrowing over the claim kinds could not fail because its comparisons exhausted every value but one |
+| **A word the table does not know is shown as it arrived** | A server that grows a vocabulary before the interface does should leave somebody reading something unfamiliar rather than a blank |
 
 ## The initial load
 
@@ -1463,12 +1481,18 @@ the one that made it too long.
 | | |
 |---|---|
 | **The finding screen splits into four, by question** | What the record says about this finding and how it came to say it; what is known about the flaw as against what anybody claimed; who is involved and what hangs off it; and the screen that arranges them |
-| **The list screen gives up the parts that take rows and draw them** | Expanded in place, by component, by bump, the pager. It keeps the one component that holds the selection, the filters, the page and what is picked across pages. That one is still long, and it is one thing: cutting a component that shares that much state between halves would be splitting badly |
+| **The list screen gives up the parts that take rows and draw them** | Expanded in place, by component, by bump, the pager, and the table itself. What is left holds the filters, the page and the question being asked — the table takes what it draws and holds none of it, which is what stops the path's product being read on the list that spans every product, where there is none |
+| **What is selected is a hook, not five pieces of state in a render function** | The rule that a changed question clears the selection was written at three of five call sites and missing at two, and it held only by a property of another file: every chip either drops its key or puts the wider default back, so removing one only ever widens. Inside the hook there is no call site left that could bypass it |
+| **What an address means lives beside the list rather than inside the screen** | Setting one filter, setting several values of one, and hiding a component are pure functions of the parameters. Two screens spelled the build prefix by hand and the finding address twice, and the copies dropped the parameter the finding reads to walk the list it came from |
 | **The queue screen splits by which queue** | Five lists lived there. What became of what you proposed is a whole tab with its own endpoint, sharing nothing with the claims but the offset in the address; an embargo extension and a severity rating are two things waiting for a second person that are not claims, and share neither the card nor the selection nor the batch. What is left is the claim queue, which is one thing |
 | **The dependency tree gives up the panel** | Walking the graph and asking what is known about one node are two questions, and the second took a third of the page while the first was on screen |
 | **The finding screen gives up the one form among its readings** | Rating the issue is a claim about the issue in this product, made from a screen that is otherwise four readings of what the record already says |
 | **The notes thread is on the screen whether or not a claim exists** | It is the one somebody can write in before anybody has decided anything, which is what it is for; the claim's own thread stays gated on a claim. It says in words that it is about this issue in this product, because it is read beside a row that may be one of eleven the same issue sits on — not about this component, and not about other products |
-| **The stylesheet splits by position, not by theme** | Order is the mechanism — the last rule wins — so grouping rules by what they are about would silently reorder the cascade. The files are the sections in the order they were already in: the tokens, the frame, what every screen is built from, the shapes belonging to one screen, and what a narrow screen changes. 653 rules before and after, same order, same content |
+| **A thread is one component, and the endpoint is what a caller keeps** | The comments on a claim and the notes on an issue are the same conversation: the avatar, the timestamp, the edited mark, the earlier versions behind it, the editor in place and the draft. Written twice they had already begun to diverge, and the timestamp was formatted at four sites — so a fix to it would land in whichever file the author had open. What one piece is called and what adding one does not do stay each caller's, so the two are worded apart deliberately rather than together by accident |
+| **The stylesheet splits by position, not by theme** | Order is the mechanism — the last rule wins — so grouping rules by what they are about would silently reorder the cascade. The files are the sections in the order they were already in: the tokens, the frame, what every screen is built from, the charts, what sits over the page, the shapes belonging to one screen, what a narrow screen changes, and what prints. Same rules, same order, same content, checked selector by selector across the split |
+| **What sits over the page is one file** | The sheet, the floating action, the drawer and the two scrims. It is where every stacking decision in the interface is, and reading them against one scale is the only way to keep them in order |
+| **What prints is imported last** | It wins by being last rather than only by being marked important, so it has a position in the cascade rather than a name that happens to sort |
+| **The two rules that are the page's rather than a screen's move to the frame** | A reduced-motion block over everything, and how a key named on a control is drawn. The per-screen file's own first line says what it holds, and neither of those is one screen's |
 | **A shape many screens draw belongs to the parts, whatever it was written beside** | Four sections — the charts, the report sheet, the drawer, the covering panel — styled components in `ui/` from the file that says it holds "shapes that belong to one screen". Moving one earlier in the cascade is a behavior change only where a per-screen rule of equal specificity was relying on losing to it, so it is checked selector by selector rather than assumed; for these four the two files shared none |
 | **What the parts file costs is the size of the parts file** | It is the shared vocabulary every screen is built from, so it grows with that vocabulary, and the only split available is per-component — which the cascade rule makes hazardous for no gain. Around nineteen hundred lines is the honest price of this split axis, recorded here rather than paid by cutting the file into pieces that have to be kept in order |
 

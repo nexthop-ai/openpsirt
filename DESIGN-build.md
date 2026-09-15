@@ -55,6 +55,8 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
 | `docs/` | The published documentation site |
 | `assets/` | Logo files |
+| `Makefile` | The build and every gate |
+| `Makefile.demo` | The seeded demo deployment and the hot-reload loop, included by the makefile beside it. A file of its own because it shares nothing with the gate half but the names of the docker and npm commands, so the half that decides whether a change may be pushed reads without the half that stands an instance up |
 
 Everything is under `internal/`, so nothing is importable by another module.
 

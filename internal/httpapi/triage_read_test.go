@@ -16,10 +16,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
-// scanned puts a build behind the handler: one component under the product,
-// with one issue reported against it. Reading what has been decided is only
-// testable against something that was found.
-func (r *reach) scanned(t *testing.T) (place string) {
+// scan applies one snapshot and one set of reported findings to the seeded
+// build, and answers with nothing: every test here reads back through the API.
+//
+// The two seeds below differ in the graph they apply and what the report
+// carries, and in nothing else — they had a locate, a target lookup, a scan
+// record, a run and an apply written out twice between them, which is five
+// calls whose failure modes a reader has to check twice to find out they are
+// the same.
+func (r *reach) scan(t *testing.T, hash string, snapshot graph.Snapshot,
+	reported []finding.Reported) {
+
 	t.Helper()
 	ctx := t.Context()
 
@@ -32,27 +39,16 @@ func (r *reach) scanned(t *testing.T) (place string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	scan, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "read-test", BuiltAt: time.Now().UTC(),
+	made, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: hash, BuiltAt: time.Now().UTC(),
 		ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
-	library := graph.Described{
-		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
-	}
-	if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
-		Root:         product,
-		Components:   []graph.Described{library},
-		Dependencies: []graph.Dependency{{Parent: product, Child: library}},
-	}); err != nil {
+	if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, made.ID, snapshot); err != nil {
 		t.Fatal(err)
 	}
-
 	findings := finding.NewStore(r.db.DB)
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
@@ -61,13 +57,40 @@ func (r *reach) scanned(t *testing.T) (place string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
-		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
-		Component: library,
-		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
-	}}); err != nil {
+	if _, err := findings.Apply(ctx, target.ID, run.ID, reported); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// The root of the seeded build, and the two components the seeds below hang
+// off it. Named once so a test reading a component by name reads the name the
+// seed wrote.
+var (
+	seededRoot = graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
+	seededLib  = graph.Described{
+		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
+	}
+	seededConsumer = graph.Described{
+		Purl: "pkg:deb/debian/libswsscommon@1.0.0", Name: "libswsscommon", Version: "1.0.0",
+	}
+)
+
+// scanned puts a build behind the handler: one component under the product,
+// with one issue reported against it. Reading what has been decided is only
+// testable against something that was found.
+func (r *reach) scanned(t *testing.T) (place string) {
+	t.Helper()
+	r.scan(t, "read-test",
+		graph.Snapshot{
+			Root:         seededRoot,
+			Components:   []graph.Described{seededLib},
+			Dependencies: []graph.Dependency{{Parent: seededRoot, Child: seededLib}},
+		},
+		[]finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+			Component: seededLib,
+			FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
+		}})
 
 	// Under the product itself, the component stands alone.
 	return finding.PlaceIdentity("libnl-3-200", "")
@@ -77,71 +100,34 @@ func (r *reach) scanned(t *testing.T) (place string) {
 // can carry, so a test can ask whether any of it survives the trip.
 func (r *reach) scannedWithEvidence(t *testing.T) {
 	t.Helper()
-	ctx := t.Context()
-
-	names := catalog.NewStore(r.db.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "evidence-test", BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
-	consumer := graph.Described{
-		Purl: "pkg:deb/debian/libswsscommon@1.0.0", Name: "libswsscommon", Version: "1.0.0",
-	}
-	library := graph.Described{
-		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
-	}
-	if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
-		Root:       product,
-		Components: []graph.Described{consumer, library},
-		Dependencies: []graph.Dependency{
-			{Parent: product, Child: consumer}, {Parent: consumer, Child: library},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	findings := finding.NewStore(r.db.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
-		Issue: finding.Named{
-			Identifier:  "CVE-2026-9999",
-			Severity:    "high",
-			Description: "A crafted attribute length causes a read past the end of the buffer.",
-			Advisory:    "https://nvd.nist.gov/vuln/detail/CVE-2026-9999",
-			References: []finding.Reference{
-				{URL: "https://github.com/thom311/libnl/commit/abc123", Kind: finding.Patch},
-				{URL: "https://example.org/write-up", Kind: finding.AdvisoryRef},
+	r.scan(t, "evidence-test",
+		graph.Snapshot{
+			Root:       seededRoot,
+			Components: []graph.Described{seededConsumer, seededLib},
+			Dependencies: []graph.Dependency{
+				{Parent: seededRoot, Child: seededConsumer},
+				{Parent: seededConsumer, Child: seededLib},
 			},
-			Exploited:  true,
-			Likelihood: 0.86,
-			Score:      8.1,
-			Vector:     "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:H",
-			Weaknesses: []string{"CWE-125"},
 		},
-		Component: library,
-		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
-	}}); err != nil {
-		t.Fatal(err)
-	}
+		[]finding.Reported{{
+			Issue: finding.Named{
+				Identifier:  "CVE-2026-9999",
+				Severity:    "high",
+				Description: "A crafted attribute length causes a read past the end of the buffer.",
+				Advisory:    "https://nvd.nist.gov/vuln/detail/CVE-2026-9999",
+				References: []finding.Reference{
+					{URL: "https://github.com/thom311/libnl/commit/abc123", Kind: finding.Patch},
+					{URL: "https://example.org/write-up", Kind: finding.AdvisoryRef},
+				},
+				Exploited:  true,
+				Likelihood: 0.86,
+				Score:      8.1,
+				Vector:     "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:H",
+				Weaknesses: []string{"CWE-125"},
+			},
+			Component: seededLib,
+			FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
+		}})
 }
 
 // decided proposes a claim through the API and returns its identifier.

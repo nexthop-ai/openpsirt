@@ -4,7 +4,7 @@ import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { usePaging } from "./list";
+import { pathTo, usePaging } from "./list";
 import { scopeQuery, useScope } from "../app/scope";
 import { useWho } from "../app/session";
 import { unwrap } from "../api/queries";
@@ -240,14 +240,14 @@ export function Unassigned() {
                     </td>
                     <td>
                       <Link
-                        to={
-                          `/products/${encodeURIComponent(row.product ?? "")}` +
-                          `/streams/${encodeURIComponent(row.stream ?? "")}` +
-                          `/variants/${encodeURIComponent(row.variant ?? "")}` +
-                          `/findings/${encodeURIComponent(row.vulnerability ?? "")}` +
-                          `/components/${encodeURIComponent(row.component ?? "")}` +
-                          (row.version ? `?version=${encodeURIComponent(row.version)}` : "")
-                        }
+                        to={pathTo(
+                          {
+                            product: row.product ?? "",
+                            stream: row.stream ?? "",
+                            variant: row.variant ?? "",
+                          },
+                          row,
+                        )}
                         className="id"
                       >
                         {row.vulnerability}

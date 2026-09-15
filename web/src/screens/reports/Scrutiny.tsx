@@ -9,7 +9,7 @@ import { Loading } from "../../ui/Loading";
 import { Outcome } from "../../ui/Outcome";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords, daysAsked } from "./Window";
+import { WindowPicker, coveringWords, daysAsked, windowStart } from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // How long back to look. Ninety days is a quarter, which is the period an
@@ -44,6 +44,16 @@ export function Scrutiny() {
         }),
       ),
   });
+
+  // The record, narrowed to the set the figure was computed over. A link
+  // carrying only the outcome opened the whole record, which is a different
+  // population from the sheet's window and product — so the number and the
+  // list it opens disagreed.
+  const overTheSame = (outcome: string) => {
+    const asked = new URLSearchParams({ outcome, alone: "true", from: windowStart(days) });
+    if (product) asked.set("product", product);
+    return `/audit?${asked.toString()}`;
+  };
 
   const alone = got.data?.alone ?? [];
   const dismissed = alone.filter((row) => DISMISSALS.has(row.outcome));
@@ -102,10 +112,7 @@ export function Scrutiny() {
                           <td className="num">{(row.claims ?? 0).toLocaleString()}</td>
                           <td className="num">{(row.rows ?? 0).toLocaleString()}</td>
                           <td>
-                            <Link
-                              to={`/audit?outcome=${row.outcome}&alone=true`}
-                              className="linkish"
-                            >
+                            <Link to={overTheSame(row.outcome ?? "")} className="linkish">
                               Read them →
                             </Link>
                           </td>

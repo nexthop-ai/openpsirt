@@ -59,9 +59,16 @@ export function labeled(outcome?: string): string {
   return said[outcome ?? ""]?.label ?? outcome ?? "";
 }
 
+// The same word as a chip, with its color and its meaning.
+//
+// A word this does not know is shown as it arrived, the way the two renderers
+// above do it. Returning nothing instead drew an empty cell in five tables —
+// and in those tables the outcome is the whole of the cell, so a vocabulary
+// the server grew before this did read as a judgment nobody made.
 export function Outcome({ outcome }: { outcome?: string }) {
-  const it = said[outcome ?? ""];
-  if (!it) return null;
+  if (!outcome) return null;
+  const it = said[outcome];
+  if (!it) return <span className="hint">{outcome}</span>;
   return (
     <span className="sev" title={it.means} style={{ "--c": it.color } as React.CSSProperties}>
       {it.label}

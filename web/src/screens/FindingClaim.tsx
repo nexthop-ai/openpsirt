@@ -8,7 +8,6 @@
 
 import { FLOORS } from "../ui/severities";
 import { useState } from "react";
-import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { initials } from "../ui/initials";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,7 +19,8 @@ import { useComment, useEditComment } from "../api/mutations";
 import { Failed } from "../ui/Failed";
 import { ReasonEditor } from "../ui/ReasonEditor";
 import { Markdown } from "../ui/Markdown";
-import { Editor, forget, mentioning } from "../ui/Editor";
+import { Thread } from "../ui/Thread";
+import { Editor, mentioning } from "../ui/Editor";
 import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 
@@ -493,154 +493,53 @@ export function Comments({
   // the mention itself says a finding exists.
   undisclosed?: boolean;
 }) {
-  const [text, setText] = useState("");
-  const [editing, setEditing] = useState<number | null>(null);
-  // Which comment's earlier versions are open, where somebody asked.
-  const [showing, setShowing] = useState<number | null>(null);
   const comment = useComment();
-  const draftKey = `comment:${claimId}`;
   const comments = useQuery({
     queryKey: ["comments", claimId],
     queryFn: async () =>
       unwrap(await api.GET("/v1/claims/{id}/comments", { params: { path: { id: claimId } } })),
   });
-  const items = comments.data?.items ?? [];
 
   return (
     <div className="card">
       <h3>Comments</h3>
-      {items.length > 0 && (
-        <div className="thread">
-          {items.map((each) => (
-            <div key={each.id} className="said2">
-              <span className="avatar">{initials(each.written_by ?? "")}</span>
-              <div>
-                <div className="meta">
-                  <b>{each.written_by}</b>
-                  <span className="when">{each.written_at?.replace("T", " ").slice(0, 16)}</span>
-                  {each.edited_at && (
-                    <button
-                      type="button"
-                      className="edited"
-                      title="What it said before"
-                      aria-expanded={showing === each.id}
-                      onClick={() => setShowing(showing === each.id ? null : (each.id ?? null))}
-                    >
-                      edited
-                    </button>
-                  )}
-                </div>
-                {editing === each.id ? (
-                  <Edit
-                    id={each.id ?? 0}
-                    was={each.body ?? ""}
-                    about={about}
-                    undisclosed={undisclosed}
-                    onDone={() => setEditing(null)}
-                  />
-                ) : (
-                  <div className="bubble">
-                    <Markdown source={each.body ?? ""} />
-                    {/* What it said before. Behind the "edited" mark
-                        rather than always on screen: the current text is what
-                        a reader is reading, and the history is what somebody
-                        checking the record goes looking for. */}
-                    {showing === each.id && <Earlier id={each.id ?? 0} />}
-                    {mine(each.written_by ?? "") && (
-                      <button
-                        type="button"
-                        className="linkish"
-                        style={{ marginTop: 6, display: "block" }}
-                        onClick={() => setEditing(each.id ?? null)}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="field" style={{ margin: "14px 0 0", maxWidth: "78ch" }}>
-        <label>Add a comment</label>
-        <Editor
-          value={text}
-          onChange={setText}
-          draftKey={draftKey}
-          rows={4}
-          label="Comment"
-          placeholder="A question, a note, something worth knowing later."
-          attachTo={about}
-          mentions={mentioning(about.product, undisclosed)}
-        />
-      </div>
-      {comment.error != null && <Failed error={comment.error} what="That could not be added." />}
-      {/* A name that reached nobody. Said without saying why: either no such
-          person is recorded or they cannot read this, and telling those apart
-          would answer "can this person see undisclosed work" one comment at a
-          time. The comment is kept either way — losing a paragraph to fix a
-          word is the wrong trade. */}
-      {(comment.data?.not_notified?.length ?? 0) > 0 && (
-        <p className="hint">
-          Nobody was told about {comment.data?.not_notified?.map((name) => `@${name}`).join(", ")} —
-          either there is no such person here, or they cannot read this finding. The comment was
-          saved.
-        </p>
-      )}
-      <div className="actions">
-        <button
-          type="button"
-          className="btn"
-          disabled={!text.trim() || comment.isPending}
-          onClick={() =>
-            comment.mutate(
-              { id: claimId, body: text },
-              {
-                onSuccess: () => {
-                  forget(draftKey);
-                  setText("");
-                },
-              },
-            )
-          }
-        >
-          Comment
-        </button>
-        <span className="consequence">Does not affect the approval</span>
-      </div>
+      <Thread
+        items={comments.data?.items ?? []}
+        mine={mine}
+        about={about}
+        undisclosed={undisclosed}
+        word="Comment"
+        consequence="Does not affect the approval"
+        placeholder="A question, a note, something worth knowing later."
+        draftKey={`comment:${claimId}`}
+        notNotified={comment.data?.not_notified ?? []}
+        adding={comment}
+        onAdd={(body, done) => comment.mutate({ id: claimId, body }, { onSuccess: done })}
+        edit={(piece, done) => (
+          <Edit
+            id={piece.id ?? 0}
+            was={piece.body ?? ""}
+            about={about}
+            undisclosed={undisclosed}
+            onDone={done}
+          />
+        )}
+        history={useCommentHistory}
+      />
     </div>
   );
 }
 
-// What a comment said before it was changed.
-//
-// A comment is part of the record that goes public at disclosure, so a record
-// whose earlier text is unrecoverable is one somebody can read and nobody can
-// check. Read only when asked for: the current text is what a reader is
-// reading, and this is what somebody checking goes looking for.
-export function Earlier({ id }: { id: number }) {
-  const history = useQuery({
+// One comment's earlier versions, as the thread asks for them. A hook rather
+// than a component, because the thread decides when to draw them and this
+// decides where they come from — which is the only thing a comment thread and
+// a note thread do not share.
+function useCommentHistory(id: number) {
+  return useQuery({
     queryKey: ["comment", id, "history"],
     queryFn: async () =>
       unwrap(await api.GET("/v1/comments/{id}/history", { params: { path: { id } } })),
   });
-  const rows = history.data?.items ?? [];
-  if (history.isPending) return <Loading />;
-  if (rows.length === 0) return null;
-  return (
-    <div className="earlier">
-      {rows.map((row) => (
-        <div key={row.version}>
-          <span className="hint">
-            Version {row.version}, replaced {row.replaced_at?.replace("T", " ").slice(0, 16)}
-          </span>
-          <Markdown source={row.body ?? ""} />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 // Rewriting a comment in place.

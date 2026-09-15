@@ -130,17 +130,29 @@ export const DEADLINES = [
   ["90", "Due within 90 days"],
 ] as const;
 
-// The package kinds a real image carries, most numerous first. The name is the
-// one the package identifier spells, with the language beside it where they
-// differ — Rust is cargo and Python is pypi, and somebody looking for one of
-// those searches for the language.
+// The package kinds worth offering, most numerous first. The name is the one
+// the package identifier spells, with the language beside it where they differ
+// — Rust is cargo and Python is pypi, and somebody looking for one of those
+// searches for the language.
+//
+// **What the server takes is open, and this is what is offered.** The filter
+// carries whatever string arrives and matches the identifier against it, so
+// this list bounds the picker rather than the question — and a list short of
+// what an image actually holds is a capability that exists and cannot be
+// reached. `apk` and `rpm` were missing from it, so on an Alpine or RPM image
+// the majority of the inventory could not be narrowed to at all, while the
+// server would have answered either correctly.
 export const ECOSYSTEMS = [
   ["", "Any"],
   ["generic", "Generic"],
   ["golang", "Go (golang)"],
   ["deb", "Debian (deb)"],
+  ["rpm", "RPM"],
+  ["apk", "Alpine (apk)"],
   ["cargo", "Rust (cargo)"],
   ["pypi", "Python (pypi)"],
+  ["npm", "npm"],
+  ["gem", "Ruby (gem)"],
   ["oci", "Container image (oci)"],
   ["github", "GitHub"],
   ["maven", "Maven"],

@@ -6,6 +6,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
+import { buildPath } from "./list";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
@@ -123,11 +124,7 @@ export function Variants() {
                   <td>
                     {stream && (
                       <Link
-                        to={
-                          `/products/${encodeURIComponent(product)}` +
-                          `/streams/${encodeURIComponent(stream)}` +
-                          `/variants/${encodeURIComponent(variant.name ?? "")}/findings`
-                        }
+                        to={`${buildPath({ product, stream, variant: variant.name ?? "" })}/findings`}
                         className="linkish"
                       >
                         Findings →

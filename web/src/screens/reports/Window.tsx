@@ -32,6 +32,14 @@ export function daysAsked(params: URLSearchParams, fallback: number): number {
   return Math.floor(days);
 }
 
+// windowStart is when a window began, as the date the lists and the record
+// take. Beside the reader of the number rather than in each sheet: two sheets
+// held a copy, and a link built from one of them is what makes a figure and
+// the list it opens ask the same question.
+export function windowStart(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
+
 // wordsFor is what one window is called, wherever it is named.
 export function wordsFor(days: number): string {
   if (days >= LONGEST) return "everything";

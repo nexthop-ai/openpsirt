@@ -231,7 +231,7 @@ export function Products({ who }: { who: Who }) {
 // the deployment. Following is not the same as stating the deployment's
 // current line — a product that stated it would stop following the next time
 // the deployment changed its mind, and nobody would see that happen.
-type Line = "" | "everything" | "low" | "medium" | "high" | "critical";
+type Line = "" | (typeof THE_LINE)[number];
 
 const lines: Line[] = ["", ...THE_LINE];
 

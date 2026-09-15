@@ -13,7 +13,6 @@ import { on } from "../ui/when";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Pace } from "../ui/Charts";
-import { upstream } from "../ui/upstream";
 import { ROLLED } from "../ui/severities";
 import { Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
@@ -113,7 +112,16 @@ export function Component() {
   }
 
   const sameVersion = rows.filter((row) => row.version === here.version);
-  const link = upstream(here.purl);
+  // Where the package is published, as the server worked it out. This screen
+  // had a table of its own in a second language, with a different membership
+  // and different answers for the same identifier — it sent every
+  // Debian-family package to Debian's tracker, so an Ubuntu package's link
+  // landed on a record for different code with a different version history and
+  // a different advisory status, while the server's own link for the same
+  // finding went to Launchpad. A link that lands on a record for the wrong
+  // thing costs more than no link, because it is followed before it is
+  // disbelieved.
+  const link = here.upstream_url ?? null;
   // The bands are declared worst first, so the first one present is the worst.
   const worst = ROLLED.find((band) => (here.by_severity ?? {})[band]);
 

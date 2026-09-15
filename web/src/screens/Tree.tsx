@@ -3,6 +3,7 @@ import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { keyOf, partsOf, type At, type Node } from "./treeshape";
+import { buildPath } from "./list";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -558,14 +559,6 @@ function componentPage(at: At, component: string | undefined): string {
 
 function beneathComponent(at: At, component: string | undefined): string {
   return `${buildPath(at)}/findings?beneath=${encodeURIComponent(component ?? "")}`;
-}
-
-function buildPath(at: At): string {
-  return (
-    `/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}`
-  );
 }
 
 // One flat list of indented rows rather than nested lists, so the rule down the

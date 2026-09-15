@@ -1,20 +1,19 @@
-import { decidedAs } from "../ui/decided";
 import { overCapNotice, useBulkCap } from "../ui/bulk";
+import { useSelection } from "./useSelection";
+import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
-import { ByBump, ByComponent, Pager, Peek, Sits } from "./FindingsViews";
+import { ByBump, ByComponent, Pager } from "./FindingsViews";
 import { FLOORS } from "../ui/severities";
 import { Filters, Narrowed, STATES, activeFilters, without, withoutAny } from "./FindingsFilters";
 import { Choices } from "../ui/Choices";
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { on } from "../ui/when";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Exploited, Severity } from "../ui/Severity";
 import { Icon } from "../ui/Icons";
 import { Holder } from "../ui/Holder";
 import { Saved, here, ruleIn, useKept } from "../ui/Saved";
@@ -30,15 +29,14 @@ import {
   SORTS,
   acrossProducts,
   asAsked,
-  hiddenIn,
-  identityOf,
   listQuery,
   pageSize,
-  pathTo,
+  withParam,
+  withParams,
+  hidden,
   type Row,
   usePaging,
 } from "./list";
-import { Wide } from "../ui/Wide";
 
 // The filters the by-bump view can apply, by the key their chip carries.
 //
@@ -47,55 +45,6 @@ import { Wide } from "../ui/Wide";
 // rather than dropped, which is what would widen the list back out while the
 // chips went on saying they were on.
 const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "state"]);
-
-// How long this has been open here.
-//
-// The finding's own age, not the year in the identifier: an issue assigned in
-// 2019 that first appeared in this product last week has been somebody's
-// problem for a week, and the identifier already carries its own year for
-// anybody who wants it. This is also the age a deadline relates to.
-function openFor(opened: string | undefined): string | null {
-  if (!opened) return null;
-  const days = Math.floor((Date.now() - Date.parse(opened + "T00:00:00Z")) / 86_400_000);
-  if (!Number.isFinite(days) || days < 0) return null;
-  if (days < 60) return `open ${days}d`;
-  if (days < 730) return `open ${Math.floor(days / 30)}mo`;
-  return `open ${Math.floor(days / 365)}y`;
-}
-
-// What to say in the Due column, and how to color it.
-//
-// A blank cell would mean two deliberate things at once — below the line or
-// past end of life — on the one screen whose purpose is noticing what is
-// running out, so the reason is said.
-function dueSays(row: { due?: string; days_left?: number; no_deadline?: string }): {
-  text: string;
-  tone: "over" | "soon" | "fine" | "none";
-} {
-  if (!row.due) {
-    return {
-      text: row.no_deadline === "out-of-support" ? "out of support" : "below the line",
-      tone: "none",
-    };
-  }
-  const left = row.days_left ?? 0;
-  if (left < 0) return { text: `${-left}d over`, tone: "over" };
-  if (left <= 7) return { text: `${left}d left`, tone: "soon" };
-  return { text: row.due, tone: "fine" };
-}
-
-// What upstream has done, said rather than left to be inferred from a blank.
-function upstreamSays(state: string | undefined, fixedIn: string | undefined) {
-  if (fixedIn) return { text: fixedIn, kind: "id" as const };
-  switch (state) {
-    case "wont-fix":
-      return { text: "declined", kind: "note" as const };
-    case "none":
-      return { text: "none yet", kind: "note" as const };
-    default:
-      return { text: "—", kind: "faint" as const };
-  }
-}
 
 // One row per issue in a component, not per place. Every filter is in the URL,
 // so a link carries what somebody is looking at; every filter is the server's,
@@ -111,6 +60,10 @@ export function Findings() {
   // has taken the same filters for both lists from the start — one struct,
   // embedded in each — so what differed was only ever the screen.
   const spanning = product === "";
+  // How many columns the header renders, so the preview row spans all of them.
+  // Written as a literal it was one short on the spanning list, which draws
+  // the product as a column of its own.
+  const COLUMNS = spanning ? 11 : 10;
   const [params, setParams] = useSearchParams();
   // The branch and the variant come from the path on a build's own list and
   // from the picker's selection otherwise. Either may be "all": the list is
@@ -128,14 +81,12 @@ export function Findings() {
     () => ({ ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) }),
     [stream, variant],
   );
-  const navigate = useNavigate();
   const { offset, go } = usePaging();
   const page = pageSize(params);
   const sort = params.get("sort") ?? "";
   const ascending = params.get("asc") === "yes";
   const floor = params.get("floor") ?? "low";
   const view = params.get("view") ?? "issues";
-  const hiding = hiddenIn(params);
   const below = params.get("below") === "yes";
   const searching = params.get("q") ?? "";
   // Everything under a node of the dependency tree, by the tree's own walk,
@@ -175,15 +126,11 @@ export function Findings() {
   // that it was chosen. Keeping keys alone meant the act could only reach the
   // rows still on screen, so picking thirty on one page and twenty on the next
   // and pressing "Assign 50" wrote twenty and dropped thirty, silently.
-  const [picked, setPicked] = useState<Map<string, Row>>(new Map());
+  const { picked, pick, pickAll, asking, failed: handFailed, through } = useSelection(asked);
   // Beside the hooks it belongs with: this reads the session, so it cannot sit
   // after an early return.
   const { cap: bulkCap, over: overCap } = useBulkCap(picked.size);
   const [handing, setHanding] = useState("");
-  // How many of a hand-over did not land. Said rather than swallowed: the loop
-  // writes one row at a time, so a failure partway through leaves part of a
-  // selection handed over, and the rows that failed stay picked.
-  const [handFailed, setHandFailed] = useState(0);
   // The list somebody has turned down a prepared claim for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
   // list on screen — narrowing further asks a different question, and the rule
@@ -208,7 +155,7 @@ export function Findings() {
             next.set("sort", key);
             next.delete("asc");
           }
-          asking(next);
+          ask(next);
         }}
       >
         {label}
@@ -341,41 +288,23 @@ export function Findings() {
     };
   }
 
-  // Every change to the question the list is asking goes through here, which
-  // is what makes clearing the selection one line rather than four.
-  //
-  // **A selection is made out of a population**, so replacing the population
-  // replaces what was selected: a triager filtering to low, ticking thirty
-  // rows and then clicking critical had a bar still saying thirty while four
-  // rows were listed — and handing them over wrote assignments for
-  // twenty-six rows nobody could see. The saved-filter path already said this
-  // and cleared; nothing else did.
-  function asking(next: URLSearchParams) {
-    next.delete("offset");
-    setPicked(new Map());
-    setHandFailed(0);
-    setParams(next);
+  // Every change to the question the list is asking goes through the hook that
+  // holds the selection, which is where the rule that a changed question
+  // clears it now lives.
+  function ask(next: URLSearchParams) {
+    setParams(asking(next));
   }
 
   function set(key: string, value: string) {
-    const next = new URLSearchParams(asked);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    asking(next);
+    ask(withParam(asked, key, value));
   }
 
-  // Several values of one filter, which the address carries as the parameter
-  // repeated. Written whole rather than added to, so unticking the last one
-  // leaves no empty parameter behind.
   function setMany(key: string, values: string[]) {
-    const next = new URLSearchParams(asked);
-    next.delete(key);
-    for (const value of values) next.append(key, value);
-    asking(next);
+    ask(withParams(asked, key, values));
   }
 
   function hide(component: string) {
-    setMany("hide", [...new Set([...hiding, component])]);
+    ask(hidden(asked, component));
   }
 
   // Memoized because the fallback is a fresh array each render, which made
@@ -496,8 +425,7 @@ export function Findings() {
           <Saved
             product={product}
             onPicked={() => {
-              setPicked(new Map());
-              setHandFailed(0);
+              ask(new URLSearchParams(asked));
               setDeclined(null);
             }}
           />
@@ -532,8 +460,8 @@ export function Findings() {
         // default back, so removing one only ever widens and the surviving
         // selection still matches. One chip whose removal narrowed would
         // re-open exactly the write that rule was added for.
-        clear={(chip) => asking(without(asked, chip))}
-        clearAll={() => asking(withoutAny(asked))}
+        clear={(chip) => ask(without(asked, chip))}
+        clearAll={() => ask(withoutAny(asked))}
       />
 
       {more && (
@@ -682,42 +610,17 @@ export function Findings() {
   );
 
   // Handing a selection to somebody, which is the one thing a selection can do
-  // until the bulk workflows that start from one are built.
+  // until the bulk workflows that start from one are built. What a refusal
+  // partway through leaves behind is the hook's rule rather than this one's.
   async function handOver() {
     const who = handing.slice(handing.indexOf(":") + 1);
     const team = handing.startsWith("team:");
-    // Every row picked, wherever it was picked, and the failures are counted
-    // rather than thrown away: a loop that stops partway through leaves some
-    // of a selection handed over and the rest not, and saying nothing about
-    // that is worse than either outcome.
-    const failed: string[] = [];
-    const handled: string[] = [];
-    for (const [key, row] of picked) {
-      handled.push(key);
-      try {
-        await hand.mutateAsync({ row, who, team });
-      } catch {
-        failed.push(key);
-      }
-    }
-    // Once, after the loop. On every write it put a list refetch between
-    // each of them, so a long selection spent its time refetching.
+    await through((row: Row) => hand.mutateAsync({ row, who, team }));
+    // Once, after the loop. On every write it put a list refetch between each
+    // of them, so a long selection spent its time refetching.
     void queries.invalidateQueries({ queryKey: ["findings"] });
     void queries.invalidateQueries({ queryKey: ["holdings"] });
-    // What is selected *now*, minus what went through. Written from the
-    // snapshot the loop began with, anything ticked while it ran — eight
-    // seconds for fifty rows, with the checkboxes live throughout — was
-    // discarded and the count dropped with nothing explaining it.
-    const sent = new Set(failed);
-    setPicked((prev) => {
-      const left = new Map(prev);
-      for (const key of handled) {
-        if (!sent.has(key)) left.delete(key);
-      }
-      return left;
-    });
     setHanding("");
-    setHandFailed(failed.length);
   }
 
   return (
@@ -789,7 +692,7 @@ export function Findings() {
           >
             {hand.isPending ? "Assigning…" : `Assign ${picked.size}`}
           </button>
-          <button type="button" className="linkish" onClick={() => setPicked(new Map())}>
+          <button type="button" className="linkish" onClick={() => pickAll(rows, shownKeys, false)}>
             Clear
           </button>
         </div>
@@ -798,405 +701,25 @@ export function Findings() {
       {rows.length === 0 ? (
         <Empty title="Nothing matches these filters." />
       ) : (
-        <div className="findings">
-          <Wide>
-            <table>
-              <thead>
-                <tr>
-                  <th style={{ width: 54 }}>
-                    <input
-                      type="checkbox"
-                      aria-label="Select every row shown"
-                      checked={picked.size > 0 && shownKeys.every((key) => picked.has(key))}
-                      onChange={(event) => {
-                        const next = new Map(picked);
-                        rows.forEach((row, at) => {
-                          const key = shownKeys[at] ?? identityOf(row);
-                          if (event.target.checked) next.set(key, row);
-                          else next.delete(key);
-                        });
-                        setPicked(next);
-                      }}
-                    />
-                  </th>
-                  <th>{sortable("Severity")}</th>
-                  {spanning && <th>Product</th>}
-                  <th>Issue</th>
-                  <th>Component</th>
-                  {/* Both ends of the way down, middle collapsed. */}
-                  <th>{oneBuild ? "Path" : "Build"}</th>
-                  <th
-                    className="num"
-                    title="EPSS: published probability of exploitation. Orders findings of equal severity"
-                  >
-                    {sortable("EPSS")}
-                  </th>
-                  <th>Fixed in</th>
-                  <th className="num">{sortable("Covers")}</th>
-                  <th>{sortable("Due")}</th>
-                  <th>State</th>
-                </tr>
-              </thead>
-              <tbody id="findingRows">
-                {rows.map((row, i) => {
-                  const key = `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
-                  const at = pathTo(buildOf(row), row, carrying, prepared?.name);
-                  // How far it is decided comes from the server, defined the
-                  // way the state filter defines it; a row does not guess from
-                  // what the build argued away, which is a different claim by
-                  // a different author.
-                  const pill = decidedAs(row.state, row.sent_back);
-                  return (
-                    <Fragment key={key}>
-                      <tr className="row" data-i={i} onClick={() => navigate(at)}>
-                        {/* The two controls that belong to the row rather than
-                            to what is in it. Side by side in one narrow cell:
-                            stacked they read as two unrelated things, and the
-                            checkbox drawn at the browser's default size looked
-                            like it had arrived from another page. */}
-                        <td className="rowpickcell" onClick={(event) => event.stopPropagation()}>
-                          <div className="rowpick">
-                            <input
-                              type="checkbox"
-                              aria-label={`Select ${row.vulnerability} in ${row.component}`}
-                              checked={picked.has(key)}
-                              onChange={(event) => {
-                                const next = new Map(picked);
-                                if (event.target.checked) next.set(key, row);
-                                else next.delete(key);
-                                setPicked(next);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="peek"
-                              aria-expanded={peeking === key}
-                              title="Preview without leaving the list"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setPeeking(peeking === key ? null : key);
-                              }}
-                            >
-                              {peeking === key ? "▾" : "▸"}
-                            </button>
-                          </div>
-                        </td>
-                        <td>
-                          <Severity word={row.severity} />
-                          {row.score ? (
-                            <span className="hint" style={{ marginLeft: 6 }}>
-                              {row.score.toFixed(1)}
-                            </span>
-                          ) : null}
-                        </td>
-                        {/* Which product this row is about, where that varies.
-                            It is the column the cross-product list exists for,
-                            and the only one a product's own list would draw
-                            the same value in for every row. */}
-                        {spanning && (
-                          <td>
-                            <Link
-                              to={`/products/${encodeURIComponent(row.product ?? "")}/findings`}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {row.product}
-                            </Link>
-                          </td>
-                        )}
-                        <td>
-                          <Link to={at} className="id" onClick={(e) => e.stopPropagation()}>
-                            {row.vulnerability}
-                          </Link>{" "}
-                          <Exploited when={row.exploited} />
-                          {/* The secondary signal. What somebody must not
-                              miss is on the finding itself. */}
-                          {row.undisclosed && (
-                            <span
-                              className="state waiting"
-                              title={
-                                row.disclose_at
-                                  ? `Not disclosed. The embargo ends ${on(row.disclose_at)}`
-                                  : "Not disclosed, with no end date set"
-                              }
-                            >
-                              Embargoed
-                            </span>
-                          )}
-                          {(() => {
-                            const age = openFor(row.opened);
-                            return age ? (
-                              <span className="hint" style={{ marginLeft: 6 }}>
-                                {age}
-                              </span>
-                            ) : null;
-                          })()}
-                          {/* The words people put on this. On the row
-                              because the point of marking work is finding it
-                              again in a list — a mark only the finding screen
-                              showed would be one nobody sees. Each is a filter:
-                              seeing one and asking for the rest is the whole
-                              motion. */}
-                          {/* One line of what the issue actually says. Fifty
-                              rows otherwise read "CVE-2026-74280 ·
-                              linux-image" fifty times, and telling two of them
-                              apart cost a click each — which is the preview
-                              control right beside it, used fifty times to do
-                              what one line of text does at a glance. */}
-                          {row.summary && (
-                            <div className="summary" title={row.summary}>
-                              {row.summary}
-                            </div>
-                          )}
-                          {(row.tags ?? []).length > 0 && (
-                            <span className="marks">
-                              {(row.tags ?? []).map((tag) => (
-                                <button
-                                  key={tag}
-                                  type="button"
-                                  className="mark"
-                                  title={`Everything tagged ${tag}`}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    set("tag", tag);
-                                  }}
-                                >
-                                  {tag}
-                                </button>
-                              ))}
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {/* The name opens the component; narrowing and
-                              hiding are the two small acts beside it. The
-                              name and its controls are one line — held
-                              apart, the column sized itself to the name and
-                              then had nowhere to put them. */}
-                          <span className="compline">
-                            <Link
-                              className="linkish id compname"
-                              title={`Open ${row.component}`}
-                              // The row's own product, not the selection's.
-                              // Across every product there is no selection, so
-                              // this built `/products//components/NAME` — a
-                              // path that matches no route, and the app fell
-                              // back to the home screen. The source-package
-                              // link four rows down already asked the row.
-                              to={`/products/${encodeURIComponent(
-                                buildOf(row).product,
-                              )}/components/${encodeURIComponent(row.component ?? "")}`}
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              {row.component}
-                            </Link>
-                            <button
-                              type="button"
-                              className="linkish onlyit"
-                              title={`Everything open against ${row.component}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                set("component", row.component ?? "");
-                              }}
-                            >
-                              only
-                            </button>
-                            <button
-                              type="button"
-                              className="linkish hideit"
-                              title={`Hide ${row.component} from this list`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                hide(row.component ?? "");
-                              }}
-                            >
-                              hide
-                            </button>
-                          </span>
-                          <br />
-                          <span className="id" style={{ color: "var(--faint)" }}>
-                            {row.version}
-                          </span>
-                          {/* The same issue at two binaries of one source
-                              package is two rows here and one piece of work
-                              everywhere else: it is decided once, upgraded
-                              once, and routed by one rule. Said on the row
-                              rather than folded away, because the places are
-                              real and a reader counting them should get the
-                              same number the list does — what they were not
-                              told is that four of the rows are one bump. */}
-                          {(siblings.get(`${row.vulnerability} ${row.source}`) ?? 0) ? (
-                            <>
-                              {" "}
-                              <button
-                                type="button"
-                                className="linkish hint"
-                                title={`Everything open against the ${row.source} source package`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  navigate(
-                                    `/products/${encodeURIComponent(
-                                      row.product || product,
-                                    )}/components/${encodeURIComponent(row.component ?? "")}`,
-                                  );
-                                }}
-                              >
-                                {row.source} · also at{" "}
-                                {siblings.get(`${row.vulnerability} ${row.source}`)} sibling
-                                {(siblings.get(`${row.vulnerability} ${row.source}`) ?? 0) === 1
-                                  ? ""
-                                  : "s"}
-                              </button>
-                            </>
-                          ) : null}
-                        </td>
-                        <td>
-                          <Sits row={row} />
-                        </td>
-                        <td className="num hint">
-                          {row.likelihood ? row.likelihood.toFixed(3) : "—"}
-                        </td>
-                        <td>
-                          {(() => {
-                            const said = upstreamSays(row.fix_state, row.fixed_in);
-                            return (
-                              <>
-                                {/* A version is one token to a reader. Left
-                                    to itself the browser breaks at every
-                                    hyphen, so "1.26.0-rc.3" arrived as two
-                                    lines and three versions as four — the
-                                    tallest cell on the row, for a column that
-                                    holds three short words. It still wraps,
-                                    but only between one version and the
-                                    next. */}
-                                <span
-                                  className={said.kind === "id" ? "id" : "hint"}
-                                  style={
-                                    said.kind === "faint" ? { color: "var(--faint)" } : undefined
-                                  }
-                                >
-                                  {said.text.split(", ").map((one, n) => (
-                                    <Fragment key={one}>
-                                      {n > 0 ? ", " : null}
-                                      <span className="whole">{one}</span>
-                                    </Fragment>
-                                  ))}
-                                </span>
-                                {row.matched === "identifier" && (
-                                  <div
-                                    className="hint"
-                                    title="Matched on a version range, not a packager advisory. May already be fixed here."
-                                  >
-                                    not confirmed
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </td>
-                        {/* Counted in the units somebody acts in. Deciding on
-                            this row decides about every package and every
-                            consumer under it, so those are the numbers shown —
-                            a place count is a figure a reader cannot reconcile
-                            with anything else on the screen. */}
-                        <td className="num">
-                          <span
-                            title={`${row.places} ${row.places === 1 ? "finding" : "findings"} underneath`}
-                          >
-                            {row.packages > 1 && (
-                              <>
-                                {row.packages} packages
-                                <span className="hint"> · </span>
-                              </>
-                            )}
-                            {row.consumers} {row.consumers === 1 ? "consumer" : "consumers"}
-                          </span>
-                          {(row.answered ?? 0) > 0 && (
-                            <span
-                              className="hint"
-                              title="Argued away by the build's own VEX, which is a different claim by a different author"
-                            >
-                              {" "}
-                              · {row.answered} by the build
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {(() => {
-                            const says = dueSays(row);
-                            return (
-                              <span
-                                className={says.tone === "none" ? "hint" : `due ${says.tone}`}
-                                title={says.tone === "none" ? "No deadline" : `Due ${row.due}`}
-                              >
-                                {says.text}
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td>
-                          <span className={`state ${pill.cls}`}>{pill.word}</span>
-                        </td>
-                      </tr>
-                      {peeking === key && (
-                        <tr className="places">
-                          <td colSpan={10}>
-                            <Peek
-                              at={buildOf(row)}
-                              vulnerability={row.vulnerability ?? ""}
-                              component={row.component ?? ""}
-                              version={row.version ?? ""}
-                              to={at}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Wide>
-
-          <div className="cards">
-            {rows.map((row) => {
-              const at = pathTo(buildOf(row), row, carrying, prepared?.name);
-              return (
-                // The only way to open a finding on a narrow screen, so it
-                // has to be reachable without a pointer: a card that answers
-                // a click and nothing else is a list nobody can get into
-                // from a keyboard.
-                <article
-                  key={`${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`}
-                  className={`fcard ${row.exploited ? "exploited" : (row.severity ?? "")}`}
-                  role="link"
-                  tabIndex={0}
-                  aria-label={`${row.vulnerability} in ${row.component}`}
-                  onClick={() => navigate(at)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      navigate(at);
-                    }
-                  }}
-                >
-                  <header>
-                    <Severity word={row.severity} />
-                    <Exploited when={row.exploited} />
-                  </header>
-                  <div>
-                    <span className="id">{row.vulnerability}</span> in{" "}
-                    <span className="id">{row.component}</span>
-                  </div>
-                  <div className="hint">
-                    {row.packages > 1 && <>{row.packages} packages · </>}
-                    {row.consumers} {row.consumers === 1 ? "consumer" : "consumers"} · fixed in{" "}
-                    {row.fixed_in ?? "—"}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </div>
+        <FindingsTable
+          rows={rows}
+          shownKeys={shownKeys}
+          picked={picked}
+          pick={pick}
+          pickAll={pickAll}
+          spanning={spanning}
+          columns={COLUMNS}
+          oneBuild={oneBuild}
+          sortable={sortable}
+          buildOf={buildOf}
+          siblings={siblings}
+          carrying={carrying}
+          prepared={prepared}
+          set={set}
+          hide={hide}
+          peeking={peeking}
+          setPeeking={setPeeking}
+        />
       )}
 
       <div className="filters" style={{ margin: "10px 0 0" }}>

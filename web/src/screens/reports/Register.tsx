@@ -140,12 +140,14 @@ export function Register() {
                         </td>
                         <td>
                           {/* The row an auditor is looking for is the one
-                              every other report leaves out. */}
-                          {row.state === "undecided" ? (
-                            <span className="state open">nobody has said</span>
-                          ) : (
-                            <span className="hint">{row.state}</span>
-                          )}
+                              every other report leaves out — and the other
+                              three states are said in words too. One arm was
+                              written and the rest fell through to the raw wire
+                              token, so a register read "waiting", "agreed" and
+                              "lapsed" in the vocabulary of the database. A
+                              fifth state still shows as it arrived, which is
+                              visible rather than blank. */}
+                          <RegisterState state={row.state} />
                         </td>
                         <td>
                           {row.outcome ? (
@@ -214,6 +216,26 @@ export function Register() {
       )}
     </Sheet>
   );
+}
+
+// What stands at one place, in the words the sheet uses.
+//
+// Four states, and a state this does not know shown as it arrived. A register
+// is read by somebody checking the record against what shipped, so a column of
+// wire tokens is the tool showing its storage rather than answering.
+function RegisterState({ state }: { state?: string }) {
+  switch (state) {
+    case "undecided":
+      return <span className="state open">nobody has said</span>;
+    case "lapsed":
+      return <span className="state lapsed">no longer stands</span>;
+    case "waiting":
+      return <span className="state waiting">waiting for a second person</span>;
+    case "agreed":
+      return <span className="state agreed">agreed</span>;
+    default:
+      return state ? <span className="hint">{state}</span> : null;
+  }
 }
 
 // Where the file comes from. A link somebody follows rather than a request

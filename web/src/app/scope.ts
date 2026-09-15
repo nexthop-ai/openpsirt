@@ -64,24 +64,35 @@ export function onFindings(pathname: string): boolean {
 // finding, the tree, the inventories — are that build's and share the prefix.
 // Anything wider is the product's list carrying the levels that are set, so
 // the address says what is being answered for and can be sent to somebody.
-export function findingsPath(at: Scoped): string {
+// The parameters the list writes into its own address when the address says
+// nothing: no work lands in a tag, none lands in a release past end-of-life,
+// and the by-issue view sets aside what a promised upgrade already answers.
+//
+// A figure counted without them opens a list that has them, which is how a
+// number and the list behind it come to disagree in front of somebody. A link
+// from such a figure carries them turned off, so the list asks what the figure
+// was counted with.
+export const UNNARROWED = "on=branch&on=tag&support=in-support&support=past-eol&planned=either";
+
+export function findingsPath(at: Scoped, unnarrowed = false): string {
   // Without a product it is the list across every product somebody can read ,
   // which is the same screen. It used to send people to the catalog instead,
   // because the cross-product list was a screen of its own reached from its
   // own rail entry — so one list had two doors and the one in the scope group
   // was dead whenever no product was picked.
-  if (!at.product) return "/findings";
+  const also = unnarrowed ? UNNARROWED : "";
+  if (!at.product) return also ? `/findings?${also}` : "/findings";
   const product = `/products/${encodeURIComponent(at.product)}`;
   if (at.stream && at.variant) {
-    return (
+    const build =
       `${product}/streams/${encodeURIComponent(at.stream)}` +
-      `/variants/${encodeURIComponent(at.variant)}/findings`
-    );
+      `/variants/${encodeURIComponent(at.variant)}/findings`;
+    return also ? `${build}?${also}` : build;
   }
   const query = new URLSearchParams();
   if (at.stream) query.set("stream", at.stream);
   if (at.variant) query.set("variant", at.variant);
-  const rest = query.toString();
+  const rest = [query.toString(), also].filter(Boolean).join("&");
   return `${product}/findings${rest ? `?${rest}` : ""}`;
 }
 
