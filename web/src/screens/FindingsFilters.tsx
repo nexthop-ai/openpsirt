@@ -712,7 +712,12 @@ export function Narrowed({
       <span className="hint">Narrowed by</span>
       {active.map((each) => (
         <button
-          key={each.key}
+          // The key and the value, because a multi-valued filter puts one
+          // entry here per value and they all carry the filter's key. Keyed
+          // on the key alone, two values of one filter were siblings with the
+          // same key, and removing either left the survivor drawing the one
+          // that went.
+          key={`${each.key} ${each.value}`}
           type="button"
           className="chip"
           aria-pressed

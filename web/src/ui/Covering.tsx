@@ -64,9 +64,13 @@ export function Covering({
     .filter((g) => g.items.some((p) => excluded.has(p.place ?? "")))
     .map((g) => g.consumer);
 
-  function toggleGroup(group: Group, on: boolean) {
+  // The rows it is given, which are the rows on screen. Handed the whole group
+  // while a filter was narrowing what was drawn, unticking a consumer showing
+  // one row excluded all forty under it — and this control is what decides
+  // what a claim covers, which is the thing the panel exists to get right.
+  function toggleGroup(items: Sitting[], on: boolean) {
     const next = new Set(excluded);
-    for (const place of group.items) {
+    for (const place of items) {
       if (on) next.delete(place.place ?? "");
       else next.add(place.place ?? "");
     }
@@ -138,9 +142,10 @@ export function Covering({
             />
           )}
           {groups.map((group) => {
-            const out = group.items.filter((p) => excluded.has(p.place ?? "")).length;
-            const state = out === 0 ? "all" : out === group.items.length ? "none" : "some";
-            const isOpen = expanded.has(group.consumer);
+            // What is on screen under this consumer, which is what the
+            // checkbox beside it acts on and what the count beside that says.
+            // The three read the same rows, so the number names what the
+            // click will do.
             const shown = filter
               ? group.items.filter((p) =>
                   (p.chain?.[p.chain.length - 1]?.component ?? "")
@@ -148,6 +153,13 @@ export function Covering({
                     .includes(filter.toLowerCase()),
                 )
               : group.items;
+            // A consumer with nothing matching is not drawn while a filter
+            // is on. Its header would offer a checkbox over no rows and a
+            // count of none, which is a control that does nothing.
+            if (shown.length === 0) return null;
+            const out = shown.filter((p) => excluded.has(p.place ?? "")).length;
+            const state = out === 0 ? "all" : out === shown.length ? "none" : "some";
+            const isOpen = expanded.has(group.consumer);
             return (
               <div key={group.consumer}>
                 <div className="grp">
@@ -155,12 +167,12 @@ export function Covering({
                     <Mixed
                       checked={state === "all"}
                       mixed={state === "some"}
-                      onChange={(on) => toggleGroup(group, on)}
+                      onChange={(on) => toggleGroup(shown, on)}
                     />
                     <span className="id">{group.consumer}</span>
                     {group.note && <span className="hint">{group.note}</span>}
                     <span className="cnt">
-                      {group.items.length - out} of {group.items.length}
+                      {shown.length - out} of {shown.length}
                     </span>
                   </label>
                   {group.items.length > 1 && (

@@ -257,8 +257,12 @@ export function pathTo(
 // At the largest page there is no room to widen, because the server returns at
 // most that many in one request. The walk then ends at the page edge rather
 // than asking twice, which is the honest outcome: one request answers, or it
-// does not.
+// does not — and the window is the page itself, unmoved. Widening backward
+// alone shifted it back a row, so the last row of every page fell outside its
+// own window; the finding screen locates itself in the window by identity, so
+// it found nothing and the walk vanished at the largest page size.
 export function windowFor(offset: number, limit: number): { offset: number; limit: number } {
+  if (limit >= MOST) return { offset, limit: MOST };
   const start = Math.max(0, offset - 1);
   return { offset: start, limit: Math.min(MOST, limit + (offset - start) + 1) };
 }

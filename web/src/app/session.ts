@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap, Refused } from "../api/queries";
-import { forgetAll } from "./drafts";
+import { forgetAll, forgetSession } from "./drafts";
 import { rememberForward, signedOutHere } from "../screens/SignIn";
 
 export type Can = {
@@ -84,6 +84,12 @@ export function mayOf(who: Who | null | undefined, product: string): Can | undef
 // that never reached the server is exactly the case where clearing matters
 // most, so it cannot sit inside the part that can fail.
 //
+// **The session's own state goes with them**, and for the same reason. This is
+// a same-tab navigation, so what the tab remembers survives it by
+// construction: the next person to sign in here was handed the previous
+// person's scope in the bar — a product name they may hold no grant on — and
+// their last outcome and reasoning in the decision form.
+//
 // **Forwarding is marked in this tab as well as in the address.** Where there
 // is one provider the sign-in screen forwards straight to it, and the provider
 // still holds its own session — so an unmarked arrival would sign them back in
@@ -104,6 +110,7 @@ export async function signOut(
   go: (where: string) => void,
 ): Promise<void> {
   forgetAll();
+  forgetSession();
   try {
     await end();
   } catch {

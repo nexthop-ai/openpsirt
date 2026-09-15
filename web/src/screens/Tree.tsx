@@ -2,7 +2,7 @@ import { ROLLED } from "../ui/severities";
 import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { type At, type Node } from "./treeshape";
+import { keyOf, partsOf, type At, type Node } from "./treeshape";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -235,7 +235,15 @@ function Whole() {
   const { product = "", stream = "", variant = "" } = useParams();
   const at = useMemo(() => ({ product, stream, variant }), [product, stream, variant]);
   const [params, setParams] = useSearchParams();
-  const focus = params.get("at") ?? "";
+  // Which row is the one being looked at, as an identity rather than a name:
+  // where a build ships one name twice, the two rows are two components.
+  const focus = params.get("at")
+    ? keyOf({
+        component: params.get("at") ?? "",
+        version: params.get("version") ?? "",
+        ecosystem: params.get("ecosystem") ?? "",
+      })
+    : "";
 
   const [opened, setOpened] = useState<Set<string>>(() => new Set());
   const [widened, setWidened] = useState<Set<string>>(() => new Set());
@@ -253,7 +261,7 @@ function Whole() {
   });
 
   const root = (top.data?.root ?? null) as Node | null;
-  const rootName = root?.component ?? "";
+  const rootKey = root ? keyOf(root) : "";
   const searching = term !== "";
   const found = (top.data?.items ?? []) as Node[];
 
@@ -272,11 +280,11 @@ function Whole() {
   // opened so the component is on screen under the parents that pull it in,
   // rather than the reader being left at the root to find it again.
   const path = params.get("path") ?? "";
-  useReseed(`${rootName}\u001f${path}`, () => {
-    if (!rootName) return;
+  useReseed(`${rootKey}\u001f${path}`, () => {
+    if (!rootKey) return;
     setOpened((prev) => {
       const next = new Set(prev);
-      next.add(rootName);
+      next.add(rootKey);
       for (const step of path.split("\u001f").filter(Boolean)) next.add(step);
       return next;
     });
@@ -295,14 +303,17 @@ function Whole() {
   // Children are read for each node the reader has opened. The root's own are
   // already in hand from the query above, so it is not asked for twice.
   const wanted = useMemo(
-    () => [...opened].filter((name) => name !== "" && name !== rootName),
-    [opened, rootName],
+    () => [...opened].filter((key) => key !== "" && key !== rootKey),
+    [opened, rootKey],
   );
   const branches = useQueries({
-    queries: wanted.map((name) => ({
-      queryKey: aroundKey(at, name),
-      queryFn: fetchAround(at, name),
-    })),
+    queries: wanted.map((key) => {
+      const { component, version, ecosystem } = partsOf(key);
+      return {
+        queryKey: aroundKey(at, component, version, ecosystem),
+        queryFn: fetchAround(at, component, version, ecosystem),
+      };
+    }),
   });
 
   // What sits under each opened node, and which of the three states that is
@@ -311,21 +322,21 @@ function Whole() {
   // read spun for ever with nothing said.
   const below = useMemo(() => {
     const map = new Map<string, Under>();
-    if (rootName) map.set(rootName, { kids: (top.data?.items ?? []) as Node[] });
-    wanted.forEach((name, i) => {
+    if (rootKey) map.set(rootKey, { kids: (top.data?.items ?? []) as Node[] });
+    wanted.forEach((key, i) => {
       const asked = branches[i];
-      if (asked?.data) map.set(name, { kids: (asked.data.below ?? []) as Node[] });
-      else if (asked?.isError) map.set(name, { error: asked.error });
-      else map.set(name, {});
+      if (asked?.data) map.set(key, { kids: (asked.data.below ?? []) as Node[] });
+      else if (asked?.isError) map.set(key, { error: asked.error });
+      else map.set(key, {});
     });
     return map;
-  }, [rootName, top.data, wanted, branches]);
+  }, [rootKey, top.data, wanted, branches]);
 
-  function toggle(name: string) {
+  function toggle(key: string) {
     setOpened((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -345,6 +356,7 @@ function Whole() {
   // are two components — and the tree knows which one was clicked, so asking
   // without it turned every such component into one nobody could look at.
   function select(name: string, children = 0, version = "", ecosystem = "") {
+    const key = keyOf({ component: name, version, ecosystem });
     // What was searched for survives the selection. Replaced wholesale, a hit
     // cleared the search it was found through: the list went away, the tree
     // redrew from the root, and the component clicked was not on screen.
@@ -359,8 +371,8 @@ function Whole() {
     if (!name || children === 0) return;
     setOpened((prev) => {
       const next = new Set(prev);
-      if (prev.has(name) && name === focus) next.delete(name);
-      else next.add(name);
+      if (prev.has(key) && key === focus) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -447,7 +459,7 @@ function Whole() {
                 focus={focus}
                 onToggle={toggle}
                 onSelect={select}
-                onWiden={(name) => setWidened((prev) => new Set(prev).add(name))}
+                onWiden={(key) => setWidened((prev) => new Set(prev).add(key))}
               />
             )}
             {searching && (
@@ -481,8 +493,8 @@ function Matches({
     <div className="tree">
       {found.map((node, i) => (
         <div
-          key={`${node.component}\u0000${node.version}\u0000${i}`}
-          className={`node openable${node.component === focus ? " here" : ""}`}
+          key={`${keyOf(node)}\u0000${i}`}
+          className={`node openable${keyOf(node) === focus ? " here" : ""}`}
         >
           <span className="rule">·</span>
           <button
@@ -577,9 +589,9 @@ function Branches({
   widened: Set<string>;
   onPath: Set<string>;
   focus: string;
-  onToggle: (name: string) => void;
+  onToggle: (key: string) => void;
   onSelect: (name: string, children?: number, version?: string, ecosystem?: string) => void;
-  onWiden: (name: string) => void;
+  onWiden: (key: string) => void;
 }) {
   const rows: React.ReactNode[] = [];
   // A component already drawn higher up is marked rather than expanded again.
@@ -592,18 +604,23 @@ function Branches({
   // says it once instead. A row whose version differs still shows its own.
   function walk(node: Node, depth: number, path: string, sharedHere = "") {
     const name = node.component;
-    const repeated = seen.has(name);
-    seen.add(name);
+    // The identity, not the name. Everything the tree remembers about a row —
+    // whether it is open, whether it has been drawn, what sits under it — is
+    // held against this, so a build shipping one name twice has two rows that
+    // open and close independently rather than one that cannot open at all.
+    const key = keyOf(node);
+    const repeated = seen.has(key);
+    seen.add(key);
 
-    const isOpen = opened.has(name);
+    const isOpen = opened.has(key);
     const openable = node.children > 0 && !repeated;
-    const under = below.get(name);
+    const under = below.get(key);
     const kids = under?.kids;
 
     rows.push(
       <div
         key={path}
-        className={`node${name === focus ? " here" : ""}${openable ? " openable" : ""}`}
+        className={`node${key === focus ? " here" : ""}${openable ? " openable" : ""}`}
         style={{ paddingLeft: depth * 20 }}
       >
         {/* Whether anything hangs off this row, said by the marker itself.
@@ -632,7 +649,7 @@ function Branches({
             }
             onClick={(event) => {
               event.stopPropagation();
-              onToggle(name);
+              onToggle(key);
             }}
           >
             {isOpen ? "▾" : "▸"}
@@ -655,7 +672,7 @@ function Branches({
           type="button"
           className="id"
           onClick={() =>
-            openable ? onToggle(name) : onSelect(name, 0, node.version, node.ecosystem)
+            openable ? onToggle(key) : onSelect(name, 0, node.version, node.ecosystem)
           }
         >
           {name}
@@ -723,7 +740,7 @@ function Branches({
     // The server has already put these in the order somebody reads them:
     // what opens first, then the most findings. Truncation, where it happens
     // at all, therefore takes from the end rather than from the middle.
-    const all = widened.has(name);
+    const all = widened.has(key);
     // Past the cap, the step on the way to the component being arrived at is
     // kept whatever its position. Otherwise a link from a finding opens a tree
     // that does not contain the component it was opened for, which is the one
@@ -732,7 +749,7 @@ function Branches({
       ? kids
       : kids
           .slice(0, CHILDREN)
-          .concat(kids.slice(CHILDREN).filter((kid) => onPath.has(kid.component)));
+          .concat(kids.slice(CHILDREN).filter((kid) => onPath.has(keyOf(kid))));
     const hidden = kids.length - shown.length;
 
     // A version every child at this level shares is not a version of any of
@@ -757,15 +774,15 @@ function Branches({
           type="button"
           className="more"
           style={{ marginLeft: (depth + 1) * 20 }}
-          onClick={() => onWiden(name)}
+          onClick={() => onWiden(key)}
         >
           Show all {kids.length.toLocaleString()} under {name} — {shown.length} shown
         </button>,
       );
     }
-    shown.forEach((kid, i) => walk(kid, depth + 1, `${path}/${i}:${kid.component}`, common));
+    shown.forEach((kid, i) => walk(kid, depth + 1, `${path}/${i}:${keyOf(kid)}`, common));
   }
 
-  walk(root, 0, root.component);
+  walk(root, 0, keyOf(root));
   return <div className="tree">{rows}</div>;
 }

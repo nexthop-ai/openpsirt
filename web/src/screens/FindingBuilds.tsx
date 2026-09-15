@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import { buildKey, fromBuildKey } from "../ui/builds";
 
 // Correcting which builds a recorded flaw affects.
 //
@@ -21,14 +22,10 @@ import { Failed } from "../ui/Failed";
 // Folded until asked, like the advisory: it reads two lists to draw itself,
 // and most visits to a finding are not somebody correcting its filing.
 
-// The separator between a build's two names. Not a character either name can
-// hold, so a key cannot be two builds.
 // The most rows the issue read returns in one request. The editor needs all
 // of them or none, so this is compared against the whole-answer count rather
 // than used as a page size.
 const MOST = 200;
-
-const APART = "\u0000";
 
 export function AffectedBuilds({
   product,
@@ -81,7 +78,7 @@ export function AffectedBuilds({
   const now = useMemo(() => {
     const held = new Set<string>();
     for (const row of holds.data?.items ?? []) {
-      if (row.product === product) held.add(`${row.stream}${APART}${row.variant}`);
+      if (row.product === product) held.add(buildKey(row));
     }
     return held;
   }, [holds.data, product]);
@@ -93,7 +90,7 @@ export function AffectedBuilds({
           params: { path: { product, vulnerability } },
           body: {
             builds: picked.map((each) => {
-              const [stream = "", variant = ""] = each.split(APART);
+              const { stream, variant } = fromBuildKey(each);
               return { stream, variant };
             }),
             ...(because.trim() ? { reason: because.trim() } : {}),
@@ -158,7 +155,7 @@ export function AffectedBuilds({
           )}
           <div className="field">
             {(builds.data?.items ?? []).map((build) => {
-              const key = `${build.stream}${APART}${build.variant}`;
+              const key = buildKey(build);
               return (
                 <label key={key} style={{ display: "block", marginBottom: 4 }}>
                   <input

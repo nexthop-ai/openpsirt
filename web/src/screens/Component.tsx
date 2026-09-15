@@ -3,6 +3,7 @@ import { Holder, type Held } from "../ui/Holder";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap } from "../api/queries";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
@@ -34,16 +35,9 @@ import { Wide } from "../ui/Wide";
 // about the one asked for and says what the others are.
 type Build = Body<"PerBuildBody">;
 
-// The separator inside a key naming one build. Not a character either name can
-// hold, so a key cannot be two builds.
-const APART = "\u0000";
-
 // How many versions to offer before the rest are a count. A kernel names
 // twenty, and the question is which to take rather than what the whole set is.
 const SHOWN = 5;
-
-const keyOf = (row: { stream?: string; variant?: string }) =>
-  (row.stream ?? "") + APART + (row.variant ?? "");
 
 const findingsAt = (product: string, row: Build, component: string) =>
   `/products/${encodeURIComponent(product)}` +
@@ -195,7 +189,7 @@ export function Component() {
               new form rather than keeping the version and releases the old one
               opened with — which it would then submit. */}
           <Upgrade
-            key={keyOf(here) + APART + (here.version ?? "")}
+            key={buildKey(here, here.version)}
             product={product}
             component={component}
             here={here}
@@ -339,19 +333,16 @@ function Sits({
             <select
               aria-label="Which build"
               style={{ width: "auto" }}
-              value={keyOf(here) + APART + (here.version ?? "")}
+              value={buildKey(here, here.version)}
               onChange={(event) => {
                 const row = builds.find(
-                  (each) => keyOf(each) + APART + (each.version ?? "") === event.target.value,
+                  (each) => buildKey(each, each.version) === event.target.value,
                 );
                 if (row) onBuild(row);
               }}
             >
               {builds.map((row) => (
-                <option
-                  key={keyOf(row) + row.version}
-                  value={keyOf(row) + APART + (row.version ?? "")}
-                >
+                <option key={buildKey(row, row.version)} value={buildKey(row, row.version)}>
                   {row.stream} · {row.variant} · {row.version}
                 </option>
               ))}
@@ -623,7 +614,7 @@ function Upgrade({
   const [said, setSaid] = useState<string | null>(null);
   // Every release shipping this version, because one bump moves all of them.
   const [chosen, setChosen] = useState<Set<string>>(
-    () => new Set(covering.map((row) => keyOf(row))),
+    () => new Set(covering.map((row) => buildKey(row, row.version))),
   );
 
   const plan = useMutation({
@@ -637,9 +628,11 @@ function Upgrade({
             reasoning: because,
             ...(holder?.kind === "team" ? { team: holder.identity } : {}),
             ...(holder?.kind === "person" ? { person: holder.identity } : {}),
+            // The build alone: one bump moves every release shipping the
+            // version, and what the server takes is the pair naming each.
             builds: [...chosen].map((each) => {
-              const [stream, variant] = each.split(APART);
-              return { stream: stream ?? "", variant: variant ?? "" };
+              const { stream, variant } = fromBuildKey(each);
+              return { stream, variant };
             }),
           },
         }),
@@ -814,7 +807,7 @@ function Upgrade({
         <span>Releases this is for</span>
         <p className="variants">
           {covering.map((row) => {
-            const key = keyOf(row);
+            const key = buildKey(row, row.version);
             const picked = chosen.has(key);
             return (
               <button
@@ -891,9 +884,9 @@ function Ships({
           <tbody>
             {rows.map((row) => (
               <tr
-                key={keyOf(row) + row.version}
+                key={buildKey(row, row.version)}
                 className={
-                  keyOf(row) === keyOf(here) && row.version === here.version ? "row on" : "row"
+                  buildKey(row, row.version) === buildKey(here, here.version) ? "row on" : "row"
                 }
               >
                 <td>

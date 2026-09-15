@@ -1,10 +1,8 @@
 import { useRef, useState } from "react";
 import { useClickAway } from "../ui/away";
 import { useReseed } from "../ui/reseed";
-import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { useCatalog, useReleaseVariants } from "../api/catalog";
 import {
   findingsPath,
   needsBuild,
@@ -47,36 +45,12 @@ export function Scope() {
 
   useClickAway(box, open, () => setOpen(false));
 
-  const products = useQuery({
-    queryKey: ["products"],
-    enabled: open,
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
-  const streams = useQuery({
-    queryKey: ["streams", product],
-    enabled: open && !!product,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
-  const variants = useQuery({
-    queryKey: ["variants", product, stream],
-    enabled: open && !!product && !!stream,
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants", {
-          params: { path: { product, stream } },
-        }),
-      ),
-  });
-  // What the product is built as, rather than what one release was. A variant
-  // belongs to the product, so with every branch selected this is the set to
-  // choose from — the per-release list would be an arbitrary one of them.
-  const declared = useQuery({
-    queryKey: ["variants", product],
-    enabled: open && !!product && !stream,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
-  });
+  const { products, streams, variants: declared } = useCatalog(open, product);
+  // What one release was built as. With a branch or tag chosen this is the set
+  // to offer; with every branch selected it is the product's own, which is
+  // what `declared` holds — the per-release list would be an arbitrary one of
+  // them.
+  const variants = useReleaseVariants(open, product, stream);
 
   // Applied as soon as it is chosen, at whatever level. A partial selection is
   // a real answer now — every level offers "all" — so there is nothing to wait

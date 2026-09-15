@@ -1,5 +1,7 @@
 import { matchPath, useLocation } from "react-router-dom";
 
+import { SCOPE_KEPT } from "./drafts";
+
 // What you are looking at.
 //
 // Read from the path rather than with useParams, because the frame is drawn
@@ -83,7 +85,9 @@ export function findingsPath(at: Scoped): string {
   return `${product}/findings${rest ? `?${rest}` : ""}`;
 }
 
-const KEPT = "openpsirt.scope";
+// Where the tab remembers what somebody is looking at. Named beside the
+// sign-out clear that takes it away, so the two cannot drift apart.
+const KEPT = SCOPE_KEPT;
 
 // Remembered for the tab rather than the browser: it is where somebody is
 // working right now, not a preference, and a second tab looking at another

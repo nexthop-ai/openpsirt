@@ -526,16 +526,14 @@ export function Findings() {
           meant opening a panel and looking at nine controls. */}
       <Narrowed
         params={asked}
-        clear={(chip) => {
-          const next = without(asked, chip);
-          next.delete("offset");
-          setParams(next);
-        }}
-        clearAll={() => {
-          const next = withoutAny(asked);
-          next.delete("offset");
-          setParams(next);
-        }}
+        // Through the same function every other change goes through, so the
+        // invariant above holds by construction rather than by a property of
+        // the chips: today every chip either drops its key or puts the wider
+        // default back, so removing one only ever widens and the surviving
+        // selection still matches. One chip whose removal narrowed would
+        // re-open exactly the write that rule was added for.
+        clear={(chip) => asking(without(asked, chip))}
+        clearAll={() => asking(withoutAny(asked))}
       />
 
       {more && (

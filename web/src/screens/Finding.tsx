@@ -933,7 +933,13 @@ export function Finding() {
                 }}
                 extending={extending}
                 prefill={opening}
-                key={opened}
+                // Remounted when what is being decided changes, not only when
+                // a prefill arrives. Changing scope on a build-scoped screen
+                // is a parameter change rather than a navigation, so the form
+                // stayed mounted and kept the previous build's answers in its
+                // fields — an outcome and a justification about one variant,
+                // offered against another.
+                key={`${opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
               />
             )}
           </>

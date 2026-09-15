@@ -10,6 +10,7 @@ import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
+import { DECIDE_KEPT } from "../app/drafts";
 
 // One judgment about this finding: the decision form the finding screen
 // carries and the findings list opens in place. Outcome, the justification
@@ -25,6 +26,20 @@ export type At = {
   component: string;
   version: string;
 };
+
+// Where the reasoning typed about one thing is kept.
+//
+// Every part of what is being decided, the version included. A build ships one
+// name at more than one version often enough that leaving it out shares a
+// draft between two of them: a justification typed about one version came back
+// pre-filled against the other, which is different code at a different number
+// of places — on the text a second person has to approve.
+export function draftKeyFor(at: At): string {
+  return (
+    `decide:${at.product}:${at.stream}:${at.variant}:` +
+    `${at.vulnerability}:${at.component}:${at.version}`
+  );
+}
 
 // What to call an outcome in a sentence about what happens next.
 //
@@ -96,7 +111,9 @@ const OFFERED = [
 // Per session rather than remembered: what somebody was doing this morning is
 // not what they are doing now, and a default that survives a night is a
 // default nobody chose.
-const LAST = "openpsirt.decide.last";
+// Where the tab remembers the last judgment, to offer back. Named beside the
+// sign-out clear that takes it away, so the two cannot drift apart.
+const LAST = DECIDE_KEPT;
 
 type Same = { outcome: string; justification: string };
 
@@ -169,7 +186,7 @@ export function Decide({
   // not what somebody had half written — so the screen that offers one mounts
   // the form again, and the fields below seed themselves from it.
   const queries = useQueryClient();
-  const draftKey = `decide:${at.product}:${at.stream}:${at.variant}:${at.vulnerability}:${at.component}`;
+  const draftKey = draftKeyFor(at);
   // Nothing chosen until somebody chooses. The form used to open on
   // "not applicable" with a justification already selected, which put every
   // finding one click from a dismissal — the outcome that hides risk and

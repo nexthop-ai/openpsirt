@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
+import { useCatalog } from "../api/catalog";
 import { useScope } from "../app/scope";
 import { Drawer } from "./Drawer";
 import { Failed } from "./Failed";
@@ -40,23 +41,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
     setHeld(null);
   });
 
-  const products = useQuery({
-    queryKey: ["products"],
-    enabled: open,
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
-  const streams = useQuery({
-    queryKey: ["streams", product],
-    enabled: open && !!product,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
-  const variants = useQuery({
-    queryKey: ["variants", product],
-    enabled: open && !!product,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
-  });
+  const { products, streams, variants } = useCatalog(open, product);
 
   const upload = useMutation({
     mutationFn: async () => {
