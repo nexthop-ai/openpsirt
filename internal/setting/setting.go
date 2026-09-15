@@ -10,6 +10,7 @@ package setting
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -339,6 +340,11 @@ type Store struct {
 	// indistinguishable from a run where the recovery worked — which is how a
 	// recovery broken on every server engine passed locally and failed in CI.
 	beforeInsert func()
+	// beforeWrite is the same seam for Change, between the read that answers
+	// what the setting held and the write that replaces it. Two writers held
+	// here have both read the original, which is the interleave that made both
+	// of them report replacing it.
+	beforeWrite func()
 }
 
 // NewStore returns a store over db.
@@ -371,44 +377,78 @@ func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
 
 // Set records a setting, whether or not anybody has set it before.
 //
-// Written as an update and then an insert rather than as one upsert statement,
-// because there is no portable spelling of an upsert: two of the four engines
-// want ON CONFLICT and the other two want ON DUPLICATE KEY UPDATE, and
-// engine-specific SQL is confined to migration data-definition and the queue's
-// locking.
+// Written as a read and then one of two writes rather than as one upsert
+// statement, because there is no portable spelling of an upsert: two of the
+// four engines want ON CONFLICT and the other two want ON DUPLICATE KEY UPDATE,
+// and engine-specific SQL is confined to migration data-definition and the
+// queue's locking.
 //
-// The order matters. Updating first means the common case — a setting somebody
-// has changed before — is one statement, and the insert is only reached the
-// first time. Two administrators setting a never-before-set value at once
-// resolve against the primary key: one insert wins and the loser goes round
-// again, landing in the update arm. That retry is a fresh transaction for the
-// reason SetIfAbsent's is — a read inside the transaction whose insert failed
-// sees nothing on two engines and is refused outright on a third.
+// The read decides which write, and both writes say so if the read was already
+// out of date. A setting somebody has changed before is updated on the name and
+// on the value that was read, so a writer whose row has moved matches nothing
+// and goes again. A never-before-set one is inserted, and two administrators
+// setting it at once resolve against the primary key: one wins and the loser
+// goes round again, landing in the update arm. Either retry is a fresh
+// transaction for the reason SetIfAbsent's is — a read inside the transaction
+// whose insert failed sees nothing on two engines and is refused outright on a
+// third, and one inside a transaction whose snapshot is fixed answers with the
+// same stale value for ever.
 func (s *Store) Set(ctx context.Context, name, value string) error {
 	_, _, err := s.Change(ctx, name, value)
 	return err
 }
 
+// errMoved says the row changed between the read that answered what the
+// setting held and the write meant to replace it.
+//
+// The attempt goes out whole rather than reading again inside it, for the
+// reason SetIfAbsent's retry does: MySQL and MariaDB fixed the transaction's
+// snapshot at the opening select, so a second read there answers with the same
+// stale value however many times it is asked.
+var errMoved = errors.New("the setting moved between the read and the write")
+
 // Change records a setting and answers what it replaced.
 //
-// The value it replaced comes from the same transaction as the write, which is
-// the only way it can be true. Read separately beforehand it is what the
-// setting held at some earlier moment: two administrators moving the same
-// setting at once both read the original, and the second writes a prior value
-// into an append-only trail that nothing ever held afterwards — a record of
-// who changed what, wrong about the what.
+// The value it replaced comes from the same transaction as the write, and the
+// write carries it: the update matches on the name *and* on the value the read
+// answered with. Both halves are needed. Read in a statement of its own, before
+// is what the setting held at some earlier moment; read inside the transaction
+// but not written into the condition, it is what the setting held when the read
+// ran, which is not the same thing either.
+//
+// At the isolation every engine opens with, a plain read takes no lock. Two
+// administrators moving the same setting at once both read the original; the
+// second's update waits on the first's row lock, and then lands on top of the
+// value it never saw. Both report replacing the original, and what each reports
+// is written into an append-only trail — so the setting ends up right and the
+// record of who changed what is wrong about the what. The condition is what
+// makes the loser's write match nothing, so that it goes again and reports what
+// it actually replaced.
+//
+// A condition rather than a locking read, because SELECT ... FOR UPDATE is
+// spelled per engine and this works the same on all four.
 //
 // had distinguishes "it held nothing" from "it held the empty string", which
 // is the difference between a deployment that never tuned this and one that
 // cleared it.
-func (s *Store) Change(ctx context.Context, name, value string) (before string, had bool, err error) {
-	for again := true; ; again = false {
-		before, had, err := s.change(ctx, name, value)
-		if again && database.IsDuplicate(err) {
+func (s *Store) Change(ctx context.Context, name, value string) (string, bool, error) {
+	// Bounded, rather than the "once more and no further" a collision on the
+	// primary key uses: the loser of that one lands in the update arm and is
+	// done, while a writer whose condition matched nothing can lose the row
+	// again to a third administrator moving the same setting. Bounded rather
+	// than looped, because contention nothing resolves has to be reported.
+	var err error
+	for attempt := 1; attempt <= database.Attempts; attempt++ {
+		var before string
+		var had bool
+		before, had, err = s.change(ctx, name, value)
+		if database.IsDuplicate(err) || errors.Is(err, errMoved) {
 			continue
 		}
 		return before, had, err
 	}
+	return "", false, fmt.Errorf("record the %q setting: gave up after %d attempts: %w",
+		name, database.Attempts, err)
 }
 
 // change is one attempt, letting a duplicate out for the caller to take again.
@@ -439,37 +479,50 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 			before, had = held.Value, true
 		}
 
+		if s.beforeWrite != nil {
+			s.beforeWrite()
+		}
+
+		// Nothing held it, so there is nothing to replace and the primary key
+		// decides who was first. An update here would take a row another
+		// writer committed since the read and report having replaced nothing
+		// while replacing what that writer stored.
+		if !had {
+			row := &Setting{Name: name, Value: value, UpdatedAt: now}
+			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
+				// Out whole, so the caller opens a new transaction whose read
+				// can see the row the winner committed. Left to fall through,
+				// one of two administrators setting a never-before-set value
+				// at once was handed a raw constraint violation.
+				if database.IsDuplicate(err) {
+					return err
+				}
+				return fmt.Errorf("record the %q setting: %w", name, err)
+			}
+			return nil
+		}
+
 		res, err := tx.NewUpdate().Model((*Setting)(nil)).
 			Set("value = ?", value).Set("updated_at = ?", now).
-			Where("name = ?", name).Exec(ctx)
+			Where("name = ?", name).Where("value = ?", before).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
 
 		// How many rows the update matched, which is the question being asked
-		// — whether the setting was already there. This counted the rows in a
-		// second statement instead, on the ground that two of the four engines
-		// report nothing touched when an update writes a value identical to
-		// the one already stored. The connection settings make that untrue:
-		// the count is rows matched on all four.
+		// — whether the row still holds what the read answered with. This
+		// counted the rows in a second statement instead, on the ground that
+		// two of the four engines report nothing touched when an update writes
+		// a value identical to the one already stored. The connection settings
+		// make that untrue: the count is rows matched on all four, so a match
+		// of none is the row having moved rather than the value already being
+		// the one being written.
 		n, err := database.Affected(res)
 		if err != nil {
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
-		if n > 0 {
-			return nil
-		}
-
-		row := &Setting{Name: name, Value: value, UpdatedAt: now}
-		if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
-			// Out whole, so the caller opens a new transaction whose update
-			// can see the row the winner committed. Left to fall through, one
-			// of two administrators setting a never-before-set value at once
-			// was handed a raw constraint violation.
-			if database.IsDuplicate(err) {
-				return err
-			}
-			return fmt.Errorf("record the %q setting: %w", name, err)
+		if n == 0 {
+			return errMoved
 		}
 		return nil
 	})

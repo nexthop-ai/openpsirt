@@ -20,6 +20,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Collation](#collation)
 - [Replica coordination](#replica-coordination)
 - [Retryable transactions](#retryable-transactions)
+- [Reads a write depends on](#reads-a-write-depends-on)
 - [Connection pool](#connection-pool)
 - [SQLite settings](#sqlite-settings)
 - [Indexes](#indexes)
@@ -535,6 +536,38 @@ Giving up does not back off first. Nothing follows the last attempt, so a wait
 before returning an error already decided holds the caller and its connection
 for an interval that buys nothing — under exactly the sustained contention that
 path exists to report.
+
+## Reads a write depends on
+
+A transaction is not a lock. At the isolation every engine opens with, a plain
+read inside one answers from a snapshot, and the write that follows lands on
+whatever the row holds when it runs.
+
+| Two writers, one row | What happens |
+|---|---|
+| Both read | Neither waits. A plain select takes no lock on any of the three servers |
+| Both write | The second waits for the first to commit, then writes over what it never saw |
+| Both report what they replaced | Both name the value they read, and only one of them replaced it |
+
+**A value read inside the transaction and reported to the caller is carried in
+the write or it is a guess.** The update matches on the key *and* on what the
+read answered with; a match of no rows means the row moved, and the attempt is
+taken again in a new transaction. Reading again inside the failed one does not
+work — MySQL and MariaDB fix the snapshot at the opening select, so the second
+read is as stale as the first.
+
+The damage is in the record rather than in the value: the row ends up holding
+what the last writer wrote, and the trail says that writer replaced something
+nothing ever held. That is the settings trail, where "who raised the floor to
+critical, and from what" is the question being asked of it.
+
+A locking read — `SELECT ... FOR UPDATE` — is the other answer, and is not used
+for this: it is spelled per engine, and the condition works the same on all
+four. See [Engine-specific code](#engine-specific-code).
+
+Bounded retries rather than a loop. Two writers resolve in one more attempt,
+three can take two, and contention that nothing resolves is reported rather
+than spun on.
 
 ## Connection pool
 
