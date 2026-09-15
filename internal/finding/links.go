@@ -173,6 +173,24 @@ func packagePage(parts graph.Parts) (Link, bool) {
 			return Link{URL: "https://launchpad.net/ubuntu/+source/" + name, Name: "Ubuntu package"}, true
 		}
 		return Link{URL: "https://packages.debian.org/" + name, Name: "Debian package"}, true
+	// An RPM is not one distribution's, so the namespace decides — the same
+	// rule the arm above follows. Sent to Fedora unconditionally, as the
+	// interface's own table did, a SUSE or Rocky package landed on a record
+	// for different code, which is the failure that table was deleted for. A
+	// namespace this does not know produces nothing rather than a guess, which
+	// leaves the distribution's own answer for a CVE as what such a package
+	// gets.
+	case "rpm":
+		switch parts.Namespace {
+		case "fedora":
+			return Link{URL: "https://src.fedoraproject.org/rpms/" + name, Name: "Fedora package"}, true
+		case "opensuse", "suse":
+			return Link{
+				URL:  "https://build.opensuse.org/package/show/openSUSE:Factory/" + name,
+				Name: "openSUSE package",
+			}, true
+		}
+		return Link{}, false
 	case "golang":
 		// A module path is several segments and they are part of the name, so
 		// this is the one place a separator survives escaping.

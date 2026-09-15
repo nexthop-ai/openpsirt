@@ -179,6 +179,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               icon="inbox"
               label="Review queue"
               count={queue.data?.total}
+              unread={queue.isError}
               unit="claims waiting"
             />
             <Rail
@@ -186,6 +187,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               icon="nobody"
               label="Unassigned"
               count={unassigned.data?.total}
+              unread={unassigned.isError}
               unit="findings nobody holds"
               quiet
             />
@@ -218,6 +220,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               icon="bug"
               label="Findings"
               count={open.data?.total}
+              unread={open.isError}
               unit="findings — an issue at a component, counted once per build"
               quiet
             />
@@ -344,6 +347,7 @@ function Rail({
   icon,
   label,
   count,
+  unread,
   unit,
   quiet,
   end,
@@ -354,6 +358,10 @@ function Rail({
   icon: string;
   label: string;
   count?: number;
+  // Whether the count could not be read. A badge is gated on being above zero,
+  // so a failed or refused count draws exactly like "nothing waiting" — which
+  // on the review queue is the answer somebody acts on by not looking.
+  unread?: boolean;
   // What the badge is a count of. The rail has room for a number and not for a
   // noun, so the unit rides on the title and on what a screen reader is given
   // — enough that "Unassigned 7,616" beside "5,803 open issues" stops being
@@ -379,14 +387,25 @@ function Rail({
     <NavLink to={to} end={end} className="nav">
       <Icon name={icon} />
       {label}
-      {typeof count === "number" && count > 0 && (
+      {unread ? (
         <span
-          className={quiet ? "count quiet" : "count"}
-          title={unit ? `${count.toLocaleString()} ${unit}` : undefined}
-          aria-label={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+          className="count quiet"
+          title="This count could not be read"
+          aria-label="This count could not be read"
         >
-          {count.toLocaleString()}
+          —
         </span>
+      ) : (
+        typeof count === "number" &&
+        count > 0 && (
+          <span
+            className={quiet ? "count quiet" : "count"}
+            title={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+            aria-label={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+          >
+            {count.toLocaleString()}
+          </span>
+        )
       )}
     </NavLink>
   );

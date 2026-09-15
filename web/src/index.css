@@ -24,7 +24,7 @@
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
 
-/* The stylesheet, in eight files, in cascade order.
+/* The stylesheet, split across the files below, in cascade order.
 
    Order is load-bearing, and the split is by position rather than by theme for
    that reason — the sections are in the order they were in when this was one

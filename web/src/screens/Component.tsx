@@ -121,7 +121,7 @@ export function Component() {
   // finding went to Launchpad. A link that lands on a record for the wrong
   // thing costs more than no link, because it is followed before it is
   // disbelieved.
-  const link = here.upstream_url ?? null;
+  const link = here.package_page_url ?? null;
   // The bands are declared worst first, so the first one present is the worst.
   const worst = ROLLED.find((band) => (here.by_severity ?? {})[band]);
 
@@ -221,7 +221,15 @@ export function Component() {
                     {here.project_url.replace(/^https?:\/\//, "")}
                   </Outward>
                 ) : link ? (
-                  <Outward href={link}>{link.replace(/^https:\/\//, "")}</Outward>
+                  // What the record is, not what its address spells. Which
+                  // distribution's or which index's page this is decides
+                  // whether it answers the question a reader has, and a
+                  // hostname makes them work that out — the server names it
+                  // for exactly this, and stripping the scheme instead threw
+                  // the name away.
+                  <Outward href={link}>
+                    {here.package_page_name || link.replace(/^https:\/\//, "")}
+                  </Outward>
                 ) : (
                   <span className="hint">not known</span>
                 )}

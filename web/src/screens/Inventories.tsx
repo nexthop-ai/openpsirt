@@ -42,6 +42,11 @@ export function Inventories() {
     queryFn: async () => unwrap(await api.GET("/v1/scanning", { params: { query: { product } } })),
   });
   const quiet = (scanning.data?.items ?? []).filter((b) => b.quiet);
+  // How many there are, against how many are named. These rows are named
+  // rather than counted, so the page is what a reader sees — but a page short
+  // of the answer named some builds and stayed silent about the rest, which on
+  // this screen reads as "those are the quiet ones".
+  const quietTotal = scanning.data?.quiet ?? 0;
   // Silence on a release that has gone out of support is expected rather than
   // a fault, so it is said quietly rather than raised — but it is still said.
   // "Not scanned, and that is fine" and "not mentioned" are different answers.
@@ -85,6 +90,14 @@ export function Inventories() {
           </span>
         </div>
       ))}
+
+      {quietTotal > quiet.length && (
+        <p className="hint" style={{ marginBottom: 10 }}>
+          {(quietTotal - quiet.length).toLocaleString()} more{" "}
+          {quietTotal - quiet.length === 1 ? "build has" : "builds have"} gone quiet here and are
+          not named above. The scan-coverage report lists every one of them.
+        </p>
+      )}
 
       {retired.length > 0 && (
         <p className="hint" style={{ marginBottom: 10 }}>

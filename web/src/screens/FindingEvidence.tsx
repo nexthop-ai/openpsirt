@@ -9,7 +9,7 @@ import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { notYours, unwrap } from "../api/queries";
+import { statusOf, unwrap } from "../api/queries";
 import { linkable } from "../ui/addressable";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
@@ -282,7 +282,13 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
       <h3>Reported by</h3>
       {told.isPending ? (
         <Loading />
-      ) : told.isError && !notYours(told.error) ? (
+      ) : told.isError && statusOf(told.error) !== 404 ? (
+        // 404 alone, not every refusal. This is the one card where the two
+        // statuses mean opposite things: the endpoint answers 404 for "nobody
+        // recorded a reporter", which is every flaw found in-house, and 403
+        // for "you do not hold triage here" — so folding them told a case
+        // collaborator the flaw was found in-house, which is a false claim
+        // about a security record rather than a quiet card.
         <Failed error={told.error} what="Who reported this could not be read." />
       ) : !report ? (
         <p className="reading">No outside reporter recorded.</p>

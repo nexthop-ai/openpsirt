@@ -1275,15 +1275,15 @@ input[type="date"] {
    a tenth of full strength: 1.16:1 against the surface in the light look,
    1.25:1 in the dark one, where 3:1 is the floor. Tabbing into the permission
    grid, which writes a grant per product per press, there was nothing on screen
-   saying which box had focus. */
+   saying which box had focus.
+
+   Written as an exclusion rather than as a list of the types that do get it: a
+   list has to be kept, and three inputs in the tree state no type at all —
+   they default to text and would have been dropped from an enumeration, which
+   is the same shape as the gap this rule exists to close. */
 select:focus,
 textarea:focus,
-input[type="text"]:focus,
-input[type="search"]:focus,
-input[type="number"]:focus,
-input[type="date"]:focus,
-input[type="url"]:focus,
-input[type="email"]:focus {
+input:not([type="checkbox"], [type="radio"], [type="file"]):focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }

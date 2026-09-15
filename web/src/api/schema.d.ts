@@ -7045,6 +7045,10 @@ export interface components {
             newest_released_at?: string;
             /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
             newest_version?: string;
+            /** @description What to call that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is */
+            package_page_name?: string;
+            /** @description Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like */
+            package_page_url?: string;
             /**
              * Format: int64
              * @description How many times those sit somewhere in this build. What the bulk cap is measured against
@@ -7063,10 +7067,6 @@ export interface components {
             upgrade_to?: string;
             /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
-            /** @description What to call that address on screen */
-            upstream_name?: string;
-            /** @description Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry and a vendored fork both look like */
-            upstream_url?: string;
             variant: string;
             /** @description What this build ships */
             version: string;
@@ -7965,7 +7965,7 @@ export interface components {
              * @example https://example.com/schemas/Set-affected-buildsRequest.json
              */
             readonly $schema?: string;
-            /** @description Every build it affects, as the whole answer rather than a change to it */
+            /** @description Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding */
             builds: components["schemas"]["Item1"][] | null;
             /** @description Why any build is being taken out. Required whenever one is */
             reason?: string;

@@ -126,7 +126,15 @@ export function Findings() {
   // that it was chosen. Keeping keys alone meant the act could only reach the
   // rows still on screen, so picking thirty on one page and twenty on the next
   // and pressing "Assign 50" wrote twenty and dropped thirty, silently.
-  const { picked, pick, pickAll, asking, failed: handFailed, through } = useSelection(asked);
+  const {
+    picked,
+    pick,
+    pickAll,
+    clear: clearPicked,
+    asking,
+    failed: handFailed,
+    through,
+  } = useSelection(asked);
   // Beside the hooks it belongs with: this reads the session, so it cannot sit
   // after an early return.
   const { cap: bulkCap, over: overCap } = useBulkCap(picked.size);
@@ -692,7 +700,7 @@ export function Findings() {
           >
             {hand.isPending ? "Assigning…" : `Assign ${picked.size}`}
           </button>
-          <button type="button" className="linkish" onClick={() => pickAll(rows, shownKeys, false)}>
+          <button type="button" className="linkish" onClick={clearPicked}>
             Clear
           </button>
         </div>

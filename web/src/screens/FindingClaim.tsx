@@ -13,7 +13,7 @@ import { initials } from "../ui/initials";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { unwrap } from "../api/queries";
+import { notYours, unwrap } from "../api/queries";
 import { Outward } from "../ui/Outward";
 import { useComment, useEditComment } from "../api/mutations";
 import { Failed } from "../ui/Failed";
@@ -396,9 +396,19 @@ export function Activity({
     </li>
   );
 
+  // A timeline assembled from three reads is only whole when all three
+  // answered. One that failed takes its events out silently — and what is
+  // missing from a record is the thing a reader cannot see is missing.
+  const unread = [revisions, approvals, comments].find(
+    (each) => each.isError && !notYours(each.error),
+  );
+
   return (
     <div className="card">
       <h3>Activity</h3>
+      {unread && (
+        <Failed error={unread.error} what="Part of this claim's history could not be read." />
+      )}
       <ul className="timeline">{now.map(line)}</ul>
       {earlier.length > 0 && (
         <>
@@ -513,6 +523,15 @@ export function Comments({
         placeholder="A question, a note, something worth knowing later."
         draftKey={`comment:${claimId}`}
         notNotified={comment.data?.not_notified ?? []}
+        // A failed read drew an empty thread with a live composer above it, so
+        // a claim waiting on a second approver read as one nobody had objected
+        // to. The note thread one file over already said this; this is the
+        // half the extraction left behind.
+        unread={
+          comments.isError && !notYours(comments.error) ? (
+            <Failed error={comments.error} what="The comments on this claim could not be read." />
+          ) : null
+        }
         adding={comment}
         onAdd={(body, done) => comment.mutate({ id: claimId, body }, { onSuccess: done })}
         edit={(piece, done) => (

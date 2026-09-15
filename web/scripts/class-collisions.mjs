@@ -146,6 +146,7 @@ if (!/\.rounded-lg[\s,:{]/.test(ours.build(["rounded-lg"]))) {
 }
 
 const names = [...defined.keys()].sort();
+
 const emitted = compiler.build(names);
 const clashing = names.filter((name) =>
   new RegExp(`\\.${name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&")}(?=[\\s,:{>+~])`).test(emitted),
@@ -246,6 +247,12 @@ if (unused.length > 0) {
 // therefore quiet rather than noisy, which is the right way round for a check
 // that cannot see what a template literal will hold.
 const written = new Map();
+// What was looked at, as against what was found. `written` holds only the
+// names markup carries that no rule defines, so it is empty in a healthy
+// tree — it cannot say whether anything was examined, and the counts below
+// can.
+let markupSeen = 0;
+let classesSeen = 0;
 async function markupClasses(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -254,11 +261,14 @@ async function markupClasses(dir) {
       continue;
     }
     if (!/\.tsx?$/.test(entry.name) || entry.name === "schema.d.ts") continue;
+    markupSeen++;
     const lines = (await readFile(full, "utf8")).split("\n");
     lines.forEach((line, i) => {
       for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
         for (const word of (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, " ").split(/\s+/)) {
-          if (/^[A-Za-z][\w-]*$/.test(word) && !defined.has(word) && !written.has(word)) {
+          if (!/^[A-Za-z][\w-]*$/.test(word)) continue;
+          classesSeen++;
+          if (!defined.has(word) && !written.has(word)) {
             written.set(word, `${path.relative(src, full)}:${i + 1}`);
           }
         }
@@ -287,8 +297,25 @@ if (clashing.length > 0) {
   console.error(`\nRename ours — "was-fixed" rather than "fixed".`);
   process.exit(1);
 }
+// A gate that iterates a collection counts what it examined and fails on zero.
+//
+// All three checks above are loops over a set, and a set that came back empty
+// makes every one of them pass having looked at nothing — which is what a
+// stylesheet moved out from under `src/`, or a markup glob that stopped
+// matching, looks like from here. The summary line says what was examined;
+// this is what stops the number being nought.
+if (names.length === 0 || markupSeen === 0 || classesSeen === 0) {
+  console.error(
+    `this found ${names.length} class name(s) in the stylesheets and ` +
+      `${classesSeen} written on an element across ${markupSeen} file(s), ` +
+      "so it checked nothing.\n\n" +
+      "  Either the stylesheets or the markup moved out from under it.\n",
+  );
+  process.exit(1);
+}
+
 console.log(
   `no collisions: ${names.length} class names checked against Tailwind, ` +
     `${modifiers.size} used as a modifier checked against our own rules, ` +
-    `${written.size} applied in markup checked for having a rule`,
+    `${classesSeen} written on an element across ${markupSeen} files checked for having a rule`,
 );

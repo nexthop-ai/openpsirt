@@ -17,6 +17,13 @@ type HolderBody struct {
 	Name     string `json:"name" doc:"What to show, which is the spelling somebody typed where there is one"`
 }
 
+// How much of the picker teams may take.
+//
+// A few, because there are few of them and a team buried under twenty-five
+// names is one nobody finds — and no more, because the bound covers the merged
+// answer and a picker that is all teams and no people is not a picker.
+const teamShare = 5
+
 // registerHolders answers who may be given work here.
 //
 // **Assigning and mentioning are different questions**, and the interface was
@@ -86,19 +93,26 @@ func registerHolders(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who may hold this could not be read", err)
 		}
-		// Narrowed and bounded by the same term and the same limit the people
-		// were. The declared bound was applied to the people alone, so every
-		// team there is followed them however many that was.
-		teams, err := store.Teams(ctx, input.Term, input.Limit)
+		// Narrowed by the same term, and asked for one more than the share so
+		// that a deployment past the share can be told from one at it.
+		teams, err := store.Teams(ctx, input.Term, teamShare+1)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "which teams there are could not be read", err)
+		}
+		moreTeams := len(teams) > teamShare
+		if moreTeams {
+			teams = teams[:teamShare]
 		}
 
 		out := &listOutput[HolderBody]{}
 		out.Body.Items = make([]HolderBody, 0, len(people)+len(teams))
-		// Teams first. There are few of them beside the people, and a picker
-		// that buries three teams under twenty-five names is one where the
-		// team is never found.
+		// Teams first, and only a few of them. There are few beside the people,
+		// and a picker that buries three teams under twenty-five names is one
+		// where the team is never found — but one that spends the whole bound
+		// on teams is worse: with the bound applied to the merged answer, a
+		// deployment holding twenty-five teams opened this on twenty-five
+		// teams and no people at all, which is a harder failure than the
+		// unbounded list it replaced.
 		named := make([]HolderBody, 0, len(teams))
 		for _, team := range teams {
 			shown := team.DisplayName
@@ -117,6 +131,22 @@ func registerHolders(api huma.API, in Ingest) {
 				Kind: "person", Identity: person.Identity, Name: person.Name,
 			})
 		}
+		// How many there are to choose from, so a picker showing a page of
+		// them can say so rather than passing the page off as the whole.
+		// Counted rather than derived from the page for the reason every other
+		// capped listing here states: a figure taken off a page answers a
+		// different question from the one it looks like.
+		total, err := store.CountWhoCanRead(ctx, subject, product.ID, wanted, input.Term)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "who may hold this could not be counted", err)
+		}
+		teamsTotal := len(named)
+		if moreTeams {
+			if teamsTotal, err = store.CountTeams(ctx, input.Term); err != nil {
+				return nil, wentWrong(in.Logger, "which teams there are could not be counted", err)
+			}
+		}
+		out.Body.Total = total + teamsTotal
 		return out, nil
 	})
 }

@@ -19,6 +19,16 @@ export class Refused extends Error {
   }
 }
 
+// The status a refusal carried, or nothing where it is not one.
+//
+// For the call sites where one of the two statuses `notYours` folds together
+// has a meaning of its own: the reporter read answers 404 for "nobody recorded
+// a reporter", which is the card's ordinary content, and 403 for "you do not
+// hold triage here", which is not.
+export function statusOf(error: unknown): number | undefined {
+  return error instanceof Refused ? error.status : undefined;
+}
+
 // Whether a refusal is the server saying this is not somebody's to see.
 //
 // A card that is quiet for one person and drawn for another is the shape

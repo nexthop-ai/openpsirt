@@ -19,6 +19,15 @@ import { identityOf, type Row } from "./list";
 // and a page does not, so an act built from what is on screen reaches part of
 // what was ticked: picking thirty on one page and twenty on the next and
 // pressing "Assign 50" wrote twenty and dropped thirty, silently.
+
+// What the list is asking, with the position in it left out. Two addresses
+// that differ only by offset are the same question asked from a different row.
+export function questionIn(params: URLSearchParams): string {
+  const question = new URLSearchParams(params);
+  question.delete("offset");
+  return question.toString();
+}
+
 export function useSelection(asked: URLSearchParams): {
   picked: Map<string, Row>;
   // One row, ticked or unticked.
@@ -26,6 +35,8 @@ export function useSelection(asked: URLSearchParams): {
   // A page, added to or taken out of the selection — which spans pages, so
   // this cannot replace it.
   pickAll: (rows: Row[], keys: string[], on: boolean) => void;
+  // Everything ticked, forgotten, wherever it was ticked.
+  clear: () => void;
   // The address the list is asking under, with the selection cleared because
   // the population changed.
   asking: (next: URLSearchParams) => URLSearchParams;
@@ -42,8 +53,13 @@ export function useSelection(asked: URLSearchParams): {
   const [failed, setFailed] = useState(0);
   // The question the selection was made out of, so a change to it clears the
   // selection here rather than at each place that changes it.
-  const [under, setUnder] = useState(asked.toString());
-  const question = asked.toString();
+  //
+  // **The offset is not part of the question.** Turning the page asks the same
+  // question from a different row, and the selection is deliberately wider
+  // than a page — so counting the offset as a change emptied the selection on
+  // every page turn, under a bar still saying "across pages".
+  const [under, setUnder] = useState(() => questionIn(asked));
+  const question = questionIn(asked);
   if (under !== question) {
     setUnder(question);
     if (picked.size > 0) setPicked(new Map());
@@ -77,8 +93,17 @@ export function useSelection(asked: URLSearchParams): {
     next.delete("offset");
     setPicked(new Map());
     setFailed(0);
-    setUnder(next.toString());
+    setUnder(questionIn(next));
     return next;
+  }
+
+  // Everything ticked, forgotten. The whole selection rather than the page it
+  // is looked at through: walking the rows on screen left somebody who had
+  // picked fifty across two pages with thirty still selected and an act armed
+  // on rows they could not see.
+  function clear() {
+    setPicked(new Map());
+    setFailed(0);
   }
 
   async function through(act: (row: Row) => Promise<unknown>) {
@@ -107,5 +132,5 @@ export function useSelection(asked: URLSearchParams): {
     setFailed(refused.length);
   }
 
-  return { picked, pick, pickAll, asking, failed, through };
+  return { picked, pick, pickAll, clear, asking, failed, through };
 }

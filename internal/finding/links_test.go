@@ -230,6 +230,14 @@ func TestThePackagePageIsAnsweredForTheInterfaceToo(t *testing.T) {
 		{"pkg:deb/ubuntu/curl@7.81.0-1ubuntu1.15", "https://launchpad.net/ubuntu/+source/curl"},
 		{"pkg:deb/debian/curl@8.14.1-2", "https://packages.debian.org/curl"},
 		{"pkg:npm/lodash@4.17.21", "https://www.npmjs.com/package/lodash/v/4.17.21"},
+		// An RPM belongs to whichever distribution built it, so the namespace
+		// decides. Sent to Fedora unconditionally the way the interface's own
+		// table did, a SUSE package landed on a record for different code.
+		{"pkg:rpm/fedora/curl@8.14.1-1.fc41", "https://src.fedoraproject.org/rpms/curl"},
+		{
+			"pkg:rpm/opensuse/curl@8.14.1-1.1",
+			"https://build.opensuse.org/package/show/openSUSE:Factory/curl",
+		},
 	} {
 		got, name := PackagePage(each.purl)
 		if got != each.want {
@@ -245,6 +253,11 @@ func TestThePackagePageIsAnsweredForTheInterfaceToo(t *testing.T) {
 	// this, and a link that lands on the wrong record costs more than none.
 	if got, _ := PackagePage("pkg:conan/zlib@1.3"); got != "" {
 		t.Errorf("an unknown ecosystem was given the address %q", got)
+	}
+	// And a distribution this has no package browser for answers with nothing
+	// rather than with another distribution's record.
+	if got, _ := PackagePage("pkg:rpm/rocky/curl@8.14.1"); got != "" {
+		t.Errorf("an RPM from a distribution this knows nothing about was sent to %q", got)
 	}
 	if got, _ := PackagePage("not a package identifier"); got != "" {
 		t.Errorf("a malformed identifier was given the address %q", got)

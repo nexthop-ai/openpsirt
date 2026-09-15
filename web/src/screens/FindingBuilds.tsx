@@ -22,9 +22,14 @@ import { buildKey, fromBuildKey } from "../ui/builds";
 // Folded until asked, like the advisory: it reads two lists to draw itself,
 // and most visits to a finding are not somebody correcting its filing.
 
-// The most rows the issue read returns in one request. The editor needs all
-// of them or none, so this is compared against the whole-answer count rather
-// than used as a page size.
+// The most builds this may set at once, which is the bound the route declares.
+//
+// The editor needs all of them or none — every build absent from what it sends
+// is closed as never affected — so this is compared against the whole-answer
+// count rather than used as a page size. Stated in both places on purpose: the
+// route is what actually holds the line, because a caller that is not this
+// screen is bound by it too, and this is what stops the screen offering an act
+// the route would refuse.
 const MOST = 200;
 
 export function AffectedBuilds({

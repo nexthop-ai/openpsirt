@@ -827,7 +827,7 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	if query == nil {
 		return nil, nil
 	}
-	query = query.OrderExpr("p.identity").Limit(limit)
+	query = narrowToTerm(query.OrderExpr("p.identity").Limit(limit), term)
 	// Narrowed here rather than in the caller, because a picker at a
 	// hundred people cannot fetch them all and filter in a browser — and
 	// the limit would cut the list before the term did, so the name
@@ -848,19 +848,50 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	// Escaped, because a search box is not a pattern language: a term of "%"
 	// matched every person the deployment could offer, in one request, from
 	// the picker that decides who may be named on an embargoed case.
-	if wanted := strings.TrimSpace(term); wanted != "" {
-		like := database.LikeContains(wanted)
-		query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("LOWER(p.identity) LIKE ?"+database.LikeClause, like).
-				WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?"+
-					database.LikeClause, like)
-		})
-	}
 	var found []Mentionable
 	if err := query.Scan(ctx, &found); err != nil {
 		return nil, fmt.Errorf("read who may be mentioned: %w", err)
 	}
 	return found, nil
+}
+
+// narrowToTerm is the picker's own matching, spelled once so the page and the
+// count of it cannot come to narrow differently.
+func narrowToTerm(query *bun.SelectQuery, term string) *bun.SelectQuery {
+	wanted := strings.TrimSpace(term)
+	if wanted == "" {
+		return query
+	}
+	like := database.LikeContains(wanted)
+	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.WhereOr("LOWER(p.identity) LIKE ?"+database.LikeClause, like).
+			WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?"+
+				database.LikeClause, like)
+	})
+}
+
+// CountWhoCanRead is how many the picker has to choose from in all.
+//
+// The same narrowing as the page above, so a listing that says "25 of 140" is
+// counting the thing it is showing part of. Asked as its own statement rather
+// than read off the page, for the reason every capped listing here states: a
+// figure taken from a page answers a different question from the one it looks
+// like.
+func (s *Store) CountWhoCanRead(ctx context.Context, subject Subject, productID int64,
+	visibility Visibility, term string) (int, error) {
+
+	if !subject.Reads(visibility, productID) {
+		return 0, nil
+	}
+	query := s.readersIn(productID, visibility)
+	if query == nil {
+		return 0, nil
+	}
+	total, err := narrowToTerm(query, term).Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("count who may be mentioned: %w", err)
+	}
+	return total, nil
 }
 
 // ReadersNamed resolves these sign-in identities to the people among them who

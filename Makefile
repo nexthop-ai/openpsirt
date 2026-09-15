@@ -151,70 +151,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-# A throwaway deployment to click around in. Everything about it is
-# overridable, because the two settings people get wrong are the host they
-# browse to and who they arrive as.
-#
-#   DEMO_HOST   where this waits for the container to answer, and what the
-#               status line prints. Not what you have to type: the demo is not
-#               told a base address, so it answers on whatever name you reach
-#               it by
-#   DEMO_USER   who you arrive as, and the administrator the demo names. An
-#               identity is the username the proxy asserts, unprefixed
-DEMO_HOST ?= localhost
-DEMO_PORT ?= 8080
-DEMO_USER ?= dev
-# The rest of the cast, one per line as port:identity:roles.
-#
-# One person cannot demonstrate this tool. Approving your own claim is refused,
-# because a control one person completes alone is not one —
-# so a demo with a single identity can propose a judgment and can never show it
-# agreed to, and the record an auditor reads says "same person" against every
-# row. Somebody has to be somebody else.
-#
-# A port each rather than a switcher: the trusted-header path is a proxy
-# stating who you are, and the smallest honest version of two people is two
-# doors. Open two browser windows and you are two people, which is also what
-# lets one of them watch the other's claim arrive.
-#
-# Roles are granted per product, so the seed grants each of these on every
-# product it declares. Nobody is an administrator but the first: an approver
-# who could also change the settings would not be exercising anything.
-DEMO_CAST ?= 8081:ana:public-read,public-triage,approver \
-             8082:ben:public-read,public-triage,approver
-# What the demo and the dev loop seed, one build per entry:
-#   inventory,product,display name,branch,variant
-# The inventory is an .xz of a CycloneDX file under the SBOM package's
-# testdata. Adding a variant is adding a line — a second variant of the same
-# product is what exercises decisions carrying across variants (REL-01,
-# REL-09), so the mellanox build of the switch image belongs here once it is
-# saved beside the broadcom one.
-DEMO_BUILDS ?= internal/sbom/testdata/switch-image.cdx.json.xz,sonic,SONiC,master,broadcom \
-               internal/sbom/testdata/switch-image-mellanox.cdx.json.xz,sonic,SONiC,master,mellanox
-# In the tree rather than under $HOME: a command that writes to somebody's home
-# directory from a checkout is a surprise, and everything here is throwaway
-# state that should be deleted by deleting the checkout. Git-ignored.
-DEMO_DIR   ?= $(CURDIR)/.demo
-DEMO_IMAGE ?= openpsirt:demo
-DEMO_NET   ?= openpsirt-demo
-# Fixed so the application can be told which addresses to trust the sign-in
-# header from. A range docker hands out at random cannot be named in advance.
-DEMO_SUBNET ?= 172.31.71.0/24
-DEMO_URL    := http://$(DEMO_HOST):$(DEMO_PORT)
-
-# The developer loop is a different thing and says so. It runs the binary and
-# the interface's own dev server on this machine, for the fast edit-and-reload
-# cycle; it needs Go, node and a scanner installed here, and it serves the
-# interface from the dev server rather than from the binary — so it exercises a
-# configuration nobody deploys.
-DEV_HOST ?= localhost
-DEV_PORT ?= 5173
-DEV_API  ?= 127.0.0.1:8081
-DEV_DIR  ?= $(DEMO_DIR)/dev
-DEV_DB   ?= $(DEV_DIR)/dev.db
-DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
-
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check clean-web
 
 all: check build
 
@@ -1043,7 +980,10 @@ endif
 run:
 	$(GO) run ./cmd/openpsirt
 
-# The demo deployment and the hot-reload loop, which share nothing with the
-# above but DOCKER and NPM. Included rather than inlined so this file is the
-# gate and the build and nothing else.
+clean-web:
+	rm -rf web/node_modules web/dist internal/webui/dist/assets internal/webui/dist/index.html
+
+clean:
+	rm -rf bin
+
 include Makefile.demo

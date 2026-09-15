@@ -58,11 +58,19 @@ func registerTeams(api huma.API, a Administering) {
 			if err != nil {
 				return nil, wentWrong(a.Logger, "cannot list teams", err)
 			}
+			// The whole-answer count, because the listing is capped: a
+			// caller cannot tell a clipped page from every team there is
+			// otherwise, and the ceiling is high rather than absent.
+			total, err := store.CountTeams(ctx, "")
+			if err != nil {
+				return nil, wentWrong(a.Logger, "cannot count the teams", err)
+			}
 			// Membership is who is here, which is answered where the rest of
 			// the record is: to an administrator.
 			members := administrating(ctx) == nil
 
 			out := &listOutput[TeamBody]{}
+			out.Body.Total = total
 			out.Body.Items = make([]TeamBody, 0, len(teams))
 			for _, team := range teams {
 				body := TeamBody{
