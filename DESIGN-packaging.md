@@ -164,12 +164,22 @@ cannot work moves the failure to a crash-looping pod and a message nobody reads.
 | A mail server with no address to send as | Mail configured halfway comes up healthy and sends nothing (REQ-02) |
 | An address with no server | |
 | A password with no username | |
+| A sign-in provider with no client secret | The process refuses to start without one, so the install would render cleanly and never come up |
+| An OIDC provider with no username claim | The same, and there is no default: what an authorization is redeemed against is a question only the deployment's operator can answer |
+| A secret given both ways at once | The chart writes no Secret when one is named, so the value in the values file would be ignored without a word — the rule the database URL already follows |
 
 Mail is opt-in, so refusing half of it costs a deployment that wants none of it
 nothing (REQ-49).
 
-Each refusal is tested by asserting that it fires. A legal install is tested
-the other way round — that what it renders names something that exists.
+Each refusal is tested by asserting that it fires, and the count of refusals
+examined is printed, because a loop that checked nothing reads exactly like one
+that found nothing wrong.
+
+A legal install is tested the other way round, and read out of the render
+rather than compared against a list: every `secretKeyRef` a legal install
+produces is resolved against the Secrets that same install creates. A list
+written beside the check would give a fifth secret source no row, and stay
+green on the defect it exists for.
 
 ## Where a secret comes from
 
@@ -177,12 +187,18 @@ the other way round — that what it renders names something that exists.
 |---|---|
 | Set in the values | A Secret the chart creates, under a key of the chart's own |
 | A Secret the operator names | That Secret, under the key they name beside it |
-| Neither | Nothing is asked for. A sign-in provider that takes no client secret is a configuration the process supports |
+| Both | Refused at render. One of them would be ignored, and which one is not something to leave a reader to work out |
+| Neither, for the mail password | Nothing is asked for. Mail is opt-in and a server may want no credentials |
+| Neither, for a sign-in provider | Refused at render, because the process refuses to start without one |
 
 The key an operator names is read only where they also name the Secret. A
 Secret the chart created holds the value under the chart's key, and asking for
 the operator's key name there asks for a key that is not there — which renders
 perfectly and produces a pod that never starts.
+
+**A Secret is written only while the thing that reads it is configured.**
+Turning a provider off by clearing its issuer used to leave the Secret behind,
+holding a live credential nothing reads.
 
 The same pair answers for the database URL, both client secrets and the mail
 password, because what differs between them is the name of the Secret and the

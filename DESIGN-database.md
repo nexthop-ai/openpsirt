@@ -374,6 +374,20 @@ What the migrations made is read first, and a word this schema has no table of
 is not a table — which is how a clause keyword is told from a name without a
 list of keywords that would go stale the same way the reserved list does.
 
+**The two halves are admitted differently, and for a reason.** The alias half
+reads only a literal recognizable as a query, because "as" is a word in nearly
+every English sentence here. The table half reads every literal, because what
+admits one is this schema's own table names — and a query whose tables are all
+bare carries no quoted table to be recognized by, which is precisely the query
+nothing was looking at. A table expression that is a table name and nothing
+else is admitted where a method that names a table is being called, since no
+pattern over the text alone tells `"person"` the table from `"person"` the kind
+of subject.
+
+**Test queries are held to it too.** They run against the same four engines,
+and twenty-two of them named a table bare. The checker's own package is the one
+exemption: a bare table in its fixtures is the input, not a defect.
+
 **A clause assembled in a variable is read where it is handed over.** Three of
 them reached the builder through a local built from literals a line earlier,
 and a check that reads only what is written at the call read none of it — which

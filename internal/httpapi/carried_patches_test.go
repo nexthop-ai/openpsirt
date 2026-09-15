@@ -30,7 +30,7 @@ func TestWhatABuildCarriesIsReachableAndNarrowedLikeEverythingElse(t *testing.T)
 			t.Fatal(err)
 		}
 		var scanID int64
-		if err := r.db.DB.NewSelect().TableExpr("scan").ColumnExpr("MAX(id)").
+		if err := r.db.DB.NewSelect().TableExpr("\"scan\"").ColumnExpr("MAX(id)").
 			Where("target_id = ?", target.ID).Scan(t.Context(), &scanID); err != nil {
 			t.Fatal(err)
 		}

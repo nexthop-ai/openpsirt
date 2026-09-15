@@ -54,12 +54,12 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 			ClosedBecause string  `bun:"closed_because"`
 			ClosedRunID   *int64  `bun:"closed_run_id"`
 		}
-		if err := f.db.DB.NewSelect().TableExpr("\"finding\" AS f").
-			ColumnExpr("f.closed_at AS closed_at").
-			ColumnExpr("f.closed_by AS closed_by").
-			ColumnExpr("COALESCE(f.closed_note, '') AS closed_note").
-			ColumnExpr("COALESCE(f.closed_because, '') AS closed_because").
-			ColumnExpr("f.closed_run_id AS closed_run_id").
+		if err := f.db.DB.NewSelect().TableExpr("\"finding\" AS \"f\"").
+			ColumnExpr("f.closed_at AS \"closed_at\"").
+			ColumnExpr("f.closed_by AS \"closed_by\"").
+			ColumnExpr("COALESCE(f.closed_note, '') AS \"closed_note\"").
+			ColumnExpr("COALESCE(f.closed_because, '') AS \"closed_because\"").
+			ColumnExpr("f.closed_run_id AS \"closed_run_id\"").
 			Where("f.id = ?", row.ID).Scan(ctx, &closed); err != nil {
 			t.Fatal(err)
 		}
@@ -116,7 +116,7 @@ func TestAScannersFindingIsNotClosedByHand(t *testing.T) {
 
 		// And it is still open, so nothing was written on the way to refusing.
 		var open int
-		if err := f.db.DB.NewSelect().TableExpr("\"finding\" AS f").
+		if err := f.db.DB.NewSelect().TableExpr("\"finding\" AS \"f\"").
 			ColumnExpr("COUNT(*)").
 			Where("f.vulnerability_id = ?", issueID).
 			Where("f.closed_at IS NULL").Scan(ctx, &open); err != nil {

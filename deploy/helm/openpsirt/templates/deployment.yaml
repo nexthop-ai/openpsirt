@@ -4,6 +4,15 @@
 {{- if and .Values.database.url .Values.database.existingSecret }}
 {{- fail "set database.url or database.existingSecret, not both" }}
 {{- end }}
+{{- if and .Values.auth.oidc.clientSecret .Values.auth.oidc.existingSecret }}
+{{- fail "set auth.oidc.clientSecret or auth.oidc.existingSecret, not both: the Secret the chart would write is not created when you name one of your own, so the value here would be silently ignored" }}
+{{- end }}
+{{- if and .Values.auth.github.clientSecret .Values.auth.github.existingSecret }}
+{{- fail "set auth.github.clientSecret or auth.github.existingSecret, not both: the value here would be silently ignored" }}
+{{- end }}
+{{- if and .Values.mail.password .Values.mail.existingSecret }}
+{{- fail "set mail.password or mail.existingSecret, not both: the value here would be silently ignored" }}
+{{- end }}
 {{- if and .Values.database.url (regexMatch "^(sqlite|sqlite3|file):" (lower .Values.database.url)) (gt (int .Values.replicaCount) 1) }}
 {{- fail (printf "database.url is SQLite and replicaCount is %d: SQLite is one file on one pod, so a second replica would start with an empty database of its own rather than share this one. Use PostgreSQL, MySQL or MariaDB, or set replicaCount to 1 for a single-pod trial" (int .Values.replicaCount)) }}
 {{- end }}
@@ -19,6 +28,15 @@
 {{- end }}
 {{- if and .Values.auth.oidc.issuer (not .Values.auth.baseURL) }}
 {{- fail "set auth.baseURL: a provider sends people back to an address and compares it against what it was registered with" }}
+{{- end }}
+{{- if and .Values.auth.oidc.issuer (not (or .Values.auth.oidc.clientSecret .Values.auth.oidc.existingSecret)) }}
+{{- fail "set auth.oidc.clientSecret or auth.oidc.existingSecret: the process refuses to start with an issuer and no client secret, so an install without one comes up as a pod that never starts" }}
+{{- end }}
+{{- if and .Values.auth.oidc.issuer (not .Values.auth.oidc.usernameClaim) }}
+{{- fail "set auth.oidc.usernameClaim: the process refuses to start without one, because it is what redeems an authorization written for somebody who has not signed in yet. There is no default; the configuration reference names the usual answer for each provider" }}
+{{- end }}
+{{- if and .Values.auth.github.clientID (not (or .Values.auth.github.clientSecret .Values.auth.github.existingSecret)) }}
+{{- fail "set auth.github.clientSecret or auth.github.existingSecret: the process refuses to start with a client identifier and no secret" }}
 {{- end }}
 {{- if and .Values.auth.github.clientID (not .Values.auth.baseURL) }}
 {{- fail "set auth.baseURL: a provider sends people back to an address and compares it against what it was registered with" }}

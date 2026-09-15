@@ -119,7 +119,7 @@ func TestAWeaknessIsMatchedWholeAndNotAsAPrefix(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		var issueID int64
-		if err := r.db.DB.NewSelect().TableExpr("vulnerability").Column("id").
+		if err := r.db.DB.NewSelect().TableExpr("\"vulnerability\"").Column("id").
 			Where(`identifier = ?`, "CVE-2026-9999").
 			Scan(t.Context(), &issueID); err != nil {
 			t.Fatal(err)
@@ -127,7 +127,7 @@ func TestAWeaknessIsMatchedWholeAndNotAsAPrefix(t *testing.T) {
 		for _, cwe := range []string{"CWE-125", "CWE-787"} {
 			row := map[string]any{"vulnerability_id": issueID, "cwe": cwe}
 			if _, err := r.db.DB.NewInsert().Model(&row).
-				TableExpr("vulnerability_weakness").Exec(t.Context()); err != nil {
+				TableExpr("\"vulnerability_weakness\"").Exec(t.Context()); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -302,13 +302,24 @@ dist:
 # "-dirty" — both name a version nobody can get back to, and neither is
 # something a chart will accept. Overridable, because building the assets to
 # look at them is a reasonable thing to want: DIST_VERSION=0.0.0-dev.
+# The version arrives from "git describe", so it is a tag name, and a tag name
+# may carry shell syntax: the ref format refuses a space and a handful of
+# characters and permits "$", "(" and ")". A value substituted into a recipe
+# becomes script text, so this one is read from the environment instead, where
+# the shell treats it as data.
+#
+# Everything downstream interpolates it freely, and may: past this target the
+# value has matched the pattern below, which admits digits, dots and a
+# restricted suffix and nothing a shell acts on. Which is why every target that
+# builds a name from it asks for this one first.
+dist-version: export CHECKED_VERSION = $(DIST_VERSION)
 dist-version:
-	@case "$(DIST_VERSION)" in \
-	  *-dirty) echo "the tree is dirty, so $(DIST_VERSION) names no commit anybody else can get"; exit 1 ;; \
+	@case "$$CHECKED_VERSION" in \
+	  *-dirty) echo "the tree is dirty, so $$CHECKED_VERSION names no commit anybody else can get"; exit 1 ;; \
 	esac
-	@printf '%s' "$(DIST_VERSION)" \
+	@printf '%s' "$$CHECKED_VERSION" \
 	  | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)*$$' \
-	  || { echo "$(DIST_VERSION) is not a version a chart can carry: tag the commit, or pass DIST_VERSION=0.0.0-dev"; exit 1; }
+	  || { echo "that is not a version a chart can carry: tag the commit, or pass DIST_VERSION=0.0.0-dev"; exit 1; }
 
 dist-clean:
 	@rm -rf $(DIST_DIR)
@@ -319,7 +330,7 @@ dist-clean:
 # pure Go and cgo is off, so every supported architecture builds here in
 # seconds and none of them needs emulation.
 dist-binaries: STAMP_VERSION := $(DIST_VERSION)
-dist-binaries:
+dist-binaries: dist-version
 	@mkdir -p $(DIST_DIR)
 	@set -e; for arch in $(DIST_ARCHES); do \
 	  name=openpsirt_$(DIST_VERSION)_linux_$$arch; \
@@ -339,7 +350,7 @@ dist-binaries:
 # version committed to a file is the one somebody forgets to move — the same
 # reason pins-check exists. Stamping at package time means the tag is the only
 # thing that has to be right.
-dist-chart:
+dist-chart: dist-version
 	@mkdir -p $(DIST_DIR)
 	@command -v helm >/dev/null 2>&1 \
 	  || { echo "helm is needed to package the chart"; exit 1; }
@@ -353,7 +364,7 @@ dist-chart:
 # for other people's software, and REQ-04 is the same promise kept about our
 # own. They are read out of the image rather than rebuilt here, because the
 # image is what the inventories are about.
-dist-inventories:
+dist-inventories: dist-version
 	@mkdir -p $(DIST_DIR)
 	@command -v $(DOCKER) >/dev/null 2>&1 \
 	  || { echo "$(DOCKER) is needed to read the inventories out of the image"; exit 1; }
@@ -375,7 +386,7 @@ dist-inventories:
 
 # One file covering every other, so a download can be checked without holding
 # a signature or trusting the page it came from.
-dist-sums:
+dist-sums: dist-version
 	@cd $(DIST_DIR) && rm -f SHA256SUMS \
 	  && sha256sum $$(ls -1 | sort) > SHA256SUMS
 	@echo "  SHA256SUMS"
@@ -395,7 +406,7 @@ dist-sums:
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
 # named for what it signs, not for the release.
-dist-verify:
+dist-verify: dist-version
 	@command -v jq >/dev/null 2>&1 \
 	  || { echo "jq is needed to read the version out of an inventory"; exit 1; }
 	@set -e; fail=0; skipped=; \
@@ -927,38 +938,61 @@ pins-check:
 	  echo "the image has $$defaults version defaults and they differ, so an"; \
 	  echo "unpassed build says one thing in the binary and another in its SBOM."; \
 	  fail=1; }; \
-	pinned=$$(grep -cE '^[A-Za-z0-9][^ ]*==' docs/requirements.txt); \
-	hashed=$$(grep -cE '^[A-Za-z0-9][^ ]*==.*\\$$' docs/requirements.txt); \
+	# Every count is taken with "|| true": grep exits 1 on a count of zero, \
+	# recipes run under -e, and a check that dies on the empty case is one \
+	# that says nothing where it has the most to say. \
+	pinned=$$(grep -cE '^[A-Za-z0-9][^ ]*==' docs/requirements.txt || true); \
+	hashed=$$(grep -cE '^[A-Za-z0-9][^ ]*==.*\\$$' docs/requirements.txt || true); \
 	[ "$$pinned" -gt 0 ] || { \
 	  echo "docs/requirements.txt names no packages, so nothing about it is pinned."; fail=1; }; \
 	[ "$$pinned" = "$$hashed" ] || { \
 	  echo "$$pinned packages are named in docs/requirements.txt and $$hashed carry a hash."; \
 	  echo "Regenerate it from docs/requirements.in rather than editing it:"; \
-	  echo "  pip-compile --generate-hashes --output-file docs/requirements.txt docs/requirements.in"; \
+	  echo "  pip-compile --generate-hashes --no-index --output-file=docs/requirements.txt docs/requirements.in"; \
 	  fail=1; }; \
+	asked=0; \
 	for wanted in $$(grep -E '^[A-Za-z0-9]' docs/requirements.in); do \
+	  asked=$$((asked + 1)); \
 	  grep -q "^$$wanted " docs/requirements.txt || { \
 	    echo "docs/requirements.in asks for $$wanted and the lock beside it does not."; fail=1; }; \
 	done; \
+	[ "$$asked" -gt 0 ] || { \
+	  echo "docs/requirements.in asks for nothing, so the lock was compared against nothing."; fail=1; }; \
+	installs=0; \
 	for flow in .github/workflows/*.yml; do \
-	  grep -q 'pip install' "$$flow" || continue; \
-	  grep -q 'pip install --require-hashes' "$$flow" || { \
-	    echo "$$flow installs the documentation closure without --require-hashes,"; \
-	    echo "so the hashes beside every package buy that job nothing."; fail=1; }; \
+	  bare=$$(grep -c 'pip install' "$$flow" || true); \
+	  [ "$$bare" -gt 0 ] || continue; \
+	  installs=$$((installs + bare)); \
+	  hashes=$$(grep -c 'pip install --require-hashes' "$$flow" || true); \
+	  [ "$$bare" = "$$hashes" ] || { \
+	    echo "$$flow installs the documentation closure $$bare times and $$hashes of those"; \
+	    echo "require hashes, so the hashes beside every package buy that job nothing."; fail=1; }; \
 	done; \
-	python=$$(awk -F"'" '/python-version:/{print $$2}' .github/workflows/*.yml | sort -u | tr '\n' ' '); \
+	[ "$$installs" -gt 0 ] || { \
+	  echo "no workflow installs the documentation closure, so --require-hashes was checked nowhere."; \
+	  fail=1; }; \
+	python=$$(awk -F': ' '/python-version:/{gsub(/['"'"'" ]/, "", $$2); print $$2}' \
+	  .github/workflows/*.yml | sort -u | tr '\n' ' '); \
+	lock=$$(awk '/autogenerated by pip-compile with Python /{print $$NF; exit}' docs/requirements.txt); \
+	[ -n "$$python" ] || { \
+	  echo "no workflow names a Python version, so the lock was compared against nothing."; fail=1; }; \
+	[ -n "$$lock" ] || { \
+	  echo "docs/requirements.txt does not say which Python resolved it."; fail=1; }; \
 	case "$$python" in \
 	  *" "*" "*) echo "the workflows build the documentation on more than one Python: $$python."; \
 	    echo "The lock was resolved on one of them."; fail=1 ;; \
+	  "$$lock "*) ;; \
+	  *) echo "the workflows use Python $${python% } and the lock was resolved on $$lock."; fail=1 ;; \
 	esac; \
-	kept=$$(mktemp -d); \
-	trap 'cp "$$kept"/go.mod go.mod; cp "$$kept"/go.sum go.sum; rm -rf "$$kept"' EXIT INT TERM; \
+	kept=$$(mktemp -d) || { echo "no temporary directory, so go.mod could not be kept"; exit 1; }; \
+	trap 'cp "$$kept"/go.mod go.mod; cp "$$kept"/go.sum go.sum; rm -rf "$$kept"' EXIT; \
+	trap 'exit 130' INT TERM; \
 	cp go.mod go.sum "$$kept"/; \
 	$(GO) mod tidy; \
 	cmp -s go.mod "$$kept"/go.mod && cmp -s go.sum "$$kept"/go.sum || { \
 	  echo "go.mod or go.sum is not what go mod tidy produces: a dependency is"; \
 	  echo "declared that nothing imports, or one is imported and not declared."; \
-	  echo "A requirement nothing uses stays in the vulnerability and licence"; \
+	  echo "A requirement nothing uses stays in the vulnerability and license"; \
 	  echo "surface for code that never runs. Run go mod tidy and commit it."; \
 	  fail=1; }; \
 	[ "$$fail" = 0 ] || exit 1
@@ -1057,14 +1091,20 @@ else
 	@# read as the refusal — so an unrelated fault reachable under one value
 	@# combination looked exactly like the guard working, and the success line
 	@# below printed anyway.
-	@for missing in \
+	@refusals=0; \
+	for missing in \
 	  "no database|needs a database|" \
 	  "nobody can administer|set auth.bootstrapAdmins|--set database.existingSecret=s" \
 	  "no way to sign in|configure a way to sign in|--set database.existingSecret=s --set auth.bootstrapAdmins={admin}" \
 	  "no address to return to|set auth.baseURL|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.oidc.issuer=https://id.example.com" \
 	  "a header anybody can set|set auth.trustedHeader.sources|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User" \
 	  "half a mail configuration|set mail.server and mail.from together|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587" \
-	  "a password that is never sent|set mail.username|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.password=shh"; do \
+	  "a password that is never sent|set mail.username|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.password=shh" \
+	  "a provider and no client secret|set auth.oidc.clientSecret|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc" \
+	  "a provider and no username claim|set auth.oidc.usernameClaim|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.clientSecret=shh" \
+	  "a GitHub app and no client secret|set auth.github.clientSecret|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh" \
+	  "a secret given twice|not both|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh --set auth.oidc.existingSecret=mine"; do \
+	  refusals=$$((refusals + 1)); \
 	  what="$${missing%%|*}"; rest="$${missing#*|}"; \
 	  expect="$${rest%%|*}"; args="$${rest#*|}"; \
 	  out=$$(helm template t deploy/helm/openpsirt $$args 2>&1) && { \
@@ -1074,8 +1114,10 @@ else
 	    *) echo "the chart refused an install with $$what for the wrong reason:"; \
 	       echo "$$out"; exit 1;; \
 	  esac; \
-	done
-	@echo "the chart refuses every install that could not be signed into, and every mail configuration that would send nothing, each for the reason it names"
+	done; \
+	  [ "$$refusals" -gt 0 ] || { echo "no refusal was examined, so this checked nothing"; exit 1; }; \
+	  echo "  $$refusals installs the chart has to refuse, each for the reason it names"
+	@echo "the chart refuses every install that could not be signed into or could not start, and every mail configuration that would send nothing"
 	@# The refusals above assert that an install the chart cannot serve fails
 	@# at render. These assert the other half: that a legal one renders a
 	@# reference something answers. A secretKeyRef naming a Secret nothing
@@ -1083,45 +1125,64 @@ else
 	@# that can never start — the same failure the refusals exist to prevent,
 	@# one step later and with no message anybody reads.
 	@#
-	@# Each row is what to install, the variable to look at, and the Secret and
-	@# key its reference must name — or "none" where there must be no reference
-	@# at all, because a provider that takes no client secret is a
-	@# configuration the binary supports.
-	@base="--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://psirt.example.com"; \
-	for want in \
-	  "a provider with no client secret|OPENPSIRT_OIDC_CLIENT_SECRET|none|--set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc" \
-	  "a client secret the chart holds|OPENPSIRT_OIDC_CLIENT_SECRET|t-openpsirt-oidc oidc-client-secret|--set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.clientSecret=shh --set auth.oidc.existingSecretKey=theirs" \
-	  "a client secret the operator holds|OPENPSIRT_OIDC_CLIENT_SECRET|mine theirs|--set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.existingSecret=mine --set auth.oidc.existingSecretKey=theirs" \
-	  "a GitHub app with no client secret|OPENPSIRT_GITHUB_CLIENT_SECRET|none|--set auth.github.clientID=gh" \
-	  "a GitHub client secret the chart holds|OPENPSIRT_GITHUB_CLIENT_SECRET|t-openpsirt-github github-client-secret|--set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.existingSecretKey=theirs" \
-	  "a mail password the chart holds|OPENPSIRT_MAIL_PASSWORD|t-openpsirt-mail mail-password|--set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh --set mail.existingSecretKey=theirs"; do \
-	  what="$${want%%|*}"; rest="$${want#*|}"; \
-	  named="$${rest%%|*}"; rest="$${rest#*|}"; \
-	  expect="$${rest%%|*}"; args="$${rest#*|}"; \
+	@# Read out of the render rather than compared against a list written
+	@# here: a fifth secret source added later gets no row in a list and the
+	@# check stays green on exactly the defect it is for. Every reference a
+	@# legal install renders is resolved against the Secrets that same install
+	@# creates, and the count of what was examined is printed, because a walk
+	@# that found nothing looks like a walk that found nothing wrong.
+	@#
+	@# Every value is held by the chart in these, because a Secret the
+	@# operator manages is not in the render and a reference to one cannot be
+	@# resolved here. That arm is asserted below, against what they named.
+	@set -e; base="--set auth.bootstrapAdmins={admin} --set auth.baseURL=https://psirt.example.com"; \
+	refs=0; \
+	for install in \
+	  "a database URL the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}" \
+	  "an OIDC secret the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh" \
+	  "a GitHub secret the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.github.clientID=gh --set auth.github.clientSecret=shh" \
+	  "a mail password the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh" \
+	  "every secret the chart holds at once|--set database.url=postgres://u:p@h:5432/d --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh"; do \
+	  what="$${install%%|*}"; args="$${install#*|}"; \
 	  out=$$(helm template t deploy/helm/openpsirt $$base $$args) \
 	    || { echo "the chart refused $$what:"; echo "$$out"; exit 1; }; \
-	  got=$$(printf '%s\n' "$$out" | awk -v want="$$named" \
-	    '$$0 ~ "name: " want "$$" {f=1; next} \
-	     f && /secretKeyRef:/ {g=1; next} \
-	     g && /name:/ {n=$$2; next} \
-	     g && /key:/ {print n, $$2; exit}'); \
-	  [ -n "$$got" ] || got=none; \
-	  [ "$$got" = "$$expect" ] || { \
-	    echo "with $$what the chart asks for [$$got] where it should ask for [$$expect]"; \
-	    exit 1; }; \
-	done
-	@# The database has no "none" case: an install with no database is refused
-	@# above, so every render carries this one.
-	@out=$$(helm template t deploy/helm/openpsirt --set database.url=postgres://u:p@h:5432/d \
-	  --set database.existingSecretKey=theirs --set auth.bootstrapAdmins={admin} \
-	  --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}); \
-	  got=$$(printf '%s\n' "$$out" | awk \
-	    '$$0 ~ "name: OPENPSIRT_DATABASE_URL$$" {f=1; next} \
-	     f && /secretKeyRef:/ {g=1; next} \
-	     g && /name:/ {n=$$2; next} \
-	     g && /key:/ {print n, $$2; exit}'); \
-	  [ "$$got" = "t-openpsirt-database database-url" ] || { \
-	    echo "with a database URL the chart holds, it asks for [$$got]"; exit 1; }
+	  written=$$(printf '%s\n' "$$out" | awk '\
+	    /^kind: Secret$$/ {secret=1; next} \
+	    /^---/ {secret=0; holds=0; next} \
+	    secret && /^  name:/ {name=$$2; next} \
+	    secret && /^stringData:$$/ {holds=1; next} \
+	    holds && /^  [A-Za-z0-9_-]+:/ {key=$$1; sub(":", "", key); print name "/" key}' | tr '\n' ' '); \
+	  found=$$(printf '%s\n' "$$out" | awk '\
+	    /secretKeyRef:/ {ref=1; next} \
+	    ref && /name:/ {name=$$2; next} \
+	    ref && /key:/ {print name "/" $$2; ref=0}'); \
+	  [ -n "$$found" ] || { echo "$$what renders no secret reference at all"; exit 1; }; \
+	  for one in $$found; do \
+	    refs=$$((refs + 1)); \
+	    case " $$written " in \
+	      *" $$one "*) ;; \
+	      *) echo "with $$what the chart asks for $$one and creates [$$written]"; exit 1 ;; \
+	    esac; \
+	  done; \
+	done; \
+	[ "$$refs" -gt 0 ] || { echo "no secret reference was examined, so this checked nothing"; exit 1; }; \
+	echo "  $$refs secret references, every one of them answered by a Secret the same install writes"
+	@# The operator's own Secret is the other arm, and cannot be resolved
+	@# inside the render because it is theirs. What is asserted there is that
+	@# the reference names what they named, rather than the chart's own key.
+	@set -e; out=$$(helm template t deploy/helm/openpsirt \
+	  --set database.existingSecret=s --set auth.bootstrapAdmins={admin} \
+	  --set auth.baseURL=https://psirt.example.com \
+	  --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc \
+	  --set auth.oidc.usernameClaim=sub \
+	  --set auth.oidc.existingSecret=mine --set auth.oidc.existingSecretKey=theirs); \
+	  got=$$(printf '%s\n' "$$out" | awk '\
+	    $$0 ~ "name: OPENPSIRT_OIDC_CLIENT_SECRET$$" {f=1; next} \
+	    f && /secretKeyRef:/ {g=1; next} \
+	    g && /name:/ {n=$$2; next} \
+	    g && /key:/ {print n, $$2; exit}'); \
+	  [ "$$got" = "mine theirs" ] \
+	    || { echo "with a Secret the operator holds, the chart asks for [$$got]"; exit 1; }
 	@echo "every secret the chart renders a reference to is one it creates, under the key it wrote"
 endif
 

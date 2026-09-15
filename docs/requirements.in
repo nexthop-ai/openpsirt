@@ -1,7 +1,7 @@
 # What the documentation site is built with. Pinned to what was verified
 # locally; update by moving a version here and regenerating the lock beside it:
 #
-#   pip-compile --generate-hashes --output-file docs/requirements.txt docs/requirements.in
+#   pip-compile --generate-hashes --no-index --output-file=docs/requirements.txt docs/requirements.in
 #
 # Run it on the Python the workflows use, which is the version they pin.
 mkdocs-material==9.7.7

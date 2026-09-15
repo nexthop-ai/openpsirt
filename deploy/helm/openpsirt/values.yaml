@@ -94,22 +94,29 @@ auth:
     issuer: ""
     clientID: ""
     # Set clientSecret here and the chart puts it in a Secret, or name one you
-    # manage yourself. A secret in values.yaml ends up in your release history
-    # and probably in version control. Leave both empty for a provider that
-    # takes no client secret — nothing is then asked for.
+    # manage yourself — one of the two, never both. A secret in values.yaml
+    # ends up in your release history and probably in version control. The
+    # process refuses to start without one, so an install that names an issuer
+    # and no secret is refused here rather than becoming a pod that never
+    # starts.
     clientSecret: ""
     existingSecret: ""
     existingSecretKey: "oidc-client-secret"
-    # Which claim carries the username, and which carries group membership.
-    # Empty means the provider's usual one.
+    # Which claim carries the username. **Required**, with no default: it is
+    # what an authorization written for somebody who has not signed in yet is
+    # redeemed against, and a provider that lets people choose their own is a
+    # question only this deployment's operator can answer. The configuration
+    # reference names the usual answer for each provider.
     usernameClaim: ""
+    # Which claim carries group membership. Empty means the provider's usual
+    # one.
     groupsClaim: ""
 
   # Sign-in through GitHub. Leave clientID empty to skip. Not to be set
   # alongside oidc.issuer above.
   github:
     clientID: ""
-    # As above: set one here, name one you manage, or leave both empty.
+    # As above: one of the two, never both, and one is required.
     clientSecret: ""
     existingSecret: ""
     existingSecretKey: "github-client-secret"

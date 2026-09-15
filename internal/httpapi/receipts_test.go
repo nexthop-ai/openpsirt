@@ -365,7 +365,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 				"state": queue.Done, "attempts": 1, "max_attempts": 5,
 				"run_after": at, "created_at": at, "updated_at": at,
 			}
-			if _, err := r.db.DB.NewInsert().Model(&done).TableExpr("job").
+			if _, err := r.db.DB.NewInsert().Model(&done).TableExpr("\"job\"").
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -469,7 +469,7 @@ func TestAKeyThatReadsNoFindingsIsToldNothingAboutWhatARunChanged(t *testing.T) 
 		}
 		// A run over that upload, finished, so the receipt has one to report.
 		var target int64
-		if err := f.db.DB.NewSelect().TableExpr("target").Column("id").
+		if err := f.db.DB.NewSelect().TableExpr("\"target\"").Column("id").
 			Limit(1).Scan(t.Context(), &target); err != nil {
 			t.Fatal(err)
 		}
@@ -477,7 +477,7 @@ func TestAKeyThatReadsNoFindingsIsToldNothingAboutWhatARunChanged(t *testing.T) 
 			"target_id": target, "scanner": "test", "ran_here": true,
 			"started_at": time.Now().UTC().Add(-time.Minute), "finished_at": time.Now().UTC(),
 		}
-		if _, err := f.db.DB.NewInsert().Model(&run).TableExpr("scan_run").
+		if _, err := f.db.DB.NewInsert().Model(&run).TableExpr("\"scan_run\"").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

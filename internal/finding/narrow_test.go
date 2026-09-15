@@ -159,7 +159,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 			t.Fatal(err)
 		}
 		var issueID int64
-		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS v").
+		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS \"v\"").
 			Column("v.id").Where("v.identifier = ?", "CVE-2026-1").
 			Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)
@@ -186,7 +186,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 				"component_upstream_version": swss.Version,
 				"live_key":                   "elsewhere-live-key",
 			}).
-			TableExpr("decision").Exec(ctx); err != nil {
+			TableExpr("\"decision\"").Exec(ctx); err != nil {
 			// A row this test cannot write is a reason to fail: skipping would
 			// make it green in exactly the case where it proves nothing.
 			t.Fatalf("could not record a claim in another product: %v", err)
@@ -382,7 +382,7 @@ func (f *fixture) decided(t *testing.T, by, issueID int64, place, state, compone
 		// which a place identity fills on its own.
 		row["live_key"] = key
 	}
-	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr("decision").Exec(t.Context()); err != nil {
+	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr("\"decision\"").Exec(t.Context()); err != nil {
 		t.Fatalf("record a %s claim: %v", state, err)
 	}
 }
@@ -410,7 +410,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 			t.Fatal(err)
 		}
 		var issueID int64
-		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS v").
+		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS \"v\"").
 			Column("v.id").Where("v.identifier = ?", "CVE-2026-1").
 			Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)
@@ -438,7 +438,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 				row["component_upstream_version"] = swss.Version
 			}
 			if _, err := f.db.DB.NewInsert().Model(&row).
-				TableExpr("decision").Exec(ctx); err != nil {
+				TableExpr("\"decision\"").Exec(ctx); err != nil {
 				t.Fatalf("record a %s claim: %v", state, err)
 			}
 		}
@@ -596,11 +596,11 @@ func claimSaying(t *testing.T, db *database.DB, personID int64, outcome string) 
 			"kind": "finding", "proposed_by": personID, "proposed_at": time.Now().UTC(),
 			"outcome": outcome,
 		}).
-		TableExpr("claim").Exec(ctx); err != nil {
+		TableExpr("\"claim\"").Exec(ctx); err != nil {
 		t.Fatalf("record a claim: %v", err)
 	}
 	var id int64
-	if err := db.DB.NewSelect().TableExpr("claim").ColumnExpr("MAX(id)").Scan(ctx, &id); err != nil {
+	if err := db.DB.NewSelect().TableExpr("\"claim\"").ColumnExpr("MAX(id)").Scan(ctx, &id); err != nil {
 		t.Fatalf("read the claim back: %v", err)
 	}
 	return id
@@ -968,7 +968,7 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 				"sent_back_at":               time.Now().UTC(),
 			}
 			if _, err := f.db.DB.NewInsert().Model(&row).
-				TableExpr("decision").Exec(ctx); err != nil {
+				TableExpr("\"decision\"").Exec(ctx); err != nil {
 				t.Fatalf("record a claim sent back: %v", err)
 			}
 		}

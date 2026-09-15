@@ -160,11 +160,11 @@ func destinationFault(line int, destination string) (Fault, bool) {
 
 // issueFault judges what an issue reference names.
 //
-// Judged at submission for the reason an attachment reference is: the half
-// that lists what a text refers to recognizes only an identifier, so a
-// destination the scheme accepted and that half ignores is a dead link nothing
-// reports — accepted when it was written and pointing at nothing when anybody
-// read it.
+// Judged at submission for the reason an attachment reference is: a
+// destination the scheme accepts and no identifier can address is a dead link
+// from the moment it is typed, and the writer is here to be told. Left to
+// whoever renders the text later, it is a link that goes nowhere and nothing
+// reports it.
 //
 // It does not ask whether we have that issue. Somebody writing about a flaw we
 // have not seen yet is writing something true, and refusing it would make the

@@ -94,8 +94,12 @@ func TestATableIsReportedOnlyWhereItIsWrittenBare(t *testing.T) {
 	}{
 		{"a bare table after FROM", `SELECT 1 FROM finding`, []string{"finding"}},
 		{"a bare table after JOIN", `JOIN component AS "c" ON c.id = f.component_id`, []string{"component"}},
+		{"a bare table after INTO", `INSERT INTO finding ("id") VALUES (?)`, []string{"finding"}},
+		{"a bare table after UPDATE", `UPDATE component SET "name" = ?`, []string{"component"}},
 		{"a bare table opening a table expression", `finding AS "f"`, []string{"finding"}},
 		{"a quoted table", `SELECT 1 FROM "finding"`, nil},
+		{"a quoted table after INTO", `INSERT INTO "finding" ("id") VALUES (?)`, nil},
+		{"a quoted table after UPDATE", `UPDATE "component" SET "name" = ?`, nil},
 		{"a quoted table opening one", `"finding" AS "f"`, nil},
 		{"a column of the same name as a table", `component = ?`, nil},
 		{"a qualified column", `finding.id = ?`, nil},
@@ -175,6 +179,33 @@ func q() {
 		}
 		if got := assembledFrom(call.Args[0]); got != c.want {
 			t.Errorf("%s: read %q, want %q", c.what, got, c.want)
+		}
+	}
+}
+
+func TestWhatIsReadAsAStatementAtAll(t *testing.T) {
+	// The alias half is applied only to a literal this recognizes as SQL,
+	// because "as" is a word in nearly every English sentence in this
+	// repository — a version that read them reported eighteen names, every
+	// one of them prose. The marker is a quoted table, which appears in a
+	// query and not in a sentence.
+	//
+	// The table half deliberately does not wait for it: a query whose tables
+	// are all bare carries no marker, and that is the query nothing was
+	// looking at.
+	for _, c := range []struct {
+		what string
+		text string
+		want bool
+	}{
+		{"a query naming a quoted table", `SELECT 1 FROM "finding" AS f`, true},
+		{"a join onto a quoted table", `JOIN "component" AS c ON c.id = f.id`, true},
+		{"a query whose tables are bare", `SELECT id FROM job WHERE kind = ?`, false},
+		{"a sentence using the word from", `read from the document as it arrived`, false},
+		{"a sentence about a table", `the index's table reads as %q`, false},
+	} {
+		if got := statement.MatchString(c.text); got != c.want {
+			t.Errorf("%s: read as a statement=%v, want %v", c.what, got, c.want)
 		}
 	}
 }

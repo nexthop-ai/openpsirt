@@ -79,13 +79,22 @@ var statement = regexp.MustCompile(`(?i)\b(?:FROM|JOIN)\s+"`)
 
 // declared matches a bare schema identifier in data-definition language.
 //
+// The existence clause is stepped over rather than read as a name: "DROP TABLE
+// IF EXISTS" declares nothing called "if", and reporting one is how a check
+// that reads text rather than parsing it goes wrong.
+//
 // **Only inside the migrations**, where every string is DDL by construction,
 // so the false positives that keep this check narrow elsewhere cannot arise.
 // The alias pattern above cannot see these at all — a `DROP TABLE` names no
 // alias and contains no AS — so a table renamed to something one engine
 // reserves passed the gate that exists to catch exactly that.
 var declared = regexp.MustCompile(
-	`(?i)\b(?:TABLE|INDEX|COLUMN|CONSTRAINT|REFERENCES)\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
+	`(?i)\b(?:TABLE|INDEX|COLUMN|CONSTRAINT|REFERENCES)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)\b`)
+
+// clause is the words that stand between one of those keywords and the name,
+// which are grammar rather than identifiers: "DROP TABLE IF EXISTS x" declares
+// nothing called "if".
+var clause = map[string]bool{"if": true, "not": true, "exists": true}
 
 // creating matches a table the migrations declare, quoted as they all are.
 //
@@ -104,12 +113,23 @@ var creating = regexp.MustCompile(`(?i)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s
 // table whose name an engine reserves would be refused by that engine alone.
 var named = regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE)\s+("?)([A-Za-z_][A-Za-z0-9_]*)`)
 
-// opening matches a table expression, which names its table first and then
-// aliases it. The alias is what tells it from a condition: a literal beginning
-// with a word this schema has a table of is usually a column of that name or a
-// qualified one, and only "<table> AS" is the table itself.
+// opening matches a table expression, which names its table and then aliases
+// it. The alias is what tells it from a condition: a literal beginning with a
+// word this schema has a table of is otherwise a column of that name or a
+// qualified one.
 
 var opening = regexp.MustCompile(`(?i)\A\s*("?)([A-Za-z_][A-Za-z0-9_]*)"?\s+AS\b`)
+
+// alone matches a literal that is a table name and nothing else.
+//
+// Only ever applied to an argument of a method that names a table, because a
+// literal that is one bare word is a constant nearly everywhere else: "person"
+// is a kind of subject in three packages before it is a table.
+var alone = regexp.MustCompile(`\A\s*("?)([A-Za-z_][A-Za-z0-9_]*)"?\s*\z`)
+
+// naming is the builder's methods whose argument is a table rather than a
+// clause, which is what makes a bare word in one of them an identifier.
+var naming = map[string]bool{"TableExpr": true, "Table": true, "ModelTableExpr": true}
 
 // aliased matches the table alias a model declares in its struct tag.
 //
@@ -191,7 +211,10 @@ func main() {
 	fset := token.NewFileSet()
 	// web holds the interface, which writes no SQL: it asks this server.
 	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
-		if strings.HasSuffix(path, "_test.go") {
+		// This checker's own tests are written out of what it reports: a bare
+		// table in a fixture is the input, not a defect. One directory rather
+		// than a pattern, so nothing else inherits the exemption.
+		if strings.Contains(path, "internal/tools/reserved") {
 			return nil
 		}
 		file, err := parser.ParseFile(fset, path, nil, 0)
@@ -202,7 +225,13 @@ func main() {
 		// migration rather than from the file, because the prose beside them
 		// is full of the same words — and with the SQL comments inside those
 		// strings taken off first, for the same reason.
-		definitions := strings.Contains(path, "database/migrate/migrations/")
+		// The data-definition half reads the migrations and not their tests:
+		// every string in a migration is DDL, and a test beside them writes
+		// English about what it declared — "the index's table reads as" is a
+		// sentence, and read as a declaration it names a word two engines
+		// reserve.
+		definitions := strings.Contains(path, "database/migrate/migrations/") &&
+			!strings.HasSuffix(path, "_test.go")
 		// Every SQL literal, wherever it is written. A pass of its own, and
 		// first, so the walk below can tell whether a literal it reaches has
 		// already been read as a statement in its own right — a node is
@@ -217,16 +246,24 @@ func main() {
 			if err != nil {
 				text = lit.Value
 			}
-			if !statement.MatchString(withoutSQLComments(text)) {
+			text = withoutSQLComments(text)
+			at := fset.Position(lit.Pos()).Line
+			// The table half reads every literal, because what admits one is
+			// this schema's own table names rather than a marker: a query
+			// whose tables are all bare carries no quoted table to be
+			// recognized by, and that is exactly the query nothing looked at.
+			if !definitions {
+				bad = append(bad, unquotedTables(text, schema, path, at)...)
+			}
+			// The alias half still needs the marker. An invented name is any
+			// bare word after AS, and "as" is a word in nearly every English
+			// sentence in this repository.
+			if !statement.MatchString(text) {
 				return true
 			}
-			at := fset.Position(lit.Pos()).Line
 			seen[at] = true
-			for _, match := range invented.FindAllStringSubmatch(withoutSQLComments(text), -1) {
+			for _, match := range invented.FindAllStringSubmatch(text, -1) {
 				bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
-			}
-			if !definitions {
-				bad = append(bad, unquotedTables(withoutSQLComments(text), schema, path, at)...)
 			}
 			return true
 		})
@@ -240,7 +277,7 @@ func main() {
 					}
 					for _, match := range declared.FindAllStringSubmatch(withoutSQLComments(text), -1) {
 						word := strings.ToLower(match[1])
-						if reserved[word] {
+						if reserved[word] && !clause[word] {
 							bad = append(bad, found{
 								word: word, file: path,
 								line: fset.Position(lit.Pos()).Line,
@@ -275,6 +312,19 @@ func main() {
 				text, at, ok := literal(fset, arg)
 				if !ok {
 					continue
+				}
+				// A table expression may be the table and nothing else, which
+				// no pattern over the text alone can tell from a constant.
+				if naming[named.Sel.Name] && !definitions {
+					if match := alone.FindStringSubmatch(text); match != nil {
+						word := strings.ToLower(match[2])
+						if match[1] != `"` && schema[word] {
+							bad = append(bad, found{
+								word: word, file: path, line: at,
+								table: true, bare: true,
+							})
+						}
+					}
 				}
 				if seen[at] {
 					continue // already read as a statement in its own right

@@ -15,7 +15,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Database engines](#database-engines)
 - [Test databases](#test-databases)
 - [Pinned pairs](#pinned-pairs)
-- [Every ecosystem is pinned by hash](#every-ecosystem-is-pinned-by-hash)
+- [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
 - [Static analysis](#static-analysis)
 - [What a gate reads](#what-a-gate-reads)
 - [Licenses](#licenses)
@@ -378,7 +378,7 @@ version.
 | The image no longer picks up a Go release by itself | Dependabot watches the images and a bump arrives as a pull request |
 | A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities, and now reports them about the toolchain both artifacts are built with rather than about one of the two |
 
-## Every ecosystem is pinned by hash
+## Hash pinning per ecosystem
 
 | Ecosystem | What names the bytes |
 |---|---|

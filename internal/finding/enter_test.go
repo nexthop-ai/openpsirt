@@ -174,7 +174,7 @@ func TestARecordedFlawSaysWhatItIsAndWhereItIs(t *testing.T) {
 			t.Fatal(err)
 		}
 		var name string
-		if err := f.db.DB.NewSelect().TableExpr("\"component\" AS c").
+		if err := f.db.DB.NewSelect().TableExpr("\"component\" AS \"c\"").
 			ColumnExpr("c.name").Where("c.id = ?", row.ComponentID).
 			Scan(t.Context(), &name); err != nil {
 			t.Fatal(err)
@@ -232,7 +232,7 @@ func TestRecordingAgainstANameTheBuildHoldsTwiceIsRefusedRatherThanGuessed(t *te
 			t.Fatalf("naming the version: %v", err)
 		}
 		var version string
-		if err := f.db.DB.NewSelect().TableExpr("\"component\" AS c").
+		if err := f.db.DB.NewSelect().TableExpr("\"component\" AS \"c\"").
 			ColumnExpr("c.version").Where("c.id = ?", row.ComponentID).
 			Scan(t.Context(), &version); err != nil {
 			t.Fatal(err)

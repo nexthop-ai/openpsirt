@@ -119,9 +119,9 @@ func TestARunIsAttributedToOneUploadHoweverThePageFalls(t *testing.T) {
 func quietTarget(t *testing.T, s *ingest.Store, productID int64) int64 {
 	t.Helper()
 	var id int64
-	if err := s.DB().NewSelect().TableExpr("\"target\" AS tg").
-		Join("JOIN \"stream\" AS st ON st.id = tg.stream_id").
-		Join("JOIN \"variant\" AS v ON v.id = tg.variant_id").
+	if err := s.DB().NewSelect().TableExpr("\"target\" AS \"tg\"").
+		Join("JOIN \"stream\" AS \"st\" ON st.id = tg.stream_id").
+		Join("JOIN \"variant\" AS \"v\" ON v.id = tg.variant_id").
 		Column("tg.id").
 		Where("st.product_id = ?", productID).
 		Where("v.name = ?", "mellanox").
@@ -158,7 +158,7 @@ func file(t *testing.T, s *ingest.Store, target int64, hash string, at time.Time
 		"state": queue.Done, "attempts": 1, "max_attempts": 5,
 		"run_after": at, "created_at": at, "updated_at": at,
 	}
-	if _, err := s.DB().NewInsert().Model(&job).TableExpr("job").
+	if _, err := s.DB().NewInsert().Model(&job).TableExpr("\"job\"").
 		Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func finishRunWith(t *testing.T, s *ingest.Store, target int64, at time.Time,
 		"scanner_version": scannerVersion, "database_version": databaseVersion,
 		"started_at": at.Add(-time.Minute), "finished_at": at, "failure": failure,
 	}
-	if _, err := s.DB().NewInsert().Model(&row).TableExpr("scan_run").
+	if _, err := s.DB().NewInsert().Model(&row).TableExpr("\"scan_run\"").
 		Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}

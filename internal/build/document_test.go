@@ -14,6 +14,7 @@ import (
 var (
 	documented = regexp.MustCompile("`make ([a-z][a-z-]*)`")
 	printed    = regexp.MustCompile(`"([a-z][a-z-]*)"`)
+	named      = regexp.MustCompile("`internal/([a-z][a-z0-9]*)/`")
 )
 
 // buildDocument returns DESIGN-build.md, which is the one document that
@@ -39,24 +40,39 @@ func TestTheLayoutTableNamesEveryPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	document := buildDocument(t)
-	var unnamed []string
-	packages := 0
+	here := map[string]bool{}
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		packages++
-		if !strings.Contains(document, "`internal/"+entry.Name()+"/`") {
-			unnamed = append(unnamed, entry.Name())
+		if entry.IsDir() {
+			here[entry.Name()] = true
 		}
 	}
-	if packages == 0 {
+	if len(here) == 0 {
 		t.Fatal("no packages were found under internal, so this checked nothing")
 	}
+	var unnamed []string
+	for name := range here {
+		if !strings.Contains(document, "`internal/"+name+"/`") {
+			unnamed = append(unnamed, name)
+		}
+	}
+	// And the other direction, which is the one that rots quietly: a package
+	// is renamed, the row that named it stays, and the table sends a reader
+	// somewhere that is not there while every check stays green.
+	var gone []string
+	for _, found := range named.FindAllStringSubmatch(document, -1) {
+		if !here[found[1]] {
+			gone = append(gone, found[1])
+		}
+	}
 	sort.Strings(unnamed)
+	sort.Strings(gone)
 	if len(unnamed) > 0 {
 		t.Errorf("under internal and named nowhere in DESIGN-build.md, so somebody looking for %s finds no row:\n  %s",
 			plural(len(unnamed)), strings.Join(unnamed, "\n  "))
+	}
+	if len(gone) > 0 {
+		t.Errorf("named by DESIGN-build.md and not under internal, so the table sends a reader to %s:\n  %s",
+			plural(len(gone)), strings.Join(gone, "\n  "))
 	}
 }
 
@@ -81,10 +97,19 @@ func TestTheGateTheMakefileAndTheDocumentNameTheSameTargets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The order slice is the whole set of names the gate prints, and it is the
-	// last one in the file that is a list of target names.
-	order := source[strings.Index(string(source), "var order = []string{"):]
-	order = order[:strings.Index(string(order), "}")]
+	// The order slice is the whole set of names the gate prints. Found rather
+	// than assumed: renaming it should report that this has stopped reading
+	// anything, not slice a string at −1 and panic.
+	opens := strings.Index(string(source), "var order = []string{")
+	if opens < 0 {
+		t.Fatal("the gate program declares no order slice, so this checked nothing")
+	}
+	order := source[opens:]
+	closes := strings.Index(string(order), "}")
+	if closes < 0 {
+		t.Fatal("the gate program's order slice is not closed, so this checked nothing")
+	}
+	order = order[:closes]
 	document := buildDocument(t)
 
 	var unknown, undescribed []string
@@ -114,10 +139,15 @@ func TestTheGateTheMakefileAndTheDocumentNameTheSameTargets(t *testing.T) {
 	}
 
 	var invented []string
+	described := 0
 	for _, found := range documented.FindAllStringSubmatch(document, -1) {
+		described++
 		if !targets[found[1]] {
 			invented = append(invented, found[1])
 		}
+	}
+	if described == 0 {
+		t.Fatal("DESIGN-build.md names no make target, so this checked nothing")
 	}
 	sort.Strings(invented)
 	if len(invented) > 0 {
