@@ -26,7 +26,7 @@ func TestWithdrawingTheRoleTakesAwayWhatItLetSomebodyBeTold(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", false)
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,11 +109,11 @@ func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		guest, err := rights.Ensure(ctx, "guest@example.com", "Guest", false)
+		guest, err := rights.Ensure(ctx, "guest@example.com", "Guest", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		granter, err := rights.Ensure(ctx, "granter@example.com", "Granter", true)
+		granter, err := rights.Ensure(ctx, "granter@example.com", "Granter", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +167,7 @@ func TestSomethingUndisclosedThatNamesNoProductIsRefused(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)
 
-		person, err := access.NewStore(db.DB).Ensure(ctx, "someone@example.com", "Someone", false)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "someone@example.com", "Someone", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,15 +196,15 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", false)
+		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		nosy, err := rights.Ensure(ctx, "nosy@example.com", "Nosy", false)
+		nosy, err := rights.Ensure(ctx, "nosy@example.com", "Nosy", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		boss, err := rights.Ensure(ctx, "boss@example.com", "Boss", true)
+		boss, err := rights.Ensure(ctx, "boss@example.com", "Boss", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}

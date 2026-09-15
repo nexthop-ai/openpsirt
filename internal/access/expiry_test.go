@@ -23,7 +23,7 @@ func atClock(t *testing.T, db *database.DB, at *time.Time) (*Store, int64) {
 	// tests move is the clock, and a role grant would only add a table this
 	// package cannot reach without importing something that imports it back.
 	store := &Store{db: db.DB, now: func() time.Time { return *at }}
-	person, err := store.Ensure(t.Context(), "someone", "Someone", true)
+	person, err := store.Ensure(t.Context(), "someone", "Someone", Stated(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestAProviderMayRefreshWhatAProviderGaveAndNotWhatSomebodySet(t *testing.T)
 		ctx := t.Context()
 		dbtest.Reset(t, db)
 		store := NewStore(db.DB)
-		person, err := store.Ensure(ctx, "ana", "Ana", false)
+		person, err := store.Ensure(ctx, "ana", "Ana", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +204,7 @@ func TestAskingForWhatNobodyOwnsWithoutAskingForADigestIsRefused(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)
 		store := NewStore(db.DB)
-		person, err := store.Ensure(ctx, "ana", "Ana", false)
+		person, err := store.Ensure(ctx, "ana", "Ana", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +253,7 @@ func TestARefusedInsertIsForgivenOnlyAsADuplicate(t *testing.T) {
 		ctx := t.Context()
 		store := NewStore(db.DB)
 
-		person, err := store.Ensure(ctx, "ana", "", false)
+		person, err := store.Ensure(ctx, "ana", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -85,23 +84,18 @@ func registerElsewhere(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		at, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
-			input.Vulnerability, input.Place)
+		// The build this decision was authorized against, not the one a
+		// second resolution would find. Resolved twice, the two can disagree
+		// under a concurrent write — a grant withdrawn between them refuses
+		// the second differently — so the request would authorize against one
+		// answer and report against another.
+		at, here, err := decidingAbout(ctx, in, subject, input.Product, input.Stream,
+			input.Variant, input.Vulnerability, input.Place)
 		if err != nil {
 			return nil, err
 		}
 
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, undeclared(in.Logger, err, "that build could not be looked up")
-		}
-		here, err := targetRow(ctx, in, named.StreamID, named.VariantID)
-		if err != nil {
-			return nil, err
-		}
-
-		reach, err := finding.NewStore(in.DB.DB).Reaching(ctx, subject, *at, here.ID)
+		reach, err := finding.NewStore(in.DB.DB).Reaching(ctx, subject, *at, here)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "cannot look for the same issue elsewhere", err)
 		}

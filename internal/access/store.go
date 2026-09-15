@@ -167,12 +167,18 @@ func NewStore(db bun.IDB) *Store {
 //
 // This is the only path that creates a person, and nothing on a sign-in path
 // calls it. Access is granted in advance or not at all.
-// admin is stated rather than optional here: this writes what it is given. A
-// caller that must leave administration alone reads what is stored and passes
-// it back, which is what the endpoint does — the same shape as an address,
-// where the three states are distinguished in the request body rather than in
-// the store.
-func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin bool) (*Account, error) {
+// admin is a pointer so that three things stay distinguishable: making
+// somebody an administrator, taking it away, and saying nothing about it.
+//
+// Nothing about it means nothing is written, which is what a caller that must
+// leave administration alone needs. Reading what is stored and passing it back
+// was what the endpoint did, and it is a read the write does not see: two
+// requests at once, one granting administration and one saying nothing, and
+// the second writes back the value it read before the first (REQ-71). A
+// dropped connection read the same way — it answered "nobody is recorded as
+// this", so administration was withdrawn from somebody who had it and no row
+// said anybody had done it.
+func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin *bool) (*Account, error) {
 	// Folded, so that what is recorded here and what a sign-in matches are the
 	// same string. An identity is a username, and a username is a name people
 	// type.
@@ -183,18 +189,32 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin 
 
 	existing, err := s.ByIdentity(ctx, identity)
 	if err == nil {
-		if existing.IsAdmin != admin {
+		if admin == nil {
+			return existing, nil
+		}
+		// Conditional on what is stored, so the value being replaced is read
+		// by the statement that replaces it. The affected-row count then says
+		// whether it moved, which is what the trail records.
+		if existing.IsAdmin != *admin {
 			if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-				Set("is_admin = ?", admin).Where("id = ?", existing.ID).Exec(ctx); err != nil {
+				Set("is_admin = ?", *admin).Where("id = ?", existing.ID).
+				Where("is_admin = ?", existing.IsAdmin).Exec(ctx); err != nil {
 				return nil, fmt.Errorf("record that %q is an administrator: %w", identity, err)
 			}
-			existing.IsAdmin = admin
+			existing.IsAdmin = *admin
 		}
 		return existing, nil
 	}
+	if !errors.Is(err, ErrNoSuchPerson) {
+		// A read that failed is not somebody who is not there. Answered as
+		// "not there", this went on to record them again — and with them a
+		// fresh party row, for a person who already had one.
+		return nil, err
+	}
 
 	person := &Account{
-		Identity: identity, DisplayName: displayName, IsAdmin: admin,
+		Identity: identity, DisplayName: displayName,
+		IsAdmin:   admin != nil && *admin,
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
 	if err := s.record(ctx, person); err != nil {
@@ -324,6 +344,10 @@ func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, erro
 	}
 	return person, nil
 }
+
+// Stated is what Ensure is told about administration, where nothing at all
+// leaves it as it is.
+func Stated(admin bool) *bool { return &admin }
 
 // ErrNoSuchPerson is what an identity nobody here holds comes back as.
 //

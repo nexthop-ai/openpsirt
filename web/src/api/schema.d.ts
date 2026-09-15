@@ -7072,13 +7072,9 @@ export interface components {
             holds?: components["schemas"]["HeldBody"][] | null;
             /** @description What to call them here */
             identity: string;
-            /** @description Which sign-in path they will arrive by, such as proxy for a trusted header */
-            provider?: string;
             /** @description Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing */
             sees_nothing?: boolean;
             signs_in_by?: components["schemas"]["SignInBody"][] | null;
-            /** @description What that provider calls them. Defaults to the identity */
-            username?: string;
         };
         PersonRecordBody: {
             /**

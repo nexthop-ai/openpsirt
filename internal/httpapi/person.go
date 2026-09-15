@@ -135,10 +135,10 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 		body.SeesNothing = seesNothing(body.Holds)
 
-		changes, total, err := trail.NewStore(in.DB.DB).About(ctx, trail.Role,
+		changes, total, err := trail.NewStore(in.DB.DB).About(ctx, subject, trail.Role,
 			person.Identity, input.Limit, 0)
 		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot read what they used to hold", err)
+			return nil, refused(a.Logger, err, "cannot read what they used to hold")
 		}
 		body.HeldTotal = total
 		who, err := whoChanged(ctx, in, a, changes)

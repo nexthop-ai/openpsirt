@@ -33,11 +33,11 @@ func eachWithDB(t *testing.T,
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		mine, err := rights.Ensure(ctx, "me@example.com", "Me", false)
+		mine, err := rights.Ensure(ctx, "me@example.com", "Me", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		theirs, err := rights.Ensure(ctx, "them@example.com", "Them", false)
+		theirs, err := rights.Ensure(ctx, "them@example.com", "Them", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

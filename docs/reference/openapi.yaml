@@ -5164,9 +5164,6 @@ components:
           maxLength: 191
           minLength: 1
           type: string
-        provider:
-          description: Which sign-in path they will arrive by, such as proxy for a trusted header
-          type: string
         sees_nothing:
           description: Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing
           type: boolean
@@ -5176,9 +5173,6 @@ components:
           type:
             - array
             - "null"
-        username:
-          description: What that provider calls them. Defaults to the identity
-          type: string
       required:
         - identity
       type: object

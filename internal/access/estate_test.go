@@ -14,7 +14,7 @@ import (
 func TestAnEstateRoleReadsNoMoreThanItsVisibility(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", false)
+		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,7 +54,7 @@ func TestAnEstateRoleReadsNoMoreThanItsVisibility(t *testing.T) {
 func TestAnEstateRoleCoversAProductDeclaredLater(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", false)
+		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -86,7 +86,7 @@ func TestAnEstateRoleCoversAProductDeclaredLater(t *testing.T) {
 func TestWithdrawingAnEstateRoleLeavesNothingBehind(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", false)
+		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestWithdrawingAnEstateRoleLeavesNothingBehind(t *testing.T) {
 func TestAnEstateRoleIsSetAsideAndRestoredByAModeSwitch(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", false)
+		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

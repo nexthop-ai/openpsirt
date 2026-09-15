@@ -107,7 +107,7 @@ func catalogOn(t *testing.T, on engines, fn func(t *testing.T, d *declaring)) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		administrator, err := rights.Ensure(t.Context(), "admin", "Administrator", true)
+		administrator, err := rights.Ensure(t.Context(), "admin", "Administrator", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}

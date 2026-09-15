@@ -76,10 +76,9 @@ func TestAnOutcomeIsOfferedOnlyWhereItsEvidenceCanBeSent(t *testing.T) {
 
 		// And the evidence is still required: the outcome without it is a
 		// claim nobody can check.
-		if got := asPerson(t, r, "triager", http.MethodPost, path,
-			`{"outcome":"already-fixed","reasoning":"Trust me."}`); got.Code < 400 {
-			t.Errorf("an already-fixed claim with no version answered %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost, path,
+			`{"outcome":"already-fixed","reasoning":"Trust me."}`),
+			http.StatusUnprocessableEntity)
 	})
 }
 

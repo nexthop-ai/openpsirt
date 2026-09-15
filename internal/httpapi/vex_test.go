@@ -139,9 +139,11 @@ func TestAVEXDocumentCarriesNothingNobodyHasAnnounced(t *testing.T) {
 		}
 
 		// And somebody who may not read undisclosed work cannot ask for it.
-		if got := asPerson(t, r, "triager", http.MethodGet, at+"?undisclosed=true", ""); got.Code < 400 {
-			t.Errorf("somebody who may not read undisclosed work previewed it: %d", got.Code)
-		}
+		// Answered as a product nobody declared rather than as a refusal, on
+		// purpose: 403 here would say "there is undisclosed work in this
+		// product and you may not see it", which is the fact being withheld.
+		refusedWith(t, asPerson(t, r, "triager", http.MethodGet, at+"?undisclosed=true", ""),
+			http.StatusNotFound)
 	})
 }
 

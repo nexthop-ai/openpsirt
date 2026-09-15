@@ -29,13 +29,13 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", true)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Somebody who is not an administrator, to check that the
 		// tool's own health is not everybody's business.
-		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", false)
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -135,15 +135,15 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", true)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
-		owner, err := rights.Ensure(ctx, "owner@example.com", "Owner", false)
+		owner, err := rights.Ensure(ctx, "owner@example.com", "Owner", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		outsider, err := rights.Ensure(ctx, "public@example.com", "Public", false)
+		outsider, err := rights.Ensure(ctx, "public@example.com", "Public", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -387,7 +387,7 @@ func TestACriticalOnAReleaseTellsWhoeverMayActOnIt(t *testing.T) {
 func recordPerson(t *testing.T, rights *access.Store, identity string, admin bool,
 	productID int64, role access.Role) int64 {
 	t.Helper()
-	person, err := rights.Ensure(t.Context(), identity, "", admin)
+	person, err := rights.Ensure(t.Context(), identity, "", access.Stated(admin))
 	if err != nil {
 		t.Fatal(err)
 	}

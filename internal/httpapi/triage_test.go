@@ -213,25 +213,22 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 
 		// No date: refused, because there is nothing to gate against and
 		// nothing to lapse.
-		if got := asPerson(t, r, "triager", http.MethodPost, at,
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"patch-needed",`+
-				`"reasoning":"Taking the upstream commit as a distro patch."}`); got.Code < 400 {
-			t.Errorf("a promise with no date answered %d", got.Code)
-		}
+				`"reasoning":"Taking the upstream commit as a distro patch."}`),
+			http.StatusUnprocessableEntity)
 		// A version: refused, because a backport moves none — that is the
 		// whole difference between the two outcomes.
-		if got := asPerson(t, r, "triager", http.MethodPost, at,
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"patch-needed","committed_to":"`+aheadOfUs+`","upgrade_to":"3.9.0",`+
-				`"reasoning":"Taking the upstream commit as a distro patch."}`); got.Code < 400 {
-			t.Errorf("a backport naming a version answered %d", got.Code)
-		}
+				`"reasoning":"Taking the upstream commit as a distro patch."}`),
+			http.StatusUnprocessableEntity)
 		// The grain, not the word: an upgrade is right, and this is the wrong
 		// place for it.
-		if got := asPerson(t, r, "triager", http.MethodPost, at,
+		refusedWith(t, asPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"upgrade-needed","committed_to":"`+aheadOfUs+`","upgrade_to":"3.9.0",`+
-				`"reasoning":"Moving to 3.9.0."}`); got.Code < 400 {
-			t.Errorf("an upgrade recorded from one finding answered %d", got.Code)
-		}
+				`"reasoning":"Moving to 3.9.0."}`),
+			http.StatusUnprocessableEntity)
 
 		got := asPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"patch-needed","committed_to":"`+aheadOfUs+`",`+
@@ -260,4 +257,18 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 			t.Errorf("asking for what is being backported found %d rows", page.Total)
 		}
 	})
+}
+
+// refusedWith pins the status a refusal answers with.
+//
+// `got.Code < 400` held for a 404 from a renamed route, a 422 for an unrelated
+// body rule, and the 500 chi's recovery middleware makes of a panic — so a
+// control that stopped running, a route that moved and a handler that crashes
+// were all indistinguishable from the refusal working.
+func refusedWith(t *testing.T, got *httptest.ResponseRecorder, want int) {
+	t.Helper()
+	if got.Code != want {
+		t.Fatalf("got %d %s, want %d %s: %s", got.Code, http.StatusText(got.Code),
+			want, http.StatusText(want), got.Body.String())
+	}
 }

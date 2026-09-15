@@ -59,20 +59,20 @@ func TestThePickerOffersOnlyPeopleWhoMayRead(t *testing.T) {
 		sonic := f.products["sonic"]
 
 		// An administrator holding nothing on the product.
-		if _, err := f.store.Ensure(ctx, "boss", "Boss", true); err != nil {
+		if _, err := f.store.Ensure(ctx, "boss", "Boss", access.Stated(true)); err != nil {
 			t.Fatal(err)
 		}
 		// A reader who is still here, and one who has left.
-		reader, err := f.store.Ensure(ctx, "reader", "Reader", false)
+		reader, err := f.store.Ensure(ctx, "reader", "Reader", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		gone, err := f.store.Ensure(ctx, "gone", "Gone", false)
+		gone, err := f.store.Ensure(ctx, "gone", "Gone", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// And somebody holding a bare capability, which grants no reading.
-		approver, err := f.store.Ensure(ctx, "approver", "Approver", false)
+		approver, err := f.store.Ensure(ctx, "approver", "Approver", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,7 +123,7 @@ func TestAMentionResolvesANamePastTheFirstPage(t *testing.T) {
 
 		for i := 0; i < 120; i++ {
 			who, err := f.store.Ensure(ctx, strings.ToLower(
-				"reader-"+string(rune('a'+i/26))+string(rune('a'+i%26))), "", false)
+				"reader-"+string(rune('a'+i/26))+string(rune('a'+i%26))), "", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -131,7 +131,7 @@ func TestAMentionResolvesANamePastTheFirstPage(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		last, err := f.store.Ensure(ctx, "zoe", "Zoe", false)
+		last, err := f.store.Ensure(ctx, "zoe", "Zoe", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +171,7 @@ func TestAskingWhoReadsSomethingIsAskedWithASubject(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		sonic := f.products["sonic"]
-		who, err := f.store.Ensure(ctx, "hidden-reader", "Hidden Reader", false)
+		who, err := f.store.Ensure(ctx, "hidden-reader", "Hidden Reader", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +233,7 @@ func TestASearchTermIsNotAPatternLanguage(t *testing.T) {
 
 		// Two identities differing only where a wildcard would not care.
 		for _, identity := range []string{"ana_ruiz", "anaxruiz"} {
-			person, err := f.store.Ensure(ctx, identity, "", false)
+			person, err := f.store.Ensure(ctx, identity, "", nil)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -52,7 +52,7 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", true)
+		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +149,7 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", true)
+		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -235,7 +235,7 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		dbtest.Reset(t, db)
 
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", true)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,7 +275,7 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		dbtest.Reset(t, db)
 
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", true)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}

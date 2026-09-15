@@ -1,6 +1,7 @@
 package trail_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -46,7 +47,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 			}
 		}
 
-		all, total, err := s.Changes(ctx, "", 100, 0)
+		all, total, err := s.Changes(ctx, by, "", 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +77,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 		}
 
 		// Filtered by kind, and paged.
-		settings, count, err := s.Changes(ctx, trail.Setting, 1, 0)
+		settings, count, err := s.Changes(ctx, by, trail.Setting, 1, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,7 +85,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 			t.Errorf("one page of the settings changes is %d of %d, want one of two",
 				len(settings), count)
 		}
-		second, _, err := s.Changes(ctx, trail.Setting, 1, 1)
+		second, _, err := s.Changes(ctx, by, trail.Setting, 1, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +143,7 @@ func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
 			{"a%b@example.com", 1},
 			{"a#b@example.com", 1},
 		} {
-			got, total, err := s.About(ctx, trail.Role, want.name, 100, 0)
+			got, total, err := s.About(ctx, by, trail.Role, want.name, 100, 0)
 			if err != nil {
 				t.Fatalf("read what changed about %q: %v", want.name, err)
 			}
@@ -156,6 +157,41 @@ func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
 						want.name, change.Name)
 				}
 			}
+		}
+	})
+}
+
+// TestTheTrailRefusesAReaderWhoDoesNotAdminister pins the check that moved out
+// of the handler.
+//
+// A row names who was brought into which case, and an undisclosed case is
+// among them, so this is a question about who may read a query rather than a
+// shape a handler happens to guard (REQ-42 and REQ-43). Refused rather than
+// answered empty: a reader who may not ask is told so, instead of being shown
+// a deployment where nobody has ever changed anything.
+func TestTheTrailRefusesAReaderWhoDoesNotAdminister(t *testing.T) {
+	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+		ctx := t.Context()
+		if err := s.Record(ctx, by, trail.Case,
+			"sonic · CVE-2026-0001 · them@example.com", nil,
+			trail.Said("a collaborator", true)); err != nil {
+			t.Fatal(err)
+		}
+
+		// Somebody real, holding everything except administration.
+		reader := access.NewPerson(by.ID+1, "reader@example.com", false, nil, 0)
+		if _, _, err := s.Changes(ctx, reader, "", 100, 0); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("listing the trail as a non-administrator answered %v, want a refusal", err)
+		}
+		if _, _, err := s.About(ctx, reader, trail.Case, "sonic", 100, 0); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("reading about one subject as a non-administrator answered %v, want a refusal", err)
+		}
+
+		// The deployment itself still reads it: a background pass answers
+		// nobody, and refusing it would be a refusal that reads as a bug.
+		if _, _, err := s.Changes(ctx, access.Everything("reporting on the tool"),
+			"", 100, 0); err != nil {
+			t.Errorf("the deployment could not read its own trail: %v", err)
 		}
 	})
 }

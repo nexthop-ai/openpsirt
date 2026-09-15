@@ -109,7 +109,7 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 			t.Fatal(err)
 		}
 		rights := access.NewStore(db.DB)
-		granted, err := rights.Ensure(ctx, "granted", "", false)
+		granted, err := rights.Ensure(ctx, "granted", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,7 +122,7 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 		// A second person who also holds a role, so that a test about whose
 		// session comes back has two possible answers. With one, asserting
 		// the identity asserts the only value the provider stub could return.
-		other, err := rights.Ensure(ctx, "other", "", false)
+		other, err := rights.Ensure(ctx, "other", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +134,7 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 		}
 		// Somebody recorded and granted nothing, who must be refused exactly
 		// as a stranger is.
-		ungranted, err := rights.Ensure(ctx, "ungranted", "", false)
+		ungranted, err := rights.Ensure(ctx, "ungranted", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

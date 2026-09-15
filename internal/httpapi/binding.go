@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -228,16 +229,20 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 
 		if in.Role == adminRole {
 			// Refused where it would leave nobody able to administer, for the
-			// same reason the mode change is.
-			if err := rights.UnbindAdmin(ctx, in.Group); err != nil {
-				return nil, wentWrong(a.Logger, "cannot unbind a group from administration", err)
-			}
-			if err := stillAdministrable(ctx, rights, a, settings); err != nil {
-				// Put back, so a refusal does not half-apply.
-				if restored := rights.BindAdmin(ctx, in.Group); restored != nil {
-					return nil, wentWrong(a.Logger, "cannot restore an administration binding", restored)
-				}
+			// same reason the mode change is — and decided inside the write,
+			// so a refusal rolls the delete back rather than being undone by
+			// a second statement that could itself fail.
+			mode, err := roleMode(ctx, a, settings)
+			if err != nil {
 				return nil, err
+			}
+			switch err := rights.UnbindAdminIfOthersRemain(ctx, in.Group, mode); {
+			case errors.Is(err, access.ErrLastAdministrator):
+				return nil, huma.Error409Conflict(
+					"that was the last thing granting administration: bind another group " +
+						"to admin, or name somebody in configuration, first")
+			case err != nil:
+				return nil, wentWrong(a.Logger, "cannot unbind a group from administration", err)
 			}
 			noteAdminChange(ctx, a, trail.Role, in.Group+" on every product",
 				trail.Said(adminRole, true), nil)
@@ -261,33 +266,22 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 // against a product, so it is not one of the roles.
 const adminRole = "admin"
 
-// stillAdministrable refuses a change that would leave nobody able to
-// administer this deployment.
+// roleMode reads where roles actually come from.
 //
-// Asked against the mode actually in force. Unbinding the last administrators'
-// group matters while roles are derived from groups and does not while they
-// are assigned, and refusing in both would make a deployment that has never
-// turned group binding on unable to tidy up a mapping it is not using.
-func stillAdministrable(ctx context.Context, rights *access.Store, a Administering, settings func() *setting.Store) error {
-	mode := access.Direct
-	if store := settings(); store != nil {
-		stored, _, err := store.Get(ctx, setting.RoleMode)
-		if err != nil {
-			return wentWrong(a.Logger, "cannot read where roles come from", err)
-		}
-		mode = access.AsMode(stored)
+// Asked because unbinding the last administrators' group matters while roles
+// are derived from groups and does not while they are assigned: refusing in
+// both would leave a deployment that has never turned group binding on unable
+// to tidy up a mapping it is not using.
+func roleMode(ctx context.Context, a Administering, settings func() *setting.Store) (access.Mode, error) {
+	store := settings()
+	if store == nil {
+		return access.Direct, nil
 	}
-
-	can, err := rights.CanAdminister(ctx, mode)
+	stored, _, err := store.Get(ctx, setting.RoleMode)
 	if err != nil {
-		return wentWrong(a.Logger, "cannot tell who would administer", err)
+		return "", wentWrong(a.Logger, "cannot read where roles come from", err)
 	}
-	if !can {
-		return huma.Error409Conflict(
-			"that was the last thing granting administration: bind another group to admin, " +
-				"or name somebody in configuration, first")
-	}
-	return nil
+	return access.AsMode(stored), nil
 }
 
 // named is the two names a product answers to, which are different strings

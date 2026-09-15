@@ -57,6 +57,7 @@ should be here.
 | Public and private mean disclosed, not readable | Every request is authenticated either way, so a mistake in these rules exposes something to a colleague rather than to the internet |
 | Anything unrecognized reads as not disclosed | A column added later would otherwise default every row that predates it to visible |
 | A deployment that cannot tell who is asking serves nobody | Failing closed means an unconfigured deployment is up and refusing, which is visible, rather than up and answering everybody |
+| Recording somebody says nothing about administration unless it is stated | Three things stay distinguishable: granting it, taking it away, and saying nothing. Decided from a read taken before the write, a request about a role passed back whatever that read returned — so two requests at once lost one, and a read that failed answered "nobody is recorded as this" and withdrew it from somebody who had it, with nothing saying anybody had |
 
 ## Roles
 
@@ -391,6 +392,13 @@ subject is exactly what a leak looks like from the outside.
 Anything else takes a subject. Two did not and should have: what a routing rule
 would catch, and which words are in use on a product. Both read findings, both
 answered for the whole product, and both were reached straight from a request.
+
+The trail's two readers were a third. A row there names who was brought into
+which case, undisclosed ones among them, so the only thing between that and a
+caller was a line in the handler. Both now take a subject and refuse one that
+does not administer the deployment — a refusal rather than an empty page, since
+a deployment where nobody has ever changed anything is a different statement
+from one somebody may not read.
 
 Whether somebody may read, and whether they may argue, are one question each,
 asked in one place. The reading rule lived on the subject from the start; the
@@ -732,6 +740,7 @@ database by hand.
 
 | Rule | Reason |
 |---|---|
+| Unbinding the last group granting administration is refused inside the write | The count has to see the delete, so both are one transaction and a refusal rolls it back. Written as a delete, a count and a compensating re-insert, a re-insert that failed left the binding gone and nobody able to administer — and a restored row carried a fresh timestamp, so it was not the row that had been there |
 | Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
 | A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
 

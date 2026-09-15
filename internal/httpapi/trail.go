@@ -121,17 +121,21 @@ func registerTrail(api huma.API, in Ingest) {
 			Total int          `json:"total"`
 		}
 	}, error) {
-		if err := administrating(ctx); err != nil {
+		subject, err := requester(ctx)
+		if err != nil {
 			return nil, err
 		}
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
 		store := access.NewStore(in.DB.DB)
-		changes, total, err := trail.NewStore(in.DB.DB).Changes(ctx,
+		// Refused by the store rather than here. A row names who was brought
+		// into which case, undisclosed ones among them, so who may read it is
+		// a question about the query (REQ-42 and REQ-43).
+		changes, total, err := trail.NewStore(in.DB.DB).Changes(ctx, subject,
 			trail.Kind(input.Kind), input.Limit, input.Offset)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "what has been changed could not be read", err)
+			return nil, refused(in.Logger, err, "what has been changed could not be read")
 		}
 
 		who := make([]int64, 0, len(changes))

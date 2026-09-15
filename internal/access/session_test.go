@@ -13,7 +13,7 @@ import (
 func signedIn(t *testing.T, f *fixture, identity string) (*access.Account, *access.Issued) {
 	t.Helper()
 	ctx := t.Context()
-	person, err := f.store.Ensure(ctx, identity, "", false)
+	person, err := f.store.Ensure(ctx, identity, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestAnUnstatedLifetimeTakesTheDefault(t *testing.T) {
 	// which lands on the default rather than on a session that never ends.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", false)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +204,7 @@ func TestAStrangersTokenReachesNothing(t *testing.T) {
 func TestASignInHasACeiling(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "ana", "", false)
+		person, err := f.store.Ensure(ctx, "ana", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
