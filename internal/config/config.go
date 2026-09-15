@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
 
 // Config is everything the process needs to start.
@@ -62,6 +63,21 @@ type Config struct {
 	// without it there is nothing to triage, because the vulnerability data is
 	// produced here rather than sent to us.
 	ScannerPath string
+	// ScannerTimeout bounds one execution of the scanner. A scan that has
+	// stopped making progress must fail as a run that failed rather than hold
+	// a worker, and a deployment whose inventories legitimately take longer
+	// than the default has to be able to raise it.
+	ScannerTimeout time.Duration
+
+	// The bounds one execution of the scanner is read within. Each is what a
+	// deployment may lower or raise; left unset, the package's own defaults
+	// apply. Here rather than among the runtime settings for the reason the
+	// ingest bounds are: what they stop is a document being read, which
+	// happens in the worker rather than in a request.
+	ScannerMaxOutput     int
+	ScannerMaxComplaint  int
+	ScannerMaxMatches    int
+	ScannerMaxReferences int
 	// Mail is where messages that leave the application go. Absent is
 	// ordinary: the notification area needs nothing configured, and a
 	// deployment that sets none of this simply tells nobody anything outside
@@ -207,6 +223,11 @@ func Load() (Config, error) {
 		IngestMaxStatements: r.number("INGEST_MAX_STATEMENTS", 0),
 		IngestMaxDepth:      r.number("INGEST_MAX_DEPTH", 0),
 
+		ScannerMaxOutput:     r.number("SCANNER_MAX_OUTPUT", 0),
+		ScannerMaxComplaint:  r.number("SCANNER_MAX_COMPLAINT", 0),
+		ScannerMaxMatches:    r.number("SCANNER_MAX_MATCHES", 0),
+		ScannerMaxReferences: r.number("SCANNER_MAX_REFERENCES", 0),
+
 		AttachmentBucket:   env("ATTACHMENT_BUCKET", ""),
 		AttachmentEndpoint: env("ATTACHMENT_ENDPOINT", ""),
 		AttachmentRegion:   env("ATTACHMENT_REGION", ""),
@@ -245,6 +266,7 @@ func Load() (Config, error) {
 		StartupTimeout:     r.duration("STARTUP_TIMEOUT", 60*time.Second),
 		DatabaseURL:        env("DATABASE_URL", ""),
 		ScannerPath:        env("SCANNER_PATH", ""),
+		ScannerTimeout:     r.duration("SCANNER_TIMEOUT", scanner.DefaultTimeout),
 		TrustedHeader:      env("TRUSTED_HEADER", ""),
 		AutoMigrate:        r.boolean("AUTO_MIGRATE", true),
 		ReadTimeout:        5 * time.Minute,

@@ -188,17 +188,6 @@ func stateWord(places, waiting, approved, lapsed int) string {
 	return ""
 }
 
-// coversHere says a decision row `de` is about the finding it was correlated
-// with by issue and place, for the counts behind the state a row carries and
-// the state filter that finds it.
-//
-// A live claim covers a place at the versions it was keyed on and no other:
-// matched by place alone, a claim approved against libnl 3.7.0 in one build
-// answered for libnl 3.9.0 at the same place in the next, while everything
-// that asks whether a decision actually applies said it covered nothing there.
-// A claim with no key has lapsed or been withdrawn, and by definition its
-// versions no longer match — what it says about the place is history, and it
-// is matched by place so that "lapsed" can be said at all.
 // worstBand is the highest severity among a set of counts, or empty where
 // nothing was rated.
 //

@@ -10,8 +10,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// Ranked severities, least first. A line admits this word and everything after
-// it.
+// ranked is the severity words, least first. A line admits one of them and
+// everything after it.
 //
 // The one list. It was three — this, an identical one beside the sort keys, and
 // a switch statement written twice in two packages — and three copies of an
@@ -38,22 +38,22 @@ func Bands() []string {
 //
 // Wider than the four bands by the two a scanner reports and nobody ranks:
 // "negligible" and "none" are answers, and a person recording a flaw may give
-// either — they rank below every band and so survive no floor, which is the
-// same treatment a word nobody recognizes gets.
+// either. They rank below every band, which is the same treatment a word
+// nobody recognizes gets. What a line lets through is decided by Band rather
+// than by the rank, and it folds them to medium.
 func Recordable() []string {
 	return append(Bands(), "negligible", "none")
 }
 
-// Ranks orders the words, least first, with anything unrecognized below all of
-// them.
-//
-// A word outside the list — "negligible", "unknown", whatever a producer
-// invents — ranks below every one of them and so survives no floor at all.
-// That is deliberate: a floor is a claim about how bad something is, and a
-// rating nobody recognizes is not evidence of anything.
+// Ranks orders the four words for sorting, and for comparing one line against
+// another, with anything unrecognized below all of them.
 //
 // Counted from one so that zero means unrecognized, which is the number the
 // SQL expressions this mirrors also produce.
+//
+// No floor is enforced through this. What a line lets through goes through
+// Band, which folds an unrated issue to medium rather than below everything —
+// see BandExpr for why, and for what reading it the other way cost.
 func Ranks(word string) int {
 	for i, known := range ranked {
 		if strings.EqualFold(word, known) {
@@ -67,9 +67,9 @@ func Ranks(word string) int {
 // nobody gave is called: they are the same state.
 //
 // A scanner's own "unknown", a producer's invented word, and no word at all
-// rank alike everywhere — below every band, surviving no floor (see Ranks
-// above). Only what a reader saw differed, and it differed by screen: one row
-// said "Unknown" and the row under it said "Unrated" about the same nothing.
+// rank alike everywhere, below every band (see Ranks above). Only what a
+// reader saw differed, and it differed by screen: one row said "Unknown" and
+// the row under it said "Unrated" about the same nothing.
 const Unrated = "unrated"
 
 // BandOf is what to call a rating when it is being counted or shown.

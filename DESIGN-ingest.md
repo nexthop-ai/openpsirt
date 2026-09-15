@@ -24,6 +24,7 @@ REQ-69.
 - [Build-declared suppressions](#build-declared-suppressions)
 - [Scheduled rescanning](#scheduled-rescanning)
 - [Scanner warnings](#scanner-warnings)
+- [What a scan run may produce](#what-a-scan-run-may-produce)
 - [Scan coverage](#scan-coverage)
 - [Receipts](#receipts)
 - [Reading back a document](#reading-back-a-document)
@@ -588,6 +589,24 @@ asks:
 
 Both are kept as the scanner wrote them and **never parsed**. Deciding whether a
 version falls inside a range needs an ordering per ecosystem.
+
+## What a scan run may produce
+
+The scanner runs as a subprocess of the process serving the API, and its report
+is read into that process. It is bounded the way a scan file is, from the same
+budget, and every bound is configurable.
+
+| Bounded | Rule |
+|---|---|
+| The report's size | Past the ceiling the run fails. It is not read in part: half a report reads as a product that stopped having problems, which is the failure every other rule here exists to prevent |
+| What the scanner said while running | Past the ceiling the excess is dropped and the run stands. A scanner with a lot to say still scanned |
+| How many matches one report states | Charged as each match is read rather than after the array, because what a bound stops is the walk |
+| How many addresses one match points at | Bounded separately, because the two multiply: a report inside the match ceiling is still a report of one match pointing at everything |
+| One execution's wall-clock time | A scanner that has stopped making progress fails as a run that failed rather than holding a worker. It stays below the ceiling on one hold (`DESIGN-queue.md`), and the process refuses to start where it does not |
+
+A report's size is components × matches × references, and a producer controls
+the first factor by uploading a scan file — so nothing about it is bounded by
+anything this deployment chose unless it is bounded here.
 
 ## Scan coverage
 

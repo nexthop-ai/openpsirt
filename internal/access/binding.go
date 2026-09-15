@@ -152,6 +152,13 @@ func (s *Store) BindAdmin(ctx context.Context, group string) error {
 // a refusal somebody can act on rather than something that went wrong.
 var ErrLastAdministrator = errors.New("nothing would be left to administer this deployment")
 
+// modeIn reads where roles come from, against whichever handle it is given.
+//
+// Taken as a function because this package does not read settings — the one
+// that does sits above it — and the mode has to be read inside the transaction
+// that acts on it rather than handed in already stale.
+type modeIn func(context.Context, bun.IDB) (Mode, error)
+
 // UnbindAdminIfOthersRemain stops a group's members being administrators,
 // unless they are the last thing granting it.
 //
@@ -161,13 +168,6 @@ var ErrLastAdministrator = errors.New("nothing would be left to administer this 
 // back is editing the database by hand. Rolling back is also what puts the
 // original row back: BindAdmin stamps a fresh CreatedAt, so a "restored"
 // binding was not the row that had been there.
-// modeIn reads where roles come from, against whichever handle it is given.
-//
-// Taken as a function because this package does not read settings — the one
-// that does sits above it — and the mode has to be read inside the transaction
-// that acts on it rather than handed in already stale.
-type modeIn func(context.Context, bun.IDB) (Mode, error)
-
 func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mode modeIn) error {
 	db, ok := database.Handle(s.db)
 	if !ok {

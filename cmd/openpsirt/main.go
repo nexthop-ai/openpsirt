@@ -222,7 +222,20 @@ func run(args []string, stdout, stderr *os.File) error {
 		return fmt.Errorf("the interface built into this binary could not be read: %w", err)
 	}
 
-	work := queue.New(db, queue.DefaultOptions())
+	queueing := queue.DefaultOptions()
+	// The ceiling on one hold is what cuts a long scan off, and it is the only
+	// bound here that can: the claim is renewed for as long as the scan runs,
+	// so the claim timeout never reaches it. A scanner allowed to run past the
+	// ceiling would be killed mid-run on every attempt and the job set aside
+	// with nothing saying why, so the two are compared where both are in hand
+	// rather than left to a documentation row.
+	if queueing.MaxHold > 0 && cfg.ScannerTimeout >= queueing.MaxHold {
+		return fmt.Errorf(
+			"OPENPSIRT_SCANNER_TIMEOUT is %s, which is not below the %s a worker may hold "+
+				"one job for — a scan allowed to run that long is killed before it finishes",
+			cfg.ScannerTimeout, queueing.MaxHold)
+	}
+	work := queue.New(db, queueing)
 	// Named before the handler is built as well as before the workers are:
 	// work that must happen once — rewriting deadlines after a policy
 	// change — is held by one replica, and the name is what holds it.
@@ -256,7 +269,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// anybody hears about it are separate concerns, and the notification
 	// pass reads what has been ingested, so a scanner reaching it directly
 	// would close a cycle between the two.
-	runner := scanner.NewRunner(db, work, scanner.Grype{Path: cfg.ScannerPath}, logger, name).
+	runner := scanner.NewRunner(db, work, scanner.Grype{
+		Path: cfg.ScannerPath, Timeout: cfg.ScannerTimeout, Limits: cfg.ScannerLimits(),
+	}, logger, name).
 		Telling(notify.Lapses(db.DB, logger))
 	// Asks public indexes what upstream has released. Started whatever the
 	// setting says and does nothing until it is turned on: the setting is

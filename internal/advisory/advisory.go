@@ -2,10 +2,12 @@
 // document somebody can publish.
 //
 // **We own the triage record; whoever publishes owns the published advisory**
-// . Nothing here records that a document was issued, and nothing goes
-// out over the network: the document is assembled from what is held and handed
-// over. That is the question that decides whether an integration works or
-// rots, and keeping both ends as the source of truth is how it rots.
+// . The document is never sent anywhere and nothing here goes out over the
+// network: it is assembled from what is held and handed over. What is kept is
+// the record that one went out and the digest of what was generated, which is
+// what makes "is what is published still what we would generate" answerable.
+// That is the question that decides whether an integration works or rots, and
+// keeping both ends as the source of truth is how it rots.
 //
 // **Only a flaw in what we ship**. A known issue in a third-party
 // component is dependency hygiene that a consumer can already read out of the

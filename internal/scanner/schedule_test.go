@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -31,7 +33,10 @@ func (f *runFixture) queued(t *testing.T) int {
 	n, err := f.db.NewSelect().Model((*queue.Job)(nil)).
 		Where("kind = ?", queue.Scan).
 		Where("reference = ?", strconv.FormatInt(f.target, 10)).
-		Where("state IN (?)", queue.Pending, queue.Running).
+		// Wrapped, because two arguments to one placeholder binds the first
+		// and drops the second: this counted pending work alone, and every
+		// assertion built on it read a running job as an absent one.
+		Where("state IN (?)", bun.List([]queue.State{queue.Pending, queue.Running})).
 		Count(t.Context())
 	if err != nil {
 		t.Fatal(err)

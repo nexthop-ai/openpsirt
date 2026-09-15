@@ -70,14 +70,6 @@ const (
 	// person has to agree. It ships with a starting point rather than a fixed
 	// rule, because how long is too long is a judgment about a product.
 	DeferralThreshold = "triage.deferral-threshold"
-	// How long a finding may stay open before it is late, by how urgent it
-	// is.
-	//
-	// Being exploited has its own, and it is the shortest: severity is how
-	// bad the flaw is, and being exploited is a fact about the world.
-	// Without a separate one the deadline contradicts the ranking, which
-	// puts an exploited medium above an unexploited critical — the list
-	// would say look at this first while the clock said ninety days.
 	// SignInKey is the deployment's own key for signing what a sign-in
 	// leaves in the browser while it is away at a provider.
 	//
@@ -96,11 +88,20 @@ const (
 	// than the first useful warning, and an extension approval is
 	// worthless without time to grant it.
 	DisclosureLead = "disclosure.lead-time"
-	DueExploited   = "remediation.due.exploited"
-	DueCritical    = "remediation.due.critical"
-	DueHigh        = "remediation.due.high"
-	DueMedium      = "remediation.due.medium"
-	DueLow         = "remediation.due.low"
+
+	// The Due values are how long a finding may stay open before it is late,
+	// by how urgent it is.
+	//
+	// Being exploited has its own, and it is the shortest: severity is how
+	// bad the flaw is, and being exploited is a fact about the world.
+	// Without a separate one the deadline contradicts the ranking, which
+	// puts an exploited medium above an unexploited critical — the list
+	// would say look at this first while the clock said ninety days.
+	DueExploited = "remediation.due.exploited"
+	DueCritical  = "remediation.due.critical"
+	DueHigh      = "remediation.due.high"
+	DueMedium    = "remediation.due.medium"
+	DueLow       = "remediation.due.low"
 	// TogetherCap is how many findings one action may claim about at once.
 	// A bound rather than none, because a single action writing an unbounded
 	// number of rows is a denial of service somebody triggers by accident. How
@@ -550,11 +551,14 @@ func (s *Store) setIfAbsent(ctx context.Context, name, value string) (string, er
 }
 
 // Duration reads a setting as a length of time, falling back to fallback where
-// it is unset or unreadable.
+// it is unset or where nobody can parse what is stored.
 //
 // A value nobody can parse is treated as one nobody set. The alternative is a
 // deployment that will not start because a setting somebody typed by hand in
 // the database is malformed, which turns a tuning mistake into an outage.
+//
+// A read that could not complete is returned as an error, never as the
+// fallback — see the note on Get.
 func (s *Store) Duration(ctx context.Context, name string, fallback time.Duration) (time.Duration, error) {
 	raw, set, err := s.Get(ctx, name)
 	if err != nil || !set {
@@ -568,7 +572,11 @@ func (s *Store) Duration(ctx context.Context, name string, fallback time.Duratio
 }
 
 // Count reads a setting as a whole number of things, falling back where it is
-// unset, unreadable or not a positive count.
+// unset, where nobody can parse what is stored, or where what is stored is not
+// a positive count.
+//
+// A read that could not complete is returned as an error, never as the
+// fallback — see the note on Get.
 func (s *Store) Count(ctx context.Context, name string, fallback int) (int, error) {
 	raw, set, err := s.Get(ctx, name)
 	if err != nil || !set {

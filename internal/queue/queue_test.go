@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -877,4 +878,91 @@ func TestAClippedSetAsideListSaysHowManyThereAre(t *testing.T) {
 			t.Errorf("the list reports %d set aside in all, want %d", total, set)
 		}
 	})
+}
+
+func TestWorkThatNeverReturnsGivesUpItsClaimAtTheCeiling(t *testing.T) {
+	// The renewal loop's only other exits are the work finishing and the
+	// claim being taken away, so a worker that wedges inside its unit of work
+	// renews for ever: the job never goes stale, is never handed out again,
+	// never fails and never reaches the state work that cannot succeed ends
+	// in. The claim timeout does not cover it — that bounds a worker going
+	// silent, and this worker is not silent.
+	opts := queue.DefaultOptions()
+	opts.Heartbeat = time.Millisecond
+	opts.MaxHold = 10 * time.Minute
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		// The clock moves while the renewals are running, so it is read from
+		// two goroutines and has to be safe for that.
+		moment := moving(t, q, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
+		if _, err := q.Add(ctx, "ingest", "wedged"); err != nil {
+			t.Fatal(err)
+		}
+		job, err := q.Claim(ctx, "wedged", "ingest")
+		if err != nil || job == nil {
+			t.Fatalf("claim: %v %+v", err, job)
+		}
+
+		working, release := q.Holding(ctx, job.ID, "wedged", quiet())
+		// The work is still running — nothing here ends it. What moves is the
+		// clock, past the ceiling on one hold.
+		moment(opts.MaxHold + time.Minute)
+
+		select {
+		case <-working.Done():
+		case <-time.After(30 * time.Second):
+			t.Fatal("work held past the ceiling was never stopped")
+		}
+		if cause := context.Cause(working); !errors.Is(cause, queue.ErrHeldTooLong) {
+			t.Errorf("the work ended with %v, want ErrHeldTooLong", cause)
+		}
+		if lost := release(); !errors.Is(lost, queue.ErrHeldTooLong) {
+			t.Errorf("stopping the renewals reported %v, want ErrHeldTooLong", lost)
+		}
+	})
+}
+
+func TestAClaimWithNoCeilingIsRenewedForAsLongAsTheWorkRuns(t *testing.T) {
+	// The other half of the pair. Zero is no ceiling, which is what a caller
+	// whose work has no upper bound of its own asks for — and a ceiling that
+	// fires anyway would cut legitimate work off mid-run.
+	opts := queue.DefaultOptions()
+	opts.Heartbeat = time.Millisecond
+	opts.MaxHold = 0
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		moment := moving(t, q, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
+		if _, err := q.Add(ctx, "ingest", "unbounded"); err != nil {
+			t.Fatal(err)
+		}
+		job, err := q.Claim(ctx, "patient", "ingest")
+		if err != nil || job == nil {
+			t.Fatalf("claim: %v %+v", err, job)
+		}
+
+		working, release := q.Holding(ctx, job.ID, "patient", quiet())
+		moment(24 * time.Hour)
+		// Long enough for many ticks at a millisecond apiece.
+		time.Sleep(50 * time.Millisecond)
+		if err := working.Err(); err != nil {
+			t.Errorf("work with no ceiling was stopped anyway: %v", context.Cause(working))
+		}
+		if lost := release(); lost != nil {
+			t.Errorf("stopping the renewals reported %v", lost)
+		}
+	})
+}
+
+// moving gives a queue a clock that can be moved on while its renewals are
+// running, and returns the way to move it.
+//
+// The renewal goroutine reads the clock, so a plain variable the test also
+// writes is a data race — and one the detector reports against whichever test
+// happens to be running beside it.
+func moving(t *testing.T, q *queue.Queue, from time.Time) func(time.Duration) {
+	t.Helper()
+	var at atomic.Int64
+	at.Store(from.UnixNano())
+	queue.SetClock(q, func() time.Time { return time.Unix(0, at.Load()).UTC() })
+	return func(by time.Duration) { at.Add(int64(by)) }
 }

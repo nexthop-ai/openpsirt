@@ -173,7 +173,6 @@ func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*
 	return p, nil
 }
 
-// ProductByName finds a product, or reports that it was never declared.
 // EndOfLife is when support for something ends, and where that date was
 // stated.
 //
@@ -576,6 +575,7 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 	return nil
 }
 
+// ProductByName finds a product, or reports that it was never declared.
 func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error) {
 	p := new(Product)
 	err := s.db.NewSelect().Model(p).Where("name = ?", matching(name)).Scan(ctx)

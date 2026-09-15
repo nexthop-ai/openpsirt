@@ -25,6 +25,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Indexes](#indexes)
 - [Columns no query reads](#columns-no-query-reads)
 - [Column widths](#column-widths)
+- [Cutting text to a width](#cutting-text-to-a-width)
 - [Test harness](#test-harness)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -626,6 +627,27 @@ nothing, and say so nowhere.
 Measured against the reference producer's real output: 6,845 components, longest
 version 49 characters, longest name 120, longest package identifier 140, nothing
 over 191.
+
+## Cutting text to a width
+
+A cut is made on a character boundary, never at a byte offset.
+
+| Rule | Reason |
+|---|---|
+| A value shortened to fit a width is cut between characters | A byte offset lands inside a multi-byte character about two times in three, and what is left is not valid UTF-8 |
+| The write is refused by three engines of four | PostgreSQL refuses invalid UTF-8 outright, MySQL and MariaDB refuse it in strict mode, and SQLite stores it — which is the engine the quick loop runs |
+| The two directions are separate operations | Keeping the head leaves the partial character at the end and keeping the tail leaves it at the front, so one of them trims backward and the other forward |
+| Both live in one place | Every site wrote its own slice, and the two that were correct were written by people who had already been bitten. The cut is the same fact in five places and is kept in one |
+
+What it costs where it is missing is the failure that reports nothing: the
+value being shortened is usually a message saying why something else failed, so
+the refused write is the one recording a failure, and the operator is left with
+neither.
+
+A width is measured in characters and the bound here is in bytes, so a name
+outside ASCII is shortened further than the column requires. That is the safe
+direction — the bound belongs to a lookup key, and the full value is stored
+beside it without one.
 
 ## Test harness
 

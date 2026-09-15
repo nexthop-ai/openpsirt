@@ -9,10 +9,29 @@
 // symbol's documentation under another's name — and each invisible to every
 // other check here, because the code is correct.
 //
-// Only the opening word is read, and only where it looks like a name this
-// repository uses: a comment that opens with a sentence rather than a symbol
-// is the ordinary case and is left alone, because the convention is a
+// Only the opening word is read, and only where it names a symbol this
+// repository declares: a comment that opens with a sentence rather than a
+// symbol is the ordinary case and is left alone, because the convention is a
 // convention and this is a check for a specific accident.
+//
+// What a symbol is, is decided over the package rather than over the file in
+// hand. Read per file, the check could not see the very accident it is for —
+// a block left behind when its symbol moved to another file names something
+// the file it sits in does not declare, so the same-file test read it as
+// prose and passed it, and file splits are where these come from.
+//
+// The package rather than the whole tree, which was measured: against every
+// name the tree declares, the check reports forty-three comments and about
+// forty of them are English. "Default", "Reading", "Two", "Only", "Scope" and
+// "Set" are all symbols somewhere, and a comment here opening with one of
+// them is a sentence. A check that fires on prose is a check people learn to
+// ignore, so the question asked is whether the comment names something its
+// own package declares.
+//
+// The opening is any declared name followed by any word, rather than a name
+// followed by one of a list of verbs. Go's convention puts no constraint on
+// the verb, and a list of them leaves every comment opening with a verb
+// nobody thought of unread.
 package main
 
 import (
@@ -21,6 +40,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -28,16 +48,35 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
-// opens is a doc comment beginning with what looks like a Go identifier
-// followed by a verb — the shape the convention produces.
-var opens = regexp.MustCompile(`^(\w+) (is|are|reports|returns|says|holds|names|answers|builds|reads|writes|takes|does|makes|turns|gives|refuses|keeps|carries|counts|resolves|records|stands|walks|has|can|may|wraps|bounds|charges|fills|puts|sends|tells|asks|adds|applies|opens|closes|marks|moves|picks|shows|spells|states|works) `)
+// opens is a doc comment beginning with an identifier followed by a word —
+// the shape the convention produces. Whether the identifier is a symbol is
+// asked of the tree rather than of the expression.
+var opens = regexp.MustCompile(`^(\w+) (\w)`)
 
 func main() {
-	var bad []string
 	// web holds the interface, which is TypeScript: nothing under it parses
 	// as Go, so reading it is work with no answer.
-	read, err := walk.Only(".go", []string{"web"}, func(path string, source []byte) error {
-		bad = append(bad, detached(path, source)...)
+	const skip = "web"
+
+	// Every name each package declares, read first, because a comment left
+	// behind by a symbol that moved names something its own file no longer
+	// declares.
+	declared := map[string]map[string]bool{}
+	if _, err := walk.Only(".go", []string{skip}, func(path string, source []byte) error {
+		where := filepath.Dir(path)
+		if declared[where] == nil {
+			declared[where] = map[string]bool{}
+		}
+		declares(source, declared[where])
+		return nil
+	}); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+
+	var bad []string
+	read, err := walk.Only(".go", []string{skip}, func(path string, source []byte) error {
+		bad = append(bad, detached(path, source, declared[filepath.Dir(path)])...)
 		return nil
 	})
 	if err != nil {
@@ -64,7 +103,7 @@ func main() {
 // detection is reachable only by running the program over the tree is one
 // whose only consumer is an exit code, and an exit code cannot tell a check
 // that found nothing from a check that looked at nothing.
-func detached(path string, source []byte) []string {
+func detached(path string, source []byte, declared map[string]bool) []string {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, source, parser.ParseComments)
 	if err != nil {
@@ -72,79 +111,120 @@ func detached(path string, source []byte) []string {
 		return nil
 	}
 	var bad []string
-	for _, decl := range file.Decls {
-		doc, names := documented(decl)
-		if doc == nil || len(names) == 0 {
-			continue
-		}
-		first := strings.TrimSpace(doc.List[0].Text)
+	for _, block := range documented(file) {
+		first := strings.TrimSpace(block.doc.List[0].Text)
 		first = strings.TrimPrefix(first, "//")
 		match := opens.FindStringSubmatch(strings.TrimSpace(first))
 		if match == nil {
 			continue
 		}
 		named := match[1]
-		if slicesContains(names, named) {
+		if slicesContains(block.names, named) {
+			continue
+		}
+		// A test's own name is a sentence rather than a symbol, so the
+		// convention does not apply to it and its comment opens with whatever
+		// the test is about — usually the symbol under test, which is exactly
+		// what this looks for. Every one of them is prose.
+		if aTest(block.names) {
 			continue
 		}
 		// A comment naming some other symbol entirely is the accident. One
-		// naming nothing in this file is prose that happens to start with a
-		// capitalized word, and is left alone.
-		if !declaredIn(file, named) {
+		// naming nothing the tree declares is prose that happens to open with
+		// a word, and is left alone.
+		if !declared[named] {
 			continue
 		}
 		bad = append(bad, fmt.Sprintf("%s:%d: the comment above %s describes %s",
-			path, fset.Position(doc.Pos()).Line, strings.Join(names, ", "), named))
+			path, fset.Position(block.doc.Pos()).Line, strings.Join(block.names, ", "), named))
 	}
 	return bad
 }
 
-// documented is a declaration's doc comment and the names it declares.
-func documented(decl ast.Decl) (*ast.CommentGroup, []string) {
-	switch d := decl.(type) {
-	case *ast.FuncDecl:
-		return d.Doc, []string{d.Name.Name}
-	case *ast.GenDecl:
-		var names []string
-		for _, spec := range d.Specs {
-			switch s := spec.(type) {
-			case *ast.TypeSpec:
-				names = append(names, s.Name.Name)
-			case *ast.ValueSpec:
-				for _, name := range s.Names {
-					names = append(names, name.Name)
-				}
+// aTest says whether a declaration is one the testing package runs.
+func aTest(names []string) bool {
+	for _, name := range names {
+		for _, prefix := range []string{"Test", "Benchmark", "Fuzz", "Example"} {
+			if strings.HasPrefix(name, prefix) {
+				return true
 			}
 		}
-		return d.Doc, names
 	}
-	return nil, nil
+	return false
 }
 
-// declaredIn reports whether this file declares the name a comment opens with,
-// which is what tells a stale block from ordinary prose.
-func declaredIn(file *ast.File, name string) bool {
-	found := false
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch d := n.(type) {
+// block is one doc comment and the names the declaration under it declares.
+type block struct {
+	doc   *ast.CommentGroup
+	names []string
+}
+
+// documented is every doc comment in a file with what it sits on.
+//
+// A spec inside a grouped declaration carries its own doc comment, and reading
+// only the group's left every comment inside a const or var block unread —
+// which is where a good part of this tree's documentation is.
+func documented(file *ast.File) []block {
+	var blocks []block
+	keep := func(doc *ast.CommentGroup, names ...string) {
+		if doc != nil && len(doc.List) > 0 && len(names) > 0 {
+			blocks = append(blocks, block{doc: doc, names: names})
+		}
+	}
+	for _, decl := range file.Decls {
+		switch d := decl.(type) {
 		case *ast.FuncDecl:
-			if d.Name.Name == name {
-				found = true
+			keep(d.Doc, d.Name.Name)
+		case *ast.GenDecl:
+			var all []string
+			for _, spec := range d.Specs {
+				switch s := spec.(type) {
+				case *ast.TypeSpec:
+					all = append(all, s.Name.Name)
+					keep(s.Doc, s.Name.Name)
+				case *ast.ValueSpec:
+					var named []string
+					for _, name := range s.Names {
+						named = append(named, name.Name)
+					}
+					all = append(all, named...)
+					keep(s.Doc, named...)
+				}
 			}
-		case *ast.TypeSpec:
-			if d.Name.Name == name {
-				found = true
-			}
-		case *ast.ValueSpec:
-			for _, one := range d.Names {
-				if one.Name == name {
-					found = true
+			keep(d.Doc, all...)
+		}
+	}
+	return blocks
+}
+
+// declares adds every name one file declares at package level to the set.
+//
+// Package level only. A local variable and a struct field are named for what
+// they hold in one function or one record, and half the ordinary English
+// words in this tree are one of those somewhere — reading them as symbols is
+// what turns the check into noise.
+func declares(source []byte, into map[string]bool) {
+	file, err := parser.ParseFile(token.NewFileSet(), "", source, parser.SkipObjectResolution)
+	if err != nil {
+		return
+	}
+	for _, decl := range file.Decls {
+		switch d := decl.(type) {
+		case *ast.FuncDecl:
+			into[d.Name.Name] = true
+		case *ast.GenDecl:
+			for _, spec := range d.Specs {
+				switch s := spec.(type) {
+				case *ast.TypeSpec:
+					into[s.Name.Name] = true
+				case *ast.ValueSpec:
+					for _, one := range s.Names {
+						into[one.Name] = true
+					}
 				}
 			}
 		}
-		return !found
-	})
-	return found
+	}
 }
 
 func slicesContains(all []string, want string) bool {

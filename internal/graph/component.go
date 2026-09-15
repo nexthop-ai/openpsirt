@@ -19,6 +19,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -582,10 +583,7 @@ func Folded(name string) string {
 	// because it carries an index. The name itself is stored unbounded, so
 	// nothing is lost — this is the lookup key, and two names agreeing for a
 	// hundred and ninety-one characters are the same name by any reading.
-	if len(folded) > foldedWidth {
-		folded = folded[:foldedWidth]
-	}
-	return folded
+	return bound.Head(folded, foldedWidth)
 }
 
 // foldedWidth is the column's width, which is what every indexed name column

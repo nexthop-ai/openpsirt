@@ -883,6 +883,17 @@ const (
 // filter and the triage package cannot drift on the spelling.
 const upgradeNeeded = "upgrade-needed"
 
+// coversHere says a decision row `de` is about the finding it was correlated
+// with by issue and place, for the counts behind the state a row carries and
+// the state filter that finds it.
+//
+// A live claim covers a place at the versions it was keyed on and no other:
+// matched by place alone, a claim approved against libnl 3.7.0 in one build
+// answered for libnl 3.9.0 at the same place in the next, while everything
+// that asks whether a decision actually applies said it covered nothing there.
+// A claim with no key has lapsed or been withdrawn, and by definition its
+// versions no longer match — what it says about the place is history, and it
+// is matched by place so that "lapsed" can be said at all.
 const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 
 // byState keeps groups by how far they have been decided.
@@ -1101,10 +1112,6 @@ func containsTerm(term string) string {
 	return database.LikeEscaped(strings.ToLower(term))
 }
 
-// trimmed drops blanks from a list of names, so a stray separator in a query
-// string does not become a name nothing matches — and so a repeated parameter
-// carrying an empty member, which is what an unset control submits, does not
-// narrow a set to nothing when it means everything.
 // fixStates is the fix statuses asked for, without the empty word. An empty
 // word is "any", and left in it would be a state nothing is ever in — turning
 // a filter that asks for nothing into one that answers nothing.
@@ -1118,8 +1125,8 @@ func (f Filter) fixStates() []FixState {
 	return kept
 }
 
-// folded is a set of tags as they are stored, without the ones that fold to
-// nothing. Folded rather than trimmed, because a tag is matched on the folded
+// foldedTags is a set of tags as they are stored, without the ones that fold
+// to nothing. Folded rather than trimmed, because a tag is matched on the folded
 // form everywhere else and a filter that skipped the folding would answer
 // nothing for a word somebody typed with a capital.
 func foldedTags(words []string) []string {
@@ -1143,6 +1150,10 @@ func having(q *bun.SelectQuery, condition string, args ...any) *bun.SelectQuery 
 	return q.Having(condition, args...)
 }
 
+// trimmed drops blanks from a list of names, so a stray separator in a query
+// string does not become a name nothing matches — and so a repeated parameter
+// carrying an empty member, which is what an unset control submits, does not
+// narrow a set to nothing when it means everything.
 func trimmed(names []string) []string {
 	kept := make([]string, 0, len(names))
 	for _, name := range names {

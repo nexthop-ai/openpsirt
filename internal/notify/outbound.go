@@ -18,6 +18,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
@@ -338,12 +339,7 @@ func matches(configured, kind string) bool {
 }
 
 // trimTo bounds what is stored of a failure.
-func trimTo(text string, most int) string {
-	if len(text) <= most {
-		return text
-	}
-	return text[:most]
-}
+func trimTo(text string, most int) string { return bound.Head(text, most) }
 
 // outboundClient is how a request leaves here.
 //
