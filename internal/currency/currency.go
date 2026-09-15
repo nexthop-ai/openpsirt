@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -146,6 +147,22 @@ func hostOf(address string) string {
 	return parsed.Hostname()
 }
 
+// askers is every ecosystem this has an index for, beside the asker for each.
+//
+// One table rather than a list beside a switch. The pass selecting candidates
+// builds its condition from the names and the pass asking picks the asker by
+// name, so kept apart an index added to one and forgotten in the other is
+// either components selected and never asked or components asked about and
+// never selected — and silently, because nothing joins the two spellings.
+//
+// Lower case, because that is how a package identifier's type is compared.
+var askers = map[string]func(*Client) Asker{
+	"golang": func(c *Client) Asker { return goProxy{c} },
+	"npm":    func(c *Client) Asker { return npmRegistry{c} },
+	"pypi":   func(c *Client) Asker { return pyPI{c} },
+	"cargo":  func(c *Client) Asker { return cratesIO{c} },
+}
+
 // Askable is every ecosystem this has an index for.
 //
 // The one list, so that the pass selecting candidates can be built from it
@@ -156,25 +173,27 @@ func hostOf(address string) string {
 // packages that is fifty passes writing nothing before the Go and Rust
 // components it can answer are reached.
 //
-// Lower case, because that is how a package identifier's type is compared.
-func Askable() []string { return []string{"golang", "npm", "pypi", "cargo"} }
+// Sorted, so the condition a pass builds from this is the same statement every
+// time rather than whatever order a map walk gave it.
+func Askable() []string {
+	names := make([]string, 0, len(askers))
+	for name := range askers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // For returns the asker for an ecosystem, or nil where there is none.
 //
 // Named by the type in a package identifier, so the caller does not have to
 // keep its own mapping of what is askable.
 func (c *Client) For(ecosystem string) Asker {
-	switch ecosystem {
-	case "golang":
-		return goProxy{c}
-	case "npm":
-		return npmRegistry{c}
-	case "pypi":
-		return pyPI{c}
-	case "cargo":
-		return cratesIO{c}
+	asker, held := askers[ecosystem]
+	if !held {
+		return nil
 	}
-	return nil
+	return asker(c)
 }
 
 // mostBody is how much of somebody else's document we will read.
