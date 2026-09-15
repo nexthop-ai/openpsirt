@@ -11,9 +11,11 @@ import { Pace, Mix, Ring, Releases } from "../ui/Charts";
 import { paceReading, mixReading } from "../ui/trend";
 import { claimOf } from "../api/claims";
 import type { Who } from "../app/session";
+import { Wide } from "../ui/Wide";
 
-// The most the server returns of what is overdue. A cap with no total, so a
-// full list is a floor on the figure rather than the figure.
+// The most of the deadline list the tiles read. The response carries the
+// whole-answer count beside it, so the figures say when they are a floor
+// rather than leaving a page to pass for the answer.
 const OVERDUE_LIMIT = 200;
 
 // How far ahead "soon" looks. A fortnight is the window the deadline list
@@ -28,7 +30,7 @@ const SOON_DAYS = 14;
 // running out inside the window. Built here so the figure and the screen it
 // opens ask the same question.
 function runningOut(at: Parameters<typeof findingsPath>[0], within: string): string {
-  return `${findingsPath(at)}?running=${within}&state=undecided`;
+  return `${findingsPath(at, true)}&running=${within}&state=undecided`;
 }
 
 function withOnly(path: string, only: string): string {
@@ -219,7 +221,7 @@ function Readiness({ at }: { at: Scoped }) {
           {/* Wrapped like every other table on the page: on a narrow screen a
               wide table scrolls sideways and says so, and this was the one
               that did neither — it was cut off with nothing explaining why. */}
-          <div className="tablewrap">
+          <Wide>
             <table className="plain">
               <thead>
                 <tr>
@@ -242,7 +244,7 @@ function Readiness({ at }: { at: Scoped }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
           <p className="reading">
             {reading(now?.critical ?? 0, shipped.critical ?? 0, shipped.stream ?? "")}
             {floor ? ` Counted at ${floor} and above.` : ""}
@@ -387,6 +389,13 @@ function Figures({
   const soonExploited = soon.filter((row) => row.exploited).length;
   const allRunning = allLate.data?.items ?? [];
   const allPoints = allOpen.data?.items ?? [];
+  // Whether the page in hand is the whole list. The two tiles below split one
+  // read into overdue and due-soon, so neither half can be compared against
+  // the cap on its own — a page that is entirely overdue would have to be a
+  // full page before the test fired, and the due-soon half had no test at all.
+  // The server says how many rows the question has; that is the test.
+  const cut = (late.data?.total ?? running.length) > running.length;
+  const cutEverywhere = (allLate.data?.total ?? allRunning.length) > allRunning.length;
 
   // What the same figure is without the scope. Nothing where no scope is
   // selected, because the two would be one number said twice.
@@ -410,7 +419,11 @@ function Figures({
 
   return (
     <div className="kpis">
-      <button type="button" className="kpi" onClick={() => navigate(findingsPath(at))}>
+      {/* Unnarrowed, because the figure is. The list writes three narrowings
+          into its own address when the address says nothing, and none of them
+          was applied to the count — so every figure here opened a list with
+          fewer rows in it than the number said. */}
+      <button type="button" className="kpi" onClick={() => navigate(findingsPath(at, true))}>
         <span className="l">Open issues · {counting}</span>
         <span className="n">{openCount === undefined ? "—" : openCount.toLocaleString()}</span>
         {everywhere(allPoints[allPoints.length - 1]?.open) ?? (
@@ -420,13 +433,18 @@ function Figures({
       {!!at.product && (
         <button
           type="button"
-          className={`kpi${(exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
-          onClick={() => navigate(withOnly(findingsPath(at), "exploited"))}
+          className={`kpi${!exploited.isError && (exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
+          onClick={() => navigate(withOnly(findingsPath(at, true), "exploited"))}
         >
           <span className="l">
             <i style={{ background: "var(--sev-exploited)" }} /> Known exploited
           </span>
-          <span className="n">{(exploited.data?.total ?? 0).toLocaleString()}</span>
+          {/* A dash rather than a zero. "No exploited findings here" and "the
+              count could not be read" are opposite answers, and the tile that
+              says the first is the one somebody stops looking at. */}
+          <span className="n">
+            {exploited.isError ? "—" : (exploited.data?.total ?? 0).toLocaleString()}
+          </span>
           {/* No twin. The all-products figure off this endpoint counts a row
               per product, issue and component, so one library's flaw in five
               products reads as five against a scoped figure that reads one —
@@ -448,7 +466,7 @@ function Figures({
         <span className="l">
           <i style={{ background: "var(--wait)" }} /> Pending your approval
         </span>
-        <span className="n">{(queue.data?.total ?? 0).toLocaleString()}</span>
+        <span className="n">{queue.isError ? "—" : (queue.data?.total ?? 0).toLocaleString()}</span>
         {everywhere(allQueue.data?.total) ?? (
           <span
             className="d"
@@ -470,18 +488,17 @@ function Figures({
         {/* The list behind this is capped, so a full one is said to be a
             floor rather than passed off as the count. */}
         <span className="n">
-          {overdue.length >= OVERDUE_LIMIT
-            ? `${OVERDUE_LIMIT.toLocaleString()}+`
-            : overdue.length.toLocaleString()}
+          {overdue.length.toLocaleString()}
+          {cut ? "+" : ""}
         </span>
         {everywhereAtLeast(
           allRunning.filter((row) => (row.days_left ?? 0) < 0).length,
-          allRunning.length >= OVERDUE_LIMIT,
+          cutEverywhere,
         ) ?? (
           <span className="d">
             {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
             deadline
-            {overdue.length >= OVERDUE_LIMIT ? " · at least" : ""}
+            {cut ? " · at least" : ""}
           </span>
         )}
       </button>
@@ -496,14 +513,18 @@ function Figures({
         <span className="l">
           <i style={{ background: "var(--wait)" }} /> Due soon
         </span>
-        <span className="n">{soon.length.toLocaleString()}</span>
+        <span className="n">
+          {soon.length.toLocaleString()}
+          {cut ? "+" : ""}
+        </span>
         {everywhereAtLeast(
           allRunning.filter((row) => (row.days_left ?? 0) >= 0).length,
-          allRunning.length >= OVERDUE_LIMIT,
+          cutEverywhere,
         ) ?? (
           <span className="d">
             {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
             {SOON_DAYS} days
+            {cut ? " · at least" : ""}
           </span>
         )}
       </button>
@@ -565,7 +586,7 @@ function Pending() {
             ? `${(everywhere.data?.total ?? 0).toLocaleString()} all products`
             : "all products"}
         </span>
-        <span className="tally">{queue.data?.total ?? 0}</span>
+        <span className="tally">{queue.isError ? "—" : (queue.data?.total ?? 0)}</span>
       </header>
       {queue.isError && <Failed error={queue.error} what="This could not be read." />}
       {items.length === 0 && !queue.isError && <p className="reading">Nothing is pending.</p>}
@@ -700,6 +721,11 @@ function Lapsed() {
   const lapsedTotal = lapsed.data?.total ?? 0;
   const expiredTotal = expired.data?.total ?? 0;
   const allTotal = (everywhereLapsed.data?.total ?? 0) + (everywhereExpired.data?.total ?? 0);
+  // A read that did not happen is not a count of nothing. Falling through, the
+  // panel stated "Nothing has lapsed" over a failed read and the tally beside
+  // the heading drew a confident zero — which is the defect this whole change
+  // is about, on the busiest screen there is.
+  const unread = lapsed.isError || expired.isError;
 
   return (
     <div className="panel">
@@ -708,11 +734,14 @@ function Lapsed() {
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
           {at.product ? `${allTotal.toLocaleString()} all products` : "all products"}
         </span>
-        <span className={lapsedTotal + expiredTotal > 0 ? "tally urgent" : "tally"}>
-          {(lapsedTotal + expiredTotal).toLocaleString()}
+        <span className={!unread && lapsedTotal + expiredTotal > 0 ? "tally urgent" : "tally"}>
+          {unread ? "—" : (lapsedTotal + expiredTotal).toLocaleString()}
         </span>
       </header>
-      {lapsedTotal > 0 && (
+      {unread && (
+        <Failed error={lapsed.error ?? expired.error} what="Lapsed decisions could not be read." />
+      )}
+      {!unread && lapsedTotal > 0 && (
         <div className="alert">
           <strong>
             {lapsedTotal.toLocaleString()} {lapsedTotal === 1 ? "decision" : "decisions"} lapsed
@@ -720,7 +749,7 @@ function Lapsed() {
           <span>The versions they were claims about have moved.</span>
         </div>
       )}
-      {expiredTotal > 0 && (
+      {!unread && expiredTotal > 0 && (
         <div className="alert">
           <strong>
             {expiredTotal.toLocaleString()} {expiredTotal === 1 ? "deferral" : "deferrals"} ran out
@@ -728,7 +757,9 @@ function Lapsed() {
           <span>The date they were put off until has passed.</span>
         </div>
       )}
-      {lapsedTotal + expiredTotal === 0 && <p className="reading">Nothing has lapsed.</p>}
+      {!unread && lapsedTotal + expiredTotal === 0 && (
+        <p className="reading">Nothing has lapsed.</p>
+      )}
       <footer>
         <Link to="/review-queue#lapsed" className="linkish">
           View →
@@ -749,8 +780,24 @@ function Status() {
     queryFn: async () => unwrap(await api.GET("/v1/scanning", { params: { query: scope } })),
   });
   const builds = scanning.data?.items ?? [];
+  // The rows in hand, for the three this names. The figures below come from
+  // the response instead: the server counts them across the whole answer and
+  // cuts the page afterwards, and a build out of support belongs on neither
+  // side of a coverage figure — silence there is expected. Counted from the
+  // page, this said "195 of 200" for any estate past two hundred builds and
+  // put a release nothing had scanned in a year on the covered side.
   const quiet = builds.filter((b) => b.quiet);
-  const last = builds.find((b) => b.last_received_at);
+  const unsupported = scanning.data?.unsupported ?? 0;
+  const live = (scanning.data?.total ?? 0) - unsupported;
+  const quietTotal = scanning.data?.quiet ?? 0;
+  // The most recent arrival across every build, which is what the line says.
+  // The first row that has one is not it: this list is ordered longest-silent
+  // first, so the first match was among the oldest.
+  const last = builds.reduce<string>(
+    (newest, build) =>
+      build.last_received_at && build.last_received_at > newest ? build.last_received_at : newest,
+    "",
+  );
   const whole = !!(at.product && at.stream && at.variant);
 
   return (
@@ -774,17 +821,17 @@ function Status() {
           </span>
         </div>
       ))}
-      {quiet.length > 3 && <p className="hint">and {quiet.length - 3} more.</p>}
+      {quietTotal > 3 && <p className="hint">and {(quietTotal - 3).toLocaleString()} more.</p>}
       <ul>
         <li>
           <span className="what">Builds being scanned</span>
           <span className="when">
-            {builds.length - quiet.length} of {builds.length}
+            {(live - quietTotal).toLocaleString()} of {live.toLocaleString()}
           </span>
         </li>
         <li>
           <span className="what">Last inventory received</span>
-          <span className="when">{on(last?.last_received_at) ?? "never"}</span>
+          <span className="when">{on(last) || "never"}</span>
         </li>
         <li>
           <span className="what">Quiet after</span>

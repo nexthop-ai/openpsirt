@@ -1,10 +1,23 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { belongTo, forget, forgetAll, keep, restore } from "./drafts";
+import { belongTo, forget, forgetAll, forgetSession, keep, restore } from "./drafts";
 
 beforeEach(() => {
   window.localStorage.clear();
   belongTo(undefined);
 });
+
+// Where the one draft in the store is, found rather than restated. The key's
+// shape is the module's business — its identity segment is encoded, so a
+// colon in an identity cannot be read as the separator — and a test that
+// retyped it would break on a change that is not a defect and would say
+// nothing about the property it is actually pinning.
+function theOnlyKey(): string {
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (key?.startsWith("openpsirt.draft.")) return key;
+  }
+  throw new Error("no draft is stored");
+}
 
 describe("drafts", () => {
   it("gives back what was left behind", () => {
@@ -45,7 +58,7 @@ describe("drafts", () => {
     // tools next. A draft has an age now.
     belongTo("oidc:ana");
     keep("revise:7", "started before the meeting");
-    const key = "openpsirt.draft.oidc:ana:revise:7";
+    const key = theOnlyKey();
     const held = JSON.parse(window.localStorage.getItem(key)!) as {
       text: string;
       at: number;
@@ -101,7 +114,7 @@ describe("drafts", () => {
     // for somebody who never reopens the form is what the window is for.
     belongTo("oidc:ana");
     keep("revise:9", "written before a meeting");
-    const key = "openpsirt.draft.oidc:ana:revise:9";
+    const key = theOnlyKey();
     const held = JSON.parse(window.localStorage.getItem(key)!) as { text: string; at: number };
     expect(held.text).toBe("written before a meeting");
     // Older than the window, which nothing else in these tests reaches.
@@ -147,15 +160,87 @@ describe("drafts", () => {
     expect(window.localStorage.getItem("openpsirt.rail")).toBe('["manage"]');
   });
 
-  it("does not reach the scope, which is kept for the session rather than the person", () => {
+  it("does not reach the session's own state, which has its own clear", () => {
     // Where the scope actually lives, asserted against the store it is in.
-    // Nothing clears it on sign-out, which this says plainly rather than
-    // leaving somebody to infer it from a localStorage key that is never set.
+    // forgetAll walks the local store alone; what the tab holds is taken away
+    // by forgetSession, and sign-out calls both.
     window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
     belongTo("oidc:ana");
 
     forgetAll();
 
     expect(window.sessionStorage.getItem("openpsirt.scope")).toBe('{"product":"sonic"}');
+  });
+});
+
+describe("what signing out takes away", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    belongTo(undefined);
+  });
+
+  it("takes the scope and the last judgment, and leaves the preferences", () => {
+    // Seeded in the stores production actually writes them to: a key put in
+    // the wrong store survives whatever the clear does, so an assertion over
+    // one pins nothing.
+    //
+    // Sign-out is a same-tab navigation, so nothing here goes on its own.
+    window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');
+    window.sessionStorage.setItem("openpsirt.decide.last", '{"outcome":"wont-fix"}');
+    window.localStorage.setItem("openpsirt.look", "dusk");
+    window.localStorage.setItem("openpsirt.rail", '["manage"]');
+
+    forgetSession();
+
+    expect(window.sessionStorage.getItem("openpsirt.scope")).toBeNull();
+    expect(window.sessionStorage.getItem("openpsirt.decide.last")).toBeNull();
+    // Preferences, not session state. Signing out is not a reason to forget
+    // which colors somebody likes.
+    expect(window.localStorage.getItem("openpsirt.look")).toBe("dusk");
+    expect(window.localStorage.getItem("openpsirt.rail")).toBe('["manage"]');
+  });
+
+  it("survives a browser that refuses storage", () => {
+    const kept = window.sessionStorage.removeItem;
+    window.sessionStorage.removeItem = () => {
+      throw new Error("storage is off");
+    };
+    expect(() => forgetSession()).not.toThrow();
+    window.sessionStorage.removeItem = kept;
+  });
+});
+
+// The sweep is the whole of the control that stops one person being handed
+// another's text, and it is a prefix test over a key built by joining two
+// fields with a colon. Neither field excludes one.
+describe("whose draft is whose", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    belongTo(undefined);
+  });
+
+  it("does not read one identity as a prefix of another", () => {
+    // `alice` and `alice:b` are both admissible identities — nothing refuses a
+    // colon — and what a draft is about is colon-rich by construction. Joined
+    // unencoded, alice's prefix matched alice:b's key, so the sweep classed
+    // one person's text as the other's and left it in the browser.
+    belongTo("alice:b");
+    keep("decide:P:S:V:CVE-2026-1:pkg", "theirs");
+    expect(restore("decide:P:S:V:CVE-2026-1:pkg")).toBe("theirs");
+
+    belongTo("alice");
+
+    expect(restore("decide:P:S:V:CVE-2026-1:pkg")).toBe("");
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it("keeps a person's own drafts across a sign-in", () => {
+    // The other direction, so the test above cannot pass by sweeping
+    // everything an encoded key produces.
+    belongTo("alice:b");
+    keep("decide:P:S:V:CVE-2026-1:pkg", "mine");
+    belongTo("alice:b");
+    expect(restore("decide:P:S:V:CVE-2026-1:pkg")).toBe("mine");
   });
 });

@@ -55,6 +55,8 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
 | `docs/` | The published documentation site |
 | `assets/` | Logo files |
+| `Makefile` | The build, every gate, and what they clean up |
+| `Makefile.demo` | The image and what is built from it: the seeded demo deployment, the hot-reload loop, and the offline scanner bundle. Included by the makefile beside it, so every target is reached the same way. A file of its own because it shares nothing with the gate half but the names of the docker and npm commands, so the half that decides whether a change may be pushed reads without the half that stands an instance up. The scanner bundle is here because it is built from the demo image rather than because it is a demo target, and every variable these read is here with them |
 
 Everything is under `internal/`, so nothing is importable by another module.
 

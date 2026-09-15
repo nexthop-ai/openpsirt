@@ -19,6 +19,27 @@ export class Refused extends Error {
   }
 }
 
+// The status a refusal carried, or nothing where it is not one.
+//
+// For the call sites where one of the two statuses `notYours` folds together
+// has a meaning of its own: the reporter read answers 404 for "nobody recorded
+// a reporter", which is the card's ordinary content, and 403 for "you do not
+// hold triage here", which is not.
+export function statusOf(error: unknown): number | undefined {
+  return error instanceof Refused ? error.status : undefined;
+}
+
+// Whether a refusal is the server saying this is not somebody's to see.
+//
+// A card that is quiet for one person and drawn for another is the shape
+// several screens want, and the test for it has to be the status rather than
+// "the read failed": 403 and 404 are answers, and a 500 is a question nobody
+// answered. Reading the second as the first draws an empty card that says
+// there is nothing there.
+export function notYours(error: unknown): boolean {
+  return error instanceof Refused && (error.status === 403 || error.status === 404);
+}
+
 // A choice the server offered, with whatever else it takes to pick one.
 export type Choice = { version: string; ecosystem?: string };
 
@@ -40,9 +61,18 @@ type Answer<T> = { data?: T; error?: unknown; response: Response };
 // one inventing its own branch.
 export function unwrap<T>({ data, error, response }: Answer<T>): T {
   if (error !== undefined || !response.ok) {
-    throw new Refused(response.status, detailOf(error) ?? response.statusText, detailsOf(error));
+    throw new Refused(response.status, said(error, response), detailsOf(error));
   }
   return data as T;
+}
+
+// What to show when the server refused. Its own sentence where it wrote one,
+// the reason phrase where it did not — and the status on its own where there
+// is no reason phrase either, which is every HTTP/2 response: the protocol
+// carries the code and dropped the phrase, so `statusText` is the empty
+// string and a screen showing it shows nothing at all.
+function said(error: unknown, response: Response): string {
+  return detailOf(error) ?? (response.statusText || `HTTP ${response.status}`);
 }
 
 function detailsOf(

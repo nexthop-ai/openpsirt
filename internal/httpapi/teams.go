@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -54,15 +55,23 @@ func registerTeams(api huma.API, a Administering) {
 			if store == nil {
 				return nil, noDatabase(a.Logger)
 			}
-			teams, err := store.Teams(ctx)
+			teams, err := store.Teams(ctx, "", database.InBulk.Most)
 			if err != nil {
 				return nil, wentWrong(a.Logger, "cannot list teams", err)
+			}
+			// The whole-answer count, because the listing is capped: a
+			// caller cannot tell a clipped page from every team there is
+			// otherwise, and the ceiling is high rather than absent.
+			total, err := store.CountTeams(ctx, "")
+			if err != nil {
+				return nil, wentWrong(a.Logger, "cannot count the teams", err)
 			}
 			// Membership is who is here, which is answered where the rest of
 			// the record is: to an administrator.
 			members := administrating(ctx) == nil
 
 			out := &listOutput[TeamBody]{}
+			out.Body.Total = total
 			out.Body.Items = make([]TeamBody, 0, len(teams))
 			for _, team := range teams {
 				body := TeamBody{

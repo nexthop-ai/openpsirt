@@ -95,6 +95,10 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
 // `resuming` is the same offer made over the screen somebody was already on,
 // after a session ended under them. The words differ because the situation
 // does: one is arriving, the other is being interrupted.
+// The dark wordmark, named once. It is committed and symlinked into the web
+// root and was referenced by nothing at all.
+const LOOKS = "/brand/logo-dark.svg";
+
 export function SignIn({ resuming }: { resuming?: boolean }) {
   const providers = useQuery({
     queryKey: ["providers"],
@@ -120,11 +124,20 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
     <div className="flex min-h-dvh items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <img
-            src="/brand/logo.svg"
-            alt="OpenPSIRT — Product Security Incident Response & Triage"
-            className="h-10"
-          />
+          {/* The artwork the look calls for. The light wordmark's ink is a
+              near-black blue, which on the dark look's canvas is all but
+              invisible — on the one screen somebody meets before they know
+              what the tool is. The stored choice wins over the system's,
+              because a person who picked a look picked it here too; where
+              nothing is stored, `prefers-color-scheme` answers. */}
+          <picture>
+            <source srcSet={LOOKS} media="(prefers-color-scheme: dark)" />
+            <img
+              src="/brand/logo.svg"
+              alt="OpenPSIRT — Product Security Incident Response & Triage"
+              className="signin-mark h-10"
+            />
+          </picture>
           {/* The mark carries no words, so the wordmark's second line is said
               here: this is the one screen somebody meets before they know what
               the tool is. */}

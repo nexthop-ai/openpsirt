@@ -11,7 +11,7 @@ import { Assess } from "./FindingAssess";
 import { Notes } from "./FindingNotes";
 import { HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useQueries, useQuery } from "@tanstack/react-query";
@@ -33,8 +33,6 @@ import { fromAt, listQuery, pathTo, where, windowFor } from "./list";
 // after. When a claim stands it is shown in its state, with one activity
 // timeline, the revision history, the comments, and the decisions made at this
 // place before, whose reasoning is offered back.
-
-type Detail = Body<"DecisionDetail">;
 
 // What a step lands on, said in the hover rather than on the button: the
 // button says which direction, and which finding is what somebody checks
@@ -71,6 +69,10 @@ export function Finding() {
   const who = useWho();
   const at = { product, stream, variant, vulnerability, component };
   const [recorded, setRecorded] = useState<Recorded | null>(null);
+  // The decision form, for the one act that has to put it in front of
+  // somebody: reusing an earlier reasoning fills it in and then has to show
+  // them what it filled in.
+  const form = useRef<HTMLDivElement>(null);
   // Which finding the screen is on. A params-only change does not remount it,
   // so anything below that belongs to one finding has to say which.
   const oneFinding = `${vulnerability}|${component}|${version}`;
@@ -284,7 +286,16 @@ export function Finding() {
   }
   if (!it) return null;
 
-  const claims = standing.map((q) => q.data).filter((d): d is Detail => !!d);
+  // Each claim kept with the summary it came from, paired before anything is
+  // dropped. Filtering first and indexing the summary list afterwards paired
+  // a claim with another claim's summary the moment one of the parallel reads
+  // was slow or failed — and the summary is where the identifier the reasoning
+  // editor writes to comes from, so a revision landed on the wrong claim.
+  const pairs = standingIds.slice(0, SAMPLE).flatMap((_, i) => {
+    const claim = standing[i]?.data;
+    return claim ? [{ claim, summary: it.standing?.[i] }] : [];
+  });
+  const claims = pairs.map((pair) => pair.claim);
   const placeOf = new Map<number, string>();
   history.forEach((q, i) => {
     for (const d of q.data?.previously ?? []) {
@@ -307,6 +318,11 @@ export function Finding() {
     place: placeOf.get(p.decision_id) ?? "",
   }));
   const similar: Similar[] = it.similar ?? [];
+  // Whether anything here is still to answer. One named predicate rather than
+  // the same test written at four sites: the fifth was written in a different
+  // unit — a count of distinct places against a count of chain rows — and
+  // could never be false, which read as a second safety check and was none.
+  const undecided = places.some((place) => place.decision == null);
   // What VEX documents say: a third layer beside what the build claims and
   // what we decided. Shown, offered as a prefill, never applied.
   const vex = it.vex ?? [];
@@ -600,7 +616,7 @@ export function Finding() {
                 Published <Severity word={it.severity} />
               </>
             )}
-            {places.some((p) => p.decision == null) && !reclassifying && (
+            {undecided && !reclassifying && (
               <button
                 type="button"
                 className="linkish"
@@ -729,11 +745,11 @@ export function Finding() {
       </div>
 
       <div className="acting">
-        {claims.map((claim, i) => (
+        {pairs.map(({ claim, summary }) => (
           <Standing
             key={claim.decision?.id}
             claim={claim}
-            summary={it.standing?.[i]}
+            summary={summary}
             places={places}
             mine={mine(claim.proposed_by ?? "")}
             mayApprove={!!who.data?.reach.find((r) => r.product === product)?.may_agree}
@@ -752,7 +768,7 @@ export function Finding() {
           <LookItUp links={it.links ?? []} />
         </div>
 
-        {places.some((p) => p.decision == null) && (
+        {undecided && (
           <>
             {/* Said when there is nothing, because the difference matters:
                 an empty panel reads as "nobody has an opinion about this",
@@ -799,7 +815,7 @@ export function Finding() {
                         <p style={{ whiteSpace: "pre-wrap" }}>{one.statement}</p>
                       </div>
                     )}
-                    {one.offers && decided < places.length && (
+                    {one.offers && (
                       <div className="actions">
                         <button
                           type="button"
@@ -909,27 +925,35 @@ export function Finding() {
               </div>
             )}
             {settled && (
-              <Decide
-                at={{ ...at, version }}
-                places={places}
-                undisclosed={!!it.undisclosed}
-                assigning={
-                  <Assignee
-                    at={at}
-                    assigned={it.assigned_to ?? ""}
-                    undisclosed={!!it.undisclosed}
-                    routedBy={it.routed_by ?? ""}
-                  />
-                }
-                onDone={(r) => {
-                  setRecorded(r);
-                  startFrom(null);
-                  setExtending(null);
-                }}
-                extending={extending}
-                prefill={opening}
-                key={opened}
-              />
+              <div ref={form}>
+                <Decide
+                  at={{ ...at, version }}
+                  places={places}
+                  undisclosed={!!it.undisclosed}
+                  assigning={
+                    <Assignee
+                      at={at}
+                      assigned={it.assigned_to ?? ""}
+                      undisclosed={!!it.undisclosed}
+                      routedBy={it.routed_by ?? ""}
+                    />
+                  }
+                  onDone={(r) => {
+                    setRecorded(r);
+                    startFrom(null);
+                    setExtending(null);
+                  }}
+                  extending={extending}
+                  prefill={opening}
+                  // Remounted when what is being decided changes, not only when
+                  // a prefill arrives. Changing scope on a build-scoped screen
+                  // is a parameter change rather than a navigation, so the form
+                  // stayed mounted and kept the previous build's answers in its
+                  // fields — an outcome and a justification about one variant,
+                  // offered against another.
+                  key={`${opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
+                />
+              </div>
             )}
           </>
         )}
@@ -952,17 +976,17 @@ export function Finding() {
 
         {/* Keyed on the claim, not on the row: the reasoning, the agreement
             and the conversation belong to the action that made the judgment. */}
-        {claims.length > 0 && claims[0]?.decision?.claim_id && (
+        {pairs[0]?.claim.decision?.claim_id && (
           <>
             <Activity
-              claimId={claims[0].decision.claim_id}
-              claim={claims[0]}
-              places={it.standing?.[0]?.places}
+              claimId={pairs[0].claim.decision.claim_id}
+              claim={pairs[0].claim}
+              places={pairs[0].summary?.places}
               previous={previous}
             />
-            <Revisions claimId={claims[0].decision.claim_id} />
+            <Revisions claimId={pairs[0].claim.decision.claim_id} />
             <Comments
-              claimId={claims[0].decision.claim_id}
+              claimId={pairs[0].claim.decision.claim_id}
               mine={mine}
               about={{ product, vulnerability }}
               undisclosed={!!it.undisclosed}
@@ -983,7 +1007,7 @@ export function Finding() {
             of the same pane, because triage is both questions — who is on it
             and what was decided. Here there is nothing left to decide, and
             reassigning a decided finding is still ordinary. */}
-        {!places.some((p) => p.decision == null) && (
+        {!undecided && (
           <Assignee
             at={at}
             assigned={it.assigned_to ?? ""}
@@ -1021,12 +1045,15 @@ export function Finding() {
           <PreviousCard
             items={previous}
             at={at}
-            undecided={places.some((p) => p.decision == null)}
+            undecided={undecided}
             onReuse={(reasoning, outcome, justification) => {
               startFrom({ reasoning, outcome, justification });
-              document
-                .querySelector(".acting .card")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              // The form, by identity. A CSS selector matched the first card
+              // inside the acting column, which is the standing claim's
+              // wherever one stands — so the act filled the form in correctly
+              // and scrolled somewhere above it, and on a long finding the
+              // form the person is now meant to submit was off screen.
+              form.current?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
           />
         )}

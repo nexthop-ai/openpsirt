@@ -5021,6 +5021,11 @@ export interface components {
             items: components["schemas"]["CoverageBody"][] | null;
             /**
              * Format: int64
+             * @description How many in support have never been scanned, across every build and not only this page
+             */
+            never: number;
+            /**
+             * Format: int64
              * @description How many have gone quiet, across every build and not only this page
              */
             quiet: number;
@@ -5034,6 +5039,11 @@ export interface components {
              * @description How many builds there are to report on
              */
             total: number;
+            /**
+             * Format: int64
+             * @description How many are out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
+             */
+            unsupported: number;
         };
         CoveredBuild: {
             /**
@@ -5656,7 +5666,7 @@ export interface components {
             disclose_at?: string;
             /** @description When it is due, as a date. Absent where there is none, and then no_deadline says why */
             due?: string;
-            /** @description The kind of package, as its identifier spells it: deb, golang, cargo, pypi, generic, oci, github, maven. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it */
+            /** @description The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it */
             ecosystem?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
@@ -7048,6 +7058,10 @@ export interface components {
             newest_released_at?: string;
             /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
             newest_version?: string;
+            /** @description What to call that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is */
+            package_page_name?: string;
+            /** @description Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like */
+            package_page_url?: string;
             /**
              * Format: int64
              * @description How many times those sit somewhere in this build. What the bulk cap is measured against
@@ -7967,7 +7981,7 @@ export interface components {
              * @example https://example.com/schemas/Set-affected-buildsRequest.json
              */
             readonly $schema?: string;
-            /** @description Every build it affects, as the whole answer rather than a change to it */
+            /** @description Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding */
             builds: components["schemas"]["Item1"][] | null;
             /** @description Why any build is being taken out. Required whenever one is */
             reason?: string;
@@ -9840,7 +9854,7 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi */
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
                 on?: ("branch" | "tag")[] | null;
@@ -9942,7 +9956,7 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi */
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
                 on?: ("branch" | "tag")[] | null;
@@ -11194,7 +11208,7 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi */
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
                 on?: ("branch" | "tag")[] | null;
@@ -11339,7 +11353,7 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi */
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
                 on?: ("branch" | "tag")[] | null;
@@ -11446,7 +11460,7 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi */
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
                 on?: ("branch" | "tag")[] | null;
@@ -11556,7 +11570,7 @@ export interface operations {
                 tag?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them: deb, golang, cargo, pypi, generic, oci, github, maven. Not the language's name — Rust is cargo and Python is pypi */
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
                 on?: ("branch" | "tag")[] | null;

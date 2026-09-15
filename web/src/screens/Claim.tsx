@@ -23,6 +23,7 @@ import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
 import { useWho } from "../app/session";
 import type { Who } from "../app/session";
+import { Wide } from "../ui/Wide";
 
 // How a product's two spellings are compared: a name people type is matched
 // without regard to capitals, which is the rule the server applies to the
@@ -455,7 +456,7 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
       <p className="hint" style={{ margin: "0 0 10px" }}>
         Holding them back makes them a claim of yours. Revise it to say what differs.
       </p>
-      <div className="tablewrap" style={{ boxShadow: "none" }}>
+      <Wide style={{ boxShadow: "none" }}>
         <table>
           <thead>
             <tr>
@@ -492,7 +493,7 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
             ))}
           </tbody>
         </table>
-      </div>
+      </Wide>
       {holding.size > 0 && (
         <div style={{ marginTop: 10 }}>
           {split.error != null && (

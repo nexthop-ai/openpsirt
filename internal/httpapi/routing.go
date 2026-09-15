@@ -8,6 +8,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -281,7 +282,7 @@ func queueSweep(ctx context.Context, in Ingest, productID int64) {
 // teamsByID is every team's two names, by identifier: the one a write resolves
 // and the one a screen shows.
 func teamsByID(ctx context.Context, in Ingest) (map[int64]named, error) {
-	teams, err := access.NewStore(in.DB.DB).Teams(ctx)
+	teams, err := access.NewStore(in.DB.DB).Teams(ctx, "", database.InBulk.Most)
 	if err != nil {
 		return nil, err
 	}

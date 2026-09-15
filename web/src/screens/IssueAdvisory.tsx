@@ -103,6 +103,16 @@ export function IssueAdvisory({
         A CSAF 2.0 document: what the flaw is, and which releases hold it. Generated, never
         published. Flaws in third-party components are refused.
       </p>
+      {/* On the screen whose purpose is publishing, "never published" and
+          "could not be asked" are the two answers that must not look alike:
+          the first is a reason to publish and the second is a reason not to
+          until it is known. */}
+      {gone.isError && (
+        <p className="hint" style={{ color: "var(--sev-high)" }}>
+          What has already gone out could not be read, so this cannot say whether it has been
+          published before.
+        </p>
+      )}
       {(gone.data?.items ?? []).length > 0 && (
         <p className="hint">
           Published {(gone.data?.items ?? []).length}{" "}

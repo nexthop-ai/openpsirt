@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import type { Body } from "../api/client";
+import type { operations } from "../api/schema";
 
 // The findings list, apart from the screen that draws it.
 //
@@ -22,16 +23,27 @@ export const PAGE = PAGES[0];
 // there is no room to ask.
 const MOST = 200;
 
-// The orders the server offers, by the word it takes and the column they sit
-// under. Named here rather than derived from the headers, because the server's
-// allowlist is the authority and a header that offered an order it does not
-// have would simply stop sorting.
+// The word the server takes for one order, read out of the generated client.
+//
+// The server derives its own enum from the one list that says which orders
+// exist, so this is the authority arriving here rather than a copy of it: a
+// word dropped there is a compile error at the header that offers it, instead
+// of a column that quietly stops sorting when the request is refused.
+export type SortWord = NonNullable<
+  NonNullable<operations["list-findings"]["parameters"]["query"]>["sort"]
+>;
+
+// The orders this list offers as column headers, by the column they sit under.
+//
+// Four of the six. `urgency` is the order the list is in when nothing else is
+// asked for and needs no header of its own, and `age` has no column to sit
+// under — which the typing makes visible rather than answers.
 export const SORTS = {
   Severity: "severity",
   EPSS: "epss",
   Covers: "places",
   Due: "deadline",
-} as const;
+} satisfies Record<string, SortWord>;
 
 // What the by-issue list asks when the address has not said: the work a
 // promised upgrade already answers is out of view, because deciding it again
@@ -53,6 +65,55 @@ export function asAsked(params: URLSearchParams, view: string): URLSearchParams 
   if (!params.has("on")) next.set("on", "branch");
   if (!params.has("support")) next.set("support", "in-support");
   return next;
+}
+
+// The address the list is asking under, changed.
+//
+// Pure functions of the parameters, so they live beside the rest of what the
+// address means rather than inside the screen that draws it. Every change
+// drops the offset: a filter change lands somebody on page nine of a list with
+// two pages, which draws as an empty list under a filter that matches plenty.
+
+// withParam sets one value, or takes the key out where there is none.
+export function withParam(params: URLSearchParams, key: string, value: string): URLSearchParams {
+  return withEach(params, { [key]: value });
+}
+
+// withEach is several filters changed in one act.
+//
+// Two `withParam` calls in a row each build their change from the same
+// parameters, so the second writes over the first — which is why unticking a
+// box that also had to clear a shortcut could not turn the box off.
+export function withEach(
+  params: URLSearchParams,
+  changes: Record<string, string>,
+): URLSearchParams {
+  const next = new URLSearchParams(params);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value) next.set(key, value);
+    else next.delete(key);
+  }
+  return next;
+}
+
+// withParams is several values of one filter, which the address carries as the
+// parameter repeated. Written whole rather than added to, so unticking the
+// last one leaves no empty parameter behind.
+export function withParams(
+  params: URLSearchParams,
+  key: string,
+  values: string[],
+): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.delete(key);
+  for (const value of values) next.append(key, value);
+  return next;
+}
+
+// hiding adds one component to what the list is asked to leave out.
+export function hidden(params: URLSearchParams, component: string): URLSearchParams {
+  const already = params.getAll("hide");
+  return withParams(params, "hide", [...new Set([...already, component])]);
 }
 
 // Which build the list is looking at. Either may be absent: the list is not
@@ -242,6 +303,17 @@ export function identityOf(row: Row): string {
 // that filter prepares. The name rather than the words: the filter is the one
 // place deciding what it says, and a copy in an address is a second one that
 // goes stale the moment somebody saves over the name.
+// Where one build's screens live. The prefix every address under a build
+// shares, written once: four screens spelled it out by hand, and the copies
+// cannot be checked against the router or against each other.
+export function buildPath(at: { product: string; stream: string; variant: string }): string {
+  return (
+    `/products/${encodeURIComponent(at.product)}` +
+    `/streams/${encodeURIComponent(at.stream)}` +
+    `/variants/${encodeURIComponent(at.variant)}`
+  );
+}
+
 export function pathTo(
   at: { product: string; stream: string; variant: string },
   // Only the three fields the address is built from, so that what a caller has
@@ -260,9 +332,7 @@ export function pathTo(
   if (from !== undefined) query.set("from", from);
   const asked = query.toString();
   return (
-    `/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}` +
+    buildPath(at) +
     `/findings/${encodeURIComponent(row.vulnerability ?? "")}` +
     `/components/${encodeURIComponent(row.component ?? "")}` +
     (asked ? `?${asked}` : "")
@@ -277,8 +347,12 @@ export function pathTo(
 // At the largest page there is no room to widen, because the server returns at
 // most that many in one request. The walk then ends at the page edge rather
 // than asking twice, which is the honest outcome: one request answers, or it
-// does not.
+// does not — and the window is the page itself, unmoved. Widening backward
+// alone shifted it back a row, so the last row of every page fell outside its
+// own window; the finding screen locates itself in the window by identity, so
+// it found nothing and the walk vanished at the largest page size.
 export function windowFor(offset: number, limit: number): { offset: number; limit: number } {
+  if (limit >= MOST) return { offset, limit: MOST };
   const start = Math.max(0, offset - 1);
   return { offset: start, limit: Math.min(MOST, limit + (offset - start) + 1) };
 }

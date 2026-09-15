@@ -81,7 +81,7 @@ func registerDueExport(api huma.API, in Ingest) {
 				"product", "stream", "variant", "places", "held by", "due", "days left",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				late, err := store.RunningOutPage(ctx, subject, scope,
+				late, _, err := store.RunningOutPage(ctx, subject, scope,
 					time.Duration(input.Days)*24*time.Hour, limit, offset)
 				if err != nil {
 					return nil, err

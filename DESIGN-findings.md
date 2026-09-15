@@ -168,6 +168,17 @@ Derived at read time and stored nowhere. An address worked out from two names
 cannot go stale while the names are right, and storing it would put a second copy
 of the templates somewhere to fall behind the first.
 
+**One table, and the interface reads its answer.** The component screen had a
+second table of its own, in a second language, with a different membership —
+neither a superset of the other — and different answers for the same
+identifier: it sent every Debian-family package to Debian's tracker, so an
+Ubuntu package's link landed on a record for different code with a different
+version history and a different advisory status, while the same finding's
+server-computed link went to Launchpad. A link that lands on a record for the
+wrong thing costs more than no link, because it is followed before it is
+disbelieved. The package's page travels on the component's own read now, and
+the second table is gone.
+
 Kept apart from the references a report carried, because the provenance is a
 different claim. On this deployment's own image, the references for a package
 matched by identifier were a vendor bulletin, two gists and two mailing-list

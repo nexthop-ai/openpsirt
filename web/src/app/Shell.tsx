@@ -179,6 +179,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               icon="inbox"
               label="Review queue"
               count={queue.data?.total}
+              unread={queue.isError}
               unit="claims waiting"
             />
             <Rail
@@ -186,6 +187,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               icon="nobody"
               label="Unassigned"
               count={unassigned.data?.total}
+              unread={unassigned.isError}
               unit="findings nobody holds"
               quiet
             />
@@ -218,6 +220,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               icon="bug"
               label="Findings"
               count={open.data?.total}
+              unread={open.isError}
               unit="findings — an issue at a component, counted once per build"
               quiet
             />
@@ -344,6 +347,7 @@ function Rail({
   icon,
   label,
   count,
+  unread,
   unit,
   quiet,
   end,
@@ -354,6 +358,10 @@ function Rail({
   icon: string;
   label: string;
   count?: number;
+  // Whether the count could not be read. A badge is gated on being above zero,
+  // so a failed or refused count draws exactly like "nothing waiting" — which
+  // on the review queue is the answer somebody acts on by not looking.
+  unread?: boolean;
   // What the badge is a count of. The rail has room for a number and not for a
   // noun, so the unit rides on the title and on what a screen reader is given
   // — enough that "Unassigned 7,616" beside "5,803 open issues" stops being
@@ -379,14 +387,25 @@ function Rail({
     <NavLink to={to} end={end} className="nav">
       <Icon name={icon} />
       {label}
-      {typeof count === "number" && count > 0 && (
+      {unread ? (
         <span
-          className={quiet ? "count quiet" : "count"}
-          title={unit ? `${count.toLocaleString()} ${unit}` : undefined}
-          aria-label={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+          className="count quiet"
+          title="This count could not be read"
+          aria-label="This count could not be read"
         >
-          {count.toLocaleString()}
+          —
         </span>
+      ) : (
+        typeof count === "number" &&
+        count > 0 && (
+          <span
+            className={quiet ? "count quiet" : "count"}
+            title={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+            aria-label={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+          >
+            {count.toLocaleString()}
+          </span>
+        )
       )}
     </NavLink>
   );
@@ -417,6 +436,10 @@ function Search({ at }: { at: Scoped }) {
   const navigate = useNavigate();
   const [typed, setTyped] = useState("");
   const [looking, setLooking] = useState(false);
+  // Said under the box when the lookup did not happen. A read that failed is
+  // not "no such issue", and falling through to the component search sent
+  // somebody to a narrowed findings list as though their issue did not exist.
+  const [unread, setUnread] = useState(false);
   const box = useRef<HTMLInputElement>(null);
 
   // "/" focuses it, unless somebody is already typing somewhere.
@@ -443,6 +466,7 @@ function Search({ at }: { at: Scoped }) {
         const term = typed.trim();
         if (term === "" || looking) return;
         setLooking(true);
+        setUnread(false);
         void api
           .GET("/v1/issues/{vulnerability}", {
             params: { path: { vulnerability: term }, query: { limit: 1 } },
@@ -453,13 +477,23 @@ function Search({ at }: { at: Scoped }) {
               navigate(`/issues/${encodeURIComponent(term)}`);
               return;
             }
+            // Only a 404 means nobody here carries it. A 500 or a 503 is a
+            // question that was never answered, and treating it as an absence
+            // is a wrong answer with a right answer's confidence.
+            if (answer.response.status !== 404) {
+              setUnread(true);
+              return;
+            }
             // Not an issue anybody here carries, so it is a component search,
             // and that is a question about one product's contents.
             if (!at.product) return;
             const path = findingsPath(at);
             navigate(`${path}${path.includes("?") ? "&" : "?"}q=${encodeURIComponent(term)}`);
           })
-          .catch(() => setLooking(false));
+          .catch(() => {
+            setLooking(false);
+            setUnread(true);
+          });
       }}
     >
       <Icon name="search" />
@@ -475,6 +509,11 @@ function Search({ at }: { at: Scoped }) {
         onChange={(event) => setTyped(event.target.value)}
       />
       <kbd>/</kbd>
+      {unread && (
+        <span className="hint" role="status" style={{ color: "var(--sev-high)" }}>
+          could not be looked up
+        </span>
+      )}
     </form>
   );
 }

@@ -61,7 +61,7 @@ func TestWhatIsRunningOutIsOrderedByDeadlineNotByAge(t *testing.T) {
 		// Ninety days ahead, so both are in range and the order is the thing
 		// being tested. The low was seen first and is due last.
 		who := f.holding(t, access.PublicTriage)
-		late, err := f.store.RunningOut(t.Context(), who, finding.Scope{}, 90*24*time.Hour, 50)
+		late, _, err := f.store.RunningOut(t.Context(), who, finding.Scope{}, 90*24*time.Hour, 50)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,7 +74,7 @@ func TestWhatIsRunningOutIsOrderedByDeadlineNotByAge(t *testing.T) {
 		}
 
 		// And a fortnight ahead the low is not in range at all.
-		soon, err := f.store.RunningOut(t.Context(), who, finding.Scope{}, 14*24*time.Hour, 50)
+		soon, _, err := f.store.RunningOut(t.Context(), who, finding.Scope{}, 14*24*time.Hour, 50)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,6 +82,65 @@ func TestWhatIsRunningOutIsOrderedByDeadlineNotByAge(t *testing.T) {
 			if row.Vulnerability == "CVE-2026-OLD" {
 				t.Error("a low with eighty days left is on the fortnight's list")
 			}
+		}
+	})
+}
+
+// The count that comes back is the answer's, not the page's. A screen reading
+// it off the rows it was handed reported its own limit as the figure and
+// opened a list with twice as many in it.
+func TestWhatIsRunningOutCountsPastThePage(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		run := f.run(t)
+		f.seenAt(t, run, time.Now().UTC().Add(-60*24*time.Hour))
+		reported := []finding.Reported{
+			found("CVE-2026-A", libnl),
+			found("CVE-2026-B", swss),
+			found("CVE-2026-C", teamd),
+		}
+		if _, err := f.store.Apply(t.Context(), f.target, run, reported); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicTriage)
+		whole, total, err := f.store.RunningOut(t.Context(), who, finding.Scope{},
+			90*24*time.Hour, 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(whole) != total {
+			t.Fatalf("%d rows against a total of %d, want them equal where nothing was cut",
+				len(whole), total)
+		}
+		if total < 2 {
+			t.Fatalf("total is %d, which is too few to page", total)
+		}
+
+		page, capped, err := f.store.RunningOut(t.Context(), who, finding.Scope{},
+			90*24*time.Hour, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page) != 1 {
+			t.Fatalf("%d rows came back for a limit of one", len(page))
+		}
+		if capped != total {
+			t.Errorf("a page of one reports a total of %d, want the whole answer's %d",
+				capped, total)
+		}
+
+		// Past the end, where there is no row to read the count off.
+		beyond, still, err := f.store.RunningOutPage(t.Context(), who, finding.Scope{},
+			90*24*time.Hour, 50, total+10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(beyond) != 0 {
+			t.Fatalf("%d rows past the end of the answer", len(beyond))
+		}
+		if still != total {
+			t.Errorf("past the end the total is %d, want %d", still, total)
 		}
 	})
 }
@@ -101,7 +160,7 @@ func TestWhatIsRunningOutIsOneRowPerIssueAtAComponent(t *testing.T) {
 			t.Fatalf("expected one issue at two places, got %d", places)
 		}
 
-		late, err := f.store.RunningOut(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+		late, _, err := f.store.RunningOut(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
 			14*24*time.Hour, 50)
 		if err != nil {
 			t.Fatal(err)
@@ -132,7 +191,7 @@ func TestAnUnratedFindingDoesNotGetTheLongestDeadline(t *testing.T) {
 
 		// A hundred days in: past the ninety-day medium window, well inside
 		// the hundred-and-eighty-day low one.
-		late, err := f.store.RunningOut(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+		late, _, err := f.store.RunningOut(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
 			0, 50)
 		if err != nil {
 			t.Fatal(err)
@@ -267,7 +326,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		// Both answers, which have to be the same answer.
 		onTheClock := func(want bool, because string) {
 			t.Helper()
-			late, err := f.store.RunningOut(ctx, triager, finding.Scope{}, 0, 50)
+			late, _, err := f.store.RunningOut(ctx, triager, finding.Scope{}, 0, 50)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -416,7 +475,7 @@ func TestWhatIsRunningOutNarrowsToWhatIsSelected(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		window := 90 * 24 * time.Hour
 
-		everything, err := f.store.RunningOut(t.Context(), who, finding.Scope{}, window, 50)
+		everything, _, err := f.store.RunningOut(t.Context(), who, finding.Scope{}, window, 50)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -425,7 +484,7 @@ func TestWhatIsRunningOutNarrowsToWhatIsSelected(t *testing.T) {
 		}
 
 		here := f.productID
-		mine, err := f.store.RunningOut(t.Context(), who,
+		mine, _, err := f.store.RunningOut(t.Context(), who,
 			finding.Scope{ProductID: &here}, window, 50)
 		if err != nil {
 			t.Fatal(err)
@@ -440,7 +499,7 @@ func TestWhatIsRunningOutNarrowsToWhatIsSelected(t *testing.T) {
 		// ignored the scope would report another product's numbers under this
 		// product's name.
 		elsewhere := here + 1000
-		none, err := f.store.RunningOut(t.Context(), who,
+		none, _, err := f.store.RunningOut(t.Context(), who,
 			finding.Scope{ProductID: &elsewhere}, window, 50)
 		if err != nil {
 			t.Fatal(err)

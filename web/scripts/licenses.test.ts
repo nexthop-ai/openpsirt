@@ -57,4 +57,16 @@ describe("what it will not guess at", () => {
   it("refuses nothing at all", () => {
     expect(ok("")).toBe(false);
   });
+
+  it("refuses a truncated expression rather than throwing on it", () => {
+    // The gate's only output is an exit code, so a parser that throws exits
+    // with a stack trace and never names the package whose license field was
+    // the problem — which is the one thing somebody reading the failure needs.
+    expect(() => ok("(MIT")).not.toThrow();
+    expect(ok("(MIT")).toBe(false);
+    expect(ok("MIT AND")).toBe(false);
+    expect(ok("MIT OR")).toBe(false);
+    expect(ok("(((")).toBe(false);
+    expect(ok(")")).toBe(false);
+  });
 });

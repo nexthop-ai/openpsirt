@@ -1,4 +1,5 @@
 import type { Sitting } from "../ui/Covering";
+import { keyOf } from "./treeshape";
 
 // The way down to one place, as the rows a reader sees.
 //
@@ -62,7 +63,10 @@ export function intoTheTree(places: Sitting[]): string {
   const steps = wayDown(walked).steps;
   const last = steps[steps.length - 1];
   query.set("at", last?.component ?? "");
-  query.set("path", steps.map((step) => step.component).join("\u001f"));
+  // Each step as the tree's own identity for a row, not as a bare name: the
+  // tree opens the set it is handed, and a name the build ships twice names
+  // two rows there.
+  query.set("path", steps.map((step) => keyOf(step)).join("\u001f"));
   if (last?.version) query.set("version", last.version);
   return query.toString();
 }

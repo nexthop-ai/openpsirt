@@ -17,6 +17,7 @@ import { Editor, forget } from "../ui/Editor";
 import { Severity, Exploited } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
 import { Because, called, labeled } from "../ui/Outcome";
+import { Wide } from "../ui/Wide";
 
 // A page of claims. The queue is read at the grain of a claim, and a claim
 // is a card with its whole argument, so a page is what fits a sitting.
@@ -182,14 +183,19 @@ export function Queue() {
         failed.push(key);
       }
     }
+    // What was refused, and nothing else.
+    //
+    // The selection spans pages and the loop above acts on all of it, so an
+    // entry that is not on the page in front of somebody was approved like the
+    // rest — keeping it ticked because it is off-page left the count standing
+    // and made a second press report every one of them as refused.
+    //
     // Kept from the current selection rather than from the snapshot this loop
     // started with, so anything ticked while it ran survives.
     setPicked((prev) => {
       const left = new Map<string, Claim>();
       for (const [key, claim] of prev) {
-        if (failed.includes(key) || !claims.some((c) => c.key === key)) {
-          left.set(key, claim);
-        }
+        if (failed.includes(key)) left.set(key, claim);
       }
       for (const key of failed) {
         const held = picked.get(key);
@@ -794,7 +800,7 @@ function Card({
             </span>
           </div>
           {(claim.outliers.rows ?? []).length > 0 && (
-            <div className="tablewrap" style={{ boxShadow: "none" }}>
+            <Wide style={{ boxShadow: "none" }}>
               <table>
                 <thead>
                   <tr>
@@ -834,7 +840,7 @@ function Card({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
           )}
           <p className="hint" style={{ margin: "8px 0 0" }}>
             Selected rows are excluded from the approval and rejected back to {claim.proposedBy} as

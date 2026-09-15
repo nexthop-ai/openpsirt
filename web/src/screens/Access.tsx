@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { type Holding, ROLES, wouldReachNothing } from "../ui/roles";
+import { Wide } from "../ui/Wide";
 
 // Who holds what, as a grid of products against capabilities.
 //
@@ -92,7 +93,7 @@ export function Access({
   }
 
   return (
-    <div className="tablewrap" style={{ margin: "4px 0 10px" }}>
+    <Wide style={{ margin: "4px 0 10px" }}>
       {products.isPending ? (
         <p className="hint">Reading the products…</p>
       ) : (
@@ -199,6 +200,6 @@ export function Access({
         Approver and assigner only work where the holder can already read findings, and those cells
         are marked.
       </p>
-    </div>
+    </Wide>
   );
 }

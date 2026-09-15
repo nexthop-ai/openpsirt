@@ -1,0 +1,85 @@
+/* The printed record.
+
+   An auditor takes a copy away, so what prints is the record rather than a
+   photograph of an application: the shell, the controls and anything that only
+   works by being clicked go, and a judgment does not break across a page —
+   half a judgment on each side of a fold is the one thing a record must not
+   do.
+
+   **Imported last.** These declarations win by being last rather than only by
+   being marked important, which is why this file has a position in the
+   cascade rather than a name that happens to sort. */
+
+@media print {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    background: #fff;
+  }
+  .rail,
+  .chrome,
+  .noprint,
+  .filters,
+  .controls,
+  .tabs2,
+  .screen-head > span {
+    display: none !important;
+  }
+  .shell,
+  .page {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .printhead {
+    display: block;
+    margin: 0 0 12px;
+  }
+  .printhead h1 {
+    font-size: 16px;
+    margin: 0 0 2px;
+  }
+  .printhead p {
+    font-size: 11px;
+    color: #444;
+    margin: 0;
+  }
+  .screen-head h2 .n {
+    display: none;
+  }
+  .judgment {
+    break-inside: avoid;
+    border: 1px solid #bbb;
+    background: #fff;
+    box-shadow: none;
+  }
+  /* A report is sections of tables rather than one judgment per block, and
+     the same rule holds: a row split across a fold is a figure nobody can
+     read. The header repeats on every page it carries onto, because a column
+     of numbers with no heading above it is a column of numbers. */
+  .panel {
+    border: 1px solid #bbb;
+    background: #fff;
+    box-shadow: none;
+  }
+  .tablewrap {
+    overflow: visible;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+  .state,
+  .claimed {
+    border: 1px solid #bbb;
+    background: #fff !important;
+    color: #000 !important;
+  }
+}

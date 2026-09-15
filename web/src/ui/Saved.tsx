@@ -1,3 +1,4 @@
+import { JUSTIFICATIONS } from "./Outcome";
 import { notACredential } from "./noautofill";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -224,19 +225,16 @@ export function Saved({
                     onChange={(event) => setJustification(event.target.value)}
                   >
                     <option value="">Select one</option>
-                    <option value="component_not_present">the component is not present</option>
-                    <option value="vulnerable_code_not_present">
-                      the vulnerable code is not present
-                    </option>
-                    <option value="vulnerable_code_not_in_execute_path">
-                      the vulnerable code is never run
-                    </option>
-                    <option value="vulnerable_code_cannot_be_controlled_by_adversary">
-                      nobody outside can reach it
-                    </option>
-                    <option value="inline_mitigations_already_exist">
-                      something already stops it
-                    </option>
+                    {/* From the one list rather than typed out again. A third
+                        copy offered the same five reasons in different words,
+                        so the same claim read one way where it was chosen and
+                        another where it was read back — and a sixth reason
+                        would have been missing here with nothing to say so. */}
+                    {JUSTIFICATIONS.map((each) => (
+                      <option key={each.value} value={each.value}>
+                        {each.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
               )}
@@ -277,8 +275,8 @@ export function Saved({
                     proposed its own claims would leave the approver as the
                     only human judgment on them, and would put a configuration
                     file where a name belongs in the record. */}
-                Proposes nothing. Picking the filter fills the decision form, and <b>you</b> you
-                submit the claim as your own.
+                Proposes nothing. Picking the filter fills the decision form, and <b>you</b> submit
+                the claim as your own.
               </p>
             </>
           )}

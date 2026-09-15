@@ -6,6 +6,8 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
 import { called } from "../ui/roles";
+import { useWho } from "../app/session";
+import { Wide } from "../ui/Wide";
 
 // One person, whole.
 //
@@ -21,6 +23,10 @@ import { called } from "../ui/roles";
 // asked by somebody who administers the deployment.
 export function Person() {
   const { identity = "" } = useParams();
+  // The way back to the list of everybody is offered to somebody who may open
+  // it, which is an administrator. A link that lands on a screen whose every
+  // control is refused is a door into a room with nothing in it.
+  const me = useWho();
   const queries = useQueryClient();
   const about = useQuery({
     queryKey: ["person", identity],
@@ -58,9 +64,21 @@ export function Person() {
         <h2>{who.display_name || who.identity}</h2>
         <p>
           <span className="id">{who.identity}</span>
-          {who.admin && <> · administers this deployment</>} · <Link to="/people">All users</Link>
+          {who.admin && <> · administers this deployment</>}
+          {me.data?.admin && (
+            <>
+              {" "}
+              · <Link to="/people">All users</Link>
+            </>
+          )}
         </p>
       </div>
+
+      {/* Both directions of the same act, so it is said once and above both
+          — the way back in sits in the "they have left" panel and the way out
+          sits below it, and an error rendered inside either is an error
+          rendered in the branch that is not showing. */}
+      {leaving.isError && <Failed error={leaving.error} what="That could not be recorded." />}
 
       {/* Said at the top rather than in a panel below: every other number on
           this screen reads differently once somebody has gone. */}
@@ -98,7 +116,7 @@ export function Person() {
                 nothing.
               </p>
             )}
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -119,7 +137,7 @@ export function Person() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
           </>
         ) : (
           <Empty
@@ -164,7 +182,7 @@ export function Person() {
         <h3>Roles granted and withdrawn</h3>
         {who.held?.length ? (
           <>
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -194,7 +212,7 @@ export function Person() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
             {who.held_total > who.held.length && (
               <p className="hint" style={{ marginTop: 6 }}>
                 The most recent {who.held.length} of {who.held_total.toLocaleString()}.
@@ -217,7 +235,7 @@ export function Person() {
         </p>
         {who.told?.length ? (
           <>
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -243,7 +261,7 @@ export function Person() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
             {who.told_total > who.told.length && (
               <p className="hint" style={{ marginTop: 6 }}>
                 The most recent {who.told.length} of {who.told_total.toLocaleString()}.
@@ -265,7 +283,6 @@ export function Person() {
           <p className="hint">
             Not a deletion. Roles are kept, so reinstating does not mean granting again.
           </p>
-          {leaving.isError && <p className="hint">That could not be recorded.</p>}
           <button type="button" onClick={() => leaving.mutate(true)} disabled={leaving.isPending}>
             Record that they have left
           </button>

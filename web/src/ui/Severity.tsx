@@ -1,4 +1,4 @@
-import { isBand } from "./severities";
+import { bandOf } from "./severities";
 
 // Severity reads at a glance and never borrows the accent color: "urgent" and
 // "clickable" must never look like the same thing.
@@ -14,10 +14,13 @@ export function Severity({ word }: { word?: string }) {
   // below every band, surviving no floor — and only what a reader saw
   // differed: one row said "Unknown" and the row under it said "Unrated"
   // about the same nothing.
-  const shown = isBand(word ?? "") ? (word as string) : "unrated";
-  const known = isBand(shown);
+  const shown = bandOf(word);
+  // The class says what the word says. `unrated` is not one of the four, so
+  // the test that decided the class was always false for it and the badge
+  // drew as a low while reading "Unrated" — the same row counted as a medium
+  // by the chart beside it and drawn with a low's stripe in the card view.
   return (
-    <span className={`sev ${known ? shown : "low"}`}>
+    <span className={`sev ${shown}`}>
       {shown[0]?.toUpperCase()}
       {shown.slice(1)}
     </span>

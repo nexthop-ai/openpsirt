@@ -9,6 +9,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Suggest } from "../ui/Suggest";
 import { matching, offeredAs, whoIs } from "../ui/whom";
+import { Wide } from "../ui/Wide";
 
 // Teams: who work arrives for, as a queue rather than as a person.
 //
@@ -90,7 +91,7 @@ export function Teams() {
           detail="Where work goes when it belongs to a group rather than a person."
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -142,6 +143,7 @@ export function Teams() {
                       people={everybody.filter(
                         (person) => !(team.members ?? []).includes(person.identity),
                       )}
+                      unread={people.isError}
                       busy={join.isPending}
                       onPick={(identity) => join.mutate({ team: team.name ?? "", identity })}
                     />
@@ -162,7 +164,7 @@ export function Teams() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       <p className="hint" style={{ marginTop: 12 }}>
@@ -218,14 +220,22 @@ export function Teams() {
 // refused after typing is a worse way to learn that than not being offered it.
 function Pick({
   people,
+  unread,
   busy,
   onPick,
 }: {
   people: { identity: string; name: string }[];
+  // Whether the list of people could be read at all. An empty list and a list
+  // nobody could fetch look alike, and only the first of them means the team
+  // already holds everybody.
+  unread: boolean;
   busy: boolean;
   onPick: (identity: string) => void;
 }) {
   const [typed, setTyped] = useState("");
+  if (unread) {
+    return <span className="hint">who could be added could not be read</span>;
+  }
   if (people.length === 0) {
     return <span className="hint">everybody recorded is on it</span>;
   }

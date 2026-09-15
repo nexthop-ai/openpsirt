@@ -65,7 +65,7 @@ export function belongTo(identity: string | undefined) {
 function sweep() {
   try {
     const going: string[] = [];
-    const mine = PREFIX + writer + ":";
+    const mine = PREFIX + encodeURIComponent(writer) + ":";
     const now = Date.now();
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
@@ -109,9 +109,16 @@ function read(key: string): { text: string; at: number } | null {
 // about. An empty identity gives an empty key, which every function here reads
 // as "do not keep this" — text typed before anybody is recognized has nowhere
 // safe to go.
+//
+// **The identity is encoded, so the separator cannot occur inside it.** An
+// identity may hold a colon — nothing refuses one — and what a draft is about
+// is colon-rich by construction, so `alice` and `alice:b` produced keys where
+// one was a prefix of the other. The sweep, which is the whole of the control
+// that takes away what is not yours, then read one person's drafts as the
+// other's and left them in the browser.
 function keyFor(about: string | undefined): string {
   if (!about || !writer) return "";
-  return PREFIX + writer + ":" + about;
+  return PREFIX + encodeURIComponent(writer) + ":" + about;
 }
 
 // keep stores text, or removes the draft when there is none left to keep.
@@ -168,6 +175,32 @@ export function forget(about: string | undefined) {
 // would be exposed in a way the application itself is not. Every writer's, not
 // only the one signing out — a draft left by an earlier session is exactly the
 // one nobody would think to clear.
+// Session-scoped state kept outside the drafts, which sign-out also takes
+// away. Named here rather than in the two modules that write it, and imported
+// by them, so the clear and its writers cannot drift apart — and so that this
+// module, which is loaded with the frame, pulls nothing else in behind it.
+//
+// The look and the rail are not here: those are preferences, and a preference
+// surviving a sign-out is what a preference is.
+export const SCOPE_KEPT = "openpsirt.scope";
+export const DECIDE_KEPT = "openpsirt.decide.last";
+const SESSION_KEPT = [SCOPE_KEPT, DECIDE_KEPT];
+
+// forgetSession clears what belongs to the session rather than to the browser.
+//
+// Sign-out is a same-tab navigation, so the session store survives it by
+// construction: the next person to sign in was handed the previous person's
+// product, branch and variant in the scope bar and their last outcome and
+// reasoning in the decision form — including a product name they may hold no
+// grant on.
+export function forgetSession() {
+  try {
+    for (const key of SESSION_KEPT) window.sessionStorage.removeItem(key);
+  } catch {
+    // A browser that refuses storage has nothing to clear.
+  }
+}
+
 export function forgetAll() {
   try {
     const going: string[] = [];

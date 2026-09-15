@@ -17,11 +17,15 @@ describe("the window a finding asks for", () => {
     expect(windowFor(50, 50)).toEqual({ offset: 49, limit: 52 });
   });
 
-  it("asks for no more than the server returns", () => {
-    // At the largest page there is no room to widen, so the walk ends at the
-    // page edge rather than quietly asking for more than it can have.
+  it("keeps the last row of the largest page inside its own window", () => {
+    // At the largest page there is no room to widen, so the window is the page
+    // itself and the walk ends at the page edge. Widening backward alone
+    // shifted the window back a row, which put the page's last row outside it
+    // — and the finding screen, which locates itself in the window by
+    // identity, then drew no walk at all.
     expect(windowFor(0, 200)).toEqual({ offset: 0, limit: 200 });
-    expect(windowFor(200, 200)).toEqual({ offset: 199, limit: 200 });
+    expect(windowFor(200, 200)).toEqual({ offset: 200, limit: 200 });
+    expect(windowFor(400, 200)).toEqual({ offset: 400, limit: 200 });
   });
 });
 

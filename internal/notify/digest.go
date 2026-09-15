@@ -24,6 +24,12 @@ type Digest struct {
 	Unowned []Item
 	// Withheld counts what is not named, and says how urgent it is.
 	Withheld Withheld
+	// HeldTotal and UnownedTotal are how many rows each half has in all,
+	// which is not how many the digest took: the walk is bounded, and a
+	// bounded list rendered as a flat statement of fact tells somebody
+	// holding four hundred things that they hold fifty.
+	HeldTotal    int
+	UnownedTotal int
 }
 
 // Item is one piece of work, as a digest names it.
@@ -64,6 +70,7 @@ func (d Digest) Message(baseURL string) Message {
 		fmt.Fprintf(&text, "%s assigned to you that you have not been told about:\n\n",
 			count(len(d.Mine), "piece of work", "pieces of work"))
 		writeItems(&text, d.Mine)
+		text.WriteString(more(len(d.Mine)+d.Withheld.Count-d.Withheld.Unowned, d.HeldTotal))
 	}
 	if len(d.Unowned) > 0 {
 		if text.Len() > 0 {
@@ -72,6 +79,7 @@ func (d Digest) Message(baseURL string) Message {
 		fmt.Fprintf(&text, "%s arrived since the last digest and nobody owns:\n\n",
 			count(len(d.Unowned), "finding", "findings"))
 		writeItems(&text, d.Unowned)
+		text.WriteString(more(len(d.Unowned)+d.Withheld.Unowned, d.UnownedTotal))
 	}
 	if d.Withheld.Count > 0 {
 		if text.Len() > 0 {
@@ -83,6 +91,19 @@ func (d Digest) Message(baseURL string) Message {
 		text.WriteString("\n" + where + "\n")
 	}
 	return Message{Subject: "Your daily digest", Text: text.String()}
+}
+
+// more says that a list is a part of something larger, where it is.
+//
+// A bounded walk rendered as a flat count is a message that says somebody
+// holds fifty things when they hold four hundred — and they cannot tell the
+// two apart from the message, which is the whole failure. Empty where nothing
+// was cut, so an ordinary digest gains no line.
+func more(shown, total int) string {
+	if total <= shown {
+		return ""
+	}
+	return fmt.Sprintf("\n%d of %d are listed. The rest are in the tool.\n", shown, total)
 }
 
 // said renders the part that names nothing.
@@ -181,11 +202,12 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	const mostPages = 20
 	taken := 0
 	for page := range mostPages {
-		held, _, err := findings.AssignedTo(ctx, subject, subject.Mine(),
+		held, total, err := findings.AssignedTo(ctx, subject, subject.Mine(),
 			finding.Scope{}, most, page*most)
 		if err != nil {
 			return digest, fmt.Errorf("read what %q holds: %w", person.Identity, err)
 		}
+		digest.HeldTotal = total
 		for _, row := range held {
 			if told[Concerning(row.ProductID, row.VulnerabilityID, row.ComponentID)] {
 				continue
@@ -206,11 +228,12 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	// rather than everything ever opened: arriving to a list of eight
 	// thousand is the same as arriving to no channel at all.
 	if person.DigestUnassigned && person.DigestSentAt != nil {
-		unowned, _, err := findings.UnassignedSince(ctx, subject, finding.Scope{},
+		unowned, total, err := findings.UnassignedSince(ctx, subject, finding.Scope{},
 			*person.DigestSentAt, most)
 		if err != nil {
 			return digest, fmt.Errorf("read what nobody owns: %w", err)
 		}
+		digest.UnownedTotal = total
 		for _, row := range unowned {
 			digest.takeUnowned(row)
 		}

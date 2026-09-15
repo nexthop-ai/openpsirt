@@ -3,12 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Loading } from "../ui/Loading";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { Refused, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
+import { Failed } from "../ui/Failed";
 import { Severity, Exploited } from "../ui/Severity";
 import { IssueAdvisory } from "./IssueAdvisory";
 import { IssueNotes } from "./FindingNotes";
 import { useWho } from "../app/session";
+import { Wide } from "../ui/Wide";
 
 // One issue, everywhere it sits.
 //
@@ -40,6 +42,11 @@ export function Issue() {
 
   if (found.isPending) return <Loading />;
   if (found.isError) {
+    // A 404 is the answer to the question this screen asks — nothing you can
+    // read carries the issue. Anything else is a read that did not happen,
+    // and saying "nothing carries this" about it is a wrong answer with the
+    // confidence of a right one.
+    const nothing = found.error instanceof Refused && found.error.status === 404;
     return (
       <>
         <div className="screen-head">
@@ -47,7 +54,14 @@ export function Issue() {
             <span className="id">{vulnerability}</span>
           </h2>
         </div>
-        <Empty title="Nothing you can see carries this." detail="Nothing you can read holds it." />
+        {nothing ? (
+          <Empty
+            title="Nothing you can see carries this."
+            detail="Nothing you can read holds it."
+          />
+        ) : (
+          <Failed error={found.error} what="This issue could not be read." />
+        )}
       </>
     );
   }
@@ -120,7 +134,7 @@ export function Issue() {
       {rows.length === 0 ? (
         <Empty title="Nothing carries it." detail="Nothing open in what you can see holds this." />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -187,7 +201,7 @@ export function Issue() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       {(it?.total ?? 0) > rows.length && (

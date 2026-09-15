@@ -132,17 +132,30 @@ export function Editor({
     });
   }
 
-  // Restore whatever was left behind, once, and only over an empty field —
-  // a draft must never overwrite something the caller supplied.
-  const restored = useRef(false);
+  // Restore whatever was left behind, once per draft, and only over an empty
+  // field — a draft must never overwrite something the caller supplied.
+  //
+  // Once per *draft*, not once per mount. The key changes under a mounted
+  // editor whenever what it is about changes, and a one-shot flag meant the
+  // second draft was never restored at all.
+  const restored = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (restored.current || !draftKey || value !== "") return;
-    restored.current = true;
+    if (restored.current === draftKey || !draftKey || value !== "") return;
+    restored.current = draftKey;
     const kept = restore(draftKey);
     if (kept) onChange(kept);
   }, [draftKey, value, onChange]);
 
+  // What is on screen is stored under the key it was typed under, never under
+  // a key that arrived after it. This effect runs on a change of either, so
+  // the first run after the key moves carries the old text — which wrote one
+  // thing's draft into another's.
+  const writtenUnder = useRef(draftKey);
   useEffect(() => {
+    if (writtenUnder.current !== draftKey) {
+      writtenUnder.current = draftKey;
+      return;
+    }
     keep(draftKey, value);
   }, [draftKey, value]);
 

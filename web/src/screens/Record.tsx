@@ -70,6 +70,9 @@ export function Record() {
   const [received, setReceived] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [refused, setRefused] = useState<string[]>([]);
+  // Where the finding that was just recorded lives, held while somebody reads
+  // which of their files did not attach.
+  const [onward, setOnward] = useState("");
   const [weaknesses, setWeaknesses] = useState<string[]>([]);
 
   const may = mayOf(who.data, product);
@@ -185,24 +188,31 @@ export function Record() {
           failed.push(file.name);
         }
       }
-      setRefused(failed);
-      return made;
+      return { made, failed };
     },
-    onSuccess: (made) => {
+    onSuccess: ({ made, failed }) => {
       void queries.invalidateQueries({ queryKey: ["findings"] });
       void queries.invalidateQueries({ queryKey: ["disclosing"] });
-      // Onto the finding. From here it behaves like any other one, and the
-      // next thing somebody does with a flaw they have just recorded is work
-      // on it.
-      // Onto the first build it landed in. They are the same finding, and the
-      // screen says how many builds hold it.
-      navigate(
+      setRefused(failed);
+      // Onto the first build it landed in. From here it behaves like any
+      // other finding, and the next thing somebody does with a flaw they have
+      // just recorded is work on it. They are the same finding whichever build
+      // is opened, and the screen says how many builds hold it.
+      const onward =
         `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(streams[0] ?? "")}` +
-          `/variants/${encodeURIComponent(variants[0] ?? "")}/findings/` +
-          `${encodeURIComponent(made.identifier)}/components/` +
-          `${encodeURIComponent(made.component)}` +
-          (version ? `?version=${encodeURIComponent(version)}` : ""),
-      );
+        `/variants/${encodeURIComponent(variants[0] ?? "")}/findings/` +
+        `${encodeURIComponent(made.identifier)}/components/` +
+        `${encodeURIComponent(made.component)}` +
+        (version ? `?version=${encodeURIComponent(version)}` : "");
+      // Unless a file was refused. Navigating in the same commit that writes
+      // the warning puts it on a screen that is already unmounting, so the
+      // files that did not attach are lost in silence. Staying put is what
+      // makes it readable, and the way onward is offered beside it.
+      if (failed.length > 0) {
+        setOnward(onward);
+        return;
+      }
+      navigate(onward);
     },
   });
 
@@ -577,6 +587,11 @@ export function Record() {
               {refused.join(", ")} could not be stored. The record stands — attach them again from
               the finding.
             </span>
+            {onward && (
+              <Link className="linkish" to={onward}>
+                Open the finding
+              </Link>
+            )}
           </div>
         )}
 

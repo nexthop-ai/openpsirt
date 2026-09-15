@@ -17,6 +17,7 @@ export function Sheet({
   name,
   answers,
   asked,
+  settled = true,
   children,
 }: {
   name: string;
@@ -25,6 +26,11 @@ export function Sheet({
   // own. The controls themselves do not print, so a sheet whose figures cover
   // ninety days and does not say so is a sheet nobody can check.
   asked?: string;
+  // Whether every figure on it has arrived. A printed sheet is a record, and
+  // this one stamps the moment it was taken on itself — so a sheet printed
+  // while its reads are in flight, or after one of them failed, is a dated
+  // document stating figures nobody computed.
+  settled?: boolean;
   children: ReactNode;
 }) {
   const at = useScope();
@@ -43,7 +49,13 @@ export function Sheet({
           <Link className="linkish" to="/reports">
             All reports
           </Link>{" "}
-          <button type="button" className="btn" onClick={() => window.print()}>
+          <button
+            type="button"
+            className="btn"
+            disabled={!settled}
+            title={settled ? undefined : "Some of these figures have not arrived"}
+            onClick={() => window.print()}
+          >
             Print
           </button>
         </span>

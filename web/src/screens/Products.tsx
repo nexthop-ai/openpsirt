@@ -11,6 +11,7 @@ import { Empty } from "../ui/Empty";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Failed } from "../ui/Failed";
 import type { Who } from "../app/session";
+import { Wide } from "../ui/Wide";
 
 // You pick a product first, and everything below is bound to it. What each one
 // holds is on the row, so the list answers the question it exists to answer
@@ -88,6 +89,13 @@ export function Products({ who }: { who: Who }) {
         {who.admin && <AddButton label="Add product" onClick={() => setAdding(true)} />}
       </div>
 
+      {setEndOfLife.isError && (
+        <Failed error={setEndOfLife.error} what="That support date could not be set." />
+      )}
+      {setFloor.isError && (
+        <Failed error={setFloor.error} what="That triage line could not be set." />
+      )}
+
       {items.length === 0 ? (
         <Empty
           title="You can reach no product yet."
@@ -98,7 +106,7 @@ export function Products({ who }: { who: Who }) {
           }
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -147,6 +155,7 @@ export function Products({ who }: { who: Who }) {
                     <td className="num">{product.branches ?? 0}</td>
                     <td className="num">{product.tags ?? 0}</td>
                     <td className="num">{product.variants ?? 0}</td>
+                    <td className="num">{(product.open ?? 0).toLocaleString()}</td>
                     <td>
                       <Floor
                         product={product.name ?? ""}
@@ -163,7 +172,6 @@ export function Products({ who }: { who: Who }) {
                         onSet={(on) => setEndOfLife.mutate({ product: product.name ?? "", on })}
                       />
                     </td>
-                    <td className="num">{(product.open ?? 0).toLocaleString()}</td>
                     <td
                       className={stale ? "" : "hint"}
                       style={stale ? { color: "var(--sev-high)", fontWeight: 600 } : undefined}
@@ -187,7 +195,7 @@ export function Products({ who }: { who: Who }) {
               })}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       <Declare
@@ -223,7 +231,7 @@ export function Products({ who }: { who: Who }) {
 // the deployment. Following is not the same as stating the deployment's
 // current line — a product that stated it would stop following the next time
 // the deployment changed its mind, and nobody would see that happen.
-type Line = "" | "everything" | "low" | "medium" | "high" | "critical";
+type Line = "" | (typeof THE_LINE)[number];
 
 const lines: Line[] = ["", ...THE_LINE];
 

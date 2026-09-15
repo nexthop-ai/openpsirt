@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { intoTheTree, wayDown } from "./waydown";
 import type { Sitting } from "../ui/Covering";
 
-// The separator the tree's path parameter uses, written as an escape: a file
-// holding the byte itself reads as binary to every text tool, which skips it
-// and says nothing.
+// The two separators the tree's path parameter uses, written as escapes: a
+// file holding the bytes themselves reads as binary to every text tool, which
+// skips it and says nothing. One between steps, and one inside a step, which
+// carries the component, the version and the kind of package — a name the
+// build ships twice names two rows in the tree.
 const SEPARATOR = "\u001f";
+const WITHIN = "\u001e";
 
 const place = (at: Partial<Sitting>): Sitting =>
   ({ place: "p", component: "curl", ...at }) as Sitting;
@@ -55,7 +58,12 @@ describe("opening the dependency tree from a finding", () => {
       ]),
     );
     expect(query.get("at")).toBe("curl");
-    expect(query.get("path")).toBe(`sonic-broadcom${SEPARATOR}curl`);
+    // Each step carries what tells it from another row of the same name, so
+    // the tree opens the step it was given rather than every component
+    // sharing its name.
+    expect(query.get("path")).toBe(
+      `sonic-broadcom${WITHIN}${WITHIN}${SEPARATOR}curl${WITHIN}8.14.1${WITHIN}`,
+    );
     expect(query.get("version")).toBe("8.14.1");
   });
 

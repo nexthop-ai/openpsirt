@@ -4,11 +4,17 @@ import { useReseed } from "./reseed";
 
 // Where a decision applies beyond this build, as a guided review.
 //
-// Three kinds of other build, and only one of them is a choice: builds already
+// Two kinds of other build, and only one of them is a choice: builds already
 // matching are covered by lookup and are named, not asked about; builds
 // holding the issue at **another version** are offered, because a tick there
-// is a claim about code nobody has looked at; a build already past the fix is
-// shown and not offered.
+// is a claim about code nobody has looked at.
+//
+// A third kind was declared, rendered and never populated — a build already
+// past the fix, shown and not offered. The endpoint splits its answer two
+// ways, so the only construction of a plan in the tree passed the empty list
+// and the card could not draw whatever the read returned. The document was the
+// thing left over rather than the code, so it goes with it; if the endpoint
+// grows the bucket the card comes back with it.
 //
 // **What is offered is a version, not a variant**, and it says so. The same
 // product built two ways is one piece of work — a matching build is reached by
@@ -30,7 +36,6 @@ export type Other = {
   variant: string;
   version: string;
   places: number;
-  blocked?: boolean;
   note: string;
   tone: "ok" | "warn" | "off";
 };
@@ -41,7 +46,6 @@ export type Plan = {
   total: number;
   matching: string[];
   offered: Other[];
-  blocked: Other[];
   reasoning: string;
   versionHere: string;
 };
@@ -227,19 +231,6 @@ export function Review({
             </>
           )}
         </div>
-        {plan.blocked.length > 0 && (
-          <div className="revcard off">
-            <h5>Not offered · {plan.blocked.length}</h5>
-            <p>
-              {plan.blocked.map((o, i) => (
-                <span key={o.key}>
-                  {i > 0 && <br />}
-                  <span className="id">{o.build}</span> — {o.note}
-                </span>
-              ))}
-            </p>
-          </div>
-        )}
       </>
     );
     foot = (
