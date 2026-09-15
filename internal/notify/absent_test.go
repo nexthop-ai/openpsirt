@@ -26,12 +26,12 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", true)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Added a moment ago, has never signed in, and holding something.
-		fresh, err := rights.Ensure(ctx, "fresh@example.com", "Fresh Start", false)
+		fresh, err := rights.Ensure(ctx, "fresh@example.com", "Fresh Start", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,22 +112,22 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", true)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
-		away, err := rights.Ensure(ctx, "away@example.com", "Ana Away", false)
+		away, err := rights.Ensure(ctx, "away@example.com", "Ana Away", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Away just as long, and holding nothing. An idle account is not an
 		// alert; it is an account.
-		idle, err := rights.Ensure(ctx, "idle@example.com", "Ivan Idle", false)
+		idle, err := rights.Ensure(ctx, "idle@example.com", "Ivan Idle", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Here yesterday and holding work, which is somebody doing their job.
-		here, err := rights.Ensure(ctx, "here@example.com", "Hana Here", false)
+		here, err := rights.Ensure(ctx, "here@example.com", "Hana Here", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

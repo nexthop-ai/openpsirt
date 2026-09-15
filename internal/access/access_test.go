@@ -68,7 +68,7 @@ func TestSomebodyUnknownAndSomebodyUngrantedGetTheSameAnswer(t *testing.T) {
 	// one answer says the name is wrong, the other says the name is right.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Ensure(ctx, "known", "Known Person", false); err != nil {
+		if _, err := f.store.Ensure(ctx, "known", "Known Person", nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -102,7 +102,7 @@ func TestAuthenticatingCreatesNobody(t *testing.T) {
 func TestARoleOnOneProductSaysNothingAboutAnother(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "reader", "Reader", false)
+		person, err := f.store.Ensure(ctx, "reader", "Reader", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +133,7 @@ func TestARoleOnOneProductSaysNothingAboutAnother(t *testing.T) {
 func TestReadingPublicIsNotReadingPrivate(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, _ := f.store.Ensure(ctx, "public-only", "Public Only", false)
+		person, _ := f.store.Ensure(ctx, "public-only", "Public Only", nil)
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
@@ -153,7 +153,7 @@ func TestACapabilityHandsOverNoVisibility(t *testing.T) {
 	// everything there is to approve.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, _ := f.store.Ensure(ctx, "approver", "Approver", false)
+		person, _ := f.store.Ensure(ctx, "approver", "Approver", nil)
 		for _, role := range []access.Role{access.Approver, access.Assigner} {
 			if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], role); err != nil {
 				t.Fatal(err)
@@ -183,7 +183,7 @@ func TestAReportingRoleCannotBeGranted(t *testing.T) {
 	// hits.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, _ := f.store.Ensure(ctx, "auditor", "Auditor", false)
+		person, _ := f.store.Ensure(ctx, "auditor", "Auditor", nil)
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.Role("reporting")); err == nil {
 			t.Error("a retired role was granted")
 		}
@@ -204,7 +204,7 @@ func TestAnAdministratorAdministersRatherThanHoldingEveryRole(t *testing.T) {
 	// able to change everything.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Ensure(ctx, "admin", "Admin", true); err != nil {
+		if _, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true)); err != nil {
 			t.Fatal(err)
 		}
 		subject, err := f.store.Resolve(ctx, "admin")
@@ -408,7 +408,7 @@ func TestTheHeaderIsRefusedFromSomewhereUntrusted(t *testing.T) {
 	// have authenticated somebody.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", true)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -579,7 +579,7 @@ func TestAnInactiveGrantIsNotSomethingSomebodyHolds(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		sonic := f.products["sonic"]
-		person, err := f.store.Ensure(ctx, "alice", "Alice", false)
+		person, err := f.store.Ensure(ctx, "alice", "Alice", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -616,7 +616,7 @@ func TestGrantingWhatIsAlreadyHeldSucceedsAndChangesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		product := f.products["sonic"]
-		person, err := f.store.Ensure(ctx, "ana", "", false)
+		person, err := f.store.Ensure(ctx, "ana", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

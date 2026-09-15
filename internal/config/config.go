@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -26,6 +27,18 @@ type Config struct {
 	LogFormat string
 	// ShutdownGrace is how long in-flight requests get to finish.
 	ShutdownGrace time.Duration
+
+	// StartupTimeout bounds everything contacted before the server listens:
+	// the database, the schema, the administrators named in configuration and
+	// the attachment store.
+	//
+	// Bounded because an endpoint that accepts a connection and never answers
+	// — a stale load-balancer target, a paused instance — held the process for
+	// ever with no log line written and no port listening. From outside that
+	// is indistinguishable from a slow image pull, and a supervisor cannot act
+	// on it. A crash loop naming what it could not reach is the failure mode
+	// that can be.
+	StartupTimeout time.Duration
 	// DatabaseURL says which database to use and how to reach it.
 	DatabaseURL string
 	// ReadTimeout and WriteTimeout bound a single request.
@@ -229,6 +242,7 @@ func Load() (Config, error) {
 		GitHubOrg:          env("GITHUB_ORG", ""),
 		LogFormat:          env("LOG_FORMAT", "text"),
 		ShutdownGrace:      r.duration("SHUTDOWN_GRACE", 15*time.Second),
+		StartupTimeout:     r.duration("STARTUP_TIMEOUT", 60*time.Second),
 		DatabaseURL:        env("DATABASE_URL", ""),
 		ScannerPath:        env("SCANNER_PATH", ""),
 		TrustedHeader:      env("TRUSTED_HEADER", ""),
@@ -248,26 +262,26 @@ func Load() (Config, error) {
 
 	sources, err := access.ParseSources(env("TRUSTED_SOURCES", ""))
 	if err != nil {
-		return Config{}, fmt.Errorf("%sTRUSTED_SOURCES: %w", envPrefix, err)
+		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_SOURCES: %w", err)
 	}
 	c.TrustedSources = sources
 	// A half-configuration is the dangerous state, so it stops the process
 	// rather than being quietly ignored: a header named with nothing to trust
 	// it from is either a mistake or the first half of one.
 	if err := (access.Trust{Header: c.TrustedHeader, From: c.TrustedSources}).Configured(); err != nil {
-		return Config{}, fmt.Errorf("%sTRUSTED_HEADER: %w", envPrefix, err)
+		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_HEADER: %w", err)
 	}
 
 	if err := c.LogLevel.UnmarshalText([]byte(env("LOG_LEVEL", "info"))); err != nil {
-		return Config{}, fmt.Errorf("%sLOG_LEVEL: %w", envPrefix, err)
+		return Config{}, fmt.Errorf("OPENPSIRT_LOG_LEVEL: %w", err)
 	}
 	switch c.LogFormat {
 	case "text", "json":
 	default:
-		return Config{}, fmt.Errorf("%sLOG_FORMAT: want \"text\" or \"json\", got %q", envPrefix, c.LogFormat)
+		return Config{}, fmt.Errorf("OPENPSIRT_LOG_FORMAT: want \"text\" or \"json\", got %q", c.LogFormat)
 	}
 	if strings.TrimSpace(c.Addr) == "" {
-		return Config{}, fmt.Errorf("%sADDR: must not be empty", envPrefix)
+		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
 	}
 	// Refused at startup rather than at the first sign-in. The API write path
 	// bounds this setting and the environment path did not, so a deployment
@@ -275,10 +289,51 @@ func Load() (Config, error) {
 	// every browser sign-in — and the way back needed an administrator's key,
 	// because nobody could sign in.
 	if c.SessionLifetime > access.MaxSessionLifetime {
-		return Config{}, fmt.Errorf("%sSESSION_LIFETIME: want at most %s, got %q",
-			envPrefix, access.MaxSessionLifetime, c.SessionLifetime)
+		return Config{}, fmt.Errorf("OPENPSIRT_SESSION_LIFETIME: want at most %s, got %q",
+			access.MaxSessionLifetime, c.SessionLifetime)
+	}
+	if err := absoluteBase(c.BaseURL); err != nil {
+		return Config{}, err
 	}
 	return c, nil
+}
+
+// absoluteBase refuses a deployment address that is not one.
+//
+// **Checked here so that every consumer may assume it is absolute**, which
+// four of them already did. It was the one string setting with a required
+// shape that nothing parsed, and the failure was silent where it mattered
+// most: `OPENPSIRT_BASE_URL=psirt.example.com` — the form the value takes in a
+// DNS record or an Ingress host field — parses, puts the whole string in Path
+// and leaves Host empty, so the same-origin check fell through to origins
+// derived from the request's own Host header. The guard became an echo of what
+// the request said, with nothing logged, while the operator believed they had
+// pinned the origin.
+//
+// The other consequences were loud and self-correcting, which is what hid it:
+// the OIDC redirect address is not absolute either, so every sign-in fails at
+// the provider — naming the provider rather than this deployment.
+func absoluteBase(base string) error {
+	if base == "" {
+		return nil
+	}
+	parsed, err := url.Parse(base)
+	switch {
+	case err != nil:
+		return fmt.Errorf("OPENPSIRT_BASE_URL: not an address at all: %q", base)
+	case parsed.Scheme != "http" && parsed.Scheme != "https":
+		return fmt.Errorf(
+			"OPENPSIRT_BASE_URL: want an absolute address such as "+
+				"https://psirt.example.com, got %q", base)
+	case parsed.Host == "":
+		return fmt.Errorf("OPENPSIRT_BASE_URL: names no host: %q", base)
+	case strings.Trim(parsed.Path, "/") != "":
+		// A path below the address would make every link this deployment
+		// writes point somewhere it does not answer.
+		return fmt.Errorf("OPENPSIRT_BASE_URL: names the address, not a path below it: %q",
+			base)
+	}
+	return nil
 }
 
 // reader reads typed settings and keeps the first value it could not read.
@@ -289,6 +344,11 @@ type reader struct {
 	err error
 }
 
+// The one refusal here that composes the prefix rather than writing a name
+// whole: the name is what it is given, one message for every setting, so there
+// is no literal to write. What keeps a variable findable in this file is the
+// call site — `r.duration("SHUTDOWN_GRACE", …)` — which is also what
+// `documented_test.go` reads to hold the set against the page.
 func (r *reader) refuse(key, want, got string) {
 	if r.err == nil {
 		r.err = fmt.Errorf("%s%s: want %s, got %q", envPrefix, key, want, got)

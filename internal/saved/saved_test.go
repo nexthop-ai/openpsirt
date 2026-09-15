@@ -37,7 +37,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // a quarter" rather than "until 3 March".
 func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", false)
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -88,7 +88,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 // rule that lives only in a request schema is one the next caller walks past.
 func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", false)
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

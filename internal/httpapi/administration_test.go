@@ -160,3 +160,50 @@ func TestATokenCannotMintACredentialThatOutlivesIt(t *testing.T) {
 		}
 	})
 }
+
+// TestRecordingSomebodyAgainLeavesAdministrationAlone pins what an omitted
+// field means.
+//
+// Administration was decided from a read taken before the write: a request
+// that said nothing about it passed back whatever the read had returned. Two
+// requests at once, one granting it and one adding a role, and the second
+// wrote back the value it saw before the first — and because the request
+// stated nothing, no trail row said anybody had done it.
+//
+// The read failing was the same shape and worse: it answered "nobody is
+// recorded as this", so the handler took an existing administrator to be new
+// and recorded them without it.
+func TestRecordingSomebodyAgainLeavesAdministrationAlone(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"deputy","admin":true}`); got.Code >= 300 {
+			t.Fatalf("recording an administrator answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// A request about something else entirely, saying nothing about
+		// administration.
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"deputy","holds":[{"product":"mine","role":"public-read"}]}`,
+		); got.Code >= 300 {
+			t.Fatalf("granting them a role answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var person struct {
+			Admin bool `json:"admin"`
+		}
+		read(t, r, "admin", "/v1/people/deputy", &person)
+		if !person.Admin {
+			t.Error("granting a role withdrew administration from somebody who held it")
+		}
+
+		// And nothing claimed it moved. A row per request would make the
+		// trail say administration changed on every edit to somebody's roles.
+		var trail changed
+		read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
+		for _, row := range trail.Items {
+			if row.About == "deputy" && row.Became == "administrator" {
+				t.Errorf("a request saying nothing about administration recorded %+v", row)
+			}
+		}
+	})
+}

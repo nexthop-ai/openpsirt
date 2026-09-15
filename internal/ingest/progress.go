@@ -176,11 +176,17 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// than only the newest, because a page of receipts spans several and each
 	// upload is answered by the run that came after it rather than by the last
 	// one to happen.
+	// Ordered by when they finished, because that is the order the
+	// attribution below walks them in. Asked for by identifier, the two agree
+	// only while no run finishes out of the order it was started in — which is
+	// routine the moment one run is long and another is queued behind it, and
+	// the receipt then cites the wrong run and loses its counts. The
+	// identifier is the tiebreaker, so the result is deterministic.
 	var runs []finding.Run
 	if err := s.db.NewSelect().Model(&runs).
 		Where("target_id = ?", targetID).
 		Where("finished_at IS NOT NULL").
-		Order("id DESC").Scan(ctx); err != nil {
+		Order("finished_at DESC", "id DESC").Scan(ctx); err != nil {
 		return nil, 0, err
 	}
 
@@ -248,8 +254,9 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 		parsed = sc.ReceivedAt
 	}
 	// The run that answers this upload is the earliest *successful* one to
-	// finish after it was parsed. Runs arrive newest first, so the last
-	// assignment in each branch below is the earliest of its kind.
+	// finish after it was parsed. The query asks for them newest first by
+	// finish time, so the last assignment in each branch below is the earliest
+	// of its kind.
 	//
 	// **A run that failed only answers an upload while nothing has succeeded
 	// since.** A scan run covers a build rather than an upload, and this

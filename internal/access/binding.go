@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -144,13 +145,56 @@ func (s *Store) BindAdmin(ctx context.Context, group string) error {
 	return nil
 }
 
-// UnbindAdmin stops a group's members being administrators.
-func (s *Store) UnbindAdmin(ctx context.Context, group string) error {
-	if _, err := s.db.NewDelete().Model((*AdminBinding)(nil)).
-		Where("group_name = ?", group).Exec(ctx); err != nil {
-		return fmt.Errorf("unbind %q from administration: %w", group, err)
+// ErrLastAdministrator is what unbinding the last thing granting
+// administration comes back as.
+//
+// A sentinel, because the caller answers it differently from a failure: it is
+// a refusal somebody can act on rather than something that went wrong.
+var ErrLastAdministrator = errors.New("nothing would be left to administer this deployment")
+
+// UnbindAdminIfOthersRemain stops a group's members being administrators,
+// unless they are the last thing granting it.
+//
+// One transaction, because the count has to see the delete. Written as a
+// delete, a count and a compensating re-insert, a re-insert that failed left
+// the binding gone and nobody able to administer — a state whose only route
+// back is editing the database by hand. Rolling back is also what puts the
+// original row back: BindAdmin stamps a fresh CreatedAt, so a "restored"
+// binding was not the row that had been there.
+// modeIn reads where roles come from, against whichever handle it is given.
+//
+// Taken as a function because this package does not read settings — the one
+// that does sits above it — and the mode has to be read inside the transaction
+// that acts on it rather than handed in already stale.
+type modeIn func(context.Context, bun.IDB) (Mode, error)
+
+func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mode modeIn) error {
+	db, ok := database.Handle(s.db)
+	if !ok {
+		return fmt.Errorf("this store is already inside a transaction")
 	}
-	return nil
+	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+		// Read here, not by the caller. A retry re-runs this closure against a
+		// database somebody else has moved, so a mode fetched before it began
+		// describes a world that is gone (REQ-71) — and judging by the old one
+		// keeps a delete that leaves nobody able to administer the deployment,
+		// which is the state this function exists to prevent.
+		in, err := mode(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.NewDelete().Model((*AdminBinding)(nil)).
+			Where("group_name = ?", group).Exec(ctx); err != nil {
+			return fmt.Errorf("unbind %q from administration: %w", group, err)
+		}
+		switch can, err := canAdminister(ctx, tx, in); {
+		case err != nil:
+			return err
+		case !can:
+			return ErrLastAdministrator
+		}
+		return nil
+	})
 }
 
 // AdminGroups lists the groups whose members administer this deployment.
@@ -415,10 +459,11 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			return fmt.Errorf("set aside the assigned roles over every product: %w", err)
 		}
 	case Direct:
-		if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
-			Where("source = ?", Derived).Exec(ctx); err != nil {
-			return fmt.Errorf("clear what groups derived over every product: %w", err)
-		}
+		// Only the per-product table is cleared of derived rows, because only
+		// it holds any: a group binding names a product, so nothing derives a
+		// role across the estate. `DESIGN-access.md` states that as the rule,
+		// and the delete that stood here against the estate table matched
+		// nothing on every deployment there has ever been.
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 			Where("source = ?", Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived: %w", err)
@@ -466,12 +511,20 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 // administration has one route back — editing the database by hand — and
 // nobody discovers that at a good moment.
 func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
+	return canAdminister(ctx, s.db, mode)
+}
+
+// canAdminister is the three counts, against whichever handle the caller is
+// asking through. Taken as a parameter so that a caller deciding whether to
+// keep a delete can ask inside the transaction that made it: asked outside,
+// the counts describe a database the delete has not reached.
+func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 	// Somebody who has left cannot administer anything: they are refused at
 	// sign-in. Counted, a deactivated bootstrap administrator made this answer
 	// true on their strength alone — so the last admin group could be unbound
 	// and the deployment started cleanly with nobody able to administer it,
 	// which is exactly what this check exists to prevent.
-	bootstrapped, err := s.db.NewSelect().Model((*Account)(nil)).
+	bootstrapped, err := db.NewSelect().Model((*Account)(nil)).
 		Where("is_bootstrap = ?", true).
 		Where("deactivated_at IS NULL").Count(ctx)
 	if err != nil {
@@ -482,14 +535,14 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 	}
 
 	if mode == GroupBound {
-		bound, err := s.db.NewSelect().Model((*AdminBinding)(nil)).Count(ctx)
+		bound, err := db.NewSelect().Model((*AdminBinding)(nil)).Count(ctx)
 		if err != nil {
 			return false, fmt.Errorf("read which groups administer: %w", err)
 		}
 		return bound > 0, nil
 	}
 
-	administrators, err := s.db.NewSelect().Model((*Account)(nil)).
+	administrators, err := db.NewSelect().Model((*Account)(nil)).
 		Where("is_admin = ?", true).
 		Where("deactivated_at IS NULL").Count(ctx)
 	if err != nil {
@@ -518,7 +571,13 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) error {
 	named := make([]string, 0, len(identities))
 	for _, identity := range identities {
-		trimmed := strings.TrimSpace(identity)
+		// Folded, because that is how an identity is stored and how a sign-in
+		// matches one. Compared with its capitals, a name written "Alice" in
+		// configuration cleared nobody and named nobody: the row is "alice",
+		// so the NOT IN below did not spare it and the update below did not
+		// find it — the way back into a deployment nobody can administer,
+		// silently doing nothing.
+		trimmed := folded(identity)
 		if trimmed == "" {
 			continue
 		}
@@ -557,7 +616,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 		}
 
 		for _, identity := range named {
-			person, err := within.Ensure(ctx, identity, "", true)
+			person, err := within.Ensure(ctx, identity, "", Stated(true))
 			if err != nil {
 				return err
 			}

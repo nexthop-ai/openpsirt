@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List administrative changes
-         * @description Who changed a setting, a role grant, a support date, a credential, an account or a team — with what it held before and what it holds now.
+         * @description Who changed a setting, a role grant, a routing rule, a support date, a credential, an account, a team or an issue's names — with what it held before and what it holds now.
          *
          *     This is the layer above the triage record rather than part of it. Three of the things listed here silently rewrite what the tool reports: the deadline windows recompute every open finding's deadline, the triage floor takes the deadline off everything below it, and an end-of-life date takes it off everything past it.
          *
@@ -4740,7 +4740,7 @@ export interface components {
              * @description What sort of thing changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "support" | "release" | "credential" | "account" | "team" | "case";
+            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
             /** @description Nobody had set it before this */
             unset?: boolean;
             was?: string;
@@ -5127,7 +5127,7 @@ export interface components {
             ids: number[] | null;
             /**
              * Format: int64
-             * @description Places of this finding left open, because they were not named
+             * @description Places of this finding this judgment did not reach: ones it did not name, and ones a decision already standing there covers
              */
             left: number;
             /** @description Whether a second person has to agree */
@@ -5541,10 +5541,10 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description Why it has none, where it has none. Blank would read as missing data on the row somebody is deciding about
+             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate. Blank would read as missing data on the row somebody is deciding about
              * @enum {string}
              */
-            no_deadline?: "below-the-line" | "past-end-of-life";
+            no_deadline?: "below-the-line" | "out-of-support";
             /** @description Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned */
             nothing_since?: boolean;
             /** @description When the earliest of these places first appeared here, as a date */
@@ -7072,13 +7072,9 @@ export interface components {
             holds?: components["schemas"]["HeldBody"][] | null;
             /** @description What to call them here */
             identity: string;
-            /** @description Which sign-in path they will arrive by, such as proxy for a trusted header */
-            provider?: string;
             /** @description Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing */
             sees_nothing?: boolean;
             signs_in_by?: components["schemas"]["SignInBody"][] | null;
-            /** @description What that provider calls them. Defaults to the identity */
-            username?: string;
         };
         PersonRecordBody: {
             /**
@@ -8019,10 +8015,17 @@ export interface components {
         SettingBody: {
             /** @description Nobody has set this; the shipped value is in use */
             default?: boolean;
+            /**
+             * @description What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off
+             * @enum {string}
+             */
+            kind: "duration" | "count" | "size" | "word" | "switch";
             /** @description What it decides */
             means: string;
             name: string;
             value: string;
+            /** @description For a word setting, the values it takes, in the order to offer them */
+            words?: string[] | null;
         };
         Shipped: {
             "@id": string;
@@ -8678,7 +8681,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "support" | "release" | "credential" | "account" | "team" | "case";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
                 limit?: number;
                 offset?: number;
             };

@@ -225,7 +225,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7))); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", false)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

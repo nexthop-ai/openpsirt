@@ -167,9 +167,17 @@ func TestEveryMigrationRollsBack(t *testing.T) {
 		if final, err := schema.Version(ctx, db); err != nil || final != 0 {
 			t.Fatalf("after rolling everything back: version %d, err %v", final, err)
 		}
-		// The tables must be gone, not merely unrecorded.
-		for _, table := range []string{"application_setting", "product", "stream", "variant"} {
-			if _, err := db.ExecContext(ctx, "SELECT 1 FROM "+table); err == nil {
+		// Every table the migrations make, not the handful somebody named.
+		// Written out by hand, this passed over most of the schema — so a Down
+		// that forgot its DROP was caught for the few that were listed and
+		// left behind for the rest, where it shows up as the next Up failing
+		// on a table that is already there.
+		left := dbtest.Tables()
+		if len(left) < 50 {
+			t.Fatalf("the table list holds %d names, so this checked almost nothing", len(left))
+		}
+		for _, table := range left {
+			if _, err := db.ExecContext(ctx, `SELECT 1 FROM "`+table+`"`); err == nil {
 				t.Errorf("%s survived a full rollback", table)
 			}
 		}

@@ -82,7 +82,7 @@ func onDay(at *time.Time) *string {
 type ChangeBody struct {
 	At   string `json:"at"`
 	By   string `json:"by" doc:"Who made the change, by sign-in identity"`
-	Kind string `json:"kind" enum:"setting,role,support,release,credential,account,team,case" doc:"What sort of thing changed"`
+	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"What sort of thing changed"`
 	// About is which one: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.
 	About string `json:"about"`
@@ -102,8 +102,9 @@ func registerTrail(api huma.API, in Ingest) {
 		OperationID: "list-administrative-changes", Method: http.MethodGet,
 		Path:    "/v1/administration/changes",
 		Summary: "List administrative changes",
-		Description: "Who changed a setting, a role grant, a support date, a credential, an " +
-			"account or a team — with what it held before and what it holds now.\n\n" +
+		Description: "Who changed a setting, a role grant, a routing rule, a support date, a " +
+			"credential, an account, a team or an issue's names — with what it held " +
+			"before and what it holds now.\n\n" +
 			"This is the layer above the triage record rather than part of it. Three of the " +
 			"things listed here silently rewrite what the tool reports: the deadline windows " +
 			"recompute every open finding's deadline, the triage floor takes the deadline off " +
@@ -111,7 +112,7 @@ func registerTrail(api huma.API, in Ingest) {
 			"Newest first, and paged: it only grows.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
-		Kind   string `query:"kind" enum:"setting,role,support,release,credential,account,team,case" doc:"Keep only changes of one kind"`
+		Kind   string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"Keep only changes of one kind"`
 		Limit  int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int    `query:"offset" minimum:"0"`
 	}) (*struct {
@@ -120,17 +121,21 @@ func registerTrail(api huma.API, in Ingest) {
 			Total int          `json:"total"`
 		}
 	}, error) {
-		if err := administrating(ctx); err != nil {
+		subject, err := requester(ctx)
+		if err != nil {
 			return nil, err
 		}
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
 		store := access.NewStore(in.DB.DB)
-		changes, total, err := trail.NewStore(in.DB.DB).Changes(ctx,
+		// Refused by the store rather than here. A row names who was brought
+		// into which case, undisclosed ones among them, so who may read it is
+		// a question about the query (REQ-42 and REQ-43).
+		changes, total, err := trail.NewStore(in.DB.DB).Changes(ctx, subject,
 			trail.Kind(input.Kind), input.Limit, input.Offset)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "what has been changed could not be read", err)
+			return nil, refused(in.Logger, err, "what has been changed could not be read")
 		}
 
 		who := make([]int64, 0, len(changes))

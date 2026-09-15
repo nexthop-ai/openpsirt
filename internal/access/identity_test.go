@@ -11,7 +11,7 @@ import (
 // administrator does before that person has ever arrived.
 func authorized(t *testing.T, f *fixture, handle, username string) *access.Account {
 	t.Helper()
-	person, err := f.store.Ensure(t.Context(), handle, "", false)
+	person, err := f.store.Ensure(t.Context(), handle, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestOneNameBelongsToOnePerson(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		authorized(t, f, "alice", "alice")
-		other, err := f.store.Ensure(ctx, "mallory", "Mallory", false)
+		other, err := f.store.Ensure(ctx, "mallory", "Mallory", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -304,7 +304,7 @@ func TestAnAuthorizationNobodyRedeemedStopsBeingRedeemable(t *testing.T) {
 	// anybody who wants those roles.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "alice", "Alice", false)
+		person, err := f.store.Ensure(ctx, "alice", "Alice", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -424,7 +424,7 @@ func TestAuthorizingSomebodyAgainRestartsTheirWindow(t *testing.T) {
 	// that somebody can administer it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "alice", "Alice", true)
+		person, err := f.store.Ensure(ctx, "alice", "Alice", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -492,7 +492,7 @@ func TestAProxyChargesTheSameWindowAsAProvider(t *testing.T) {
 	// start, which restarts the window.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "alice", "Alice", false)
+		person, err := f.store.Ensure(ctx, "alice", "Alice", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

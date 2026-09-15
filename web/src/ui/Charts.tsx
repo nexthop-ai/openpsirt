@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Body } from "../api/client";
+import { BANDS as LADDER, COLORS } from "./severities";
 
 // The three shapes the reporting decisions name, drawn small. They sit inside
 // panels rather than on a page of their own, so they carry no title and no
@@ -60,12 +61,10 @@ export function folded(by: Record<string, number>): Record<string, number> {
   return out;
 }
 
-const BANDS = [
-  { key: "critical", color: "var(--sev-critical)" },
-  { key: "high", color: "var(--sev-high)" },
-  { key: "medium", color: "var(--sev-medium)" },
-  { key: "low", color: "var(--sev-low)" },
-];
+// Derived from the ladder rather than written beside it. Spelled out, a rung
+// added to the ladder drew no band here and the split stopped summing to the
+// count printed next to it — which is the one thing a split has to do.
+const BANDS = LADDER.map((key) => ({ key, color: COLORS[key] }));
 
 const tip = {
   background: "var(--surface)",

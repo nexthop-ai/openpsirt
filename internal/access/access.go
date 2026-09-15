@@ -284,6 +284,15 @@ func Everything(what string) Subject {
 	return Subject{Kind: Person, Identity: what, unnarrowed: true}
 }
 
+// Unnarrowed reports whether this is the deployment itself rather than
+// anybody in it — what Everything makes, for a background pass that answers
+// nobody.
+//
+// Asked by the stores that refuse a subject outright rather than narrowing a
+// query for it. Those cannot express "everything" as a filter, so they need
+// the question the filtering ones answer by not narrowing at all.
+func (s Subject) Unnarrowed() bool { return s.unnarrowed }
+
 // Holds reports whether this subject holds a role on a product.
 //
 // **An administrator does not hold every role**. Administration is people,

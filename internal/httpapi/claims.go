@@ -133,8 +133,8 @@ func registerClaims(api huma.API, in Ingest) {
 				link = findingPath(d.ProductName, d.StreamName, d.VariantName,
 					d.Issue.Identifier, d.Component) + "?version=" + url.QueryEscape(d.Version)
 			}
-		} else if in.Logger != nil {
-			in.Logger.Error("could not say which finding a sent-back claim is about",
+		} else if err != nil {
+			in.logger().Error("could not say which finding a sent-back claim is about",
 				"error", err, "claim", input.ID)
 		}
 		for _, author := range back.Authors {

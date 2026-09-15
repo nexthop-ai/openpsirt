@@ -267,7 +267,7 @@ func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *tr
 
 	visibility, err := store.NoteVisibility(ctx, note.ProductID, note.VulnerabilityID)
 	if err != nil {
-		in.Logger.WarnContext(ctx, "could not tell who was named", "error", err)
+		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
 		return nil
 	}
 	dropped, err := mentioned(ctx, in, subject, mentionTarget{
@@ -279,7 +279,7 @@ func tellNamed(ctx context.Context, in Ingest, subject access.Subject, store *tr
 		// by itself for a link to point at.
 	}, note.Body, fmt.Sprintf("/issues/%s", identifier))
 	if err != nil {
-		in.Logger.WarnContext(ctx, "could not tell who was named", "error", err)
+		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
 	}
 	return dropped
 }

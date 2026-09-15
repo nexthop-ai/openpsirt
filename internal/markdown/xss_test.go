@@ -1,43 +1,86 @@
 package markdown_test
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
-// The corpus that has been used to get script past sanitizers, and the shapes
-// specific to markdown itself, asked of the one control that runs here.
-//
-// What renders it is somebody else's — the interface for a browser, an
-// integrator for their own application — and each of them has its own tests
-// over the same corpus. This is the half the server owns: refusing the text
-// before it is stored.
-var corpus = []string{
-	`<script>alert(1)</script>`,
-	`<img src=x onerror=alert(1)>`,
-	`[click](javascript:alert(1))`,
-	`[click](JaVaScRiPt:alert(1))`,
-	`[click](java&#115;cript:alert(1))`,
-	`[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)`,
-	`![img](javascript:alert(1))`,
-	`![img](https://evil.example/pixel.gif)`,
-	`<a href="vbscript:msgbox(1)">x</a>`,
-	`<iframe srcdoc="&lt;script&gt;alert(1)&lt;/script&gt;"></iframe>`,
-	`<a href=" javascript:alert(1)">x</a>`,
-	`<a href="jav&#x0A;ascript:alert(1)">x</a>`,
+// payload is one entry of the shared corpus, and what each half must do with
+// it.
+type payload struct {
+	Text       string `json:"text"`
+	Submission string `json:"submission"`
+	Why        string `json:"why"`
 }
 
-func TestTheSameCorpusIsRefusedAtSubmission(t *testing.T) {
+// corpus is read from the file the interface's renderer reads.
+//
+// **One file, because it was two.** This list called itself "the same corpus"
+// as the one in `web/src/ui/markdown.test.ts` and was 27 payloads shorter —
+// two copies of a security corpus diverge in the direction of the one nobody
+// is adding to, and the comment saying they were the same is what stopped
+// anybody checking.
+func corpus(t *testing.T) []payload {
+	t.Helper()
+	// A literal path, in this file, for the reason the settings gate uses
+	// one: a walk that stopped matching would read less and report the same
+	// clean answer.
+	source, err := os.ReadFile("../../testdata/xss-corpus.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Payloads []payload `json:"payloads"`
+	}
+	if err := json.Unmarshal(source, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Payloads) < 40 {
+		t.Fatalf("the corpus holds %d payloads, so this checked almost nothing",
+			len(doc.Payloads))
+	}
+	return doc.Payloads
+}
+
+func TestTheSameCorpusIsAnsweredAtSubmission(t *testing.T) {
 	// Refusing at submission is what tells somebody their text will not do
 	// what they meant, and it is the whole of what the server enforces:
 	// nothing here renders, so there is no second pass to fall back on.
-	for _, payload := range corpus {
-		if err := markdown.Check(payload); err == nil {
-			t.Errorf("%q was accepted at submission", payload)
+	//
+	// Both answers, because not every payload is refusable here and the
+	// corpus says which — a fenced block holds whatever it holds, and escaped
+	// text is text. Asserting "all refused" over a list that grew would have
+	// meant trimming the list rather than reading the entry.
+	refused, accepted := 0, 0
+	for _, one := range corpus(t) {
+		err := markdown.Check(one.Text)
+		switch one.Submission {
+		case "refused":
+			refused++
+			if err == nil {
+				t.Errorf("%q was accepted at submission, and is there because %s",
+					one.Text, one.Why)
+			}
+		case "accepted":
+			accepted++
+			if err != nil {
+				t.Errorf("%q was refused at submission, and is accepted because %s:\n  %v",
+					one.Text, one.Why, err)
+			}
+		default:
+			t.Errorf("%q says its submission answer is %q, which is neither",
+				one.Text, one.Submission)
 		}
+	}
+	// Both arms reached. A corpus that drifted to one answer would check one
+	// direction and read as though it checked two.
+	if refused == 0 || accepted == 0 {
+		t.Errorf("the corpus asked for %d refusals and %d acceptances", refused, accepted)
 	}
 }
 

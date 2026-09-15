@@ -1,4 +1,3 @@
-import { THE_LINE } from "../ui/severities";
 import { notACredential } from "../ui/noautofill";
 import { useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -211,36 +210,31 @@ function label(name?: string): string {
   }
 }
 
-// The settings whose value is one of a few words rather than a length of time.
-// A select rather than a text box, because a free field invites a value the
-// server then refuses.
-const choices: Record<string, string[]> = {
-  "triage.floor": [...THE_LINE],
-  "upstream.currency": ["off", "on"],
-};
-
-// The settings whose value is a plain number of things rather than a length of
-// time. Named here because everything else here is a duration, and a duration
-// is composed rather than typed — asking somebody to write "8760h" is asking
-// for a mistake that is a factor of twenty-four.
-const counts = new Set(["triage.together-cap", "routing.batch", "queue.backlog"]);
-
-// The settings whose value is a number of bytes. Composed for the same reason
-// a duration is: 26214400 is twenty-five megabytes, and nobody reads it as
-// that — the mistake available in a raw byte field is a factor of a thousand.
-const sizes = new Set(["attachment.max-size", "attachment.quota", "attachment.per-person-quota"]);
+// What a value is, and what it may be, come from the server.
+//
+// They were three tables here keyed on setting names, beside the server's own
+// — five copies of one fact. A setting added to the server and not to these
+// was offered as a text field somebody typed a refused value into, and a word
+// list that drifted offered a word the write path refuses. The server is what
+// checks the value, so the server is what says what it is.
 
 function Field({
   setting,
   onSet,
 }: {
-  setting: { name?: string; value?: string; default?: boolean; means?: string };
+  setting: {
+    name?: string;
+    value?: string;
+    default?: boolean;
+    means?: string;
+    kind: "duration" | "count" | "size" | "word" | "switch";
+    words?: string[] | null;
+  };
   onSet: (value: string) => void;
 }) {
   const [value, setValue] = useState(setting.value ?? "");
-  const words = choices[setting.name ?? ""];
-  // Everything that is not a word, a count or a size is a length of time.
-  const timed = !words && !counts.has(setting.name ?? "") && !sizes.has(setting.name ?? "");
+  const words = setting.words;
+  const timed = setting.kind === "duration";
   // A duration this can compose. Where it cannot — somebody set "90m" from a
   // script, and they meant it — the text field stays, because a control that
   // can only say whole hours must not offer to edit one of those.
@@ -251,7 +245,7 @@ function Field({
   // arrive unset, so that is the state they are first seen in.
   const takes = timed && composable(setting.value ?? "");
   // The same composition for a size, where the setting is one.
-  const measured = sizes.has(setting.name ?? "") ? readBytes(setting.value ?? "") : null;
+  const measured = setting.kind === "size" ? readBytes(setting.value ?? "") : null;
 
   // **The number and the unit are held as typed, not re-derived.**
   //
@@ -397,7 +391,7 @@ function Field({
       {!takes && !measured && !words && humane(value) && (
         <span className="hint">= {humane(value)}</span>
       )}
-      {!measured && sizes.has(setting.name ?? "") && humaneBytes(value) && (
+      {!measured && setting.kind === "size" && humaneBytes(value) && (
         <span className="hint">= {humaneBytes(value)}</span>
       )}
       {(takes || measured) && count.trim() !== "" && !usable && (

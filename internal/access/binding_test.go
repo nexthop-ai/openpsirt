@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
@@ -84,7 +86,7 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 	// cannot be a way in behind the groups' back.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", false)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,7 +196,7 @@ func TestSwitchingToGroupBoundSetsAssignmentsAsideRatherThanDeletingThem(t *test
 	// how the team actually divides work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", false)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -254,6 +256,10 @@ func TestSwitchingBackToDirectClearsWhatGroupsDerived(t *testing.T) {
 	})
 }
 
+// groupBound is the mode read, for a test that is about the counting rather
+// than about where the mode comes from.
+func groupBound(context.Context, bun.IDB) (access.Mode, error) { return access.GroupBound, nil }
+
 func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 	// The only route back is editing the database by hand, and nobody
 	// discovers that at a good moment.
@@ -275,11 +281,28 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 			t.Errorf("a group bound to administration was not enough: %v %v", can, err)
 		}
 
-		// Naming somebody in configuration is enough in either mode.
-		if err := f.store.UnbindAdmin(ctx, "leads"); err != nil {
+		// Unbinding it while it is the only thing granting administration is
+		// refused, and the row is still there afterwards. Refused inside the
+		// write rather than deleted and put back: a compensating re-insert
+		// that failed left the binding gone and nobody able to administer.
+		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); !errors.Is(
+			err, access.ErrLastAdministrator) {
+			t.Errorf("unbinding the last administrators' group answered %v, want a refusal", err)
+		}
+		groups, err := f.store.AdminGroups(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
+		if len(groups) != 1 || groups[0] != "leads" {
+			t.Errorf("a refused unbind left %v, want the binding still there", groups)
+		}
+
+		// Naming somebody in configuration is enough in either mode, and with
+		// that in place the group can be unbound.
 		if err := f.store.NameBootstrapAdmins(ctx, []string{"the-operator"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.UnbindAdminIfOthersRemain(ctx, "leads", groupBound); err != nil {
 			t.Fatal(err)
 		}
 		for _, mode := range []access.Mode{access.Direct, access.GroupBound} {
@@ -364,7 +387,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// Promoted here, not by a group.
-		person, err := f.store.Ensure(ctx, "bob", "Bob", true)
+		person, err := f.store.Ensure(ctx, "bob", "Bob", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}

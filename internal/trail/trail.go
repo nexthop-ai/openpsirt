@@ -37,6 +37,16 @@ const (
 	Account Kind = "account"
 	// Team is a team declared or retired, or somebody put on one or taken off.
 	Team Kind = "team"
+	// Routing is a standing rule that hands unheld work to a team, added or
+	// retired. Not a Role: a role is granted to a person against one product,
+	// and a routing rule grants nobody anything — it decides who is asked.
+	Routing Kind = "routing"
+	// Alias is another identifier an issue answers to. Deployment-wide and
+	// permanent: from the moment it is recorded, a scan of any product
+	// reporting that name resolves to this issue and inherits its decisions.
+	// Neither a setting nor a grant, and the one act here that changes what a
+	// later scan means.
+	Alias Kind = "alias"
 	// Release is when a tag went out and what it was cut from. Both are
 	// recorded after the fact and both change what a chart and a set of
 	// release notes say, so who moved them is the same question as who moved
@@ -110,7 +120,12 @@ func (s *Store) Record(ctx context.Context, by access.Subject, kind Kind, name s
 // Paged, because it only grows: a deployment a year old has every setting
 // anybody ever moved in it, and a screen that asks for all of them is one that
 // stops answering.
-func (s *Store) Changes(ctx context.Context, kind Kind, limit, offset int) ([]Change, int, error) {
+func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind,
+	limit, offset int) ([]Change, int, error) {
+
+	if err := readable(by); err != nil {
+		return nil, 0, err
+	}
 	limit = database.AList.Of(limit)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if kind != "" {
@@ -147,9 +162,12 @@ func (s *Store) Changes(ctx context.Context, kind Kind, limit, offset int) ([]Ch
 // escape character is "#" rather than a backslash, because a backslash inside a
 // string literal is itself an escape on two of the four engines and `ESCAPE
 // '\'` does not parse there at all — the same reason the routing rules use it.
-func (s *Store) About(ctx context.Context, kind Kind, name string,
+func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name string,
 	limit, offset int) ([]Change, int, error) {
 
+	if err := readable(by); err != nil {
+		return nil, 0, err
+	}
 	limit = database.AList.Of(limit)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if kind != "" {
@@ -174,6 +192,27 @@ func (s *Store) About(ctx context.Context, kind Kind, name string,
 		return nil, 0, fmt.Errorf("read what changed about %q: %w", name, err)
 	}
 	return changes, total, nil
+}
+
+// readable refuses a subject that does not administer this deployment.
+//
+// Here rather than in the handler that asks, because a row names who was
+// brought into which case and an undisclosed one is among them — so this is a
+// query about who may read something rather than a shape a handler happens to
+// guard, and a check in a handler is the one somebody forgets (REQ-42 and
+// REQ-43). A refusal rather than an empty page: a reader who may not ask is
+// told so, instead of being shown a deployment where nobody has ever changed
+// anything.
+func readable(by access.Subject) error {
+	if by.Kind == access.Person && by.Admin {
+		return nil
+	}
+	// The deployment itself rather than anybody in it — a background pass
+	// reporting on the tool, which answers nobody.
+	if by.Unnarrowed() {
+		return nil
+	}
+	return access.Denied("read the administrative trail")
 }
 
 // Said turns a value into what the trail stores, where absent means unset.

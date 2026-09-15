@@ -439,7 +439,7 @@ gets ticked without being read.
 |---|---|
 | **Injection — SQL** | Every value parameterized. **Every identifier from an allowlist** — a sort column and a filter field cannot be bound by a placeholder, so a column name arriving from a query parameter is the live hole (REQ-66). Nothing is partitioned, so there are no partition names to guard; `DESIGN-database.md` says what is not built there |
 | **Injection — output** | Component names, versions and descriptions come from a third party's SBOM and get rendered to staff who hold the most access. Encoded on output, and **never passed through the markdown renderer** — that is for text a person typed here (REQ-66). **A URL from a scan or a feed is not encoded output**: it is a scheme a browser acts on, so it is allowlisted before it becomes somewhere to click, and shown without a link where it fails |
-| **Injection — markdown** | Policy enforced at submission, **before storage**: raw HTML off at the parser rather than stripped after, link schemes limited to `http`, `https`, `mailto` — a destination beginning `//` or `/\` is an address on another host, not a relative link — and **nothing remote fetched by a rendered document, images included**. Source stored, never rendered HTML. **Nothing on the server renders**, so sanitizing runs wherever the text is rendered: the interface for a browser, an integrator for their own application, and what the submission check does not catch is theirs to catch. **The fenced-block language tag is input** — allowlisted before it reaches a class attribute, by the renderer, which is where the class is written (REQ-67) |
+| **Injection — markdown** | Policy enforced at submission, **before storage**: raw HTML refused at submission naming the line it is on — not escaped, and not turned off at the parser, which is a renderer option here and reaches nothing — link schemes limited to `http`, `https`, `mailto` — a destination beginning `//` or `/\` is an address on another host, not a relative link — and **nothing remote fetched by a rendered document, images included**. Source stored, never rendered HTML. **Nothing on the server renders**, so sanitizing runs wherever the text is rendered: the interface for a browser, an integrator for their own application, and what the submission check does not catch is theirs to catch. **The fenced-block language tag is input** — allowlisted before it reaches a class attribute, by the renderer, which is where the class is written (REQ-67) |
 | **Broken access control** | Enforced in the data layer with a subject, never per handler. Covers counts, aggregates, search and exports — not just row reads (REQ-42 and REQ-43). An attachment fetch is authorized against its finding's visibility before any signed URL is issued (REQ-70) |
 | **Cryptographic failures** | API keys and personal tokens hashed at rest, shown once (REQ-68). Session identifiers unguessable |
 | **Insecure design** | Does the change contradict a recorded decision? Cite the identifier if so |
@@ -459,6 +459,18 @@ gets ticked without being read.
 - **Authorization is tested as a matrix**: role × visibility × endpoint,
  including counts, aggregates, search and exports.
 - Regression tests are named for the invariant they pin.
+
+**A gate that iterates a collection counts what it examined and fails on
+zero.** The form is `internal/config/documented_test.go:44-45` — `if len(reads)
+== 0 { t.Fatal("no settings were found in the source, so this checked
+nothing") }` — and its two-direction join is the standard: it reports both a
+setting documented and not read, and one read and not documented. Sixteen gates
+were scoped so that they could not go red for the failure they name, and the
+shapes are worth knowing because they recur: a loop over a collection that may
+be empty, an assertion that is a hand-written list of what to check, and an
+exit code with the message thrown away. A gate reached only by running the
+program over the tree is the third of those — lift the detection into a
+function and give it one input that must be reported and one that must not.
 
 **A test named for an arm has an input that reaches only that arm**, and the
 check is coverage of the named line rather than the test passing. Eighteen
@@ -519,7 +531,8 @@ somebody working out later why the code looks like this. Both are in a hurry.
 |---|---|
 | **Short, and plain spoken English** | The register the interface uses, for the same reason: it is skimmed. `DESIGN-interface.md` § What a screen says has the whole of it |
 | **Lists, tables and examples before prose** | A before-and-after pair says what a paragraph about the change does not. A paragraph is for the one thing that is neither a list nor a table |
-| **Numbers where there are numbers** | "6,685 words down to 2,821" is checkable; "much less prose" is not. The same rule the decisions follow |
+| **A measurement where there is one** | "3 ms on PostgreSQL, 11 ms on MySQL", "335,021 findings for one image": a number describing something outside this repository is why the change has the shape it has, and somebody can re-run it |
+| **No count of the tree's own contents** | The same rule code comments and documents are held to, and for a sharper reason: a description is rewritten as the branch is, so "38 trailed acts" or "27 payloads shorter" is stale the next time anybody pushes — and then a reviewer counts them, finds them wrong, and the whole exchange bought nothing. Say the shape. "Every trailed act" stays true through the commit that adds one |
 | **A screenshot where the layout moved** | A reviewer cannot see a rearranged screen in a diff, and asking them to build the branch to find out is asking for a shallower review |
 | **What is left undone, said** | A branch that lands with something out of scope says so, rather than leaving the next person to discover it |
 

@@ -57,6 +57,7 @@ should be here.
 | Public and private mean disclosed, not readable | Every request is authenticated either way, so a mistake in these rules exposes something to a colleague rather than to the internet |
 | Anything unrecognized reads as not disclosed | A column added later would otherwise default every row that predates it to visible |
 | A deployment that cannot tell who is asking serves nobody | Failing closed means an unconfigured deployment is up and refusing, which is visible, rather than up and answering everybody |
+| Recording somebody says nothing about administration unless it is stated | Three things stay distinguishable: granting it, taking it away, and saying nothing. Decided from a read taken before the write, a request about a role passed back whatever that read returned — so two requests at once lost one, and a read that failed answered "nobody is recorded as this" and withdrew it from somebody who had it, with nothing saying anybody had |
 
 ## Roles
 
@@ -391,6 +392,13 @@ subject is exactly what a leak looks like from the outside.
 Anything else takes a subject. Two did not and should have: what a routing rule
 would catch, and which words are in use on a product. Both read findings, both
 answered for the whole product, and both were reached straight from a request.
+
+The trail's two readers were a third. A row there names who was brought into
+which case, undisclosed ones among them, so the only thing between that and a
+caller was a line in the handler. Both now take a subject and refuse one that
+does not administer the deployment — a refusal rather than an empty page, since
+a deployment where nobody has ever changed anything is a different statement
+from one somebody may not read.
 
 Whether somebody may read, and whether they may argue, are one question each,
 asked in one place. The reading rule lived on the subject from the start; the
@@ -732,6 +740,7 @@ database by hand.
 
 | Rule | Reason |
 |---|---|
+| Unbinding the last group granting administration is refused inside the write | The count has to see the delete, so both are one transaction and a refusal rolls it back. Written as a delete, a count and a compensating re-insert, a re-insert that failed left the binding gone and nobody able to administer — and a restored row carried a fresh timestamp, so it was not the row that had been there |
 | Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
 | A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
 
@@ -892,15 +901,41 @@ prevented in the browser; losing the *place* is prevented here.
 ## The administration trail
 
 An administrative change is recorded — who, what, before, after, and when
-(REQ-22): settings, role grants and withdrawals, end-of-life dates, the triage
-floor, credentials, accounts and teams. An administrator reads it beside the
-triage record, because it is the same question one layer up.
+(REQ-22): settings, role grants and withdrawals, routing rules, end-of-life
+dates, the triage floor, credentials, accounts, teams, who is on a case, and
+the names an issue answers to. An administrator reads it beside the triage
+record, because it is the same question one layer up.
 
 | Rule | Reason |
 |---|---|
 | Both values are kept, and absent is not empty | "Who raised the floor to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
-| Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, so a test walks the routes and asserts each leaves a row |
+| Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
 | A failure to record is not a failure of the change | The change has already happened; an error would invite a retry that makes it twice |
+| Recorded as soon as the change has happened, before anything that follows it | Deactivating somebody also ends their sessions and hands their work back, and either can fail with the deactivation already written. Recorded afterwards it was lost for good, because the second attempt finds nothing to move and stops earlier still |
+| A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
+| Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
+
+### Which writes leave a row
+
+Every write the server registers is one of two things, and the walk fails on one
+that is neither.
+
+| | |
+|---|---|
+| **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group bindings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
+| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue |
+
+The second list carries a reason per route rather than a count, because
+absorbing a route that should leave a row is the failure the walk exists to
+make visible — and the way that happens is somebody adding a line to the list
+instead of a call to the recorder.
+
+**The walk is what makes this true rather than intended.** It reads the
+operations the server registered, so a route in neither list fails it; the
+driving half then exercises each trailed route and reads the row back. What it
+replaced was a literal of twelve acts beside a comment claiming a route walk,
+and nine administrative writes recorded nothing with the suite green — a group
+bound to administration among them.
 
 Three levers silently rewrite what this tool reports: changing the deadline policy
 recomputes every open finding's deadline, raising the triage floor removes

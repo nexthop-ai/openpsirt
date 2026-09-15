@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import { BANDS } from "../ui/severities";
 
 type Changed = {
   total?: number;
@@ -126,12 +127,9 @@ function Shape({
   changed: Changed | undefined;
   exploited?: number;
 }) {
-  const bands: [string, number][] = [
-    ["critical", changed?.critical ?? 0],
-    ["high", changed?.high ?? 0],
-    ["medium", changed?.medium ?? 0],
-    ["low", changed?.low ?? 0],
-  ];
+  // Read off the ladder rather than listed here. Written out, a rung added
+  // to it was a row this strip never drew.
+  const bands: [string, number][] = BANDS.map((word) => [word, changed?.[word] ?? 0]);
   const total = changed?.total ?? 0;
   return (
     <div className="card">

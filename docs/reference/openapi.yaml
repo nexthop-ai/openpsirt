@@ -954,12 +954,14 @@ components:
           enum:
             - setting
             - role
+            - routing
             - support
             - release
             - credential
             - account
             - team
             - case
+            - alias
           type: string
         unset:
           description: Nobody had set it before this
@@ -1619,7 +1621,7 @@ components:
             - array
             - "null"
         left:
-          description: Places of this finding left open, because they were not named
+          description: "Places of this finding this judgment did not reach: ones it did not name, and ones a decision already standing there covers"
           format: int64
           type: integer
         needs_approval:
@@ -2311,10 +2313,10 @@ components:
           description: The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix
           type: string
         no_deadline:
-          description: Why it has none, where it has none. Blank would read as missing data on the row somebody is deciding about
+          description: "Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate. Blank would read as missing data on the row somebody is deciding about"
           enum:
             - below-the-line
-            - past-end-of-life
+            - out-of-support
           type: string
         nothing_since:
           description: Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned
@@ -5162,9 +5164,6 @@ components:
           maxLength: 191
           minLength: 1
           type: string
-        provider:
-          description: Which sign-in path they will arrive by, such as proxy for a trusted header
-          type: string
         sees_nothing:
           description: Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing
           type: boolean
@@ -5174,9 +5173,6 @@ components:
           type:
             - array
             - "null"
-        username:
-          description: What that provider calls them. Defaults to the identity
-          type: string
       required:
         - identity
       type: object
@@ -6694,6 +6690,15 @@ components:
         default:
           description: Nobody has set this; the shipped value is in use
           type: boolean
+        kind:
+          description: "What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off"
+          enum:
+            - duration
+            - count
+            - size
+            - word
+            - switch
+          type: string
         means:
           description: What it decides
           type: string
@@ -6701,10 +6706,18 @@ components:
           type: string
         value:
           type: string
+        words:
+          description: For a word setting, the values it takes, in the order to offer them
+          items:
+            type: string
+          type:
+            - array
+            - "null"
       required:
         - name
         - value
         - means
+        - kind
       type: object
     Shipped:
       additionalProperties: false
@@ -7823,7 +7836,7 @@ paths:
   /v1/administration/changes:
     get:
       description: |-
-        Who changed a setting, a role grant, a support date, a credential, an account or a team — with what it held before and what it holds now.
+        Who changed a setting, a role grant, a routing rule, a support date, a credential, an account, a team or an issue's names — with what it held before and what it holds now.
 
         This is the layer above the triage record rather than part of it. Three of the things listed here silently rewrite what the tool reports: the deadline windows recompute every open finding's deadline, the triage floor takes the deadline off everything below it, and an end-of-life date takes it off everything past it.
 
@@ -7841,12 +7854,14 @@ paths:
             enum:
               - setting
               - role
+              - routing
               - support
               - release
               - credential
               - account
               - team
               - case
+              - alias
             type: string
         - explode: false
           in: query

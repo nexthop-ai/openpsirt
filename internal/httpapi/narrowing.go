@@ -115,7 +115,7 @@ func scopedFloor(ctx context.Context, in Ingest, q ScopeQuery,
 // `why` is the sentence for that line and `about` the pairs that say which
 // act it was, in the logger's own key-and-value form.
 func tell(ctx context.Context, in Ingest, why string, telling notify.Telling, about ...any) {
-	if err := notify.NewStore(in.DB.DB).Tell(ctx, telling); err != nil && in.Logger != nil {
-		in.Logger.Error(why, append([]any{"error", err}, about...)...)
+	if err := notify.NewStore(in.DB.DB).Tell(ctx, telling); err != nil {
+		in.logger().Error(why, append([]any{"error", err}, about...)...)
 	}
 }

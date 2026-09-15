@@ -1,3 +1,4 @@
+import { FLOORS } from "../ui/severities";
 import { labeled } from "../ui/Outcome";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
@@ -28,12 +29,22 @@ import { Words } from "../ui/Words";
 // upstream did, where we are with it, where it came from, what it sits in,
 // and when.
 
-export const SEVERITIES = [
-  ["low", "Any"],
-  ["medium", "Medium and above"],
-  ["high", "High and above"],
-  ["critical", "Critical only"],
-] as const;
+// A floor is picked by asking "at least this bad", so the words run least
+// first — which is what FLOORS is. Derived rather than listed here: written
+// out, a rung added to the ladder was one this filter could not be set to.
+//
+// The label says what picking it means rather than naming the word again: the
+// least of them is every finding there is, and the worst of them is only that
+// one.
+export const SEVERITIES = FLOORS.map((word, i) => [
+  word,
+  i === 0 ? "Any" : i === FLOORS.length - 1 ? "Critical only" : titled(word) + " and above",
+]) as unknown as readonly (readonly [string, string])[];
+
+// titled is a word as a label opens it.
+function titled(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
 
 export const FIX_STATES = [
   ["", "Any"],

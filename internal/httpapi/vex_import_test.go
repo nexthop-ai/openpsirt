@@ -79,10 +79,9 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 
 		// Only an administrator uploads one: it is a statement about a
 		// product, not a judgment somebody triages.
-		if got := r.vexed(t, "triager", "debian", said("not_affected",
-			"vulnerable_code_not_present", "The affected routine is not built.")); got.Code < 400 {
-			t.Errorf("a triager uploaded VEX statements, answering %d", got.Code)
-		}
+		refusedWith(t, r.vexed(t, "triager", "debian", said("not_affected",
+			"vulnerable_code_not_present", "The affected routine is not built.")),
+			http.StatusForbidden)
 
 		got := r.vexed(t, "admin", "debian", said("not_affected",
 			"vulnerable_code_not_present", "The affected routine is not built here."))

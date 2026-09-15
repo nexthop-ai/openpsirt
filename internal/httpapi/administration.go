@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -101,16 +102,12 @@ type PersonBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"What to call them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"What to show instead of the identity"`
 	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
-	// Provider and Username are how they will sign in. Recording somebody
-	// without them records a person with access and no door to come through,
-	// so they are required when somebody is first recorded.
+	// How somebody signs in is SignsInBy below, which carries the username
+	// and whether the provider's own identifier has been pinned to it. Two
+	// fields here said the same thing, were documented as though a request
+	// set them, and were assigned on no path at all — so every client written
+	// against the published document read them as absent for everybody.
 	//
-	// The username is what an administrator can type: a provider's own
-	// identifier for somebody is not knowable until they have arrived, so the
-	// authorization is written in the name and pinned to the identifier the
-	// first time it is redeemed.
-	Provider string `json:"provider,omitempty" doc:"Which sign-in path they will arrive by, such as proxy for a trusted header"`
-	Username string `json:"username,omitempty" doc:"What that provider calls them. Defaults to the identity"`
 	// Email, and whether a provider gave it. The second is worth answering:
 	// an address a provider supplied is one a later sign-in may change, and
 	// one recorded here is not.
@@ -337,30 +334,39 @@ func registerAdministration(api huma.API, a Administering) {
 			return nil, err
 		}
 
+		// Nobody recorded under that name, and a read that failed, are
+		// different answers. Told apart by the sentinel rather than by "any
+		// error at all": read as "this person is new", a dropped connection
+		// took administration away from somebody who had it, recorded nothing
+		// saying so, and answered 201.
 		before, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
-		created := lookupErr != nil
+		switch {
+		case lookupErr == nil:
+		case errors.Is(lookupErr, access.ErrNoSuchPerson):
+			before = nil
+		default:
+			return nil, wentWrong(a.Logger, "that person could not be looked up", lookupErr)
+		}
 
 		// Recording somebody records the way they sign in, because access
 		// without a way to arrive is access nobody can use. The identity is
 		// that way: one provider is configured at a time and a username a
 		// trusted proxy asserts is the same person, so there is nothing left
 		// to ask for and nothing left to get wrong.
-		// Omitting administration leaves it as it is, the same way omitting an
-		// address does. A request that says nothing about it — granting a role
-		// on a product, say — decided it when this was a plain bool, so
-		// ticking a role withdrew administration from whoever had it.
-		administers := before != nil && before.IsAdmin
-		if in.Body.Admin != nil {
-			administers = *in.Body.Admin
-		}
-		person, err := store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName, administers)
+		//
+		// Administration is passed through rather than decided here. A request
+		// that says nothing about it leaves it alone, and the store is what
+		// knows that — computed here from a read taken before the write, two
+		// requests at once would have the second write back the value it saw
+		// before the first.
+		person, err := store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName, in.Body.Admin)
 		if err != nil {
 			return nil, huma.Error400BadRequest(err.Error())
 		}
-		if created {
+		if before == nil {
 			noteAdminChange(ctx, a, trail.Account, in.Body.Identity, nil,
 				trail.Said("recorded", true))
-		} else if before != nil && in.Body.Admin != nil && before.IsAdmin != *in.Body.Admin {
+		} else if in.Body.Admin != nil && before.IsAdmin != *in.Body.Admin {
 			// Administration is global and is the widest thing anybody here
 			// holds, so a change to it is recorded with what it changed from
 			// (REQ-22). Only where it actually moved: recording somebody again
@@ -449,7 +455,7 @@ func registerAdministration(api huma.API, a Administering) {
 		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot read back the person just recorded", err)
 		}
-		return answer(created, *body), nil
+		return answer(before == nil, *body), nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{

@@ -256,7 +256,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // plan nobody can be asked about.
 func (f *fixture) planner(t *testing.T, roles ...access.Role) access.Subject {
 	t.Helper()
-	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "them@example.com", "Them", false)
+	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "them@example.com", "Them", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

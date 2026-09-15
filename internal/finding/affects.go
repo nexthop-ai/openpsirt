@@ -107,6 +107,12 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// What is open now, read inside the transaction: a retry
 		// re-runs this against a database somebody else may have
 		// moved.
+		// Ordered, because the first row is what a filing against another
+		// build is copied from. Unordered, which row that is depends on the
+		// plan an engine happened to pick, so the same request could produce
+		// a different row on a different engine or after an index changed.
+		// The earliest filing is the one to copy: it is the record of what was
+		// first known about this issue here.
 		var rows []Finding
 		err := tx.NewSelect().Model(&rows).
 			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
@@ -114,6 +120,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			Where("st.product_id = ?", productID).
 			Where("f.vulnerability_id = ?", vulnerabilityID).
 			Where("f.closed_at IS NULL").
+			Order("f.opened_at ASC", "f.id ASC").
 			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("read which builds hold it: %w", err)
@@ -233,6 +240,7 @@ func (s *Store) filedAgainst(ctx context.Context, productID, vulnerabilityID int
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
+		Order("f.opened_at ASC", "f.id ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read which builds hold it: %w", err)

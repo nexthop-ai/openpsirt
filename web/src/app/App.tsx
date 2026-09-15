@@ -182,8 +182,15 @@ export function App() {
             <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
             <Route path={ROUTES.settings} element={<Settings />} />
             {/* A path the page does not know either. Sending somebody home is
-            better than a dead end, and the address bar already told them
-            where they tried to go. */}
+            better than a dead end — and the replace is what stops the back
+            button returning to an address that only redirects again.
+            
+            **What it costs is that nothing says why.** The address they tried
+            is gone from the bar with it, so a link built wrong lands on the
+            home screen looking like a click that did nothing. That is how
+            `/products//components/NAME` — a component link built with no
+            product selected — was reported as "it brings you back to the
+            homepage". */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

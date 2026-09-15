@@ -691,9 +691,15 @@ type EvidenceBody struct {
 	Opened string `json:"opened,omitempty" doc:"When the earliest of these places first appeared here, as a date"`
 	// Due and NoDeadline are the same pair the list carries, and the screen
 	// somebody actually decides on carried neither.
-	Due        string        `json:"due,omitempty" doc:"When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late"`
-	DaysLeft   *int          `json:"days_left,omitempty" doc:"Negative once it is overdue"`
-	NoDeadline string        `json:"no_deadline,omitempty" enum:"below-the-line,past-end-of-life" doc:"Why it has none, where it has none. Blank would read as missing data on the row somebody is deciding about"`
+	Due      string `json:"due,omitempty" doc:"When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late"`
+	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue"`
+	// The same two words the list body declares. This said
+	// `past-end-of-life`, which nothing produces, and omitted
+	// `out-of-support`, which the store emits on every finding whose release
+	// is past end of life — so a consumer validating against the published
+	// document rejected the body, and a TypeScript one could not narrow on
+	// the value it actually receives. Two bodies for one value, disagreeing.
+	NoDeadline string        `json:"no_deadline,omitempty" enum:"below-the-line,out-of-support" doc:"Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate. Blank would read as missing data on the row somebody is deciding about"`
 	FoundBy    *MeasuredBody `json:"found_by,omitempty" doc:"What produced this: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
 	// Recorded says a person entered this rather than a scanner reporting it,
@@ -813,7 +819,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 					// makes a database failure indistinguishable from "the
 					// issue is at none of them", and the caller gets the wide
 					// list with nothing saying why.
-					in.Logger.Error("which versions carry this issue could not be read",
+					in.logger().Error("which versions carry this issue could not be read",
 						"component", input.Component, "error", second)
 				}
 				switch {

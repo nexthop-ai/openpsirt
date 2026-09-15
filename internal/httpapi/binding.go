@@ -2,12 +2,16 @@ package httpapi
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
 // ModeBody is where this deployment's roles come from.
@@ -103,9 +107,15 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err := rights.SwitchTo(ctx, wanted); err != nil {
 			return nil, wentWrong(a.Logger, "cannot change where roles come from", err)
 		}
-		if err := store.Set(ctx, setting.RoleMode, string(wanted)); err != nil {
+		// Changed rather than set, because what it held is not derivable
+		// afterwards and is half of what the trail is asked: read in a
+		// statement of its own it would be the value at some earlier moment.
+		before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
+		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot record where roles come from", err)
 		}
+		noteAdminChange(ctx, a, trail.Setting, setting.RoleMode,
+			trail.Said(before, had), trail.Said(string(wanted), true))
 		return &struct{ Body ModeBody }{Body: ModeBody{Mode: string(wanted)}}, nil
 	})
 
@@ -179,6 +189,8 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 			if err := rights.BindAdmin(ctx, in.Body.Group); err != nil {
 				return nil, wentWrong(a.Logger, "cannot bind a group to administration", err)
 			}
+			noteAdminChange(ctx, a, trail.Role, in.Body.Group+" on every product",
+				nil, trail.Said(adminRole, true))
 			return &struct{ Body BindingBody }{Body: in.Body}, nil
 		}
 
@@ -193,6 +205,10 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
 			return nil, wentWrong(a.Logger, "cannot bind a group", err)
 		}
+		// Named by the product's address rather than its display name, because
+		// that is what a binding states and what the withdrawal resolves.
+		noteAdminChange(ctx, a, trail.Role, in.Body.Group+" on "+product.Name,
+			nil, trail.Said(in.Body.Role, true))
 		return &struct{ Body BindingBody }{Body: in.Body}, nil
 	})
 
@@ -215,17 +231,20 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 
 		if in.Role == adminRole {
 			// Refused where it would leave nobody able to administer, for the
-			// same reason the mode change is.
-			if err := rights.UnbindAdmin(ctx, in.Group); err != nil {
+			// same reason the mode change is — and decided inside the write,
+			// so a refusal rolls the delete back rather than being undone by
+			// a second statement that could itself fail.
+			switch err := rights.UnbindAdminIfOthersRemain(ctx, in.Group,
+				roleModeIn(settings)); {
+			case errors.Is(err, access.ErrLastAdministrator):
+				return nil, huma.Error409Conflict(
+					"that was the last thing granting administration: bind another group " +
+						"to admin, or name somebody in configuration, first")
+			case err != nil:
 				return nil, wentWrong(a.Logger, "cannot unbind a group from administration", err)
 			}
-			if err := stillAdministrable(ctx, rights, a, settings); err != nil {
-				// Put back, so a refusal does not half-apply.
-				if restored := rights.BindAdmin(ctx, in.Group); restored != nil {
-					return nil, wentWrong(a.Logger, "cannot restore an administration binding", restored)
-				}
-				return nil, err
-			}
+			noteAdminChange(ctx, a, trail.Role, in.Group+" on every product",
+				trail.Said(adminRole, true), nil)
 			return &struct{}{}, nil
 		}
 
@@ -236,6 +255,8 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err := rights.Unbind(ctx, in.Group, product.ID, access.Role(in.Role)); err != nil {
 			return nil, wentWrong(a.Logger, "cannot unbind a group", err)
 		}
+		noteAdminChange(ctx, a, trail.Role, in.Group+" on "+product.Name,
+			trail.Said(in.Role, true), nil)
 		return &struct{}{}, nil
 	})
 }
@@ -244,33 +265,24 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 // against a product, so it is not one of the roles.
 const adminRole = "admin"
 
-// stillAdministrable refuses a change that would leave nobody able to
-// administer this deployment.
+// roleModeIn reads where roles actually come from, against whichever handle it
+// is given — which is the transaction deciding, rather than this.
 //
-// Asked against the mode actually in force. Unbinding the last administrators'
-// group matters while roles are derived from groups and does not while they
-// are assigned, and refusing in both would make a deployment that has never
-// turned group binding on unable to tidy up a mapping it is not using.
-func stillAdministrable(ctx context.Context, rights *access.Store, a Administering, settings func() *setting.Store) error {
-	mode := access.Direct
-	if store := settings(); store != nil {
-		stored, _, err := store.Get(ctx, setting.RoleMode)
-		if err != nil {
-			return wentWrong(a.Logger, "cannot read where roles come from", err)
+// Asked because unbinding the last administrators' group matters while roles
+// are derived from groups and does not while they are assigned: refusing in
+// both would leave a deployment that has never turned group binding on unable
+// to tidy up a mapping it is not using.
+func roleModeIn(settings func() *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
+	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
+		if settings() == nil {
+			return access.Direct, nil
 		}
-		mode = access.AsMode(stored)
+		stored, _, err := setting.NewStore(db).Get(ctx, setting.RoleMode)
+		if err != nil {
+			return "", fmt.Errorf("read where roles come from: %w", err)
+		}
+		return access.AsMode(stored), nil
 	}
-
-	can, err := rights.CanAdminister(ctx, mode)
-	if err != nil {
-		return wentWrong(a.Logger, "cannot tell who would administer", err)
-	}
-	if !can {
-		return huma.Error409Conflict(
-			"that was the last thing granting administration: bind another group to admin, " +
-				"or name somebody in configuration, first")
-	}
-	return nil
 }
 
 // named is the two names a product answers to, which are different strings
@@ -382,6 +394,8 @@ func registerRevocation(api huma.API, a Administering) {
 		if err := rights.RevokeToken(ctx, token.ID); err != nil {
 			return nil, wentWrong(a.Logger, "cannot revoke a token", err)
 		}
+		noteAdminChange(ctx, a, trail.Credential, in.Identity+" · "+in.Name,
+			trail.Said("in force", true), nil)
 		return &struct{}{}, nil
 	})
 
@@ -406,6 +420,8 @@ func registerRevocation(api huma.API, a Administering) {
 		if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
 			return nil, wentWrong(a.Logger, "cannot end the sessions", err)
 		}
+		noteAdminChange(ctx, a, trail.Account, in.Identity,
+			nil, trail.Said("sessions ended", true))
 		return &struct{}{}, nil
 	})
 }

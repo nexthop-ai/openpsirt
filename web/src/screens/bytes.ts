@@ -9,6 +9,12 @@
 
 // The units offered, in bytes. Binary multiples, because that is what the
 // shipped defaults are written as and what a storage bucket is measured in.
+//
+// **The smallest unit is one byte**, which is what makes both readers below
+// total: every positive whole number of bytes divides by it, so the loop
+// always returns and the statement after it was unreachable. The duration
+// composer beside this one genuinely differs — its smallest unit is an hour,
+// so "90m" falls out of its loop and its fall-through is real.
 export const SIZES = [
   { unit: "bytes", bytes: 1 },
   { unit: "KB", bytes: 1024 },
@@ -29,7 +35,8 @@ export function readBytes(value: string): { count: number; unit: Size } | null {
   for (const each of [...SIZES].reverse()) {
     if (bytes % each.bytes === 0) return { count: bytes / each.bytes, unit: each.unit };
   }
-  return null;
+  // The bytes unit divides everything, so the loop above always returned.
+  throw new Error(`no unit divides ${bytes}, which the bytes unit does`);
 }
 
 // Write one back in the form the server takes.
@@ -52,5 +59,7 @@ export function humaneBytes(value: string): string {
       return `${said} ${each.unit}`;
     }
   }
-  return `${bytes} bytes`;
+  // Same reason: the bytes unit is one byte, so the loop above always
+  // returned.
+  throw new Error(`no unit fits ${bytes}, which the bytes unit does`);
 }

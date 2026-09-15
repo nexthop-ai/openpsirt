@@ -78,6 +78,9 @@ func registerRun(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		if in.DB == nil {
+			return nil, noDatabase(in.logger())
+		}
 		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, target.ID, input.Run)
 		if err != nil {
 			return nil, absent(in.Logger, err, "that run could not be looked up",

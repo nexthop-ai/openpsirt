@@ -106,9 +106,12 @@ func registerTags(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		if in.DB == nil {
+			return nil, noDatabase(in.logger())
+		}
 		rows, err := finding.NewStore(in.DB.DB).TagsInUse(ctx, subject, named.ID)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "the tags could not be read", err)
+			return nil, wentWrong(in.logger(), "the tags could not be read", err)
 		}
 		out := &listOutput[string]{}
 		out.Body.Items = rows

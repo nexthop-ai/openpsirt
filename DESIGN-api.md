@@ -46,15 +46,23 @@ document is wrong the first time somebody is in a hurry — silently.
 ## Unauthenticated surfaces
 
 The application serves no documentation of its own, leaving **no unauthenticated
-route that reads anything from the database**. Four surfaces answer without a
-credential. The list is written out rather than inferred from a rule, so adding a
-route never adds an exception.
+route that reads domain data**: no product, finding, issue, person or credential
+is readable without a credential.
+
+Sign-in is not nothing, and the absolute this used to state was false. It reads
+and writes the deployment's own sign-in key, the session it is creating and the
+account row a first arrival needs — its own machinery, and nothing beyond it. A
+route added under that prefix is checked against that; it is not harmless by
+construction.
+
+Four surfaces answer without a credential. The list is written out rather than
+inferred from a rule, so adding a route never adds an exception.
 
 | Surface | Answers |
 |---|---|
 | `/healthz`, `/readyz` | Whether the process is up and whether it can reach its database |
 | `/v1/sign-in` | The providers an operator configured. A sign-in page draws a button per provider and cannot ask for that list while holding nothing |
-| `/v1/sign-in/…` | Redirects to a provider, or refuses. Nothing under it reads anything, so a route added here by mistake leaks a redirect rather than data |
+| `/v1/sign-in/…` | Redirects to a provider, or refuses. What it reads and writes is its own: the sign-in key, the session, and the account a first arrival needs. A route added here is checked against that rather than assumed harmless |
 | The interface | The built assets. They contain no data; everything drawn in them is fetched with a credential |
 
 ## Operation descriptions

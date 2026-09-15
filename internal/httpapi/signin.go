@@ -142,7 +142,7 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 		// provider is an operator's problem, and telling whoever is at the
 		// browser would describe our configuration to them.
 		if in.Logger != nil {
-			in.Logger.Warn("a sign-in could not be completed",
+			in.logger().Warn("a sign-in could not be completed",
 				"provider", provider.Name(), "error", err)
 		}
 		refuseSignIn(w, in)
@@ -170,7 +170,7 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 	person, err := admit(r, in, rights, identity)
 	if err != nil {
 		if in.Logger != nil {
-			in.Logger.Info("refused somebody who authenticated but reaches nothing",
+			in.logger().Info("refused somebody who authenticated but reaches nothing",
 				"provider", provider.Name(), "identity", identity.Username)
 		}
 		refuseSignIn(w, in)
@@ -270,7 +270,7 @@ func fillEmail(r *http.Request, in Ingest, rights *access.Store,
 		return
 	}
 	if err := rights.SetEmail(r.Context(), person.ID, identity.Email, access.FromProvider); err != nil && in.Logger != nil {
-		in.Logger.Warn("could not record where to reach somebody who signed in",
+		in.logger().Warn("could not record where to reach somebody who signed in",
 			"person", person.Identity, "error", err)
 	}
 }
@@ -488,7 +488,7 @@ func refuseSignIn(w http.ResponseWriter, in Ingest) {
 // about it to whoever asked.
 func wentWrongHere(w http.ResponseWriter, in Ingest, what string, err error) {
 	if in.Logger != nil {
-		in.Logger.Error(what, "error", err)
+		in.logger().Error(what, "error", err)
 	}
 	Problem(w, http.StatusInternalServerError, "something went wrong")
 }

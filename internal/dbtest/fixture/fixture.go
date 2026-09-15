@@ -172,7 +172,7 @@ func (w *World) DeclarePerson(identity, displayName string, admin bool) *access.
 			"falls back to the identity, so a field answering the wrong one "+
 			"cannot be told from a field answering the right one", identity)
 	}
-	person, err := w.Access.Ensure(context.Background(), identity, displayName, admin)
+	person, err := w.Access.Ensure(context.Background(), identity, displayName, access.Stated(admin))
 	if err != nil {
 		w.t.Fatalf("declare %q: %v", identity, err)
 	}

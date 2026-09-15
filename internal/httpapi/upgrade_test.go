@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -86,11 +87,9 @@ func TestPlanningAnUpgradeNeedsTheTriageRight(t *testing.T) {
 		soon := time.Now().UTC().Add(24 * time.Hour).Format("2006-01-02")
 		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
 			"builds":[{"stream":"master","variant":"broadcom"}],"reasoning":"No."}`, soon)
-		got := asPerson(t, r, "reader", http.MethodPost,
-			"/v1/products/mine/components/linux-image/upgrade", body)
-		if got.Code < 400 {
-			t.Fatalf("somebody who may not triage planned an upgrade: %d", got.Code)
-		}
+		refusedWith(t, asPerson(t, r, "reader", http.MethodPost,
+			"/v1/products/mine/components/linux-image/upgrade", body),
+			http.StatusForbidden)
 	})
 }
 
@@ -165,11 +164,10 @@ func TestAPromiseCannotBeMovedOntoADateAlreadyPast(t *testing.T) {
 			t.Fatal(err)
 		}
 		gone := time.Now().UTC().Add(-24 * time.Hour).Format(time.DateOnly)
-		if got := asPerson(t, r, "private-triage", http.MethodPut,
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodPut,
 			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
-			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Backdated."}`, gone)); got.Code < 400 {
-			t.Errorf("a promise moved onto a date already past answered %d", got.Code)
-		}
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Backdated."}`, gone)),
+			http.StatusUnprocessableEntity)
 	})
 }
 
@@ -196,11 +194,24 @@ func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
 			t.Fatal(err)
 		}
 		later := time.Now().UTC().Add(48 * time.Hour).Format(time.DateOnly)
-		if got := asPerson(t, r, "private-triage", http.MethodPut,
+		refusedWith(t, asPerson(t, r, "private-triage", http.MethodPut,
 			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,`+
-				`"reasoning":"Slipping <script>alert(1)</script>"}`, later)); got.Code < 400 {
-			t.Errorf("reasoning carrying a script tag answered %d", got.Code)
+				`"reasoning":"Slipping <script>alert(1)</script>"}`, later)),
+			http.StatusUnprocessableEntity)
+
+		// And the text never reached storage. The status alone would pass with
+		// the policy running after the write instead of before it, which is
+		// what this route did: the re-promise reached the claim through the
+		// inner revision, and that one did not check.
+		var claim struct {
+			Argument struct {
+				Reasoning string `json:"reasoning"`
+			} `json:"argument"`
+		}
+		read(t, r, "private-triage", fmt.Sprintf("/v1/claims/%d", done.ClaimID), &claim)
+		if strings.Contains(claim.Argument.Reasoning, "<script>") {
+			t.Errorf("the refused reasoning was stored anyway: %q", claim.Argument.Reasoning)
 		}
 	})
 }

@@ -55,7 +55,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		// with it about which build counts.
 		seen, err := lastScans(ctx, d.Scans(), subject)
 		if err != nil {
-			return nil, wentWrong(d.Logger, "cannot read when these were last scanned", err)
+			return nil, refused(d.Logger, err, "cannot read when these were last scanned")
 		}
 
 		out := &listOutput[ProductBody]{}
@@ -113,7 +113,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			return c.Stream
 		})
 		if err != nil {
-			return nil, wentWrong(d.Logger, "cannot read when these were last scanned", err)
+			return nil, refused(d.Logger, err, "cannot read when these were last scanned")
 		}
 
 		// The product's date, read once, so a release that has not stated one

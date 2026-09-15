@@ -12,7 +12,7 @@ import (
 func holder(t *testing.T, f *fixture) (*access.Account, string) {
 	t.Helper()
 	ctx := t.Context()
-	person, err := f.store.Ensure(ctx, "someone", "Someone", false)
+	person, err := f.store.Ensure(ctx, "someone", "Someone", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestATokenNarrowedToAProductCarriesNoAdministration(t *testing.T) {
 	// administered everything would not be narrowed at all.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "an-admin", "An Admin", true)
+		person, err := f.store.Ensure(ctx, "an-admin", "An Admin", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -143,7 +143,7 @@ func TestATokenHasToExpireAndCannotOutlastTheCeiling(t *testing.T) {
 	// A credential that never runs out is one nobody ever revokes.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", true)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -226,7 +226,7 @@ func TestATokenCannotMintOrWithdrawAnother(t *testing.T) {
 	// An administrator's narrowed token would mint one carrying administration.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		boss, err := f.store.Ensure(ctx, "boss", "Boss", true)
+		boss, err := f.store.Ensure(ctx, "boss", "Boss", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -277,7 +277,7 @@ func TestTwoCredentialsMayNotShareAName(t *testing.T) {
 			t.Error("two keys were given one name")
 		}
 
-		person, err := f.store.Ensure(ctx, "someone", "Someone", true)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -296,7 +296,7 @@ func TestATokenDefaultsToWhateverTheCeilingAllows(t *testing.T) {
 	// them while naming a limit they never mentioned.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", true)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -326,7 +326,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		here := f.products["sonic"]
 		elsewhere := f.products["onie"]
 
-		person, err := f.store.Ensure(ctx, "ana", "", false)
+		person, err := f.store.Ensure(ctx, "ana", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

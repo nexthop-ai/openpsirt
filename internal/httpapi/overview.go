@@ -106,7 +106,7 @@ func registerOverview(api huma.API, in Ingest) {
 		seen, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject,
 			finding.Scope{ProductID: &named.ID}, 0)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "cannot read when these were last scanned", err)
+			return nil, refused(in.Logger, err, "cannot read when these were last scanned")
 		}
 		type where struct{ stream, variant string }
 		covered := make(map[where]ingest.Coverage, len(seen))

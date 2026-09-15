@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
 // TokenBody is somebody's own credential for scripting.
@@ -113,6 +114,12 @@ func registerTokens(api huma.API, in Ingest) {
 			// missing, a lifetime past the ceiling — so they are reported.
 			return nil, asked(in.Logger, err)
 		}
+		// A personal token is a way into the deployment, so who minted one is
+		// the same question as who minted a pipeline key — and the answer is
+		// asked for after somebody leaves, when they are not there to ask.
+		// Named by owner and token, because a name is unique to its owner.
+		noteChange(ctx, in, trail.Credential, subject.Identity+" · "+token.Name,
+			nil, trail.Said(narrowedToProduct(input.Body.Product), true))
 		return &struct{ Body TokenBody }{Body: TokenBody{
 			Name: token.Name, Product: input.Body.Product, Secret: secret,
 			ExpiresAt: stamp(token.ExpiresAt),
@@ -151,8 +158,18 @@ func registerTokens(api huma.API, in Ingest) {
 		if err := rights.RevokeToken(ctx, token.ID); err != nil {
 			return nil, wentWrong(in.Logger, "cannot revoke a token", err)
 		}
+		noteChange(ctx, in, trail.Credential, subject.Identity+" · "+token.Name,
+			trail.Said("in force", true), nil)
 		return &struct{}{}, nil
 	})
+}
+
+// narrowedToProduct spells what a personal token may reach, for the trail.
+func narrowedToProduct(product string) string {
+	if product == "" {
+		return "everything its owner may reach"
+	}
+	return product
 }
 
 // mine resolves whose tokens are being asked about.

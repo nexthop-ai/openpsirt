@@ -55,12 +55,10 @@ func main() {
 
 		if !strings.HasSuffix(path, "_test.go") && file.Name.Name != "main" {
 			for _, d := range file.Decls {
-				fn, ok := d.(*ast.FuncDecl)
-				if !ok || !fn.Name.IsExported() {
-					continue
+				for _, name := range exportedIn(d) {
+					at := fset.Position(d.Pos())
+					declared = append(declared, decl{name, at.Filename, at.Line})
 				}
-				at := fset.Position(fn.Pos())
-				declared = append(declared, decl{fn.Name.Name, at.Filename, at.Line})
 			}
 		}
 
@@ -106,6 +104,41 @@ func main() {
 	// silence on a walk that reached nothing are the same output, and this is
 	// the gate AGENTS.md leans on.
 	fmt.Printf("every exported symbol is named by something (%d in %d files)\n", len(declared), read)
+}
+
+// exportedIn is every exported name one declaration makes.
+//
+// **Types, values and constants as well as functions.** Only functions were
+// read, so a request type registered on no operation sat fully specified and
+// unreachable — declared, documented, and in neither the OpenAPI document nor
+// the generated client, because nothing put it there. A type is exactly the
+// shape this gate is least able to be talked out of: it compiles, it reads as
+// intent, and nothing calls it.
+func exportedIn(d ast.Decl) []string {
+	switch typed := d.(type) {
+	case *ast.FuncDecl:
+		if typed.Name.IsExported() {
+			return []string{typed.Name.Name}
+		}
+	case *ast.GenDecl:
+		var names []string
+		for _, spec := range typed.Specs {
+			switch s := spec.(type) {
+			case *ast.TypeSpec:
+				if s.Name.IsExported() {
+					names = append(names, s.Name.Name)
+				}
+			case *ast.ValueSpec:
+				for _, one := range s.Names {
+					if one.IsExported() {
+						names = append(names, one.Name)
+					}
+				}
+			}
+		}
+		return names
+	}
+	return nil
 }
 
 // satisfiesSomething covers the names a standard interface calls, which are

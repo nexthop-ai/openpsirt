@@ -2,8 +2,14 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/danielgtaylor/huma/v2/humatest"
 )
 
 // An export writes every row even where its reader's own page is smaller than
@@ -134,4 +140,64 @@ func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
 	if written != exportPage {
 		t.Errorf("%d rows were written before it failed, want the one page", written)
 	}
+}
+
+// TestAnExportThatStopsEarlySaysSoInTheFile is the one thing the export path
+// exists to guarantee, written by no test until now.
+//
+// A file that simply stops is a file somebody reads as complete. The status is
+// long gone by the time a page can fail — the headers went out with the first
+// byte — so saying it in the body is the only honest thing left, and it is the
+// half that had never run in either format.
+func TestAnExportThatStopsEarlySaysSoInTheFile(t *testing.T) {
+	for _, c := range []struct {
+		format string
+		marker string
+	}{
+		{"csv", "# this export stopped early and is incomplete"},
+		{"json", `],"incomplete":true}`},
+	} {
+		t.Run(c.format, func(t *testing.T) {
+			// A reader that answers one page and then fails, which is what a
+			// connection lost part way through a large export looks like.
+			pages := 0
+			out := Exporting{
+				Header: []string{"n"},
+				Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
+					pages++
+					if pages > 1 {
+						return nil, errors.New("the connection went away")
+					}
+					page := make([][]string, 0, limit)
+					for i := offset; i < offset+limit; i++ {
+						page = append(page, []string{fmt.Sprint(i)})
+					}
+					return page, nil
+				},
+			}
+
+			rec := httptest.NewRecorder()
+			ctx := humatest.NewContext(nil,
+				httptest.NewRequest(http.MethodGet, "/export", nil).WithContext(t.Context()), rec)
+			writeExport(ctx, c.format, "mine", out)
+
+			body := rec.Body.String()
+			if !strings.Contains(body, c.marker) {
+				t.Errorf("an export that stopped early does not say so: %q", tail(body))
+			}
+			// And the rows it did write are still there, because a truncated
+			// file that says it is truncated is worth more than none.
+			if !strings.Contains(body, "\n0") && !strings.Contains(body, `"n":"0"`) {
+				t.Errorf("an export that stopped early threw away what it had: %q", tail(body))
+			}
+		})
+	}
+}
+
+// tail is the end of a body, for a failure message about how one finishes.
+func tail(body string) string {
+	if len(body) <= 200 {
+		return body
+	}
+	return "…" + body[len(body)-200:]
 }

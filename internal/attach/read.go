@@ -206,11 +206,16 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 		return 0, nil
 	}
 	before := s.now().Add(-olderThan).Truncate(time.Microsecond)
+	// Oldest first, because the limit cuts the answer. Unordered, which 500 of
+	// them a pass takes is whatever the engine returned, so a sweep can pick
+	// the same rows again and leave others standing indefinitely — the one
+	// thing a bounded sweep has to avoid is not making progress.
 	var stale []Attachment
 	if err := s.db.NewSelect().Model(&stale).
 		Where("attached_at IS NULL").
 		Where("redacted_at IS NULL").
 		Where("uploaded_at < ?", before).
+		Order("uploaded_at ASC", "id ASC").
 		Limit(500).
 		Scan(ctx); err != nil {
 		return 0, fmt.Errorf("read what nothing refers to: %w", err)

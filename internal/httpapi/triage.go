@@ -766,6 +766,14 @@ func refusedDecision(logger *slog.Logger, err error) error {
 	case errors.Is(err, triage.ErrSamePerson):
 		return huma.Error409Conflict("the person who proposed a decision may not agree to it")
 	}
+	// An authorization refusal is not somebody having asked for the
+	// impossible. Without this arm it fell through to the default below and
+	// answered 422 carrying access.Denied's own sentence — which names the
+	// internal product identifier, so a refusal handed the caller a number
+	// nothing else publishes.
+	if errors.Is(err, access.ErrDenied) {
+		return huma.Error403Forbidden("not authorized")
+	}
 	var faults markdown.Faults
 	if errors.As(err, &faults) {
 		return refusedText(faults)

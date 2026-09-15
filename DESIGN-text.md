@@ -51,9 +51,14 @@ browser, an email and an export.
 
 ## Raw markup
 
-Raw markup is refused at the parser rather than stripped afterwards. The parser
-drops a raw block and escapes an inline one. The assertion is that nothing
-arrives as live markup, not which of the two mechanisms ran.
+Raw markup is **refused at submission**, naming the line it is on. Not dropped,
+not escaped: a person told while they are still writing can fix it, and a tag
+silently escaped is somebody who typed one thing and was shown another.
+
+| Rule | Reason |
+|---|---|
+| Refused rather than allowlisted | An allowlist of permitted tags is a thing that can be wrong, and every interesting attack lives in the gap between what such a list permits and what a browser does. Nothing triage needs requires markup, so the category goes rather than being bounded |
+| Refused rather than turned off at the parser | A parser that produced no markup nodes would leave nothing to report, and the point is to report it. This was described as parser configuration and was not: the option that reads that way is a *renderer* option, and nothing here renders |
 
 There is no second pass. A sanitizer ran over the parser's output once, and it
 was the only reader of the rendering this server no longer does — so what
@@ -106,6 +111,7 @@ the issue, and the issue has an address of its own.
 | The shape is checked, the existence is not | Whether we hold that issue is a question with a subject attached, and this policy has none. Somebody writing about a flaw nothing has scanned yet is writing something true, and refusing it would make the text argue with the scan schedule |
 | A shape rather than a list of prefixes | CVE, GHSA and every vendor identifier a scan file carries are all a letter followed by letters, digits and separators. A list of the ones we have heard of would refuse a reference to an issue we already hold |
 | Judged at submission, not only at render | The half that lists what a text refers to recognizes only an identifier, so a destination the scheme accepted and that half ignores is a dead link nothing reports — the same disagreement `attachment:../../secret` produced |
+| Nothing resolves it server-side, and nothing needs to | An identifier **is** the address: our record of an issue is reached from the identifier alone, by anybody, with no lookup. That is what makes it unlike a mention, which needs the person table, or an attachment, which needs a token resolved to a file — the two REQ-65 is about. A reference to an issue nothing has scanned yet points at a page that says so, and becomes right when a scan arrives |
 
 ## Images and attachments
 

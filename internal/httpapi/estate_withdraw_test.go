@@ -20,7 +20,7 @@ func TestWithdrawingAnEstateRoleHandsBackWhatItWasHolding(t *testing.T) {
 		ctx := t.Context()
 		seedTheirs(t, r)
 
-		holder, err := r.rights.Ensure(ctx, "estate-triager", "", false)
+		holder, err := r.rights.Ensure(ctx, "estate-triager", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,7 +91,7 @@ func TestWithdrawingAnEstateRoleLeavesNamedProductsAlone(t *testing.T) {
 		ctx := t.Context()
 		seedTheirs(t, r)
 
-		holder, err := r.rights.Ensure(ctx, "both-ways", "", false)
+		holder, err := r.rights.Ensure(ctx, "both-ways", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -338,7 +338,7 @@ export function Decide({
   });
   const ready = waiting === null;
 
-  function body(narrow: boolean) {
+  function body() {
     return {
       outcome: outcome as
         "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "patch-needed",
@@ -350,7 +350,7 @@ export function Decide({
       ...(needsFixedVersion ? { fixed_version: fixedVersion.trim() } : {}),
       ...(needsLanding ? { committed_to: lands } : {}),
       reasoning,
-      ...(narrow && excluded.size > 0 ? { places: covering.map((p) => p.place ?? "") } : {}),
+      ...(excluded.size > 0 ? { places: covering.map((p) => p.place) } : {}),
       ...(extending ? { extends: extending.claimId } : {}),
       ...(prefill?.fromStatement ? { from_statement: prefill.fromStatement } : {}),
     };
@@ -376,7 +376,7 @@ export function Decide({
               query: at.version ? { version: at.version } : {},
             },
             body: {
-              ...body(true),
+              ...body(),
               // The version the reach named, because the other build may ship
               // this component at several and a name alone is a refusal there.
               ...(applied.length > 0

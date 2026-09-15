@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -221,8 +222,8 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 				// What is logged is what the browser said and what this
 				// deployment answers to. Both are already known to whoever
 				// can read the log.
-				if in.Logger != nil {
-					in.Logger.Warn("a write was refused because it did not come from a page this deployment served",
+				{
+					in.logger().Warn("a write was refused because it did not come from a page this deployment served",
 						"origin", r.Header.Get("Origin"),
 						"referer", r.Header.Get("Referer"),
 						"answers_to", strings.Join(origins(r, in.BaseURL), ", "),
@@ -371,7 +372,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerReachAcross(api, in)
 	registerBindings(api, Administering{
 		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Groups: in.groupsReachable,
+		Groups: in.groupsReachable, Trail: in.trail,
 	}, func() *setting.Store {
 		if in.DB == nil {
 			return nil
@@ -485,6 +486,15 @@ func wentWrong(logger *slog.Logger, what string, err error) error {
 // direction that is already safe, because a store's own sentences are the only
 // thing that reaches the caller.
 func asked(logger *slog.Logger, err error) error {
+	// An authorization refusal is not somebody having asked for the
+	// impossible. Without this arm it fell to the sentence below and came back
+	// 422 carrying the store's own words — which name the product identifier
+	// the refusal exists to withhold. `add-alias` is the live case: recording
+	// another name asks for triage in every product the issue is open in, and
+	// the route guard can only authorize the one in the path.
+	if errors.Is(err, access.ErrDenied) {
+		return huma.Error403Forbidden("not authorized")
+	}
 	if database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
 	}
@@ -528,9 +538,15 @@ var open = map[string]bool{
 // because sign-in cannot name its routes in advance: the provider is part of
 // the path and the set of providers is configuration.
 //
-// It is narrow on purpose. Everything under it either redirects to a provider
-// or refuses, and nothing under it reads anything — so a route added here by
-// mistake can leak a redirect and not data.
+// It is narrow on purpose, and **not empty of reads**: everything under it is
+// sign-in machinery, which reads and writes the deployment's own sign-in key,
+// the session it is creating and the account row a first arrival needs. It
+// reaches no product, finding, issue or credential.
+//
+// The sentence that stood here said nothing under it reads anything, which was
+// an absolute and was false — and it sat beside the constant it was wrong
+// about. A route added here is checked against what sign-in actually touches;
+// it is not harmless by construction.
 const openPrefix = "/v1/sign-in/"
 
 // refuse answers somebody unrecognized.

@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -335,5 +336,39 @@ func TestWithdrawingSomebodysLastRoleHandsBackWhatTheyHeld(t *testing.T) {
 			t.Errorf("%d people still hold work here after losing their role",
 				len(holdings.Items))
 		}
+	})
+}
+
+func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) {
+	// An identity is stored folded and a person types their own name with the
+	// capitals they use. Compared exactly, "Triager" was not "triager", so
+	// somebody taking their own work — or handing it back — was told they
+	// needed the right that names giving work to somebody else.
+	//
+	// Two sites, because the same comparison is made twice: assigning one
+	// finding, and planning an upgrade across a component.
+	twoReach(t, func(t *testing.T, r *reach) {
+		place := r.scanned(t)
+		at := "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+
+		// "triager" holds triage and deliberately not the right to give work
+		// away, which is what makes this the case being pinned.
+		for _, spelled := range []string{"triager", "Triager", "TRIAGER", " triager "} {
+			got := asPerson(t, r, "triager", http.MethodPut, at,
+				`{"person":`+strconv.Quote(spelled)+`}`)
+			if got.Code >= 300 {
+				t.Errorf("taking their own work as %q answered %d: %s",
+					spelled, got.Code, got.Body.String())
+			}
+		}
+
+		// And the rule still holds for somebody else, which is what makes the
+		// above a spelling rather than a hole.
+		if got := asPerson(t, r, "triager", http.MethodPut, at,
+			`{"person":"reader"}`); got.Code < 300 {
+			t.Errorf("somebody without the right gave work away, answering %d", got.Code)
+		}
+		_ = place
 	})
 }

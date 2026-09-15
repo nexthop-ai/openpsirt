@@ -60,9 +60,18 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
+		// Absent means the product follows the deployment, which is a
+		// different act from stating the deployment's current line: a blank
+		// and an unset value have to stay distinguishable in the record.
+		before := product.TriageFloor
 		if err := store.SetTriageFloor(ctx, product.ID, word); err != nil {
 			return nil, wentWrong(d.Logger, "that line could not be recorded", err)
 		}
+		// The line one product triages at, recorded like the deployment's own:
+		// it is one of the three levers that rewrite what this tool reports
+		// without anything being scanned.
+		noteDeclared(ctx, d, trail.Setting, "triage floor of "+product.Name,
+			trail.Said(stated(before), before != nil), trail.Said(word, word != ""))
 		if d.RewriteDeadlines != nil {
 			d.RewriteDeadlines(ctx, "triage floor of product "+product.Name, word)
 		}

@@ -228,7 +228,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// belongs with the change that decides, field by field, which of the
 		// two each should carry.
 		rights := access.NewStore(db.DB)
-		administrator, err := rights.Ensure(ctx, "admin", "", true)
+		administrator, err := rights.Ensure(ctx, "admin", "", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -240,7 +240,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// reading by administering — and the point of the pair is that
 		// the grant is visible in the same record as everybody else's
 		// rather than implied by the flag.
-		adminReader, err := rights.Ensure(ctx, "admin-reader", "", true)
+		adminReader, err := rights.Ensure(ctx, "admin-reader", "", access.Stated(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -277,7 +277,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 			// that holds it bare.
 			"assigner-only": {access.Assigner},
 		} {
-			person, err := rights.Ensure(ctx, who, "", false)
+			person, err := rights.Ensure(ctx, who, "", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -298,7 +298,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// approver is actually granted in a deployment. The approver above
 		// holds the capability alone, and reaches nothing — that is the rule
 		// being pinned, not an oversight.
-		reviewer, err := rights.Ensure(ctx, "reviewer", "", false)
+		reviewer, err := rights.Ensure(ctx, "reviewer", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -316,7 +316,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// deliberately: the hazard is that "every product" is read as "no
 		// narrowing at all", which would hand this identity the undisclosed
 		// findings in both products (REQ-42 and REQ-43).
-		estate, err := rights.Ensure(ctx, "estate-reader", "", false)
+		estate, err := rights.Ensure(ctx, "estate-reader", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -331,7 +331,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// the role everywhere" and "may act on this issue here" can be told
 		// apart: an issue a product does not carry is not one anybody rates
 		// through it, however widely they are trusted.
-		estateTriage, err := rights.Ensure(ctx, "wide-triager", "", false)
+		estateTriage, err := rights.Ensure(ctx, "wide-triager", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -346,7 +346,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// one. Not "nothing": a subject granted nothing anywhere is refused at
 		// the door, so a case grant is untestable through them — and a case is
 		// exactly what somebody outside a product is brought into.
-		outsider, err := rights.Ensure(ctx, "outsider", "", false)
+		outsider, err := rights.Ensure(ctx, "outsider", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -358,7 +358,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		}
 
 		// Somebody who exists and was granted nothing at all.
-		ungranted, err := rights.Ensure(ctx, "nothing", "", false)
+		ungranted, err := rights.Ensure(ctx, "nothing", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -798,6 +798,34 @@ func TestNothingButTheProbesAnswersWithoutACredential(t *testing.T) {
 		for _, leaked := range []string{"reader", "triager", "admin", "identity", "person"} {
 			if strings.Contains(strings.ToLower(got.text), leaked) {
 				t.Errorf("the providers list mentions %q: %s", leaked, got.text)
+			}
+		}
+
+		// And the subtree beneath it, which nothing exercised. What is down
+		// there redirects to a provider or refuses; what it must never do is
+		// answer 200 with anything in it, because a stranger is who reaches
+		// it. The design said "nothing under it reads anything", which was an
+		// absolute and was false — sign-in reads its own key, its own
+		// sessions and the account a first arrival needs — so what is asserted
+		// here is the part that is true and checkable: no domain data.
+		for _, path := range []string{
+			"/v1/sign-in/",
+			"/v1/sign-in/stub",
+			"/v1/sign-in/stub/callback",
+			"/v1/sign-in/nothing-configured",
+			"/v1/sign-in/../products",
+			"/v1/sign-in/stub/../../products",
+		} {
+			got := r.body(t, "", http.MethodGet, path)
+			if got.code == http.StatusOK && strings.TrimSpace(got.text) != "" {
+				t.Errorf("%s answered %d to a stranger with a body: %s",
+					path, got.code, got.text)
+			}
+			// Whatever it answers, it names nothing this deployment holds.
+			for _, leaked := range []string{"reader", "triager", "admin", "mine", "theirs"} {
+				if strings.Contains(strings.ToLower(got.text), leaked) {
+					t.Errorf("%s mentioned %q to a stranger: %s", path, leaked, got.text)
+				}
 			}
 		}
 	})

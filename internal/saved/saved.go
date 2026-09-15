@@ -70,8 +70,13 @@ type Filter struct {
 // Prepares reports whether this filter carries a claim to prefill.
 func (f Filter) Prepares() bool { return strings.TrimSpace(f.Outcome) != "" }
 
-// Called is the spelling to show, which is the one they typed where there is
-// one.
+// Called is the spelling to show, which is the one they typed.
+//
+// The fallback to the normalized name is for a row the column permits and this
+// package does not write: `display_name` is nullable, and every save here sets
+// it to the trimmed spelling of a name already refused for being empty once
+// normalized. So it cannot fire on anything written here — it is what a row
+// written by hand, or by a migration, would fall back to.
 func (f Filter) Called() string {
 	if f.DisplayName != "" {
 		return f.DisplayName
