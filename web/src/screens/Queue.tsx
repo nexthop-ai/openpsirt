@@ -655,6 +655,8 @@ function Card({
               </span>
             ) : f.fix_state === "wont-fix" ? (
               <span>upstream declined</span>
+            ) : f.fix_state === "mixed" ? (
+              <span>upstream fix differs by build</span>
             ) : null}
             {typeof f.score === "number" && <span>CVSS {f.score.toFixed(1)}</span>}
             {f.description && f.description.length >= 200 && (

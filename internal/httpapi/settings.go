@@ -179,11 +179,12 @@ var settable = []struct {
 // theSwitch is what an on-or-off setting may be set to.
 var theSwitch = []string{setting.On, setting.Off}
 
-// theFloor is the words the triage line may be set to. \"everything\" is not a
-// severity — it is the absence of a line, and it is what a deployment starts
-// with, because a tool that quietly hid findings on the day it was installed
-// would be deciding something nobody asked it to.
-var theFloor = []string{"everything", "low", "medium", "high", "critical"}
+// theFloor is the words the triage line may be set to, from the package that
+// owns the ordering they are drawn from.
+//
+// "everything" is not a severity: it is the line that keeps nothing out, and a
+// word an operator sets rather than a rating anything is compared against.
+var theFloor = finding.TriageFloors()
 
 func registerSettings(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{

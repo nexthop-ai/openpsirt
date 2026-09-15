@@ -462,7 +462,8 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
 		Scored:   row.Scored == 1,
-		FixState: FixState(row.FixState), FixedIn: row.FixedIn,
+		FixState: agreedFixState(row.FixStateLeast, row.FixStateMost),
+		FixedIn:  agreedFixedIn(row.FixStateLeast, row.FixStateMost, row.FixedIn),
 		Matched:  Matched(row.Matched),
 		State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
 		SentBack: row.SentBack > 0,
@@ -615,7 +616,8 @@ type decorated struct {
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ScoreCenti    int        `bun:"score_centi"`
 	Scored        int        `bun:"scored"`
-	FixState      string     `bun:"fix_state"`
+	FixStateLeast string     `bun:"fix_state_least"`
+	FixStateMost  string     `bun:"fix_state_most"`
 	FixedIn       string     `bun:"fixed_in"`
 	Matched       string     `bun:"matched"`
 	ConsumerID    *int64     `bun:"consumer_id"`
@@ -791,7 +793,13 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
-		ColumnExpr(`MIN(f.fix_state) AS "fix_state"`).
+		// Both ends of what the places say, because a group whose places
+		// disagree is what FixMixed is for and a minimum alone cannot say it:
+		// the filter selected exactly that set and every row came back
+		// claiming one definite state, with a version taken from whichever of
+		// the disagreeing rows sorted first.
+		ColumnExpr(`MIN(f.fix_state) AS "fix_state_least"`).
+		ColumnExpr(`MAX(f.fix_state) AS "fix_state_most"`).
 		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
 		// Any of them: a group is an issue at a component, every place of it
 		// comes from one line of a scanner's report, and the applier writes

@@ -33,7 +33,7 @@ func TestAskingAboutAnIssueSomewhereElseSaysNothingAboutIt(t *testing.T) {
 		// answer, and the shortest way to a vulnerability row that this
 		// product holds nothing against is to make one.
 		if _, err := r.db.DB.NewInsert().Model(&finding.Vulnerability{
-			Identity: "cve-2026-elsewhere", Identifier: "CVE-2026-ELSEWHERE",
+			Identifier: "CVE-2026-ELSEWHERE", IdentifierFolded: "cve-2026-elsewhere",
 			Severity: "high",
 		}).Exec(t.Context()); err != nil {
 			t.Fatal(err)

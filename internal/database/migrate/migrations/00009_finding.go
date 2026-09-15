@@ -35,11 +35,10 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 	}
 
 	statements := []string{
-		// identity is derived from the identifier this issue is filed under
-		// here, which is whichever of its names is the most widely recognized.
+		// An issue is filed under whichever of its names is the most widely
+		// recognized, and that name folded is what makes it one row.
 		`CREATE TABLE "vulnerability" (
 			"id"            ` + t.id + `,
-			"identity"      ` + t.hash + ` NOT NULL,
 			"identifier"    ` + t.free + ` NOT NULL,
 			-- The same name folded, so anything matching an issue by name
 			-- compares two columns rather than a function of one.
@@ -47,6 +46,13 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- chose, and a VEX statement arrives folded, so a comparison
 			-- between them had LOWER() on the indexed side — which made the
 			-- statement filter scan this whole table once per statement.
+			--
+			-- Unique, which is what keeps one issue one row. It was a hash of
+			-- the unfolded name in a column of its own, which nothing read and
+			-- which only one of the two paths that refile an issue under a
+			-- better-known name maintained — so the key drifted away from the
+			-- row it identified, invisibly, until a collision named a name
+			-- neither issue was filed under.
 			"identifier_folded" ` + t.name + ` NOT NULL,
 			-- What the world says. What we say instead belongs to one
 			-- product and lives in "issue_rating", because a rating is a
@@ -78,7 +84,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			"score_centi"     ` + t.ref + ` NULL,
 			"vector"          ` + t.free + ` NULL,
 			"first_seen_at" ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "vulnerability_identity_unique" UNIQUE ("identity")
+			CONSTRAINT "vulnerability_folded_unique" UNIQUE ("identifier_folded")
 		)` + t.suffix,
 
 		// Every name an issue is known by, including the one it is filed
@@ -249,6 +255,20 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- and refused the table outright there.
 			"urgency"           ` + t.ref + ` NOT NULL,
 			"urgency_exploited" ` + t.boolean + ` NOT NULL,
+			-- When exploitation was learned, which is what an exploited
+			-- deadline is counted from.
+			--
+			-- Recorded rather than derived: an issue that becomes exploited
+			-- six months after a finding opened has a deadline of a few days
+			-- from the moment it was learned, and counting from the opening
+			-- lands it in the past — a deadline nobody could have met.
+			-- Nothing else in the row holds that moment, so a later recount
+			-- had no base to use and quietly moved the deadline back.
+			--
+			-- Null where the row is not exploited, and null on one that was
+			-- marked before this was recorded, which reads as "count from
+			-- the opening" because there is nothing better to count from.
+			"exploited_learned_at" ` + t.timestamp + ` NULL,
 			"urgency_shipped"   ` + t.boolean + ` NOT NULL,
 			-- What this place held before, where the version moved and the
 			-- issue came with it. Present means somebody bumped this and the
@@ -378,7 +398,6 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 		// own name and every name it goes by, because which of them a
 		// publisher chose is a preference of whichever database they
 		// consulted rather than a property of the issue.
-		`CREATE INDEX "vulnerability_folded_idx" ON "vulnerability" ("identifier_folded")`,
 		`CREATE INDEX "vulnerability_alias_folded_idx"
 			ON "vulnerability_alias" ("identifier_folded", "vulnerability_id")`,
 

@@ -509,6 +509,11 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 					// that became exploited after six months would land
 					// three days before it was known — a deadline nobody
 					// could have met.
+					//
+					// The moment is kept on the row as well as spent here,
+					// because every later recount has to arrive at the same
+					// answer and nothing else holds it.
+					Set("exploited_learned_at = ?", learnedAt).
 					Set("due_at = ?", learnedAt.Add(windows.Exploited)).
 					Where("id IN (?)", bun.List(learning)).Exec(ctx); err != nil {
 					return fmt.Errorf("mark what is being exploited: %w", err)
@@ -574,9 +579,10 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 	// column, and an inner one, so a finding a person opened was left out of
 	// its own recount.
 	var groups []struct {
-		Exploited bool      `bun:"exploited"`
-		OpenedAt  time.Time `bun:"opened_at"`
-		Severity  string    `bun:"severity"`
+		Exploited bool       `bun:"exploited"`
+		OpenedAt  time.Time  `bun:"opened_at"`
+		LearnedAt *time.Time `bun:"learned_at"`
+		Severity  string     `bun:"severity"`
 	}
 	err = tx.NewSelect().
 		TableExpr(`finding AS "f"`).
@@ -586,11 +592,17 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 		Join(RatedHere, productID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`f.opened_at AS "opened_at"`).
+		// Grouped on the learning as well, because it is the base an
+		// exploited deadline is counted from: grouped without it, the
+		// recount fell back to the opening and moved every exploited
+		// deadline back to a date that was already in the past.
+		ColumnExpr(`f.exploited_learned_at AS "learned_at"`).
 		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
-		GroupExpr("f.urgency_exploited, f.opened_at, "+EffectiveSeverityExpr).
+		GroupExpr("f.urgency_exploited, f.opened_at, f.exploited_learned_at, "+
+			EffectiveSeverityExpr).
 		Scan(ctx, &groups)
 	if err != nil {
 		return fmt.Errorf("read what this issue is open against: %w", err)
@@ -604,8 +616,14 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 			Where("urgency_exploited = ?", group.Exploited).
 			Where("opened_at = ?", group.OpenedAt).
 			Where(inThisProduct, productID)
+		if group.LearnedAt != nil {
+			q = q.Where("exploited_learned_at = ?", *group.LearnedAt)
+		} else {
+			q = q.Where("exploited_learned_at IS NULL")
+		}
 		if floor.Admits(group.Exploited, group.Severity) {
-			q = q.Set("due_at = ?", group.OpenedAt.Add(windows.For(group.Exploited, group.Severity)))
+			q = q.Set("due_at = ?", clockedFrom(group.Exploited, group.OpenedAt, group.LearnedAt).
+				Add(windows.For(group.Exploited, group.Severity)))
 		} else {
 			q = q.Set("due_at = NULL")
 		}
@@ -614,6 +632,21 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 		}
 	}
 	return nil
+}
+
+// clockedFrom is the moment a deadline is counted from.
+//
+// The opening for everything but an exploited finding, and the moment
+// exploitation was learned for one of those: an issue that becomes exploited
+// six months in has a few days from the learning, and counting those days from
+// the opening lands the deadline before the day it was written. A row marked
+// exploited with no moment recorded falls back to the opening, because there
+// is nothing better to count from.
+func clockedFrom(exploited bool, openedAt time.Time, learnedAt *time.Time) time.Time {
+	if exploited && learnedAt != nil {
+		return *learnedAt
+	}
+	return openedAt
 }
 
 // Assessments lists what has been said about issues, newest first.

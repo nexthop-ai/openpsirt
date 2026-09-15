@@ -385,8 +385,13 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			}
 		}
 		bands := []band{
+			// Exploited with nothing recorded to count from. The opening is
+			// what is left, which is what a row marked exploited before the
+			// moment was recorded falls back to; the rest are rewritten in a
+			// pass of their own below, keyed on the learning.
 			{windows.Exploited, func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Where("urgency_exploited = ?", true)
+				return q.Where("urgency_exploited = ?", true).
+					Where("exploited_learned_at IS NULL")
 			}},
 			{windows.Critical, rated("critical")},
 			{windows.High, rated("high")},
@@ -424,6 +429,51 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 					if err := ctx.Err(); err != nil {
 						return changed, err
 					}
+				}
+			}
+		}
+
+		// And the exploited rows, counted from when exploitation was learned
+		// rather than from when the finding opened. Six months after a
+		// finding opens, a few days from the learning is a deadline somebody
+		// can meet and a few days from the opening is one already in the past.
+		var learned []time.Time
+		err = s.db.NewSelect().
+			TableExpr(`finding AS "f"`).
+			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			ColumnExpr("f.exploited_learned_at").
+			Where("f.closed_at IS NULL").
+			Where("f.urgency_exploited = ?", true).
+			Where("f.exploited_learned_at IS NOT NULL").
+			Where("st.product_id = ?", productID).
+			GroupExpr("f.exploited_learned_at").
+			Scan(ctx, &learned)
+		if err != nil {
+			return changed, fmt.Errorf("read when exploitation was learned: %w", err)
+		}
+		for _, at := range learned {
+			due := at.Add(windows.Exploited)
+			for from := int64(0); from <= highest; from += recomputeSlice {
+				result, err := s.db.NewUpdate().
+					Model((*Finding)(nil)).
+					Set("due_at = ?", due).
+					Where("id > ?", from).
+					Where("id <= ?", from+recomputeSlice).
+					Where("exploited_learned_at = ?", at).
+					Where("urgency_exploited = ?", true).
+					Where("closed_at IS NULL").
+					Where(inThisProduct, productID).Exec(ctx)
+				if err != nil {
+					return changed, fmt.Errorf("rewrite deadlines: %w", err)
+				}
+				n, err := database.Affected(result)
+				if err != nil {
+					return changed, fmt.Errorf("rewrite deadlines: %w", err)
+				}
+				changed += int(n)
+				if err := ctx.Err(); err != nil {
+					return changed, err
 				}
 			}
 		}

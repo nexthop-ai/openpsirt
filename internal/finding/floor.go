@@ -152,6 +152,38 @@ type Floor struct {
 	ProductID int64
 }
 
+// TriageFloors are the words a line may be set to, least first, with the word
+// for no line at the head.
+//
+// One list rather than a copy per caller: what an operator may set and what
+// the line is then compared against are the same vocabulary, and a second
+// spelling of it is what let a word the line accepts be a word it cannot
+// enforce.
+func TriageFloors() []string {
+	out := make([]string, 0, len(ranked)+1)
+	return append(append(out, NoFloor), ranked...)
+}
+
+// FloorWord is a stored line as a word this understands, and whether it is one.
+//
+// Anything unrecognized answers NoFloor and false. A line that cannot be
+// enforced has to read as no line at all: Hides was true for any word that was
+// neither empty nor NoFloor, so a product set to something outside the
+// vocabulary displayed a line everywhere while every query let everything
+// through — the screens said a line was in force and nothing enforced one.
+func FloorWord(word string) (string, bool) {
+	matched := strings.ToLower(strings.TrimSpace(word))
+	if matched == "" || matched == NoFloor {
+		return NoFloor, true
+	}
+	for _, known := range ranked {
+		if matched == known {
+			return matched, true
+		}
+	}
+	return NoFloor, false
+}
+
 // Hides reports whether the line keeps anything out at all.
 func (f Floor) Hides() bool { return f.Word != "" && f.Word != NoFloor }
 
@@ -238,7 +270,11 @@ func FloorFor(ctx context.Context, db bun.IDB, productID int64) (Floor, error) {
 		return Floor{}, fmt.Errorf("read what this product triages: %w", err)
 	}
 	if stated.Floor != nil && *stated.Floor != "" {
-		return Floor{Word: *stated.Floor, FromProduct: true, ProductID: productID}, nil
+		// Normalized here as well as refused at the write, so a value stored
+		// by anything else reads as no line rather than as a line nothing
+		// enforces.
+		word, known := FloorWord(*stated.Floor)
+		return Floor{Word: word, FromProduct: known, ProductID: productID}, nil
 	}
 	word, set, err := setting.NewStore(db).Get(ctx, setting.TriageFloor)
 	if err != nil {
@@ -247,5 +283,6 @@ func FloorFor(ctx context.Context, db bun.IDB, productID int64) (Floor, error) {
 	if !set || word == "" {
 		return Floor{Word: NoFloor, ProductID: productID}, nil
 	}
-	return Floor{Word: word, ProductID: productID}, nil
+	line, _ := FloorWord(word)
+	return Floor{Word: line, ProductID: productID}, nil
 }

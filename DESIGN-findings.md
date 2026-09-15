@@ -92,6 +92,7 @@ names**: every name resolves to one row, and a decision holds across all of them
 | An issue is filed under the most widely recognized of its names | What a person sees is the name they will find in an advisory. The rest are kept, and any of them finds the row |
 | Identifiers are compared in one case | Every scheme treats them as case-insensitive and reports disagree about which case to write |
 | A report that would merge two held issues is refused | That is a merge of findings and decisions already made against both, and reading a scan is the wrong moment to do it quietly |
+| The filed name, folded, is what makes one issue one row | It was a hash of the unfolded name in a column of its own, which nothing read and which only one of the two paths that refile an issue under a better-known name maintained — so the key drifted away from the row it identified, and the collision when it came named a name neither issue was filed under |
 | **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
 
 ## What a report supplies
@@ -119,6 +120,7 @@ being parsed and thrown away.
 |---|---|
 | Severity | Stored as a word, which is what ranks and what sets a deadline. A number is taken where the report carries one — the first rating stating both a score and its vector, worst claim winning. The vector travels with the number |
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
+| A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered. It groups findings by the shape of the mistake rather than the package it landed in |
 
 ## Who supplied a component
@@ -596,6 +598,7 @@ bottom of the list, until somebody rescanned that tag, which for a tag is never.
 | The signals that moved are what decides who is re-ranked | The write that raises them reports whether any of them actually rose, so nothing is recomputed for a report that told us nothing new |
 | Only learning something is exploited moves a clock | Neither the score nor the likelihood is in the deadline, and a clock reset by a revised number would never arrive |
 | The clock runs from when it was learned | Counted from when the finding opened, an issue that became exploited after six months lands three days before it was known — a deadline nobody could have met |
+| The moment it was learned is kept on the row | Nothing else holds it, so every later recount had to guess and fell back to the opening — which moved the deadline back to a date already in the past, on any assessment, agreement or withdrawal that touched the issue, with nothing logged |
 | It is not a cache being refreshed | The stored order describes an issue rather than a moment, so it is rewritten when the signals move. What is stored because it cannot be worked out again is a different thing |
 
 Four signals, in this order:

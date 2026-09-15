@@ -250,9 +250,24 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		Description: issue.Description, Advisory: issue.Advisory,
 		References: references,
 		Component:  component.Name, Version: component.Version,
-		FixState: FixState(rows[0].FixState), FixedIn: rows[0].FixedIn, FixedAt: rows[0].FixedAt,
+		FixedAt:     rows[0].FixedAt,
 		ArrivedFrom: rows[0].ArrivedFrom,
 	}
+	// What upstream did, asked of every place rather than of the first. A
+	// detail read is one issue at one component across its places, and places
+	// that disagree have no single answer — which is what the mixed state is
+	// for, and what the filter selects while the row claimed a definite one.
+	least, most := rows[0].FixState, rows[0].FixState
+	for _, row := range rows {
+		if row.FixState < least {
+			least = row.FixState
+		}
+		if row.FixState > most {
+			most = row.FixState
+		}
+	}
+	evidence.FixState = agreedFixState(least, most)
+	evidence.FixedIn = agreedFixedIn(least, most, rows[0].FixedIn)
 	// Any place answers. They all come from one line of a scanner's report,
 	// which the applier writes to every place of the group.
 	evidence.Matched = Matched(rows[0].Matched)
@@ -276,7 +291,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		evidence.LatestVersion = *component.LatestVersion
 	}
 	evidence.LatestReleasedAt = component.LatestReleasedAt
-	if component.LatestReleasedAt != nil && FixState(rows[0].FixState) != FixedUpstream {
+	if component.LatestReleasedAt != nil && evidence.FixState != FixedUpstream {
 		evidence.NothingSince = currency.NothingSince(
 			issue.Identifier, *component.LatestReleasedAt)
 	}

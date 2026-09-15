@@ -242,6 +242,10 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					due := startedAt.Add(windows.For(rating.Exploited, severity))
 					entry.DueAt = &due
 				}
+				// A finding that opens already exploited was learned about
+				// when it opened, and the recount has to reach the same
+				// answer as the line above.
+				entry.ExploitedLearnedAt = learnedExploitation(entry, startedAt)
 				wanted[key{vulnerabilityID, at}] = entry
 			}
 		}
@@ -325,6 +329,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					Set("urgency = ?", f.Urgency).
 					Set("urgency_exploited = ?", f.RankExploited).
 					Set("urgency_shipped = ?", f.RankShipped)
+			}
+			if reclocked {
+				// The moment, kept beside the deadline it produced. Every
+				// later recount counts from it, and nothing else on the row
+				// holds it — so without this the recount fell back to the
+				// opening and moved the deadline into the past.
+				update = update.Set("exploited_learned_at = ?", learnedExploitation(f, startedAt))
 			}
 			if reclocked {
 				// From this run rather than from when the
@@ -464,6 +475,18 @@ func same(held, found Finding) bool {
 // clock over — likelihood and score are not in the deadline at all, and a
 // deadline recounted whenever a number was revised would never arrive, which
 // is the same failure as recounting it nightly.
+// learnedExploitation is the moment to record beside a clock that just moved,
+// or nothing where the row is no longer exploited.
+//
+// The run's start rather than the wall clock, because that is what the
+// deadline beside it was counted from and the two have to agree.
+func learnedExploitation(f Finding, startedAt time.Time) *time.Time {
+	if !f.RankExploited {
+		return nil
+	}
+	return &startedAt
+}
+
 func ranking(held, found Finding) (moved, reclocked bool) {
 	moved = held.Urgency != found.Urgency ||
 		held.RankExploited != found.RankExploited ||

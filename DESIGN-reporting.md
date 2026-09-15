@@ -328,6 +328,7 @@ deadline, and whether the deadline was met.
 | One row per issue and place, whatever else is true of it | The agreement is read as a scalar rather than joined, because nothing makes an approval unique per decision — a second approver adds a row, and a join multiplied the finding. The page then held fewer rows than its total said, and because paging is by offset every page after that skipped one |
 | It states no triage line, because it applies none | Everything in the build is here, decided or not, which is the basis on which an auditor can rely on it. The file said it had been taken above a line and had not |
 | Everything is joined outward from the finding and joined left | A place nobody has decided about is the row this exists to show. Closed rows are included, and whether a deadline was met is answerable only for something that closed |
+| A judgment that lapsed is part of the record, and a superseded one is not | Asked of the decision's own columns rather than of the join. In the join it hid a lapsed judgment entirely, so the place reported as never decided and the register lost who proposed and who approved it — while the findings list called the same place lapsed |
 | The row names what pulls the component in, beside the place identity | The identity is derived from content, so it correlates two rows and names no location. A register whose only answer to "where" is sixty-four hex characters is one nobody can read, and where is what an auditor is asking |
 
 Current state, with no `as_of`. Reconstructing the view as of a past date was
@@ -538,6 +539,7 @@ severity word for the triage floor; on or off for upstream currency.
 |---|---|
 | Zero and negative are refused | Every reader treats them as unset, so storing one produces a setting that looks set and does nothing |
 | Only known names may be set | Storing an unknown one creates a setting nothing reads |
+| A triage line that is not one of the severity words reads as no line | The word admits nothing and narrows nothing, so a line outside the vocabulary was displayed everywhere as in force while every query let everything through. A line that cannot be enforced says so |
 | A failure to *read* a setting is not "unset" | Every caller has a default, so a database that could not answer would silently swap the deployment's configuration for the shipped one, including the threshold deciding which deferrals need a second person. That is reported |
 | Everything offered is read | The session lifetime was offered here while sign-in took its value from the environment and never looked. The order is the administrator's setting, then what the process was started with, then the built-in default |
 

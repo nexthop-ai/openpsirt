@@ -346,3 +346,40 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		}
 	})
 }
+
+func TestALineNothingCanEnforceReadsAsNoLine(t *testing.T) {
+	// A word outside the ordering admits nothing and narrows nothing, so the
+	// two halves disagreed: every screen said the product triaged at that
+	// line, and every query let everything through. Refused at the write, and
+	// read as no line at all where something else stored one — a line that
+	// cannot be enforced has to say so rather than be displayed.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		for _, word := range []string{"negligible", "Critical", "none", "  "} {
+			if _, err := f.db.DB.NewUpdate().TableExpr("product").
+				Set("triage_floor = ?", word).
+				Where("id = ?", f.productID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			line, err := finding.FloorFor(ctx, f.db.DB, f.productID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch word {
+			case "Critical":
+				// The same word in a different case is the same line.
+				if line.Word != "critical" || !line.Hides() {
+					t.Errorf("%q reads as %+v, want the critical line", word, line)
+				}
+			default:
+				if line.Hides() {
+					t.Errorf("%q reads as a line in force while it admits everything: %+v",
+						word, line)
+				}
+			}
+			if !line.Admits(false, "low") && !line.Hides() {
+				t.Errorf("%q hides nothing and does not admit a low", word)
+			}
+		}
+	})
+}

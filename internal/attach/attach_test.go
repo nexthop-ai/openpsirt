@@ -88,7 +88,7 @@ func (f *fixture) anIssue(t *testing.T, name string, visibility access.Visibilit
 	t.Helper()
 	ctx := t.Context()
 	issue := &finding.Vulnerability{
-		Identity: strings.ToLower(name), Identifier: name, Severity: "high",
+		Identifier: name, IdentifierFolded: strings.ToLower(name), Severity: "high",
 	}
 	if _, err := f.db.DB.NewInsert().Model(issue).Exec(ctx); err != nil {
 		t.Fatalf("record an issue: %v", err)

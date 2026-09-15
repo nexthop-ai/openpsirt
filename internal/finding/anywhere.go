@@ -260,7 +260,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
-		ColumnExpr(`MIN(f.fix_state) AS "fix_state"`).
+		// Both ends, because a group whose places disagree is mixed and a
+		// minimum alone answers with one of the disagreeing values.
+		ColumnExpr(`MIN(f.fix_state) AS "fix_state_least"`).
+		ColumnExpr(`MAX(f.fix_state) AS "fix_state_most"`).
 		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
 		ColumnExpr(`MIN(COALESCE(f.matched, '')) AS "matched"`).
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`).
