@@ -5127,7 +5127,7 @@ export interface components {
             ids: number[] | null;
             /**
              * Format: int64
-             * @description Places of this finding left open, because they were not named
+             * @description Places of this finding this judgment did not reach: ones it did not name, and ones a decision already standing there covers
              */
             left: number;
             /** @description Whether a second person has to agree */
@@ -5541,10 +5541,10 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description Why it has none, where it has none. Blank would read as missing data on the row somebody is deciding about
+             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate. Blank would read as missing data on the row somebody is deciding about
              * @enum {string}
              */
-            no_deadline?: "below-the-line" | "past-end-of-life";
+            no_deadline?: "below-the-line" | "out-of-support";
             /** @description Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned */
             nothing_since?: boolean;
             /** @description When the earliest of these places first appeared here, as a date */

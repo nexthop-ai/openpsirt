@@ -81,10 +81,16 @@ type AlsoBuild struct {
 
 // DecidedBody is what one judgment about a finding recorded.
 type DecidedBody struct {
-	ClaimID       int64   `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-	Recorded      int     `json:"recorded" doc:"How many places it was written against"`
-	Covered       int     `json:"covered" doc:"How many findings those places hold"`
-	Left          int     `json:"left" doc:"Places of this finding left open, because they were not named"`
+	ClaimID  int64 `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
+	Recorded int   `json:"recorded" doc:"How many places it was written against"`
+	Covered  int   `json:"covered" doc:"How many findings those places hold"`
+	// Every place this judgment did not reach, whatever kept it from
+	// reaching. "Because they were not named" described one of the two:
+	// with `remaining` it also counts places a decision reached through
+	// lookup already suppressed, which is deliberate — a caller deciding
+	// what is left to do wants the number that is left to do, not the
+	// number they could have named.
+	Left          int     `json:"left" doc:"Places of this finding this judgment did not reach: ones it did not name, and ones a decision already standing there covers"`
 	NeedsApproval bool    `json:"needs_approval" doc:"Whether a second person has to agree"`
 	IDs           []int64 `json:"ids"`
 	// Also is what the same judgment wrote in each other build named, in the

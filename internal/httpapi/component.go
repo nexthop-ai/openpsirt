@@ -276,7 +276,10 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 	// Putting work into a team's queue is dispatching; taking it out again
 	// is not, and that asymmetry is the whole of a team queue rather than
 	// a holding.
-	givingAway := team != "" || person != subject.Identity
+	// Matched without regard to capitals, because an identity is stored
+	// folded: somebody typing their own name with the capitals they use was
+	// told they needed the right to give work away, to themselves.
+	givingAway := team != "" || !strings.EqualFold(strings.TrimSpace(person), subject.Identity)
 	if givingAway && !subject.Holds(access.Assigner, productID) {
 		return nil, huma.Error422UnprocessableEntity(
 			"you may take what nobody owns and hand back your own; giving this to " +

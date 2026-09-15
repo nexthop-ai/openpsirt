@@ -214,8 +214,13 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin 
 
 	person := &Account{
 		Identity: identity, DisplayName: displayName,
-		IsAdmin:   admin != nil && *admin,
-		CreatedAt: s.now().Truncate(time.Microsecond),
+		IsAdmin: admin != nil && *admin,
+		// Said rather than left to the zero value. "Nobody has said" and
+		// "somebody said none" are different states — read as the same, the
+		// next sign-in puts back the address an administrator had just
+		// removed — so the state a new row is in is named where it is made.
+		EmailSource: NobodySaid,
+		CreatedAt:   s.now().Truncate(time.Microsecond),
 	}
 	if err := s.record(ctx, person); err != nil {
 		return nil, fmt.Errorf("record %q: %w", identity, err)

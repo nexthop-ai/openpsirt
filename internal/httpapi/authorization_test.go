@@ -800,6 +800,34 @@ func TestNothingButTheProbesAnswersWithoutACredential(t *testing.T) {
 				t.Errorf("the providers list mentions %q: %s", leaked, got.text)
 			}
 		}
+
+		// And the subtree beneath it, which nothing exercised. What is down
+		// there redirects to a provider or refuses; what it must never do is
+		// answer 200 with anything in it, because a stranger is who reaches
+		// it. The design said "nothing under it reads anything", which was an
+		// absolute and was false — sign-in reads its own key, its own
+		// sessions and the account a first arrival needs — so what is asserted
+		// here is the part that is true and checkable: no domain data.
+		for _, path := range []string{
+			"/v1/sign-in/",
+			"/v1/sign-in/stub",
+			"/v1/sign-in/stub/callback",
+			"/v1/sign-in/nothing-configured",
+			"/v1/sign-in/../products",
+			"/v1/sign-in/stub/../../products",
+		} {
+			got := r.body(t, "", http.MethodGet, path)
+			if got.code == http.StatusOK && strings.TrimSpace(got.text) != "" {
+				t.Errorf("%s answered %d to a stranger with a body: %s",
+					path, got.code, got.text)
+			}
+			// Whatever it answers, it names nothing this deployment holds.
+			for _, leaked := range []string{"reader", "triager", "admin", "mine", "theirs"} {
+				if strings.Contains(strings.ToLower(got.text), leaked) {
+					t.Errorf("%s mentioned %q to a stranger: %s", path, leaked, got.text)
+				}
+			}
+		}
 	})
 }
 

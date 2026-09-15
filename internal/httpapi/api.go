@@ -528,9 +528,15 @@ var open = map[string]bool{
 // because sign-in cannot name its routes in advance: the provider is part of
 // the path and the set of providers is configuration.
 //
-// It is narrow on purpose. Everything under it either redirects to a provider
-// or refuses, and nothing under it reads anything — so a route added here by
-// mistake can leak a redirect and not data.
+// It is narrow on purpose, and **not empty of reads**: everything under it is
+// sign-in machinery, which reads and writes the deployment's own sign-in key,
+// the session it is creating and the account row a first arrival needs. It
+// reaches no product, finding, issue or credential.
+//
+// The sentence that stood here said nothing under it reads anything, which was
+// an absolute and was false — and it sat beside the constant it was wrong
+// about. A route added here is checked against what sign-in actually touches;
+// it is not harmless by construction.
 const openPrefix = "/v1/sign-in/"
 
 // refuse answers somebody unrecognized.

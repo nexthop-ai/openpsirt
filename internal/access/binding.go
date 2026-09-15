@@ -554,7 +554,13 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) error {
 	named := make([]string, 0, len(identities))
 	for _, identity := range identities {
-		trimmed := strings.TrimSpace(identity)
+		// Folded, because that is how an identity is stored and how a sign-in
+		// matches one. Compared with its capitals, a name written "Alice" in
+		// configuration cleared nobody and named nobody: the row is "alice",
+		// so the NOT IN below did not spare it and the update below did not
+		// find it — the way back into a deployment nobody can administer,
+		// silently doing nothing.
+		trimmed := folded(identity)
 		if trimmed == "" {
 			continue
 		}

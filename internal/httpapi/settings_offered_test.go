@@ -1,7 +1,10 @@
 package httpapi_test
 
 import (
+	"fmt"
 	"net/http"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -81,6 +84,46 @@ func TestNothingOfferedComesBackWithoutAValue(t *testing.T) {
 			if expected, named := want[each.Name]; named && each.Value != expected {
 				t.Errorf("%s reports %q, and its readers fall back to %q",
 					each.Name, each.Value, expected)
+			}
+		}
+	})
+}
+
+func TestWhatTheDocumentSaysAFindingWithNoDeadlineCarries(t *testing.T) {
+	// Two response bodies published the same field with different words. The
+	// evidence body declared `past-end-of-life`, which nothing in the tree
+	// produces, and omitted `out-of-support`, which the store emits on every
+	// finding whose release is past end of life — so a consumer validating
+	// against the published document rejected the body it was actually sent,
+	// and a TypeScript one could not narrow on the value.
+	//
+	// Read from the document the server builds, because that is what a
+	// consumer is held to.
+	twoReach(t, func(t *testing.T, r *reach) {
+		declared := map[string][]string{}
+		for name, schema := range r.api.OpenAPI().Components.Schemas.Map() {
+			for field, property := range schema.Properties {
+				if field != "no_deadline" || len(property.Enum) == 0 {
+					continue
+				}
+				said := make([]string, 0, len(property.Enum))
+				for _, one := range property.Enum {
+					said = append(said, fmt.Sprint(one))
+				}
+				sort.Strings(said)
+				declared[name] = said
+			}
+		}
+		if len(declared) == 0 {
+			t.Fatal("no published body declares why a finding has no deadline")
+		}
+		// The two the store emits, and nothing else. Named here rather than
+		// read from internal/finding so that a word added there without being
+		// published fails this rather than passing it.
+		want := []string{"below-the-line", "out-of-support"}
+		for body, said := range declared {
+			if !slices.Equal(said, want) {
+				t.Errorf("%s declares %v, and the store emits %v", body, said, want)
 			}
 		}
 	})

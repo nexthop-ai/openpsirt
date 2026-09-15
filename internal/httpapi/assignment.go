@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -125,8 +126,12 @@ func registerAssigning(api huma.API, in Ingest) {
 		// Putting work into a team's queue is dispatching. Taking it
 		// out again is not, and that asymmetry is the whole of a team
 		// queue rather than a holding.
+		// Without regard to capitals, for the reason the component path is:
+		// an identity is stored folded, so the exact comparison refused
+		// somebody handing work back to themselves under their own spelling.
 		givingAway := input.Body.Team != "" ||
-			(input.Body.Person != "" && input.Body.Person != subject.Identity)
+			(input.Body.Person != "" &&
+				!strings.EqualFold(strings.TrimSpace(input.Body.Person), subject.Identity))
 		if givingAway && !subject.Holds(access.Assigner, product) {
 			return nil, noSuchFinding()
 		}
