@@ -476,7 +476,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 						Set("due_at = "+said, args...).
 						Where("id > ?", from).
 						Where("id <= ?", from+recomputeSlice).
-						Where("opened_at IN (?)", bun.In(chunk)).
+						Where("opened_at IN (?)", bun.List(chunk)).
 						Where("closed_at IS NULL").
 						Where(inThisProduct, productID)
 					result, err := each.where(query).Exec(ctx)
@@ -527,7 +527,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 					Set("due_at = "+said, args...).
 					Where("id > ?", from).
 					Where("id <= ?", from+recomputeSlice).
-					Where("exploited_learned_at IN (?)", bun.In(chunk)).
+					Where("exploited_learned_at IN (?)", bun.List(chunk)).
 					Where("urgency_exploited = ?", true).
 					Where("closed_at IS NULL").
 					Where(inThisProduct, productID).Exec(ctx)

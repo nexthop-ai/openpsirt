@@ -530,7 +530,7 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 						// answer and nothing else holds it.
 						Set("exploited_learned_at = ?", learnedAt).
 						Set("due_at = ?", learnedAt.Add(windows.Exploited)).
-						Where("id IN (?)", bun.In(batch)).Exec(ctx)
+						Where("id IN (?)", bun.List(batch)).Exec(ctx)
 					return err
 				}); err != nil {
 				return fmt.Errorf("mark what is being exploited: %w", err)

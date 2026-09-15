@@ -105,7 +105,7 @@ func InAnyOf(column string, ids []int64) (string, []any) {
 	for start := 0; start < len(ids); start += BatchSize {
 		end := min(start+BatchSize, len(ids))
 		said = append(said, column+" IN (?)")
-		args = append(args, bun.In(ids[start:end]))
+		args = append(args, bun.List(ids[start:end]))
 	}
 	return "(" + strings.Join(said, " OR ") + ")", args
 }

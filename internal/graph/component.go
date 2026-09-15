@@ -634,7 +634,7 @@ func (c *Components) fillSuppliers(ctx context.Context, described map[string]Des
 		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			_, err := c.db.NewUpdate().Model((*Component)(nil)).
 				Set("supplier = ?", said).
-				Where("id IN (?)", bun.In(batch)).
+				Where("id IN (?)", bun.List(batch)).
 				Where(`"supplier" IS NULL OR "supplier" = ?`, "").
 				Exec(ctx)
 			return err

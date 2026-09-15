@@ -376,7 +376,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	if err := readableBy(s.db.NewSelect().
 		TableExpr(`decision AS "de"`).
 		ColumnExpr("de.id").
-		Where("de.claim_id IN (?)", bun.In(claims)), subject, "de").
+		Where("de.claim_id IN (?)", bun.List(claims)), subject, "de").
 		Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which rows these claims wrote: %w", err)
 	}
@@ -399,7 +399,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`COUNT(*) AS "covers"`).
-		Where("de.id IN (?)", bun.In(ids)).
+		Where("de.id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
 		Where("COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr).
 		Where("COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr).
