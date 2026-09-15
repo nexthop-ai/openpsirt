@@ -81,3 +81,29 @@ func SecondsBetween(db bun.IDB, from, to Expr) string {
 		return fmt.Sprintf("((julianday(%s) - julianday(%s)) * 86400)", to, from)
 	}
 }
+
+// AsTimestamp is an expression typed as a moment, in the spelling each engine
+// understands.
+//
+// A value bound into a statement arrives untyped, and an expression built out
+// of several of them — a CASE choosing between moments — is a string as far as
+// the engine can tell. One of the four then refuses to write it into a
+// timestamp column, and the other three take it; so this is one of the few
+// places an engine has to be asked directly, and it lives here with the rest.
+//
+// The target is the type the schema declares for a moment on that engine, so a
+// change there is a change here.
+func AsTimestamp(db bun.IDB, expr string) string {
+	switch db.Dialect().Name().String() {
+	case "pg":
+		return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", expr)
+	case "mysql":
+		// MariaDB takes the MySQL spelling because it takes the MySQL
+		// dialect. Neither accepts TIMESTAMP as a cast target.
+		return fmt.Sprintf("CAST(%s AS DATETIME(6))", expr)
+	default:
+		// SQLite stores a moment as text in a fixed format and compares it as
+		// text, so there is nothing to cast it to.
+		return expr
+	}
+}

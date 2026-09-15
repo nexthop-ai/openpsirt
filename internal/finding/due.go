@@ -339,6 +339,10 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 // The arithmetic stays in Go, which is what keeps it portable — no engine
 // agrees on how to add days to a timestamp — and the statement writes
 // constants, which is what it did when it carried one moment.
+//
+// The caller types the result. A bound value arrives untyped, so a CASE
+// choosing between several of them is a string as far as the engine can tell,
+// and one of the four refuses to write a string into a timestamp column.
 func whenOpened(column string, moments []time.Time, window time.Duration) (string, []any) {
 	said := "CASE " + column
 	args := make([]any, 0, len(moments)*2)
@@ -473,7 +477,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 					said, args := whenOpened("opened_at", chunk, each.window)
 					query := s.db.NewUpdate().
 						Model((*Finding)(nil)).
-						Set("due_at = "+said, args...).
+						Set("due_at = "+database.AsTimestamp(s.db, said), args...).
 						Where("id > ?", from).
 						Where("id <= ?", from+recomputeSlice).
 						Where("opened_at IN (?)", bun.List(chunk)).
@@ -524,7 +528,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				said, args := whenOpened("exploited_learned_at", chunk, windows.Exploited)
 				result, err := s.db.NewUpdate().
 					Model((*Finding)(nil)).
-					Set("due_at = "+said, args...).
+					Set("due_at = "+database.AsTimestamp(s.db, said), args...).
 					Where("id > ?", from).
 					Where("id <= ?", from+recomputeSlice).
 					Where("exploited_learned_at IN (?)", bun.List(chunk)).
