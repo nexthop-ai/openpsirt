@@ -146,10 +146,17 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 	})
 }
 
-func TestAStatementCarryingNoPackageIdentifierIsStillShown(t *testing.T) {
+func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 	// The claim against a source tree, which the name is all there is of.
 	// Dropping it would silently lose every statement a publisher made the
 	// only way their document could make it.
+	//
+	// A source tree is named either way it can be named: as a bare name, and
+	// as a package identifier of the generic type. The matching rules treat
+	// the two as one claim, and narrowing the second away here compared a
+	// source tree's type against the component's own — so a statement that
+	// had already suppressed the finding was missing from the evidence for
+	// it, and the page said nobody had spoken.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PrivateTriage)
@@ -166,13 +173,24 @@ func TestAStatementCarryingNoPackageIdentifierIsStillShown(t *testing.T) {
 			}}); err != nil {
 			t.Fatal(err)
 		}
+		// The same claim from another publisher, spelled as an identifier.
+		// Another publisher because a second document from the first sets
+		// the first aside, which is a different rule.
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+			"Apache", "apache.json", "sha256:three", []finding.Statement{{
+				Vulnerability: "CVE-2026-2", Component: "thrift",
+				Purl:   "pkg:generic/thrift@0.14.1",
+				Status: "not_affected",
+			}}); err != nil {
+			t.Fatal(err)
+		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
 			[]string{"CVE-2026-2"}, "thrift", "pkg:deb/debian/thrift@0.14.1")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(said) != 1 {
-			t.Errorf("%d statements, want the one that names no identifier", len(said))
+		if len(said) != 2 {
+			t.Errorf("%d statements, want the source tree named both ways", len(said))
 		}
 	})
 }

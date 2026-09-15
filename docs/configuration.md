@@ -372,5 +372,5 @@ are dropped instead, because a scanner with a lot to say still scanned.
 |---|---|---|
 | `OPENPSIRT_SCANNER_MAX_OUTPUT` | How large one report may be. The load-bearing bound: every count below is bounded by it | 256 MB |
 | `OPENPSIRT_SCANNER_MAX_COMPLAINT` | How much of what a scanner said while running is kept | 1 MB |
-| `OPENPSIRT_SCANNER_MAX_MATCHES` | How many matches one report may state. The largest real image measured here produced 335,021 findings, 305,487 of them a single kernel across 62 modules | 500,000 |
+| `OPENPSIRT_SCANNER_MAX_MATCHES` | How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
 | `OPENPSIRT_SCANNER_MAX_REFERENCES` | How many addresses one match may point at. Bounded separately because the two multiply | 1,000 |

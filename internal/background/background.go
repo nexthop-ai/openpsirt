@@ -1,13 +1,13 @@
 // Package background runs a pass on a timer until its context ends.
 //
-// Nine packages held the same body: default a non-positive interval to a
-// constant of their own, start a timer that fires at once, loop selecting on
-// the context and the tick, run the pass, log, reset. Any change to how passes
-// are scheduled — spreading nine goroutines that would otherwise wake together
-// on a cold start, a measurement per pass, a first-run delay — had to be made
-// nine times, and a missed copy would diverge silently because nothing tested
-// any of them. Two had already diverged, over whether the log line carries the
-// trace context.
+// Every recurring pass in this tree held the same body: default a non-positive
+// interval to a constant of its own, start a timer that fires at once, loop
+// selecting on the context and the tick, run the pass, log, reset. Any change
+// to how passes are scheduled — spreading goroutines that would otherwise wake
+// together on a cold start, a measurement per pass, a first-run delay — was an
+// edit per copy, and a missed copy would diverge silently because nothing
+// tested any of them. Some had already diverged, over whether the log line
+// carries the trace context.
 //
 // **Reporting stays with the caller.** Each pass logs a different thing: a
 // count of what it collected, a count of what it sent and a count of what

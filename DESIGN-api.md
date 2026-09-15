@@ -165,9 +165,19 @@ did not cause it and cannot fix it.
 
 ## Paging
 
-`limit` and `offset`, with a total, on every list. One list declared a limit
-alone: past its ceiling the rest could not be read through the API at all, and
-the screen showed a subset and reported it as the list.
+`limit` and `offset`, with a total, wherever a caller reads a second page. A
+list that takes a limit and no offset cannot be read past its ceiling at all
+through the API, and the screen showed the ceiling's worth and reported it as
+the list.
+
+Some lists take a limit and no offset on purpose, and the limit is there to
+refuse an absurd request rather than to cut a page.
+
+| A limit alone | |
+|---|---|
+| What it is for | A list a screen draws whole: a standing short list, a picker's page, what sits at the top of one build's tree |
+| What makes it correct | The ceiling is above anything the list can hold, so nobody is looking at a page |
+| What ends it | The list growing past the ceiling on a real deployment. It gains an offset then, and the screen gains the control to use it |
 
 The bound is stated twice:
 

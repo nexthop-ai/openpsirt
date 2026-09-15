@@ -35,9 +35,21 @@ func (b *bounded) Write(p []byte) (int, error) {
 	b.over = true
 	// Cut on a character boundary: what is kept is stored, and three engines
 	// of four refuse invalid UTF-8.
-	b.kept.WriteString(bound.Head(string(p[:room]), int(room)))
+	//
+	// The whole of what is on offer, bounded to the room left. Handed
+	// `p[:room]`, which is already exactly that many bytes, the bound had
+	// nothing to cut and returned it as it was — so the buffer still ended
+	// mid-character and the cut was a no-op.
+	b.kept.WriteString(bound.Head(string(p), int(room)))
 	return len(p), nil
 }
 
 // String is what was kept.
 func (b *bounded) String() string { return b.kept.String() }
+
+// Bytes is what was kept, without copying it.
+//
+// The report is read from this, and it is bounded at about half of what the
+// chart ships for the whole process — so a copy taken to read from spends the
+// other half, and the ceiling stops bounding what it was chosen to bound.
+func (b *bounded) Bytes() []byte { return b.kept.Bytes() }

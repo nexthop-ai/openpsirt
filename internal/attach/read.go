@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -244,11 +245,13 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 			Exec(ctx)
 		if err != nil {
 			failed++
+			unreadable(ctx, s.logger, row, err)
 			continue
 		}
 		claimed, err := database.Affected(res)
 		if err != nil {
 			failed++
+			unreadable(ctx, s.logger, row, err)
 			continue
 		}
 		if claimed == 0 {
@@ -276,6 +279,22 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 			"collected", gone, "orphaned", orphaned, "unreadable", failed)
 	}
 	return gone, nil
+}
+
+// unreadable says which row a collection pass could not claim, and why.
+//
+// Counted alone, the row is left standing with nothing naming it: a pass that
+// could not claim the same row every time reports the same number every time
+// and nobody can tell which one it is, or whether it is one row or a
+// different one each pass. The key, because it is what the bytes are found
+// by, and the error, because a permission that was revoked and an engine that
+// went away are two different mornings.
+func unreadable(ctx context.Context, logger *slog.Logger, row *Attachment, err error) {
+	if logger == nil {
+		return
+	}
+	logger.ErrorContext(ctx, "an unattached upload could not be claimed for collection",
+		"key", row.ObjectKey, "filename", row.Filename, "error", err)
 }
 
 // Issue resolves the product and issue an attachment path names, authorizing

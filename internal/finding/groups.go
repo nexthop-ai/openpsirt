@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -766,8 +767,8 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
 		// Whether any of the issues folded here carries a score at all.
-		// Written as a sum rather than as a boolean, because the four engines
-		// do not agree about what a boolean out of an aggregate is.
+		// Written as a number rather than as a boolean, because the four
+		// engines do not agree about what a boolean out of an aggregate is.
 		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
 		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
 		// When the earliest of these places opened, and the earliest deadline
@@ -899,7 +900,7 @@ func firstLineOf(description string) string {
 		if space := strings.LastIndex(said[:most], " "); space > 0 {
 			return strings.TrimSpace(said[:space]) + "…"
 		}
-		return said[:most] + "…"
+		return bound.Head(said, most) + "…"
 	}
 	return strings.TrimSpace(said)
 }

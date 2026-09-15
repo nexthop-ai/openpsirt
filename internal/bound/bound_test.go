@@ -66,3 +66,23 @@ func TestABoundOfNoneKeepsNothing(t *testing.T) {
 		t.Fatalf("Tail = %q", got)
 	}
 }
+
+func TestABadByteEarlyOnDoesNotSwallowWhatFollowsIt(t *testing.T) {
+	// What is cut is often a program's own output, and a scanner that fails
+	// writes whatever it likes to standard error. Asked whether the whole
+	// kept prefix decodes, the trim walked back past every good character to
+	// the first bad byte and threw away the rest — so the recorded reason for
+	// a failed scan was whatever preceded the binary, which is usually
+	// nothing. The cut is about the last character, not about the string.
+	noise := "\xff" + strings.Repeat("a", 100)
+	if got := Head(noise, 50); got != noise[:50] {
+		t.Fatalf("a bad byte at the front cut the message to %q", got)
+	}
+
+	// And the character the bound falls inside is still the one cut: the
+	// trim goes back at most the three bytes a split character can leave.
+	split := "\xff" + strings.Repeat("a", 47) + "€"
+	if got := Head(split, 50); got != split[:48] {
+		t.Fatalf("the split character was not cut: %q", got)
+	}
+}

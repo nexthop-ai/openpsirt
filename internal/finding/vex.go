@@ -182,8 +182,14 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 //
 // Compared in the type and the namespace, never the version: a statement says
 // which versions it is about in its own terms, and this only asks whether the
-// two are the same package. A statement that carries no identifier is kept —
-// that is the claim against a source tree, which the name is all there is of.
+// two are the same package.
+//
+// A claim against a source tree is kept however it was named: with no package
+// identifier at all, and with one of the generic type. The two are the same
+// claim and the matching rules match them the same way (DESIGN-ingest.md), so
+// narrowing the generic spelling away here hid the evidence for a suppression
+// that had already been applied — the finding was gone and what a publisher
+// said about it was not on the page.
 func namingTheSamePackage(said []Statement, purl string) []Statement {
 	here := graph.PartsOfPurl(purl)
 	if here.Name == "" {
@@ -192,14 +198,22 @@ func namingTheSamePackage(said []Statement, purl string) []Statement {
 	kept := make([]Statement, 0, len(said))
 	for _, one := range said {
 		there := graph.PartsOfPurl(one.Purl)
-		if there.Name != "" && (there.Type != here.Type ||
-			!strings.EqualFold(there.Namespace, here.Namespace)) {
+		if there.Name == "" || there.Type == sourceTree {
+			kept = append(kept, one)
+			continue
+		}
+		if there.Type != here.Type ||
+			!strings.EqualFold(there.Namespace, here.Namespace) {
 			continue
 		}
 		kept = append(kept, one)
 	}
 	return kept
 }
+
+// sourceTree is the package type a source tree is named with where it is named
+// as a package identifier at all.
+const sourceTree = "generic"
 
 // MostPublisher is how long the name of whoever published a statement may be.
 //

@@ -1,6 +1,7 @@
 package attach_test
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
@@ -629,4 +631,58 @@ func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
 		}
 		_ = body.Close()
 	})
+}
+
+func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
+	// The pass counted what it could not read and threw the error away, in
+	// the one writer here that destroys somebody's data. Counted alone the
+	// row is left standing with nothing naming it: the same number comes back
+	// every pass, and nobody can tell whether it is one row stuck or a
+	// different one each time, or what is wrong with it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		stuck := f.upload(t, who, "stuck.log", []byte("nothing will ever point here"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		var said bytes.Buffer
+		store := attach.NewStore(f.db.DB, f.files).
+			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
+		// Taken away between the page and the loop, so the claim on a row the
+		// pass has in hand is the statement that fails.
+		attach.AfterPage(store, stop)
+
+		if _, err := store.Sweep(ctx, 24*time.Hour); err != nil {
+			t.Fatalf("sweep: %v", err)
+		}
+		wrote := said.String()
+		for _, want := range []string{stuck.ObjectKey, "stuck.log", "error="} {
+			if !strings.Contains(wrote, want) {
+				t.Errorf("a row the pass could not claim was reported without %q: %s",
+					want, wrote)
+			}
+		}
+	})
+}
+
+func TestALongNameIsShortenedBetweenCharacters(t *testing.T) {
+	// The bound on a served and stored filename was a byte slice, so a name
+	// whose hundred-and-twentieth byte falls inside a character was stored as
+	// something three engines of four refuse — and the refusal lands on the
+	// upload rather than on the name.
+	for _, most := range []int{118, 119, 120, 121} {
+		name := strings.Repeat("a", most-1) + strings.Repeat("é", 40) + ".log"
+		got := attach.SafeName(name)
+		if len(got) > 120 {
+			t.Errorf("a name of %d bytes was kept at %d", most, len(got))
+		}
+		if !utf8.ValidString(got) {
+			t.Errorf("a name cut at %d is not storable: %q", most, got)
+		}
+	}
 }

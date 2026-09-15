@@ -30,3 +30,32 @@ func TestWhatAScannerComplainedIsStillStorableOnceItIsBounded(t *testing.T) {
 		}
 	}
 }
+
+func TestWhatIsKeptOfAChattyScannerIsStorable(t *testing.T) {
+	// The bound is applied where the excess is dropped, and what survives is
+	// written to the run's caution — a real column, on four engines, three of
+	// which refuse invalid UTF-8. The trim beside it keeps the end, so a
+	// partial character left at the tail of what was kept survives into the
+	// stored value.
+	//
+	// Swept over a length because where the cut falls depends on how much
+	// arrives before the ceiling: one fixed string is as likely as not to
+	// land on a boundary and pass whatever the code does.
+	for extra := range 4 {
+		b := bounded{most: int64(1024 + extra)}
+		said := strings.Repeat("€", 2048)
+		if _, err := b.Write([]byte(said)); err != nil {
+			t.Fatal(err)
+		}
+		if !b.over {
+			t.Fatalf("at %d bytes the ceiling was not reached", 1024+extra)
+		}
+		if !utf8.ValidString(b.String()) {
+			t.Errorf("at %d bytes what was kept is not valid UTF-8, so three engines "+
+				"of four refuse the write recording it", 1024+extra)
+		}
+		if int64(len(b.String())) > b.most {
+			t.Errorf("at %d bytes it kept %d", 1024+extra, len(b.String()))
+		}
+	}
+}

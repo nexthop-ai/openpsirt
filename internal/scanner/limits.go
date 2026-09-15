@@ -31,11 +31,15 @@ type Limits struct {
 
 // DefaultLimits are the bounds a run uses when given none.
 //
-// Set from what reading costs rather than from what a report looks like. The
-// largest real image measured here produced 335,021 findings, 305,487 of them
-// a single kernel across 62 modules, so a ceiling of half a million matches is
-// above the worst real case and still far below what would exhaust the
-// process.
+// Set from what reading costs rather than from what a report looks like.
+//
+// A match and a finding are different units and the ceiling is on matches: one
+// match becomes as many findings as its component has places in the build, so
+// the findings a scan produced are an upper bound on the matches its report
+// stated, and usually a loose one. The largest real image measured here
+// produced 335,021 findings, so its report stated fewer matches than that —
+// which puts a ceiling of half a million above the worst real case by a margin
+// nobody has to measure, and still far below what would exhaust the process.
 //
 // The byte ceiling is the load-bearing one — every other count is bounded by
 // it — and it is set the way the inventory reader's is: about half of what the

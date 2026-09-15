@@ -443,3 +443,139 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 		}
 	})
 }
+
+func TestADestinationTakingOneKindReachesPastABacklogOfAnother(t *testing.T) {
+	// The kind decided the loop rather than the window: the oldest two
+	// hundred were selected whatever kind they were, and a row this
+	// destination does not take never gets a delivery row — so it stayed in
+	// the window for ever. A paging destination behind two hundred ordinary
+	// events was wedged exactly as a destination taking everything was, and
+	// the backlog test above never reached it because its destination takes
+	// every kind.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "paging",
+			string(notify.CriticalOnRelease), server.URL,
+			"a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+
+		// A window's worth of a kind this destination does not take.
+		for i := range notify.SweepBatch {
+			if err := store.Tell(ctx, notify.Telling{
+				PersonID: who.ID, Kind: notify.Assigned,
+				Body: fmt.Sprintf("not for paging %d", i), Link: "/x",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// And then the one it does, created after all of them.
+		if _, _, err := store.Reconcile(ctx, who.ID, notify.CriticalOnRelease, []notify.Holds{{
+			About: "critical-on-release sonic v1.0 broadcom",
+			Body:  "A release carries an unaddressed critical.",
+			Link:  "/findings/1",
+		}}); err != nil {
+			t.Fatal(err)
+		}
+
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		sent, _, err := signal.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sent != 1 {
+			t.Fatalf("the sweep carried %d, want the one of this destination's kind "+
+				"from behind the backlog", sent)
+		}
+	})
+}
+
+func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
+	// A delivery is keyed on what was said, so a condition opened for six
+	// people is six notification rows and one delivery — which is deliberate,
+	// because a channel wants it once. Asked "settled here?" by the row's own
+	// number, five of those six could never be settled: the duplicate arm
+	// returns without writing anything for them, so they answered the
+	// predicate for ever and, being the oldest, sat at the front of the
+	// window. A few dozen people across the condition kinds is enough to stop
+	// the sweep advancing again.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		first, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, first), "chat",
+			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+
+		// One condition, opened for several people: one thing to say and
+		// several rows saying it.
+		held := []notify.Holds{{
+			About: "build-quiet sonic master broadcom",
+			Body:  "Nothing has been filed against sonic master broadcom.",
+			Link:  "/builds/1",
+		}}
+		for i := range 6 {
+			who := first
+			if i > 0 {
+				who, err = rights.Ensure(ctx,
+					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true))
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, _, err := store.Reconcile(ctx, who.ID, notify.BuildQuiet, held); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		if _, _, err := signal.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// One request, which is the point of keying on what was said.
+		saw.mu.Lock()
+		requests := saw.requests
+		saw.mu.Unlock()
+		if requests != 1 {
+			t.Errorf("a condition opened for six people was sent %d times", requests)
+		}
+
+		// And every one of the six has left the window. Asked of what was
+		// sent, six rows still fit inside it and the sweep reaches past them
+		// — so the question is put to the predicate, which is what wedges.
+		left, err := notify.StillToTell(signal, ctx, "chat")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left != 0 {
+			t.Errorf("%d of the six rows can never be settled, so they hold the front "+
+				"of the window for ever", left)
+		}
+	})
+}

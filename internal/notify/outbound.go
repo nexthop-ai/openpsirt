@@ -165,25 +165,11 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 		// nothing created afterwards was ever signalled: no error, no log, no
 		// counter. The mail sweep beside this one has carried a per-row
 		// delivery predicate all along, which is what makes it advance.
-		var rows []Notification
-		if err := s.db.NewSelect().Model(&rows).
-			// What is worth saying is what is still true or still unread. A
-			// cleared condition is not news, and an event nobody has yet been
-			// told about outside is.
-			Where("nt.cleared_at IS NULL").
-			Where(`NOT EXISTS (SELECT 1 FROM "outbound_delivery" AS "settled" `+
-				`WHERE "settled"."outbound_id" = ? AND "settled"."notification_id" = "nt"."id" `+
-				`AND ("settled"."sent_at" IS NOT NULL OR "settled"."attempts" >= ?))`,
-				destination.ID, tries).
-			OrderExpr("nt.created_at ASC, nt.id ASC").
-			Limit(sweepBatch).
-			Scan(ctx, &rows); err != nil {
-			return sent, failed, fmt.Errorf("read what there is to say: %w", err)
+		rows, err := s.window(ctx, destination)
+		if err != nil {
+			return sent, failed, err
 		}
 		for _, row := range rows {
-			if !matches(destination.Kind, string(row.Kind)) {
-				continue
-			}
 			done, err := s.deliver(ctx, destination, row)
 			switch {
 			case err != nil:
@@ -196,6 +182,46 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 		}
 	}
 	return sent, failed, nil
+}
+
+// window is what this destination has still to be told, oldest first.
+//
+// Both halves of "still to be told" are asked of the database rather than of
+// the loop, because a row the loop skips never gets a delivery row — so it
+// stays in the window for ever and the window stops advancing.
+func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error) {
+	var rows []Notification
+	q := s.db.NewSelect().Model(&rows).
+		// What is worth saying is what is still true or still unread. A
+		// cleared condition is not news, and an event nobody has yet been
+		// told about outside is.
+		Where("nt.cleared_at IS NULL").
+		// Settled here, asked the way the delivery is keyed. A delivery is
+		// unique on the destination and what was said, and what was said is a
+		// condition's own identity where it has one — so a condition opened
+		// for six people is six rows and one delivery, which is deliberate
+		// because a channel wants it once. Asked by the row's own number
+		// instead, five of the six could never be settled: they answered this
+		// for ever and, being the oldest, sat at the front of the window.
+		Where(`NOT EXISTS (SELECT 1 FROM "outbound_delivery" AS "settled" `+
+			`WHERE "settled"."outbound_id" = ? `+
+			`AND ("settled"."notification_id" = "nt"."id" `+
+			`     OR ("nt"."about" <> ? AND "settled"."about" = "nt"."about")) `+
+			`AND ("settled"."sent_at" IS NOT NULL OR "settled"."attempts" >= ?))`,
+			to.ID, "", tries).
+		OrderExpr("nt.created_at ASC, nt.id ASC").
+		Limit(sweepBatch)
+	// The kind is an equality test, which is what normalizing it on the way in
+	// is for. Filtered after the limit instead, a destination configured for
+	// one kind wedged behind two hundred rows of another exactly as a
+	// destination taking everything did.
+	if to.Kind != Everything {
+		q = q.Where("nt.kind = ?", to.Kind)
+	}
+	if err := q.Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what there is to say: %w", err)
+	}
+	return rows, nil
 }
 
 // what one attempt came to.
@@ -350,11 +376,6 @@ func about(row Notification) string {
 // running.
 func foldedKind(kind string) string {
 	return strings.ToLower(strings.TrimSpace(kind))
-}
-
-// matches says whether a destination takes this kind.
-func matches(configured, kind string) bool {
-	return configured == Everything || configured == foldedKind(kind)
 }
 
 // trimTo bounds what is stored of a failure.

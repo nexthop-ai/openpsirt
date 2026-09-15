@@ -19,11 +19,13 @@
 // clears the date.
 //
 // **A revocation that matched nothing is ErrNothingMatched, never success.**
-// Four writes that take access away bound only the error from the statement
-// and never read how many rows it matched, so withdrawing a role somebody does
-// not hold, or a role that does not exist, answered as though it had been
+// The writes that take access away bound only the error from the statement and
+// never read how many rows it matched, so withdrawing a role somebody does not
+// hold, or a role that does not exist, answered as though it had been
 // withdrawn — and the caller then wrote a trail row saying so and handed back
-// every finding the person was dealing with in that product.
+// every finding the person was dealing with in that product. A grant, an
+// estate grant, a group binding, a group's administration and a team
+// membership all take access away, and all five read what they matched.
 package access
 
 import (

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -117,31 +116,12 @@ func registerAssigning(api huma.API, in Ingest) {
 		// directory for the price of one request, to anybody who may
 		// triage.
 		//
-		// Assigning to yourself, or to nobody, is not giving work away
-		// and needs no more than the triage right already checked.
-		if input.Body.Person != "" && input.Body.Team != "" {
-			return nil, huma.Error422UnprocessableEntity(
-				"work is held by one party: name a person or a team, not both")
-		}
-		// Putting work into a team's queue is dispatching. Taking it
-		// out again is not, and that asymmetry is the whole of a team
-		// queue rather than a holding.
-		// Without regard to capitals, for the reason the component path is:
-		// an identity is stored folded, so the exact comparison refused
-		// somebody handing work back to themselves under their own spelling.
-		givingAway := input.Body.Team != "" ||
-			(input.Body.Person != "" &&
-				!strings.EqualFold(strings.TrimSpace(input.Body.Person), subject.Identity))
-		if givingAway && !subject.Holds(access.Assigner, product) {
-			// An act they may not do on a finding they are already looking
-			// at, which is the rule this package states: a 404 answers a
-			// *name*, and this one answers an act on something already shown.
-			// The component path refuses the identical condition in these
-			// words; this one answered a 404 and the two contradicted each
-			// other about what had happened.
-			return nil, huma.Error422UnprocessableEntity(
-				"you may take what nobody owns and hand back your own; giving this to " +
-					"somebody else needs the right that names it")
+		// The same rule the component path states, asked in one place: the
+		// two had already drifted over which status a refused hand-off is,
+		// so one route answered a 404 and the other a 422 about the
+		// identical condition.
+		if err := mayHandOver(subject, product, input.Body.Person, input.Body.Team); err != nil {
+			return nil, err
 		}
 
 		var to *int64

@@ -637,7 +637,7 @@ A cut is made on a character boundary, never at a byte offset.
 | A value shortened to fit a width is cut between characters | A byte offset lands inside a multi-byte character about two times in three, and what is left is not valid UTF-8 |
 | The write is refused by three engines of four | PostgreSQL refuses invalid UTF-8 outright, MySQL and MariaDB refuse it in strict mode, and SQLite stores it — which is the engine the quick loop runs |
 | The two directions are separate operations | Keeping the head leaves the partial character at the end and keeping the tail leaves it at the front, so one of them trims backward and the other forward |
-| Both live in one place | Every site wrote its own slice, and the two that were correct were written by people who had already been bitten. The cut is the same fact in five places and is kept in one |
+| Both live in one place | Every site wrote its own slice, and the ones that were correct were written by people who had already been bitten. The cut is one fact, so it is written once and called |
 
 What it costs where it is missing is the failure that reports nothing: the
 value being shortened is usually a message saying why something else failed, so

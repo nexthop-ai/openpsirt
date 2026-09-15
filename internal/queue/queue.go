@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
-	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -637,12 +637,14 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 // line carries the whole of it either way.
 const mostOfAnError = 4096
 
-// head is the first n bytes of s, cut on a rune boundary and marked where it
+// head is the first n bytes of s, cut between characters and marked where it
 // was cut.
 //
 // A cut at a byte offset splits a multi-byte character and leaves an invalid
 // tail, which three of the four engines then refuse to store — so the bound
-// meant to keep a write small is what makes it fail.
+// meant to keep a write small is what makes it fail. The cut itself is the
+// shared one: this spelled it a second time, correctly, which is how the
+// spellings that are not correct survive.
 func head(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -652,10 +654,7 @@ func head(s string, n int) string {
 	if room <= 0 {
 		return ""
 	}
-	for room > 0 && !utf8.RuneStart(s[room]) {
-		room--
-	}
-	return s[:room] + cut
+	return bound.Head(s, room) + cut
 }
 
 // held reads a conditional update's count as whether the job was still this
