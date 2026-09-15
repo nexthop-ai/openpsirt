@@ -117,8 +117,8 @@ type Approval struct {
 	// on the old words. With only the approver recorded, the queue reported
 	// that back to the proposer as somebody else having undone their
 	// agreement.
-	WithdrawnBy *int64 `bun:"withdrawn_by"`
-	Batch       *string    `bun:"batch"`
+	WithdrawnBy *int64  `bun:"withdrawn_by"`
+	Batch       *string `bun:"batch"`
 	// Covered is how many findings this claim covered when it was agreed to.
 	//
 	// Kept rather than worked out later. A decision reaches by matching, so a

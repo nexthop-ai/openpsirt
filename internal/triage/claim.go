@@ -251,7 +251,6 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return nil, err
 	}
 
-
 	var recorded []*Decision
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
