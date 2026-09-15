@@ -791,7 +791,11 @@ func registerCoverage(api huma.API, in Ingest) {
 
 		rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "what has been scanned could not be read", err)
+			// When a build was last scanned by anybody is a person's
+			// question, and the store says so. Answered as a fault it read as
+			// the deployment being broken rather than as this credential not
+			// being the one to ask.
+			return nil, refused(in.Logger, err, "what has been scanned could not be read")
 		}
 
 		out := &coverageOutput{}
@@ -883,7 +887,11 @@ func registerCoverageExport(api huma.API, in Ingest) {
 		// re-sort the same estate for every two hundred rows.
 		rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "what has been scanned could not be read", err)
+			// When a build was last scanned by anybody is a person's
+			// question, and the store says so. Answered as a fault it read as
+			// the deployment being broken rather than as this credential not
+			// being the one to ask.
+			return nil, refused(in.Logger, err, "what has been scanned could not be read")
 		}
 		out := Exporting{
 			About: [2]string{"quiet after days", strconv.Itoa(int(quietAfter.Hours() / 24))},

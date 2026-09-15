@@ -23,26 +23,61 @@ import (
 // The source is read rather than the package being asked, because the names
 // are literals at their call sites: that is what makes them greppable, and a
 // list built beside them to satisfy a test is a second list to keep right.
+// sources is where a setting is read from the environment, and refusals is
+// where one is named in a message telling an operator to set it.
+//
+// Literals rather than a walk, which is what keeps a file-reading test from
+// being a file-reading primitive: a walk that stopped matching would read
+// fewer files and report the same clean answer.
+var (
+	sources  = []string{"config.go", "ingest.go"}
+	refusals = []string{
+		"config.go", "ingest.go",
+		"../../cmd/openpsirt/main.go",
+		"../attach/s3.go",
+		"../advisory/advisory.go",
+	}
+)
+
 func TestEverySettingIsWrittenDown(t *testing.T) {
 	read := regexp.MustCompile(`(?:env|r\.duration|r\.number|r\.boolean)\("([A-Z0-9_]+)"`)
 	reads := map[string]bool{}
 	// Named one by one rather than walked: every path here is a literal, which
 	// is what keeps a file-reading test from being a file-reading primitive.
-	config, err := os.ReadFile("config.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ingest, err := os.ReadFile("ingest.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, source := range [][]byte{config, ingest} {
+	for _, path := range sources {
+		source, err := os.ReadFile(path) //nolint:gosec // G304: every path in `sources` is a literal in this file
+		if err != nil {
+			t.Fatal(err)
+		}
 		for _, found := range read.FindAllStringSubmatch(string(source), -1) {
 			reads[found[1]] = true
 		}
 	}
 	if len(reads) == 0 {
 		t.Fatal("no settings were found in the source, so this checked nothing")
+	}
+
+	// A variable named in a refusal is one an operator is being told to set,
+	// so it is held to the documented set exactly as one that is read here is.
+	//
+	// Three packages name them: this one, and the two below it that carry the
+	// prefix of their own because importing back would cycle. Named one by one
+	// like the sources above, and counted, because a path that stops resolving
+	// is a file this stops reading and nothing else says so.
+	named := regexp.MustCompile(`OPENPSIRT_([A-Z0-9_]+)`)
+	told := 0
+	for _, path := range refusals {
+		source, err := os.ReadFile(path) //nolint:gosec // G304: every path in `refusals` is a literal in this file
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, found := range named.FindAllStringSubmatch(string(source), -1) {
+			reads[found[1]] = true
+			told++
+		}
+	}
+	if told == 0 {
+		t.Fatal("no variable is named in any refusal, so half of this checked nothing")
 	}
 
 	page, err := os.ReadFile("../../docs/configuration.md")

@@ -16,12 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-// envPrefix is how these settings are spelled in the environment, so a refusal
-// can name the way through it. Repeated rather than imported, for the reason
-// the same constant is repeated elsewhere: a dependency on the configuration
-// package for a five-character string is the worse trade.
-const envPrefix = "OPENPSIRT_"
-
 // Bucket keeps bytes in an object store reached over the S3 API, which is what
 // MinIO, Ceph and every cloud provider speak.
 type Bucket struct {
@@ -111,8 +105,8 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 			// source.
 			return nil, fmt.Errorf(
 				"object store endpoint must be https, or loopback for development: %s"+
-					" — set %sATTACHMENT_ALLOW_HTTP to accept it on this network",
-				shown, envPrefix)
+					" — set OPENPSIRT_ATTACHMENT_ALLOW_HTTP to accept it on this network",
+				shown)
 		}
 	}
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {

@@ -52,19 +52,14 @@ var ErrNoPublisher = errors.New("this deployment has not been configured with a 
 func missingPublisher(p publisher.Named) error {
 	switch {
 	case p.Name == "" && p.Namespace == "":
-		return fmt.Errorf("%w: set %sPUBLISHER_NAME and %sPUBLISHER_NAMESPACE",
-			ErrNoPublisher, envPrefix, envPrefix)
+		return fmt.Errorf("%w: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE",
+			ErrNoPublisher)
 	case p.Name == "":
-		return fmt.Errorf("%w: %sPUBLISHER_NAME is not set", ErrNoPublisher, envPrefix)
+		return fmt.Errorf("%w: OPENPSIRT_PUBLISHER_NAME is not set", ErrNoPublisher)
 	default:
-		return fmt.Errorf("%w: %sPUBLISHER_NAMESPACE is not set", ErrNoPublisher, envPrefix)
+		return fmt.Errorf("%w: OPENPSIRT_PUBLISHER_NAMESPACE is not set", ErrNoPublisher)
 	}
 }
-
-// envPrefix is how the settings are spelled in the environment, repeated here
-// rather than imported: the configuration package reads this one, and a cycle
-// for the sake of a five-character string is a worse trade than the string.
-const envPrefix = "OPENPSIRT_"
 
 // ErrNoSuchIssue says the product holds nothing under that identifier.
 var ErrNoSuchIssue = errors.New("this product holds no issue by that name")

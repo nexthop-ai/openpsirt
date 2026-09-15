@@ -80,30 +80,58 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 
 	ctx := context.Background()
-	if fs.NArg() > 0 && fs.Arg(0) == "migrate" {
+	// A subcommand this does not know is refused rather than ignored.
+	// Ignored, `openpsirt migrat` started the server — a typo in a job that
+	// was meant to apply migrations and nothing else, answering requests
+	// against whatever schema was there. runMigrate already refuses an
+	// action it does not know, which is the contrast.
+	if fs.NArg() > 0 {
+		if fs.Arg(0) != "migrate" {
+			return fmt.Errorf("unknown command %q: the only one is \"migrate\"", fs.Arg(0))
+		}
 		return runMigrate(ctx, cfg, logger, stdout, fs.Args()[1:])
 	}
 
+	// Everything below this line is contacted before the server listens, and
+	// all of it under one deadline.
+	//
+	// **Unbounded, a hang here was silent and total.** An endpoint that
+	// accepts the connection and never answers held PingContext for ever: the
+	// process was up, no port was listening, and not one log line had been
+	// written — from outside, the same thing as a slow image pull. A crash
+	// loop that names what it could not reach is the failure a supervisor can
+	// act on. Migrating is deliberately outside it, above: a schema change on
+	// a large table legitimately takes longer than a deployment starts in.
+	//
+	// Each step says what it is about to do, for the same reason: a hang has
+	// to name what it is hanging on.
+	startup, settled := context.WithTimeout(ctx, cfg.StartupTimeout)
+	defer settled()
+	ctx = startup
+	logger.Info("starting", "timeout", cfg.StartupTimeout)
+
+	logger.Info("connecting to the database")
 	db, err := openDatabase(ctx, cfg, logger)
 	if err != nil {
-		return err
+		return startupFailed(err, "connecting to the database", cfg)
 	}
 	defer closeQuietly(db, logger)
 
 	// Migrating before serving means a request never arrives against a schema
 	// the code does not expect.
 	if cfg.AutoMigrate {
+		logger.Info("applying the schema")
 		if err := schema.Up(ctx, db, logger); err != nil {
-			return err
+			return startupFailed(err, "applying the schema", cfg)
 		}
 	} else if err := schemaIsCurrent(ctx, db, logger); err != nil {
-		return err
+		return startupFailed(err, "checking the schema version", cfg)
 	}
 
 	// Named administrators are granted at every start, which is what makes
 	// this the way back in rather than a one-time setup step.
 	if err := access.Bootstrap(ctx, access.NewStore(db.DB), cfg.BootstrapAdmins); err != nil {
-		return err
+		return startupFailed(err, "granting the administrators named in configuration", cfg)
 	}
 	if len(cfg.BootstrapAdmins) > 0 {
 		logger.Info("administrators granted from configuration", "count", len(cfg.BootstrapAdmins))
@@ -125,9 +153,10 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 	if !canAdminister {
 		return fmt.Errorf(
-			"nobody can administer this deployment: %s mode is on with no group bound to administration, "+
-				"and %sBOOTSTRAP_ADMINS names nobody. Name somebody there and start again",
-			mode, "OPENPSIRT_")
+			"nobody can administer this deployment: %s mode is on with no group bound to "+
+				"administration, and OPENPSIRT_BOOTSTRAP_ADMINS names nobody. Name somebody "+
+				"there and start again",
+			mode)
 	}
 	logger.Info("roles are assigned", "mode", mode)
 
@@ -155,13 +184,13 @@ func run(args []string, stdout, stderr *os.File) error {
 		// on the request — so it is stated, and a deployment that configured a
 		// provider without stating it stops here rather than at somebody's
 		// first sign-in.
-		return fmt.Errorf(
-			"%sBASE_URL has to name the address people reach this on, because a provider is configured",
-			"OPENPSIRT_")
+		return errors.New("OPENPSIRT_BASE_URL has to name the address people reach this on, " +
+			"because a provider is configured")
 	}
 
 	// Where files hanging off an issue are kept. Nothing configured is the
 	// ordinary case: attachments are off and everything else works.
+	logger.Info("checking the attachment store")
 	files, err := attachmentStore(ctx, cfg, logger)
 	if err != nil {
 		return err
@@ -306,6 +335,18 @@ func closeQuietly(db *database.DB, logger *slog.Logger) {
 	}
 }
 
+// startupFailed names what the process was doing when it gave up.
+//
+// A deadline reached says only "context deadline exceeded", which names
+// nothing an operator can go and look at. What they need is which of the
+// things contacted before the server listens did not answer.
+func startupFailed(err error, doing string, cfg config.Config) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("gave up %s after %s: %w", doing, cfg.StartupTimeout, err)
+	}
+	return err
+}
+
 func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (*database.DB, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("no database configured: set OPENPSIRT_DATABASE_URL")
@@ -443,8 +484,14 @@ func newLogger(cfg config.Config, w *os.File) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, opts))
 }
 
-// passes is what runs beside the server: the ten background loops, each of
-// which may be absent because the thing it works on is not configured.
+// passes is what runs beside the server: ten background loops, two of which
+// may be absent because the thing they work on is not configured — the mail
+// sender where no channel is configured, and the attachment sweeper where no
+// store is.
+//
+// The other eight always run. Guarding all of them read as though any could be
+// missing, and made the reader open six packages to find out that four of the
+// guards could never be false.
 //
 // Grouped rather than passed one at a time. Twelve parameters is past what a
 // call site can be read at, and they divide cleanly into what to serve and
@@ -473,38 +520,51 @@ type passes struct {
 // retried for no reason.
 func (p passes) background(ctx context.Context) *sync.WaitGroup {
 	var workers sync.WaitGroup
-	start := func(run func(context.Context, time.Duration), every time.Duration) {
+	for _, one := range p.loops() {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			run(ctx, every)
+			one.run(ctx, one.every)
 		}()
 	}
-	if p.reader != nil {
-		start(p.reader.Run, readInterval)
+	return &workers
+}
+
+// loop is one background pass, and how often it runs.
+type loop struct {
+	what  string
+	run   func(context.Context, time.Duration)
+	every time.Duration
+}
+
+// loops is what this deployment runs beside the server.
+//
+// A list rather than a run of if statements, so that what a given deployment
+// starts can be read — and held to — without starting any of it.
+func (p passes) loops() []loop {
+	// The eight that always run. Their constructors return a value
+	// unconditionally, so a guard here would be a condition a reader has to go
+	// and disprove — which is what four of them were.
+	all := []loop{
+		{"read what arrived", p.reader.Run, readInterval},
+		{"scan what arrived", p.runner.Run, readInterval},
+		{"schedule rescans", p.schedule.Run, scheduleInterval},
+		{"ask upstream what is current", p.upstream.Run, askInterval},
+		{"watch for quiet builds", p.watch.Run, 0},
+		{"send what is owed outward", p.outward.Run, 0},
+		{"route unheld work to teams", p.routing.Run, readInterval},
+		{"set aside work whose worker died", p.undertaker.Run, 0},
 	}
+	// And the two a deployment may not have. NewPost answers nil where no
+	// mail channel is configured and NewKeeper where no attachment store is,
+	// so these two guards are the ones that say something.
 	if p.post != nil {
-		start(p.post.Run, 0)
-	}
-	if p.outward != nil {
-		start(p.outward.Run, 0)
+		all = append(all, loop{"send mail", p.post.Run, 0})
 	}
 	if p.keeper != nil {
-		start(p.keeper.Run, 0)
+		all = append(all, loop{"sweep unattached files", p.keeper.Run, 0})
 	}
-	if p.runner != nil {
-		start(p.runner.Run, readInterval)
-	}
-	if p.routing != nil {
-		start(p.routing.Run, readInterval)
-	}
-	if p.undertaker != nil {
-		start(p.undertaker.Run, 0)
-	}
-	start(p.schedule.Run, scheduleInterval)
-	start(p.upstream.Run, askInterval)
-	start(p.watch.Run, 0)
-	return &workers
+	return all
 }
 
 func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside passes) error {
@@ -538,7 +598,14 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside 
 
 	select {
 	case err := <-errs:
-		return err
+		// The workers are already running, each of them beginning with a
+		// timer that fires at once. Returning here left them mid-query while
+		// the caller's deferred close took the database away — an orderly
+		// failure to listen turned into failed scans and jobs retried for no
+		// reason. Stopping them is what ctx's cancel does; waiting is what
+		// this adds.
+		stop()
+		return errors.Join(err, workersStopped(workers, cfg, logger))
 	case <-ctx.Done():
 	}
 
@@ -562,16 +629,35 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside 
 	// Observed: a query that should have taken milliseconds ran for over an
 	// hour, SIGTERM did nothing, and the process had to be killed. A shutdown
 	// that cannot be completed by the signal meant for it is not a shutdown.
-	if !waitFor(workers, cfg.ShutdownGrace) {
-		logger.Warn("stopped without waiting for background work to finish",
-			"grace", cfg.ShutdownGrace,
-			"why", "a worker did not stop in time, most likely blocked on a slow query")
-	}
+	// Both halves of the grace answer the same way. An overrun request made
+	// Shutdown return an error and the process exit 1; an overrun worker
+	// logged a warning and returned nil, so the process exited 0 — and
+	// `docs/configuration.md` describes the two as one setting applied twice.
+	// A supervisor reading the exit code was told that half of a shutdown
+	// that did not finish had finished.
+	workerErr := workersStopped(workers, cfg, logger)
 	if shutdownErr != nil {
-		return fmt.Errorf("shutdown: %w", shutdownErr)
+		shutdownErr = fmt.Errorf("shutdown: %w", shutdownErr)
+	}
+	if err := errors.Join(shutdownErr, workerErr); err != nil {
+		return err
 	}
 	logger.Info("stopped")
 	return nil
+}
+
+// workersStopped waits out the grace and says whether the workers finished.
+//
+// An error rather than a warning, because it is the same overrun the server's
+// own shutdown reports as one.
+func workersStopped(workers *sync.WaitGroup, cfg config.Config, logger *slog.Logger) error {
+	if waitFor(workers, cfg.ShutdownGrace) {
+		return nil
+	}
+	logger.Warn("stopped without waiting for background work to finish",
+		"grace", cfg.ShutdownGrace,
+		"why", "a worker did not stop in time, most likely blocked on a slow query")
+	return fmt.Errorf("background work did not stop within %s", cfg.ShutdownGrace)
 }
 
 // waitFor waits for a group, and reports whether it finished in time.
@@ -635,12 +721,12 @@ func onlyTheBoundProvider(ctx context.Context, rights *access.Store, providers m
 		return fmt.Errorf(
 			"identities here are bound to %q and this deployment is configured for %s: "+
 				"an identifier one provider issued names somebody else at another. Point "+
-				"%sOIDC_ISSUER back at %[1]q, unbind each person under Administration "+
+				"OPENPSIRT_OIDC_ISSUER back at %[1]q, unbind each person under Administration "+
 				"(DELETE /v1/people/{identity}/identifier), and change the issuer after that "+
 				"— a binding is withdrawn while the provider that made it is still "+
 				"configured. Where %[1]q cannot be reached either, configure the trusted "+
 				"header with no provider at all and do the same from there",
-			was, strings.Join(configured, ", "), "OPENPSIRT_")
+			was, strings.Join(configured, ", "))
 	}
 	return nil
 }
@@ -661,11 +747,10 @@ func signInProviders(ctx context.Context, cfg config.Config, logger *slog.Logger
 	// see which two are fighting.
 	if cfg.OIDCIssuer != "" && cfg.GitHubClientID != "" {
 		return nil, fmt.Errorf(
-			"two sign-in providers are configured: %sOIDC_ISSUER and %sGITHUB_CLIENT_ID. "+
-				"One provider is configured at a time, because an identity here is a username "+
-				"and two providers issuing them independently cannot be told apart. "+
-				"Remove one and start again",
-			"OPENPSIRT_", "OPENPSIRT_")
+			"two sign-in providers are configured: OPENPSIRT_OIDC_ISSUER and " +
+				"OPENPSIRT_GITHUB_CLIENT_ID. One provider is configured at a time, because an " +
+				"identity here is a username and two providers issuing them independently " +
+				"cannot be told apart. Remove one and start again")
 	}
 
 	if cfg.OIDCIssuer != "" {

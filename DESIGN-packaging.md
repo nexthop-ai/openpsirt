@@ -11,6 +11,7 @@ Satisfies REQ-01, REQ-02, REQ-04, and the probe behavior REQ-72 requires.
 - [Bundled scanner](#bundled-scanner)
 - [Image checks in CI](#image-checks-in-ci)
 - [Chart probes](#chart-probes)
+- [Starting and stopping](#starting-and-stopping)
 - [Chart security context](#chart-security-context)
 - [Render-time refusals](#render-time-refusals)
 - [Self-inventories](#self-inventories)
@@ -108,6 +109,17 @@ outage into a restart loop on top of a database outage.
 The startup probe allows ten minutes by default. Migrations run before the
 service answers, and a probe that gives up part way kills the pod and restarts
 the migration from the beginning.
+
+## Starting and stopping
+
+| Rule | Reason |
+|---|---|
+| Everything contacted before the server listens is under one deadline, and each step says what it is about to do | An endpoint that accepts the connection and never answers held the process for ever with no log line written and no port listening — from outside, the same thing as a slow image pull. A crash loop naming what it could not reach is the failure a supervisor can act on |
+| Migrating is outside that deadline | A schema change on a large table legitimately takes longer than a deployment starts in, which is what the ten-minute startup probe above is for |
+| A subcommand this does not know is refused | Ignored, a typo in a job meant to apply migrations started a server instead, against whatever schema was there |
+| Ten background loops run beside the server; two of them may be absent | The mail sender where no channel is configured, and the attachment sweeper where no store is. Every other pass runs whatever a deployment has — a list rather than ten guarded starts, so what runs can be read without opening the package behind each one |
+| Every exit waits for the background work, including a failure to listen | Each pass begins with a timer that fires at once, so returning early left them mid-query while the deferred close took the database away — an orderly failure to listen became failed scans and jobs retried for no reason |
+| Both halves of the shutdown grace answer the same way | An overrun request made the process exit 1 and an overrun worker exit 0, while the setting that bounds them is one. A supervisor reading the exit code was told that half of an unfinished shutdown had finished |
 
 ## Chart security context
 

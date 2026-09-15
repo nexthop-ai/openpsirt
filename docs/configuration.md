@@ -20,6 +20,7 @@ taken.
 | `OPENPSIRT_BASE_URL` | The address people arrive on. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
 | `OPENPSIRT_PLAIN_HTTP` | Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not | `false` |
 | `OPENPSIRT_SHUTDOWN_GRACE` | How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that | `15s` |
+| `OPENPSIRT_STARTUP_TIMEOUT` | How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on | `60s` |
 | `OPENPSIRT_LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` |
 | `OPENPSIRT_LOG_FORMAT` | `text` or `json` | `text` |
 

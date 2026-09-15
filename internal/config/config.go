@@ -26,6 +26,18 @@ type Config struct {
 	LogFormat string
 	// ShutdownGrace is how long in-flight requests get to finish.
 	ShutdownGrace time.Duration
+
+	// StartupTimeout bounds everything contacted before the server listens:
+	// the database, the schema, the administrators named in configuration and
+	// the attachment store.
+	//
+	// Bounded because an endpoint that accepts a connection and never answers
+	// — a stale load-balancer target, a paused instance — held the process for
+	// ever with no log line written and no port listening. From outside that
+	// is indistinguishable from a slow image pull, and a supervisor cannot act
+	// on it. A crash loop naming what it could not reach is the failure mode
+	// that can be.
+	StartupTimeout time.Duration
 	// DatabaseURL says which database to use and how to reach it.
 	DatabaseURL string
 	// ReadTimeout and WriteTimeout bound a single request.
@@ -229,6 +241,7 @@ func Load() (Config, error) {
 		GitHubOrg:          env("GITHUB_ORG", ""),
 		LogFormat:          env("LOG_FORMAT", "text"),
 		ShutdownGrace:      r.duration("SHUTDOWN_GRACE", 15*time.Second),
+		StartupTimeout:     r.duration("STARTUP_TIMEOUT", 60*time.Second),
 		DatabaseURL:        env("DATABASE_URL", ""),
 		ScannerPath:        env("SCANNER_PATH", ""),
 		TrustedHeader:      env("TRUSTED_HEADER", ""),

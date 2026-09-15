@@ -39,6 +39,11 @@ type Keeper struct {
 // Nil rather than a pass that does nothing: a worker started for a feature the
 // deployment does not have is a goroutine and a log line an operator has to
 // work out the meaning of.
+//
+// **The caller checks, and Run does not.** A nil-receiver guard on Run as well
+// made the answer here look optional to read and left a branch nothing could
+// reach — the caller that starts this is the one place that knows whether a
+// deployment keeps files.
 func NewKeeper(db *bun.DB, files Storage, logger *slog.Logger, after time.Duration) *Keeper {
 	if files == nil {
 		return nil
@@ -51,9 +56,6 @@ func NewKeeper(db *bun.DB, files Storage, logger *slog.Logger, after time.Durati
 
 // Run sweeps until the context ends.
 func (k *Keeper) Run(ctx context.Context, interval time.Duration) {
-	if k == nil {
-		return
-	}
 	if interval <= 0 {
 		interval = betweenSweeps
 	}
