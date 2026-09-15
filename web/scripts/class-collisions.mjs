@@ -18,6 +18,7 @@
 import { compile } from "tailwindcss";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { positionedModifiers, rulesIn } from "./class-rules.mjs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -74,39 +75,14 @@ for (const file of await stylesheets(src)) {
 // because the chip sits inside a row that navigates on click, every click
 // anywhere went to that finding.
 //
-// What is reported is narrow, because a modifier sharing a name with a text
-// style is ordinary and correct: `.linkish.id` beside a bare `.id` that sets a
-// font is two rules that agree. What cannot be right is a modifier whose bare
-// rule takes an element **out of normal flow** — a chip does not become
-// positioned because of the word beside it. So the test is the property, not
-// the name.
-const escapes = /(^|[\s;])(position\s*:\s*(fixed|absolute|sticky)|inset\s*:)/;
 const declared = new Map();
 const modifiers = new Map();
+const read = { declared, modifiers };
 for (const file of await stylesheets(src)) {
-  // Comments go first. A rule is read as the text before its brace, and a
-  // comment sitting above one is part of that text — so a prose paragraph
-  // above `.overpane` was read as the selector and the rule was never seen.
-  const css = (await readFile(file, "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    for (const part of selector.split(",")) {
-      const one = part.trim();
-      if (!/^(?:\.[-\w]+)+$/.test(one)) continue;
-      const names = [...one.matchAll(/\.([-\w]+)/g)].map(([, name]) => name);
-      if (names.length === 1) {
-        declared.set(names[0], (declared.get(names[0]) ?? "") + ";" + body);
-      } else {
-        for (const name of names.slice(1)) {
-          if (!modifiers.has(name)) modifiers.set(name, one);
-        }
-      }
-    }
-  }
+  rulesIn(await readFile(file, "utf8"), read);
 }
 
-const positioned = [...modifiers.keys()]
-  .filter((name) => escapes.test(declared.get(name) ?? ""))
-  .sort();
+const positioned = positionedModifiers(read);
 
 if (positioned.length > 0) {
   console.error(

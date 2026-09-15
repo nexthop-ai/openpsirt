@@ -144,23 +144,38 @@ func namedByDesigns(width map[string]int) (map[string]bool, error) {
 		if err != nil {
 			return nil, err
 		}
-		text := string(body)
-		for _, id := range one.FindAllString(text, -1) {
+		for id := range identifiersIn(string(body), width) {
 			named[id] = true
-		}
-		// "an explanation and an approval to what expires a decision"
-		// names everything between, which is how the documents state a
-		// run of them.
-		for _, span := range spans.FindAllStringSubmatch(text, -1) {
-			if span[1] != span[3] {
-				continue
-			}
-			first, _ := strconv.Atoi(span[2])
-			last, _ := strconv.Atoi(span[4])
-			for n := first; n <= last; n++ {
-				named[fmt.Sprintf("%s-%0*d", span[1], width[span[1]], n)] = true
-			}
 		}
 	}
 	return named, nil
+}
+
+// identifiersIn is every requirement one document names, ranges expanded.
+//
+// Lifted out of the file reading so it can be asked directly. A range is how
+// the documents state a run of them — "REQ-23 to REQ-25" names all three — and
+// expanding one is the step that decides whether a hundred and thirty-two
+// decisions are claimed by a document or merely near one. That is worth being
+// able to put a case to; reached only by running the program over the tree, it
+// had an exit code for its evidence.
+func identifiersIn(text string, width map[string]int) map[string]bool {
+	named := map[string]bool{}
+	for _, id := range one.FindAllString(text, -1) {
+		named[id] = true
+	}
+	for _, span := range spans.FindAllStringSubmatch(text, -1) {
+		// Never across areas. "REQ-70 to SEC-02" is two identifiers in a
+		// sentence rather than a run, and expanding it would claim every
+		// number between them under whichever prefix came first.
+		if span[1] != span[3] {
+			continue
+		}
+		first, _ := strconv.Atoi(span[2])
+		last, _ := strconv.Atoi(span[4])
+		for n := first; n <= last; n++ {
+			named[fmt.Sprintf("%s-%0*d", span[1], width[span[1]], n)] = true
+		}
+	}
+	return named
 }

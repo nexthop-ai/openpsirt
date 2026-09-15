@@ -63,6 +63,32 @@ var inside = map[string]string{
 	"internal/access/store.go": "the per-product grant's model declaration",
 }
 
+// namesOneAlone reports whether a file names one grant table and not the
+// other, and which one is missing.
+//
+// The rule is "name both", which has two failing shapes and this used to see
+// one. It returned early unless the per-product name appeared, and the estate
+// table's name **contains** the per-product one — so a file naming only the
+// estate table satisfied that test, and was then found to name neither once
+// the estate occurrences were taken out. A store query joining the estate
+// table alone cannot see a role held against one product, so it answers no for
+// somebody who holds exactly the grant being asked about.
+//
+// Lifted out of the walk so it can be asked directly: a gate reachable only by
+// running the program over the tree has an exit code for its only evidence.
+func namesOneAlone(body string) (missing string, only bool) {
+	namesEstate := strings.Contains(body, estate)
+	namesPerProduct := strings.Contains(strings.ReplaceAll(body, estate, ""), perProduct)
+	switch {
+	case namesPerProduct == namesEstate:
+		return "", false
+	case namesEstate:
+		return perProduct, true
+	default:
+		return estate, true
+	}
+}
+
 func main() {
 	var bad []string
 	// web holds the interface, which reaches no table: it asks this server.
@@ -91,14 +117,7 @@ func main() {
 		// against one product, so it answers no for somebody who holds exactly
 		// the grant being asked about — the defect this program describes,
 		// with the two tables the other way round.
-		body := string(text)
-		namesEstate := strings.Contains(body, estate)
-		namesPerProduct := strings.Contains(strings.ReplaceAll(body, estate, ""), perProduct)
-		if namesPerProduct != namesEstate {
-			missing := estate
-			if namesEstate {
-				missing = perProduct
-			}
+		if missing, only := namesOneAlone(string(text)); only {
 			bad = append(bad, fmt.Sprintf("%s: names one grant table and not %s", path, missing))
 		}
 		return nil
