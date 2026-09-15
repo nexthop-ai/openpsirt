@@ -2,6 +2,7 @@ package finding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,6 +29,13 @@ type ReleasePoint struct {
 	Open       int
 	BySeverity map[string]int
 }
+
+// ErrNoProductNamed is what a question about one product's line of releases
+// answers where no product was named.
+//
+// Its own answer rather than an empty list, because an empty list is what a
+// product with no releases looks like and the two are not the same statement.
+var ErrNoProductNamed = errors.New("release over release is a question about one product")
 
 // ReleaseTrend reports what is open against each tagged release of a product.
 //
@@ -58,7 +66,12 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		// Release over release is a question about one product's line of
 		// releases. Across products there is no sequence to plot: two
 		// products' tags interleave by date and mean nothing side by side.
-		return nil, nil
+		//
+		// Refused rather than answered empty. An empty list is what a product
+		// with no releases looks like, so a request that named no product got
+		// the same answer as one whose product has nothing to plot — and the
+		// route's own description says a product must be named.
+		return nil, ErrNoProductNamed
 	}
 	limit = database.APlot.Of(limit)
 

@@ -92,6 +92,17 @@ type reader struct {
 	spdx3Order     []string
 	// spdx3DocumentCreation is the one the document itself points at.
 	spdx3DocumentCreation string
+	// spdx3DocumentRefs are the identifiers of the elements that are the
+	// document itself, which is what a relationship naming the build's roots
+	// has to come from. The second version names a constant for this; the
+	// third states it as an element, and there can be more than one because
+	// a document may carry an inventory element beside its own.
+	spdx3DocumentRefs map[string]bool
+	// spdx3Describes are the describes relationships as they were read, kept
+	// until the walk is over. Which element is the document is itself stated
+	// by an element, in no fixed position, so whether a relationship came
+	// from the document cannot be answered where it is read.
+	spdx3Describes []spdx3Describes
 	// settleErr is a fault found after the walk, where the format states
 	// something by pointing at an element rather than by carrying it.
 	settleErr error
@@ -108,11 +119,27 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 		files:      map[string]bool{},
 		seen:       map[string]int{},
 		upstream:   map[string]string{},
+
+		spdx3DocumentRefs: map[string]bool{},
 	}
 }
 
 // bind records what one of the document's own identifiers refers to.
+//
+// Nothing is bound on a header-only read. That read answers a question about
+// the document's own record and runs synchronously inside the upload request,
+// and the whole point of it is that the contents cost a walk rather than a
+// structure per component.
+//
+// What it costs is the duplicate-identifier refusal, which a header read no
+// longer makes: a document carrying one is answered 202 and fails later in the
+// background reader. That is already how the other two formats behave, and a
+// fault reported at two different times depending on which format a build
+// emits is the worse of the two.
 func (c *reader) bind(ref string, described graph.Described) error {
+	if c.headerOnly {
+		return nil
+	}
 	if ref == "" {
 		return nil
 	}
@@ -231,8 +258,14 @@ func (c *reader) charge() error {
 // contain records one component holding another, which a producer declares by
 // nesting rather than by naming an edge.
 func (c *reader) contain(parent, child graph.Described) error {
+	// Charged and then walked past on a header read. The charge is what stops
+	// the walk and the append is what holds memory, so the bound still holds
+	// on both paths while the header read holds nothing.
 	if err := c.charge(); err != nil {
 		return err
+	}
+	if c.headerOnly {
+		return nil
 	}
 	c.contained = append(c.contained, graph.Dependency{Parent: parent, Child: child})
 	return nil
@@ -250,6 +283,7 @@ func (c *reader) edge(parent, child string) error {
 
 // finish resolves the document's own identifiers into components.
 func (c *reader) finish() (*Document, error) {
+	c.spdx3Roots()
 	c.resolveRoot()
 	c.resolveUpstream()
 	rootIdentity := c.doc.Root.Identity()

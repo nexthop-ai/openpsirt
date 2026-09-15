@@ -19,6 +19,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -71,6 +72,10 @@ type Component struct {
 	// LatestCheckedAt is when we last asked, whatever came back, so that
 	// "we asked and there is nothing" is distinguishable from "we have not
 	// asked".
+	//
+	// Null for ever on a component of an ecosystem there is no index for,
+	// which is the second of those and is true: those are not selected to be
+	// asked about at all.
 	LatestVersion    *string    `bun:"latest_version"`
 	LatestReleasedAt *time.Time `bun:"latest_released_at"`
 	LatestCheckedAt  *time.Time `bun:"latest_checked_at"`
@@ -454,14 +459,14 @@ func PartsOfPurl(purl string) Parts {
 		}
 	}
 
-	// The scheme is fixed by the specification. Anything else is not an
-	// identifier we can read, and guessing at one produces a link to a page
-	// about something else.
-	rest, found := strings.CutPrefix(body, "pkg:")
-	if !found {
-		if rest, found = strings.CutPrefix(body, "PKG:"); !found {
-			return Parts{}
-		}
+	// The scheme is fixed by the specification and is compared without regard
+	// to capitals, which is what the specification says of it — and what the
+	// canonical form beside this already did. Matched against two spellings,
+	// `Pkg:` got a real identity from one and an empty fold basis from the
+	// other, so the same component was two things depending on which asked.
+	scheme, rest, found := strings.Cut(body, ":")
+	if !found || !strings.EqualFold(scheme, "pkg") {
+		return Parts{}
 	}
 	// Cut the version from the right: a name contains no "@" and a version
 	// can.
@@ -582,10 +587,7 @@ func Folded(name string) string {
 	// because it carries an index. The name itself is stored unbounded, so
 	// nothing is lost — this is the lookup key, and two names agreeing for a
 	// hundred and ninety-one characters are the same name by any reading.
-	if len(folded) > foldedWidth {
-		folded = folded[:foldedWidth]
-	}
-	return folded
+	return bound.Head(folded, foldedWidth)
 }
 
 // foldedWidth is the column's width, which is what every indexed name column

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -87,17 +88,13 @@ func (r *Runner) Once(ctx context.Context) (*Outcome, error) {
 	return outcome, ending.Err
 }
 
+// betweenRuns is how long an idle runner waits before asking for work again
+// where the caller says nothing.
+const betweenRuns = 5 * time.Second
+
 // Run scans until the context ends.
 func (r *Runner) Run(ctx context.Context, interval time.Duration) {
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
-
+	background.Every(ctx, interval, betweenRuns, func(ctx context.Context) {
 		for {
 			outcome, err := r.Once(ctx)
 			if err != nil {
@@ -140,8 +137,7 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 					"closed", outcome.Applied.Closed)
 			}
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // unexplainedAlert is how many unexplained disappearances in one scan suggest

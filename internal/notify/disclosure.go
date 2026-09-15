@@ -32,7 +32,7 @@ import (
 // this list on the next sweep without anybody dismissing anything, and one
 // that is disclosed leaves it because the finding stops being private.
 func (w *Watch) pastDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
-	return w.disclosureWithin(ctx, admins, 0)
+	return w.disclosureWithin(ctx, admins, DisclosureDue, 0)
 }
 
 // approachingDisclosure is every embargo whose date falls inside the lead time
@@ -52,7 +52,7 @@ func (w *Watch) approachingDisclosure(ctx context.Context, admins []int64) (map[
 	if lead <= 0 {
 		lead = setting.DefaultDisclosureLead
 	}
-	return w.disclosureWithin(ctx, admins, lead)
+	return w.disclosureWithin(ctx, admins, DisclosureNear, lead)
 }
 
 // statementsRevised is every standing decision whose cited VEX statement has
@@ -106,18 +106,9 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		return nil, err
 	}
 
-	out := map[int64][]Holds{}
-	told, err := w.beingTold(ctx, StatementRevised)
+	out, err := w.everybody(ctx, StatementRevised, acts)
 	if err != nil {
 		return nil, err
-	}
-	for _, person := range told {
-		out[person] = nil
-	}
-	for personID := range acts {
-		if _, already := out[personID]; !already {
-			out[personID] = nil
-		}
 	}
 
 	for _, row := range rows {
@@ -146,7 +137,14 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 
 // disclosureWithin is every undisclosed finding whose date has arrived, or —
 // where a lead time is given — is about to.
-func (w *Watch) disclosureWithin(ctx context.Context, admins []int64,
+//
+// The kind is passed in rather than assumed. One function serves both
+// conditions and it seeded from the people already being told about the
+// arrived one, whichever it was computing — so for the coming one, anybody who
+// was neither an administrator nor currently holding the finding was absent
+// from the map, was never reconciled, and their alert stood indefinitely with
+// nothing able to clear it. That alert names the issue and the product.
+func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	lead time.Duration) (map[int64][]Holds, error) {
 
 	var rows []struct {
@@ -207,29 +205,20 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64,
 		whose[person.PartyID] = person.ID
 	}
 
-	out := make(map[int64][]Holds, len(admins)+len(rows))
-	for _, admin := range admins {
-		out[admin] = nil
-	}
-	// And everybody who is currently being told one of these, whether or not
-	// they should still hear about anything. Reconcile makes one person's open
-	// set exactly what it is handed, so somebody who is never handed a list is
-	// never reconciled — and their alert stands after the thing it was about
-	// has been answered.
+	// Every administrator, and everybody who is currently being told one of
+	// these, whether or not they should still hear about anything. Reconcile
+	// makes one person's open set exactly what it is handed, so somebody who
+	// is never handed a list is never reconciled — and their alert stands
+	// after the thing it was about has been answered.
 	//
 	// This does not arise for the conditions that only ever go to
 	// administrators, because that set does not move. It arises here because
 	// who hears about an embargo includes whoever holds it, and work is handed
 	// around: the person who held it yesterday would keep an alert about a
 	// date that has since been moved, with nothing left to clear it.
-	told, err := w.beingTold(ctx, DisclosureDue)
+	out, err := w.everybodyAnd(ctx, kind, nil, admins)
 	if err != nil {
 		return nil, err
-	}
-	for _, person := range told {
-		if _, already := out[person]; !already {
-			out[person] = nil
-		}
 	}
 	for _, row := range rows {
 		where := row.Product + " " + row.Stream + " " + row.Variant + " " + row.Vulnerability

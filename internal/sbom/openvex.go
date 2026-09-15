@@ -35,6 +35,15 @@ func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
 	if err := v.read(); err != nil {
 		return nil, fmt.Errorf("reading suppressions: %w", err)
 	}
+	// A document that fired both vocabularies is not either of them. Half-read
+	// it was accepted and the OpenVEX statements were dropped without a word,
+	// because the CSAF result is returned and the other list is discarded —
+	// the operator is told the upload worked and the claims are simply absent.
+	// The inventory side already refuses this and says why.
+	if v.csaf != nil && len(v.claims) > 0 {
+		return nil, fmt.Errorf("suppressions state both OpenVEX and CSAF-VEX, " +
+			"so which format the document is cannot be settled")
+	}
 	if v.csaf != nil {
 		claims, err := v.csaf.finish()
 		if err != nil {
@@ -53,10 +62,29 @@ type suppressions struct {
 	lim       Limits
 	namespace string
 	claims    []Suppression
+	// named counts every identifier this document makes the reader hold: a
+	// product a claim points at, and an identifier an issue also goes by.
+	// Charged as each is read.
+	named int
 	// csaf is set once a key only CSAF has is seen. The two formats share no
 	// top-level key, so which one a document is decides itself rather than
 	// being sniffed at from the first bytes.
 	csaf *csafReader
+}
+
+// name charges one more identifier this document makes the reader hold.
+//
+// The same bound and the same reason as the CSAF reader's: the claim count
+// counts statements, so one statement pointing at ten million products was
+// under it. Charged on the way in, because what a bound has to stop is the
+// walk.
+func (v *suppressions) name() error {
+	v.named++
+	if v.named > v.lim.MaxComponents {
+		return fmt.Errorf("suppression document names more than the %d product limit",
+			v.lim.MaxComponents)
+	}
+	return nil
 }
 
 func (v *suppressions) read() error {
@@ -71,12 +99,14 @@ func (v *suppressions) read() error {
 			return nil
 		case "statements":
 			return v.b.array(func() error {
+				// Compared before the element is read, so that the claim past
+				// the limit is refused rather than walked in full first.
+				if len(v.claims) >= v.lim.MaxStatements {
+					return fmt.Errorf("more claims than the %d limit", v.lim.MaxStatements)
+				}
 				claim, err := v.statement()
 				if err != nil {
 					return err
-				}
-				if len(v.claims) >= v.lim.MaxStatements {
-					return fmt.Errorf("more claims than the %d limit", v.lim.MaxStatements)
 				}
 				v.claims = append(v.claims, claim)
 				return nil
@@ -155,6 +185,9 @@ func (v *suppressions) vulnerability(claim *Suppression) error {
 					return err
 				}
 				if alias != "" {
+					if err := v.name(); err != nil {
+						return err
+					}
 					claim.Aliases = append(claim.Aliases, alias)
 				}
 				return nil
@@ -205,6 +238,9 @@ func (v *suppressions) products(claim *Suppression) error {
 		}
 		if target.Purl == "" {
 			return nil
+		}
+		if err := v.name(); err != nil {
+			return err
 		}
 		base, _ := purlParts(target.Purl)
 		if slash := strings.LastIndex(base, "/"); slash >= 0 {

@@ -70,8 +70,13 @@ func TestTheRoutesNothingReachedAnswerAndRefuse(t *testing.T) {
 				refusedFor: "", refusal: http.StatusUnauthorized,
 			},
 			{
+				// Named, because release over release is a question about one
+				// product's line of releases: two products' tags interleave
+				// by date and mean nothing side by side. Unnamed it is
+				// refused rather than answered with an empty list, which is
+				// what a product with no releases looks like.
 				what: "how releases are trending", method: http.MethodGet,
-				path: "/v1/trend/releases",
+				path: "/v1/trend/releases?product=mine",
 				who:  "reader", want: http.StatusOK,
 				refusedFor: "", refusal: http.StatusUnauthorized,
 			},

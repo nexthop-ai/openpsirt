@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
@@ -108,17 +109,7 @@ func NewPost(db *bun.DB, channel Channel, baseURL string, logger *slog.Logger,
 
 // Run sweeps until the context ends.
 func (p *Post) Run(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		interval = betweenPosts
-	}
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
 		if sent, err := p.Digests(ctx); err != nil {
 			p.logger.Error("sending digests", "error", err)
 		} else if sent > 0 {
@@ -131,8 +122,7 @@ func (p *Post) Run(ctx context.Context, interval time.Duration) {
 			p.logger.Info("notifications sent",
 				"channel", p.channel.Name(), "sent", sent, "failed", failed)
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // waiting is one notification to carry, with where it goes.
@@ -163,6 +153,14 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 		ColumnExpr(`pe.email AS "email"`).
 		Join(`JOIN "person" AS "pe" ON pe.id = nt.person_id`).
 		Where("nt.sent_at IS NULL").
+		// A condition the application has already withdrawn is not news. The
+		// sibling sweep carries the rule and this one did not, so mail went
+		// about a build that had resumed being scanned or an embargo whose
+		// date had moved — and the area inside the application does not show
+		// it, so there is nothing to reconcile the message against. For a
+		// private condition the message says only that there is something
+		// undisclosed needing attention: a message about nothing at all.
+		Where("nt.cleared_at IS NULL").
 		Where("nt.attempts < ?", tries).
 		// Somebody with no address is told nothing outside the
 		// application and keeps the area inside it. Excluded in the

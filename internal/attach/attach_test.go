@@ -1,6 +1,7 @@
 package attach_test
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
@@ -580,3 +582,107 @@ func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
 
 // hush is a logger that writes nothing, for the background pass.
 func hush() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
+
+func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
+	// The guard ran after the loss it exists to prevent: the bytes were
+	// unlinked, the delete then matched nothing because the file had just
+	// been referred to, and the row stood pointing at bytes that were gone —
+	// counted as a collection that happened.
+	//
+	// The window is not contrived: text naming an attachment is saved after
+	// the transaction that wrote it, so a comment landing between the sweep's
+	// page and its delete loop is the ordinary race.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		racing := f.upload(t, who, "racing.log", []byte("text is about to point here"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Referred to between the sweep reading its page and acting on it,
+		// which is the window rather than a moment either side of it.
+		attach.AfterPage(f.store, func() {
+			if err := attach.Attached(ctx, f.db.DB, []string{racing.Token}, time.Now().UTC()); err != nil {
+				t.Error(err)
+			}
+		})
+
+		gone, err := f.store.Sweep(ctx, 24*time.Hour)
+		if err != nil {
+			t.Fatalf("sweep: %v", err)
+		}
+		if gone != 0 {
+			t.Errorf("the sweep reported collecting %d, and the file is referred to", gone)
+		}
+		// The record stands, and so do the bytes behind it.
+		found, err := f.store.Find(ctx, who, racing.Token)
+		if err != nil {
+			t.Fatalf("the sweep took a file text refers to: %v", err)
+		}
+		// Asked of the store rather than through Fetch, which for a file
+		// this size answers with an address and never opens anything — so a
+		// record standing over bytes that are gone reads as a working fetch
+		// until somebody follows the address.
+		body, err := f.files.Open(ctx, found.ObjectKey)
+		if err != nil {
+			t.Fatalf("the record stands and its bytes are gone: %v", err)
+		}
+		_ = body.Close()
+	})
+}
+
+func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
+	// The pass counted what it could not read and threw the error away, in
+	// the one writer here that destroys somebody's data. Counted alone the
+	// row is left standing with nothing naming it: the same number comes back
+	// every pass, and nobody can tell whether it is one row stuck or a
+	// different one each time, or what is wrong with it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		stuck := f.upload(t, who, "stuck.log", []byte("nothing will ever point here"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		var said bytes.Buffer
+		store := attach.NewStore(f.db.DB, f.files).
+			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
+		// Taken away between the page and the loop, so the claim on a row the
+		// pass has in hand is the statement that fails.
+		attach.AfterPage(store, stop)
+
+		if _, err := store.Sweep(ctx, 24*time.Hour); err != nil {
+			t.Fatalf("sweep: %v", err)
+		}
+		wrote := said.String()
+		for _, want := range []string{stuck.ObjectKey, "stuck.log", "error="} {
+			if !strings.Contains(wrote, want) {
+				t.Errorf("a row the pass could not claim was reported without %q: %s",
+					want, wrote)
+			}
+		}
+	})
+}
+
+func TestALongNameIsShortenedBetweenCharacters(t *testing.T) {
+	// The bound on a served and stored filename was a byte slice, so a name
+	// whose hundred-and-twentieth byte falls inside a character was stored as
+	// something three engines of four refuse — and the refusal lands on the
+	// upload rather than on the name.
+	for _, most := range []int{118, 119, 120, 121} {
+		name := strings.Repeat("a", most-1) + strings.Repeat("é", 40) + ".log"
+		got := attach.SafeName(name)
+		if len(got) > 120 {
+			t.Errorf("a name of %d bytes was kept at %d", most, len(got))
+		}
+		if !utf8.ValidString(got) {
+			t.Errorf("a name cut at %d is not storable: %q", most, got)
+		}
+	}
+}

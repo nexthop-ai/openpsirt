@@ -665,12 +665,24 @@ func (s *Store) Grants(ctx context.Context, personID int64) ([]Grant, error) {
 // what somebody used to hold is answered by the record of what they did, not
 // by keeping a permission that no longer applies.
 func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Role) error {
-	_, err := s.db.NewDelete().Model((*Grant)(nil)).
+	res, err := s.db.NewDelete().Model((*Grant)(nil)).
 		Where("person_id = ?", personID).
 		Where("product_id = ?", productID).
 		Where("role = ?", role).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("withdraw %q: %w", role, err)
+	}
+	// A withdrawal that matched nothing is not a withdrawal. Answered as
+	// success, the caller wrote a trail row recording an act that did not
+	// happen, and then asked whether the person still held anything here —
+	// which, for a role they never had, came back no, and handed back every
+	// finding they were dealing with in that product.
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("withdraw %q: %w", role, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("they do not hold %q here: %w", role, ErrNothingMatched)
 	}
 	return nil
 }

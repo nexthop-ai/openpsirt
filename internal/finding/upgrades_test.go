@@ -323,3 +323,53 @@ func TestVersionsNobodyCanOrderAreNotRanked(t *testing.T) {
 		}
 	})
 }
+
+func TestAWordAnAdvisoryWroteWhereAVersionBelongsIsNotTheUpgrade(t *testing.T) {
+	// The Debian comparison answers for any pair of strings, so the guard that
+	// refuses an unrankable set could not fire on this scheme. A letter
+	// outranks a digit, so an advisory whose fixed version reads "unfixed"
+	// sorted above every real release and was presented as the upgrade that
+	// closes the most.
+	each(t, func(t *testing.T, f *fixture) {
+		fixedIn := func(id, to string) finding.Reported {
+			return finding.Reported{
+				Issue:     finding.Named{Identifier: id, Severity: "high"},
+				Component: libnl,
+				FixState:  finding.FixedUpstream, FixedIn: to,
+			}
+		}
+		f.shipped(t, twoConsumers())
+		run := f.run(t)
+		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+			fixedIn("CVE-2026-1", "3.8.0"),
+			fixedIn("CVE-2026-2", "3.9.0"),
+			fixedIn("CVE-2026-3", "unfixed"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicTriage)
+		builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), libnl.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 {
+			t.Fatalf("%d builds carry it", len(builds))
+		}
+		up := builds[0].Upgrades
+		if len(up) == 0 {
+			t.Fatal("nothing to move to")
+		}
+		if up[0].To == "unfixed" {
+			t.Error("the list leads with a word an advisory wrote where a version belongs")
+		}
+		// And the set reads as unranked rather than as a ranking one entry
+		// cannot be placed in: a list ordered except for the entry nobody
+		// could place is not ordered.
+		for _, one := range up {
+			if one.Ordered {
+				t.Errorf("%q was reported as ordered", one.To)
+			}
+		}
+	})
+}

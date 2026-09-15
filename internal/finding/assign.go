@@ -905,7 +905,7 @@ func targetsNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]build
 	return held, nil
 }
 
-// onlyVisible narrows a query to what this subject may read, per product.
+// onlyReadable narrows a query to what this subject may read, per product.
 //
 // Holding private read on one product does not make undisclosed findings on
 // another visible, so the clause is per product rather than a single flag.

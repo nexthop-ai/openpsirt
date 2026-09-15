@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestAFailureDoesNotCarryTheAddressBack(t *testing.T) {
@@ -35,5 +36,29 @@ func TestAFailureDoesNotCarryTheAddressBack(t *testing.T) {
 	}
 	if !strings.Contains(said, "connection refused") {
 		t.Errorf("the stored failure no longer says what went wrong: %q", said)
+	}
+}
+
+func TestAFailureOutsideASCIIIsStillStorableOnceItIsBounded(t *testing.T) {
+	// The stored failure is the standard library's own error text, which
+	// quotes an address somebody else chose, so it can carry characters
+	// outside ASCII at the 400-byte cut. What is left goes into a column on
+	// four engines: PostgreSQL refuses invalid UTF-8 outright and MySQL and
+	// MariaDB refuse it in strict mode, and the update is only logged when it
+	// fails — leaving the operator's one view of why a destination refuses
+	// permanently empty.
+	//
+	// Swept over a leading offset, because where the cut falls depends on the
+	// length of the whole message: one fixed string is as likely as not to
+	// land on a boundary and pass whatever the code does.
+	for offset := range 4 {
+		text := strings.Repeat("x", offset) + strings.Repeat("é", 400)
+		stored := trimTo(text, 400)
+		if !utf8.ValidString(stored) {
+			t.Fatalf("at offset %d the stored failure is not valid UTF-8: %q", offset, stored)
+		}
+		if len(stored) > 400 {
+			t.Fatalf("at offset %d the stored failure is %d bytes", offset, len(stored))
+		}
 	}
 }

@@ -16,6 +16,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
 - [Pending upgrades](#pending-upgrades)
+- [Asking upstream what is current](#asking-upstream-what-is-current)
 - [Ordering the versions a scanner named](#ordering-the-versions-a-scanner-named)
 - [Promise states](#promise-states)
 - [Build-declared suppressions](#build-declared-suppressions)
@@ -175,6 +176,40 @@ rather than from anything written down: the distinct issues the bump would close
 here, and how many places those sit at. Nothing is declared done by hand — a
 build is clear when it stops holding them.
 
+## Asking upstream what is current
+
+What the public index for an ecosystem says the newest version is, for the
+components this deployment builds rather than the ones a distribution
+maintains. Off unless an administrator turns it on: it is the one thing here
+that reaches the network.
+
+| Rule | Reason |
+|---|---|
+| One replica asks, settled by a lease | These are free services somebody else runs, and the politeness the pass is built around — two hundred at a time, a quarter of a second apart — is a rate per deployment rather than per replica |
+| The lease is taken again as the pass runs | Sized from the interval between cycles it was a guess at how long a pass takes, and the arithmetic beside it said so: two hundred requests with a timeout each is far past several intervals. A slow index handed the pass to a second replica mid-flight and both asked |
+| A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
+| The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
+| A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
+
+What comes back is classified, because the classes want opposite treatment.
+
+| Answer | Recorded | Reason |
+|---|---|---|
+| A version | Yes | The thing being asked for |
+| The index has never heard of it | Asked, with no version | A private module and a vendored fork both look like this, and neither is a fault. Recorded so the question is not asked again tomorrow |
+| A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read. An answer we will never get is still an answer about this component |
+| A bad day — too many requests, or the index itself unwell | Nothing | The one class worth coming back to: it stays due and the next pass asks again |
+
+**Everything that is not a bad day is recorded.** Read as one, a refusal the
+index repeats every time left the component unrecorded — and the window takes
+the never-asked first, so it held the head of every pass afterwards for ever,
+with the components behind it never reached.
+
+A previous answer is never overwritten by an empty one. An index returns
+not-found for a renamed package and for some transient conditions, and letting
+one of those destroy a version already in hand would sit on the hole for a
+month.
+
 ## Ordering the versions a scanner named
 
 Where a component could go is every version the findings open against it name as
@@ -195,6 +230,7 @@ closes everything near the bottom.
 |---|---|
 | An ordering is per ecosystem, and only where its algorithm is written down | A distribution's version comparison and dotted numeric releases are written here. Everything else is left unordered rather than approximated, because an ordering claimed before its algorithm exists is the confident wrong answer |
 | The spelling decides, not the ecosystem | A runtime published through a language index and naming itself after its own toolchain has the scheme and not the spelling. One version a comparison refuses leaves the whole set unranked: a list ordered except for the entry nobody could place is not ordered |
+| Every scheme can refuse, including the one whose comparison answers for any two strings | The distribution comparison walks alternating runs of digits and non-digits and always produces an ordering, so it read as a scheme that never fails. What an advisory wrote where a version belongs — "unfixed", a sentence — then outranked every real release, because a letter sorts above a digit, and was presented as the upgrade closing the most. Each scheme decides what a version of it looks like before comparing: the distribution's rule is its own, that an upstream version begins with a digit |
 | Unranked means the two counts are equal and say so | An exact match still counts. What is never done is inferring that one version reaches another, so nothing overstates what an upgrade would close |
 | Which scheme applies is read from the package identifier | Two ecosystems spell some versions identically and order them differently, so reading the shape of the string would order a package by whichever scheme its version happened to resemble |
 | The scanner already compared versions to match the finding | So refusing to compare does not make the tool comparison-free — it leaves it unable to rank what it has already been told. What is new here is saying which of the answers is furthest along, not deciding which findings apply |
@@ -288,6 +324,8 @@ held. Nothing is sent anywhere.
 | A document about an undisclosed flaw is a draft, and says so | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either |
 | Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
+| The document's version is the last number its own revision history states | Counted separately the two disagreed the moment an advisory had been issued once, and a validator compares them. The two agreed by accident only for a document nobody had published, which is why it went unseen |
+| The publisher's category is one of the six the standard names, refused at startup otherwise | The value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them — which is the one use a generated advisory has |
 
 ## The VEX document
 

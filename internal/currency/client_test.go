@@ -314,3 +314,27 @@ func TestTheProjectsOwnPagesAreOfferedBeforeItsRepository(t *testing.T) {
 		t.Errorf("project %q, want the repository", only.Project)
 	}
 }
+
+func TestEveryAskableEcosystemHasAnAsker(t *testing.T) {
+	// The list and the switch were separate spellings of one fact, with
+	// nothing joining them: a fifth index added to one and forgotten in the
+	// other is either components selected and never asked, or asked about
+	// and never selected, and neither says anything. Derived from one table
+	// now, and this is what says the derivation is still a derivation.
+	client := currency.New()
+	askable := currency.Askable()
+	if len(askable) == 0 {
+		t.Fatal("nothing is askable, so this checked nothing")
+	}
+	for _, each := range askable {
+		if client.For(each) == nil {
+			t.Errorf("%q is selected by the pass and has no index to ask", each)
+		}
+		if each != strings.ToLower(each) {
+			t.Errorf("%q is compared against a package identifier's type, which is folded", each)
+		}
+	}
+	if client.For("deb") != nil {
+		t.Error("a distribution package has an asker, and the distribution is the maintainer")
+	}
+}

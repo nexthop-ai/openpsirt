@@ -527,7 +527,7 @@ func TestAClaimAboutAnUndisclosedFlawIsNotListed(t *testing.T) {
 		f.recorded(t, keeper.ID+1, "onlooker")
 		reader := f.holding(t, access.PublicRead)
 		reader.ID = keeper.ID + 1
-		claims, _, err := f.store.Assessments(t.Context(), reader, 0, "", 50)
+		claims, _, _, err := f.store.Assessments(t.Context(), reader, 0, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -539,7 +539,7 @@ func TestAClaimAboutAnUndisclosedFlawIsNotListed(t *testing.T) {
 
 		// Whoever may read it still sees it, or the narrowing has hidden the
 		// claim from the person who made it.
-		mine, _, err := f.store.Assessments(t.Context(), keeper, 0, "", 50)
+		mine, _, _, err := f.store.Assessments(t.Context(), keeper, 0, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -851,6 +851,51 @@ func TestAProductWithNoRatingOfItsOwnReadsThePublishedOne(t *testing.T) {
 		}
 		if len(theirs) != 0 {
 			t.Errorf("a rating made in one product raised a finding in another: %+v", theirs)
+		}
+	})
+}
+
+func TestTheRatingsListIsPagedAndSaysHowManyThereAre(t *testing.T) {
+	// Capped at two hundred with no offset and no total, a deployment past
+	// that could not read the rest through the API at all — and the screen
+	// showed a subset and reported it as the list. Every comparable list in
+	// the package is paged and totalled; this was the one that was not.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		keeper := f.planner(t, access.PrivateTriage)
+		for range 5 {
+			id := f.embargoed(t, keeper)
+			if _, err := f.store.Assess(ctx, keeper, f.productID, id, "medium",
+				"The affected routine is not built here."); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		first, _, total, err := f.store.Assessments(ctx, keeper, 0, "", 2, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 5 {
+			t.Errorf("the list says there are %d ratings, want the five recorded", total)
+		}
+		if len(first) != 2 {
+			t.Fatalf("a page of two came back with %d", len(first))
+		}
+		// The total is counted over the same narrowing rather than summed
+		// from the page, which is the difference between "five" and "two".
+		later, _, again, err := f.store.Assessments(ctx, keeper, 0, "", 2, 4)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again != total {
+			t.Errorf("the total changed with the page, from %d to %d", total, again)
+		}
+		if len(later) != 1 {
+			t.Fatalf("the last page came back with %d, want the one remaining", len(later))
+		}
+		if later[0].ID == first[0].ID {
+			t.Error("skipping four rows answered with the first of them")
 		}
 	})
 }

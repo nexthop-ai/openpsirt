@@ -116,10 +116,19 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	about mentionTarget, body, link string) ([]string, error) {
 
 	names := markdown.Mentions(body)
-	if len(names) == 0 || about.ProductID == 0 {
+	if len(names) == 0 {
 		return nil, nil
 	}
+	// Reported rather than discarded, in both directions. A name past the cap
+	// and a name written where there is no product to read them against are
+	// both names that reached nobody, which is what this answer is for — and
+	// the author was told every mention landed.
+	if about.ProductID == 0 {
+		return names, nil
+	}
+	var dropped []string
 	if len(names) > mentionCap {
+		dropped = append(dropped, names[mentionCap:]...)
 		names = names[:mentionCap]
 	}
 
@@ -140,7 +149,6 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	}
 
 	told := map[int64]bool{subject.ID: true}
-	var dropped []string
 	for _, name := range names {
 		who, known := byName[strings.ToLower(name)]
 		// A name nobody holds, and a name held by somebody who may not read

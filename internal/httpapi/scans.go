@@ -273,6 +273,23 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	}
 	parts := input.RawBody.Data()
 
+	// How many documents may arrive with one scan, refused before any row is
+	// written. Each one is read within the bounds a document is read within,
+	// and without a ceiling on the count those bounds are multiplied by a
+	// number nothing decides.
+	limits := in.Limits.OrDefault()
+	var sent int
+	for _, part := range parts.Suppressions {
+		if part.IsSet {
+			sent++
+		}
+	}
+	if sent > limits.MaxDocuments {
+		return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+			"that scan carries %d suppression documents, and this deployment reads %d",
+			sent, limits.MaxDocuments))
+	}
+
 	// Who is sending, before anything is read or written.
 	subject, err := requester(ctx)
 	if err != nil {
@@ -648,7 +665,15 @@ func registerReceipts(api huma.API, in Ingest) {
 		}
 		scans := ingest.NewStore(in.DB.DB)
 		receipts, total, err := scans.Receipts(ctx, subject, target.ID, sender, input.Limit, input.Offset)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			// The answer a build nobody declared gets. A 500 here against a
+			// 404 for a stranger said which builds exist, one name at a time
+			// — and the reach that meets it is a case collaborator, who holds
+			// nothing on the product and may reach the one finding they were
+			// brought in on.
+			return nil, nothingScannedThere()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "the scans could not be read", err)
 		}
 		// What each run changed, in one pair of statements for the page. A
@@ -661,7 +686,10 @@ func registerReceipts(api huma.API, in Ingest) {
 			}
 		}
 		changed, err := finding.NewStore(in.DB.DB).Changes(ctx, subject, target.ID, runs)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, nothingScannedThere()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "what the scans changed could not be read", err)
 		}
 

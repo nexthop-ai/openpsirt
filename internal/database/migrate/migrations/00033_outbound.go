@@ -72,13 +72,29 @@ func upOutbound(ctx context.Context, tx *sql.Tx) error {
 			-- What was said, as a key: the condition's identity where it has
 			-- one, and the notification's own identifier otherwise.
 			"about"       ` + t.hash + ` NOT NULL,
+			-- Which notification produced the claim. Not part of the key,
+			-- because a condition opened for six people is six rows and one
+			-- delivery — it is what lets the sweep ask "has this row been
+			-- settled here" without rebuilding the key in SQL, which needs a
+			-- string concatenation the four engines spell differently.
+			"notification_id" ` + t.ref + ` NOT NULL,
 			"attempts"    ` + t.ref + ` NOT NULL,
 			"sent_at"     ` + t.timestamp + ` NULL,
 			"failed"      ` + t.free + ` NULL,
 			"first_seen"  ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "outbound_delivery_once" UNIQUE ("outbound_id", "about"),
+			-- What the sweep reads: the rows this destination has settled,
+			-- so it can select the oldest that is not among them rather than
+			-- re-reading the same oldest two hundred for ever.
+			CONSTRAINT "outbound_delivery_nt" FOREIGN KEY ("notification_id")
+				REFERENCES "notification"("id") ON DELETE CASCADE,
 			CONSTRAINT "outbound_delivery_fk" FOREIGN KEY ("outbound_id") REFERENCES "outbound"("id")
 		)` + t.suffix,
+		// The sweep asks, per destination, which of the oldest uncleared
+		// notifications it has already settled. Without this that is a scan
+		// of every delivery ever made, on every cycle.
+		`CREATE INDEX "outbound_delivery_settled_idx" ON "outbound_delivery"
+			("outbound_id", "notification_id")`,
 	}
 
 	return apply(ctx, tx, statements)

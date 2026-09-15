@@ -75,10 +75,16 @@ type Match struct {
 // What is skipped is the decision itself: the rows in this build at the very
 // versions being decided are what `at.Places` already counts.
 func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Deciding, hereTargetID int64) (Reach, error) {
-	if !subject.Sees(at.ProductID) {
+	// Asked about the issue rather than about the product, as every other
+	// read of one finding is (place.go, detail.go, vex.go): a collaborator was
+	// brought into one case and reads that case wherever it sits, and the
+	// question here is how far a decision about that case reaches. Asked of
+	// the product alone this refused them, and the route answers a refusal
+	// from here as a fault rather than as a refusal.
+	if !access.SeesOn(subject, at.ProductID, at.VulnerabilityID) {
 		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
 	}
-	visible := access.Visible(subject, at.ProductID)
+	visible := access.VisibleOn(subject, at.ProductID, at.VulnerabilityID)
 	if len(visible) == 0 {
 		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
 	}
@@ -201,10 +207,10 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// grouped five-join queries and two authorization checks each, so the
 	// cost the removed sampling was there to avoid came straight back.
 	at := places[0]
-	if !subject.Sees(at.ProductID) {
+	if !access.SeesOn(subject, at.ProductID, at.VulnerabilityID) {
 		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
 	}
-	visible := access.Visible(subject, at.ProductID)
+	visible := access.VisibleOn(subject, at.ProductID, at.VulnerabilityID)
 	if len(visible) == 0 {
 		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
 	}

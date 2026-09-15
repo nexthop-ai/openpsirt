@@ -1871,7 +1871,7 @@ export interface paths {
          * Generate a CSAF advisory for an issue
          * @description Returns a CSAF 2.0 document for a flaw in this product: what it is, and which releases hold it and which no longer do.
          *
-         *     **The document is generated, not published.** Nothing is sent anywhere and nothing here records that an advisory was issued — the triage record is ours and the published advisory belongs to whoever publishes it, and keeping both as the source of truth is how such an arrangement rots.
+         *     **The document is generated, not published.** Nothing is sent anywhere. Recording that a document was issued is a separate request, and what it keeps is the digest of what was generated, so that whether what you published is still what this would generate can be answered.
          *
          *     **Only for a flaw in what you ship.** An issue a scanner reported against a third-party component is refused: that is dependency hygiene a consumer can already read out of the inventory, and a vendor advisory for every upstream CVE in a dependency is not what an advisory is.
          *
@@ -8817,7 +8817,10 @@ export interface operations {
                 product?: string;
                 /** @description Limit to one state */
                 state?: "proposed" | "live" | "withdrawn";
+                /** @description How many to return */
                 limit?: number;
+                /** @description How many to skip */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -11920,7 +11923,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "multipart/form-data": {
-                    evidence: string;
+                    evidence: boolean;
                     /** Format: binary */
                     file: string;
                 };
@@ -13954,7 +13957,7 @@ export interface operations {
     "upload-vex-statements": {
         parameters: {
             query?: {
-                /** @description Who published it, where the document does not name itself */
+                /** @description Who published it, where the document does not name itself. At most 191 characters */
                 publisher?: string;
             };
             header?: never;

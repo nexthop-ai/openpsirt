@@ -495,9 +495,12 @@ func TestABindingIsMatchedWithItsCapitals(t *testing.T) {
 			t.Fatal(err)
 		}
 		// A different name as far as a provider is concerned, so it withdraws
-		// nothing — and says so by leaving the row.
-		if err := f.store.Unbind(ctx, "Security", product, access.PrivateRead); err != nil {
-			t.Fatal(err)
+		// nothing — and says so, rather than reporting a withdrawal that did
+		// not happen and leaving the row.
+		err := f.store.Unbind(ctx, "Security", product, access.PrivateRead)
+		if !errors.Is(err, access.ErrNothingMatched) {
+			t.Errorf("unbinding a differently spelled group answered %v, "+
+				"want a refusal saying it matched nothing", err)
 		}
 		bindings, err := f.store.Bindings(ctx)
 		if err != nil {

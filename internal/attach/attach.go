@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 )
 
 // Attachment is one file, and the record that outlives it.
@@ -111,11 +113,10 @@ func SafeName(name string) string {
 		return "attachment"
 	}
 	// Bounded so that a name cannot make a header enormous. The digits are
-	// arbitrary; what matters is that there is a limit.
-	if len(name) > 120 {
-		name = name[:120]
-	}
-	return name
+	// arbitrary; what matters is that there is a limit — and that the cut
+	// falls between characters, because the name is stored as well as served
+	// and three engines of four refuse half a character.
+	return bound.Head(name, 120)
 }
 
 // Disposition is the header a file is served with.

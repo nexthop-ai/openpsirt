@@ -207,3 +207,40 @@ func TestRecordingSomebodyAgainLeavesAdministrationAlone(t *testing.T) {
 		}
 	})
 }
+
+func TestWithdrawingSomethingNobodyHoldsRecordsNothingAndReleasesNothing(t *testing.T) {
+	// The write bound only the error from its statement and never read how
+	// many rows it matched, so a role somebody does not hold — or a word that
+	// is not a role at all — answered as withdrawn. The caller then wrote a
+	// trail row saying the role was withdrawn, and asked whether the person
+	// still held anything there: for a role they never had the answer was no,
+	// and everything they were dealing with in that product went back to the
+	// unassigned list.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+
+		// A role this person does not hold on a product that exists.
+		got := asPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/triager/roles/mine/private-read", "")
+		if got.Code != http.StatusNotFound {
+			t.Errorf("withdrawing a role nobody holds answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		// A word that is not a role at all.
+		got = asPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/triager/roles/mine/not-a-role", "")
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("withdrawing a word that is not a role answered %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		// And nothing was recorded as having happened.
+		var trail changed
+		read(t, r, "admin", "/v1/administration/changes?kind=role&limit=200", &trail)
+		for _, row := range trail.Items {
+			if strings.Contains(row.About, "triager") {
+				t.Errorf("a withdrawal that withdrew nothing recorded %+v", row)
+			}
+		}
+	})
+}

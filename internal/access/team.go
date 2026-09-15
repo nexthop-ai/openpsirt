@@ -228,11 +228,25 @@ func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) error
 // RemoveFromTeam takes somebody off a team. What they have already taken is
 // theirs and stays theirs: membership says where work arrives, not who holds
 // what has arrived.
+//
+// A removal that matched nothing is ErrNothingMatched, like every other write
+// here that takes access away: taking somebody off a team they were never on
+// otherwise answered as though it had happened, and the caller wrote a trail
+// row saying a membership was ended that never existed. Membership is what
+// routes an undisclosed finding to somebody, so a trail that says who stopped
+// receiving them is a record of who could have seen what.
 func (s *Store) RemoveFromTeam(ctx context.Context, teamID, personID int64) error {
-	_, err := s.db.NewDelete().Model((*Membership)(nil)).
+	res, err := s.db.NewDelete().Model((*Membership)(nil)).
 		Where("team_id = ?", teamID).Where("person_id = ?", personID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("take that person off the team: %w", err)
+	}
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("take that person off the team: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("they are not on that team: %w", ErrNothingMatched)
 	}
 	return nil
 }

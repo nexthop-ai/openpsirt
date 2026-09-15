@@ -269,21 +269,8 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 	if person == "" && team == "" {
 		return nil, nil
 	}
-	if person != "" && team != "" {
-		return nil, huma.Error422UnprocessableEntity(
-			"work is held by one party: name a person or a team, not both")
-	}
-	// Putting work into a team's queue is dispatching; taking it out again
-	// is not, and that asymmetry is the whole of a team queue rather than
-	// a holding.
-	// Matched without regard to capitals, because an identity is stored
-	// folded: somebody typing their own name with the capitals they use was
-	// told they needed the right to give work away, to themselves.
-	givingAway := team != "" || !strings.EqualFold(strings.TrimSpace(person), subject.Identity)
-	if givingAway && !subject.Holds(access.Assigner, productID) {
-		return nil, huma.Error422UnprocessableEntity(
-			"you may take what nobody owns and hand back your own; giving this to " +
-				"somebody else needs the right that names it")
+	if err := mayHandOver(subject, productID, person, team); err != nil {
+		return nil, err
 	}
 	strictest, err := finding.NewStore(in.DB.DB).StrictestOnComponent(ctx, subject,
 		productID, targets, component)
@@ -325,4 +312,37 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 	}
 	party := found.PartyID
 	return &party, nil
+}
+
+// mayHandOver refuses a party nobody may be given work as, and a hand-off the
+// subject may not make.
+//
+// One helper because the rule is one rule and the two routes that state it
+// answered the same request differently otherwise: they had drifted over which
+// status a refused hand-off is, so the two paths to the same act contradicted
+// each other about what had happened.
+//
+// Putting work into a team's queue is dispatching; taking it out again is not,
+// and that asymmetry is the whole of a team queue rather than a holding.
+// Matched without regard to capitals, because an identity is stored folded:
+// somebody typing their own name with the capitals they use was told they
+// needed the right to give work away, to themselves.
+//
+// A 422 rather than a 404, which is this package's rule: a 404 answers a
+// *name*, and this answers an act on a finding already shown to them.
+func mayHandOver(subject access.Subject, productID int64, person, team string) error {
+	if person != "" && team != "" {
+		return huma.Error422UnprocessableEntity(
+			"work is held by one party: name a person or a team, not both")
+	}
+	// Assigning to yourself, or to nobody, is not giving work away and needs
+	// no more than the triage right the route has already asked for.
+	givingAway := team != "" ||
+		(person != "" && !strings.EqualFold(strings.TrimSpace(person), subject.Identity))
+	if givingAway && !subject.Holds(access.Assigner, productID) {
+		return huma.Error422UnprocessableEntity(
+			"you may take what nobody owns and hand back your own; giving this to " +
+				"somebody else needs the right that names it")
+	}
+	return nil
 }

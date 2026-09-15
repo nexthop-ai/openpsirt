@@ -802,3 +802,47 @@ func TestTheFormatADocumentDeclaredIsCarriedOut(t *testing.T) {
 		t.Error("SPDX cannot say which vulnerability a patch resolves")
 	}
 }
+
+func TestWhoSuppliedAPackageDoesNotDependOnKeyOrder(t *testing.T) {
+	// Two fields say it and the format lets a producer write them in either
+	// order. Read first-key-wins, a package stating both took whichever the
+	// producer put nearer the top, so one document described a package two
+	// ways depending on nothing anybody chose.
+	//
+	// The supplier is the stronger of the two and wins whichever came first.
+	document := func(first, second string) string {
+		return `{"spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "name": "x",
+		 "creationInfo": {"created": "2026-09-01T00:00:00Z"},
+		 "documentDescribes": ["SPDXRef-root"],
+		 "packages": [
+		   {"SPDXID": "SPDXRef-root", "name": "image", "versionInfo": "1"},
+		   {"SPDXID": "SPDXRef-p", "name": "libc6", "versionInfo": "2.41",
+		    ` + first + `, ` + second + `}]}`
+	}
+	supplier := `"supplier": "Organization: Debian"`
+	originator := `"originator": "Organization: Somebody else"`
+
+	for _, body := range []string{
+		document(supplier, originator),
+		document(originator, supplier),
+	} {
+		doc, err := sbom.Read(strings.NewReader(body), sbom.Limits{})
+		if err != nil {
+			t.Fatalf("read: %v", err)
+		}
+		var found bool
+		for _, one := range doc.Components {
+			if one.Name != "libc6" {
+				continue
+			}
+			found = true
+			if one.Supplier != "Debian" {
+				t.Errorf("who supplied it reads %q, want the supplier whichever order it was written in",
+					one.Supplier)
+			}
+		}
+		if !found {
+			t.Error("the package was not read")
+		}
+	}
+}

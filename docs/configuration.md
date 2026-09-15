@@ -74,6 +74,7 @@ or a `sslmode` of your own reaches the driver as written.
 | Variable | Meaning | Default |
 |---|---|---|
 | `OPENPSIRT_SCANNER_PATH` | Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in | unset |
+| `OPENPSIRT_SCANNER_TIMEOUT` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below the two hours a worker may hold one job for, and the process refuses to start where it does not | `30m` |
 | `GRYPE_DB_CACHE_DIR` | Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
 | `GRYPE_DB_AUTO_UPDATE` | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
 
@@ -122,7 +123,7 @@ refused over a connection the server would not secure with STARTTLS.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_MAIL_FROM` | The address messages are sent as. Set it and the server together, or neither | unset |
+| `OPENPSIRT_MAIL_FROM` | The address messages are sent as. Set it and the server together, or neither: half of the pair is refused at startup, because a server with nobody to send as sends nothing and would say nothing about it | unset |
 | `OPENPSIRT_MAIL_SERVER` | The SMTP server as `host:port`, e.g. `smtp.example.com:587` | unset |
 | `OPENPSIRT_MAIL_USERNAME` | Username, where the server wants one. Sent only after STARTTLS | unset |
 | `OPENPSIRT_MAIL_PASSWORD` | Password for that username. Sent only after STARTTLS | unset |
@@ -150,7 +151,7 @@ validation after you have sent it.
 |---|---|---|
 | `OPENPSIRT_PUBLISHER_NAME` | The organization advisories say issued them. Set it and the namespace together, or neither | unset |
 | `OPENPSIRT_PUBLISHER_NAMESPACE` | A URL identifying that organization, which is what a reader of a CSAF document matches on | unset |
-| `OPENPSIRT_PUBLISHER_CATEGORY` | What the standard calls the kind of publisher. A deployment publishing about its own product is a vendor | `vendor` |
+| `OPENPSIRT_PUBLISHER_CATEGORY` | What the standard calls the kind of publisher: `coordinator`, `discoverer`, `other`, `translator`, `user` or `vendor`. A deployment publishing about its own product is a vendor. Anything else is refused at startup — the value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them | `vendor` |
 
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
@@ -354,3 +355,22 @@ the container's memory limit with them.
 | `OPENPSIRT_INGEST_MAX_FILES` | How many files a document may catalog. Not covered by the component count: a real scan catalogs forty-five to fifty-six files per package, so one bound cannot size both | 500,000 |
 | `OPENPSIRT_INGEST_MAX_STATEMENTS` | How many claims a suppression document may make | 100,000 |
 | `OPENPSIRT_INGEST_MAX_DEPTH` | How deeply it may nest | 64 |
+| `OPENPSIRT_INGEST_MAX_DOCUMENTS` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
+
+## Reading what the scanner reported
+
+The scanner's report is read in the same process, and its size is components ×
+matches × references — the first of which a producer controls by uploading a
+scan file. So it is bounded the way a scan file is, from the same budget, and
+each bound left unset keeps the built-in value.
+
+A report past its ceiling fails the run rather than being read in part: half a
+report reads as a product that stopped having problems. Complaints past theirs
+are dropped instead, because a scanner with a lot to say still scanned.
+
+| Variable | What it does | Default |
+|---|---|---|
+| `OPENPSIRT_SCANNER_MAX_OUTPUT` | How large one report may be. The load-bearing bound: every count below is bounded by it | 256 MB |
+| `OPENPSIRT_SCANNER_MAX_COMPLAINT` | How much of what a scanner said while running is kept | 1 MB |
+| `OPENPSIRT_SCANNER_MAX_MATCHES` | How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
+| `OPENPSIRT_SCANNER_MAX_REFERENCES` | How many addresses one match may point at. Bounded separately because the two multiply | 1,000 |

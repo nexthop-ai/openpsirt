@@ -181,6 +181,11 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	var (
 		described graph.Described
 		ref       string
+		// Who supplied it, stated two ways. Resolved after the object rather
+		// than during it, because a producer chooses the order of its own
+		// keys and which field wins must not.
+		supplier   string
+		originator string
 	)
 	if err := c.count(); err != nil {
 		return graph.Described{}, "", err
@@ -198,18 +203,18 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 			}
 			described.Version = sentinel(stated)
 			return nil
-		case "supplier", "originator":
+		case "supplier":
 			// One string, prefixed with what kind of party it is:
 			// "Organization: Debian". The prefix is the format's and says
 			// nothing a reader wants, so the name after it is what is kept.
-			var stated string
-			if err := c.into(&stated); err != nil {
-				return err
-			}
-			if described.Supplier == "" {
-				described.Supplier = partyName(stated)
-			}
-			return nil
+			return c.into(&supplier)
+		case "originator":
+			// The weaker of the two, and kept aside rather than written
+			// straight in: which field wins must not depend on which one the
+			// producer happened to write first, and key order is the
+			// producer's choice. Read first-key-wins, a package stating both
+			// took whichever the producer put nearer the top.
+			return c.into(&originator)
 		case "externalRefs":
 			return c.spdxExternalRefs(&described)
 		default:
@@ -221,6 +226,16 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	}
 	if err := described.Valid(); err != nil {
 		return graph.Described{}, "", fmt.Errorf("%w, so it cannot be tracked", err)
+	}
+
+	// The supplier where a producer stated one, whatever order it wrote the
+	// two fields in — the same precedence the other format's supplier and
+	// publisher get, and for the same reason. The prefix saying what kind of
+	// party it is belongs to the format and says nothing a reader wants, so
+	// the name after it is what is kept.
+	described.Supplier = partyName(supplier)
+	if described.Supplier == "" {
+		described.Supplier = partyName(originator)
 	}
 
 	// The format has no field saying what a package was built from — what it

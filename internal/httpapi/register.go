@@ -117,6 +117,13 @@ func registerRegister(api huma.API, in Ingest) {
 		// which is the more dangerous of the two: a file that claims to have
 		// left things out reads as complete about what remains.
 		store := finding.NewStore(in.DB.DB)
+		// Asked before a byte is written. Once the stream has started the
+		// status is gone, so a refusal reaching it there could only be said
+		// in the file — and what it said was that the export stopped early,
+		// with a 200 in front of it.
+		if err := store.MayReadRegister(ctx, subject, target); err != nil {
+			return nil, refusedFinding(in, err)
+		}
 		out := Exporting{
 			Header: []string{
 				"issue", "severity", "component", "version", "place", "consumer", "state",

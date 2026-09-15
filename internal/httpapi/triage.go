@@ -754,7 +754,7 @@ func triaging(ctx context.Context, in Ingest) (access.Subject, *triage.Store, er
 	return subject, triage.NewStore(in.DB.DB), nil
 }
 
-// refused turns a store's refusal into an answer.
+// refusedDecision turns a store's refusal into an answer.
 //
 // A decision somebody may not reach answers as one that is not there, so that
 // guessing identifiers says nothing. Everything a caller could have got right

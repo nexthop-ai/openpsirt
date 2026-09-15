@@ -175,3 +175,40 @@ func TestAMentionThatReachedNobodyIsReportedBack(t *testing.T) {
 		}
 	})
 }
+
+func TestNamesPastTheMentionCapAreReportedRatherThanDiscarded(t *testing.T) {
+	// The cap is generous enough that nobody meets it writing normally, which
+	// is what made the silence hard to notice: past it the tail of the list
+	// was cut away before anything looked at it, so those names were told
+	// nothing and did not appear among the ones that reached nobody. On a
+	// finding nobody has announced, that notification is the only signal the
+	// people named get that they were called into it.
+	twoReach(t, func(t *testing.T, r *reach) {
+		place := r.scanned(t)
+		_, claim := r.decidedAt(t, place)
+
+		var named strings.Builder
+		named.WriteString("@private-triage")
+		for i := range 30 {
+			fmt.Fprintf(&named, " @nobody-%d", i)
+		}
+		got := asPerson(t, r, "private-triage", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			`{"body":"`+named.String()+` what do you think?"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())
+		}
+		var said struct {
+			NotNotified []string `json:"not_notified"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &said); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		// Every name but the one person who could be told. The author asked
+		// thirty people a question and none of them heard it.
+		if len(said.NotNotified) != 30 {
+			t.Errorf("%d names were reported as reaching nobody, want the thirty that did not",
+				len(said.NotNotified))
+		}
+	})
+}

@@ -17,5 +17,6 @@ func (c Config) Limits() sbom.Limits {
 		MaxFiles:      c.IngestMaxFiles,
 		MaxStatements: c.IngestMaxStatements,
 		MaxDepth:      c.IngestMaxDepth,
+		MaxDocuments:  c.IngestMaxDocuments,
 	}
 }

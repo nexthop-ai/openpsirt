@@ -1,6 +1,7 @@
 package scanner_test
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -17,7 +18,7 @@ func parse(t *testing.T) scanner.Result {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	result, err := scanner.ParseGrype(f)
+	result, err := scanner.ParseGrype(f, scanner.Limits{})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -42,7 +43,7 @@ func TestTheDatabaseVersionIsFoundWhereverItSits(t *testing.T) {
 	// record of what their findings were matched against.
 	older := `{"matches": [], "descriptor": {"name": "grype", "version": "0.90.0",
 	 "db": {"built": "2026-01-01T00:00:00Z", "schemaVersion": 5}}}`
-	result, err := scanner.ParseGrype(strings.NewReader(older))
+	result, err := scanner.ParseGrype(strings.NewReader(older), scanner.Limits{})
 	if err != nil {
 		t.Fatalf("an older scanner's output: %v", err)
 	}
@@ -126,7 +127,7 @@ func TestSeverityIsAWordInOneCase(t *testing.T) {
 }
 
 func TestOutputThatIsNotUnderstoodIsRefused(t *testing.T) {
-	if _, err := scanner.ParseGrype(strings.NewReader("not json")); err == nil {
+	if _, err := scanner.ParseGrype(strings.NewReader("not json"), scanner.Limits{}); err == nil {
 		t.Error("unreadable scanner output was accepted")
 	}
 }
@@ -135,7 +136,8 @@ func TestAnEmptyRunIsNotAFailure(t *testing.T) {
 	// Nothing found is an ordinary answer, and treating it as an error would
 	// make a clean product look like a broken scanner.
 	result, err := scanner.ParseGrype(strings.NewReader(
-		`{"matches": [], "descriptor": {"name": "grype", "version": "0.112.0"}}`))
+		`{"matches": [], "descriptor": {"name": "grype", "version": "0.112.0"}}`),
+		scanner.Limits{})
 	if err != nil {
 		t.Fatalf("an empty run: %v", err)
 	}
@@ -180,7 +182,7 @@ func TestHowGrypeReachedAMatchIsRead(t *testing.T) {
 	  "descriptor": {"name": "grype", "version": "0.118.0"}
 	}`
 
-	result, err := scanner.ParseGrype(strings.NewReader(output))
+	result, err := scanner.ParseGrype(strings.NewReader(output), scanner.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +229,7 @@ func TestAnUnknownMatchKindIsTreatedAsTheWeakerOne(t *testing.T) {
 	  }],
 	  "descriptor": {"name": "grype", "version": "0.118.0"}
 	}`
-	result, err := scanner.ParseGrype(strings.NewReader(output))
+	result, err := scanner.ParseGrype(strings.NewReader(output), scanner.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +248,7 @@ func TestAnUnknownMatchKindIsTreatedAsTheWeakerOne(t *testing.T) {
 	  }],
 	  "descriptor": {"name": "grype", "version": "0.118.0"}
 	}`
-	fuzzy, err := scanner.ParseGrype(strings.NewReader(unknown))
+	fuzzy, err := scanner.ParseGrype(strings.NewReader(unknown), scanner.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +277,7 @@ func TestTheRangeAMatchFiredOnAndTheDataThatAnsweredAreKept(t *testing.T) {
 	  "matchDetails":[{"type":"cpe-match","found":{"versionConstraint":"<= 1.37.0 (unknown)"}}]
 	}]}`
 
-	result, err := scanner.ParseGrype(strings.NewReader(doc))
+	result, err := scanner.ParseGrype(strings.NewReader(doc), scanner.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +307,7 @@ func TestAMatchThatStatesNoRangeSaysSoRatherThanGuessing(t *testing.T) {
 	  "matchDetails":[{"type":"exact-direct-match"}]
 	}]}`
 
-	result, err := scanner.ParseGrype(strings.NewReader(doc))
+	result, err := scanner.ParseGrype(strings.NewReader(doc), scanner.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +333,7 @@ func TestTheRangeComesFromTheDetailTheKindWasDecidedBy(t *testing.T) {
 	  ]
 	}]}`
 
-	result, err := scanner.ParseGrype(strings.NewReader(doc))
+	result, err := scanner.ParseGrype(strings.NewReader(doc), scanner.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,5 +395,98 @@ func TestPatchesOnTheRelatedRecordAreKept(t *testing.T) {
 			t.Errorf("reference listed twice: %s", url)
 		}
 		seen[url] = true
+	}
+}
+
+// reportOf builds a report stating count matches, each naming one component.
+func reportOf(count int) string {
+	var doc strings.Builder
+	doc.WriteString(`{"matches":[`)
+	for i := range count {
+		if i > 0 {
+			doc.WriteString(",")
+		}
+		fmt.Fprintf(&doc, `{"vulnerability":{"id":"CVE-2026-%d"},`+
+			`"artifact":{"name":"openssl","version":"3.0.1"}}`, i)
+	}
+	doc.WriteString(`],"descriptor":{"version":"0.112.0"}}`)
+	return doc.String()
+}
+
+func TestAReportStatingMoreMatchesThanTheLimitIsRefused(t *testing.T) {
+	// A report is components × matches × references and the producer controls
+	// the first factor by uploading a scan file, so nothing bounds the
+	// product unless this does. The pair is what catches a bound set too low:
+	// exactly the limit is read, one past it is refused.
+	limits := scanner.Limits{MaxMatches: 4}
+	if _, err := scanner.ParseGrype(strings.NewReader(reportOf(4)), limits); err != nil {
+		t.Fatalf("a report of exactly the limit: %v", err)
+	}
+	_, err := scanner.ParseGrype(strings.NewReader(reportOf(5)), limits)
+	if err == nil {
+		t.Fatal("a report past the match limit was read")
+	}
+	if !strings.Contains(err.Error(), "match limit") {
+		t.Errorf("the refusal does not name the limit it hit: %v", err)
+	}
+}
+
+// pointingAt builds a report of one match pointing at count addresses.
+func pointingAt(count int) string {
+	urls := make([]string, 0, count)
+	for i := range count {
+		urls = append(urls, fmt.Sprintf(`"https://example.test/%d"`, i))
+	}
+	return `{"matches":[{"vulnerability":{"id":"CVE-2026-1","urls":[` +
+		strings.Join(urls, ",") + `]},"artifact":{"name":"openssl","version":"3.0.1"}}],` +
+		`"descriptor":{"version":"0.112.0"}}`
+}
+
+func TestOneMatchPointingPastTheReferenceLimitIsRefused(t *testing.T) {
+	// Bounded per match rather than per report, because the two multiply: a
+	// report well inside the match limit is still a report of one match
+	// pointing at everything.
+	limits := scanner.Limits{MaxReferences: 4}
+	if _, err := scanner.ParseGrype(strings.NewReader(pointingAt(4)), limits); err != nil {
+		t.Fatalf("a match pointing at exactly the limit: %v", err)
+	}
+	_, err := scanner.ParseGrype(strings.NewReader(pointingAt(5)), limits)
+	if err == nil {
+		t.Fatal("a match past the reference limit was read")
+	}
+	if !strings.Contains(err.Error(), "reference limit") {
+		t.Errorf("the refusal does not name the limit it hit: %v", err)
+	}
+}
+
+func TestWhatLabelsAReferenceIsItsHostAndItsPath(t *testing.T) {
+	// The label is what somebody sorts a dozen links by, and the function is
+	// written to err toward saying less. Matched against the raw address a
+	// query string, a fragment and a lookalike host all decided it, which is
+	// the other direction.
+	for _, c := range []struct {
+		address string
+		want    finding.ReferenceKind
+	}{
+		{"https://git.kernel.org/torvalds/c/abcdef", finding.Patch},
+		{"https://patchwork.freedesktop.org/patch/1234/", finding.Patch},
+		{"https://github.test/openssl/openssl/commit/abcdef", finding.Patch},
+		{"https://nvd.nist.gov/vuln/detail/CVE-2026-1", finding.AdvisoryRef},
+		{"https://github.test/openssl/openssl/security/advisories/GHSA-1", finding.AdvisoryRef},
+		{"https://unrelated.test/thread/12", finding.Report},
+
+		// A host somebody else controls that merely contains a name we
+		// recognize. The expression matched a substring of the host.
+		{"https://git.kernel.org.evil.test/", finding.Report},
+		{"https://nvd.nist.gov.evil.test/", finding.Report},
+		// A query string and a fragment are not the address's path.
+		{"https://unrelated.test/?from=git.kernel.org", finding.Report},
+		{"https://unrelated.test/#CVE-2026-1", finding.Report},
+		{"https://unrelated.test/?ref=/commit/abcdef", finding.Report},
+	} {
+		got := scanner.KindOf(c.address)
+		if got != c.want {
+			t.Errorf("%s is labelled %q, want %q", c.address, got, c.want)
+		}
 	}
 }

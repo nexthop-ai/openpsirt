@@ -121,6 +121,18 @@ func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
 	}, nil
 }
 
+// MayReadRegister answers whether this subject may read a build's register at
+// all, without reading any of it.
+//
+// For the export, which streams: once the first byte is written the status is
+// gone, so a refusal that arrives mid-stream can only be said in the file. A
+// caller asks this first and refuses with a status, the way every other route
+// refuses.
+func (s *Store) MayReadRegister(ctx context.Context, subject access.Subject, targetID int64) error {
+	_, _, err := s.registerNarrowing(ctx, subject, targetID)
+	return err
+}
+
 // RegisterPage is a page of the register and nothing else.
 //
 // **The count is not free and an export does not carry it.** Counting is a

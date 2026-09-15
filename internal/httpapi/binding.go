@@ -240,6 +240,11 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 				return nil, huma.Error409Conflict(
 					"that was the last thing granting administration: bind another group " +
 						"to admin, or name somebody in configuration, first")
+			case errors.Is(err, access.ErrNothingMatched):
+				// Nothing was bound, so nothing was withdrawn — and the check
+				// that would have refused this passed *because* the delete
+				// did nothing.
+				return nil, noSuchGrant()
 			case err != nil:
 				return nil, wentWrong(a.Logger, "cannot unbind a group from administration", err)
 			}
@@ -252,7 +257,14 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err != nil {
 			return nil, absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
 		}
-		if err := rights.Unbind(ctx, in.Group, product.ID, access.Role(in.Role)); err != nil {
+		role := access.Role(in.Role)
+		if !role.Valid() {
+			return nil, huma.Error422UnprocessableEntity("that is not a role")
+		}
+		switch err := rights.Unbind(ctx, in.Group, product.ID, role); {
+		case errors.Is(err, access.ErrNothingMatched):
+			return nil, noSuchGrant()
+		case err != nil:
 			return nil, wentWrong(a.Logger, "cannot unbind a group", err)
 		}
 		noteAdminChange(ctx, a, trail.Role, in.Group+" on "+product.Name,

@@ -1,6 +1,7 @@
 package finding_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -82,7 +83,12 @@ func TestABranchIsNotAPointOnAReleaseTrend(t *testing.T) {
 
 func TestAcrossProductsThereIsNoSequenceToPlot(t *testing.T) {
 	// Two products' tags interleave by date and mean nothing side by side, so
-	// this answers nothing rather than answering wrongly.
+	// this refuses rather than answering wrongly.
+	//
+	// Refused rather than answered empty: an empty list is what a product
+	// with no releases looks like, so the two were one answer — and a
+	// dashboard polling without a product read as a product that had never
+	// cut a release.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		tag := f.anotherBuild(t, "v1.0")
@@ -94,8 +100,8 @@ func TestAcrossProductsThereIsNoSequenceToPlot(t *testing.T) {
 		}
 		points, err := f.store.ReleaseTrend(ctx, f.holding(t, access.PublicRead),
 			finding.Scope{}, 12)
-		if err != nil {
-			t.Fatal(err)
+		if !errors.Is(err, finding.ErrNoProductNamed) {
+			t.Errorf("a release trend with no product named answered %v", err)
 		}
 		if len(points) != 0 {
 			t.Errorf("a release trend was drawn with no product named: %+v", points)

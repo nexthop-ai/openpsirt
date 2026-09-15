@@ -267,7 +267,16 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 			return nil, err
 		}
 		points, err := finding.NewStore(in.DB.DB).ReleaseTrend(ctx, subject, scope, input.Limit)
-		if err != nil {
+		switch {
+		case errors.Is(err, finding.ErrNoProductNamed):
+			// The description says a product must be named and the route
+			// answered 200 with an empty list — which is what a product with
+			// no releases looks like, so a dashboard polling it without one
+			// read as a product that had never cut a release.
+			return nil, huma.Error422UnprocessableEntity(
+				"a product must be named: two products' tags interleave by date and mean " +
+					"nothing side by side")
+		case err != nil:
 			return nil, refused(in.Logger, err, "cannot read what each release shipped with")
 		}
 		out := &struct {

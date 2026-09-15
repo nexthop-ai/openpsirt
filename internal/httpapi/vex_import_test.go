@@ -401,17 +401,18 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 func TestTheDigestCoversTheWholeDocumentItStreamed(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
-		// Long enough that the parser answers well before the end of it: the
-		// statements it reads are at the front and the padding is a field it
-		// skips, which is exactly the shape that leaves a digest short.
-		padding := strings.Repeat("x", 64*1024)
+		// The padding sits **outside** the top-level object, so the parser
+		// stops at the closing brace and the drain past it actually runs.
+		// Inside the object it is a field the parser skips on its way to the
+		// end, which leaves the drain reading nothing and the test passing
+		// whatever the drain does.
+		padding := strings.Repeat("\n", 64*1024)
 		document := `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
 			"author":"Example Distribution","timestamp":"2026-09-01T00:00:00Z","version":1,
 			"statements":[{"vulnerability":{"name":"CVE-2026-9999"},"status":"not_affected",
 			  "justification":"vulnerable_code_not_present",
 			  "impact_statement":"The affected routine is not built here.",
-			  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}],
-			"_padding":"` + padding + `"}`
+			  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}` + padding
 
 		got := r.vexed(t, "admin", "debian", document)
 		if got.Code != http.StatusCreated {
@@ -427,6 +428,31 @@ func TestTheDigestCoversTheWholeDocumentItStreamed(t *testing.T) {
 		if taken.Digest != hex.EncodeToString(whole[:]) {
 			t.Errorf("the digest recorded is %q, want the hash of the whole document %q",
 				taken.Digest, hex.EncodeToString(whole[:]))
+		}
+	})
+}
+
+func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
+	// It is the key a later upload supersedes on and an indexed column of a
+	// fixed width, so two publishers agreeing for that many characters would
+	// collapse into one and the second upload would set aside statements it
+	// has nothing to do with. And where the query parameter is absent the
+	// value falls back to the name the client gave the file it uploaded,
+	// which is the path with nothing else guarding it.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		document := `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
+			"author":"Example","timestamp":"2026-09-01T00:00:00Z","version":1,
+			"statements":[{"vulnerability":{"name":"CVE-2026-9998"},"status":"not_affected",
+			  "justification":"vulnerable_code_not_present",
+			  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}`
+
+		if got := r.vexed(t, "admin", strings.Repeat("d", 192), document); got.Code < 400 {
+			t.Errorf("a publisher longer than the column answered %d", got.Code)
+		}
+		if got := r.vexed(t, "admin", strings.Repeat("d", 191), document); got.Code != http.StatusCreated {
+			t.Errorf("a publisher exactly the width of the column answered %d: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }

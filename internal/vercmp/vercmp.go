@@ -68,7 +68,7 @@ func Order(scheme Scheme, a, b string) (int, bool) {
 	}
 	switch scheme {
 	case Debian:
-		return debianOrder(a, b), true
+		return debianOrder(a, b)
 	case Semantic:
 		return semanticOrder(a, b)
 	default:
@@ -92,31 +92,73 @@ func Reaches(scheme Scheme, candidate, wanted string) bool {
 }
 
 // debianOrder compares two Debian versions: epoch, then upstream, then revision.
-func debianOrder(a, b string) int {
-	ae, au, ar := splitDebian(a)
-	be, bu, br := splitDebian(b)
+//
+// A string that is not a version is refused rather than ordered. The
+// comparison itself answers for any pair of strings, which read as a scheme
+// that never fails: an advisory stating its fixed version as "unfixed" sorted
+// above every real release, because a letter outranks a digit, and the upgrade
+// planner then recommended upgrading to "unfixed".
+func debianOrder(a, b string) (int, bool) {
+	ae, au, ar, aOK := splitDebian(a)
+	be, bu, br, bOK := splitDebian(b)
+	if !aOK || !bOK {
+		return 0, false
+	}
 	if c := compareNumeric(ae, be); c != 0 {
-		return c
+		return c, true
 	}
 	if c := comparePart(au, bu); c != 0 {
-		return c
+		return c, true
 	}
-	return comparePart(ar, br)
+	return comparePart(ar, br), true
 }
 
-// splitDebian pulls a version into epoch, upstream version and revision.
+// splitDebian pulls a version into epoch, upstream version and revision, and
+// says whether what it was given is a version at all.
 //
 // The revision is whatever follows the *last* hyphen, because an upstream
 // version may contain one and a revision may not.
-func splitDebian(v string) (epoch, upstream, revision string) {
+//
+// What makes a string not a version is Debian policy's own rule: the upstream
+// part begins with a digit, and every part is drawn from a small set of
+// characters. A word an advisory wrote where a version belongs — "unfixed",
+// "TBD", a sentence — fails both.
+func splitDebian(v string) (epoch, upstream, revision string, ok bool) {
 	epoch = "0"
-	if at := strings.Index(v, ":"); at >= 0 && digits(v[:at]) {
+	if at := strings.Index(v, ":"); at >= 0 {
+		if !digits(v[:at]) {
+			return "", "", "", false
+		}
 		epoch, v = v[:at], v[at+1:]
 	}
 	if at := strings.LastIndex(v, "-"); at >= 0 {
-		return epoch, v[:at], v[at+1:]
+		upstream, revision = v[:at], v[at+1:]
+	} else {
+		upstream = v
 	}
-	return epoch, v, ""
+	if upstream == "" || !isDigit(upstream[0]) {
+		return "", "", "", false
+	}
+	if !debianCharacters(upstream) || !debianCharacters(revision) {
+		return "", "", "", false
+	}
+	return epoch, upstream, revision, true
+}
+
+// debianCharacters says whether every character is one a Debian version may
+// hold. The hyphen is not among them: it separates the revision, and the
+// caller has already cut at the last one.
+func debianCharacters(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= '0' && c <= '9', c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z':
+		case c == '.', c == '+', c == '~':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // comparePart compares one part of a Debian version, alternating runs of

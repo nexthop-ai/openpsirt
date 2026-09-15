@@ -28,6 +28,12 @@ type Interface struct {
 // Without this, turning that route back on would be shadowed by the interface,
 // and the interface would have quietly claimed a name the server means to own.
 func reserved(path string) bool {
+	// Compared without regard to capitals, and against a path that has
+	// already been cleaned. Matched case-sensitively against the raw path, a
+	// request spelled with a dot segment or with different capitals was
+	// answered with the page rather than reaching the API — a client parsing
+	// JSON then reports a parse failure rather than the 404 it is.
+	path = strings.ToLower(path)
 	if path == "/v1" || strings.HasPrefix(path, "/v1/") {
 		return true
 	}
@@ -58,7 +64,12 @@ func mountInterface(router interface {
 		// Serving a page here would answer a bad endpoint with HTML, which a
 		// client parsing JSON reports as a parse failure rather than as the
 		// 404 it is.
-		if reserved(r.URL.Path) {
+		// Cleaned once, and the same cleaned value decides both questions.
+		// Tested on the raw path and resolved from the cleaned one, a path
+		// with a dot segment was answered with the page while naming
+		// something the API owns.
+		asked := path.Clean(r.URL.Path)
+		if reserved(asked) {
 			http.NotFound(w, r)
 			return
 		}
@@ -70,7 +81,7 @@ func mountInterface(router interface {
 		// A real file is served as itself. Anything else is a route belonging
 		// to the page, which is index.html — the page then reads the path and
 		// decides what to draw.
-		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		name := strings.TrimPrefix(asked, "/")
 		if name != "" && name != "." {
 			if f, err := ui.Files.Open(name); err == nil {
 				_ = f.Close()

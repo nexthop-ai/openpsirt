@@ -11,6 +11,7 @@ Satisfies REQ-03, REQ-06, REQ-69.
 - [Exclusive handout](#exclusive-handout)
 - [Failure handling](#failure-handling)
 - [Claim renewal](#claim-renewal)
+- [Passes on a timer](#passes-on-a-timer)
 - [Leases](#leases)
 - [Backlog refusal](#backlog-refusal)
 - [What a failed job records](#what-a-failed-job-records)
@@ -90,6 +91,41 @@ so several renewals may fail before the claim is at risk.
 | What a worker does about its own failure is passed in | It is the one respect the workers genuinely differ: the reader records the failure against the scan as well as the job, and must not on a cancellation or where the job went to another worker. Passed as a closure rather than a flag, so the difference is visible where it is made |
 | The claim went stale while the work ran | Only the claim holder finishes a job: the finishing statement carries the claim's condition. A refused finish is reported as "no longer held" and logged |
 | Shutdown mid-job | The job is handed back as a failed attempt. The writes recording an ending run under their own context, detached from the cancellation and bounded by a few seconds |
+| The work never returns | Renewal stops at a ceiling on the whole hold, the work is canceled, and the attempt is recorded as this job's failure |
+
+### The ceiling on one hold
+
+Renewal is bounded in total, not only per renewal.
+
+| Rule | Reason |
+|---|---|
+| One claim is renewed for at most a fixed span, four claim timeouts by default | Renewal otherwise has two exits — the work finishing and the claim being taken away — so a worker wedged inside its unit of work renews for ever |
+| The claim timeout does not cover this | It bounds a worker going silent, and a wedged worker is not silent: it is renewing on time and reporting nothing |
+| What the ceiling costs where it is too low | Legitimate work is cut off mid-run, which is the same hazard the claim timeout carries, so the ceiling exceeds the longest single unit of work by a wide margin |
+| A ceiling reached is logged at the level an operator sees | A worker that reached it is not coming back, and nothing else here says so |
+| It is recorded as this job's failed attempt, not as a handover | Nobody else holds the job. Counting the attempt is what eventually sets the job aside rather than handing it to a succession of workers that each wedge in turn |
+| A subprocess is given a delay to release the pipes once it is killed | Killing a process does not close a pipe a helper it spawned still holds, and waiting on the copy blocks past the deadline that killed it — which is how a worker wedges in the first place |
+
+Zero is no ceiling, for work whose caller states that it has no upper bound.
+That is asked for rather than arrived at by omission.
+
+## Passes on a timer
+
+One shape, in one place: a first tick at once, then the interval; a
+non-positive interval takes the pass's own default; the context ends the loop.
+
+| Rule | Reason |
+|---|---|
+| The first tick is immediate | A process that has just started is the moment a sweep is most worth running, because whatever accumulated while it was down is waiting |
+| Reporting stays with each pass | They log different things — what was collected, what was sent and what failed, a line per unit of work. A helper that owned the logging would be the call site written out again with a worse vocabulary |
+| A failed pass is logged and the loop goes on | A pass that cannot run is not a reason to stop serving, and what it failed to do is still there next time |
+
+It was written out once per pass, and some of those copies had already diverged
+over whether the log line carries the trace context. Anything about how passes
+are scheduled — spreading goroutines that would otherwise wake together on a
+cold start, a measurement per pass, a first-run delay — was an edit per copy,
+and a missed one would have diverged in silence because nothing tested any of
+them.
 
 ## Leases
 

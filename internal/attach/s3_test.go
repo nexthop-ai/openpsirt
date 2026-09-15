@@ -30,6 +30,20 @@ func TestPlaintextEndpointNeedsSayingSo(t *testing.T) {
 			endpoint: "http://10.4.1.9:9000", refused: true},
 		{name: "loopback needs no allowance", endpoint: "http://127.0.0.1:9000", clear: false},
 		{name: "loopback by name needs none either", endpoint: "http://localhost:9000"},
+		// Loopback is the whole of 127.0.0.0/8 and the IPv6 forms, not three
+		// spellings of it. Giving a local store its own address is ordinary,
+		// and it was refused with a message naming exactly what the operator
+		// had supplied.
+		{name: "a local store on its own loopback address", endpoint: "http://127.0.0.2:9000"},
+		{name: "loopback written as IPv6", endpoint: "http://[::1]:9000"},
+		{name: "loopback written as an IPv4-mapped IPv6 literal",
+			endpoint: "http://[::ffff:127.0.0.1]:9000"},
+		// And the addresses this is actually about are still refused: a
+		// private address is somebody else's network, not this machine.
+		{name: "a private address is not loopback",
+			endpoint: "http://192.168.1.10:9000", refused: true},
+		{name: "another private range is not loopback either",
+			endpoint: "http://172.16.4.2:9000", refused: true},
 		{name: "the allowance is what admits a network",
 			endpoint: "http://objects.example.com", allow: true, clear: true},
 		{name: "no endpoint at all is a cloud provider", endpoint: ""},

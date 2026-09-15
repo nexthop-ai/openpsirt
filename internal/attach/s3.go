@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -77,10 +78,6 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		options = append(options, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(settings.Key, settings.Secret, settings.Token)))
 	}
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, options...)
-	if err != nil {
-		return nil, fmt.Errorf("object store credentials: %w", err)
-	}
 	inTheClear := false
 	endpoint := strings.TrimSpace(settings.Endpoint)
 	shown := endpoint
@@ -89,14 +86,34 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		if err != nil {
 			return nil, fmt.Errorf("object store endpoint: %w", err)
 		}
+		// A name and password in the address are taken out of it and handed
+		// over as credentials, which is also what makes the signing
+		// well-defined. Left in, the raw string reached the client and every
+		// failure it reported carried the password — a startup reachability
+		// failure is printed to standard error, where a container runtime
+		// captures it into the log store the redaction exists to keep it out
+		// of.
+		//
+		// A configured key still wins, for the reason above.
+		if parsed.User != nil {
+			if settings.Key == "" && settings.Secret == "" {
+				password, _ := parsed.User.Password()
+				options = append(options, awsconfig.WithCredentialsProvider(
+					credentials.NewStaticCredentialsProvider(
+						parsed.User.Username(), password, settings.Token)))
+			}
+			parsed.User = nil
+			endpoint = parsed.String()
+		}
 		// A presigned URL is a bearer token in an address, and one crossing a
 		// network in the clear is a file anybody on the path may fetch — the
 		// redirect is the part that leaves us. So plain HTTP is refused unless
 		// it reaches no further than this machine, or an operator has said
 		// that this network is one they accept it on (REQ-70).
-		// Said without the password. What an operator writes here may carry
-		// one, and a refusal is logged like anything else that stops a start.
-		shown = parsed.Redacted()
+		// What is shown and what is used are the same string now, rather
+		// than two that can drift: the password has already been taken out
+		// of the one the client gets.
+		shown = endpoint
 		inTheClear = parsed.Scheme != "https" && !loopback(parsed.Hostname())
 		if inTheClear && !settings.AllowHTTP {
 			// Naming the way through. The operator meeting this is the one a
@@ -108,6 +125,10 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 					" — set OPENPSIRT_ATTACHMENT_ALLOW_HTTP to accept it on this network",
 				shown)
 		}
+	}
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, options...)
+	if err != nil {
+		return nil, fmt.Errorf("object store credentials: %w", err)
 	}
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		if endpoint != "" {
@@ -135,8 +156,25 @@ func (b *Bucket) InTheClear() bool { return b.clear }
 // cloud provider, which is addressed by region rather than by name.
 func (b *Bucket) Endpoint() string { return b.endpoint }
 
+// loopback says whether a host reaches no further than this machine.
+//
+// Asked of the address rather than compared against a table of three. The
+// table left the whole of 127.0.0.0/8 and the IPv4-mapped IPv6 forms outside
+// it, so a local store given its own loopback address was refused with a
+// message naming exactly what the operator had supplied — and the only way
+// past it said, in the deployment log, that a plaintext store had been
+// accepted across a network when it had not.
+//
+// The literal name stays, because it is a name rather than an address and the
+// deployment may have it in its own hosts file.
 func loopback(host string) bool {
-	return host == "127.0.0.1" || host == "localhost" || host == "::1"
+	if host == "localhost" {
+		return true
+	}
+	// Belt and braces: Hostname() already strips the brackets from an IPv6
+	// literal, and a caller that has not been through it has not.
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
 }
 
 func (b *Bucket) Name() string { return "s3" }

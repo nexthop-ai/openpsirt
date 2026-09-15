@@ -5459,6 +5459,7 @@ components:
           type: integer
         display_name:
           description: What people see. Defaults to the name
+          maxLength: 191
           type: string
         end_of_life:
           description: The date support ends for releases that have not stated their own, as YYYY-MM-DD
@@ -8068,14 +8069,25 @@ paths:
               - live
               - withdrawn
             type: string
-        - explode: false
+        - description: How many to return
+          explode: false
           in: query
           name: limit
           schema:
             default: 50
+            description: How many to return
             format: int64
             maximum: 200
             minimum: 1
+            type: integer
+        - description: How many to skip
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: How many to skip
+            format: int64
+            minimum: 0
             type: integer
       responses:
         "200":
@@ -13775,7 +13787,7 @@ paths:
       description: |-
         Returns a CSAF 2.0 document for a flaw in this product: what it is, and which releases hold it and which no longer do.
 
-        **The document is generated, not published.** Nothing is sent anywhere and nothing here records that an advisory was issued — the triage record is ours and the published advisory belongs to whoever publishes it, and keeping both as the source of truth is how such an arrangement rots.
+        **The document is generated, not published.** Nothing is sent anywhere. Recording that a document was issued is a separate request, and what it keeps is the digest of what was generated, so that whether what you published is still what this would generate can be answered.
 
         **Only for a flaw in what you ship.** An issue a scanner reported against a third-party component is refused: that is dependency hygiene a consumer can already read out of the inventory, and a vendor advisory for every upstream CVE in a dependency is not what an advisory is.
 
@@ -14088,7 +14100,7 @@ paths:
             schema:
               properties:
                 evidence:
-                  type: string
+                  type: boolean
                 file:
                   contentEncoding: binary
                   contentMediaType: application/octet-stream
@@ -17162,12 +17174,13 @@ paths:
           required: true
           schema:
             type: string
-        - description: Who published it, where the document does not name itself
+        - description: Who published it, where the document does not name itself. At most 191 characters
           explode: false
           in: query
           name: publisher
           schema:
-            description: Who published it, where the document does not name itself
+            description: Who published it, where the document does not name itself. At most 191 characters
+            maxLength: 191
             type: string
       requestBody:
         content:

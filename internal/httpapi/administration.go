@@ -497,7 +497,21 @@ func registerAdministration(api huma.API, a Administering) {
 		if err != nil {
 			return nil, undeclared(a.Logger, err, "that product could not be looked up")
 		}
-		if err := store.Withdraw(ctx, person.ID, product.ID, access.Role(in.Role)); err != nil {
+		// The role is checked before anything is written, because a word that
+		// is not a role withdraws nothing and would otherwise be recorded as a
+		// withdrawal of it.
+		role := access.Role(in.Role)
+		if !role.Valid() {
+			return nil, huma.Error422UnprocessableEntity("that is not a role")
+		}
+		// Mapped before the trail row and before the work is handed back. A
+		// withdrawal that matched nothing did neither of those things, and
+		// doing them anyway wrote a record of an act that never happened and
+		// unassigned everything the person was dealing with there.
+		switch err := store.Withdraw(ctx, person.ID, product.ID, role); {
+		case errors.Is(err, access.ErrNothingMatched):
+			return nil, noSuchGrant()
+		case err != nil:
 			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)
 		}
 		noteAdminChange(ctx, a, trail.Role, in.Identity+" on "+in.Product,
@@ -595,7 +609,14 @@ func registerAdministration(api huma.API, a Administering) {
 		if err != nil {
 			return nil, noSuchPerson()
 		}
-		if err := store.WithdrawEstateRole(ctx, person.ID, access.Role(in.Role)); err != nil {
+		role := access.Role(in.Role)
+		if !role.Valid() {
+			return nil, huma.Error422UnprocessableEntity("that is not a role")
+		}
+		switch err := store.WithdrawEstateRole(ctx, person.ID, role); {
+		case errors.Is(err, access.ErrNothingMatched):
+			return nil, noSuchGrant()
+		case err != nil:
 			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)
 		}
 		noteAdminChange(ctx, a, trail.Role, in.Identity+" on every product",

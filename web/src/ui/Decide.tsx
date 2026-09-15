@@ -12,10 +12,9 @@ import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
 
 // One judgment about this finding: the decision form the finding screen
-// carries and the findings list opens in place. Outcome, the justification
-// where it does not apply, a date where it is deferred, the reasoning, which
-// places it covers, and — on submit — a guided review of where it applies
-// beyond this build.
+// carries. Outcome, the justification where it does not apply, a date where it
+// is deferred, the reasoning, which places it covers, and — on submit — a
+// guided review of where it applies beyond this build.
 
 export type At = {
   product: string;

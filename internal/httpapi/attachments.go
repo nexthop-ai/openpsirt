@@ -71,7 +71,12 @@ type attachmentParts struct {
 	File huma.FormFile `form:"file" required:"true"`
 	// Evidence says the file hangs off the issue itself rather than off text
 	// somebody is part way through writing.
-	Evidence string `form:"evidence"`
+	//
+	// Declared as a boolean so the framework parses it and refuses what is
+	// not one. Compared against the literal "true", every other spelling —
+	// "True", "1", "yes" — read as false and marked the file for deletion a
+	// day later, with the uploader told it had worked.
+	Evidence bool `form:"evidence"`
 }
 
 func registerAttachments(api huma.API, in Ingest) {
@@ -135,7 +140,7 @@ func registerAttachments(api huma.API, in Ingest) {
 		// Evidence hangs off the issue and is listed at once; anything else is
 		// waiting for the text that will refer to it, and is swept if that
 		// text never arrives.
-		evidence := input.RawBody.Data().Evidence == "true"
+		evidence := input.RawBody.Data().Evidence
 		stored, err := files.Upload(ctx, subject, productID, vulnerabilityID,
 			part.Filename, part, part.Size, maxSize, quota, share, evidence)
 		switch {

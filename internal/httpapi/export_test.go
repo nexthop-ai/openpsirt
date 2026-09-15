@@ -39,10 +39,12 @@ func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
 			if at := got.Header().Get("Content-Disposition"); !strings.Contains(at, ".csv") {
 				t.Errorf("the export is not offered as a file: %q", at)
 			}
-			// The preamble row is narrower than the columns, which is what a
-			// spreadsheet wants and what a strict parser has to be told about.
+			// Read strictly, which is the check that would have said the
+			// file was ragged: the record stating what the file is about is
+			// padded to the header's width, because CSV has no comment
+			// convention and a short record is a document a conformant reader
+			// refuses.
 			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			reader.FieldsPerRecord = -1
 			read, err := reader.ReadAll()
 			if err != nil {
 				t.Fatalf("%s got something that is not a spreadsheet: %v", who, err)
@@ -80,7 +82,6 @@ func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
 		narrowed := asPerson(t, r, "private-triage", http.MethodGet,
 			"/v1/products/mine/findings.csv?severity=high", "")
 		reader := csv.NewReader(strings.NewReader(narrowed.Body.String()))
-		reader.FieldsPerRecord = -1
 		lines, err := reader.ReadAll()
 		if err != nil {
 			t.Fatal(err)
@@ -119,6 +120,70 @@ func TestAnExportAnswersAsJSONToo(t *testing.T) {
 		if out.Items[0].Component == "" || out.Items[0].Issue == "" {
 			t.Errorf("a row came out empty: %+v", out.Items[0])
 		}
+
+		// One document, one convention. The stated fact's key was written
+		// with underscores and every column name kept the spaces it is read
+		// with on paper, so the same file named its fields two ways.
+		var raw struct {
+			Items []map[string]string `json:"items"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &raw); err != nil {
+			t.Fatal(err)
+		}
+		if len(raw.Items) == 0 {
+			t.Fatal("no rows to read the keys of")
+		}
+		var spaced []string
+		for key := range raw.Items[0] {
+			if strings.Contains(key, " ") {
+				spaced = append(spaced, key)
+			}
+		}
+		if len(spaced) != 0 {
+			t.Errorf("these keys are written as they are read on paper: %v", spaced)
+		}
+		if _, held := raw.Items[0]["upstream_fix"]; !held {
+			t.Errorf("a multi-word column is not keyed the way the stated fact is: %v",
+				raw.Items[0])
+		}
+	})
+}
+
+func TestAnUnscoredFindingExportsWithNoScoreRatherThanAZero(t *testing.T) {
+	// A file sorted by score for a release meeting put the unscored findings
+	// among the genuinely 0.0-rated ones at the bottom, and a filter for
+	// "below four" took every one of them. Empty is the only thing a column
+	// of numbers has for "there is no number", and it is what the file's
+	// schema says an empty score column means.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		if _, err := r.db.DB.NewUpdate().Table("vulnerability").
+			Set("score_centi = NULL").Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		got := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/findings.csv", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
+		}
+		read, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatalf("the export is not readable as CSV: %v", err)
+		}
+		at := -1
+		for i, column := range read[1] {
+			if column == "score" {
+				at = i
+			}
+		}
+		if at < 0 {
+			t.Fatalf("the export has no score column: %v", read[1])
+		}
+		for _, row := range read[2:] {
+			if row[at] != "" {
+				t.Errorf("a finding with no score exported as %q", row[at])
+			}
+		}
 	})
 }
 
@@ -152,7 +217,6 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 				t.Errorf("%s came back as %q", at, kind)
 			}
 			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			reader.FieldsPerRecord = -1
 			read, err := reader.ReadAll()
 			if err != nil {
 				t.Fatalf("%s is not a spreadsheet: %v", at, err)
@@ -293,8 +357,6 @@ func TestAnExportAnswersTheSameQuestionAsTheListItCameFrom(t *testing.T) {
 				t.Fatalf("exporting %q answered %d: %s", query, got.Code, got.Body.String())
 			}
 			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			// The comment line before the header is a field short of the rows.
-			reader.FieldsPerRecord = -1
 			read, err := reader.ReadAll()
 			if err != nil {
 				t.Fatalf("the export is not readable as CSV: %v", err)
@@ -357,7 +419,6 @@ func TestAnExportedNameCannotBeAFormula(t *testing.T) {
 			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
 		}
 		reader := csv.NewReader(strings.NewReader(got.Body.String()))
-		reader.FieldsPerRecord = -1
 		rows, err := reader.ReadAll()
 		if err != nil {
 			t.Fatalf("the export is not readable as CSV: %v", err)
@@ -448,7 +509,6 @@ func TestTheCrossProductExportCarriesTheProductAndTheVisibility(t *testing.T) {
 				t.Fatalf("%s exporting answered %d: %s", who, got.Code, got.Body.String())
 			}
 			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			reader.FieldsPerRecord = -1
 			read, err := reader.ReadAll()
 			if err != nil {
 				t.Fatalf("%s got something that is not a spreadsheet: %v", who, err)
@@ -516,7 +576,6 @@ func TestTheTwoListsThatCouldNotLeaveTheScreenNowCan(t *testing.T) {
 				t.Fatalf("exporting %s answered %d: %s", at, got.Code, got.Body.String())
 			}
 			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			reader.FieldsPerRecord = -1
 			read, err := reader.ReadAll()
 			if err != nil {
 				t.Fatalf("the export is not readable as CSV: %v", err)
@@ -580,7 +639,6 @@ func TestCoverageStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T
 			t.Fatalf("exporting coverage answered %d: %s", got.Code, got.Body.String())
 		}
 		reader := csv.NewReader(strings.NewReader(got.Body.String()))
-		reader.FieldsPerRecord = -1
 		lines, err := reader.ReadAll()
 		if err != nil {
 			t.Fatalf("coverage came back as something that is not a spreadsheet: %v", err)
