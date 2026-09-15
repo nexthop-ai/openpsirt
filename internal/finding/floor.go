@@ -63,6 +63,39 @@ func Ranks(word string) int {
 	return 0
 }
 
+// rankCase is the severity ordering as SQL, numbered from one in ranked's
+// order, over whatever expression the caller names.
+//
+// Built from the one list rather than written out again. The order was typed
+// out three more times — twice as SQL and once as the mapping back to words —
+// and Bands' own doc already records what that cost: a word added to one copy
+// and missing from another sorts one way and filters another.
+//
+// The ELSE is the caller's. The cross-product list needs zero, so that the
+// sentinel for "no line" compares below every rating; a caller naming an
+// expression that already folds every value needs none of it.
+func rankCase(over string, otherwise int) string {
+	// A simple CASE, so the expression is named once: written as a searched
+	// one it repeats, and an expression carrying a placeholder then wants four
+	// arguments where its caller binds one.
+	said := "CASE " + over
+	for i := len(ranked) - 1; i >= 0; i-- {
+		said += fmt.Sprintf(" WHEN '%s' THEN %d", ranked[i], i+1)
+	}
+	return said + fmt.Sprintf(" ELSE %d END", otherwise)
+}
+
+// wordAt is the severity word a rank stands for, empty for a rank no band has.
+//
+// The inverse of rankCase, read out of the same list rather than written back
+// out as a switch.
+func wordAt(rank int) string {
+	if rank < 1 || rank > len(ranked) {
+		return ""
+	}
+	return ranked[rank-1]
+}
+
 // Unrated is what a rating nobody recognizes is called, and what a rating
 // nobody gave is called: they are the same state.
 //

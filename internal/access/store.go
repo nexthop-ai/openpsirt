@@ -636,7 +636,6 @@ func hashSecret(secret string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// People lists everybody who has been granted something, with what they hold.
 // People lists everybody and what they hold, inactive grants included and
 // marked as such.
 //

@@ -35,6 +35,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
@@ -585,6 +586,14 @@ type Issuance struct {
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
 	product, identifier, summary string) (*Issuance, error) {
 
+	// The submission policy, before the summary is stored. It is typed prose
+	// that goes into the published revision history, so what is in the column
+	// has to be known to have passed what was in force when it arrived.
+	summary = strings.TrimSpace(summary)
+	if err := markdown.Check(summary); err != nil {
+		return nil, err
+	}
+
 	doc, err := s.For(ctx, subject, who, product, identifier)
 	if err != nil {
 		return nil, err
@@ -628,7 +637,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// of that attempt's answers.
 		recorded = &Issuance{
 			ProductID: named.ID, VulnerabilityID: issue.ID,
-			Digest: hex.EncodeToString(sum[:]), Summary: strings.TrimSpace(summary),
+			Digest: hex.EncodeToString(sum[:]), Summary: summary,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
 		// Scanned into a value rather than read through a cursor: a cursor

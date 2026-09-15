@@ -86,3 +86,9 @@ type vexStatus string
 
 // Schema answers with the statuses the format defines.
 func (vexStatus) Schema(huma.Registry) *huma.Schema { return words(finding.VexStatuses()) }
+
+// origin is where a finding came from, as a narrowing.
+type origin string
+
+// Schema answers with the words the narrowing takes.
+func (origin) Schema(huma.Registry) *huma.Schema { return words(finding.Origins()) }

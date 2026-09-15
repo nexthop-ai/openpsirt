@@ -106,12 +106,9 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	// The worst thing in the bundle, as a rank rather than as a word, because
 	// the four engines do not agree on how words order. Folded exactly the way
 	// the line and the deadline fold them, so an unrated issue is a medium
-	// here as it is everywhere else.
-	const worst = `MAX(CASE
-		WHEN ` + EffectiveSeverityExpr + ` = 'critical' THEN 4
-		WHEN ` + EffectiveSeverityExpr + ` = 'high' THEN 3
-		WHEN ` + EffectiveSeverityExpr + ` IN ('low', 'negligible', 'none') THEN 1
-		ELSE 2 END)`
+	// here as it is everywhere else — which is what asking the fold rather
+	// than the raw word buys, and the ELSE below cannot fire because of it.
+	worst := "MAX(" + rankCase(BandExpr, 0) + ")"
 
 	bundled := func(q *bun.SelectQuery) *bun.SelectQuery {
 		return filter.narrow(q.
@@ -198,19 +195,11 @@ type Build struct {
 
 // worstWord turns the rank the bundle query folds severities to back into the
 // word, in the same four the rest of this speaks.
-func worstWord(rank int) string {
-	switch rank {
-	case 4:
-		return "critical"
-	case 3:
-		return "high"
-	case 1:
-		return "low"
-	case 2:
-		return "medium"
-	}
-	return ""
-}
+//
+// Read out of the one list rather than written back out as a switch: the
+// mapping and its inverse disagreeing about a word added later is the same
+// defect twice.
+func worstWord(rank int) string { return wordAt(rank) }
 
 // namesIn fills in which component names each bundle on the page covers.
 //

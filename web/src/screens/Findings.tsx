@@ -362,9 +362,19 @@ export function Findings() {
   }
 
   function set(key: string, value: string) {
+    setEach({ [key]: value });
+  }
+
+  // Several filters in one act. Two `set` calls in a row each built their
+  // change from the render's own parameters, so the second wrote over the
+  // first — which is why unticking a box that also had to clear a shortcut
+  // could not turn the box off.
+  function setEach(changes: Record<string, string>) {
     const next = new URLSearchParams(asked);
-    if (value) next.set(key, value);
-    else next.delete(key);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
     asking(next);
   }
 
@@ -546,6 +556,7 @@ export function Findings() {
         <Filters
           params={asked}
           set={set}
+          setEach={setEach}
           setMany={setMany}
           tags={inUse.data?.items ?? []}
           oneBuild={oneBuild}
@@ -622,10 +633,17 @@ export function Findings() {
           size={page}
           // A bump has no place, no deadline and no assignee, so the filters
           // that ask about one have no row here to narrow. Named on screen
-          // rather than dropped quietly.
-          cannot={activeFilters(asked)
-            .filter((each) => !BUMPABLE.has(each.key))
-            .map((each) => each.label)}
+          // rather than dropped quietly — and the three this view does take
+          // take one value each, so a second value asked for is named here
+          // too rather than sent nowhere while the chip above says it is on.
+          cannot={[
+            ...activeFilters(asked)
+              .filter((each) => !BUMPABLE.has(each.key))
+              .map((each) => each.label),
+            ...activeFilters(asked)
+              .filter((each) => BUMPABLE.has(each.key) && asked.getAll(each.key).length > 1)
+              .map((each) => each.label + " past the first"),
+          ]}
           onPage={(next) => {
             const now = new URLSearchParams(params);
             if (next === 0) now.delete("offset");

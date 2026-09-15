@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -198,6 +199,11 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject,
 	if strings.TrimSpace(reason) == "" {
 		return nil, fmt.Errorf("say why the embargo is being extended")
 	}
+	// The submission policy, run before the text is stored. This row is
+	// append-only and is read back into a disclosure record.
+	if err := markdown.Check(reason); err != nil {
+		return nil, err
+	}
 
 	now := s.now().UTC().Truncate(time.Microsecond)
 	until = until.UTC().Truncate(time.Microsecond)
@@ -375,9 +381,7 @@ func moveTo(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("visibility = ?", access.Private).
 		Where("closed_at IS NULL").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE st.product_id = ?)`, productID).
+		Where(inThisProduct, productID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("move the disclosure date: %w", err)

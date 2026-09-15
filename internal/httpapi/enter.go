@@ -362,7 +362,7 @@ func registerExtensions(api huma.API, in Ingest) {
 		Vulnerability string `path:"vulnerability"`
 		Body          struct {
 			Until  string `json:"until" doc:"Where the embargo should end, as a date"`
-			Reason string `json:"reason" minLength:"1" doc:"Why it is being extended"`
+			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"Why it is being extended"`
 		}
 	}) (*struct {
 		Status int

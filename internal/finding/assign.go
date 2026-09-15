@@ -42,9 +42,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 		// Assigning one build left the identical work unassigned
 		// beside it, which is how a person ends up holding half of
 		// what they think they hold.
-		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE st.product_id = ?)`, productID).
+		Where(inThisProduct, productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("component_id = ?", componentID).
 		Where("closed_at IS NULL").
@@ -199,9 +197,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 		if !dispatches {
 			held, err := s.db.NewSelect().Model((*Finding)(nil)).
 				Column("id").
-				Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-					JOIN "stream" AS "st" ON st.id = tg.stream_id
-					WHERE st.product_id = ?)`, productID).
+				Where(inThisProduct, productID).
 				Where("vulnerability_id = ?", vulnerabilityID).
 				Where("component_id = ?", componentID).
 				Where("closed_at IS NULL").
@@ -231,9 +227,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// to the finding rather than to the place.
 	private, err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-			WHERE tg.stream_id IN (SELECT st.id FROM "stream" AS "st"
-				WHERE st.product_id = ?))`, productID).
+		Where(inThisProduct, productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("component_id = ?", componentID).
 		Where("closed_at IS NULL").
@@ -270,9 +264,7 @@ func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetI
 	}
 	private, err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE st.product_id = ?)`, productID).
+		Where(inThisProduct, productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("component_id = ?", componentID).
 		Where("closed_at IS NULL").
@@ -373,9 +365,7 @@ func (s *Store) ReleaseIn(ctx context.Context, subject access.Subject, party, pr
 			Set("assigned_to = ?", nil).Set("assigned_at = ?", nil).
 			Where("assigned_to = ?", party).
 			Where("closed_at IS NULL").
-			Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-				JOIN "stream" AS "st" ON st.id = tg.stream_id
-				WHERE st.product_id = ?)`, productID).
+			Where(inThisProduct, productID).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("hand back what they were dealing with: %w", err)
@@ -905,17 +895,6 @@ func targetsNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]build
 	return held, nil
 }
 
-// onlyReadable narrows a query to what this subject may read, per product.
-//
-// Holding private read on one product does not make undisclosed findings on
-// another visible, so the clause is per product rather than a single flag.
-//
-// **An administrator is not narrowed at all**, and the first version of this
-// got that exactly backwards: Products() reports "everything" as an empty list
-// with a flag, the empty list rendered as IN (NULL) — which is never true —
-// and the clause collapsed to public-only for the one subject who is supposed
-// to see everything. Their dashboard, deadline list and trend all
-// under-reported, with nothing saying so.
 // onlyReadable narrows a query to what one person may read: the products they
 // hold anything on, and within those, what has been disclosed to them.
 //
@@ -951,6 +930,17 @@ func inOneProduct(q *bun.SelectQuery, subject access.Subject, productID int64,
 	return onlyVisible(q, subject, []int64{productID}, all)
 }
 
+// onlyVisible narrows a query to what this subject may read, per product.
+//
+// Holding private read on one product does not make undisclosed findings on
+// another visible, so the clause is per product rather than a single flag.
+//
+// **An administrator is not narrowed at all**, and the first version of this
+// got that exactly backwards: Products() reports "everything" as an empty list
+// with a flag, the empty list rendered as IN (NULL) — which is never true —
+// and the clause collapsed to public-only for the one subject who is supposed
+// to see everything. Their dashboard, deadline list and trend all
+// under-reported, with nothing saying so.
 func onlyVisible(q *bun.SelectQuery, subject access.Subject, products []int64, all bool) *bun.SelectQuery {
 	if all {
 		return q

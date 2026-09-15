@@ -200,10 +200,13 @@ func SeverityScore(word string) int {
 		return 800
 	case "medium":
 		return 550
-	case "low":
+	// "negligible" and "none" are words a scanner reports and no band holds.
+	// The fold has already decided they are lows, everywhere a query asks —
+	// so the Go side answers the same rather than giving them a score of
+	// their own, which ranked them above unrated and below every low, and
+	// turned back into "low" anywhere a stored number became a word again.
+	case "low", "negligible", "none":
 		return 300
-	case "negligible":
-		return 100
 	default:
 		return 0
 	}

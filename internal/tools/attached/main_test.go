@@ -148,6 +148,87 @@ const (
 			0,
 		},
 		{
+			// The shape a block left behind takes once somebody corrects its
+			// opening word to match the declaration under it: two docs on one
+			// symbol, both rendered under one name, and the first about
+			// something else.
+			"two doc comments glued together with no blank line",
+			`package p
+
+// Narrow takes a wide thing and makes it narrow.
+//
+// It was here first.
+// Narrow is the other one, which is the real doc.
+func Narrow() {}
+`,
+			inPackage("Narrow"),
+			1,
+		},
+		{
+			// The ordinary shape, and it has to stay quiet: a doc comment
+			// wraps, and a wrapped line beginning with the symbol's own name
+			// mid-sentence is prose.
+			"a doc comment that wraps onto a line beginning with its own name",
+			`package p
+
+// Narrow is the rule for the number: the rating somebody made, the published
+// narrow score where there is none, and nothing where there is neither.
+func Narrow() {}
+`,
+			inPackage("Narrow", "narrow"),
+			0,
+		},
+		{
+			// A run of constants introduced by a paragraph about the run is
+			// how this tree groups them, and Go hands the whole block to the
+			// first one. Its opening names no symbol, which is what tells it
+			// from two docs glued together.
+			"a paragraph introducing a run of constants",
+			`package p
+
+const (
+	// The two kinds of thing, which differ in what they are counted against.
+	//
+	// Narrow is the first of them.
+	Narrow = 1
+	Widen  = 2
+)
+`,
+			inPackage("Narrow", "Widen"),
+			0,
+		},
+		{
+			// A block separated from its declaration by another block is not
+			// a doc comment at all: godoc shows it nowhere, and the thing it
+			// was written for has none.
+			"a comment block attached to nothing",
+			`package p
+
+// Widen takes a narrow thing and makes it wide.
+
+// Narrow is the other one.
+func Narrow() {}
+`,
+			inPackage("Narrow", "Widen"),
+			1,
+		},
+		{
+			// A file this tree opens with a paragraph about what the file is,
+			// which is not a doc comment and is deliberate.
+			"a file header naming what the file is about",
+			`package p
+
+// Narrow and what it is for, in one file.
+
+import "fmt"
+
+// Narrow takes a wide thing and makes it narrow.
+func Narrow() { fmt.Println() }
+`,
+			inPackage("Narrow"),
+			0,
+		},
+		{
 			// A file the compiler will complain about, better than this can.
 			"source that does not parse",
 			"package p\n\nfunc (\n",

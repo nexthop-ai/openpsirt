@@ -550,13 +550,12 @@ func (f *fixture) issue(t *testing.T, identifier string) int64 {
 	return id
 }
 
-// recorded makes sure a person exists to hang a claim on.
+// recorded puts a person row in place at a known identifier, which the
+// subjects these tests build are matched on.
 //
 // An assessment names whoever made it, and that is a real reference rather
 // than a number in a column — the subjects these tests hold are made up, so
 // the row has to be put there for them.
-// recorded puts a person row in place at a known identifier, which the
-// subjects these tests build are matched on.
 //
 // Written column by column rather than through the access store because the
 // identifier has to be the one the subject carries, and a store assigns its

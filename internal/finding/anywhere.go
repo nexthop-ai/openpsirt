@@ -39,17 +39,6 @@ import (
 // is in the statement, and an issue that exists only in products somebody
 // holds nothing on answers as an issue that does not exist.
 
-// rankOf turns a severity word into a number, so a line and a rating can be
-// compared in the statement.
-//
-// The words rank; the column holds words. Inside one product the line is read
-// first and turned into a list of words the query admits, which cannot be done
-// across products — each row's line is its own — so the comparison happens in
-// SQL, and this is the same order severityOrder states.
-const rankOf = `CASE %s
-	WHEN 'critical' THEN 4 WHEN 'high' THEN 3
-	WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END`
-
 // Anywhere is what is open across every product this subject may see.
 //
 // Ordered, filtered and paged the way the per-product list is, by the same
@@ -352,11 +341,19 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 }
 
 // ratedAt is the rating in force, as a number that compares against a line.
-var ratedAt = fmt.Sprintf(rankOf, BandExpr)
+//
+// The words rank; the column holds words. Inside one product the line is read
+// first and turned into a list of words the query admits, which cannot be done
+// across products — each row's line is its own — so the comparison happens in
+// SQL, in the order the one list states.
+var ratedAt = rankCase(BandExpr, 0)
 
 // lineAt is the line the row's own product holds, as the same number. A
 // product that states none inherits the deployment's, which is bound.
-var lineAt = fmt.Sprintf(rankOf, "COALESCE(NULLIF(p.triage_floor, ''), ?)")
+//
+// Zero for anything that is not a band, which is what makes the sentinel for
+// "no line" compare below every rating.
+var lineAt = rankCase("COALESCE(NULLIF(p.triage_floor, ''), ?)", 0)
 
 // sortedAcross is the ORDER BY the cross-product list is paged with.
 //

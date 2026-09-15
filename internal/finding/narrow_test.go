@@ -748,7 +748,7 @@ func TestNarrowingToWhatSomebodyRecordedHere(t *testing.T) {
 				"one recorded", total)
 		}
 		kept, keptTotal, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{Recorded: true, BelowFloor: true})
+			finding.Filter{Origin: finding.RecordedByHand, BelowFloor: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -758,6 +758,23 @@ func TestNarrowingToWhatSomebodyRecordedHere(t *testing.T) {
 		}
 		if kept[0].Component != swss.Name {
 			t.Errorf("the recorded flaw came back as %q", kept[0].Component)
+		}
+
+		// And the other way, which a flag could not ask: the screen offered
+		// "Scanner" and could only send the absence of "entered by hand", so
+		// choosing it narrowed nothing while the panel showed it as chosen.
+		scanned, scannedTotal, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
+			finding.Filter{Origin: finding.ReportedByAScanner, BelowFloor: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(scanned) != 2 || scannedTotal != 2 {
+			t.Fatalf("asking for what a scanner reported kept %d rows and counted %d of %d",
+				len(scanned), scannedTotal, len(all))
+		}
+		if len(scanned)+len(kept) != len(all) {
+			t.Errorf("the two origins answer %d rows between them, out of %d",
+				len(scanned)+len(kept), len(all))
 		}
 	})
 }
@@ -1011,5 +1028,56 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 		}
 		sentBack(elsewhere.ID, swss.Version)
 		asked("a claim sent back in another product", 0)
+	})
+}
+
+func TestANarrowingThatCannotBeAppliedAnswersNothingRatherThanEverything(t *testing.T) {
+	// "Assigned to me" from a subject that is nobody. A pipeline credential
+	// and the deployment looking at itself both hold no party, so there is
+	// nothing the phrase can name — and the narrowing was dropped, so the
+	// caller was handed every finding while the panel went on showing the
+	// filter as on. A filter that cannot be applied answers nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+
+		all, total, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total == 0 {
+			t.Fatal("nothing is open, so this checked nothing")
+		}
+
+		// The same reader, holding a party, asking for theirs: nothing is
+		// assigned, so nothing comes back. That is the shape the answer below
+		// has to match.
+		mine, mineTotal, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{Assigned: []string{"me"}, HeldBy: []int64{101}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(mine) != 0 || mineTotal != 0 {
+			t.Fatalf("%d of %d came back as theirs with nothing assigned", len(mine), mineTotal)
+		}
+
+		// And from the deployment looking at itself, which holds no party —
+		// so "mine" names nothing there and the answer is nothing.
+		nobody := access.Everything("a pass over the estate")
+		asked, askedTotal, err := f.store.Groups(ctx, nobody, f.scope, 50, 0,
+			finding.Filter{Assigned: []string{"me"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(asked) != 0 || askedTotal != 0 {
+			t.Errorf("asking for what a subject holding no party is dealing with answered "+
+				"%d of %d — every finding there is", len(asked), len(all))
+		}
 	})
 }

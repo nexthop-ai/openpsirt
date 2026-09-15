@@ -199,7 +199,9 @@ export function listQuery(params: URLSearchParams) {
     ...(hiding.length > 0 ? { exclude: hiding } : {}),
     ...(components.length > 0 ? { component: components } : {}),
     ...(tags.length > 0 ? { tag: tags } : {}),
-    ...(params.get("recorded") === "1" ? { recorded: true } : {}),
+    ...(params.get("origin")
+      ? { origin: params.get("origin") as "scanner" | "manual" }
+      : {}),
     ...(params.get("planned") && params.get("planned") !== "either"
       ? { planned: params.get("planned") as "planned" | "unplanned" }
       : {}),

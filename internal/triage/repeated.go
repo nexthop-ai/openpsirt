@@ -142,9 +142,9 @@ func deferredDays(db bun.IDB) string {
 // before that date, and never negative. Written as a CASE rather than with a
 // two-argument minimum, because the four engines spell that three ways.
 func heldSeconds(db bun.IDB) string {
-	ends := `(CASE WHEN de.state = '` + string(Withdrawn) + `'
+	ends := database.Composed(`(CASE WHEN de.state = '` + string(Withdrawn) + `'
 			AND de.ended_at IS NOT NULL AND de.ended_at < cl.deferred_until
-		THEN de.ended_at ELSE cl.deferred_until END)`
-	seconds := database.SecondsBetween(db, "de.proposed_at", ends)
+		THEN de.ended_at ELSE cl.deferred_until END)`)
+	seconds := database.SecondsBetween(db, database.Column(db, "de.proposed_at"), ends)
 	return "(CASE WHEN " + seconds + " > 0 THEN " + seconds + " ELSE 0 END)"
 }

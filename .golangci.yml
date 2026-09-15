@@ -5,6 +5,14 @@
 # gate is one someone turns off.
 version: "2"
 
+# The tags the linter compiles with, beside the default set.
+#
+# "measure" guards a file no ordinary build loads, so without this the linter
+# never read it — and the one target that does pass the tag refuses unless
+# three server engines are configured.
+build-tags:
+  - measure
+
 linters:
   default: none
   enable:

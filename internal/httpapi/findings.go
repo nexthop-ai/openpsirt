@@ -255,7 +255,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		Outcomes:      plainly(n.Outcome),
 		Assigned:      n.Assigned,
 		Reassessed:    n.Reassessed,
-		Recorded:      n.Recorded,
+		Origin:        finding.Origin(n.Origin),
 		Planned:       planned(n.Planned),
 		Unconfirmed:   n.Unconfirmed,
 		Exclude:       n.Exclude,
@@ -326,7 +326,7 @@ type Narrowing struct {
 	// the working population, and both say so on the screen: a default that
 	// narrows silently makes the count something other than the whole count
 	// with nothing saying so.
-	On           []string    `query:"on,explode" enum:"branch,tag" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
+	On           []string    `query:"on,explode" enum:"branch,tag" uniqueItems:"true" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
 	Support      []string    `query:"support,explode" enum:"in-support,past-eol" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
 	Under        string      `query:"under" maxLength:"191" doc:"Keep only what sits inside the container of this name"`
 	UnderBuild   bool        `query:"under_build" doc:"Keep only what the build holds directly, which is what has no container above it"`
@@ -346,7 +346,7 @@ type Narrowing struct {
 	DecidedAfter string      `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
 	Said         []vexStatus `query:"vex_status,explode" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
 	Reassessed   bool        `query:"reassessed" doc:"Keep only groups whose issue we rated differently from the world — what has been re-prioritized here"`
-	Recorded     bool        `query:"recorded" doc:"Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before"`
+	Origin       origin      `query:"origin" doc:"Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand"`
 	Planned      string      `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`
 	Unconfirmed  bool        `query:"unconfirmed" doc:"Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does"`
 	Exclude      []string    `query:"exclude,explode" maxItems:"200" maxLength:"191" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`

@@ -315,6 +315,7 @@ components:
           type: string
         reasoning:
           description: Why. It outlives the version it was made about, so the next person needs the argument
+          maxLength: 65536
           minLength: 1
           type: string
         severity:
@@ -2460,6 +2461,7 @@ components:
           type: string
         reason:
           description: Why it is being extended
+          maxLength: 65536
           minLength: 1
           type: string
         until:
@@ -9722,6 +9724,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -9930,13 +9933,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -10144,6 +10150,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -10352,13 +10359,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -12025,6 +12035,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -12233,13 +12244,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -12524,6 +12538,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -12732,13 +12747,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -12947,6 +12965,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -13155,13 +13174,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query
@@ -13396,6 +13418,7 @@ paths:
             type:
               - array
               - "null"
+            uniqueItems: true
         - description: Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything
           explode: true
           in: query
@@ -13604,13 +13627,16 @@ paths:
           schema:
             description: Keep only groups whose issue we rated differently from the world — what has been re-prioritized here
             type: boolean
-        - description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
+        - description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
           explode: false
           in: query
-          name: recorded
+          name: origin
           schema:
-            description: Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before
-            type: boolean
+            description: Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand
+            enum:
+              - scanner
+              - manual
+            type: string
         - description: Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means
           explode: false
           in: query

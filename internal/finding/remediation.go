@@ -65,7 +65,7 @@ var agingBuckets = []struct {
 	{"over three months", 90, 0},
 }
 
-// resolvedExpr is what counts as an issue actually going away.
+// resolved keeps only what counts as an issue actually going away.
 //
 // **A closure is not a fix unless the issue went with it.** A bump that
 // carried the issue into the next version closed one row and opened another
@@ -78,7 +78,12 @@ var agingBuckets = []struct {
 // two.** A record taken back was never a finding, so it is not churn being
 // counted as progress — it is nothing at all, and counting it would make the
 // fix rate improve every time somebody corrected a filing mistake.
-const resolvedExpr = `f.closed_because IN ('removed', 'upgraded', 'revised', 'fixed')`
+// Bound rather than spliced, and built from Resolving rather than retyped
+// beside it: a value in a placeholder is the rule, and a literal here is the
+// shape somebody copies to a place where it does matter.
+func resolved(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.Where("f.closed_because IN (?)", bun.List(Resolving()))
+}
 
 // Remediation reports how fast issues are being closed and what is aging.
 func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope Scope,
@@ -122,9 +127,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		Where("f.closed_at IS NOT NULL").
 		Where("f.closed_at >= ?", since).
-		Where(resolvedExpr).
 		GroupExpr("band, f.vulnerability_id")
-	closed = scope.Narrow(onlyReadable(closed, subject, products, all))
+	closed = resolved(scope.Narrow(onlyReadable(closed, subject, products, all)))
 
 	// The averaging happens over the grouped issues, in a statement of its
 	// own, because averaging inside the grouping would average the places.
@@ -258,5 +262,6 @@ func byBandOf(from *bun.SelectQuery, db bun.IDB) *bun.SelectQuery {
 // engine is asked how to subtract two moments.
 func secondsBetween(db bun.IDB) string {
 	return "AVG(" + database.SecondsBetween(db,
-		"per_issue.opened_at", "per_issue.closed_at") + ")"
+		database.Column(db, "per_issue.opened_at"),
+		database.Column(db, "per_issue.closed_at")) + ")"
 }

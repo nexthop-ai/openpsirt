@@ -656,11 +656,15 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 // heldBy is the sign-in identity of whoever is dealing with a finding, or
 // empty where nobody is or the places do not agree.
+//
+// Over the fold, which is the unit the rows beside it use and the unit a
+// judgment covers. Over one component it answered about a third of what the
+// screen was showing.
 func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, componentID int64) (string, error) {
 	var holders []struct {
 		Identity *string `bun:"identity"`
 	}
-	err := s.db.NewSelect().
+	err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`finding AS "f"`).
 		// Joined on the party a person is assignable as, which is what
 		// the assignment column holds. A team's queue names no person
@@ -669,9 +673,8 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 		ColumnExpr(`p.identity AS "identity"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.component_id = ?", componentID).
 		Where("f.closed_at IS NULL").
-		GroupExpr("p.identity").
+		GroupExpr("p.identity"), componentID).
 		Scan(ctx, &holders)
 	if err != nil {
 		return "", fmt.Errorf("read who is dealing with this: %w", err)
@@ -687,22 +690,24 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 //
 // One name for the whole group, and empty where its places disagree: the same
 // rule the holder follows, because a group placed two ways is a state nobody
-// chose and naming one of them would hide it.
+// chose and naming one of them would hide it. The group is the fold, and
+// routing places findings one at a time — so asked about one component this
+// reported no rule where a rule had placed part of the fold, and the whole
+// thing where the name given happened to be the part it placed.
 func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 	componentID int64) (string, error) {
 
 	var named []struct {
 		Name *string `bun:"name"`
 	}
-	err := s.db.NewSelect().
+	err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`finding AS "f"`).
 		Join(`LEFT JOIN "routing_rule" AS "rr" ON rr.id = f.routed_by`).
 		ColumnExpr(`rr.name AS "name"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.component_id = ?", componentID).
 		Where("f.closed_at IS NULL").
-		GroupExpr("rr.name").
+		GroupExpr("rr.name"), componentID).
 		Scan(ctx, &named)
 	if err != nil {
 		return "", fmt.Errorf("read what placed this: %w", err)

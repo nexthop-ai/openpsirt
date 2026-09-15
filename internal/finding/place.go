@@ -100,52 +100,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 	}
 
 	var rows []placeRow
-	err = s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
-		ColumnExpr(`f.visibility AS "visibility"`).
-		// The upstream version where one is stated, and the
-		// component's own where none is. Most packages are not forks
-		// and state no upstream at all — measured on a real image, 88%
-		// of them — so reading only the stated one left the version
-		// half of the key empty for almost everything, and a key that
-		// never changes is a decision that never lapses. A dismissal
-		// written about one version would suppress the same issue in
-		// every later one, forever.
-		//
-		// Falling back to the shipped version asks again on a
-		// packaging revision that changed no code, which only the
-		// upstream version lapsing would rather avoid. That is the
-		// safe direction to be wrong in: asking twice costs somebody a
-		// minute, and not asking costs a vulnerability nobody looked
-		// at. The case only the upstream version lapsing is actually
-		// about — a fork carrying its own version while the issue
-		// lives upstream — is exactly the case that states an
-		// upstream, so it is unaffected.
-		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
-		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
-		// The three the rating in force is worked out from, scored by the
-		// project's one rule rather than by a second one in SQL: an
-		// assessment writes the word and never the published score, so the
-		// score alone says an issue rated critical here is worth zero.
-		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
-		ColumnExpr(`COALESCE(ir.severity, '') AS "rated_here"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-		// The deadline, because a promise to act is gated against the earliest
-		// one among what the act covers. Read from the rows rather than
-		// supplied, like the versions and the visibility: it is a fact about
-		// the place and a caller free to state it would be choosing whether
-		// their own commitment needed a second person.
-		ColumnExpr(`f.due_at AS "due_at"`).
-		// Whether the release was built once. A tag cannot change, so what may
-		// be said about a finding on one is narrower, and that is a fact about
-		// the build rather than about who is asking.
-		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+	err = placeColumns(s.db.NewSelect().TableExpr(`finding AS "f"`), productID).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.place_identity = ?", placeIdentity).
@@ -339,14 +294,14 @@ type InBundle struct {
 	Places          []Deciding
 }
 
-// PlacesInBundleWithin is everywhere one upstream bump would reach, across a
+// PlacesOnComponentWithin is everywhere a component is open, across a
 // product's builds, read through a handle the caller chooses.
 //
-// The read half of declaring a bump. Keyed exactly the way the bundle list
-// keys its rows — the source package where one is recorded, the upstream
-// version in hand, and the version that fixes it — because a declaration that
-// resolved its own population differently from the row somebody clicked would
-// answer about something else.
+// The read half of planning an upgrade. Coverage is the component rather than
+// a version pair, because an upgrade is a claim that moving the package
+// answers what is open on it — and deciding that 3.5.2 also covers something
+// fixed in 3.5.0 would need an ordering per ecosystem this does not have. A
+// person claims it, and the next scan says which of it was true.
 //
 // Narrowed by what the subject may see, like every other read here. A place
 // they cannot see is not one they can declare a bump for.
@@ -354,14 +309,6 @@ type InBundle struct {
 // It takes the handle because the caller opens the transaction itself and
 // resolves the places it writes about from inside it: resolved beforehand, a
 // retry can propose about a finding somebody closed in between.
-// PlacesOnComponentWithin is everywhere a component is open, across a
-// product's builds.
-//
-// The read half of planning an upgrade. Coverage is the component rather than
-// a version pair, because an upgrade is a claim that moving the package
-// answers what is open on it — and deciding that 3.5.2 also covers something
-// fixed in 3.5.0 would need an ordering per ecosystem this does not have. A
-// person claims it, and the next scan says which of it was true.
 func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 	subject access.Subject, productID int64, targets []int64,
 	component string) ([]InBundle, error) {
@@ -383,32 +330,13 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		Consumer        string `bun:"consumer"`
 		FixedIn         string `bun:"fixed_in"`
 	}
-	query := db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+	query := placeColumns(db.NewSelect().TableExpr(`finding AS "f"`), productID).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
-		ColumnExpr(`f.visibility AS "visibility"`).
-		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
-		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
-		// The three the rating in force is worked out from, scored by the
-		// project's one rule rather than by a second one in SQL: an
-		// assessment writes the word and never the published score, so the
-		// score alone says an issue rated critical here is worth zero.
-		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
-		ColumnExpr(`COALESCE(ir.severity, '') AS "rated_here"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		ColumnExpr(`COALESCE(f.fixed_in, '') AS "fixed_in"`).
-		ColumnExpr(`f.due_at AS "due_at"`).
-		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -510,30 +438,10 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		Consumer      string `bun:"consumer"`
 		FixedIn       string `bun:"fixed_in"`
 	}
-	err = s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+	err = placeColumns(s.db.NewSelect().TableExpr(`finding AS "f"`), productID).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
-		ColumnExpr(`f.visibility AS "visibility"`).
-		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
-		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
-		// The three the rating in force is worked out from, scored by the
-		// project's one rule rather than by a second one in SQL: an
-		// assessment writes the word and never the published score, so the
-		// score alone says an issue rated critical here is worth zero.
-		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
-		ColumnExpr(`COALESCE(ir.severity, '') AS "rated_here"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		ColumnExpr(`COALESCE(f.fixed_in, '') AS "fixed_in"`).
-		// The deadline each place carries, for the reason PlaceFor reads it.
-		ColumnExpr(`f.due_at AS "due_at"`).
-		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		// The fold rather than the one component named. One judgment covers
@@ -583,4 +491,62 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		})
 	}
 	return places, nil
+}
+
+// placeColumns adds the joins and the column expressions a place row is read
+// from, to a query over finding AS "f".
+//
+// The eight expressions and the reasoning behind two of them were written out
+// verbatim in three queries here. Each copy still compiles and still returns
+// rows when one of them gains a column, so nothing notices a site left behind
+// — and what these feed is the key a decision expires on, which is the one
+// thing in this package that must not differ between the read that writes it
+// and the read that matches it.
+//
+// It does not take the ordering with it: the three order differently, and what
+// a decision is keyed on must not depend on what the database returned first.
+func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
+	return q.
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		Join(RatedHere, productID).
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`f.visibility AS "visibility"`).
+		// The upstream version where one is stated, and the component's own
+		// where none is. Most packages are not forks and state no upstream at
+		// all — measured on a real image, 88% of them — so reading only the
+		// stated one left the version half of the key empty for almost
+		// everything, and a key that never changes is a decision that never
+		// lapses. A dismissal written about one version would suppress the
+		// same issue in every later one, forever.
+		//
+		// Falling back to the shipped version asks again on a packaging
+		// revision that changed no code, which only the upstream version
+		// lapsing would rather avoid. That is the safe direction to be wrong
+		// in: asking twice costs somebody a minute, and not asking costs a
+		// vulnerability nobody looked at. The case only the upstream version
+		// lapsing is actually about — a fork carrying its own version while
+		// the issue lives upstream — is exactly the case that states an
+		// upstream, so it is unaffected.
+		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
+		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
+		// The three the rating in force is worked out from, scored by the
+		// project's one rule rather than by a second one in SQL: an
+		// assessment writes the word and never the published score, so the
+		// score alone says an issue rated critical here is worth zero.
+		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
+		ColumnExpr(`COALESCE(ir.severity, '') AS "rated_here"`).
+		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+		// The deadline, because a promise to act is gated against the earliest
+		// one among what the act covers. Read from the rows rather than
+		// supplied, like the versions and the visibility: it is a fact about
+		// the place, and a caller free to state it would be choosing whether
+		// their own commitment needed a second person.
+		ColumnExpr(`f.due_at AS "due_at"`).
+		// Whether the release was built once. A tag cannot change, so what may
+		// be said about a finding on one is narrower, and that is a fact about
+		// the build rather than about who is asking.
+		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag)
 }

@@ -210,9 +210,7 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		Column("id").
 		Where("closed_at IS NULL").
 		Where("assigned_to IS NULL").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE st.product_id = ?)`, productID).
+		Where(inThisProduct, productID).
 		Limit(room)
 	if rule.Upstream != "" {
 		page = bySource(page, rule.Upstream)
@@ -375,9 +373,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible)).
-			Where(`f.target_id IN (SELECT tg.id FROM "target" AS "tg"
-				JOIN "stream" AS "st" ON st.id = tg.stream_id
-				WHERE st.product_id = ?)`, productID)
+			Where(inThisProductAs("f.target_id"), productID)
 		if upstream != "" {
 			q = bySource(q, upstream)
 		}

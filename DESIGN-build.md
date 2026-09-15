@@ -106,6 +106,8 @@ of ours needs no edit.
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
 | `make measure` | Measurements rather than gates. Behind a build tag |
+| `make measure-builds` | The measurement file, type-checked without being run. Inside `vet` |
+| `make sbom-shape` | The reader over a full-size inventory, decompressed from a committed fixture. Inside `check` |
 
 ## Gate tiers
 
@@ -139,6 +141,16 @@ query runs both.
 Three steps pass only on a commit — `openapi-current`, `web-api` and
 `reserved-current` each diff a regenerated file against the last commit, so on
 an uncommitted tree they report the file as stale.
+
+**Test code a tag or an environment variable guards is compiled by the gate.**
+A file behind a build tag is loaded by nothing an ordinary run compiles, so a
+rename anywhere it reaches leaves it silently broken while the build, the vet,
+the linter and CI all pass — and the one target that does pass the tag refuses
+outright unless three server engines are configured, so nobody finds out. It is
+vetted rather than run: `go vet` type-checks, needs no database and costs a
+second, and the linter is given the tag too. A test guarded by an environment
+variable nothing sets is the same gap with a different lock, and the answer is
+the same: a target that sets it, inside `check`.
 
 ## CI jobs
 

@@ -9882,8 +9882,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -9984,8 +9984,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11236,8 +11236,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11381,8 +11381,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11488,8 +11488,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11598,8 +11598,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */

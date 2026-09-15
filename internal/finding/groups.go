@@ -851,17 +851,17 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	return known, nil
 }
 
-// ends reduces a way down to the two steps worth showing and a count of what
-// was left out.
+// Ends returns the two ends of a way down and how many steps sit between
+// them: the part of the product a component belongs to, and what directly
+// pulls it in.
+//
+// Exported because a decision is described the same way wherever it is
+// listed, and a second spelling of which step is which is how two screens
+// disagree about where a component sits.
 //
 // The chain arrives build-first. The build itself is not one of the two: every
 // row in a list scoped to one build shares it, so naming it in every row says
 // nothing and costs the width that the parts which differ need.
-// Ends returns the two ends of a way down and how many steps sit between
-// them: the part of the product a component belongs to, and what directly
-// pulls it in. Exported because a decision is described the same way
-// wherever it is listed, and a second spelling of which step is which is how
-// two screens disagree about where a component sits.
 func Ends(down []graph.Step) (owner, parent string, middle int) {
 	switch len(down) {
 	case 0:

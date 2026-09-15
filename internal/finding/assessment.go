@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
 // Assessment is what one product thinks of an issue, as against what was
@@ -109,6 +110,13 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 		return nil, errors.New(
 			"say why. An assessment outlives the version it was made about and reaches " +
 				"every build of this product, so the next person needs the argument")
+	}
+	// The same policy every other typed field goes through, run before the
+	// text is stored rather than when it is read back — which is what the
+	// policy says it is for, and what makes the column known to hold text that
+	// passed what was in force when it arrived.
+	if err := markdown.Check(reasoning); err != nil {
+		return nil, err
 	}
 
 	var recorded *Assessment

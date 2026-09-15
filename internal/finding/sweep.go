@@ -53,7 +53,10 @@ func NewSweeper(db *database.DB, q *queue.Queue, logger *slog.Logger, name strin
 func NewSweeperOfSize(db *database.DB, q *queue.Queue, logger *slog.Logger,
 	name string, batch int) *Sweeper {
 	if batch <= 0 {
-		batch = 2000
+		// The same number the production path falls back to, named rather
+		// than typed again: the decision that a bulk write's cap is a setting
+		// was taken for that path and this fallback was left holding a copy.
+		batch = setting.DefaultRoutingBatch
 	}
 	return &Sweeper{db: db, queue: q, logger: logger, name: name, batch: batch}
 }

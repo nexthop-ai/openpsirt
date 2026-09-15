@@ -208,6 +208,9 @@ a query string becomes part of the statement.
 | The direction is one of two words written here | Not a word that arrived |
 | A key that misses answers in the list's own order | An unknown sort is a mistake about a list, not a reason not to show it |
 | The issue table is joined only where the chosen order needs it | The ordinary page still reads one covering index |
+| A narrowing that cannot be applied answers nothing, never everything | "Assigned to me" from a credential that holds no party names nobody, and dropping the condition handed the caller every finding there is while the screen went on showing the filter as on. A filter asking for a set nothing is in answers with nothing |
+| A filter with three answers is a word, not a flag | Origin is one: the screen offered "Scanner" and could only send the absence of "entered by hand", so choosing it filtered nothing |
+| A repeated value is one value | A set of one word sent twice read as "both kinds, so no narrowing", which silently put tags back into a list somebody had asked to see branches of |
 
 This also prevents a sort exposing a column the caller was never meant to order
 by.

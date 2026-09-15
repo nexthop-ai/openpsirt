@@ -311,6 +311,13 @@ every release, whose violations appear only on whichever engine somebody is leas
 likely to be developing against. A column named `rank` was accepted by three
 engines and refused by the fourth, where it had become a window function.
 
+A column reference a statement composes is quoted through one function, which
+is the package's to own. It owned none, so every caller wrote identifiers bare
+and two helpers took a column name as an ordinary string parameter — with
+nothing between them and a name arriving from a query parameter except that
+every caller happened to pass a literal. What a caller may pass is a named type
+now: a quoted column, or an expression the caller composed and stands behind.
+
 Two engines quote with backticks by default, so their connections are asked for
 standard quoting. Backticks keep working and string literals are untouched: this
 changes what a double quote means, not what a quote means.

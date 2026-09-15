@@ -132,12 +132,6 @@ func ambiguousAmong(name string, choices []graph.Choice) error {
 // ambiguousOrMissing answers a component lookup that could not settle on one.
 //
 // A name matching several is a different answer from a name matching none: the
-// first is something the caller can fix by saying which version, and the
-// second is not. Telling them apart discloses nothing — whoever is asking has
-// already been authorized to read this build.
-// ambiguousOrMissing answers a component lookup that could not settle on one.
-//
-// A name matching several is a different answer from a name matching none: the
 // first is something the caller can fix by saying which one, and the second is
 // not. Telling them apart discloses nothing — whoever is asking has already
 // been authorized to read this build.

@@ -14,7 +14,6 @@ import (
 // component reached several ways, a component the inventory placed nowhere, a
 // subtree with a shared library in it counted once, and a document in a loop.
 
-// everyone reads everything, which is what these walks are narrowed by.
 // everyone is somebody granted reading on the product a fixture builds, for
 // the walks whose subject is incidental. An administrator used to stand here,
 // which stopped working when administering stopped meaning reading — and an

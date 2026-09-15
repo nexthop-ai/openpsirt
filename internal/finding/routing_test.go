@@ -195,3 +195,66 @@ func TestAComponentNamedOutsideASCIIMatchesTheSameOnEveryEngine(t *testing.T) {
 		}
 	})
 }
+
+func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
+	// The binary packages one source was built at one version are one thing to
+	// a person, and the finding screen's rows are the whole fold — deliberately,
+	// so that a form recording twelve places does not show six. Who holds it
+	// and what placed it asked about one component instead, so the guarantee
+	// those two state — one name for the whole group, empty where its places
+	// disagree — was a guarantee about a group they could not see. A rule that
+	// placed a third of a fold reported as no rule under one name and as the
+	// whole thing under another.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// Two binaries of one source at one version, which is one fold.
+		lib := graph.Described{
+			Purl: "pkg:deb/debian/libcurl4t64@8.5.0", Name: "libcurl4t64", Version: "8.5.0",
+			UpstreamName: "curl", UpstreamVersion: "8.5.0",
+		}
+		tool := graph.Described{
+			Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0",
+			UpstreamName: "curl", UpstreamVersion: "8.5.0",
+		}
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{lib, tool},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: lib}, {Parent: root, Child: tool},
+			},
+		})
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-CURL", lib), found("CVE-2026-CURL", tool),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+		if _, err := f.store.AddRule(ctx, who, f.productID, where, "just the library",
+			"", "libcurl4t64"); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.ApplyRules(ctx, f.productID, 100); err != nil {
+			t.Fatal(err)
+		}
+
+		// Named either way, the screen says the same thing — and what it says
+		// is that the fold does not agree.
+		issue := f.issue(t, "CVE-2026-CURL")
+		for _, named := range []string{"libcurl4t64", "curl"} {
+			seen, err := f.store.Detail(ctx, who, f.target, issue, f.componentID(t, named))
+			if err != nil {
+				t.Fatalf("read the finding named %q: %v", named, err)
+			}
+			if seen.RoutedBy != "" {
+				t.Errorf("named %q, the screen says %q placed the whole fold, and it placed "+
+					"part of it", named, seen.RoutedBy)
+			}
+			if seen.AssignedTo != "" {
+				t.Errorf("named %q, the screen says %q is dealing with the whole fold",
+					named, seen.AssignedTo)
+			}
+		}
+	})
+}

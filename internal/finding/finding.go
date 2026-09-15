@@ -124,6 +124,27 @@ const (
 	Fixed Closure = "fixed"
 )
 
+// Resolving is what counts as an issue actually going away.
+//
+// One list rather than three projections of it. It was a positive list of four
+// words spliced into SQL, a negative list of three in Go, and a third list of
+// the same four as a switch returning prose — none of them checked by the
+// compiler, and all three disagreeing about any closure added later. A closure
+// not named here is churn or a correction, never progress.
+func Resolving() []Closure {
+	return []Closure{Removed, Upgraded, Revised, Fixed}
+}
+
+// Resolves reports whether this closure is one of them.
+func (c Closure) Resolves() bool {
+	for _, each := range Resolving() {
+		if c == each {
+			return true
+		}
+	}
+	return false
+}
+
 // Run is one execution of a scanner over one variant.
 type Run struct {
 	bun.BaseModel `bun:"table:scan_run,alias:sr"`

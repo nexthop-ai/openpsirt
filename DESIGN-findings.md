@@ -93,6 +93,7 @@ names**: every name resolves to one row, and a decision holds across all of them
 | Identifiers are compared in one case | Every scheme treats them as case-insensitive and reports disagree about which case to write |
 | A report that would merge two held issues is refused | That is a merge of findings and decisions already made against both, and reading a scan is the wrong moment to do it quietly |
 | The filed name, folded, is what makes one issue one row | It was a hash of the unfolded name in a column of its own, which nothing read and which only one of the two paths that refile an issue under a better-known name maintained — so the key drifted away from the row it identified, and the collision when it came named a name neither issue was filed under |
+| The fold is what a screen reports about | The rows a finding screen shows are the whole fold, so who holds it, what rule placed it and everything else reported beside them is asked of the fold too. Asked of one component, a rule that placed a third of a fold reported as no rule under one name and as the whole thing under another — while the guarantee those reads state is "one name for the whole group, and empty where its places disagree" |
 | **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
 
 ## What a report supplies
@@ -119,6 +120,7 @@ being parsed and thrown away.
 | Field | Treatment |
 |---|---|
 | Severity | Stored as a word, which is what ranks and what sets a deadline. A number is taken where the report carries one — the first rating stating both a score and its vector, worst claim winning. The vector travels with the number |
+| What counts as a fix | One list, named once. A closure not on it is churn or a correction, never progress — it was a positive list of four words spliced into SQL, a negative list of three in Go, and a third list of the same four as a switch returning prose, none of them checked by the compiler and all three disagreeing about any closure added later |
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
 | A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered. It groups findings by the shape of the mistake rather than the package it landed in |
@@ -832,8 +834,13 @@ added to one to be missing from the others.
 | List | Purpose |
 |---|---|
 | The four rated bands | The order a report reads in |
-| `negligible` and `none` | Answers a scanner gives and nobody ranks. They rank below every band, so they survive no floor at all |
+| `negligible` and `none` | Answers a scanner gives and no band holds. The fold reads them as lows, so scoring them anywhere else put them above unrated and below every low — and a stored score turned back into a word came out "low" regardless, which is a word nobody published about the issue |
 | `everything` | Not a severity: the absence of a floor, which is why it sits with the floor rather than the ladder |
+
+The ordering in SQL is built from the list rather than written out beside it,
+and the mapping back to a word is an index into the same list. The `ELSE` is
+the caller's: a cross-product page needs an unrecognized rating to compare
+below every band, so that the sentinel for "no line" does.
 
 ## File organization
 

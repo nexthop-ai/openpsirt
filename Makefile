@@ -285,6 +285,21 @@ docs-check:
 
 vet:
 	$(GO) vet $(PACKAGES)
+	$(MAKE) measure-builds
+
+# The measurement file, type-checked without being run.
+#
+# It sits behind a build tag, and "make measure" is the only thing that passes
+# that tag — a target which refuses outright unless three server engines are
+# configured, so nobody discovers that the file has stopped compiling. A rename
+# anywhere it reaches left it silently broken while the build, the vet, the
+# linter and CI all passed.
+#
+# Vetting rather than running: go vet type-checks, it needs no database, and it
+# costs a second.
+.PHONY: measure-builds
+measure-builds:
+	$(GO) vet -tags measure ./internal/finding/
 
 lint:
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) run
@@ -310,6 +325,25 @@ licenses:
 	  || { echo "npm not found, so the interface's licenses are unchecked here"; exit 1; }
 	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) LICENSE_EXCEPTIONS=$(WEB_LICENSE_EXCEPTIONS) \
 	  $(NPM) --prefix web run --silent licenses
+
+# The reader over a real inventory, which the fixtures cannot stand in for.
+#
+# It reports every path the reader takes that no document exercised, and the
+# shapes that appear once are the ones a small document does not have. It had
+# never run: the test asks for a document through an environment variable that
+# nothing in the makefile, the workflows or the documentation ever set, while a
+# full-size one sat in the same directory compressed.
+#
+# Decompressed into a scratch directory rather than committed uncompressed:
+# the file is the size the measurement is about.
+.PHONY: sbom-shape
+sbom-shape:
+	@command -v xz >/dev/null 2>&1 \
+	  || { echo "xz not found, so the full-size inventory cannot be read here"; exit 1; }
+	@work=$$(mktemp -d); trap 'rm -rf "$$work"' EXIT; \
+	  xz -dc internal/sbom/testdata/switch-image.cdx.json.xz > "$$work/full.cdx.json"; \
+	  OPENPSIRT_TEST_SBOM="$$work/full.cdx.json" $(GO) test ./internal/sbom/ -count=1 \
+	    -run TestAFullSizeDocumentIntroducesNoUndecidedPath
 
 # We ingest SBOMs, so we publish one for ourselves. CycloneDX because that is
 # the format this project treats as authoritative on the way in.
@@ -490,7 +524,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved confined granted attached readable negatives pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
+check: build vet lint unreachable unclaimed reserved confined granted attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -551,15 +585,6 @@ web-check:
 	$(MAKE) web-audit
 	$(MAKE) web-api
 
-# Known vulnerabilities in what the interface installs.
-#
-# The counterpart to govulncheck, and the other half of REQ-75's vulnerability
-# scanning: govulncheck reads Go modules and says nothing at all about npm.
-# The advisory data is the registry's, so this needs a network and says so
-# rather than passing when it cannot reach one.
-#
-# High and above fails. Everything is reported, because "one moderate" and
-# "forty moderates" are different facts and only one of them is worth a look.
 # Credentials in the tree.
 #
 # REQ-75 names secret scanning as a gate. The platform product that provides
@@ -575,6 +600,15 @@ secrets:
 	$(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
 		--no-banner --redact
 
+# Known vulnerabilities in what the interface installs.
+#
+# The counterpart to govulncheck, and the other half of REQ-75's vulnerability
+# scanning: govulncheck reads Go modules and says nothing at all about npm.
+# The advisory data is the registry's, so this needs a network and says so
+# rather than passing when it cannot reach one.
+#
+# High and above fails. Everything is reported, because "one moderate" and
+# "forty moderates" are different facts and only one of them is worth a look.
 web-audit:
 	@command -v $(NPM) >/dev/null 2>&1 \
 	  || { echo "npm not found, so the interface's dependencies are unscanned here"; exit 1; }
