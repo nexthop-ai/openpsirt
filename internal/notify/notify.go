@@ -45,6 +45,21 @@ const (
 // here so a producer and a screen cannot disagree about it.
 type Kind string
 
+// Kinds is every kind of notification, in the order they are declared.
+//
+// Named so that the tables keyed on a kind can be checked against it. There
+// was no enumeration, and the table of subject lines was one row short: the
+// kind it was missing shipped under the generic fallback, and it is the one
+// kind whose whole purpose is a specific sentence.
+func Kinds() []Kind {
+	return []Kind{
+		Assigned, Mentioned, SentBack, BuildQuiet, HoldingAbsent,
+		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
+		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
+		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
+	}
+}
+
 const (
 	// Assigned is work arriving, which is what a triager most wants to notice.
 	Assigned Kind = "assigned"

@@ -222,7 +222,20 @@ func run(args []string, stdout, stderr *os.File) error {
 		return fmt.Errorf("the interface built into this binary could not be read: %w", err)
 	}
 
-	work := queue.New(db, queue.DefaultOptions())
+	queueing := queue.DefaultOptions()
+	// The ceiling on one hold is what cuts a long scan off, and it is the only
+	// bound here that can: the claim is renewed for as long as the scan runs,
+	// so the claim timeout never reaches it. A scanner allowed to run past the
+	// ceiling would be killed mid-run on every attempt and the job set aside
+	// with nothing saying why, so the two are compared where both are in hand
+	// rather than left to a documentation row.
+	if queueing.MaxHold > 0 && cfg.ScannerTimeout >= queueing.MaxHold {
+		return fmt.Errorf(
+			"OPENPSIRT_SCANNER_TIMEOUT is %s, which is not below the %s a worker may hold "+
+				"one job for — a scan allowed to run that long is killed before it finishes",
+			cfg.ScannerTimeout, queueing.MaxHold)
+	}
+	work := queue.New(db, queueing)
 	// Named before the handler is built as well as before the workers are:
 	// work that must happen once — rewriting deadlines after a policy
 	// change — is held by one replica, and the name is what holds it.
@@ -256,7 +269,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// anybody hears about it are separate concerns, and the notification
 	// pass reads what has been ingested, so a scanner reaching it directly
 	// would close a cycle between the two.
-	runner := scanner.NewRunner(db, work, scanner.Grype{Path: cfg.ScannerPath}, logger, name).
+	runner := scanner.NewRunner(db, work, scanner.Grype{
+		Path: cfg.ScannerPath, Timeout: cfg.ScannerTimeout, Limits: cfg.ScannerLimits(),
+	}, logger, name).
 		Telling(notify.Lapses(db.DB, logger))
 	// Asks public indexes what upstream has released. Started whatever the
 	// setting says and does nothing until it is turned on: the setting is
@@ -286,7 +301,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// What leaves the application, where an operator configured somewhere for
 	// it to go. Nil when they did not, which is ordinary rather than broken:
 	// the notification area is the channel that always exists.
-	post := notify.NewPost(db.DB, mailChannel(cfg), cfg.BaseURL, logger, name)
+	post := notify.NewPost(db.DB, mailChannel(cfg, logger), cfg.BaseURL, logger, name)
 	// One signed request per notification, to whatever destinations an
 	// administrator configured. Started whatever is configured and does
 	// nothing where nothing is: the destinations are read each cycle, so
@@ -815,11 +830,17 @@ func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 // Returned as the interface rather than the concrete type, and deliberately
 // through a function that can answer nil: a typed nil pointer handed to an
 // interface is not nil, and the sweep asks whether it has a channel.
-func mailChannel(cfg config.Config) notify.Channel {
+// Which of the two it got is logged, the way the attachment store logs what it
+// chose. Half a configuration is refused where it is read, so what reaches
+// here is either a whole one or none — and "none" is ordinary rather than a
+// fault, which is exactly why it has to be said out loud.
+func mailChannel(cfg config.Config, logger *slog.Logger) notify.Channel {
 	mail := notify.NewMail(cfg.MailServer, cfg.MailFrom, cfg.MailUsername, cfg.MailPassword)
 	if mail == nil {
+		logger.Info("mail is not configured, so nothing is sent outside the application")
 		return nil
 	}
+	logger.Info("mail is configured", "server", cfg.MailServer, "from", cfg.MailFrom)
 	return mail
 }
 

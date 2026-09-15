@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
 
 // Config is everything the process needs to start.
@@ -62,6 +63,21 @@ type Config struct {
 	// without it there is nothing to triage, because the vulnerability data is
 	// produced here rather than sent to us.
 	ScannerPath string
+	// ScannerTimeout bounds one execution of the scanner. A scan that has
+	// stopped making progress must fail as a run that failed rather than hold
+	// a worker, and a deployment whose inventories legitimately take longer
+	// than the default has to be able to raise it.
+	ScannerTimeout time.Duration
+
+	// The bounds one execution of the scanner is read within. Each is what a
+	// deployment may lower or raise; left unset, the package's own defaults
+	// apply. Here rather than among the runtime settings for the reason the
+	// ingest bounds are: what they stop is a document being read, which
+	// happens in the worker rather than in a request.
+	ScannerMaxOutput     int
+	ScannerMaxComplaint  int
+	ScannerMaxMatches    int
+	ScannerMaxReferences int
 	// Mail is where messages that leave the application go. Absent is
 	// ordinary: the notification area needs nothing configured, and a
 	// deployment that sets none of this simply tells nobody anything outside
@@ -115,6 +131,7 @@ type Config struct {
 	IngestMaxFiles      int
 	IngestMaxStatements int
 	IngestMaxDepth      int
+	IngestMaxDocuments  int
 	// BootstrapAdmins are granted administrator at every startup, not only the
 	// first. Applying it every time makes it the way back in for an operator
 	// who has locked themselves out: add yourself, restart. For software
@@ -206,6 +223,12 @@ func Load() (Config, error) {
 		IngestMaxFiles:      r.number("INGEST_MAX_FILES", 0),
 		IngestMaxStatements: r.number("INGEST_MAX_STATEMENTS", 0),
 		IngestMaxDepth:      r.number("INGEST_MAX_DEPTH", 0),
+		IngestMaxDocuments:  r.number("INGEST_MAX_DOCUMENTS", 0),
+
+		ScannerMaxOutput:     r.number("SCANNER_MAX_OUTPUT", 0),
+		ScannerMaxComplaint:  r.number("SCANNER_MAX_COMPLAINT", 0),
+		ScannerMaxMatches:    r.number("SCANNER_MAX_MATCHES", 0),
+		ScannerMaxReferences: r.number("SCANNER_MAX_REFERENCES", 0),
 
 		AttachmentBucket:   env("ATTACHMENT_BUCKET", ""),
 		AttachmentEndpoint: env("ATTACHMENT_ENDPOINT", ""),
@@ -245,6 +268,7 @@ func Load() (Config, error) {
 		StartupTimeout:     r.duration("STARTUP_TIMEOUT", 60*time.Second),
 		DatabaseURL:        env("DATABASE_URL", ""),
 		ScannerPath:        env("SCANNER_PATH", ""),
+		ScannerTimeout:     r.duration("SCANNER_TIMEOUT", scanner.DefaultTimeout),
 		TrustedHeader:      env("TRUSTED_HEADER", ""),
 		AutoMigrate:        r.boolean("AUTO_MIGRATE", true),
 		ReadTimeout:        5 * time.Minute,
@@ -271,6 +295,16 @@ func Load() (Config, error) {
 	if err := (access.Trust{Header: c.TrustedHeader, From: c.TrustedSources}).Configured(); err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_HEADER: %w", err)
 	}
+	// The same rule, for the same reason. A server with nobody to send as is
+	// not a configuration, it is half of one — and half of one answered as
+	// "no mail configured", which is a choice an operator is entitled to make
+	// and is indistinguishable from the mistake. Embargo mail is what a
+	// coordinated disclosure runs on, and it was silently off.
+	if (strings.TrimSpace(c.MailServer) == "") != (strings.TrimSpace(c.MailFrom) == "") {
+		return Config{}, fmt.Errorf(
+			"OPENPSIRT_MAIL_SERVER and OPENPSIRT_MAIL_FROM: set both or neither — " +
+				"a server with nobody to send as sends nothing, and says nothing about it")
+	}
 
 	if err := c.LogLevel.UnmarshalText([]byte(env("LOG_LEVEL", "info"))); err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_LOG_LEVEL: %w", err)
@@ -279,6 +313,18 @@ func Load() (Config, error) {
 	case "text", "json":
 	default:
 		return Config{}, fmt.Errorf("OPENPSIRT_LOG_FORMAT: want \"text\" or \"json\", got %q", c.LogFormat)
+	}
+	// The standard permits exactly six words here and the value reaches the
+	// document verbatim, so a typo produced advisories that fail validation
+	// wherever anybody takes them — which is the one use a generated advisory
+	// has. Refused at startup, beside the setting above that is checked the
+	// same way for the same reason.
+	switch c.PublisherCategory {
+	case "coordinator", "discoverer", "other", "translator", "user", "vendor":
+	default:
+		return Config{}, fmt.Errorf("OPENPSIRT_PUBLISHER_CATEGORY: want one of "+
+			"\"coordinator\", \"discoverer\", \"other\", \"translator\", \"user\" or "+
+			"\"vendor\", got %q", c.PublisherCategory)
 	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")

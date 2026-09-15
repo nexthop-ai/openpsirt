@@ -20,11 +20,13 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Collation](#collation)
 - [Replica coordination](#replica-coordination)
 - [Retryable transactions](#retryable-transactions)
+- [Reads a write depends on](#reads-a-write-depends-on)
 - [Connection pool](#connection-pool)
 - [SQLite settings](#sqlite-settings)
 - [Indexes](#indexes)
 - [Columns no query reads](#columns-no-query-reads)
 - [Column widths](#column-widths)
+- [Cutting text to a width](#cutting-text-to-a-width)
 - [Test harness](#test-harness)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -535,6 +537,38 @@ before returning an error already decided holds the caller and its connection
 for an interval that buys nothing — under exactly the sustained contention that
 path exists to report.
 
+## Reads a write depends on
+
+A transaction is not a lock. At the isolation every engine opens with, a plain
+read inside one answers from a snapshot, and the write that follows lands on
+whatever the row holds when it runs.
+
+| Two writers, one row | What happens |
+|---|---|
+| Both read | Neither waits. A plain select takes no lock on any of the three servers |
+| Both write | The second waits for the first to commit, then writes over what it never saw |
+| Both report what they replaced | Both name the value they read, and only one of them replaced it |
+
+**A value read inside the transaction and reported to the caller is carried in
+the write or it is a guess.** The update matches on the key *and* on what the
+read answered with; a match of no rows means the row moved, and the attempt is
+taken again in a new transaction. Reading again inside the failed one does not
+work — MySQL and MariaDB fix the snapshot at the opening select, so the second
+read is as stale as the first.
+
+The damage is in the record rather than in the value: the row ends up holding
+what the last writer wrote, and the trail says that writer replaced something
+nothing ever held. That is the settings trail, where "who raised the floor to
+critical, and from what" is the question being asked of it.
+
+A locking read — `SELECT ... FOR UPDATE` — is the other answer, and is not used
+for this: it is spelled per engine, and the condition works the same on all
+four. See [Engine-specific code](#engine-specific-code).
+
+Bounded retries rather than a loop. Two writers resolve in one more attempt,
+three can take two, and contention that nothing resolves is reported rather
+than spun on.
+
 ## Connection pool
 
 The failure worth designing against is a far end that goes without a FIN or an
@@ -626,6 +660,27 @@ nothing, and say so nowhere.
 Measured against the reference producer's real output: 6,845 components, longest
 version 49 characters, longest name 120, longest package identifier 140, nothing
 over 191.
+
+## Cutting text to a width
+
+A cut is made on a character boundary, never at a byte offset.
+
+| Rule | Reason |
+|---|---|
+| A value shortened to fit a width is cut between characters | A byte offset lands inside a multi-byte character about two times in three, and what is left is not valid UTF-8 |
+| The write is refused by three engines of four | PostgreSQL refuses invalid UTF-8 outright, MySQL and MariaDB refuse it in strict mode, and SQLite stores it — which is the engine the quick loop runs |
+| The two directions are separate operations | Keeping the head leaves the partial character at the end and keeping the tail leaves it at the front, so one of them trims backward and the other forward |
+| Both live in one place | Every site wrote its own slice, and the ones that were correct were written by people who had already been bitten. The cut is one fact, so it is written once and called |
+
+What it costs where it is missing is the failure that reports nothing: the
+value being shortened is usually a message saying why something else failed, so
+the refused write is the one recording a failure, and the operator is left with
+neither.
+
+A width is measured in characters and the bound here is in bytes, so a name
+outside ASCII is shortened further than the column requires. That is the safe
+direction — the bound belongs to a lookup key, and the full value is stored
+beside it without one.
 
 ## Test harness
 

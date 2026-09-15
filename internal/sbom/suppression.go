@@ -92,11 +92,19 @@ type Target struct {
 func (t Target) Covers(d graph.Described) bool {
 	base, version := purlParts(t.Purl)
 	if base == "" {
-		return false
+		// A claim naming no package identifier names a source tree, and the
+		// most that can be said is that a component of that name, or a fork
+		// of one, is what was meant. The producer's automatically extracted
+		// claims name source trees rather than packages, so this is the
+		// ordinary case rather than the exception — read as "matches
+		// nothing", every one of them was accepted, stored and silently had
+		// no effect.
+		return coversNamed(t.Name, "", d)
 	}
 	if strings.HasPrefix(base, "pkg:generic/") {
-		named := strings.TrimPrefix(base, "pkg:generic/")
-		return equalName(named, d.Name) || equalName(named, d.UpstreamName)
+		// The same question, asked of a claim that spells the source tree as
+		// an identifier rather than as a bare name.
+		return coversNamed(strings.TrimPrefix(base, "pkg:generic/"), version, d)
 	}
 	componentBase, componentVersion := purlParts(d.Purl)
 	if componentBase != base {
@@ -109,6 +117,27 @@ func (t Target) Covers(d graph.Described) bool {
 		componentVersion = d.Version
 	}
 	return version == componentVersion
+}
+
+// coversNamed answers a claim that names a source tree rather than a package.
+//
+// The name matches the component's own or what it was built from, which is the
+// "or a fork of one" half: a build knows which packages came out of a tree and
+// we do not.
+//
+// A version the claim stated is still a version it stated. Read as an
+// unversioned claim, a statement about openssl 1.0.2 suppressed the live
+// finding on openssl 3.5.1 — and the version is compared against what the
+// component was built from as well as against its own, because a claim about a
+// source tree is most often about what the component was derived from.
+func coversNamed(named, version string, d graph.Described) bool {
+	if !equalName(named, d.Name) && !equalName(named, d.UpstreamName) {
+		return false
+	}
+	if version == "" {
+		return true
+	}
+	return version == d.Version || version == d.UpstreamVersion
 }
 
 // Covers reports whether any of a claim's targets is the component described.

@@ -244,8 +244,14 @@ function Field({
   // control that cannot say which unit a number is in — the embargo periods
   // arrive unset, so that is the state they are first seen in.
   const takes = timed && composable(setting.value ?? "");
-  // The same composition for a size, where the setting is one.
-  const measured = setting.kind === "size" ? readBytes(setting.value ?? "") : null;
+  // The same composition for a size, and chosen the same way: on what the
+  // setting *is* rather than on whether the value in hand happens to parse.
+  // Read from the value, a size nobody had set fell through to a plain text
+  // box — the one control that cannot say which unit a number is in — so
+  // typing 25 into the attachment quota set it to twenty-five bytes.
+  const sized = setting.kind === "size";
+  const measured = sized ? readBytes(setting.value ?? "") : null;
+  const sizes = sized && (setting.value ?? "").trim() === "" ? true : measured !== null;
 
   // **The number and the unit are held as typed, not re-derived.**
   //
@@ -279,7 +285,7 @@ function Field({
     ? usable
       ? write(typed, unit)
       : ""
-    : measured
+    : sizes
       ? usable
         ? writeBytes(typed, size)
         : ""
@@ -287,7 +293,7 @@ function Field({
   const changed = asked !== "" && asked !== (setting.value ?? "");
 
   return (
-    <div className="field" style={{ margin: 0, maxWidth: takes || measured ? 320 : 240 }}>
+    <div className="field" style={{ margin: 0, maxWidth: takes || sizes ? 320 : 240 }}>
       {/* The sentence sits on the label rather than on the control. A
           password manager classifies a field by the words it can reach
           through it, and what a setting means is prose about sign-ins,
@@ -339,7 +345,7 @@ function Field({
               ))}
             </select>
           </>
-        ) : measured ? (
+        ) : sizes ? (
           <>
             <input
               id={setting.name}
@@ -388,13 +394,13 @@ function Field({
           they chose it in, which is arithmetic nobody asked for. A value the
           composer cannot take is the case that needs the sentence: it sits in
           a plain text field, and what it means is not obvious. */}
-      {!takes && !measured && !words && humane(value) && (
+      {!takes && !sizes && !words && humane(value) && (
         <span className="hint">= {humane(value)}</span>
       )}
-      {!measured && setting.kind === "size" && humaneBytes(value) && (
+      {!sizes && setting.kind === "size" && humaneBytes(value) && (
         <span className="hint">= {humaneBytes(value)}</span>
       )}
-      {(takes || measured) && count.trim() !== "" && !usable && (
+      {(takes || sizes) && count.trim() !== "" && !usable && (
         <span className="hint" style={{ color: "var(--sev-high)" }}>
           A whole number of one or more.
         </span>

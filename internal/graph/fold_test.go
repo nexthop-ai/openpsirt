@@ -1,7 +1,9 @@
 package graph_test
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -177,4 +179,19 @@ func TestTheFoldIsWrittenAsAComponentIsRecorded(t *testing.T) {
 			t.Error("a version bump left the fold where it was")
 		}
 	})
+}
+
+func TestALongNameOutsideASCIIStaysStorableAfterItIsCut(t *testing.T) {
+	// A component name is a producer's text and the lookup key is bounded, so
+	// the cut can fall inside a character. What is left is written to a column
+	// on four engines: PostgreSQL refuses invalid UTF-8 outright and MySQL and
+	// MariaDB refuse it in strict mode.
+	name := strings.Repeat("é", 200)
+	folded := graph.Folded(name)
+	if !utf8.ValidString(folded) {
+		t.Fatalf("the folded name is not valid UTF-8: %q", folded)
+	}
+	if !strings.HasPrefix(name, folded) {
+		t.Error("the folded name is not a prefix of the name it folds")
+	}
 }

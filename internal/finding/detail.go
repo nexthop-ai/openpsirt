@@ -77,8 +77,13 @@ type Evidence struct {
 	// ours would read as the world's.
 	Assessed  string
 	Component string
-	Version   string
-	Upstream  string
+	// Purl is the component's package identifier, where it has one. Carried
+	// because a name alone does not say which package it is: two registries
+	// and two namespaces hold different packages under one short name, and
+	// what a third party said about one of them is not about the other.
+	Purl     string
+	Version  string
+	Upstream string
 	// FixState, FixedIn and FixedAt are what upstream has done about it, which
 	// is the difference between "decide whether this matters" and "take the
 	// next version".
@@ -296,6 +301,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	// Worked out here rather than stored: an address derived from two names
 	// cannot go stale while the names are right, and storing it would be a
 	// second copy of the templates to keep in step.
+	evidence.Purl = component.Purl
 	evidence.Links = links(issue.Identifier, evidence.Aliases, component.Purl)
 	return evidence
 }

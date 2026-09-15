@@ -636,6 +636,47 @@ func TestTheComponentBoundHoldsWhenOnlyTheHeaderIsWanted(t *testing.T) {
 	}
 }
 
+func TestAHeaderOnlyReadHoldsNothingItWalkedPast(t *testing.T) {
+	// The count is only half of it. Charging the walk stops a document nobody
+	// could have meant; holding nothing is what makes the read cheap for the
+	// documents that are fine — and this read runs synchronously inside the
+	// upload request, so what it holds is held per concurrent upload.
+	//
+	// This one built. The contents were skipped at the top level, but a
+	// document putting its components inside the root component's own array
+	// was bound and contained all the way down: up to the component ceiling
+	// in map entries and up to the edge ceiling in dependency values, against
+	// the measured 73 MB and 124 MB those ceilings stand for.
+	//
+	// Asked of the structures rather than of the heap, because everything a
+	// header read holds is garbage by the time it returns — so the heap after
+	// it says nothing about the heap during it, and during it is the whole
+	// question.
+	const components = 50
+	var b strings.Builder
+	b.WriteString(`{"bomFormat": "CycloneDX", "specVersion": "1.6",
+	 "metadata": {"component": {"bom-ref": "root", "name": "p", "version": "1",
+	  "components": [`)
+	for i := range components {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"bom-ref": "n%d", "name": "package-%d", "version": "1.2.3",`+
+			`"purl": "pkg:deb/debian/package-%d@1.2.3"}`, i, i, i)
+	}
+	b.WriteString(`]}}}`)
+
+	bound, contained, members, err := sbom.HeaderHeld(b.String(), sbom.DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bound != 0 || contained != 0 || members != 0 {
+		t.Errorf("a header-only read of %d nested components bound %d identifiers, held %d "+
+			"edges and recorded %d components, and it documents itself as skipping them",
+			components, bound, contained, members)
+	}
+}
+
 func TestWhoSuppliedAComponentIsKeptWithoutMovingIdentity(t *testing.T) {
 	// A bare name is not enough for a dependency of a dependency, and a
 	// producer often says who supplied it — one real image states it for 759

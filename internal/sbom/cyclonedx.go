@@ -119,9 +119,6 @@ func (c *reader) rootComponent() error {
 	}
 	c.doc.Root = described
 	c.doc.RootDeclared = true
-	if c.headerOnly {
-		return nil
-	}
 	if err := c.bind(ref, described); err != nil {
 		return err
 	}
@@ -135,6 +132,12 @@ func (c *reader) rootComponent() error {
 
 // componentArray reads an array of components and returns the ones directly in
 // it. Anything nested deeper has already been recorded by the time it returns.
+//
+// A header-only read gathers no members, and the recording helpers it calls
+// hold nothing on that path. This is the one header read that built: the
+// contents were skipped at the top level but a document putting its components
+// inside the root component's own array was bound and contained all the way
+// down, in a read that happens inside the upload request.
 func (c *reader) componentArray() ([]graph.Described, error) {
 	var members []graph.Described
 	err := c.b.array(func() error {
@@ -152,6 +155,9 @@ func (c *reader) componentArray() ([]graph.Described, error) {
 			if err := c.contain(described, member); err != nil {
 				return err
 			}
+		}
+		if c.headerOnly {
+			return nil
 		}
 		members = append(members, described)
 		return nil

@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -295,6 +296,12 @@ func TestTheNameAskedComesFromTheIdentifier(t *testing.T) {
 		{"", "", "", false},
 		{"not-a-purl", "", "", false},
 		{"pkg:golang", "", "", false},
+		// A malformed escape is a refusal rather than a segment kept raw.
+		// Kept, it became part of the name asked about, and what came back
+		// was an answer about a different package or none at all — recorded
+		// either way as this component's upstream version.
+		{"pkg:npm/%zz/node@20.1.0", "", "", false},
+		{"pkg:golang/example.com/%2@v1", "", "", false},
 	} {
 		ecosystem, name, ok := currency.Asked(c.purl)
 		if ok != c.ok || ecosystem != c.ecosystem || name != c.name {
@@ -337,12 +344,17 @@ func TestUpstreamIsOnlyCalledSilentAfterAClearYear(t *testing.T) {
 	}
 }
 
-// The defect this exists to prevent: a component whose ecosystem has no index
-// used to be skipped without recording that we had looked, so it stayed due
-// forever. `due` takes the oldest 200 with never-asked first, so on a real
-// image — 3,929 components in ecosystems nothing asks against 3,010 that are
-// askable — the window filled with rows nothing ever wrote and the feature
-// asked upstream about nothing at all, every cycle, for good.
+// The defect this exists to prevent: components whose ecosystem has no index
+// filling the window and leaving nothing asked. `due` takes the oldest 200
+// with never-asked first, so on a real image — 3,929 components in ecosystems
+// nothing asks against 3,010 that are askable — the feature asked upstream
+// about nothing at all, every cycle, for good.
+//
+// They are not selected at all now, which is the structural form of the same
+// guarantee: the window is built from the ecosystems there is an index for
+// rather than from the complement of one of them. Recording an empty answer
+// for each of them, which is what it did before, got through the backlog and
+// then spent a slot on every one of them again a month later.
 func TestEcosystemsWithNoIndexDoNotStarveTheQueue(t *testing.T) {
 	each(t, func(t *testing.T, db *database.DB) {
 		var of []component
@@ -354,25 +366,25 @@ func TestEcosystemsWithNoIndexDoNotStarveTheQueue(t *testing.T) {
 			"serde": {Version: "1.0.230"},
 		}, nil)
 
-		// However the unaskable ones are ordered, they must be got through
-		// rather than sat on. Two passes is more than enough for one slice.
-		for range 2 {
-			if _, err := r.Once(t.Context()); err != nil {
-				t.Fatalf("once: %v", err)
+		// One pass, because the unaskable ones never enter the window: with
+		// them in it, two hundred of them came first and the one component
+		// with an answer was never reached.
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		if len(*asked) != 1 || (*asked)[0] != "serde" {
+			t.Fatalf("asked about %v, want the one component there is an index for", *asked)
+		}
+		got := read(t, db)
+		if got["pkg:cargo/serde@1.0.0"].Version == nil {
+			t.Error("the component there is an index for was never answered")
+		}
+		// And nothing was written about the ones nothing can be asked: the
+		// column says when we last asked, and we did not.
+		for purl, row := range got {
+			if purl != "pkg:cargo/serde@1.0.0" && row.Checked != nil {
+				t.Errorf("%s was recorded as asked about, and there is no index for it", purl)
 			}
-		}
-		if len(*asked) == 0 {
-			t.Fatal("nothing upstream was ever asked: the unaskable components " +
-				"filled the window and were never recorded, so they stayed due")
-		}
-		unasked := 0
-		for _, row := range read(t, db) {
-			if row.Checked == nil {
-				unasked++
-			}
-		}
-		if unasked != 0 {
-			t.Errorf("%d components still have no record of being looked at", unasked)
 		}
 	})
 }
@@ -563,6 +575,7 @@ func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 			{purl: "pkg:npm/kept@1.0.0"},
 			{purl: "pkg:npm/clipped@1.0.0"},
 			{purl: "pkg:npm/hostile@1.0.0"},
+			{purl: "pkg:npm/enormous@1.0.0"},
 		}, map[string]currency.Latest{
 			"kept": {
 				Version: "2.0.0", Summary: "  a   label   with   spaces  ",
@@ -576,6 +589,13 @@ func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 			"hostile": {
 				Version: "2.0.0", Summary: "fine",
 				Project: "javascript:alert(document.domain)",
+			},
+			// The summary is shortened and the address is not: a cut address
+			// is a different address, and this one becomes somewhere to
+			// click. The comment beside the two said both were bounded.
+			"enormous": {
+				Version: "2.0.0", Summary: "fine",
+				Project: "https://example.test/" + strings.Repeat("a", currency.MostAddress),
 			},
 		}, nil)
 		if _, err := r.Once(t.Context()); err != nil {
@@ -615,6 +635,110 @@ func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 		// And refusing the address does not lose the rest of the answer.
 		if hostile.Version == nil || *hostile.Version != "2.0.0" {
 			t.Errorf("refusing the address lost the version: %v", hostile.Version)
+		}
+
+		enormous := got["pkg:npm/enormous@1.0.0"]
+		if enormous.Project != nil && *enormous.Project != "" {
+			t.Errorf("an address past the bound was stored, %d bytes of it",
+				len(*enormous.Project))
+		}
+		if enormous.Version == nil || *enormous.Version != "2.0.0" {
+			t.Errorf("refusing the address lost the version: %v", enormous.Version)
+		}
+	})
+}
+
+func TestARefusalTheIndexWillRepeatDoesNotHoldTheHeadOfTheWindow(t *testing.T) {
+	// Every status but 200, 404 and 410 took the arm for a bad day: nothing
+	// was written, so the component stayed due — and the window takes the
+	// never-asked first, so the same one led every pass afterwards for ever
+	// and the components behind it were never reached. A package a registry
+	// withdrew, a region it will not serve and a request it will not accept
+	// are all of them.
+	each(t, func(t *testing.T, db *database.DB) {
+		r, asked := seed(t, db, []component{
+			{purl: "pkg:npm/refused@1.0.0"},
+			{purl: "pkg:npm/behind-it@1.0.0"},
+		}, map[string]currency.Latest{
+			"behind-it": {Version: "2.0.0"},
+		}, nil)
+		// The first one is refused in a way the index will repeat.
+		r.Index = func(ecosystem string) currency.Asker {
+			if ecosystem != "npm" {
+				return nil
+			}
+			return refusing{asked: asked, says: map[string]currency.Latest{
+				"behind-it": {Version: "2.0.0"},
+			}}
+		}
+
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		got := read(t, db)
+		// Recorded as asked, so it leaves the head of the window.
+		if got["pkg:npm/refused@1.0.0"].Checked == nil {
+			t.Error("a refusal the index will repeat was left unrecorded, so it stays due")
+		}
+		// And the one behind it was reached, which is what being stuck costs.
+		if got["pkg:npm/behind-it@1.0.0"].Version == nil {
+			t.Error("the component behind it was never asked about")
+		}
+	})
+}
+
+// refusing answers one name and refuses the rest the way an index refuses
+// something it will go on refusing.
+type refusing struct {
+	says  map[string]currency.Latest
+	asked *[]string
+}
+
+func (r refusing) Latest(_ context.Context, name string) (currency.Latest, error) {
+	*r.asked = append(*r.asked, name)
+	if latest, known := r.says[name]; known {
+		return latest, nil
+	}
+	return currency.Latest{}, fmt.Errorf("%w: answered 403 Forbidden", currency.ErrUnaskable)
+}
+
+func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
+	// The lease was sized from the interval between cycles, and the comment
+	// beside it stated the arithmetic that contradicts that: a pass is up to
+	// two hundred requests with a timeout each, which is far past five
+	// intervals. So a slow index handed the pass to a second replica
+	// mid-flight and both asked — the thing a lease exists to prevent, at
+	// somebody else's expense.
+	each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		var of []component
+		says := map[string]currency.Latest{}
+		for i := range currency.RenewEvery * 3 {
+			name := fmt.Sprintf("thing-%03d", i)
+			of = append(of, component{purl: "pkg:cargo/" + name + "@1.0.0"})
+			says[name] = currency.Latest{Version: "2.0.0"}
+		}
+		r, asked := seed(t, db, of, says, nil)
+
+		// A lease of no length, so it has lapsed by the time the pass asks
+		// for it again — which is what a pass outliving its lease looks like.
+		currency.Asking(r, 0)
+		leases := queue.NewLeases(db.DB)
+		if mine, err := leases.Take(ctx, currency.AskingLease, "somebody-else", time.Hour); err != nil {
+			t.Fatal(err)
+		} else if !mine {
+			t.Fatal("the other replica did not take the lease")
+		}
+
+		if _, err := r.Once(ctx); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		// It gets through the first stretch and then stops, rather than
+		// asking about every one of them while another replica holds the
+		// lease and is asking about the same ones.
+		if len(*asked) != currency.RenewEvery {
+			t.Errorf("asked about %d components after losing the lease, want the %d "+
+				"it had already started", len(*asked), currency.RenewEvery)
 		}
 	})
 }

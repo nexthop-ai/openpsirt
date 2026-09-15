@@ -38,7 +38,11 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 		return nil, err
 	}
 	if !subject.Sees(productID) {
-		return nil, fmt.Errorf("no build is declared there")
+		// The answer every other read in this package gives, so the handler
+		// can tell a refusal from a fault. A plain error here reached the
+		// handler with nothing to match on and became a 500, which says a
+		// build exists and something went wrong reading it.
+		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	// Counts carry the reader's visibility like every other read does. A
 	// run that opened an undisclosed finding must not report a larger

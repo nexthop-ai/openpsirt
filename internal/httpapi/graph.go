@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -88,8 +89,17 @@ func registerGraph(api huma.API, in Ingest) {
 		}
 		store := graph.NewStore(in.DB.DB)
 
+		// A refusal from the store is the answer a build nobody declared
+		// gets, not a fault. Falling through to the fault answer, this route
+		// said 500 where a stranger got 404 — and the pair says which builds
+		// exist, one name at a time. A case collaborator is the reach that
+		// meets it: they hold nothing on the product and may open exactly one
+		// finding.
 		components, edges, err := store.Counts(ctx, subject, target)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, nothingScannedThere()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "the build's contents could not be counted", err)
 		}
 		out := &rootsOutput{}
@@ -101,7 +111,10 @@ func registerGraph(api huma.API, in Ingest) {
 		// beside them would invite drawing them as though they hung off it.
 		if strings.TrimSpace(input.Term) != "" {
 			found, err := store.Search(ctx, subject, target, input.Term, input.Limit)
-			if err != nil {
+			switch {
+			case errors.Is(err, access.ErrDenied):
+				return nil, nothingScannedThere()
+			case err != nil:
 				return nil, wentWrong(in.Logger, "the build could not be searched", err)
 			}
 			out.Body.Term = input.Term
@@ -110,7 +123,10 @@ func registerGraph(api huma.API, in Ingest) {
 		}
 
 		root, roots, err := store.Roots(ctx, subject, target)
-		if err != nil {
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, nothingScannedThere()
+		case err != nil:
 			return nil, wentWrong(in.Logger, "the build's contents could not be read", err)
 		}
 		out.Body.Items = neighbors(roots)

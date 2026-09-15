@@ -4,13 +4,13 @@
 /* The tokens, the type scale, the shell and every component are the restyled
    mockup's, taken as they were settled rather than approximated. The mockup
    drew the interface inside a frame; here the frame is the page, so its
-   tokens sit on the root and its grid on the app container. Three looks, one
-   markup: a look is a token set, chosen per person and kept in the browser.
+   tokens sit on the root and its grid on the app container. A look is a token
+   set, chosen per person and kept in the browser.
    Severity is its own scale, deliberately not the accent — "urgent" and
    "clickable" must never read as the same thing. */
 
 /* ============================================================
-   The app. Three looks, one markup. Every component below reads only
+   The app. A look is a token set. Every component below reads only
    these tokens, so switching a look is a token swap and a few
    structural overrides marked [look].
    ============================================================ */

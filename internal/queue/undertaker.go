@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/background"
 )
 
 // betweenBurials is how often work abandoned by its worker is looked for.
@@ -65,17 +67,7 @@ func (u *Undertaker) Run(ctx context.Context, interval time.Duration) {
 	if u == nil {
 		return
 	}
-	if interval <= 0 {
-		interval = betweenBurials
-	}
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenBurials, func(ctx context.Context) {
 		// Logged and carried on, like every other background pass here: a
 		// pass that cannot run is not a reason to stop serving, and what it
 		// failed to set aside is still there on the next one.
@@ -87,6 +79,5 @@ func (u *Undertaker) Run(ctx context.Context, interval time.Duration) {
 			// something an operator has to know happened.
 			u.logger.InfoContext(ctx, "set aside work whose worker never came back", "jobs", buried)
 		}
-		timer.Reset(interval)
-	}
+	})
 }

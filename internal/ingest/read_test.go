@@ -488,3 +488,56 @@ func waitFor(t *testing.T, done func() bool, what string) {
 	}
 	t.Fatalf("waited for %s and it did not happen", what)
 }
+
+// reading is a reader over the fixture's database with bounds of its own.
+func (f *readerFixture) reading(limits sbom.Limits) *ingest.Reader {
+	return ingest.NewReader(f.db, f.queue, limits,
+		slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
+}
+
+func TestTheClaimBudgetIsSpentAcrossTheDocumentsRatherThanPerDocument(t *testing.T) {
+	// Every bound is per document, and a scan carries as many suppression
+	// documents as a build cares to attach. Passed whole to each of them, a
+	// producer sending several each inside the limit made this hold several
+	// times what the limit was set to allow — in the background reader, after
+	// the upload had already been answered 202.
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour), anInventory,
+			aSuppression, aSuppression, aSuppression)
+
+		// Three documents of one claim each, against a budget of two.
+		_, err := f.reading(sbom.Limits{MaxStatements: 2}).Once(t.Context())
+		if err == nil {
+			t.Fatal("three documents were read against a budget of two claims")
+		}
+		if !strings.Contains(err.Error(), "limit") {
+			t.Errorf("the refusal does not name the limit it hit: %v", err)
+		}
+	})
+}
+
+func TestMoreSuppressionDocumentsThanAllowedAreRefused(t *testing.T) {
+	// The ceiling on the count, which is what makes every per-document bound
+	// mean something: without it they are multiplied by a number nothing
+	// decides.
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		// A pair, because a ceiling set too low is only visible against a
+		// scan that has to keep working. The two builds are read in the order
+		// their work was queued.
+		f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour), anInventory,
+			aSuppression, aSuppression, aSuppression)
+		f.accept(t, f.tag, time.Now().UTC().Add(-time.Hour), anInventory,
+			aSuppression, aSuppression, aSuppression)
+
+		if _, err := f.reading(sbom.Limits{MaxDocuments: 3}).Once(t.Context()); err != nil {
+			t.Fatalf("exactly the document limit: %v", err)
+		}
+		_, err := f.reading(sbom.Limits{MaxDocuments: 2}).Once(t.Context())
+		if err == nil {
+			t.Fatal("three documents were read against a limit of two")
+		}
+		if !strings.Contains(err.Error(), "suppression documents") {
+			t.Errorf("the refusal does not name the limit it hit: %v", err)
+		}
+	})
+}

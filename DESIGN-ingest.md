@@ -24,6 +24,7 @@ REQ-69.
 - [Build-declared suppressions](#build-declared-suppressions)
 - [Scheduled rescanning](#scheduled-rescanning)
 - [Scanner warnings](#scanner-warnings)
+- [What a scan run may produce](#what-a-scan-run-may-produce)
 - [Scan coverage](#scan-coverage)
 - [Receipts](#receipts)
 - [Reading back a document](#reading-back-a-document)
@@ -221,15 +222,21 @@ the cost of taking the file. Skipping is not free — the reference producer sor
 its keys, putting tens of thousands of components ahead of the metadata — but
 walking past a value is far cheaper than building something from it.
 
-Read as a stream, with four bounds, all settable per read: document size,
-component count, edge count, and nesting depth. Edges need their own bound,
-because a thousand components can declare a million edges between them.
+Read as a stream, and bounded in every dimension a producer controls, all
+settable per read: document size, component count, file count, edge count,
+claim count, nesting depth, and how many documents may arrive with one scan.
+Edges need their own bound, because a thousand components can declare a
+million edges between them.
 
 | Rule | Reason |
 |---|---|
 | The depth bound is why the document is walked rather than decoded | Decoding has no depth limit anyone can set, so a file nested far enough to exhaust the process would be discovered by running out of memory. Nesting is bounded everywhere, including inside the parts nothing reads |
 | An oversized document is refused as oversized | Truncating it and letting the reader fail reports a malformed file, which sends whoever sees the message looking at their build instead of at the limit. This holds for a third party's VEX document as well, which was read to the limit and handed on: over-sized became malformed, and the digest recorded was over the part that fitted |
 | The component bound is charged where a component is read, not where one is recorded | Charged at the recording, the header pass — which records nothing — counted none of them, so a document putting its components inside the root component's own nested array was walked in full during a read that happens inside the upload request, with only the size bound saying how many there could be. The same document read whole was refused. A bound that holds on one of two paths through the same parser is a bound somebody routes around |
+| The header pass holds nothing it walked past | Charging the walk is what stops a document nobody could have meant; holding nothing is what keeps the pass cheap for the documents that are fine, and this pass runs inside the upload request, so what it holds is held per concurrent upload. It was charging and holding: the count was the fix and the retention was not |
+| A suppression document's product identifiers are charged against the component bound | The claim bound counts claims, and one claim names any number of products — so a document holding a single statement that lists millions of identifiers was inside every bound in force, and the map holding them was charged against nothing |
+| The claim bound is spent across a scan's documents rather than per document | Every other bound is per document, and a scan carries as many as a build attaches. Passed whole to each, a producer sending fifty each inside the limit made this hold fifty times what the limit allows |
+| How many documents arrive with one scan is bounded too | It is what makes every per-document bound mean something: without it they are multiplied by a number nothing decides |
 
 | Rule | Reason |
 |---|---|
@@ -423,7 +430,13 @@ they fill in. A document that is valid and sparse is not a broken one.
 | An edge names something the document never describes | Dropped and counted. The missing component is not invented |
 | An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
 | An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |
+| A relationship naming what a build is about, stated by anything other than the document | Left out. Taken as a root claim, any element could make itself the build's root and re-parent the whole inventory under it |
 | Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
+
+Two things a document states twice are resolved once it has closed rather than
+as they are read, because key order is the producer's choice and which of two
+fields wins must not be: who supplied a component, which two of the three
+vocabularies state two ways each, and what a component was built from.
 
 The counts matter as much as the tolerance. Each is a number that should be
 stable build to build, so a change says the producer changed.
@@ -431,13 +444,13 @@ stable build to build, so a change says the producer changed.
 | Refused | Reason |
 |---|---|
 | Neither format, or a major version not written against | A reader that guesses eventually guesses wrong on a file that looks close enough |
-| Keys from two formats | Whichever handler ran last has already written over the other's answer, and nothing here can say which half the producer meant |
+| Keys from two formats | Whichever handler ran last has already written over the other's answer, and nothing here can say which half the producer meant. The same rule for a suppression document, where reading half of one dropped the other half's claims without a word |
 | Half of one format's declaration | An unstated version is a version this was not written against |
 | A file and a component sharing one identifier | The same coin toss two components sharing one is refused for, and worse: the edge resolves to the component and invents a dependency nobody stated |
 | A component with no name | It cannot be identified, so it cannot be tracked |
 | Two components sharing one identifier | Every edge naming it is ambiguous |
 | A build time nothing can read | The build time orders scans against each other |
-| Past any of the four bounds | A broken or hostile file has to fail rather than exhaust the process |
+| Past any of the bounds | A broken or hostile file has to fail rather than exhaust the process |
 
 Reading is all or nothing. A partial inventory is indistinguishable from a
 product that shrank, and acting on one closes findings that are still somebody's
@@ -522,6 +535,8 @@ its own name or in a header saying what it fixes.
 | Qualifiers and subpaths are discarded before comparing | A claim is written as the package and the version; the same package in an inventory carries the architecture it was built for |
 | A claim naming no version covers every version | The format says so, and it is how a build states something about whatever it ships |
 | A claim against a source tree matches a component of that name, or a fork of one | The build knows which packages came out of a tree and this deployment does not |
+| A source tree is named either way it can be named | As a bare name where the document carried no package identifier, and as a package identifier of the generic type where it carried one. The two are the same claim and are matched the same |
+| A source tree named with a version is matched on it, against the component's own version and against what it was built from | A stated version is a version the build stated. Read as covering every version, a claim about one release suppresses a live finding on another |
 | A claim is matched at every place its component sits | The fan-out is ours either way |
 
 A claim that matched nothing is reported, not dropped. A build's judgment that
@@ -588,6 +603,24 @@ asks:
 
 Both are kept as the scanner wrote them and **never parsed**. Deciding whether a
 version falls inside a range needs an ordering per ecosystem.
+
+## What a scan run may produce
+
+The scanner runs as a subprocess of the process serving the API, and its report
+is read into that process. It is bounded the way a scan file is, from the same
+budget, and every bound is configurable.
+
+| Bounded | Rule |
+|---|---|
+| The report's size | Past the ceiling the run fails. It is not read in part: half a report reads as a product that stopped having problems, which is the failure every other rule here exists to prevent |
+| What the scanner said while running | Past the ceiling the excess is dropped and the run stands. A scanner with a lot to say still scanned |
+| How many matches one report states | Charged as each match is read rather than after the array, because what a bound stops is the walk |
+| How many addresses one match points at | Bounded separately, because the two multiply: a report inside the match ceiling is still a report of one match pointing at everything |
+| One execution's wall-clock time | A scanner that has stopped making progress fails as a run that failed rather than holding a worker. It stays below the ceiling on one hold (`DESIGN-queue.md`), and the process refuses to start where it does not |
+
+A report's size is components × matches × references, and a producer controls
+the first factor by uploading a scan file — so nothing about it is bounded by
+anything this deployment chose unless it is bounded here.
 
 ## Scan coverage
 

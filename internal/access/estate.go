@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // EstateGrant is a role held across every product (REQ-42).
@@ -71,9 +73,17 @@ func (s *Store) GrantEstateRole(ctx context.Context, personID int64, role Role) 
 // this whole shape exists to avoid — so an estate grant is withdrawn whole,
 // and anything still wanted is granted per product deliberately.
 func (s *Store) WithdrawEstateRole(ctx context.Context, personID int64, role Role) error {
-	if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
-		Where("person_id = ?", personID).Where("role = ?", role).Exec(ctx); err != nil {
+	res, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
+		Where("person_id = ?", personID).Where("role = ?", role).Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("withdraw %q across every product: %w", role, err)
+	}
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("withdraw %q across every product: %w", role, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("they do not hold %q across every product: %w", role, ErrNothingMatched)
 	}
 	return nil
 }

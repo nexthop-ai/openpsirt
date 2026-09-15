@@ -218,3 +218,31 @@ describe("where a row opens", () => {
     expect(new URLSearchParams(at.split("?")[1]).has("rule")).toBe(false);
   });
 });
+
+describe("a number the address carries", () => {
+  // `Number("")` is 0 and `Number("soon")` is NaN, and both went to the server
+  // as they were: NaN reached it as the text "NaN", and 0 reached a parameter
+  // whose stated minimum is 1. The address is somebody else's text like any
+  // other, and a value outside what the server takes is a parameter to leave
+  // off rather than one to send wrong.
+  it("is left off where it is not a number at all", () => {
+    expect(listQuery(new URLSearchParams("running=soon")).due_within).toBeUndefined();
+    expect(listQuery(new URLSearchParams("open_for=lately")).open_for).toBeUndefined();
+  });
+
+  it("is left off where it is outside what the server takes", () => {
+    expect(listQuery(new URLSearchParams("open_for=0")).open_for).toBeUndefined();
+    expect(listQuery(new URLSearchParams("running=0")).due_within).toBeUndefined();
+    expect(listQuery(new URLSearchParams("open_for=-3")).open_for).toBeUndefined();
+  });
+
+  it("is sent where it is one", () => {
+    expect(listQuery(new URLSearchParams("open_for=14")).open_for).toBe(14);
+    expect(listQuery(new URLSearchParams("running=7")).due_within).toBe(7);
+  });
+
+  it("reads an offset that is not a number as the first page", () => {
+    expect(listQuery(new URLSearchParams("offset=nowhere")).offset).toBe(0);
+    expect(listQuery(new URLSearchParams("offset=100")).offset).toBe(100);
+  });
+});

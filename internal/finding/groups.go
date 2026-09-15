@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -123,7 +124,13 @@ type Group struct {
 	// beside it comes from whichever scoring generation the source used — a
 	// 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under
 	// v3 — so a row showing only the word looks mis-sorted when two tie.
+	//
+	// Scored says whether there is one at all, because the column is nullable
+	// and zero is a real score. Published as a zero, an unscored finding sorted
+	// with the genuinely 0.0-rated ones at the bottom of a spreadsheet and was
+	// included by every filter asking for a score below anything.
 	ScoreCenti int
+	Scored     bool
 	// Owner and Parent are the two ends of the way down to this component:
 	// the part of the product it belongs to, and what directly pulls it in
 	// . Those two are what differ between sibling rows — the top says
@@ -188,17 +195,6 @@ func stateWord(places, waiting, approved, lapsed int) string {
 	return ""
 }
 
-// coversHere says a decision row `de` is about the finding it was correlated
-// with by issue and place, for the counts behind the state a row carries and
-// the state filter that finds it.
-//
-// A live claim covers a place at the versions it was keyed on and no other:
-// matched by place alone, a claim approved against libnl 3.7.0 in one build
-// answered for libnl 3.9.0 at the same place in the next, while everything
-// that asks whether a decision actually applies said it covered nothing there.
-// A claim with no key has lapsed or been withdrawn, and by definition its
-// versions no longer match — what it says about the place is history, and it
-// is matched by place so that "lapsed" can be said at all.
 // worstBand is the highest severity among a set of counts, or empty where
 // nothing was rated.
 //
@@ -465,6 +461,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		Places: row.Places, Answered: row.Answered,
 		Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
+		Scored:   row.Scored == 1,
 		FixState: FixState(row.FixState), FixedIn: row.FixedIn,
 		Matched:  Matched(row.Matched),
 		State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
@@ -617,6 +614,7 @@ type decorated struct {
 	DiscloseAt    *time.Time `bun:"disclose_at"`
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ScoreCenti    int        `bun:"score_centi"`
+	Scored        int        `bun:"scored"`
 	FixState      string     `bun:"fix_state"`
 	FixedIn       string     `bun:"fixed_in"`
 	Matched       string     `bun:"matched"`
@@ -768,6 +766,10 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
+		// Whether any of the issues folded here carries a score at all.
+		// Written as a number rather than as a boolean, because the four
+		// engines do not agree about what a boolean out of an aggregate is.
+		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
 		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
 		// When the earliest of these places opened, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not
@@ -898,7 +900,7 @@ func firstLineOf(description string) string {
 		if space := strings.LastIndex(said[:most], " "); space > 0 {
 			return strings.TrimSpace(said[:space]) + "…"
 		}
-		return said[:most] + "…"
+		return bound.Head(said, most) + "…"
 	}
 	return strings.TrimSpace(said)
 }

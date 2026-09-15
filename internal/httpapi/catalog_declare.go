@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
-// Declaring what exists.
+// registerDeclaring registers the writes that say what exists.
 //
 // A scan may only be filed against something declared, and this is where that
 // happens. All three are administrator writes and all three are idempotent:

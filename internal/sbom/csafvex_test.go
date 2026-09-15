@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
@@ -158,5 +159,59 @@ func TestATreeAfterTheClaimsStillResolves(t *testing.T) {
 	}
 	if len(claims) != 2 {
 		t.Errorf("%d claims when the tree came last, want the two", len(claims))
+	}
+}
+
+// A CSAF product that names a source tree and carries no package identifier,
+// which is what a distribution's automatically extracted claims look like.
+const csafNamedOnly = `{
+  "document": {"category": "csaf_vex", "csaf_version": "2.0",
+    "publisher": {"category": "vendor", "name": "Example Distribution",
+                  "namespace": "https://example.test"},
+    "title": "Statements about thrift",
+    "tracking": {"id": "EX-2026-2", "version": "1", "status": "final",
+                 "current_release_date": "2026-09-01T00:00:00Z",
+                 "initial_release_date": "2026-09-01T00:00:00Z",
+                 "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z",
+                                       "summary": "First"}]}},
+  "product_tree": {"full_product_names": [{"product_id": "THRIFT", "name": "thrift"}]},
+  "vulnerabilities": [{
+    "cve": "CVE-2017-1000487",
+    "product_status": {"known_not_affected": ["THRIFT"]}
+  }]
+}`
+
+func TestAClaimNamingNoPackageIdentifierStillCoversWhatItNames(t *testing.T) {
+	// The producer's automatically extracted claims name source trees rather
+	// than packages, so a product with no purl helper is the ordinary case and
+	// not the exception. Read as covering nothing, every one of these was
+	// accepted, stored, reported as recorded, and silently had no effect: the
+	// finding the build had already answered stayed open as noise.
+	got, err := sbom.ReadSuppressions(strings.NewReader(csafNamedOnly), sbom.Limits{})
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("read %d claims, want 1", len(got))
+	}
+	if len(got[0].Targets) != 1 || got[0].Targets[0].Purl != "" {
+		t.Fatalf("what it points at is %+v", got[0].Targets)
+	}
+
+	named := graph.Described{Purl: "pkg:deb/debian/libthrift@0.14.1", Name: "thrift", Version: "0.14.1"}
+	forked := graph.Described{
+		Purl: "pkg:deb/sonic/thriftshim@1.0", Name: "thriftshim", Version: "1.0", UpstreamName: "thrift",
+	}
+	elsewhere := graph.Described{
+		Purl: "pkg:deb/debian/thrift-compiler@0.14.1", Name: "thrift-compiler", Version: "0.14.1",
+	}
+	if !got[0].Covers(named) {
+		t.Error("a claim naming a source tree missed the component of that name")
+	}
+	if !got[0].Covers(forked) {
+		t.Error("a claim naming a source tree missed a fork of it")
+	}
+	if got[0].Covers(elsewhere) {
+		t.Error("a claim naming a source tree reached a component that merely starts the same")
 	}
 }

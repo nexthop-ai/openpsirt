@@ -188,10 +188,17 @@ function Digest({
 function Tokens() {
   const queries = useQueryClient();
   const [name, setName] = useState("");
-  const [count, setCount] = useState(30);
+  // Held as typed rather than as a number. Read through Number(), clearing
+  // the box was zero, which the writer floored at one — so an empty field
+  // minted a token lasting an hour rather than refusing to mint one at all.
+  const [count, setCount] = useState("30");
   const [product, setProduct] = useState("");
   const [unit, setUnit] = useState<Unit>("days");
   const [minted, setMinted] = useState<{ name: string; secret: string } | null>(null);
+  // How long it lasts, or nothing where the box says something that is not a
+  // count of them. An expiry is required, so nothing is a reason to refuse
+  // rather than a number to invent.
+  const lasts = Number.isInteger(Number(count)) && Number(count) >= 1;
 
   const tokens = useQuery({
     queryKey: ["tokens"],
@@ -210,7 +217,7 @@ function Tokens() {
         await api.POST("/v1/tokens", {
           body: {
             name: name.trim(),
-            lifetime: write(count, unit),
+            lifetime: write(Number(count), unit),
             // Empty means it reaches whatever its owner reaches. Narrowing
             // intersects rather than adds, so naming a product its owner
             // cannot read reaches nothing.
@@ -335,7 +342,7 @@ function Tokens() {
               min={1}
               style={{ width: 90 }}
               value={count}
-              onChange={(event) => setCount(Number(event.target.value))}
+              onChange={(event) => setCount(event.target.value)}
             />
             <select
               aria-label="Lifetime unit"
@@ -373,7 +380,7 @@ function Tokens() {
           type="button"
           className="btn"
           style={{ alignSelf: "end" }}
-          disabled={name.trim() === "" || mint.isPending}
+          disabled={name.trim() === "" || !lasts || mint.isPending}
           onClick={() => mint.mutate()}
         >
           Make a token

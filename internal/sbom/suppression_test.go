@@ -276,3 +276,129 @@ func TestPatchClaimsAreChargedAgainstTheClaimBound(t *testing.T) {
 		t.Errorf("read %d claims, want 60", len(doc.Suppressions))
 	}
 }
+
+func TestAClaimAgainstOneVersionOfASourceTreeIsAboutThatVersion(t *testing.T) {
+	// A claim naming no version is about every version, which the format says
+	// and which is how a build states something about whatever it ships. A
+	// claim that does name one is not: read as unversioned, a statement about
+	// thrift 0.16.0 removed the live finding on thrift 0.20.0 from what
+	// anybody had to look at.
+	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-2"}, "status": "not_affected",
+	 "products": [{"@id": "pkg:generic/thrift@0.16.0"}]}`))
+
+	stated := graph.Described{Purl: "pkg:deb/debian/libthrift@0.16.0", Name: "thrift", Version: "0.16.0"}
+	later := graph.Described{Purl: "pkg:deb/debian/libthrift@0.20.0", Name: "thrift", Version: "0.20.0"}
+	// The version a component was built from, because a claim about a source
+	// tree is most often about what the component was derived from.
+	derived := graph.Described{
+		Purl: "pkg:deb/sonic/thriftshim@1.0", Name: "thriftshim", Version: "1.0",
+		UpstreamName: "thrift", UpstreamVersion: "0.16.0",
+	}
+
+	if !got[0].Covers(stated) {
+		t.Error("a claim about one version missed that version")
+	}
+	if !got[0].Covers(derived) {
+		t.Error("a claim about one version of a source tree missed what was built from it")
+	}
+	if got[0].Covers(later) {
+		t.Error("a claim about one version covered another")
+	}
+}
+
+// pointingAt builds one OpenVEX claim naming count products.
+func pointingAt(count int) string {
+	var products strings.Builder
+	for i := range count {
+		if i > 0 {
+			products.WriteString(",")
+		}
+		fmt.Fprintf(&products, `{"@id": "pkg:deb/debian/libc%d@1.0"}`, i)
+	}
+	return statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+	 "products": [` + products.String() + `]}`)
+}
+
+func TestOneClaimNamingMoreProductsThanAllowedIsRefused(t *testing.T) {
+	// The claim bound counts claims, and one claim can name any number of
+	// products — so a document holding a single statement that lists millions
+	// of identifiers was under every bound in force, and the map holding them
+	// was charged against nothing.
+	//
+	// A pair, because a bound set too low is only visible against a document
+	// that has to keep working.
+	if _, err := sbom.ReadSuppressions(strings.NewReader(pointingAt(4)),
+		sbom.Limits{MaxComponents: 4}); err != nil {
+		t.Fatalf("a claim naming exactly the limit: %v", err)
+	}
+	_, err := sbom.ReadSuppressions(strings.NewReader(pointingAt(5)), sbom.Limits{MaxComponents: 4})
+	if err == nil {
+		t.Fatal("a claim past the product limit was read")
+	}
+	if !strings.Contains(err.Error(), "product limit") {
+		t.Errorf("the refusal does not name the limit it hit: %v", err)
+	}
+}
+
+// csafNaming builds a CSAF document whose tree defines count products.
+func csafNaming(count int) string {
+	var products strings.Builder
+	for i := range count {
+		if i > 0 {
+			products.WriteString(",")
+		}
+		fmt.Fprintf(&products, `{"product_id": "P%d", "name": "libc%d",
+		 "product_identification_helper": {"purl": "pkg:deb/debian/libc%d@1.0"}}`, i, i, i)
+	}
+	return `{"document": {"category": "csaf_vex", "csaf_version": "2.0",
+	  "publisher": {"category": "vendor", "name": "Example", "namespace": "https://example.test"},
+	  "title": "x", "tracking": {"id": "EX-1", "version": "1", "status": "final",
+	    "current_release_date": "2026-09-01T00:00:00Z",
+	    "initial_release_date": "2026-09-01T00:00:00Z",
+	    "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z", "summary": "First"}]}},
+	 "product_tree": {"full_product_names": [` + products.String() + `]},
+	 "vulnerabilities": [{"cve": "CVE-2026-1", "product_status": {"known_not_affected": ["P0"]}}]}`
+}
+
+func TestACSAFTreeNamingMoreProductsThanAllowedIsRefused(t *testing.T) {
+	// The other reader, and the worse shape: a document with no
+	// vulnerabilities at all never reaches the claim bound, so a product tree
+	// of any size was read whole against nothing but the byte ceiling.
+	//
+	// The claim below names one of them, so the count under test is the tree's
+	// four plus that one reference.
+	if _, err := sbom.ReadSuppressions(strings.NewReader(csafNaming(4)),
+		sbom.Limits{MaxComponents: 5}); err != nil {
+		t.Fatalf("a tree naming exactly the limit: %v", err)
+	}
+	_, err := sbom.ReadSuppressions(strings.NewReader(csafNaming(6)), sbom.Limits{MaxComponents: 5})
+	if err == nil {
+		t.Fatal("a tree past the product limit was read")
+	}
+	if !strings.Contains(err.Error(), "product limit") {
+		t.Errorf("the refusal does not name the limit it hit: %v", err)
+	}
+}
+
+func TestADocumentStatingBothVexFormatsIsRefused(t *testing.T) {
+	// Half-read, the CSAF result was returned and the OpenVEX statements were
+	// discarded without a word: the operator is told the upload worked and
+	// the claims are simply absent. The inventory side already refuses a
+	// document that fired two vocabularies, for exactly this reason.
+	both := `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": "urn:x", "version": 1,
+	 "statements": [{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+	  "products": [{"@id": "pkg:deb/debian/libc6"}]}],
+	 "document": {"category": "csaf_vex"},
+	 "product_tree": {"full_product_names": [{"product_id": "P",
+	   "product_identification_helper": {"purl": "pkg:deb/debian/libc6@1.0"}}]},
+	 "vulnerabilities": [{"cve": "CVE-2026-2",
+	   "product_status": {"known_not_affected": ["P"]}}]}`
+
+	_, err := sbom.ReadSuppressions(strings.NewReader(both), sbom.Limits{})
+	if err == nil {
+		t.Fatal("a document claiming to be two formats was read as one of them")
+	}
+	if !strings.Contains(err.Error(), "OpenVEX") || !strings.Contains(err.Error(), "CSAF") {
+		t.Errorf("the refusal does not name both formats it found: %v", err)
+	}
+}

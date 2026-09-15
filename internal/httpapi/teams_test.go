@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -193,9 +194,12 @@ func TestATeamQueueIsTakenFromWithTriageAndFilledWithDispatch(t *testing.T) {
 		at := "/v1/products/mine/streams/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
-		// Filling the queue is dispatching.
+		// Filling the queue is dispatching. Refused as an act rather than as
+		// a name that is not there: the finding is one they are already
+		// looking at, and the same condition on the component path has always
+		// been answered this way.
 		if got := asPerson(t, r, "triager", http.MethodPut, at,
-			`{"team":"kernel"}`); got.Code != http.StatusNotFound {
+			`{"team":"kernel"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a triager routed work to a team, answering %d: %s",
 				got.Code, got.Body.String())
 		}
@@ -369,6 +373,35 @@ func TestATeamQueueAndItsCountsAreNarrowedPerMember(t *testing.T) {
 			if holding.Items[0].Open != who.wants {
 				t.Errorf("%s is told the team holds %d, want %d — a count is as much a "+
 					"disclosure as a row", who.identity, holding.Items[0].Open, who.wants)
+			}
+		}
+	})
+}
+
+func TestTakingSomebodyOffATeamTheyAreNotOnRecordsNothing(t *testing.T) {
+	// The fifth write that takes access away, and it read what it matched the
+	// way the other four now do. Membership is what routes an undisclosed
+	// finding to somebody, so a trail row saying a membership ended is a
+	// record of who stopped being able to receive them — and answered as
+	// success, one was written for a membership that never existed.
+	eachReach(t, func(t *testing.T, r *reach) {
+		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"kernel","members":["reader"]}`); made.Code != http.StatusCreated {
+			t.Fatalf("recording a team answered %d: %s", made.Code, made.Body.String())
+		}
+
+		// Somebody who is here and is not on that team.
+		got := asPerson(t, r, "admin", http.MethodDelete, "/v1/teams/kernel/members/private", "")
+		if got.Code != http.StatusNotFound {
+			t.Errorf("taking off somebody who was never on answered %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		var trail changed
+		read(t, r, "admin", "/v1/administration/changes?kind=team&limit=200", &trail)
+		for _, row := range trail.Items {
+			if strings.Contains(row.About, "private") {
+				t.Errorf("a removal that removed nothing recorded %+v", row)
 			}
 		}
 	})

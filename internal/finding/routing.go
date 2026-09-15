@@ -201,9 +201,10 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 
 	now := s.now().UTC().Truncate(time.Microsecond)
 	// The identifiers to place, read as a bounded page and then written by
-	// identifier. Bounded on rows written rather than on what was asked
-	// for , and the write re-checks the holder so that an assignment
-	// landing between the read and the write is not overwritten.
+	// identifier. Bounded on rows read rather than on rows placed, so a rule
+	// matching nothing still spends its budget and the sweep terminates — and
+	// the write re-checks the holder so that an assignment landing between the
+	// read and the write is not overwritten.
 	var ids []int64
 	page := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").

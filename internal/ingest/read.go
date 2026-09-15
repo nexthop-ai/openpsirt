@@ -9,6 +9,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -119,6 +120,11 @@ func (r *Reader) Once(ctx context.Context) (*Result, error) {
 	return result, ending.Err
 }
 
+// betweenReads is how long an idle reader waits before asking for work again
+// where the caller says nothing. Short: it is what a producer waits to see its
+// scan reflected.
+const betweenReads = 5 * time.Second
+
 // Run reads scans until the context ends.
 //
 // Polling rather than listening: a notification mechanism exists on one of the
@@ -126,15 +132,7 @@ func (r *Reader) Once(ctx context.Context) (*Result, error) {
 // asked. The interval is what a producer waits to see its scan reflected,
 // which is not a number anybody is watching a clock for.
 func (r *Reader) Run(ctx context.Context, interval time.Duration) {
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
-
+	background.Every(ctx, interval, betweenReads, func(ctx context.Context) {
 		// Keep going while there is work, so a backlog drains at the speed of
 		// the work rather than at the speed of the poll.
 		for {
@@ -168,8 +166,7 @@ func (r *Reader) Run(ctx context.Context, interval time.Duration) {
 				"self_references", result.SelfReferences,
 				"documents_retained", result.Retained)
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // read turns one accepted scan into stored graph.
@@ -233,15 +230,35 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// Reading them now also means a document that cannot be read is a fault in
 	// what the build sent, found while the producer still has the build in
 	// front of them.
+	//
+	// The claim budget is spent across the documents rather than per document.
+	// Passed whole to each of them, a producer sending fifty attachments each
+	// inside the limit made this hold fifty times what the limit was set to
+	// allow — in the background reader, after the upload was answered 202.
 	claims := doc.Suppressions
+	limits := r.limits.OrDefault()
+	left := limits.MaxStatements - len(claims)
+	documentsRead := 0
 	for _, held := range held {
 		if held.Kind != SuppressionsKind {
 			continue
 		}
-		read, err := sbom.ReadSuppressions(documents.Open(ctx, held.ID), r.limits)
+		documentsRead++
+		if documentsRead > limits.MaxDocuments {
+			return nil, fmt.Errorf("scan %d: more suppression documents than the %d limit",
+				scanID, limits.MaxDocuments)
+		}
+		if left <= 0 {
+			return nil, fmt.Errorf("scan %d: more claims than the %d limit",
+				scanID, limits.MaxStatements)
+		}
+		within := limits
+		within.MaxStatements = left
+		read, err := sbom.ReadSuppressions(documents.Open(ctx, held.ID), within)
 		if err != nil {
 			return nil, fmt.Errorf("scan %d: %w", scanID, err)
 		}
+		left -= len(read)
 		claims = append(claims, read...)
 	}
 

@@ -866,7 +866,8 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		// whichever database they consulted rather than a property of the
 		// issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
-			issue, append([]string{body.Vulnerability}, body.Aliases...), body.Component)
+			issue, append([]string{body.Vulnerability}, body.Aliases...),
+			body.Component, evidence.Purl)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what VEX documents say could not be read", err)
 		}

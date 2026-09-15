@@ -2,10 +2,12 @@
 // document somebody can publish.
 //
 // **We own the triage record; whoever publishes owns the published advisory**
-// . Nothing here records that a document was issued, and nothing goes
-// out over the network: the document is assembled from what is held and handed
-// over. That is the question that decides whether an integration works or
-// rots, and keeping both ends as the source of truth is how it rots.
+// . The document is never sent anywhere and nothing here goes out over the
+// network: it is assembled from what is held and handed over. What is kept is
+// the record that one went out and the digest of what was generated, which is
+// what makes "is what is published still what we would generate" answerable.
+// That is the question that decides whether an integration works or rots, and
+// keeping both ends as the source of truth is how it rots.
 //
 // **Only a flaw in what we ship**. A known issue in a third-party
 // component is dependency hygiene that a consumer can already read out of the
@@ -253,6 +255,10 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 		shown = named.Name
 	}
 
+	// Built before the document, because the version it states is the number
+	// of its own last entry.
+	history := revisions(entered.OpenedAt.UTC(), gone, now)
+
 	doc := &Document{}
 	doc.Document = Meta{
 		// A security advisory rather than the VEX profile, because what this
@@ -270,9 +276,12 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 		},
 		Tracking: Tracking{
 			ID: identifier, Status: statusOf(entered),
-			// One past what has gone out: this document is the next revision,
-			// and a validator compares it against the history below.
-			Version:            strconv.Itoa(len(gone) + 1),
+			// The number of the last entry in the history below, rather than
+			// a second count of the same thing. Counted separately the two
+			// disagreed the moment an advisory had been issued once: the
+			// history numbered this document N+2 and the version said N+1,
+			// and a validator compares them.
+			Version:            history[len(history)-1].Number,
 			InitialReleaseDate: entered.OpenedAt.UTC(),
 			CurrentReleaseDate: now,
 			// Which build wrote it, read from the binary rather than held in
@@ -283,7 +292,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 				Engine: Engine{Name: "OpenPSIRT", Version: version.Get().Version},
 				Date:   now,
 			},
-			RevisionHistory: revisions(entered.OpenedAt.UTC(), gone, now),
+			RevisionHistory: history,
 		},
 	}
 	if text := summaryOf(issue, identifier); text != "" {
@@ -721,6 +730,13 @@ func revisions(opened time.Time, gone []Issuance, now time.Time) []Revision {
 			Number: strconv.Itoa(one.Ordinal + 1), Date: one.IssuedAt.UTC(), Summary: summary,
 		})
 	}
+	// Only where something has gone out before. A document nobody has
+	// published is not a revision of anything: its newest entry is the flaw
+	// being recorded, which is what it describes.
+	//
+	// That is also the one case where counting the version separately agreed
+	// with the history by accident, which is why the disagreement only showed
+	// once an advisory had been issued.
 	if len(gone) > 0 {
 		out = append(out, Revision{
 			Number: strconv.Itoa(len(gone) + 2), Date: now,

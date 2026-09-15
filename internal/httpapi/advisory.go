@@ -20,10 +20,10 @@ func registerAdvisory(api huma.API, in Ingest) {
 		Summary: "Generate a CSAF advisory for an issue",
 		Description: "Returns a CSAF 2.0 document for a flaw in this product: what it is, and " +
 			"which releases hold it and which no longer do.\n\n" +
-			"**The document is generated, not published.** Nothing is sent anywhere and " +
-			"nothing here records that an advisory was issued — the triage record is ours and " +
-			"the published advisory belongs to whoever publishes it, and keeping both as the " +
-			"source of truth is how such an arrangement rots.\n\n" +
+			"**The document is generated, not published.** Nothing is sent anywhere. " +
+			"Recording that a document was issued is a separate request, and what it keeps " +
+			"is the digest of what was generated, so that whether what you published is " +
+			"still what this would generate can be answered.\n\n" +
 			"**Only for a flaw in what you ship.** An issue a scanner reported against a " +
 			"third-party component is refused: that is dependency hygiene a consumer can " +
 			"already read out of the inventory, and a vendor advisory for every upstream CVE " +

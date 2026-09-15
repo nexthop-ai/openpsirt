@@ -602,6 +602,10 @@ var tables = []string{
 	"attachment",
 	// Points at nothing, so its position says nothing.
 	"lease",
+	// Before outbound, which it points at, and before notification, which it
+	// also points at. The delivery row cascades with the notification, so the
+	// order is belt as well as braces.
+	"outbound_delivery",
 	// Before person, which it points at.
 	"notification",
 	// Before person and target, both of which it points at.
@@ -655,8 +659,7 @@ var tables = []string{
 	"flaw_report",
 	// Before person, product and vulnerability, all of which it points at.
 	"advisory_issuance",
-	// Before outbound, which it points at, and that before person.
-	"outbound_delivery",
+	// Before person, which it points at.
 	"outbound",
 	// Before team and person, both of which they point at.
 	"team_member",

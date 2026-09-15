@@ -1,6 +1,9 @@
 package sbom
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // VocabularyOverlap reports the top-level keys more than one vocabulary
 // claims, and which claim each.
@@ -52,4 +55,20 @@ func TopLevelKeys() map[string][]string {
 		sort.Strings(keys[v.name])
 	}
 	return keys
+}
+
+// HeaderHeld is how many structures a header-only read of this document built
+// and then discarded.
+//
+// Exported for a test, because the reader is not reachable from outside and
+// what this is about cannot be measured from the outside either: everything a
+// header read holds is garbage by the time it returns, so the heap after it
+// says nothing about the heap during it — and during it is inside the upload
+// request.
+func HeaderHeld(body string, lim Limits) (bound, contained, members int, err error) {
+	c := newReader(strings.NewReader(body), lim, true)
+	if err := c.read(); err != nil {
+		return 0, 0, 0, err
+	}
+	return len(c.byRef), len(c.contained), len(c.described), nil
 }

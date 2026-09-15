@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
-	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -92,6 +92,21 @@ type Options struct {
 	// Well under the claim timeout, so a renewal can fail several times over
 	// before the claim is actually at risk. Zero renews nothing.
 	Heartbeat time.Duration
+	// MaxHold is how long one claim may be renewed for in total, after which
+	// the renewals stop and the work is cancelled.
+	//
+	// Renewal has no other exit. A unit of work that never returns is held
+	// and renewed for ever, so the job never goes stale, is never handed to
+	// another worker, never fails and never reaches the state work that
+	// cannot succeed ends in — and nothing counts it, because the queue's
+	// depth counts what is waiting. The claim timeout does not cover this:
+	// it bounds a worker going silent, and a wedged worker is not silent.
+	//
+	// A small multiple of the claim timeout, because it has to exceed the
+	// longest legitimate single unit of work. Zero is no ceiling, which is
+	// what a caller running work with no upper bound of its own asks for
+	// explicitly rather than by omission.
+	MaxHold time.Duration
 	// Backoff is how long to wait before retrying, multiplied by the attempt.
 	Backoff time.Duration
 }
@@ -108,7 +123,12 @@ func DefaultOptions() Options {
 		MaxBacklog:   setting.DefaultQueueBacklog,
 		ClaimTimeout: 30 * time.Minute,
 		Heartbeat:    5 * time.Minute,
-		Backoff:      30 * time.Second,
+		// Four claim timeouts. The longest unit of work here is a scan, whose
+		// own bound defaults to one claim timeout, so this leaves room for a
+		// deployment to raise that several times over before the ceiling is
+		// what stops it.
+		MaxHold: 2 * time.Hour,
+		Backoff: 30 * time.Second,
 	}
 }
 
@@ -381,6 +401,13 @@ var ErrWorkerGone = errors.New("the worker holding this job never reported back"
 // holds it now will record how it ended, so the caller has nothing to retry.
 var ErrNoLongerHeld = errors.New("the job is no longer held by this worker")
 
+// ErrHeldTooLong ends work that has been held past the ceiling on one claim.
+//
+// The work did not report anything, which is what separates this from a
+// failure: the worker is still inside it and nothing will come back. Ending
+// the claim is what lets the job go stale and be handed out again.
+var ErrHeldTooLong = errors.New("the claim on this job was held past its ceiling")
+
 // Settling is a context for recording how a job ended.
 //
 // The record is written after the work — including after the shutdown that
@@ -450,6 +477,7 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 	}
 
 	var lost error
+	started := q.now()
 	stopped := make(chan struct{})
 	go func() {
 		defer close(stopped)
@@ -460,6 +488,22 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 			case <-working.Done():
 				return
 			case <-ticker.C:
+			}
+			// A ceiling on the whole hold, not on one renewal. Without it the
+			// only exits are the work finishing and the claim being taken
+			// away, so work that never returns is renewed for ever and the
+			// job is stranded in a state nothing reports.
+			//
+			// Logged at Error: a hold that reached its ceiling is a worker
+			// that is not coming back, which is the one event here an
+			// operator has to see.
+			if held := q.now().Sub(started); q.opts.MaxHold > 0 && held >= q.opts.MaxHold {
+				logger.Error("work has been held past the ceiling on one claim, "+
+					"so the claim is being given up and the work cancelled",
+					"job", id, "worker", worker, "held", held, "ceiling", q.opts.MaxHold)
+				lost = ErrHeldTooLong
+				give(ErrHeldTooLong)
+				return
 			}
 			// Bounded by the interval: a renewal still waiting when the next
 			// one is due has already failed, and on SQLite it is waiting for
@@ -593,12 +637,14 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 // line carries the whole of it either way.
 const mostOfAnError = 4096
 
-// head is the first n bytes of s, cut on a rune boundary and marked where it
+// head is the first n bytes of s, cut between characters and marked where it
 // was cut.
 //
 // A cut at a byte offset splits a multi-byte character and leaves an invalid
 // tail, which three of the four engines then refuse to store — so the bound
-// meant to keep a write small is what makes it fail.
+// meant to keep a write small is what makes it fail. The cut itself is the
+// shared one: this spelled it a second time, correctly, which is how the
+// spellings that are not correct survive.
 func head(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -608,10 +654,7 @@ func head(s string, n int) string {
 	if room <= 0 {
 		return ""
 	}
-	for room > 0 && !utf8.RuneStart(s[room]) {
-		room--
-	}
-	return s[:room] + cut
+	return bound.Head(s, room) + cut
 }
 
 // held reads a conditional update's count as whether the job was still this
@@ -744,9 +787,14 @@ func (q *Queue) Settle(ctx context.Context, job *Job, worker, noun string,
 	settled, done := Settling(ctx)
 	defer done()
 
+	// A claim given up at its ceiling is this job's own failure rather than a
+	// handover: nobody else has it, and the attempt has to be counted or the
+	// job is retried for ever.
+	ceiling := errors.Is(taken, ErrHeldTooLong)
+
 	var ended error
 	if work != nil {
-		if recover != nil && ctx.Err() == nil && taken == nil {
+		if recover != nil && ctx.Err() == nil && (taken == nil || ceiling) {
 			if err := recover(settled); err != nil && logger != nil {
 				logger.Warn("could not record why work failed",
 					"job", job.ID, noun, job.Reference, "error", err)
@@ -777,7 +825,16 @@ func (q *Queue) Settle(ctx context.Context, job *Job, worker, noun string,
 		}
 	}
 
-	if taken != nil {
+	switch {
+	case ceiling:
+		// Logged at Error and reported as a failure. The ending was recorded
+		// above, so the attempt counts and the job is eventually set aside
+		// rather than run again for ever by workers that each wedge in turn.
+		if logger != nil {
+			logger.Error("work was stopped because its claim reached the ceiling on one hold",
+				"job", job.ID, noun, job.Reference)
+		}
+	case taken != nil:
 		// The work was stopped because the job went to another worker, so the
 		// error it ended with describes that rather than anything about the
 		// thing being worked on. There is nothing to retry and nothing to

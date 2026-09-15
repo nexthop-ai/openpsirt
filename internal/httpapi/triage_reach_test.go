@@ -220,3 +220,45 @@ func TestTheMergedReachAnswersNothingToSomebodyWhoMayNotSeeTheProduct(t *testing
 		}
 	})
 }
+
+func TestACollaboratorIsToldHowFarTheirOwnDecisionWouldReach(t *testing.T) {
+	// Both reach reads asked whether the subject may read the product, where
+	// every other read of one finding asks about the issue. A collaborator
+	// holds nothing on the product and holds exactly the case, so the product
+	// question refused them — and the route answers a refusal from the store
+	// as a fault, so the two screens offering to carry a judgment across
+	// builds answered with a fault for the one person whose only finding they
+	// are about.
+	twoReach(t, func(t *testing.T, r *reach) {
+		place := r.scanned(t)
+		build := "/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"
+		paths := []string{
+			build + "/places/" + place + "/reach",
+			build + "/components/libnl-3-200/reach",
+		}
+
+		// Before the case is theirs, and the refusal is a refusal rather than
+		// a fault: the issue scope must not hand the product away either.
+		for _, path := range paths {
+			got := asPerson(t, r, "outsider", http.MethodGet, path, "")
+			if got.Code < 400 || got.Code >= 500 {
+				t.Errorf("%s answers somebody with nothing on this product %d: %s",
+					path, got.Code, got.Body.String())
+			}
+		}
+
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/CVE-2026-9999/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		for _, path := range paths {
+			got := asPerson(t, r, "outsider", http.MethodGet, path, "")
+			if got.Code != http.StatusOK {
+				t.Errorf("%s answers the collaborator of that very case %d: %s",
+					path, got.Code, got.Body.String())
+			}
+		}
+	})
+}

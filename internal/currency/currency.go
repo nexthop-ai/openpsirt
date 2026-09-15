@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -74,6 +75,19 @@ var ErrUnknown = fmt.Errorf("nothing upstream to ask")
 // as a retryable failure it is also a denial of service, since one uploaded
 // document full of such names keeps the whole pass busy failing.
 var ErrUnaskable = fmt.Errorf("this name cannot be asked about")
+
+// ErrNotAnswering is returned where an index is having a bad day: it refused
+// the request for a reason that will not be true tomorrow, or could not
+// answer at all.
+//
+// The one class that is worth coming back to, and the reason the others are
+// told apart from it. Everything that is *not* one of these three is a
+// refusal the index will repeat every time — a package withdrawn, a region
+// blocked, a document nothing can read — and it used to take this arm: the
+// component was left unrecorded, and the window that takes the never-asked
+// first put it at the head of every pass afterwards, for ever, with the
+// components behind it never reached.
+var ErrNotAnswering = fmt.Errorf("the index is not answering")
 
 // Client asks the public index for an ecosystem.
 type Client struct {
@@ -133,22 +147,53 @@ func hostOf(address string) string {
 	return parsed.Hostname()
 }
 
+// askers is every ecosystem this has an index for, beside the asker for each.
+//
+// One table rather than a list beside a switch. The pass selecting candidates
+// builds its condition from the names and the pass asking picks the asker by
+// name, so kept apart an index added to one and forgotten in the other is
+// either components selected and never asked or components asked about and
+// never selected — and silently, because nothing joins the two spellings.
+//
+// Lower case, because that is how a package identifier's type is compared.
+var askers = map[string]func(*Client) Asker{
+	"golang": func(c *Client) Asker { return goProxy{c} },
+	"npm":    func(c *Client) Asker { return npmRegistry{c} },
+	"pypi":   func(c *Client) Asker { return pyPI{c} },
+	"cargo":  func(c *Client) Asker { return cratesIO{c} },
+}
+
+// Askable is every ecosystem this has an index for.
+//
+// The one list, so that the pass selecting candidates can be built from it
+// rather than from its complement. Maintained as a complement — one entry
+// excluding distribution packages — every other unaskable ecosystem passed the
+// filter, reached the asker, found none and was recorded empty, spending one
+// of the two hundred slots a pass has. On an image with ten thousand Alpine
+// packages that is fifty passes writing nothing before the Go and Rust
+// components it can answer are reached.
+//
+// Sorted, so the condition a pass builds from this is the same statement every
+// time rather than whatever order a map walk gave it.
+func Askable() []string {
+	names := make([]string, 0, len(askers))
+	for name := range askers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // For returns the asker for an ecosystem, or nil where there is none.
 //
 // Named by the type in a package identifier, so the caller does not have to
 // keep its own mapping of what is askable.
 func (c *Client) For(ecosystem string) Asker {
-	switch ecosystem {
-	case "golang":
-		return goProxy{c}
-	case "npm":
-		return npmRegistry{c}
-	case "pypi":
-		return pyPI{c}
-	case "cargo":
-		return cratesIO{c}
+	asker, held := askers[ecosystem]
+	if !held {
+		return nil
 	}
-	return nil
+	return asker(c)
 }
 
 // mostBody is how much of somebody else's document we will read.
@@ -181,14 +226,36 @@ func (c *Client) getAs(ctx context.Context, at, accept string, into any) error {
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return ErrUnknown
+	case resp.StatusCode == http.StatusTooManyRequests, resp.StatusCode >= 500:
+		// A bad day: asked for too much, or the index itself is unwell.
+		// Nothing is recorded, so the component stays due and the next pass
+		// asks again.
+		return fmt.Errorf("%w: %s answered %s", ErrNotAnswering, at, resp.Status)
 	case resp.StatusCode != http.StatusOK:
-		return fmt.Errorf("%s answered %s", at, resp.Status)
+		// Every other refusal is one the index will repeat: a package the
+		// registry withdrew, a region it will not serve, a request it will
+		// not accept in that shape. Recorded as asked, because an answer we
+		// will never get is still an answer about this component.
+		return fmt.Errorf("%w: %s answered %s", ErrUnaskable, at, resp.Status)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, mostBody))
+	// One byte past the ceiling, so a document over it is refused as too large
+	// rather than cut off and reported as unreadable — which sent the
+	// component down the arm for a document nothing can parse and left it
+	// there.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, mostBody+1))
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %s: %w", ErrNotAnswering, at, err)
 	}
-	return json.Unmarshal(body, into)
+	if int64(len(body)) > mostBody {
+		return fmt.Errorf("%w: %s answered more than the %d bytes this reads",
+			ErrUnaskable, at, mostBody)
+	}
+	if err := json.Unmarshal(body, into); err != nil {
+		// A document this cannot read is a fact about what the index serves
+		// for this name rather than a bad day, so it is recorded.
+		return fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
+	}
+	return nil
 }
 
 // goProxy asks the module proxy, which answers with the version and its time

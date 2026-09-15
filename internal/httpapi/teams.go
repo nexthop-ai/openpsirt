@@ -227,7 +227,13 @@ func registerTeams(api huma.API, a Administering) {
 		if err != nil {
 			return nil, noSuchPerson()
 		}
-		if err := store.RemoveFromTeam(ctx, team.ID, person.ID); err != nil {
+		// Mapped before the trail row, as every other withdrawal is: a
+		// removal that matched nothing is not a removal, and recording it as
+		// one says somebody stopped receiving work they were never sent.
+		switch err := store.RemoveFromTeam(ctx, team.ID, person.ID); {
+		case errors.Is(err, access.ErrNothingMatched):
+			return nil, huma.Error404NotFound("they are not on that team")
+		case err != nil:
 			return nil, wentWrong(a.Logger, "cannot take somebody off a team", err)
 		}
 		noteAdminChange(ctx, a, trail.Team, team.Name+" · "+in.Identity,
