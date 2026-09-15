@@ -9,7 +9,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -109,10 +108,6 @@ func registerRegister(api huma.API, in Ingest) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
-		}
-		if _, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject,
-			input.Product, input.Stream, input.Variant); err != nil {
-			return nil, noSuchProduct()
 		}
 		// No triage line is stated, because none is applied. The register is
 		// every place in the build with what stands there, which is what makes

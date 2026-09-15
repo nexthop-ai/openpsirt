@@ -172,7 +172,14 @@ func registerSettings(api huma.API, in Ingest) {
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
-		settings := setting.NewStore(in.DB.DB)
+		// From the accessor, which answers nothing where there is no
+		// database. Built from `in.DB.DB` directly this panicked into the
+		// recovery middleware and answered 500, where the route already has
+		// words for a process that has no database.
+		settings := in.settings()
+		if settings == nil {
+			return nil, noDatabase(in.logger())
+		}
 		out := &listOutput[SettingBody]{}
 		out.Body.Items = make([]SettingBody, 0, len(settable))
 		for _, each := range settable {
@@ -267,7 +274,11 @@ func registerSettings(api huma.API, in Ingest) {
 		// the value at some earlier moment — two administrators moving the
 		// same setting at once both read the original, and the second wrote a
 		// prior value into an append-only trail that nothing ever held.
-		before, had, err := setting.NewStore(in.DB.DB).Change(ctx, input.Name, input.Body.Value)
+		settings := in.settings()
+		if settings == nil {
+			return nil, noDatabase(in.logger())
+		}
+		before, had, err := settings.Change(ctx, input.Name, input.Body.Value)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "that setting could not be recorded", err)
 		}

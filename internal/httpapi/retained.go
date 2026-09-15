@@ -103,7 +103,7 @@ func registerRetained(api huma.API, in Ingest) {
 			hc.SetHeader("Cache-Control", "private, no-store")
 			hc.SetStatus(http.StatusOK)
 			if _, err := io.Copy(hc.BodyWriter(), body); err != nil {
-				in.Logger.ErrorContext(ctx, "sending a retained document stopped part way",
+				in.logger().ErrorContext(ctx, "sending a retained document stopped part way",
 					"error", err, "document", doc.ID)
 			}
 		}}, nil

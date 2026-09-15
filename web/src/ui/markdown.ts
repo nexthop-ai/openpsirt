@@ -204,17 +204,16 @@ function anchor(node: Element) {
     return;
   }
   const href = node.getAttribute("href") ?? "";
-  // A file held here is ours, so it keeps its href and is not sent out to
-  // another tab with a referrer policy meant for somebody else's site.
-  if (href.startsWith(ATTACHMENT_PATH)) {
-    return;
-  }
   if (!SCHEMES.test(href)) {
-    // A link to somewhere in this deployment keeps its href. One finding
-    // referring to another is ordinary, the submission check accepts it,
-    // and deleting the anchor while leaving the text is the disagreement
-    // DESIGN-text.md records as the one nothing reports: accepted when it
-    // was written, no longer a link when anybody read it.
+    // A link to somewhere in this deployment keeps its href — a rewritten
+    // attachment reference among them, which is why the early return that
+    // stood above this answered nothing of its own: `/v1/attachments/x` has
+    // no scheme, so it arrives here and resolves against this page.
+    //
+    // One finding referring to another is ordinary, the submission check
+    // accepts it, and deleting the anchor while leaving the text is the
+    // disagreement DESIGN-text.md records as the one nothing reports:
+    // accepted when it was written, no longer a link when anybody read it.
     //
     // Resolved against this page rather than matched against a pattern,
     // because `//somewhere.else/x` is relative-looking and is not ours, and
@@ -230,10 +229,6 @@ function anchor(node: Element) {
     node.setAttribute("target", "_blank");
   }
 }
-
-// The prefix a rewritten reference has, for telling one from a link somebody
-// typed at a site that happens to be ours.
-const ATTACHMENT_PATH = "/v1/attachments/";
 
 // Rewrites a reference to a file held here into the path it is fetched from,
 // and removes an image pointing anywhere else.

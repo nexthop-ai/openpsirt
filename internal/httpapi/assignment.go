@@ -578,7 +578,7 @@ func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 		carrying, second := finding.NewStore(in.DB.DB).VersionsWithIssue(
 			ctx, subject, target.ID, issue, component)
 		if second != nil {
-			in.Logger.Error("which versions carry this issue could not be read",
+			in.logger().Error("which versions carry this issue could not be read",
 				"component", component, "error", second)
 		}
 		switch {

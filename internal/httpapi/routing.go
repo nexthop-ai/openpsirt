@@ -273,8 +273,8 @@ func queueSweep(ctx context.Context, in Ingest, productID int64) {
 		return
 	}
 	if _, err := in.Queue.Add(ctx, queue.Route,
-		strconv.FormatInt(productID, 10)); err != nil && in.Logger != nil {
-		in.Logger.Error("could not queue a routing sweep", "error", err, "product", productID)
+		strconv.FormatInt(productID, 10)); err != nil {
+		in.logger().Error("could not queue a routing sweep", "error", err, "product", productID)
 	}
 }
 

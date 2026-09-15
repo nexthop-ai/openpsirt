@@ -443,10 +443,11 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			return fmt.Errorf("set aside the assigned roles over every product: %w", err)
 		}
 	case Direct:
-		if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
-			Where("source = ?", Derived).Exec(ctx); err != nil {
-			return fmt.Errorf("clear what groups derived over every product: %w", err)
-		}
+		// Only the per-product table is cleared of derived rows, because only
+		// it holds any: a group binding names a product, so nothing derives a
+		// role across the estate. `DESIGN-access.md` states that as the rule,
+		// and the delete that stood here against the estate table matched
+		// nothing on every deployment there has ever been.
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 			Where("source = ?", Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived: %w", err)

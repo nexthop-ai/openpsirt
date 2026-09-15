@@ -247,7 +247,7 @@ func registerAttachments(api huma.API, in Ingest) {
 			hc.SetHeader("Content-Length", strconv.FormatInt(row.SizeBytes, 10))
 			hc.SetStatus(http.StatusOK)
 			if _, err := io.Copy(hc.BodyWriter(), body); err != nil {
-				in.Logger.ErrorContext(ctx, "sending an attachment stopped part way",
+				in.logger().ErrorContext(ctx, "sending an attachment stopped part way",
 					"error", err, "token", row.Token)
 			}
 		}}, nil

@@ -109,6 +109,29 @@ func (in Ingest) trail() *trail.Store {
 	return trail.NewStore(in.DB.DB)
 }
 
+// settings returns a store over what an operator has set, or nothing where
+// there is no database.
+func (in Ingest) settings() *setting.Store {
+	if in.DB == nil {
+		return nil
+	}
+	return setting.NewStore(in.DB.DB)
+}
+
+// logger is where this process writes, and never nil.
+//
+// **A handler that logs must not have to remember.** Sixty-three sites guard
+// the field with `if in.Logger != nil` and two did not, so a process built
+// without one — which is the one that renders the API document — panicked into
+// the recovery middleware and answered 500 where the route had words for a
+// refusal. A no-op logger makes the omission impossible rather than rare.
+func (in Ingest) logger() *slog.Logger {
+	if in.Logger != nil {
+		return in.Logger
+	}
+	return slog.New(slog.DiscardHandler)
+}
+
 // groupsReachable says whether anything configured here can report which
 // groups somebody is in: a provider with a source of them, or a trusted proxy
 // that reports them.
@@ -364,9 +387,11 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		if err != nil {
 			return err
 		}
-		result = UploadResult{ScanID: scan.ID, Serial: header.Serial}
-		if !header.BuiltAt.IsZero() {
-			result.BuiltAt = header.BuiltAt.UTC().Format(time.RFC3339)
+		// Through the package's own helper, and unconditionally: an inventory
+		// with no build time was refused above, so the branch that stood here
+		// asked a question already answered.
+		result = UploadResult{
+			ScanID: scan.ID, Serial: header.Serial, BuiltAt: stamp(header.BuiltAt),
 		}
 		if taken != ingest.Accept {
 			return nil
@@ -402,7 +427,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// be looked up. Info rather than a warning — a producer refusing to
 		// stop retrying writes a line per attempt, and the serial is what
 		// makes those readable rather than alarming.
-		in.Logger.InfoContext(ctx, "an upload was refused",
+		in.logger().InfoContext(ctx, "an upload was refused",
 			"outcome", outcome, "serial", header.Serial, "product", input.Product)
 		return nil, rejection(outcome, err)
 	case err != nil:

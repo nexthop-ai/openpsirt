@@ -268,9 +268,9 @@ func splitSemantic(v string) (release []string, pre string, ok bool) {
 	if at := strings.Index(v, "-"); at >= 0 {
 		v, pre = v[:at], v[at+1:]
 	}
-	if v == "" {
-		return nil, "", false
-	}
+	// An empty version needs no guard of its own: Split gives one empty part,
+	// which is not digits, and the loop below answers with the same nil, "",
+	// false. The branch that stood here was a second spelling of that.
 	release = strings.Split(v, ".")
 	for _, part := range release {
 		if !digits(part) {

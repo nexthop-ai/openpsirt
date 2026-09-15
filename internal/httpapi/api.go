@@ -221,8 +221,8 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 				// What is logged is what the browser said and what this
 				// deployment answers to. Both are already known to whoever
 				// can read the log.
-				if in.Logger != nil {
-					in.Logger.Warn("a write was refused because it did not come from a page this deployment served",
+				{
+					in.logger().Warn("a write was refused because it did not come from a page this deployment served",
 						"origin", r.Header.Get("Origin"),
 						"referer", r.Header.Get("Referer"),
 						"answers_to", strings.Join(origins(r, in.BaseURL), ", "),

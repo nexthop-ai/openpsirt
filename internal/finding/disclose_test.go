@@ -207,6 +207,26 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 			t.Errorf("after agreement the embargo ends %s, want %s",
 				got, now.Add(28*24*time.Hour))
 		}
+
+		// And a third person agreeing is told it has already been agreed to,
+		// and the date does not move again.
+		//
+		// **This is the read's answer, not the write's.** The row is read
+		// before the update and the second agreement is refused there. What
+		// the update's own `approved_at IS NULL` clause guards is the race —
+		// two people agreeing between that read and that write — and the
+		// count it produces is now reported rather than discarded, which is
+		// what makes the clause say something. Forcing that interleave needs
+		// the barrier `internal/catalog/race_test.go` is written against, and
+		// is not covered here.
+		third := f.someoneElse(t, access.PrivateTriage)
+		if err := f.store.AgreeToExtension(t.Context(), third, long.ID); !errors.Is(
+			err, finding.ErrAlreadyAgreed) {
+			t.Errorf("agreeing a second time answered %v, want ErrAlreadyAgreed", err)
+		}
+		if got := f.endsAt(t, issue); !got.Equal(now.Add(28 * 24 * time.Hour)) {
+			t.Errorf("a second agreement moved the embargo again, to %s", got)
+		}
 	})
 }
 

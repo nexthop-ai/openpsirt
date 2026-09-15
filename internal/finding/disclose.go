@@ -245,9 +245,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject,
 			Was: was, Until: until, Reason: reason,
 			AskedBy: subject.ID, AskedAt: now, NeedsApproval: needs,
 		}
-		if !needs {
-			out.ApprovedAt = nil
-		}
+		// ApprovedAt is unset on every path to here, so nothing clears it.
 		if _, err := tx.NewInsert().Model(out).Exec(ctx); err != nil {
 			return fmt.Errorf("record the extension: %w", err)
 		}
@@ -293,12 +291,27 @@ func (s *Store) AgreeToExtension(ctx context.Context, subject access.Subject, id
 			return ErrAlreadyAgreed
 		}
 
-		if _, err := tx.NewUpdate().Model((*Extension)(nil)).
+		// The count is read, because the WHERE below is what decides the
+		// outcome. Discarded, a second person agreeing at the same moment as
+		// the first matched nothing and was told they had agreed — the
+		// clause was there, the guard it carries was not reported, and the
+		// two-person rule reported two agreements where the record holds one.
+		res, err := tx.NewUpdate().Model((*Extension)(nil)).
 			Set("approved_by = ?", subject.ID).
 			Set("approved_at = ?", now).
 			Where("id = ?", id).
-			Where("approved_at IS NULL").Exec(ctx); err != nil {
+			Where("approved_at IS NULL").Exec(ctx)
+		if err != nil {
 			return fmt.Errorf("record the agreement: %w", err)
+		}
+		switch agreed, err := database.Affected(res); {
+		case err != nil:
+			return fmt.Errorf("read whether the agreement was recorded: %w", err)
+		case agreed == 0:
+			// Somebody agreed between the read above and this write. Reported
+			// as what it is rather than as a second agreement: the record
+			// holds one, and the date moved once.
+			return ErrAlreadyAgreed
 		}
 		return moveTo(ctx, tx, asked.ProductID, asked.VulnerabilityID, asked.Until, now)
 	})

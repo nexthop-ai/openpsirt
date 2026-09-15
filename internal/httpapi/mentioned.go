@@ -69,7 +69,7 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 	// claim is shown as its representative.
 	_, rows, err := store.ReadClaim(ctx, subject, claimID)
 	if err != nil || len(rows) == 0 {
-		in.Logger.WarnContext(ctx, "could not tell who was named", "error", err)
+		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
 		return nil
 	}
 	dropped, err := mentioned(ctx, in, subject, mentionTarget{
@@ -79,7 +79,7 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 		About:           rows[0].PlaceIdentity[:min(8, len(rows[0].PlaceIdentity))],
 	}, body, fmt.Sprintf("/claims/%d", claimID))
 	if err != nil {
-		in.Logger.WarnContext(ctx, "could not tell who was named", "error", err)
+		in.logger().WarnContext(ctx, "could not tell who was named", "error", err)
 	}
 	return dropped
 }

@@ -819,7 +819,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 					// makes a database failure indistinguishable from "the
 					// issue is at none of them", and the caller gets the wide
 					// list with nothing saying why.
-					in.Logger.Error("which versions carry this issue could not be read",
+					in.logger().Error("which versions carry this issue could not be read",
 						"component", input.Component, "error", second)
 				}
 				switch {

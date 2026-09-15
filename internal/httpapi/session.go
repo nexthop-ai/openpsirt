@@ -88,23 +88,6 @@ func clearedCookie(plainHTTP bool) http.Cookie {
 	return browserCookie(access.SessionCookie, "", false, plainHTTP, -1)
 }
 
-// browserCookie builds the cookies this API sets, in one place so the
-// attributes are argued about once.
-//
-// SameSite=Lax so a browser does not attach them to a state-changing request
-// from another site — a second guard beside the echoed value rather than a
-// replacement for it, since neither covers every browser somebody arrives
-// with.
-//
-// plainHTTP clears Secure, for running this locally without TLS. A Secure
-// cookie is simply never sent over plain HTTP, so leaving it set there would
-// make sign-in fail silently: the browser drops the cookie and every request
-// afterwards looks like a stranger's. It is a parameter rather than a default
-// so that reaching it is deliberate.
-//
-// that asked for it, and that HttpOnly is off only for the value a page has to
-// read in order to echo it.
-//
 // browserCookie builds the cookies this API sets, in one place so their
 // attributes are argued about once.
 //
