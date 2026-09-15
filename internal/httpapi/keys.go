@@ -36,8 +36,15 @@ func registerKeys(api huma.API, a Administering) {
 		out.Body.Items = make([]KeyBody, 0, len(keys))
 		for _, key := range keys {
 			body := KeyBody{Name: key.Name, Withdrawn: key.RevokedAt != nil}
+			// The address, because create-key resolves this field through
+			// ProductByName — and the Stream and Variant fields beside it
+			// already answer the address. A listing that cannot be used to
+			// remake what it lists is a listing of something else.
 			if product, err := names.ProductByID(ctx, key.ProductID); err == nil {
-				body.Product = product.DisplayName
+				body.Product = product.Name
+				if product.DisplayName != product.Name {
+					body.ProductDisplayName = product.DisplayName
+				}
 			}
 			// What the key is narrowed to, not only which product it names.
 			// "any branch, any variant" and "one release only" are different
@@ -80,21 +87,21 @@ func registerKeys(api huma.API, a Administering) {
 
 		product, err := names.ProductByName(ctx, in.Body.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(a.Logger, err, "that product could not be looked up")
 		}
 		scope := access.Scope{ProductID: product.ID}
 
 		if in.Body.Stream != "" {
 			stream, err := names.StreamByName(ctx, product.ID, in.Body.Stream)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
 			}
 			scope.StreamID = &stream.ID
 		}
 		if in.Body.Variant != "" {
 			variant, err := names.VariantByName(ctx, product.ID, in.Body.Variant)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
 			}
 			scope.VariantID = &variant.ID
 		}

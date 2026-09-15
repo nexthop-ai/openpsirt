@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -61,7 +60,7 @@ func registerCarried(api huma.API, in Ingest) {
 			"that is no longer here is exactly the row somebody asking why a patch stopped " +
 			"working is looking for.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`
@@ -80,14 +79,13 @@ func registerCarried(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		located, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		target, err := names.ExistingTarget(ctx, located.StreamID, located.VariantID)
+		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 		rows, total, err := finding.NewStore(in.DB.DB).CarriedPatches(ctx, subject, target.ID,
 			input.Component, input.Limit, input.Offset)

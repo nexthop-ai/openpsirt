@@ -14,7 +14,9 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Migrations](#migrations)
 - [Migration locks](#migration-locks)
 - [Identifier quoting](#identifier-quoting)
+- [Pattern matching](#pattern-matching)
 - [Affected-row counts](#affected-row-counts)
+- [Absence and failure](#absence-and-failure)
 - [Collation](#collation)
 - [Replica coordination](#replica-coordination)
 - [Retryable transactions](#retryable-transactions)
@@ -380,6 +382,29 @@ Two tests hold silent truncation, which is the worst shape a portability
 difference can take — nothing fails and the data is wrong. Both were checked by
 reverting the fix and watching them fail.
 
+## Pattern matching
+
+A search box is not a pattern language. Typing "50%" means a name containing
+"50%", not every name containing "50"; "a_b" means what it says.
+
+| Rule | Reason |
+|---|---|
+| Every value in a `LIKE` is escaped, and every clause states its escape character | SQLite has no default escape character at all, so omitting the clause makes a backslash mean one thing on three engines and another on the fourth |
+| The escape character is `#`, and never a backslash | MySQL and MariaDB treat a backslash as an escape inside a string literal, so `ESCAPE '\'` is an unterminated string: a syntax error on two engines and parsed happily by the other two |
+| The escaping lives here, with the other engine differences | It was written out twice, unexported in one package and copied into another, while four predicates in two further packages had none |
+| A pattern the code wrote is not escaped; a value somebody supplied is | A trailing `/%` matching an ecosystem prefix is the pattern. The ecosystem inside it is not |
+
+What that cost where it was missing: the picker deciding who may be named on
+an embargoed case answered a term of "%" with every person the deployment
+could offer, in one request.
+
+Folding happens in Go and again in the engine. Folding in Go is Unicode-aware
+and `LOWER()` on SQLite is ASCII-only, so a term carrying a non-ASCII capital
+is found on three engines and missed on the fourth wherever the column has no
+folded copy. The component half has one; the issue half does not, and issue
+identifiers are ASCII in every scheme anybody publishes — which is why this is
+written down rather than fixed.
+
 ## Affected-row counts
 
 A conditional write reports a lost race only through the number of rows the
@@ -408,6 +433,27 @@ that cannot be read is a fault.
 No current driver returns an error there, which is why the helper exists rather
 than the rule. Nothing fails today when a caller gets it wrong, and nothing
 would report it on the day one starts.
+
+## Absence and failure
+
+A row that is not there and a read that could not be made are different answers,
+and a store that wraps both alike makes every caller above it wrong at once.
+
+| Rule | Reason |
+|---|---|
+| A reader says which of the two it hit | The caller chooses a status from it. Wrapped alike, the only status available is the one that asserts something the read never established |
+| Absence is a sentinel each package words for itself | A caller matches on the sentinel through the wrapping. Matching on a message is the same mistake as reading an engine's error text |
+| A failed read names the act, and the act reaches the log | "Look up product 12" is what an operator needs. What the driver said is not a thing to publish |
+| One helper, not a rule people remember | The split was made by hand at thirty-eight call sites and made correctly at five |
+
+The correct spelling already existed six times in the catalog beside readers
+that did not have it — `TargetFor` and `ExistingTarget` are the same two-column
+select, and only one of them told the two apart. `ExistingTarget` has
+twenty-three callers, twenty-one of which turned its error into "nothing has
+been scanned there".
+
+What that cost: a database nobody could reach reported to every authenticated
+caller that their products, builds, issues and findings did not exist.
 
 ## Collation
 

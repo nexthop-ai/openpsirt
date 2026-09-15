@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // WentBody is one advisory that went out.
@@ -47,7 +46,7 @@ func registerPublished(api huma.API, in Ingest) {
 			"Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody " +
 			"who may not read it, and a count is as much a disclosure as a row.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		Days    int    `query:"days" default:"365" minimum:"1" maximum:"3650" doc:"How far back to look, by when the advisory went out"`
 	}) (*listOutput[WentBody], error) {
@@ -60,9 +59,9 @@ func registerPublished(api huma.API, in Ingest) {
 		}
 		var products []int64
 		if input.Product != "" {
-			named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, err
 			}
 			products = []int64{named.ID}
 		}

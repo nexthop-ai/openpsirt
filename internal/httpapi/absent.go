@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 // What to say when a name reaches nothing.
@@ -69,6 +72,12 @@ func noSuchIssue() error {
 // walk identifiers.
 func noSuchNote() error {
 	return huma.Error404NotFound("no note is recorded there")
+}
+
+// noSuchRule is what a routing rule nobody declared answers, and what one
+// belonging to a product the caller cannot reach answers.
+func noSuchRule() error {
+	return huma.Error404NotFound("no routing rule is recorded there")
 }
 
 func noSuchAssessment() error {
@@ -163,6 +172,159 @@ func severalComponents(several *graph.Ambiguous, sayWith string) error {
 		several.Name, len(several.Choices), sayWith), detail...)
 }
 
+// absent turns a store error into the right answer: the caller's own 404 for a
+// row that is not there, and a fault for a read that could not be made.
+//
+// One place, because the split was being made by hand at every call site and
+// made correctly at a handful of them. Everywhere else a failed read was
+// answered as an authoritative negative — so a database nobody could reach told
+// every authenticated caller that their products, builds, issues and findings
+// did not exist, with the driver's own message in some of the bodies.
+//
+// missing is the sentence for a name that reaches nothing, passed as the
+// function rather than called, so a caller cannot build one from the error.
+func absent(logger *slog.Logger, err error, reading string, missing func() error) error {
+	switch {
+	// A refusal answers as a name that is not there, which is the rule at the
+	// top of this file. Its own text names the product and the act, so it is
+	// the fixed sentence that goes out and never the error.
+	case errors.Is(err, access.ErrDenied):
+		return missing()
+	// The absence sentinels, named one at a time rather than matched by
+	// shape. Each package words absence for itself, and a store that has not
+	// been given a sentinel yet must fall through to the fault arm rather than
+	// be guessed at — which is how a failed read became "that does not exist"
+	// in the first place.
+	case errors.Is(err, catalog.ErrNotFound),
+		errors.Is(err, finding.ErrNoSuchIssue),
+		errors.Is(err, ingest.ErrNoScan),
+		errors.Is(err, access.ErrNoSuchTeam),
+		errors.Is(err, access.ErrNoSuchToken),
+		errors.Is(err, finding.ErrNoSuchRun),
+		errors.Is(err, access.ErrNoSuchPerson):
+		return missing()
+	default:
+		return wentWrong(logger, reading, err)
+	}
+}
+
+// undeclared is absent for the paths where saying which part of an address did
+// not resolve is the answer's whole value: a pipeline whose upload was refused
+// has to know what to declare, and "no product is declared by that name" does
+// not say whether the product, the branch or the variant was the problem.
+//
+// **The one place a 404 body is built from an error here.** It is reached only
+// once the error is known to be the catalog's own ErrNotFound, whose message is
+// composed from the names the caller supplied and fixed words — nothing a
+// driver wrote can be in it. Everything else goes the ordinary way: a refusal
+// gets the fixed sentence, and a read that could not be made is a fault rather
+// than an authoritative negative.
+func undeclared(logger *slog.Logger, err error, reading string) error {
+	if errors.Is(err, catalog.ErrNotFound) {
+		return huma.Error404NotFound(err.Error())
+	}
+	return absent(logger, err, reading, noSuchProduct)
+}
+
+// productNamedVisibly resolves a product this subject may know exists.
+//
+// Paired with locatedVisibly rather than folded into it: catalog.VisibleProduct
+// asks whether the subject sees the product, and catalog.LocateVisible admits
+// somebody brought into a case here as well. Two deliberately different
+// contracts, and which one an endpoint wants is a security judgment — one that
+// was made by hand at every call site and invisible at all of them.
+func productNamedVisibly(ctx context.Context, in Ingest, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, name)
+	if err != nil {
+		return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
+	}
+	return product, nil
+}
+
+// productForIssue resolves a product for a route that is about one issue in
+// it.
+//
+// **The wider of the two rules here, and the pair is deliberate.** A route
+// about the product as a whole asks productNamedVisibly, which is what
+// somebody may see; a route about one named issue asks this, which admits
+// somebody brought into a case. Which of the two an endpoint wants is a
+// security judgment, and it was made by hand at every call site and visible at
+// none — including one handler that applied both in a single request, so one
+// answer about one subject and one product contradicted the other four lines
+// later.
+//
+// Wider than productNamedVisibly by the case grants: somebody brought into one case
+// holds nothing on the product and may still act on the issue they were
+// brought in on, so refusing to resolve the product would refuse them the one
+// thing they were granted while telling them nothing they did not already
+// know. Every read past this still asks about the issue, which is where the
+// case grant is honored again. It is the rule the catalog already applies when
+// it resolves a build for somebody on a case.
+func productForIssue(ctx context.Context, in Ingest, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
+	if err != nil {
+		return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
+	}
+	if !subject.Sees(product.ID) && len(subject.Cases(product.ID)) == 0 {
+		return nil, noSuchProduct()
+	}
+	return product, nil
+}
+
+// locatedVisibly resolves the three names a build is addressed by.
+//
+// The refusal is noSuchProduct whichever of the three did not resolve. Which
+// part of an address is wrong is a statement about what exists under the
+// other two, and answering it turns the route into a way to walk the catalog.
+func locatedVisibly(ctx context.Context, in Ingest, subject access.Subject,
+	product, stream, variant string) (*catalog.Named, error) {
+
+	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, stream, variant)
+	if err != nil {
+		return nil, absent(in.Logger, err, "that build could not be looked up", noSuchProduct)
+	}
+	return named, nil
+}
+
+// targetIDOf is the build a route is about, resolved and required to have been
+// scanned.
+//
+// The closure three report routes each carried a copy of. Kept as one function
+// so that "the names do not resolve" and "nothing has been filed here" stay
+// two answers: the first is a typo and the second is a build waiting for its
+// first scan, and a reader can act on only one of them.
+func targetIDOf(ctx context.Context, in Ingest, subject access.Subject,
+	product, stream, variant string) (int64, error) {
+
+	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
+	if err != nil {
+		return 0, err
+	}
+	target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return target.ID, nil
+}
+
+// targetRow is the build a pair of names was already resolved to, required to
+// have been scanned.
+//
+// "Nothing has been scanned there" is an answer about the build. A read that
+// could not be made does not support it, and this is the reader with the most
+// callers in the tree — nearly all of which answered 404.
+func targetRow(ctx context.Context, in Ingest, streamID, variantID int64) (*catalog.Target, error) {
+	target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, streamID, variantID)
+	if err != nil {
+		return nil, absent(in.Logger, err, "that build could not be looked up", nothingScannedThere)
+	}
+	return target, nil
+}
+
 // issueHere resolves an issue named in a path about a place, and answers as
 // though the name were unused wherever the subject may not read a finding of
 // it in this product.
@@ -180,7 +342,7 @@ func issueHere(ctx context.Context, in Ingest, subject access.Subject,
 
 	issue, err := finding.NewVulnerabilities(in.DB.DB).ByName(ctx, name)
 	if err != nil {
-		return 0, noSuchFinding()
+		return 0, absent(in.Logger, err, "that issue could not be looked up", noSuchFinding)
 	}
 	told, err := finding.NewStore(in.DB.DB).MayBeToldOfIn(ctx, subject, productID, issue)
 	if err != nil {
@@ -203,7 +365,7 @@ func narrowedTo(ctx context.Context, in Ingest, subject access.Subject,
 	if name == "" {
 		return 0, nil
 	}
-	product, err := productNamed(ctx, in, subject, name)
+	product, err := productNamedVisibly(ctx, in, subject, name)
 	if err != nil {
 		return 0, err
 	}

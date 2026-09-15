@@ -2,11 +2,14 @@ package access
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Credential prefixes.
@@ -149,16 +152,51 @@ func (s Subject) delegate() Subject {
 // its owner cannot read reaches nothing rather than being granted it. Admin is
 // dropped entirely: administration is global, and a token narrowed to one
 // product carrying it would not be narrowed at all.
+//
+// **A copy with things removed, never a fresh subject.** Written as a struct
+// literal it carried five fields and silently dropped the rest — who somebody
+// is, which teams they are on, and the cases they were brought into — none of
+// which is a per-product fact. Through such a token every "assigned to me"
+// surface answered empty and taking an unowned finding for yourself was
+// refused with a message saying you were giving work to somebody else, while
+// the same acts worked through the same person's session. A collaborator's
+// narrowed token could not open the case it was brought into.
+//
+// Written this way, a field added later is kept by default. Dropping one is
+// then a line somebody wrote, which is the direction that fails safely: a
+// field wrongly kept is a narrowing that is too wide and visible in a test, and
+// a field wrongly dropped is a person who has stopped being themselves.
 func (s Subject) narrowedTo(productID int64) Subject {
-	narrowed := Subject{
-		ID: s.ID, Identity: s.Identity, Kind: s.Kind, delegated: s.delegated,
-		grants: map[int64][]Role{},
+	held, ok := s.grants[productID]
+	s.grants = map[int64][]Role{}
+	if ok {
+		s.grants[productID] = held
 	}
-	if held, ok := s.grants[productID]; ok {
-		narrowed.grants[productID] = held
+	// Administration is global, so a narrowed token carries none of it.
+	s.Admin = false
+	s.unnarrowed = false
+	// A role held across every product is held on this one, and nowhere else
+	// through this token. The estate grants were spread across products when
+	// the subject was built, so what is left above is already the intersection.
+	//
+	// The cases stay: being brought into one is a grant on a pair of a product
+	// and an issue, and a token pinned to that product does not take it away.
+	// Cases in other products go, for the same reason the other grants do.
+	if len(s.cases) > 0 {
+		here := map[int64][]int64{}
+		if issues, on := s.cases[productID]; on {
+			here[productID] = issues
+		}
+		s.cases = here
 	}
-	return narrowed
+	return s
 }
+
+// ErrNoSuchToken is what a name nobody has minted under comes back as.
+//
+// A sentinel rather than a sentence, because whoever asked has to tell it from
+// a read that could not be made: the first is a 404 and the second is a fault.
+var ErrNoSuchToken = errors.New("no token is recorded under that name")
 
 // Tokens lists somebody's own credentials.
 func (s *Store) Tokens(ctx context.Context, personID int64) ([]Token, error) {
@@ -199,7 +237,9 @@ func (s *Store) TokenByName(ctx context.Context, personID int64, name string) (*
 	token := new(Token)
 	if err := s.db.NewSelect().Model(token).
 		Where("person_id = ?", personID).Where("name = ?", name).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("no token of yours is called %q", name)
+		return nil, database.FromRead(err,
+			fmt.Errorf("no token of yours is called %q: %w", name, ErrNoSuchToken),
+			fmt.Sprintf("look up the token called %q", name))
 	}
 	return token, nil
 }

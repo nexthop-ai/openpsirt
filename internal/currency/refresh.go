@@ -216,7 +216,14 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		// part of an hour while it keeps talking to the network — which is the
 		// one thing the setting exists to stop.
 		on, err := r.enabled(ctx)
-		if err != nil || !on {
+		if err != nil {
+			// Reported rather than read as "turned off". A pass that stopped
+			// because it could not read the setting looked exactly like one
+			// that stopped because an operator turned it off, and neither
+			// logged anything.
+			return asked, fmt.Errorf("read whether asking upstream is on: %w", err)
+		}
+		if !on {
 			return asked, nil
 		}
 

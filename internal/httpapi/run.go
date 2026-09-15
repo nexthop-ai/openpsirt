@@ -6,7 +6,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -61,7 +60,7 @@ func registerRun(api huma.API, in Ingest) {
 			"Derived when it is asked for rather than stored, so it moves as findings close " +
 			"and reopen — and narrowed by what you may see, like every other count here.",
 		Tags: []string{"Ingest"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
@@ -71,18 +70,18 @@ func registerRun(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		named, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, target.ID, input.Run)
 		if err != nil {
-			return nil, huma.Error404NotFound("no such run on this build")
+			return nil, absent(in.Logger, err, "that run could not be looked up",
+				func() error { return huma.Error404NotFound("no such run on this build") })
 		}
 		body := RunBody{
 			RunID: ran.RunID, Scanner: ran.Scanner, ScannerVersion: ran.ScannerVersion,

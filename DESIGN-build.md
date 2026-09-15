@@ -93,6 +93,7 @@ of ours needs no edit.
 | `make sbom` | This project's own CycloneDX inventory |
 | `make web-check` | Interface: locked install, type check, Prettier, ESLint, Stylelint, tests with coverage, class-name checks, and the generated client diffed against the API document. Refuses without npm rather than skipping |
 | `make unreachable` | Exported code nothing reaches |
+| `make negatives` | A 404 built from an error's own text: it asserts a name reaches nothing, and publishes whatever the error carried |
 | `make granted` | Every query outside the access package asks both grant tables |
 | `make unclaimed` | Every requirement is named by a design document |
 | `make pins-check` | Every version pinned in two files still agrees |
@@ -121,7 +122,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `confined`, `granted`, `test` |
+| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |

@@ -47,7 +47,7 @@ export interface paths {
          *
          *     Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody who may not read it, and a count is as much a disclosure as a row.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-published-advisories"];
         put?: never;
@@ -99,7 +99,7 @@ export interface paths {
          *
          *     Everything is dated by when the claim was proposed, not by when it was agreed to, and narrowed by what you may see.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-approval-scrutiny"];
         put?: never;
@@ -125,7 +125,7 @@ export interface paths {
          *
          *     A claim carries the severity recorded against its issue, so claims about findings you cannot read are absent rather than refused.
          *
-         *     **Requires:** any recognized credential. Narrowed to issues you may read a finding of in the product the rating belongs to. A rating is about one product, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
+         *     **Requires:** any signed-in person, and not a pipeline key. Narrowed to issues you may read a finding of in the product the rating belongs to. A rating is about one product, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
          */
         get: operations["list-assessments"];
         put?: never;
@@ -199,7 +199,7 @@ export interface paths {
          *
          *     The number worth watching is not how many findings exist but how many are waiting behind somebody: an idle account holding nothing is harmless, and work stuck behind a person who has gone is the problem — nothing tells this software that somebody has left.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-holdings"];
         put?: never;
@@ -225,7 +225,7 @@ export interface paths {
          *
          *     A file an administrator removed answers 410: the record and the reference remain, and the bytes are gone on purpose.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["fetch-attachment"];
         put?: never;
@@ -261,7 +261,7 @@ export interface paths {
          *
          *     `alone=true` returns judgments no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-audit"];
         put?: never;
@@ -289,7 +289,7 @@ export interface paths {
          *
          *     Takes every filter the audit list takes, including the period.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-audit"];
         put?: never;
@@ -317,7 +317,7 @@ export interface paths {
          *
          *     For the earlier justifications see `GET /v1/claims/{id}/revisions` and for the discussion `GET /v1/claims/{id}/comments`.
          *
-         *     **Requires:** any recognized credential. Answers only claims you may read every row of.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only claims you may read every row of.
          */
         get: operations["get-claim"];
         put?: never;
@@ -379,7 +379,7 @@ export interface paths {
          *
          *     `covered` is how many findings the claim covered **when it was agreed to**. A claim applies to every build running the same versions, so it covers more as builds appear — with nobody acting, and nobody having agreed to the larger number. Comparing this against what it covers now is the point of keeping it.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-claim-approvals"];
         put?: never;
@@ -403,7 +403,7 @@ export interface paths {
          *
          *     Comments are separate from the justification and never affect an approval.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-claim-comments"];
         put?: never;
@@ -513,7 +513,7 @@ export interface paths {
          *
          *     A claim is one argument however many places it covers, so its reasoning is one text with one history. An approval names the specific revision that was agreed to, so this is how to read what an approver actually saw rather than what the text says now.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-claim-revisions"];
         put?: never;
@@ -645,7 +645,7 @@ export interface paths {
          *
          *     **A product is required** — a place identity carries no product, so this cannot be asked across the deployment.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-compliance-rate"];
         put?: never;
@@ -671,7 +671,7 @@ export interface paths {
          *
          *     Set `expired=true` to list deferrals whose date has passed — the findings that have come back and need judging again.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-decisions"];
         put?: never;
@@ -695,7 +695,7 @@ export interface paths {
          *
          *     What it says — the outcome, the justification, the dates — belongs to the claim it is one row of, at `claim_id`. For the earlier justifications see `GET /v1/claims/{id}/revisions`, and for who agreed to which of them see `GET /v1/claims/{id}/approvals`.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-decision"];
         put?: never;
@@ -721,7 +721,7 @@ export interface paths {
          *
          *     Counted over the judgments rather than the findings they cover, so the order is not decided by how far a component spreads through an image.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-repeated-deferrals"];
         put?: never;
@@ -777,7 +777,7 @@ export interface paths {
          *
          *     Agree with `POST /v1/disclosure-extensions/{id}/approval`.
          *
-         *     **Requires:** any recognized credential. Only where you may read undisclosed work.
+         *     **Requires:** any signed-in person, and not a pipeline key. Only where you may read undisclosed work.
          */
         get: operations["list-pending-extensions"];
         put?: never;
@@ -831,7 +831,7 @@ export interface paths {
          *
          *     `beneath` is not offered: a subtree is a walk over one build's edges. Neither is `differs`, which is a statement about a selection of builds. Both are on the per-product list, which is where a build can be named.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-findings-anywhere"];
         put?: never;
@@ -859,7 +859,7 @@ export interface paths {
          *
          *     Takes every filter the cross-product list takes. `beneath` and `differs` are not offered here, for the reason that list gives.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-findings-anywhere"];
         put?: never;
@@ -887,7 +887,7 @@ export interface paths {
          *
          *     Answers by any name the issue goes by.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-issue"];
         put?: never;
@@ -971,7 +971,7 @@ export interface paths {
          *
          *     Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-measures"];
         put?: never;
@@ -997,7 +997,7 @@ export interface paths {
          *
          *     Narrowed to what you may still read.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-my-claims"];
         put?: never;
@@ -1049,7 +1049,7 @@ export interface paths {
          *
          *     Answers only where you may read what the note is about — the same rule as reading the note itself, asked of the issue rather than of the note, because two rules for one question is one rule out of step.
          *
-         *     **Requires:** any recognized credential. Answers only where you may read what the note is about, which is the note's own product and issue rather than anything in the path.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only where you may read what the note is about, which is the note's own product and issue rather than anything in the path.
          */
         get: operations["get-issue-note-history"];
         put?: never;
@@ -1275,7 +1275,7 @@ export interface paths {
          *
          *     An identity nobody holds answers with an empty list rather than a 404, which is also what an identity somebody holds answers when none of their work is yours to see. The two are deliberately the same.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see. An identity nobody holds answers as one whose work you cannot see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see. An identity nobody holds answers as one whose work you cannot see.
          */
         get: operations["list-assigned"];
         put?: never;
@@ -1485,7 +1485,7 @@ export interface paths {
          *
          *     A scan may only be filed against something declared, so this is the first question to ask after an upload is refused for naming something unknown.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-products"];
         put?: never;
@@ -1521,7 +1521,7 @@ export interface paths {
          *
          *     **Public findings only unless you ask otherwise.** Its destination is usually a public document, so including something undisclosed should be deliberate rather than something pasted in without noticing.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["compare-releases"];
         put?: never;
@@ -1549,7 +1549,7 @@ export interface paths {
          *
          *     **Public findings only unless you ask otherwise**, because the destination is usually a public document.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-comparison"];
         put?: never;
@@ -1577,7 +1577,7 @@ export interface paths {
          *
          *     **Public findings only unless you ask otherwise**, as the comparison itself is. Where fixes are left out for not having been disclosed, the note says how many and never which.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-release-notes"];
         put?: never;
@@ -1609,7 +1609,7 @@ export interface paths {
          *
          *     `due_at` is what a commitment about that build is gated against, and is absent where nothing is open.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-component"];
         put?: never;
@@ -1695,7 +1695,7 @@ export interface paths {
          *
          *     `stream` and `variant` are optional and independent. With both named the list is one build. With either left out it answers for every build under the product that matches the rest: a row is still one issue in one component, its place count is across every build it is in, and `builds` says how many those are. Across more than one build a row carries `stream` and `variant` naming one of them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a chain belongs to one build's graph. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-findings"];
         put?: never;
@@ -1737,7 +1737,7 @@ export interface paths {
          *
          *     Takes every filter the findings list takes.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-findings"];
         put?: never;
@@ -1765,7 +1765,7 @@ export interface paths {
          *
          *     `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-finding-components"];
         put?: never;
@@ -1791,7 +1791,7 @@ export interface paths {
          *
          *     Takes the same filters as the by-component list, and the line this deployment triages at is stated in the file.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-finding-components"];
         put?: never;
@@ -1821,7 +1821,7 @@ export interface paths {
          *
          *     Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about a place or a deadline has no row here to narrow.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-fix-bundles"];
         put?: never;
@@ -1849,7 +1849,7 @@ export interface paths {
          *
          *     Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
          *
-         *     **Requires:** any recognized credential on the product. Asking about undisclosed findings needs private-read or private-triage.
+         *     **Requires:** public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
          */
         get: operations["list-holders"];
         put?: never;
@@ -1879,7 +1879,7 @@ export interface paths {
          *
          *     Requires a publisher configured for this deployment: a document naming none is not a valid CSAF document.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-advisory"];
         put?: never;
@@ -1905,7 +1905,7 @@ export interface paths {
          *
          *     The published document itself belongs to whoever published it. The digest is what makes the comparison possible, and it was taken from the document generated here rather than from anything sent.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-advisory-issuances"];
         put?: never;
@@ -1997,7 +1997,7 @@ export interface paths {
          *
          *     A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-attachments"];
         put?: never;
@@ -2163,7 +2163,7 @@ export interface paths {
          *
          *     **It is about the issue in this product, not about one component.** A row in the findings list is one issue at one source package, and one issue is often several rows — so a note kept against a row would be written on one of them and hidden from the rest. What is about a judgment at a place is a comment on that claim instead.
          *
-         *     **Requires:** any recognized credential. Answers where you may read a finding of this issue in this product, at its visibility — an issue with one undisclosed place here is undisclosed for this. Anywhere else it answers as an issue that is not there.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers where you may read a finding of this issue in this product, at its visibility — an issue with one undisclosed place here is undisclosed for this. Anywhere else it answers as an issue that is not there.
          */
         get: operations["list-issue-notes"];
         put?: never;
@@ -2255,7 +2255,7 @@ export interface paths {
          *
          *     `visibility` says which kind of finding the text is about. Asking about undisclosed findings requires being able to read them.
          *
-         *     **Requires:** any recognized credential on the product. Asking about undisclosed findings needs private-read or private-triage.
+         *     **Requires:** public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
          */
         get: operations["list-mentionable"];
         put?: never;
@@ -2283,7 +2283,7 @@ export interface paths {
          *
          *     A build whose release is out of support says so rather than reading as one that stopped being scanned: those are different facts and only one of them is a fault.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-product-overview"];
         put?: never;
@@ -2309,7 +2309,7 @@ export interface paths {
          *
          *     Severities are folded the same four ways everything else here ranks by, through the one expression the working list and the deadline also read, so a chart cannot disagree with a list about what counts as high.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-releases"];
         put?: never;
@@ -2421,7 +2421,7 @@ export interface paths {
          *
          *     **Kept per product.** A filter narrows one product's findings list and its query names branches and variants that usually exist in no other, so one offered everywhere would be offered where it matches nothing.
          *
-         *     **Requires:** any recognized credential. Answers your own and nobody else's.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers your own and nobody else's.
          */
         get: operations["list-saved-filters"];
         put?: never;
@@ -2444,7 +2444,7 @@ export interface paths {
          * Keep a filter under a name
          * @description Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
          *
-         *     **Requires:** any recognized credential. Yours alone.
+         *     **Requires:** any signed-in person, and not a pipeline key. Yours alone.
          */
         put: operations["save-filter"];
         post?: never;
@@ -2452,7 +2452,7 @@ export interface paths {
          * Forget a saved filter
          * @description Drops one of your own. A name you have not kept is not there, which is the same answer as somebody else's — the filters are personal, and the query says so rather than only the screen.
          *
-         *     **Requires:** any recognized credential. Yours alone.
+         *     **Requires:** any signed-in person, and not a pipeline key. Yours alone.
          */
         delete: operations["forget-filter"];
         options?: never;
@@ -2475,7 +2475,7 @@ export interface paths {
          *
          *     A stream past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-streams"];
         put?: never;
@@ -2559,7 +2559,7 @@ export interface paths {
          *
          *     A release predating a variant has never been filed against it and does not list it, which is what keeps something introduced later from appearing to have shipped years ago.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-release-variants"];
         put?: never;
@@ -2633,7 +2633,7 @@ export interface paths {
          *
          *     Narrow to one package with `component`, matched on what the claim says it is about rather than on a component this build carries — a claim naming something that is no longer here is exactly the row somebody asking why a patch stopped working is looking for.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-carried-patches"];
         put?: never;
@@ -2661,7 +2661,7 @@ export interface paths {
          *
          *     With `q` it searches instead: components anywhere in the build whose name contains that text, most findings first and no root. Nobody finds anything in a graph this size by opening nodes — a real image holds eight thousand components under a root with five thousand children — so searching is the way in, and browsing is for answering "what else is under this" once you are already somewhere.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-top-level-components"];
         put?: never;
@@ -2689,7 +2689,7 @@ export interface paths {
          *
          *     Rows come back in the order they are drawn, parents before children, the fullest branch first. A component the inventory placed nowhere has no chain and sits at the end.
          *
-         *     **Requires:** any recognized credential. Answers what you hold, whether or not you read the product.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers what you hold, whether or not you read the product.
          */
         get: operations["list-my-components"];
         put?: never;
@@ -2717,7 +2717,7 @@ export interface paths {
          *
          *     **A component name is not unique within a build.** Where one ships at several versions, `version` says which — without it, a name that matches more than one is refused with 409, naming the choices, rather than guessed at.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-component-neighbors"];
         put?: never;
@@ -2769,7 +2769,7 @@ export interface paths {
          *
          *     `contains` matches the text of a report. It narrows a list; it is not part of any claim made afterwards.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-issues-at-component"];
         put?: never;
@@ -2795,7 +2795,7 @@ export interface paths {
          *
          *     **A component name is not unique within a build.** Where one ships at several versions, `version` says which — without it, a name that matches more than one is refused rather than guessed at.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-finding"];
         put?: never;
@@ -2885,7 +2885,7 @@ export interface paths {
          *
          *     A build reached from two places of the finding is one thing to agree to, and carries the places of both.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-finding-reach"];
         put?: never;
@@ -2947,7 +2947,7 @@ export interface paths {
          *
          *     Read `previously` before deciding again. A claim that lapsed on a version bump is usually still the right answer, and re-affirming it is a different request from making a new one.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-finding-decision"];
         put?: never;
@@ -3021,7 +3021,7 @@ export interface paths {
          *
          *     Only `differing` is a choice. The first two follow from the matching rules and are there to be told, not agreed to — and showing them as one number is how a decision comes to reach builds the person making it never knew about.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-decision-reach"];
         put?: never;
@@ -3081,7 +3081,7 @@ export interface paths {
          *
          *     There is no separate 'replanned': re-promising writes a new date and the standing promise is the one read, so a replanned upgrade is a planned one with a later date.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-pending-upgrades"];
         put?: never;
@@ -3109,7 +3109,7 @@ export interface paths {
          *
          *     Counted as issues at components at or above the deployment's line, which `floor` names.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-readiness"];
         put?: never;
@@ -3135,7 +3135,7 @@ export interface paths {
          *
          *     **Current state, and no `as_of`.** Reconstructing the view as of a past date was asked for and refused: each row already carries the dates that evidence what is being checked, and a reconstruction would be a second answer about the past that has to be kept honest against the first.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-disposition-register"];
         put?: never;
@@ -3157,7 +3157,7 @@ export interface paths {
          * Export the disposition register
          * @description The register as a file. Read with your own visibility as it streams, like every other export here.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-disposition-register"];
         put?: never;
@@ -3185,7 +3185,7 @@ export interface paths {
          *
          *     Derived when it is asked for rather than stored, so it moves as findings close and reopen — and narrowed by what you may see, like every other count here.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-scan-run"];
         put?: never;
@@ -3273,7 +3273,7 @@ export interface paths {
          *
          *     Requires a publisher configured for this deployment: a document naming none has nobody as its author.
          *
-         *     **Requires:** any recognized credential on the product. Answers only what you may see: the document is what stands about the build, which is a read of it rather than an act of triage.
+         *     **Requires:** public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
          */
         get: operations["get-vex"];
         put?: never;
@@ -3299,7 +3299,7 @@ export interface paths {
          *
          *     **Only the words on findings you may read.** A tag row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
          *
-         *     **Requires:** any recognized credential on the product. Answers only the words on findings you may see.
+         *     **Requires:** public-read or public-triage or private-read or private-triage on the product. Answers only the words on findings you may see.
          */
         get: operations["list-tags"];
         put?: never;
@@ -3351,7 +3351,7 @@ export interface paths {
          *
          *     Each says whether it is customer-facing, which feeds how urgent a finding in it is, and defaults to customer-facing where nobody has said.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-variants"];
         put?: never;
@@ -3417,7 +3417,7 @@ export interface paths {
          *
          *     Narrowed by what you may see, and ordered by what is open.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-out-of-support"];
         put?: never;
@@ -3443,7 +3443,7 @@ export interface paths {
          *
          *     The day the file was taken is stated in it, because how long ago a release ended is only readable against a date.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-out-of-support"];
         put?: never;
@@ -3469,7 +3469,7 @@ export interface paths {
          *
          *     **Counted in issues, not in places.** One kernel flaw across sixty modules is one thing that was fixed; an average weighted by how far a component fans out measures the dependency graph rather than anybody's work.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-remediation"];
         put?: never;
@@ -3497,7 +3497,7 @@ export interface paths {
          *
          *     **Your own claims are not here.** Approving your own is refused, so a queue containing them is a list of work you cannot do. Ask for `mine=true` to see what you proposed and nobody has agreed to yet, which is a different question.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-review-queue"];
         put?: never;
@@ -3523,7 +3523,7 @@ export interface paths {
          *
          *     Limited to what you may approve every row of, as the screen is, and your own claims are not in it. `mine=true` writes out what you proposed and nobody has agreed to, which is a different question, and `product` narrows it the way the screen does.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-review-queue"];
         put?: never;
@@ -3623,7 +3623,7 @@ export interface paths {
          *
          *     One row per issue at a component, however many places it sits at. `days_left` is negative once something is overdue.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-running-out"];
         put?: never;
@@ -3649,7 +3649,7 @@ export interface paths {
          *
          *     `days_left` is negative once something is overdue.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-running-out"];
         put?: never;
@@ -3675,7 +3675,7 @@ export interface paths {
          *
          *     How long counts as quiet is the `scanning.quiet-after` setting.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-scanning"];
         put?: never;
@@ -3703,7 +3703,7 @@ export interface paths {
          *
          *     The threshold `quiet` was computed against is stated in the file.
          *
-         *     **Requires:** any recognized credential. Exports only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-scanning"];
         put?: never;
@@ -3727,7 +3727,7 @@ export interface paths {
          *
          *     CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a different scheme, and scoring either with this one produces a number nothing downstream could tell apart from a real one.
          *
-         *     **Requires:** any recognized credential. Answers a calculation, and reads nothing.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers a calculation, and reads nothing.
          */
         get: operations["score-vector"];
         put?: never;
@@ -3901,7 +3901,7 @@ export interface paths {
          *
          *     **Names to anybody, membership to an administrator.** Routing work to a team means naming one, so anybody who may hand work around has to be able to see the names; who is on it is the same question as who is here, and that is answered where the rest of the record is.
          *
-         *     **Requires:** any recognized credential. Membership is listed for an administrator; anybody else sees the names.
+         *     **Requires:** any signed-in person, and not a pipeline key. Membership is listed for an administrator; anybody else sees the names.
          */
         get: operations["list-teams"];
         put?: never;
@@ -4047,7 +4047,7 @@ export interface paths {
          *
          *     Worked out when it is asked for. Nothing is precomputed or refreshed on a schedule until a measurement says it has to be.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-trend"];
         put?: never;
@@ -4075,7 +4075,7 @@ export interface paths {
          *
          *     **No rates here.** How many appeared and were resolved between two releases is an artifact of how far apart somebody cut them; rates always plot on calendar. And a product must be named: two products' tags interleave by date and mean nothing side by side.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-release-trend"];
         put?: never;
@@ -4101,7 +4101,7 @@ export interface paths {
          *
          *     **One item per issue in a component in a product, not one per build.** The same code built as several variants is one piece of work — a judgment is keyed on the product and the code rather than on the build, so answering it once answers every build holding the same versions. `builds` says how many that is. Where two builds ship different versions of the component they are different work and appear separately.
          *
-         *     **Requires:** any recognized credential. Answers only what you may see.
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-unassigned"];
         put?: never;
@@ -4123,7 +4123,7 @@ export interface paths {
          * Get the server version
          * @description Identifies the build that is answering, so an operator can tell which version they are looking at.
          *
-         *     **Requires:** any recognized credential. A person rather than a pipeline: a build server has no business asking what version is running.
+         *     **Requires:** any signed-in person, and not a pipeline key. A person rather than a pipeline: a build server has no business asking what version is running.
          */
         get: operations["get-version"];
         put?: never;
@@ -4488,8 +4488,10 @@ export interface components {
             readonly $schema?: string;
             /** @description The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here */
             group: string;
-            /** @description The product the role is held against */
+            /** @description The product the role is held against, by the name that addresses it */
             product?: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /**
              * @description What membership of this group grants
              * @enum {string}
@@ -5905,8 +5907,10 @@ export interface components {
             effective: boolean;
             /** @description Held across every product, including products declared later */
             everywhere?: boolean;
-            /** @description The product the role is held against. Absent where it is held across every product */
+            /** @description The product the role is held against, by the name that addresses it. Absent where it is held across every product */
             product?: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /**
              * @description What they may do with it
              * @enum {string}
@@ -6106,8 +6110,10 @@ export interface components {
             last_used_at?: string;
             /** @description What this credential is for */
             name: string;
-            /** @description The product it may send scans for. Always required */
+            /** @description The product it may send scans for, by the name that addresses it. Always required */
             product: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Optionally, the one release it may send for */
@@ -7796,8 +7802,10 @@ export interface components {
              * @description Where it sits among the others. The first rule that matches places the work
              */
             order: number;
-            /** @description Where work lands, by team name */
+            /** @description Where work lands, by the name that addresses the team */
             team: string;
+            /** @description What to call that team, where it was declared with a display name */
+            team_display_name?: string;
             /** @description A source package name. Catches every binary package built from it */
             upstream?: string;
         };
@@ -8310,8 +8318,10 @@ export interface components {
             name: string;
             /** @description Whose it is. Shown to an administrator listing everybody's */
             owner?: string;
-            /** @description Optionally, the one product it may reach */
+            /** @description Optionally, the one product it may reach, by the name that addresses it */
             product?: string;
+            /** @description What to call that product, where it was declared with a display name */
+            product_display_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Whether it has been withdrawn */

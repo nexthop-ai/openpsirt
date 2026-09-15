@@ -22,7 +22,8 @@ func (s *Store) ProductOf(ctx context.Context, targetID int64) (int64, error) {
 		Where("tg.id = ?", targetID).
 		Scan(ctx, &productID)
 	if err != nil {
-		return 0, fmt.Errorf("look up which product build %d belongs to: %w", targetID, err)
+		return 0, missingOr(err, fmt.Sprintf("build %d", targetID),
+			fmt.Sprintf("look up which product build %d belongs to", targetID))
 	}
 	return productID, nil
 }

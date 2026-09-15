@@ -61,7 +61,7 @@ func registerIssue(api huma.API, in Ingest) {
 			"the count is the leak even when no row is shown.\n\n" +
 			"Answers by any name the issue goes by.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Limit         int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
 	}) (*IssueOutput, error) {

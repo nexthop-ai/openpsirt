@@ -6,6 +6,17 @@
 // perfectly well but was never granted anything is turned away with the same
 // answer as somebody unknown — telling an outsider which of the two applies is
 // free reconnaissance.
+//
+// **Every question of the form "may this person do this" excludes a
+// deactivated account.** Deactivation leaves the grant rows in place on
+// purpose — it is the recorded act of leaving rather than an undoing of what
+// somebody held — so a query that reads only grants answers that a departed
+// person is still cleared. Three of them did, and one of the three gated
+// handing an undisclosed finding to a person or a team.
+//
+// Naming somebody in configuration readmits them, because that is the
+// documented way back into a deployment nobody can administer and nothing else
+// clears the date.
 package access
 
 import (

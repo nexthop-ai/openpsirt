@@ -79,9 +79,13 @@ func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
 	}
 
 	names := catalog.NewStore(in.DB.DB)
-	product, err := names.ProductByName(ctx, q.Product)
+	// Resolved even where the subject cannot see it, because what a refusal
+	// here must not do is say whether the name exists — the branch and the
+	// variant below answer the same way the product does, and the sees flag is
+	// what keeps them in step.
+	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, q.Product)
 	if err != nil {
-		return finding.Scope{}, false, noSuchProduct()
+		return finding.Scope{}, false, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
 	}
 	sees := subject.Sees(product.ID)
 	scope.ProductID = &product.ID
@@ -93,10 +97,14 @@ func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
 			// answers about itself, so a refusal here says nothing a refusal
 			// on the product did not.
 			if !sees {
-				return finding.Scope{}, false, noSuchProduct()
+				return finding.Scope{}, false, absent(in.Logger, err,
+					"that branch could not be looked up", noSuchProduct)
 			}
-			return finding.Scope{}, false, huma.Error404NotFound(
-				"that product has no branch or tag by that name")
+			return finding.Scope{}, false, absent(in.Logger, err,
+				"that branch could not be looked up", func() error {
+					return huma.Error404NotFound(
+						"that product has no branch or tag by that name")
+				})
 		}
 		scope.StreamID = &stream.ID
 	}
@@ -104,10 +112,14 @@ func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
 		variant, err := names.VariantByName(ctx, product.ID, q.Variant)
 		if err != nil {
 			if !sees {
-				return finding.Scope{}, false, noSuchProduct()
+				return finding.Scope{}, false, absent(in.Logger, err,
+					"that variant could not be looked up", noSuchProduct)
 			}
-			return finding.Scope{}, false, huma.Error404NotFound(
-				"that product has no variant by that name")
+			return finding.Scope{}, false, absent(in.Logger, err,
+				"that variant could not be looked up", func() error {
+					return huma.Error404NotFound(
+						"that product has no variant by that name")
+				})
 		}
 		scope.VariantID = &variant.ID
 	}

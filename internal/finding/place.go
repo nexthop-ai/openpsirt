@@ -153,7 +153,10 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		Where("f.visibility IN (?)", bun.List(visible)).
 		OrderExpr("component_upstream, consumer_upstream").
 		Scan(ctx, &rows)
-	if err != nil || len(rows) == 0 {
+	if err != nil {
+		return nil, fmt.Errorf("read what is open at that place: %w", err)
+	}
+	if len(rows) == 0 {
 		return nil, fmt.Errorf("no open finding is recorded there")
 	}
 

@@ -85,7 +85,7 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 		return nil, err
 	}
 	if !subject.Sees(productID) {
-		return nil, fmt.Errorf("no such scan on this build")
+		return nil, ErrNoScan
 	}
 	held := new(Scan)
 	q := s.db.NewSelect().Model(held).
@@ -95,7 +95,8 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 		q = q.Where("credential = ?", credential)
 	}
 	if err := q.Scan(ctx); err != nil {
-		return nil, fmt.Errorf("no such scan on this build")
+		return nil, database.FromRead(err, ErrNoScan,
+			fmt.Sprintf("look up scan %d on this build", scanID))
 	}
 	return held, nil
 }

@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -86,16 +85,16 @@ func registerOverview(api huma.API, in Ingest) {
 			"A build whose release is out of support says so rather than reading as one that " +
 			"stopped being scanned: those are different facts and only one of them is a fault.",
 		Tags: []string{"Catalog"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*OverviewOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		standing, whole, err := finding.NewStore(in.DB.DB).HowItStands(ctx, subject, named.ID)
 		if err != nil {

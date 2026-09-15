@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -102,7 +101,7 @@ func registerScrutiny(api huma.API, in Ingest) {
 			"Everything is dated by when the claim was proposed, not by when it was agreed to, " +
 			"and narrowed by what you may see.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		Days    int    `query:"days" default:"90" minimum:"1" maximum:"3650" doc:"How far back to look, by when a claim was proposed"`
 	}) (*scrutinyOutput, error) {
@@ -118,9 +117,9 @@ func registerScrutiny(api huma.API, in Ingest) {
 			// Resolved against what the caller may see, and a product they may
 			// not read answers as one nobody declared. Anything else turns
 			// this into a way to ask which products exist.
-			named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, err
 			}
 			products = []int64{named.ID}
 		}

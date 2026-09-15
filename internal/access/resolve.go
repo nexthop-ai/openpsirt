@@ -131,6 +131,16 @@ func NewResolver(store *Store, trust Trust) *Resolver {
 	}
 }
 
+// ReportsGroups says whether a trusted proxy is configured to report group
+// membership.
+//
+// Asked before roles are switched to group-bound, where a deployment with no
+// source of groups admits nobody: this is one of the two sources, the other
+// being a provider.
+func (r *Resolver) ReportsGroups() bool {
+	return strings.TrimSpace(r.trust.GroupsHeader) != ""
+}
+
 // WithMode tells the resolver where roles come from.
 func (r *Resolver) WithMode(mode func(context.Context) Mode) *Resolver {
 	if mode != nil {

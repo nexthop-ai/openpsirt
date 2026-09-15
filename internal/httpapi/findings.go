@@ -9,7 +9,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -398,7 +397,7 @@ func registerFindings(api huma.API, in Ingest) {
 			"chain belongs to one build's graph. `beneath` is a walk over one build's edges " +
 			"and is refused unless both are named.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
 		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
@@ -514,7 +513,7 @@ func registerComponentFindings(api huma.API, in Ingest) {
 			"matches the rest. `beneath` is a walk over one build's edges and is refused " +
 			"unless both are named.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
 		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
@@ -767,7 +766,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			"versions, `version` says which — without it, a name that matches more than one is " +
 			"refused rather than guessed at.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
@@ -780,14 +779,13 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		named, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 
 		issue, err := issueHere(ctx, in, subject, named.ProductID, input.Vulnerability)
@@ -862,7 +860,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		// whichever database they consulted rather than a property of the
 		// issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
-			append([]string{body.Vulnerability}, body.Aliases...), body.Component)
+			issue, append([]string{body.Vulnerability}, body.Aliases...), body.Component)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what VEX documents say could not be read", err)
 		}

@@ -1,6 +1,7 @@
 package catalog_test
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -20,6 +21,32 @@ func each(t *testing.T, fn func(t *testing.T, db *database.DB, s *catalog.Store)
 
 		fn(t, db, catalog.NewStore(db.DB))
 	})
+}
+
+// declared is a product with one branch and one variant, which is the smallest
+// catalog anything can be filed against.
+//
+// Beside each() because three tests wrote these nine lines out, and a fourth
+// wrote out each()'s body as well — so a change to how a test database is
+// prepared landed in one place and silently missed the only test covering
+// EnsureStream.
+func declared(t *testing.T, ctx context.Context, s *catalog.Store) (
+	*catalog.Product, *catalog.Stream, *catalog.Variant) {
+
+	t.Helper()
+	product, err := s.DeclareProduct(ctx, "SONiC", "SONiC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := s.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	variant, err := s.DeclareVariant(ctx, product.ID, "broadcom", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return product, stream, variant
 }
 
 func TestDeclareAndResolve(t *testing.T) {
@@ -103,7 +130,7 @@ func TestResolveNamesTheMissingPart(t *testing.T) {
 			if !errors.Is(err, catalog.ErrNotFound) {
 				t.Errorf("error is not ErrNotFound: %v", err)
 			}
-			if !contains(err.Error(), tc.want) {
+			if !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("error %q does not name %s", err, tc.want)
 			}
 		}
@@ -215,15 +242,6 @@ func TestStreamKindIsChecked(t *testing.T) {
 	})
 }
 
-func contains(h, n string) bool {
-	for i := 0; i+len(n) <= len(h); i++ {
-		if h[i:i+len(n)] == n {
-			return true
-		}
-	}
-	return false
-}
-
 func TestADeclaredNameIsFoundHoweverItIsCapitalized(t *testing.T) {
 	// These names get typed by hand into build scripts. "sonic" reaching a
 	// product declared as "SONiC" is the same typo problem that declaring
@@ -279,16 +297,7 @@ func TestWhatAScanIsFiledAgainstIgnoresCapitals(t *testing.T) {
 	// against nothing and the upload was refused as undeclared.
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
-		product, err := s.DeclareProduct(ctx, "SONiC", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
+		declared(t, ctx, s)
 
 		target, err := s.Resolve(ctx, "sonic", "MASTER", "Broadcom")
 		if err != nil {
@@ -314,11 +323,8 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 	//
 	// Saying it came from a *different* branch stays refused, because a tag is
 	// one frozen point and it came from wherever it came from.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+	each(t, func(t *testing.T, _ *database.DB, store *catalog.Store) {
 		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		store := catalog.NewStore(db.DB)
 		product, err := store.DeclareProduct(ctx, "sonic", "SONiC")
 		if err != nil {
 			t.Fatal(err)

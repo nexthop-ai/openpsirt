@@ -56,8 +56,9 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	}
 	for _, grant := range held {
 		body.Holds = append(body.Holds, HeldBody{
-			Product: named[grant.ProductID], Role: string(grant.Role),
-			Effective: grant.Active, Source: string(grant.Source),
+			Product: named[grant.ProductID].Address, Role: string(grant.Role),
+			ProductDisplayName: named[grant.ProductID].Display,
+			Effective:          grant.Active, Source: string(grant.Source),
 		})
 	}
 	body.SeesNothing = seesNothing(body.Holds)
@@ -85,6 +86,14 @@ type Administering struct {
 	// redeemable for is read. Nil where this process has no database, and
 	// then the built-in window applies.
 	Settings func() *setting.Store
+	// Groups says whether anything configured here can hand over group
+	// membership: a provider with a source of groups, or a trusted proxy that
+	// reports them.
+	//
+	// Asked before roles are switched to group-bound. Without a source every
+	// arrival reports belonging to nothing, so nobody derives any role and the
+	// deployment locks itself out — including whoever made the change.
+	Groups func() bool
 }
 
 // PersonBody is somebody who has been granted access.
@@ -198,7 +207,12 @@ type SignInBody struct {
 type HeldBody struct {
 	// Product is the one it is held against, absent where it is held across
 	// every product.
-	Product string `json:"product,omitempty" doc:"The product the role is held against. Absent where it is held across every product"`
+	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it. Absent where it is held across every product"`
+	// ProductDisplayName is what to show beside it. The field above is what
+	// the withdraw route resolves, so it carries the address and this carries
+	// the label — a screen rendering the label and sending it back is how a
+	// role could be granted and not withdrawn.
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
 	// Everywhere says it is held across the estate, covering products
 	// declared afterwards. Reported rather than left to be inferred from an
 	// absent product: an access review asks what somebody holds, and "on
@@ -220,7 +234,11 @@ type HeldBody struct {
 // KeyBody is a pipeline credential, without its secret.
 type KeyBody struct {
 	Name    string `json:"name" minLength:"1" maxLength:"191" doc:"What this credential is for"`
-	Product string `json:"product" minLength:"1" doc:"The product it may send scans for. Always required"`
+	Product string `json:"product" minLength:"1" doc:"The product it may send scans for, by the name that addresses it. Always required"`
+	// ProductDisplayName is the human spelling, beside the address rather than
+	// in place of it: this field is what create-key resolves, and a display
+	// name resolves to nothing.
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
 	// Stream and Variant narrow it further. Either, both or neither may be
 	// given: a key covering a whole product cannot imply which release an
 	// upload is for, which is why an upload always states its own target.
@@ -292,8 +310,9 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			for _, grant := range held[person.ID] {
 				body.Holds = append(body.Holds, HeldBody{
-					Product: named[grant.ProductID], Role: string(grant.Role),
-					Effective: grant.Active, Source: string(grant.Source),
+					Product: named[grant.ProductID].Address, Role: string(grant.Role),
+					ProductDisplayName: named[grant.ProductID].Display,
+					Effective:          grant.Active, Source: string(grant.Source),
 				})
 			}
 			body.SeesNothing = seesNothing(body.Holds)
@@ -412,7 +431,7 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			product, err := names.ProductByName(ctx, hold.Product)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
 			}
 			if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
 				return nil, huma.Error400BadRequest(err.Error())
@@ -470,7 +489,7 @@ func registerAdministration(api huma.API, a Administering) {
 		}
 		product, err := names.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(a.Logger, err, "that product could not be looked up")
 		}
 		if err := store.Withdraw(ctx, person.ID, product.ID, access.Role(in.Role)); err != nil {
 			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)

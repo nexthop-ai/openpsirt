@@ -4,7 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // One person brought into one undisclosed case, without being granted private
@@ -217,6 +222,210 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 		if got := asPerson(t, r, "triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
 			t.Errorf("a decision listed to this collaborator answered %d when opened: %s",
 				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
+	// A grant on an embargoed case that the API can show and cannot withdraw.
+	//
+	// Store.Names answers a display name where one is set, and the list put
+	// that in a field named identity. The removal route resolves {identity}
+	// through ByIdentity, which matches the folded identity column — so
+	// somebody with a display name was listed under a value matching no row,
+	// the chip's remove answered 404, and the grant on the undisclosed issue
+	// stood.
+	//
+	// Nothing could have caught it: every fixture in the tree sets a display
+	// name equal to the identity, which is the one case where the two strings
+	// agree.
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+
+		// Somebody whose display name is not their identity, which is the
+		// shape the recording route itself documents.
+		person, err := r.rights.Ensure(ctx, "ana", "Ana Ruiz", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.Claim(ctx, person.ID, "ana"); err != nil {
+			t.Fatal(err)
+		}
+		mine, err := catalog.NewStore(r.db.DB).ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.GrantRole(ctx, person.ID, mine.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
+		at := "/v1/products/mine/issues/" + embargoed + "/collaborators"
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			at+"/ana", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var listed struct {
+			Items []struct {
+				Identity string `json:"identity"`
+				Name     string `json:"name"`
+				AddedAt  string `json:"added_at"`
+			} `json:"items"`
+		}
+		read(t, r, "private-triage", at, &listed)
+		if len(listed.Items) != 1 {
+			t.Fatalf("the case lists %d collaborators: %+v", len(listed.Items), listed.Items)
+		}
+		one := listed.Items[0]
+		// The handle in the field the removal route resolves, and the label
+		// beside it rather than in place of it.
+		if one.Identity != "ana" {
+			t.Errorf("the collaborator is listed as %q, which resolves to nobody", one.Identity)
+		}
+		if one.Name != "Ana Ruiz" {
+			t.Errorf("the listing does not say what to call them: %q", one.Name)
+		}
+		// Not the zero time. A person the grant reports and the rows do not
+		// used to come back dated 0001-01-01.
+		if strings.HasPrefix(one.AddedAt, "0001-") || one.AddedAt == "" {
+			t.Errorf("the listing dates the grant %q", one.AddedAt)
+		}
+
+		// And what the list published takes them off again.
+		// Escaped the way a client puts a path segment together, so that a
+		// value which is not a handle fails the assertion above rather than
+		// the request builder here.
+		if got := asPerson(t, r, "private-triage", http.MethodDelete,
+			at+"/"+url.PathEscape(one.Identity), ""); got.Code != http.StatusNoContent {
+			t.Fatalf("removing them by the name the list gave answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		read(t, r, "private-triage", at, &listed)
+		if len(listed.Items) != 0 {
+			t.Errorf("they are still on the case: %+v", listed.Items)
+		}
+	})
+}
+
+func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testing.T) {
+	// "A grant that shows a row in a list and refuses it when opened is a
+	// grant with no content" — DESIGN-access.md says so, about the three reads
+	// by identifier that used to do exactly that. The finding detail was a
+	// fourth, through the graph.
+	//
+	// graph.visibleIn asks Sees and Reads product-wide with no case arm, and
+	// Detail calls Chains to build the way down to each place. So a
+	// collaborator holding no role on the product was refused the path to the
+	// component their own case sits in, and the route answered "no open
+	// finding is recorded there".
+	//
+	// Every existing collaborator test passes because it uses an identity that
+	// also holds a product role, which carries it through.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+
+		// Somebody with a role on the other product and nothing on this one,
+		// which is what a collaborator brought in from outside looks like.
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var detail struct {
+			Vulnerability string `json:"vulnerability"`
+			Places        []struct {
+				Place string `json:"place"`
+				Down  []struct {
+					Name string `json:"name"`
+				} `json:"down"`
+			} `json:"places"`
+		}
+		read(t, r, "outsider", findingAt(embargoed), &detail)
+		if detail.Vulnerability != embargoed {
+			t.Fatalf("the detail is about %q, want their case", detail.Vulnerability)
+		}
+		if len(detail.Places) == 0 {
+			t.Error("the finding says it sits nowhere")
+		}
+
+		// And the case grant is still not a role on the product: the rest of
+		// it stays out of reach.
+		for _, path := range []string{
+			"/v1/products/mine/findings",
+			"/v1/products/mine/streams/master/variants/broadcom/vex",
+		} {
+			if got := asPerson(t, r, "outsider", http.MethodGet, path, ""); got.Code < 400 {
+				t.Errorf("a case collaborator reached %s: %d", path, got.Code)
+			}
+		}
+	})
+}
+
+func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
+	// "May this subject see this product" has two rules here, and the pair is
+	// deliberate: a route about the product as a whole asks what somebody may
+	// see, and a route about one named issue admits somebody brought into a
+	// case. Which of the two an endpoint wants is a security judgment, and it
+	// was made by hand at every call site and visible at none.
+	//
+	// Recording which builds an issue affects gated on the narrow rule and
+	// then resolved each named build with the wide one — so one request gave
+	// both answers about the same subject and the same product, four lines
+	// apart.
+	//
+	// What is pinned is that the product question has one answer. What each
+	// route then allows is a separate question, answered by the act: a
+	// collaborator opens their case, and neither manages its list nor says
+	// which builds the issue affects, because both are product-level acts.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The route about their own case answers it.
+		if got := asPerson(t, r, "outsider", http.MethodGet,
+			findingAt(embargoed), ""); got.Code != http.StatusOK {
+			t.Fatalf("a route about their own case answered %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		// Every other issue-scoped route refuses them for what they may do,
+		// never for the product not existing — that answer contradicts the one
+		// they just got.
+		const invisible = "no product is declared by that name"
+		for _, c := range []struct {
+			method string
+			path   string
+			body   string
+		}{
+			{http.MethodGet, "/v1/products/mine/issues/" + embargoed + "/collaborators", ""},
+			{http.MethodPut, "/v1/products/mine/issues/" + embargoed + "/builds",
+				`{"builds":[{"stream":"master","variant":"broadcom"}]}`},
+		} {
+			got := asPerson(t, r, "outsider", c.method, c.path, c.body)
+			if got.Code < 400 {
+				t.Errorf("%s %s answered %d for a case collaborator", c.method, c.path, got.Code)
+			}
+			if contains(got.Body.String(), invisible) {
+				t.Errorf("%s %s says the product does not exist, having admitted them "+
+					"to the same product elsewhere in the same breath: %s",
+					c.method, c.path, got.Body.String())
+			}
+		}
+
+		// And a route about the product as a whole is not theirs, which is
+		// where that answer is the right one.
+		got := asPerson(t, r, "outsider", http.MethodGet, "/v1/products/mine/assessments", "")
+		if got.Code < 400 {
+			t.Errorf("a case collaborator reached the product's assessments: %d", got.Code)
 		}
 	})
 }

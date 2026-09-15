@@ -67,8 +67,14 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 	// A person's question. A pipeline key sees the receipts for what it sent
 	// and nothing more, and when a build was last scanned by anybody is a fact
 	// about the deployment rather than about that key's uploads.
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second. A person holding
+	// nothing is the first, and is answered below.
+	if subject.Kind != access.Person {
+		return nil, access.Denied("read when these were last scanned")
+	}
 	products, all := subject.Products()
-	if subject.Kind != access.Person || (!all && len(products) == 0) {
+	if !all && len(products) == 0 {
 		return nil, nil
 	}
 

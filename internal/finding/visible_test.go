@@ -3,6 +3,7 @@ package finding_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -136,6 +137,56 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 		}
 		if got := open(access.NewPerson(2, "stranger", false, nil, 0)); got != 0 {
 			t.Errorf("somebody with no rights was told %d", got)
+		}
+	})
+}
+
+// TestAPipelineKeyIsRefusedByTheReadRatherThanAnsweredEmpty pins the rule
+// DESIGN-access.md places in the data layer, over the reads that answer a
+// selection rather than one row.
+//
+// Roughly twenty of them answered a credential that is not a person with an
+// empty result, so the invariant lived in one function at the HTTP edge — and
+// a check in a handler is the one somebody forgets. Subject.Kind is a string,
+// so the zero subject took every one of those branches too.
+func TestAPipelineKeyIsRefusedByTheReadRatherThanAnsweredEmpty(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		key := access.NewPipeline(1, "nightly", access.Scope{ProductID: f.productID})
+		// The zero subject, which is what a caller that forgot to resolve one
+		// passes. Kind is a string, so it is not a Person either.
+		var nobody access.Subject
+
+		for _, who := range []struct {
+			what    string
+			subject access.Subject
+		}{{"a pipeline key", key}, {"the zero subject", nobody}} {
+			for _, read := range []struct {
+				what string
+				ask  func(access.Subject) error
+			}{
+				{"findings across products", func(s access.Subject) error {
+					_, _, err := f.store.Anywhere(ctx, s, 10, 0, finding.Filter{})
+					return err
+				}},
+				{"who is holding work", func(s access.Subject) error {
+					_, err := f.store.HeldBy(ctx, s, f.productID)
+					return err
+				}},
+				{"what the releases hold", func(s access.Subject) error {
+					_, err := f.store.Releases(ctx, s, f.productID)
+					return err
+				}},
+				{"what is running out of time", func(s access.Subject) error {
+					_, err := f.store.RunningOut(ctx, s, finding.Scope{}, 14*24*time.Hour, 10)
+					return err
+				}},
+			} {
+				if err := read.ask(who.subject); !errors.Is(err, access.ErrDenied) {
+					t.Errorf("%s asking %s got %v, want a refusal",
+						who.what, read.what, err)
+				}
+			}
 		}
 	})
 }

@@ -206,7 +206,14 @@ func (s *Store) Chains(ctx context.Context, subject access.Subject, targetID int
 	if len(componentIDs) == 0 {
 		return chains, nil
 	}
-	if _, err := s.visibleIn(ctx, subject, targetID); err != nil {
+	// May they know this build exists, rather than may they read what is open
+	// against it. A chain is the way down to a component and carries no
+	// finding, and every caller has already narrowed the components it is
+	// asking about. Asked as the stronger question, a collaborator holding no
+	// role on the product was refused the path to the component their own case
+	// sits in — so the finding their grant is for answered as though it were
+	// not there.
+	if err := s.knowsBuild(ctx, subject, targetID); err != nil {
 		return nil, err
 	}
 	rows, err := s.climb(ctx, targetID, componentIDs)

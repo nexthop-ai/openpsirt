@@ -258,3 +258,93 @@ func (f *fixture) alsoIn(t *testing.T, identifier string, target int64) {
 		t.Fatal(err)
 	}
 }
+
+// TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal covers three
+// paths in the generator that had never been entered.
+//
+// The alias loop had never run, so IDs had never carried a second entry and
+// CVE had never been filled from an alias — which is the one lookup a published
+// advisory exists to serve: a reader searching by the identifier a coordinator
+// gave them. And every document generated in every test was a draft, so the
+// final arm and the "Issued" fallback summary had never been executed either.
+func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// Disclosed, so the document is final rather than a draft.
+		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
+			TargetIDs: []int64{f.master}, Component: carrier.Name, Severity: "high",
+			Summary:   "The management socket answers before anyone authenticated.",
+			Disclosed: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// A CVE assigned afterwards, which is the ordinary way one arrives:
+		// the issue stays filed under what we minted and goes by both.
+		issue, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := finding.NewVulnerabilities(f.db.DB).
+			AlsoKnownAs(ctx, f.who, issue, "CVE-2026-4242"); err != nil {
+			t.Fatal(err)
+		}
+
+		// Refiled under the better-known name, which is what recording a CVE
+		// does: what somebody sees should be the name they will find in an
+		// advisory, and the minted name stays an alias so nothing that used
+		// it stops resolving.
+		doc, err := f.store.For(ctx, f.who, issuer, "sonic", "CVE-2026-4242")
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		if len(doc.Vulnerabilities) != 1 {
+			t.Fatalf("the document carries %d vulnerabilities", len(doc.Vulnerabilities))
+		}
+		one := doc.Vulnerabilities[0]
+
+		// The CVE in the field a reader looks in, filled from the alias
+		// because the issue is still filed under what we minted.
+		if one.CVE != "CVE-2026-4242" {
+			t.Errorf("the document names the CVE as %q", one.CVE)
+		}
+		// And both names in the field that carries names, each said once.
+		var minted, alias int
+		for _, id := range one.IDs {
+			switch id.Text {
+			case identifier:
+				minted++
+			case "CVE-2026-4242":
+				alias++
+			}
+		}
+		if minted != 1 || alias != 1 {
+			t.Errorf("the document lists the minted name %d times and the CVE %d: %+v",
+				minted, alias, one.IDs)
+		}
+
+		// Disclosed, so it is a document rather than a draft of one.
+		if doc.Document.Tracking.Status != "final" {
+			t.Errorf("a disclosed flaw generates a %q document", doc.Document.Tracking.Status)
+		}
+
+		// Issued with no summary, so the history says what happened rather
+		// than nothing.
+		if _, err := f.store.Issued(ctx, f.who, issuer, "sonic", "CVE-2026-4242", ""); err != nil {
+			t.Fatal(err)
+		}
+		doc, err = f.store.For(ctx, f.who, issuer, "sonic", "CVE-2026-4242")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var said bool
+		for _, revision := range doc.Document.Tracking.RevisionHistory {
+			said = said || revision.Summary == "Issued"
+		}
+		if !said {
+			t.Errorf("issuing with no summary left the history saying nothing: %+v",
+				doc.Document.Tracking.RevisionHistory)
+		}
+	})
+}

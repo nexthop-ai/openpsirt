@@ -269,6 +269,15 @@ func Load() (Config, error) {
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("%sADDR: must not be empty", envPrefix)
 	}
+	// Refused at startup rather than at the first sign-in. The API write path
+	// bounds this setting and the environment path did not, so a deployment
+	// following the documented configuration started cleanly and then failed
+	// every browser sign-in — and the way back needed an administrator's key,
+	// because nobody could sign in.
+	if c.SessionLifetime > access.MaxSessionLifetime {
+		return Config{}, fmt.Errorf("%sSESSION_LIFETIME: want at most %s, got %q",
+			envPrefix, access.MaxSessionLifetime, c.SessionLifetime)
+	}
 	return c, nil
 }
 

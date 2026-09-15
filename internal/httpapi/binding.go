@@ -20,8 +20,11 @@ type BindingBody struct {
 	Group string `json:"group" minLength:"1" maxLength:"191" doc:"The group exactly as the provider names it — a team slug, or a claim value. Matched with its capitals, because it is the provider's identity rather than a name typed here"`
 	// Product is absent where the binding carries administration, which is
 	// global rather than held against a product.
-	Product string `json:"product,omitempty" doc:"The product the role is held against"`
-	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin" doc:"What membership of this group grants"`
+	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it"`
+	// ProductDisplayName is what to show beside it, for the reason HeldBody
+	// carries one: unbind resolves the field above.
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
+	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin" doc:"What membership of this group grants"`
 }
 
 func registerBindings(api huma.API, a Administering, settings func() *setting.Store) {
@@ -84,6 +87,18 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 				"nothing would administer this deployment in that mode: bind a group to admin, " +
 					"or name somebody in configuration, before switching")
 		}
+		// And something has to be able to say what groups somebody is in. A
+		// provider configured without a source of groups reports every arrival
+		// as belonging to nothing, so in this mode nobody derives any role —
+		// which is the same lockout the check above prevents, arriving by the
+		// other door and looking like a working deployment that admits nobody.
+		if wanted == access.GroupBound && a.Groups != nil && !a.Groups() {
+			return nil, huma.Error409Conflict(
+				"nothing here can say which groups somebody is in, so in that mode " +
+					"nobody would hold any role: configure a groups claim on the provider, " +
+					"an organization for GitHub sign-in, or a trusted proxy that reports " +
+					"groups, before switching")
+		}
 
 		if err := rights.SwitchTo(ctx, wanted); err != nil {
 			return nil, wentWrong(a.Logger, "cannot change where roles come from", err)
@@ -111,7 +126,7 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot list the group bindings", err)
 		}
-		named, err := productNames(ctx, a)
+		products, err := productNames(ctx, a)
 		if err != nil {
 			return nil, err
 		}
@@ -119,8 +134,10 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		out := &listOutput[BindingBody]{}
 		out.Body.Items = make([]BindingBody, 0, len(bindings))
 		for _, binding := range bindings {
+			held := products[binding.ProductID]
 			out.Body.Items = append(out.Body.Items, BindingBody{
-				Group: binding.GroupName, Product: named[binding.ProductID], Role: string(binding.Role),
+				Group: binding.GroupName, Product: held.Address,
+				ProductDisplayName: held.Display, Role: string(binding.Role),
 			})
 		}
 
@@ -171,7 +188,7 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		}
 		product, err := names.ProductByName(ctx, in.Body.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
 		}
 		if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
 			return nil, wentWrong(a.Logger, "cannot bind a group", err)
@@ -214,7 +231,7 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 
 		product, err := names.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
 		}
 		if err := rights.Unbind(ctx, in.Group, product.ID, access.Role(in.Role)); err != nil {
 			return nil, wentWrong(a.Logger, "cannot unbind a group", err)
@@ -256,8 +273,28 @@ func stillAdministrable(ctx context.Context, rights *access.Store, a Administeri
 	return nil
 }
 
+// named is the two names a product answers to, which are different strings
+// wherever an operator declared a display name.
+//
+// Both, because a body carrying a role or a binding needs each for a different
+// purpose: the address is what the withdraw beside the row resolves, and the
+// display name is what the row says. Published as one pair rather than fetched
+// twice, so the two cannot come back from different reads.
+type named struct {
+	// Address is what ProductByName matches: lowercased and trimmed.
+	Address string
+	// Display is what the operator declared, empty where it is the address
+	// again.
+	Display string
+}
+
 // productNames maps product rows to the names bindings state them by.
-func productNames(ctx context.Context, a Administering) (map[int64]string, error) {
+//
+// The address is the one a binding states and the one every matching write
+// resolves. Publishing the display name there made the interface's Withdraw
+// send back a word that matched no row, so a role on a product whose display
+// name is not merely a recapitalization could be granted and not withdrawn.
+func productNames(ctx context.Context, a Administering) (map[int64]named, error) {
 	names := a.Catalog()
 	// Every product, because this is naming the ones bindings already refer
 	// to rather than answering anybody about them. The caller is administering
@@ -266,11 +303,15 @@ func productNames(ctx context.Context, a Administering) (map[int64]string, error
 	if err != nil {
 		return nil, wentWrong(a.Logger, "cannot read the products roles are held against", err)
 	}
-	named := map[int64]string{}
+	by := map[int64]named{}
 	for _, product := range products {
-		named[product.ID] = product.DisplayName
+		one := named{Address: product.Name}
+		if product.DisplayName != product.Name {
+			one.Display = product.DisplayName
+		}
+		by[product.ID] = one
 	}
-	return named, nil
+	return by, nil
 }
 
 // registerRevocation mounts what an administrator needs to cut access off now
@@ -328,11 +369,15 @@ func registerRevocation(api huma.API, a Administering) {
 		}
 		person, err := rights.ByIdentity(ctx, in.Identity)
 		if err != nil {
-			return nil, noSuchPerson()
+			return nil, absent(a.Logger, err, "that person could not be looked up",
+				noSuchPerson)
 		}
 		token, err := rights.TokenByName(ctx, person.ID, in.Name)
 		if err != nil {
-			return nil, huma.Error404NotFound("they hold no token called that")
+			return nil, absent(a.Logger, err, "that token could not be looked up",
+				func() error {
+					return huma.Error404NotFound("they hold no token called that")
+				})
 		}
 		if err := rights.RevokeToken(ctx, token.ID); err != nil {
 			return nil, wentWrong(a.Logger, "cannot revoke a token", err)

@@ -167,6 +167,25 @@ func IsNoRows(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
 }
 
+// FromRead says which of two things a failed read was: a row that is not
+// there, or a read that could not be made.
+//
+// absent is what the caller should get where the row is genuinely missing —
+// the asking package's own sentinel, worded however that package words it.
+// reading names the act, for the line an operator reads: "look up product 12".
+//
+// One spelling, because the difference is a status code at every caller and it
+// was being made by hand wherever it was made at all. A reader that wraps every
+// failure alike answers "that does not exist" for a database it could not
+// reach, and every caller above it repeats that to whoever asked — so an outage
+// tells an authenticated reader their products, builds and findings are gone.
+func FromRead(err error, absent error, reading string) error {
+	if IsNoRows(err) {
+		return absent
+	}
+	return fmt.Errorf("%s: %w", reading, err)
+}
+
 // IsDuplicate reports whether a write was refused by a unique constraint.
 //
 // Here rather than at a call site for the same reason WorthRetrying is: what

@@ -9,7 +9,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // HolderBody is somebody or something work can be handed to.
@@ -58,7 +57,7 @@ func registerHolders(api huma.API, in Ingest) {
 			"directory and needs administration.",
 		Tags: []string{"Triage"},
 	}, perProduct, "Asking about undisclosed findings needs private-read or "+
-		"private-triage."), func(ctx context.Context, input *struct {
+		"private-triage.", readRights()...), func(ctx context.Context, input *struct {
 		Product    string `path:"product"`
 		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"The visibility of the work being handed over"`
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals"`
@@ -71,9 +70,9 @@ func registerHolders(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		// Asking who may hold undisclosed work is itself a question about
 		// undisclosed work, and is answered the way every other path answers

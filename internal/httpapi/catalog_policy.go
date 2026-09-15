@@ -58,7 +58,7 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		}
 		product, err := store.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		if err := store.SetTriageFloor(ctx, product.ID, word); err != nil {
 			return nil, wentWrong(d.Logger, "that line could not be recorded", err)
@@ -98,7 +98,7 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		}
 		product, err := store.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		before := product.EOLOn
 		if err := store.SetProductEndOfLife(ctx, product.ID, on); err != nil {
@@ -155,16 +155,16 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		}
 		product, err := store.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		stream, err := store.StreamByName(ctx, product.ID, in.Stream)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		if named := strings.TrimSpace(in.Body.CutFrom); named != "" {
 			from, err := store.StreamByName(ctx, product.ID, named)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			if err := store.FillInParent(ctx, stream.ID, from.ID); err != nil {
 				return nil, asked(d.Logger, err)
@@ -207,11 +207,11 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		}
 		product, err := store.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		stream, err := store.StreamByName(ctx, product.ID, in.Stream)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		before := stream.EOLOn
 		if err := store.SetStreamEndOfLife(ctx, stream.ID, on); err != nil {

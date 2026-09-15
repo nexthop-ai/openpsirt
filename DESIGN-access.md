@@ -40,6 +40,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [Disclosure](#disclosure)
 - [Extending a disclosure date](#extending-a-disclosure-date)
 - [Case collaborators](#case-collaborators)
+- [Values a deployment mints](#values-a-deployment-mints)
 - [Mail addresses](#mail-addresses)
 - [Absent holders](#absent-holders)
 - [Limits](#limits)
@@ -261,8 +262,12 @@ Recorded by an administrator, as a date on the person.
 | Never a deletion | The record names them as the proposer of judgments and the approver of others, and an assignment used to point at them. Deleting the row would either break those or rewrite what happened |
 | Their roles are left where they are | What somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it from memory. What stops them is the date |
 | Read once, where every way in already passes | A session, a personal token and a group-bound sign-in all resolve by identity. A second spelling of the check is a second rule to keep in step with the first |
+| **Every question of the form "may this person do this" excludes them** | The grants are left in place on purpose, so a query reading only grants answers that somebody who has left is still cleared. Three did: two of them decide whether an undisclosed finding may be handed to a person or a team, where the assignment itself is the disclosure, and the third decides whether their work is released |
+| A departed administrator does not satisfy the startup check | Otherwise the last admin group can be unbound and the deployment starts cleanly with nobody able to administer it — which is the state that check exists to prevent |
+| Naming somebody in configuration readmits them | It is the documented way back into a deployment nobody can administer, and nothing else clears the date. Done there rather than wherever a person is recorded: an administrator re-recording a departed colleague must not silently readmit them |
 | Sessions are ended rather than left to expire | Roles are re-read at sign-in, so withdrawing one takes effect then. This is what makes leaving immediate instead |
 | Everything they held is handed back | Work held by somebody who is gone is work nobody is doing, and it does not look like it |
+| Granting what is already held succeeds, and only where the insert was refused as a duplicate | Five paths ran a second query on *any* insert failure and reported success if a row was there — including a failure caused by a concurrent insert that was then rolled back. What "already held" means is the part that differs, so it stays with each caller: a grant asks whether it is in force, a binding asks whether the row exists |
 | Deactivating somebody who has already left succeeds and moves nothing | An administrator clicking again, or two of them acting at once, is the ordinary case — and the date is when they left, not when it was last asserted |
 | An administrator may not deactivate themselves | It leaves nobody able to undo it, and the bootstrap account is often the one doing it |
 | Coming back does not return their work | Somebody else may have picked it up, and reassigning it would take it off them silently |
@@ -515,6 +520,7 @@ sign-ins, which has to be swept and which anybody can fill.
 | The identity token must carry the value tying it to this sign-in | It belonging to a different one |
 | An identity token naming no subject is refused | Quietly reducing that deployment to matching by name |
 | A provider's stated address is used only where the provider says it verified it | An authorization waiting under somebody's work address being redeemable by anybody willing to claim it |
+| The sealed value carries when it was minted, and a stale one is refused | The window being a request to the browser and nothing else. The browser holding the value may be the one that planted it, and the key sealing it is never rotated — so without a time in the payload a sign-in sealed months ago stays acceptable |
 
 ## Outbound provider fetches
 
@@ -724,6 +730,21 @@ means at least one group mapped to administration, or somebody named in
 configuration. The only route back from locking yourself out is editing the
 database by hand.
 
+| Rule | Reason |
+|---|---|
+| Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
+| A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
+
+**The session lifetime has a ceiling of thirty days.** It is the window in which
+a role a group withdrew can still be held, and it was whatever an administrator
+typed: a lifetime of a year made every browser sign-in last a year. Refused
+rather than quietly shortened, at the settings write and at startup, so that
+somebody who asks for more hears the limit rather than discovering it later.
+
+Thirty is a judgment rather than a commitment. Nothing has been decided about
+where the ceiling belongs, and somebody could reasonably say ninety — it is the
+owner's to settle, and `TODO.md` carries it until they do.
+
 ## The grant grid
 
 Products down and capabilities across (REQ-42), one checkbox per pair. It
@@ -754,7 +775,9 @@ re-granted anything (REQ-42).
 | Withdrawn whole, leaving nothing behind | Expanding into per-product grants at withdrawal records the catalog of that day, which is the same defect by the back door. Anything still wanted on one product is granted there deliberately |
 | Withdrawing it hands back the work it was holding | It is the last role in every product at once, and a finding assigned to somebody who can no longer open it is in no list at all: out of the shared queue because it is assigned, and out of theirs because they cannot reach it. Asked per product, exactly as withdrawing a per-product role is |
 | Every question about what somebody holds asks this table too | A grant that only a resolved subject can see is invisible to the predicates that read the grant tables directly — whether somebody may be handed a finding, who may be mentioned, whether their last role in a product has gone, and whether an approver still holds the right they used. Each of those is asked of both tables |
-| A query outside the access package naming one table and not the other is refused | Checked rather than remembered. Five predicates missed the second kind of grant the day it was added, each answering no for somebody who held the role — which compiles and passes. The duplicate-insert check for a per-product grant is the one reader that must stay narrow, and it is inside the package where the two are resolved |
+| A query naming one table and not the other is refused, in every package | Checked rather than remembered. Five predicates missed the second kind of grant the day it was added, each answering no for somebody who held the role — which compiles and passes. The access package was exempt whole, and four hand-written copies of the union then lived in the one place the check could not see; the union is written once now, and the files that name one table alone are named individually with the reason |
+| The union is one builder, and what it attaches to is the caller's | Whether the question is about one person, a team's members, or everybody who may be mentioned differs; the two halves do not. The column naming the person comes from the code, because a placeholder cannot bind one |
+| Two EXISTS rather than a union | A union inside an EXISTS is a syntax error on SQLite, and this has to run on four engines |
 | Withdrawing one product from it is not offered | "All except one" is a third kind of fact, with its own storage, its own narrowing and its own meaning in an access review |
 | Set aside and restored by a change of role-assignment mode | It is an assignment, so the act that makes switching reversible covers it. Nothing derives one: a group binding names a product |
 | Stored in its own table rather than as a grant with no product | All four engines treat NULLs in a unique key as distinct from each other, so a nullable product would let duplicate estate rows accumulate with the database enforcing nothing — and the partial index that fixes it is engine-specific (REQ-71) |
@@ -772,6 +795,7 @@ for work it was never scoped for.
 
 | Rule | Reason |
 |---|---|
+| Narrowing removes, never rebuilds | Who somebody is, the teams they are on and the cases they were brought into are not per-product facts, and a token pinned to a product must not stop them being themselves. Written as a fresh subject it carried five fields and dropped the rest, so every "assigned to me" surface answered empty and taking an unowned finding for yourself was refused as giving work to somebody else |
 | A live reference to its owner, never a snapshot | What it reaches is read from what they hold at the moment it is used, so a role withdrawn cuts the token at the same instant — including one withdrawn because a group membership went away, which is the case with nothing else to notice it |
 | It may not mint or withdraw another | Minting resolves through the owner, so a token that could mint would ask for a wider one and be given it, making every limit exactly one request deep |
 | Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration is dropped by narrowing entirely, because a token narrowed to one product that still administered everything would not be narrowed |
@@ -802,6 +826,18 @@ screen and the other is a disclosure.
 A pipeline is refused a read rather than shown an empty one, receipts for its
 own uploads excepted. "Here is nothing" and "you cannot ask" are different
 statements, and the first invites a caller to believe the list is empty.
+
+**Refused where the read is, not only at the edge.** Roughly twenty store reads
+answered a credential that is not a person with an empty result, so the
+invariant the design places in the data layer was in fact enforced by one
+function in a handler — and a check in a handler is the one somebody forgets.
+`Subject.Kind` is a string, so the zero subject took every one of those
+branches as well.
+
+The two halves are separate questions and are answered separately. A credential
+that is not a person is refused. A *person* who holds nothing is answered with
+an empty list, which is the correct answer for a narrowed read and not a
+refusal. Both checks stay: the point is that the layers say the same thing.
 
 Everything except the probes is authenticated, named as a list rather than
 guarded by a path prefix. A prefix leaves everything outside it open by default,
@@ -962,6 +998,9 @@ private access.
 | Asked once the row is in hand | It needs the issue, which a bare product-and-visibility rule cannot see. That is the opposite order from a name somebody typed, and safe for the same reason it is necessary: the row is already established as existing |
 | Adding somebody is an access change | It lands in the administration trail, tells them at once in the area inside the application, and the finding shows how many collaborators it has. It stops meaning anything at disclosure |
 | Whoever reads the case manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo |
+| The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator was refused the path to the component their own case sits in and the finding answered as though it were not there |
+| Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faulted on the row the grant exists to open |
+| Resolving a build's names admits a collaborator; reading what that build holds does not | The names their own issue sits at have to resolve, or the grant refuses them the one thing it gave. So every read reached through that lookup puts the product-wide question for itself, and a document about the whole build is not a question about one named issue |
 
 The product-wide question keeps answering no, and that is the whole of the
 safety. Every list, count, report and export narrows by whether somebody reads
@@ -973,6 +1012,29 @@ named issue.
 A collaborator does not get the findings list. They reach the case through the
 notification the grant sends — the one message that names an undisclosed issue on
 purpose, because it goes to the person who has just been given that issue.
+
+## Values a deployment mints
+
+Some settings are written by the deployment rather than typed by an operator.
+The key sealing a sign-in that is in flight is the one that matters. It is not
+what a session is verified against: a session is a random secret, hashed into a
+row and resolved by that hash, and losing this key costs only the sign-ins
+between the two mints.
+
+| Rule | Reason |
+|---|---|
+| Minted only where nothing holds one, and the answer is what is stored | Two replicas starting together both find nothing and both mint. Written as a plain set, the second overwrites the first — and every sign-in already in flight, sealed with the losing key, is refused when the callback lands |
+| The caller takes whichever key won | It wants a key everybody agrees on, not the one it generated |
+
+**What a setting held is answered by the write that replaced it.** Read in a
+statement of its own beforehand it is the value at some earlier moment: two
+administrators moving the same setting at once both read the original, and the
+second writes a prior value into the append-only trail that nothing ever held
+afterwards. A record of who changed what, wrong about the what, and unfixable
+later because the value is gone.
+
+A read-back after the write closes only the window between that write and
+itself, which is not the window that matters.
 
 ## Mail addresses
 

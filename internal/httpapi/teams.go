@@ -41,7 +41,7 @@ func registerTeams(api huma.API, a Administering) {
 			"names; who is on it is the same question as who is here, and that is answered " +
 			"where the rest of the record is.",
 		Tags: []string{"Administration"},
-	}, anySubject, "Membership is listed for an administrator; anybody else sees the names."),
+	}, anyPerson, "Membership is listed for an administrator; anybody else sees the names."),
 		func(ctx context.Context, _ *struct{}) (*listOutput[TeamBody], error) {
 			if _, err := reading(ctx); err != nil {
 				return nil, err
@@ -234,7 +234,9 @@ func teamBody(ctx context.Context, store *access.Store, team access.Team) (TeamB
 	if err != nil {
 		return TeamBody{}, err
 	}
-	named, err := store.Names(ctx, members)
+	// The identity, because the field is documented as the identity people
+	// sign in under and the route that takes somebody off a team resolves it.
+	named, err := store.Handles(ctx, members)
 	if err != nil {
 		return TeamBody{}, err
 	}

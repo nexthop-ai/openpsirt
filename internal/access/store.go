@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -319,10 +318,18 @@ func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, erro
 	// "nobody" for somebody who is plainly there.
 	err := s.db.NewSelect().Model(person).Where("identity = ?", folded(identity)).Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("look up %q: %w", identity, err)
+		return nil, database.FromRead(err,
+			fmt.Errorf("nobody is recorded as %q: %w", identity, ErrNoSuchPerson),
+			fmt.Sprintf("look up %q", identity))
 	}
 	return person, nil
 }
+
+// ErrNoSuchPerson is what an identity nobody here holds comes back as.
+//
+// A sentinel rather than a sentence, because whoever asked has to tell it from
+// a read that could not be made: the first is a 404 and the second is a fault.
+var ErrNoSuchPerson = errors.New("nobody here is called that")
 
 // Resolve turns an identity into the subject it stands for.
 //
@@ -429,6 +436,44 @@ func (s *Store) Resolve(ctx context.Context, identity string) (Subject, error) {
 		person.PartyID, on...).OnCases(cases), nil
 }
 
+// alreadyThere turns a refused insert into success where the state the caller
+// asked for already holds.
+//
+// Every grant path wrote this out, and none of them asked what the failure was
+// — so any insert error at all became success as long as a row was there,
+// including one caused by a concurrent insert that was then rolled back. The
+// question is only ever asked of a uniqueness violation, which is the one
+// failure that means "somebody got there first".
+//
+// The predicate stays the caller's, because what "already holds" means is the
+// one part that genuinely differs: a grant asks whether it is in force, a
+// binding asks whether the row exists, and each says why beside itself.
+//
+// Where the row is there and the predicate says no, the caller hears what
+// happened rather than the driver's constraint message — which is what an
+// administrator was shown for an operation the endpoint documents as
+// idempotent.
+//
+// The other way round is also in this package: AddToTeam reads and writes
+// inside one transaction instead. Either is defensible; this is the one for a
+// write whose refusal is a unique index rather than a row it has to see first.
+func (s *Store) alreadyThere(ctx context.Context, insertErr error, what string,
+	present func(context.Context) (bool, error)) error {
+
+	if !database.IsDuplicate(insertErr) {
+		return fmt.Errorf("%s: %w", what, insertErr)
+	}
+	there, err := present(ctx)
+	if err != nil {
+		return fmt.Errorf("%s: %w", what, err)
+	}
+	if there {
+		return nil
+	}
+	return fmt.Errorf("%s: it is already recorded and is not in force, so it "+
+		"cannot be granted again from here", what)
+}
+
 // GrantRole gives somebody a role on a product.
 func (s *Store) GrantRole(ctx context.Context, personID, productID int64, role Role) error {
 	if !role.Valid() {
@@ -440,11 +485,15 @@ func (s *Store) GrantRole(ctx context.Context, personID, productID int64, role R
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
 	if _, err := s.db.NewInsert().Model(grant).Exec(ctx); err != nil {
-		// Granting what somebody already holds is not a failure.
-		if held, err := s.holds(ctx, personID, productID, role); err == nil && held {
-			return nil
-		}
-		return fmt.Errorf("grant %q: %w", role, err)
+		// Granting what somebody already holds is not a failure. In force,
+		// like every other question about what somebody holds: a row set aside
+		// by a change of mode grants nothing, so reporting success on one
+		// would tell an administrator they had granted something that does not
+		// exist.
+		return s.alreadyThere(ctx, err, fmt.Sprintf("grant %q", role),
+			func(ctx context.Context) (bool, error) {
+				return s.holds(ctx, personID, productID, role)
+			})
 	}
 	return nil
 }
@@ -493,14 +542,21 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 		return Subject{}, ErrDenied
 	}
 
+	// Matched on the whole digest, which is the comparison. A constant-time
+	// compare stood here afterwards, over the row the equality had just
+	// selected — so it could not fail, and the sentence above it said the
+	// lookup was "not by itself a statement that the secrets match" when a SQL
+	// equality on the whole digest is exactly that.
+	//
+	// The presented secret is never compared byte by byte: only its digest
+	// reaches the database. What decides the timing of this is the index
+	// lookup, which is not constant time and which nothing here controls —
+	// making that a property rather than decoration means replacing the lookup
+	// with a fetch by a non-secret key and a comparison in Go, which is a
+	// different design and would be stated as one.
 	key := new(Key)
 	err := s.db.NewSelect().Model(key).Where("secret_hash = ?", hashSecret(secret)).Scan(ctx)
 	if err != nil {
-		return Subject{}, ErrDenied
-	}
-	// Compared again in constant time. The lookup above found a row by digest,
-	// which is not by itself a statement that the secrets match.
-	if subtle.ConstantTimeCompare([]byte(key.SecretHash), []byte(hashSecret(secret))) != 1 {
 		return Subject{}, ErrDenied
 	}
 	if key.RevokedAt != nil {
@@ -596,30 +652,28 @@ func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Ro
 // their assigned work into work nobody can reach: assigned, so not in the
 // shared queue, and assigned to somebody who can no longer open it.
 func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) (bool, error) {
-	// Active ones, like every other question about what somebody holds. A
-	// row that grants nothing must never be counted as access — a grant left
-	// inactive by a switch to group-bound roles answered "they still hold
-	// something here", so their assigned findings stayed with somebody who
-	// could no longer open them, and the response said nothing was released.
-	n, err := s.db.NewSelect().Model((*Grant)(nil)).
-		Where("person_id = ?", personID).
-		Where("active = ?", true).
-		Where("product_id = ?", productID).Count(ctx)
+	// And they are still here. A departed person's grant rows are left in
+	// place deliberately, so counting them left their work with somebody who
+	// is refused at sign-in and the answer said nothing was released.
+	here, err := s.here(ctx, personID)
+	if err != nil || !here {
+		return false, err
+	}
+	// Any role at all, asked of the same union every other question uses. In
+	// force, like every question about what somebody holds: a row that grants
+	// nothing must never be counted as access — a grant left inactive by a
+	// switch to group-bound roles answered "they still hold something here",
+	// so their assigned findings stayed with somebody who could no longer open
+	// them and the response said nothing was released. And a role held across
+	// every product is a role held here, so withdrawing their last per-product
+	// grant does not leave their work unreachable.
+	held, err := holdingAny(s.db.NewSelect().
+		TableExpr(`person AS "p"`).ColumnExpr("p.id").
+		Where("p.id = ?", personID), "p.id", Roles(), productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
 	}
-	if n > 0 {
-		return true, nil
-	}
-	// A role held across every product is a role held here, so withdrawing
-	// their last per-product grant does not leave their work unreachable.
-	everywhere, err := s.db.NewSelect().Model((*EstateGrant)(nil)).
-		Where("person_id = ?", personID).
-		Where("active = ?", true).Count(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read what they still hold everywhere: %w", err)
-	}
-	return everywhere > 0, nil
+	return held, nil
 }
 
 // Keys lists the pipeline credentials, without their secrets.
@@ -641,6 +695,10 @@ func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 // otherwise. Batched because the alternative is a query per row, and the
 // places this is needed — a review queue, a list of what was dismissed — are
 // exactly the ones that are long.
+//
+// **What this answers is never sent back to a lookup.** A display name is a
+// label somebody chose and resolves to nobody; Handles is what a route naming
+// a person in its path matches.
 func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error) {
 	names := map[int64]string{}
 	if len(ids) == 0 {
@@ -660,6 +718,34 @@ func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error
 		names[person.ID] = person.Identity
 	}
 	return names, nil
+}
+
+// Handles resolves people to the identity they sign in under.
+//
+// Beside Names, and the other half of it: Names is for showing and this is for
+// resolving, and wherever somebody has a display name the two are different
+// strings. ByIdentity matches the folded identity column alone, so a list that
+// published a display name in a field a route resolves could not be acted on —
+// which is how a collaborator on an embargoed case became somebody the API
+// could list and not remove.
+//
+// The package offered no batch identity lookup at all, so a handler that had
+// to round-trip a name had nothing else to reach for.
+func (s *Store) Handles(ctx context.Context, ids []int64) (map[int64]string, error) {
+	handles := map[int64]string{}
+	if len(ids) == 0 {
+		return handles, nil
+	}
+	var people []Account
+	if err := s.db.NewSelect().Model(&people).
+		Column("id", "identity").
+		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what these people sign in as: %w", err)
+	}
+	for _, person := range people {
+		handles[person.ID] = person.Identity
+	}
+	return handles, nil
 }
 
 // Mentionable is somebody who could be named in text about a product.
@@ -722,11 +808,23 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	// Lowered on both sides rather than asked to compare loosely: the
 	// engines do not agree on what a case-insensitive comparison is, and
 	// one spelled the same way everywhere behaves the same way everywhere.
-	if wanted := strings.ToLower(strings.TrimSpace(term)); wanted != "" {
-		like := "%" + wanted + "%"
+	//
+	// **Folded here and again by the engine, and this is the caller where that
+	// still costs something.** Folding in Go is Unicode-aware and LOWER() on
+	// SQLite is ASCII-only, so a display name carrying a non-ASCII capital is
+	// found on three engines and missed on the fourth. An identity is an
+	// address and ASCII; a display name is free human text and has no folded
+	// column to compare against, unlike the component names that do.
+	//
+	// Escaped, because a search box is not a pattern language: a term of "%"
+	// matched every person the deployment could offer, in one request, from
+	// the picker that decides who may be named on an embargoed case.
+	if wanted := strings.TrimSpace(term); wanted != "" {
+		like := database.LikeContains(wanted)
 		query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("LOWER(p.identity) LIKE ?", like).
-				WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?", like)
+			return q.WhereOr("LOWER(p.identity) LIKE ?"+database.LikeClause, like).
+				WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?"+
+					database.LikeClause, like)
 		})
 	}
 	var found []Mentionable
@@ -790,19 +888,12 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 	if len(enough) == 0 {
 		return nil
 	}
-	return s.db.NewSelect().
+	return holdingAny(s.db.NewSelect().
 		TableExpr(`person AS "p"`).
 		ColumnExpr(`p.id AS "id"`).
 		ColumnExpr(`p.identity AS "identity"`).
 		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.identity) AS "name"`).
-		Where("p.deactivated_at IS NULL").
-		Where(`EXISTS (SELECT 1 FROM "role_grant" AS "g"
-			WHERE g.person_id = p.id AND g.active = ?
-			  AND g.product_id = ? AND g.role IN (?))
-			OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
-			WHERE ga.person_id = p.id AND ga.active = ?
-			  AND ga.role IN (?))`,
-			true, productID, bun.List(enough), true, bun.List(enough))
+		Where("p.deactivated_at IS NULL"), "p.id", enough, productID)
 }
 
 // Deactivate records that somebody has left, and Reactivate that they are

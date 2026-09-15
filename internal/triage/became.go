@@ -93,8 +93,10 @@ type Became struct {
 func (s *Store) Became(ctx context.Context, subject access.Subject,
 	limit, offset int) ([]Became, int, error) {
 
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, 0, nil
+		return nil, 0, access.Denied("read what judgments became")
 	}
 	limit = database.AList.Of(limit)
 

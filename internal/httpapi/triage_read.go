@@ -153,7 +153,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"Set `expired=true` to list deferrals whose date has passed — the findings that have " +
 			"come back and need judging again.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		Outcome string `query:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Limit to one outcome"`
 		State   string `query:"state" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to one state"`
@@ -212,7 +212,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"`GET /v1/claims/{id}/revisions`, and for who agreed to which of them see " +
 			"`GET /v1/claims/{id}/approvals`.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{ Body DecisionDetail }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -248,7 +248,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"For the earlier justifications see `GET /v1/claims/{id}/revisions` and for the " +
 			"discussion `GET /v1/claims/{id}/comments`.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only claims you may read every row of."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only claims you may read every row of."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{ Body ClaimDetail }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -314,7 +314,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"this is how to read what an approver actually saw rather than what the text says " +
 			"now.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*listOutput[RevisionBody], error) {
 		subject, store, err := triaging(ctx, in)
@@ -364,7 +364,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"appear — with nobody acting, and nobody having agreed to the larger number. " +
 			"Comparing this against what it covers now is the point of keeping it.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*listOutput[ApprovalBody], error) {
 		subject, store, err := triaging(ctx, in)
@@ -527,7 +527,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			"usually still the right answer, and re-affirming it is a different request from " +
 			"making a new one.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`

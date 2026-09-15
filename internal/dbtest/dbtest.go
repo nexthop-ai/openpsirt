@@ -140,6 +140,28 @@ func Two(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	run(t, fn, map[database.Engine]bool{database.SQLite: true, database.Postgres: true}, beside)
 }
 
+// Servers runs fn against the three server engines and not SQLite.
+//
+// **For a test that needs two transactions open at once**, which SQLite cannot
+// give it: its pool is one connection, so a second writer waits for a
+// connection the first is holding and the test deadlocks rather than racing.
+//
+// A narrow exemption, and the only one: everything else that pins what a query
+// does belongs in Each, whatever it costs. What qualifies here is a test whose
+// subject is two writers colliding — which is also where the defects live that
+// SQLite cannot show, because it serializes writers and the three servers do
+// not.
+func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
+	t.Helper()
+	servers := map[database.Engine]bool{}
+	for _, engine := range database.Engines() {
+		if engine != database.SQLite {
+			servers[engine] = true
+		}
+	}
+	run(t, fn, servers, beside)
+}
+
 // Only runs fn against one engine.
 //
 // **The database arrives migrated and empty of the previous test's rows.**

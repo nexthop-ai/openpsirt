@@ -40,6 +40,21 @@ var ErrNotFound = errors.New("not declared")
 // ErrExists is returned when a declaration would duplicate one already made.
 var ErrExists = errors.New("already declared")
 
+// missingOr says which of the two a failed read was: a row that is not there,
+// or a read that could not be made.
+//
+// One spelling, because the two answers differ by a status code at every
+// caller and the distinction was made by hand at each of them — where it was
+// made at all. A reader that wraps every failure alike hands a caller "that
+// does not exist" for a database it could not reach, and a caller that trusts
+// it says so to whoever asked.
+//
+// absent names the thing, in the words a reader sees: "product 12", "target 4".
+// reading names the act, for the line an operator gets: "look up product 12".
+func missingOr(err error, absent, reading string) error {
+	return database.FromRead(err, fmt.Errorf("%s: %w", absent, ErrNotFound), reading)
+}
+
 // Product is a thing that gets shipped.
 type Product struct {
 	bun.BaseModel `bun:"table:product,alias:p"`
@@ -258,7 +273,8 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error 
 	var kind Kind
 	if err := s.db.NewSelect().Model((*Stream)(nil)).Column("kind").
 		Where("id = ?", parent).Scan(ctx, &kind); err != nil {
-		return fmt.Errorf("release %d: %w", parent, ErrNotFound)
+		return missingOr(err, fmt.Sprintf("release %d", parent),
+			fmt.Sprintf("look up what release %d is", parent))
 	}
 	if kind != Branch {
 		return fmt.Errorf("a release is cut from a branch, and that is a %s", kind)
@@ -282,7 +298,8 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) error 
 		var stood *int64
 		if err := s.db.NewSelect().Model((*Stream)(nil)).Column("parent_id").
 			Where("id = ?", streamID).Scan(ctx, &stood); err != nil {
-			return fmt.Errorf("release %d: %w", streamID, ErrNotFound)
+			return missingOr(err, fmt.Sprintf("release %d", streamID),
+				fmt.Sprintf("read what release %d was cut from", streamID))
 		}
 		if stood != nil && *stood == parent {
 			return nil
@@ -457,8 +474,14 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 
 	// A person's question. A pipeline key reads back what it sent, and which
 	// releases a deployment has stopped supporting is not that.
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second. A person holding
+	// nothing is the first, and is answered below.
+	if subject.Kind != access.Person {
+		return nil, access.Denied("read which releases are out of support")
+	}
 	products, all := subject.Products()
-	if subject.Kind != access.Person || (!all && len(products) == 0) {
+	if !all && len(products) == 0 {
 		return nil, nil
 	}
 	past, err := s.StreamsPastEndOfLife(ctx, at)
@@ -560,7 +583,7 @@ func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("product %q: %w", name, ErrNotFound)
 		}
-		return nil, err
+		return nil, fmt.Errorf("look up product %q: %w", name, err)
 	}
 	return p, nil
 }
@@ -598,7 +621,7 @@ func (s *Store) StreamByName(ctx context.Context, productID int64, name string) 
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("stream %q: %w", name, ErrNotFound)
 		}
-		return nil, err
+		return nil, fmt.Errorf("look up stream %q: %w", name, err)
 	}
 	return st, nil
 }
@@ -640,7 +663,7 @@ func (s *Store) VariantByName(ctx context.Context, productID int64, name string)
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("variant %q: %w", name, ErrNotFound)
 		}
-		return nil, err
+		return nil, fmt.Errorf("look up variant %q: %w", name, err)
 	}
 	return v, nil
 }
@@ -732,6 +755,14 @@ func (s *Store) TargetFor(ctx context.Context, streamID, variantID int64) (*Targ
 
 	target = &Target{StreamID: streamID, VariantID: variantID, CreatedAt: now()}
 	if _, err := s.db.NewInsert().Model(target).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			// Two pipelines filed the first scan for this pair at once. The
+			// row the other one wrote is the row: the read above and this
+			// write are two statements, so both found nothing and both
+			// inserted, and the unique index refused whichever arrived
+			// second. Nothing here is the loser's to report.
+			return s.ExistingTarget(ctx, streamID, variantID)
+		}
 		return nil, fmt.Errorf("record that this release is built as this variant: %w", err)
 	}
 	return target, nil
@@ -793,19 +824,23 @@ type Placement struct {
 func (s *Store) Describe(ctx context.Context, targetID int64) (*Placement, error) {
 	var t Target
 	if err := s.db.NewSelect().Model(&t).Where("id = ?", targetID).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up target %d: %w", targetID, err)
+		return nil, missingOr(err, fmt.Sprintf("target %d", targetID),
+			fmt.Sprintf("look up target %d", targetID))
 	}
 	var v Variant
 	if err := s.db.NewSelect().Model(&v).Where("id = ?", t.VariantID).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up the variant target %d is built as: %w", targetID, err)
+		return nil, missingOr(err, fmt.Sprintf("variant %d", t.VariantID),
+			fmt.Sprintf("look up the variant target %d is built as", targetID))
 	}
 	var st Stream
 	if err := s.db.NewSelect().Model(&st).Where("id = ?", t.StreamID).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up the release target %d belongs to: %w", targetID, err)
+		return nil, missingOr(err, fmt.Sprintf("stream %d", t.StreamID),
+			fmt.Sprintf("look up the release target %d belongs to", targetID))
 	}
 	var p Product
 	if err := s.db.NewSelect().Model(&p).Where("id = ?", st.ProductID).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up the product release %d belongs to: %w", st.ID, err)
+		return nil, missingOr(err, fmt.Sprintf("product %d", st.ProductID),
+			fmt.Sprintf("look up the product release %d belongs to", st.ID))
 	}
 	return &Placement{
 		Product: p.DisplayName, Stream: st.DisplayName, Kind: st.Kind, Variant: v.DisplayName,
@@ -821,7 +856,8 @@ func (s *Store) Describe(ctx context.Context, targetID int64) (*Placement, error
 func (s *Store) ProductByID(ctx context.Context, id int64) (*Product, error) {
 	p := new(Product)
 	if err := s.db.NewSelect().Model(p).Where("id = ?", id).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up product %d: %w", id, err)
+		return nil, missingOr(err, fmt.Sprintf("product %d", id),
+			fmt.Sprintf("look up product %d", id))
 	}
 	return p, nil
 }
@@ -833,7 +869,8 @@ func (s *Store) ProductByID(ctx context.Context, id int64) (*Product, error) {
 func (s *Store) StreamByID(ctx context.Context, id int64) (*Stream, error) {
 	row := new(Stream)
 	if err := s.db.NewSelect().Model(row).Where("id = ?", id).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up stream %d: %w", id, err)
+		return nil, missingOr(err, fmt.Sprintf("stream %d", id),
+			fmt.Sprintf("look up stream %d", id))
 	}
 	return row, nil
 }
@@ -842,7 +879,8 @@ func (s *Store) StreamByID(ctx context.Context, id int64) (*Stream, error) {
 func (s *Store) VariantByID(ctx context.Context, id int64) (*Variant, error) {
 	row := new(Variant)
 	if err := s.db.NewSelect().Model(row).Where("id = ?", id).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up variant %d: %w", id, err)
+		return nil, missingOr(err, fmt.Sprintf("variant %d", id),
+			fmt.Sprintf("look up variant %d", id))
 	}
 	return row, nil
 }
@@ -856,7 +894,10 @@ func (s *Store) ExistingTarget(ctx context.Context, streamID, variantID int64) (
 	err := s.db.NewSelect().Model(target).
 		Where("stream_id = ?", streamID).Where("variant_id = ?", variantID).Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("nothing has been filed against this build: %w", err)
+		if database.IsNoRows(err) {
+			return nil, fmt.Errorf("nothing has been filed against this build: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("look up what is filed against this build: %w", err)
 	}
 	return target, nil
 }

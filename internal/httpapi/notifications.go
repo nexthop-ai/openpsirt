@@ -102,8 +102,11 @@ func registerNotifications(api huma.API, in Ingest) {
 		if err := notify.NewStore(in.DB.DB).Acknowledge(ctx, subject, input.ID); err != nil {
 			// The same answer whether it is somebody else's or not there,
 			// which is what stops this being a way to find out which
-			// identifiers exist.
-			return nil, huma.Error404NotFound("no notification of yours by that number")
+			// identifiers exist. A read that could not be made is neither.
+			return nil, absent(in.Logger, err, "that notification could not be looked up",
+				func() error {
+					return huma.Error404NotFound("no notification of yours by that number")
+				})
 		}
 		return nil, nil
 	})

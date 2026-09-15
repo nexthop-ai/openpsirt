@@ -87,7 +87,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		product, err := productNamed(ctx, in, subject, input.Product)
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			"A claim carries the severity recorded against its issue, so claims about " +
 			"findings you cannot read are absent rather than refused.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Narrowed to issues you may read a finding of in the product the rating "+
+	}, anyPerson, "Narrowed to issues you may read a finding of in the product the rating "+
 		"belongs to. A rating is about one product, and an issue this deployment minted for a "+
 		"flaw nobody has announced is not public knowledge."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
@@ -215,7 +215,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		// exist as far as they are concerned.
 		within := int64(0)
 		if input.Product != "" {
-			product, err := productNamed(ctx, in, subject, input.Product)
+			product, err := productNamedVisibly(ctx, in, subject, input.Product)
 			if err != nil {
 				return nil, err
 			}
@@ -298,16 +298,4 @@ func productsNamed(ctx context.Context, in Ingest,
 	}
 	shown, err = products.ProductNames(ctx, ids)
 	return called, shown, err
-}
-
-// productNamed resolves a product name the caller supplied, refusing one they
-// hold nothing on in the words an undeclared name gets.
-func productNamed(ctx context.Context, in Ingest, subject access.Subject,
-	name string) (*catalog.Product, error) {
-
-	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
-	if err != nil || !subject.Sees(product.ID) {
-		return nil, noSuchProduct()
-	}
-	return product, nil
 }

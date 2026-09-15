@@ -17,6 +17,10 @@ import (
 // on one says nothing about the other.
 type fixture struct {
 	store *access.Store
+	// db is the handle behind the store, for the few tests that need a row
+	// the access package does not own — an issue, so a case grant has
+	// something real to point at.
+	db *database.DB
 	// catalog declares products, for the tests that need one to appear after
 	// somebody was already granted something.
 	catalog  *catalog.Store
@@ -34,6 +38,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		cat := catalog.NewStore(db.DB)
 		f := &fixture{
 			store:    access.NewStore(db.DB),
+			db:       db,
 			catalog:  cat,
 			products: map[string]int64{}, streams: map[string]int64{}, variants: map[string]int64{},
 		}
@@ -597,6 +602,42 @@ func TestAnInactiveGrantIsNotSomethingSomebodyHolds(t *testing.T) {
 		if held {
 			t.Error("a grant that grants nothing reads as something they hold, " +
 				"so their assigned work is never handed back")
+		}
+	})
+}
+
+// TestGrantingWhatIsAlreadyHeldSucceedsAndChangesNothing pins the branch
+// DESIGN-access.md states in prose and nothing executed: the arm GrantRole
+// falls into when the insert is refused was at 0.0%.
+//
+// An administrator clicking twice, or two of them acting at once, is the
+// ordinary case. The state the caller asked for is the state that holds.
+func TestGrantingWhatIsAlreadyHeldSucceedsAndChangesNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		product := f.products["sonic"]
+		person, err := f.store.Ensure(ctx, "ana", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i := range 2 {
+			if err := f.store.GrantRole(ctx, person.ID, product, access.PublicRead); err != nil {
+				t.Fatalf("granting the same role, attempt %d: %v", i+1, err)
+			}
+		}
+		held, err := f.store.Grants(ctx, person.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		live := 0
+		for _, grant := range held {
+			if grant.Role == access.PublicRead && grant.Active {
+				live++
+			}
+		}
+		if live != 1 {
+			t.Errorf("granting the same role twice left %d live rows: %+v", live, held)
 		}
 	})
 }

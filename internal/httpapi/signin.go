@@ -82,6 +82,7 @@ func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
 		// through the provider. It never leaves this browser, so nothing a
 		// provider echoes back can decide where somebody ends up.
 		Return: aLocalPath(r.URL.Query().Get("return")),
+		Minted: time.Now().UTC(),
 	})
 	if err != nil {
 		wentWrongHere(w, in, "a sign-in could not be started", err)
@@ -304,6 +305,12 @@ func pendingFrom(ctx context.Context, in Ingest, r *http.Request) (inProgress, e
 	if held.Pending.State == "" || held.Pending.Verifier == "" {
 		return inProgress{}, errors.New("the sign-in in progress is incomplete")
 	}
+	// The same window the cookie was given, enforced where it can be: a value
+	// with no time in it is one sealed before this was checked at all, and it
+	// is refused rather than read as fresh.
+	if held.Minted.IsZero() || time.Since(held.Minted) > pendingLife {
+		return inProgress{}, errors.New("the sign-in in progress has expired")
+	}
 	// Checked again on the way out as well as on the way in. The cookie is the
 	// browser's, so somebody may edit it — and while a person redirecting
 	// themselves somewhere gains nothing, an address that left here is an
@@ -381,14 +388,15 @@ func signingKey(ctx context.Context, in Ingest) ([]byte, error) {
 		return nil, err
 	}
 	minted := base64.RawURLEncoding.EncodeToString(fresh)
-	if err := settings.Set(ctx, setting.SignInKey, minted); err != nil {
+	// Only where nothing holds one, and the answer is whatever is stored
+	// afterwards. Written as a plain set followed by a read, two replicas
+	// starting together both minted and the second overwrote the first: every
+	// session signed with the losing key stopped verifying, a sign-in already
+	// in flight included. The read-back closed the window between that write
+	// and itself, and not the one that mattered.
+	stored, err := settings.SetIfAbsent(ctx, setting.SignInKey, minted)
+	if err != nil {
 		return nil, err
-	}
-	// Read back, so two processes minting at once agree on which key won
-	// rather than each signing with its own.
-	stored, found, err := settings.Get(ctx, setting.SignInKey)
-	if err != nil || !found {
-		return fresh, err
 	}
 	return base64.RawURLEncoding.DecodeString(stored)
 }
@@ -398,6 +406,15 @@ func signingKey(ctx context.Context, in Ingest) ([]byte, error) {
 type inProgress struct {
 	Pending signin.Pending `json:"pending"`
 	Return  string         `json:"return,omitempty"`
+	// Minted is when this was sealed, checked when it is opened.
+	//
+	// The window was a MaxAge on the cookie and nothing else — a request to
+	// the browser, and the browser holding it may be the one that planted it.
+	// The payload carried no time, so the server could not tell a one-minute
+	// old value from a one-month old one, and the signing key is minted once
+	// and never rotated: a sealed sign-in stayed acceptable for the life of
+	// the deployment.
+	Minted time.Time `json:"minted"`
 }
 
 // aLocalPath keeps a return address that names somewhere on this deployment,

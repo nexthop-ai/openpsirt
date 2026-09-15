@@ -2,6 +2,8 @@ package access
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,4 +231,84 @@ func TestAskingForWhatNobodyOwnsWithoutAskingForADigestIsRefused(t *testing.T) {
 			t.Errorf("turning it off left something on: %+v", got)
 		}
 	})
+}
+
+// TestARefusedInsertIsForgivenOnlyAsADuplicate pins the narrowing the public
+// API cannot show.
+//
+// Five paths ran a second query on *any* insert failure and reported success
+// if a row was there — so a failure caused by something else, including a
+// concurrent insert that was then rolled back, became a grant the caller
+// believes in. Only a uniqueness violation means "somebody got there first".
+//
+// In this package because the guard takes the store's own error: through a
+// store method a foreign-key failure and a duplicate both end in an error, and
+// the difference does not show. Every engine, because what each calls "that
+// already exists" is a different code in a different type, and the duplicate
+// here is a real one from whichever engine is running rather than one written
+// out by hand.
+func TestARefusedInsertIsForgivenOnlyAsADuplicate(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		dbtest.Reset(t, db)
+		ctx := t.Context()
+		store := NewStore(db.DB)
+
+		person, err := store.Ensure(ctx, "ana", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A real refusal from the unique index, by claiming the same identity
+		// twice.
+		if err := store.Claim(ctx, person.ID, "ana"); err != nil {
+			t.Fatal(err)
+		}
+		duplicate := store.claimAgain(ctx, person.ID, "ana")
+		if duplicate == nil {
+			t.Fatal("claiming the same identity twice was accepted, so there is no " +
+				"duplicate to test with")
+		}
+		if !database.IsDuplicate(duplicate) {
+			t.Fatalf("the engine did not report a duplicate: %v", duplicate)
+		}
+
+		present := func(context.Context) (bool, error) { return true, nil }
+
+		// A duplicate, with the row there: the state the caller asked for
+		// holds.
+		if err := store.alreadyThere(ctx, duplicate, "grant", present); err != nil {
+			t.Errorf("a duplicate with the row there was refused: %v", err)
+		}
+
+		// Anything else, with the row there just the same. Forgiving this is
+		// reporting a grant the failure may well have prevented.
+		other := errors.New("connection reset by peer")
+		err = store.alreadyThere(ctx, other, "grant", present)
+		if err == nil {
+			t.Fatal("a failure that was not a duplicate was reported as success")
+		}
+		if !errors.Is(err, other) {
+			t.Errorf("the refusal loses what actually failed: %v", err)
+		}
+
+		// And a duplicate whose row does not satisfy the caller's predicate
+		// says what happened rather than handing back the constraint message.
+		absent := func(context.Context) (bool, error) { return false, nil }
+		err = store.alreadyThere(ctx, duplicate, "grant", absent)
+		if err == nil {
+			t.Fatal("a duplicate whose row grants nothing was reported as success")
+		}
+		if strings.Contains(err.Error(), "constraint") ||
+			strings.Contains(err.Error(), "Duplicate") {
+			t.Errorf("the engine's constraint message reached the caller: %v", err)
+		}
+	})
+}
+
+// claimAgain records the same identity a second time and answers what the
+// engine said, which is the duplicate the test needs.
+func (s *Store) claimAgain(ctx context.Context, personID int64, identity string) error {
+	_, err := s.db.NewInsert().Model(&Identity{
+		PersonID: personID, Username: identity, CreatedAt: s.now(),
+	}).Exec(ctx)
+	return err
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -326,7 +327,12 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 		query = query.Where("c.version = ?", version)
 	}
 	if ecosystem != "" {
-		query = query.Where("LOWER(c.purl) LIKE ?", "pkg:"+strings.ToLower(ecosystem)+"/%")
+		// The ecosystem is escaped and the trailing "/%" is not: the first is
+		// a value somebody supplied and the second is the pattern this clause
+		// is. An unescaped ecosystem made "_" match any character, so one
+		// name could be resolved as another's component.
+		query = query.Where("LOWER(c.purl) LIKE ?"+database.LikeClause,
+			"pkg:"+database.LikeEscaped(strings.ToLower(ecosystem))+"/%")
 	}
 
 	var rows []struct {
@@ -708,6 +714,29 @@ func ranks(n Neighbor) int {
 	return n.Findings
 }
 
+// knowsBuild refuses somebody who may not know this build exists.
+//
+// The weaker of the two questions here, and the right one for a read that
+// carries no findings: the way down to a component is the build's shape rather
+// than what is open against it. It admits a case collaborator, which is the
+// same rule the catalog's own lookup applies — the names their issue sits at
+// have to resolve, and so does the path to the component it sits in, or the
+// grant shows them a row they cannot open.
+//
+// visibleIn is the other question and stays where counts are answered. A count
+// of findings narrowed by a case grant would be a count of the product's work,
+// and that is what a collaborator may not have.
+func (s *Store) knowsBuild(ctx context.Context, subject access.Subject, targetID int64) error {
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+	if err != nil {
+		return err
+	}
+	if !subject.Sees(productID) && len(subject.Cases(productID)) == 0 {
+		return access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+	return nil
+}
+
 // visibleIn reports the visibilities this subject may read in a build, and
 // refuses where they may read none.
 //
@@ -715,15 +744,9 @@ func ranks(n Neighbor) int {
 // count here that is not narrowed the same way is the more dangerous of the
 // two: nobody looking at it expects it to be a disclosure.
 func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID int64) ([]access.Visibility, error) {
-	var productID int64
-	err := s.db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id").
-		Where("tg.id = ?", targetID).
-		Scan(ctx, &productID)
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
 	if err != nil {
-		return nil, fmt.Errorf("look up which product this build belongs to: %w", err)
+		return nil, err
 	}
 	if !subject.Sees(productID) {
 		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
@@ -824,7 +847,10 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		// LOWER on both sides rather than a case-insensitive comparison,
 		// which two of the four engines spell differently and one of them
 		// decides by collation.
-		Where("c.name_folded LIKE ?", "%"+Folded(term)+"%").
+		// Escaped as well as folded. Folded trims, lowercases and truncates
+		// and does not escape, so a term of "%" searched the whole build.
+		Where("c.name_folded LIKE ?"+database.LikeClause,
+			"%"+database.LikeEscaped(Folded(term))+"%").
 		GroupExpr("c.id, c.name, c.version, kids.n").
 		OrderExpr("findings DESC, c.name").
 		Limit(limit).

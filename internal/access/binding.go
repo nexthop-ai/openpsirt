@@ -94,14 +94,15 @@ func (s *Store) Bind(ctx context.Context, group string, productID int64, role Ro
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
 	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
-		// Binding what is already bound is not a failure.
-		n, counted := s.db.NewSelect().Model((*Binding)(nil)).
-			Where("group_name = ?", group).Where("product_id = ?", productID).
-			Where("role = ?", role).Count(ctx)
-		if counted == nil && n > 0 {
-			return nil
-		}
-		return fmt.Errorf("bind %q to %q: %w", group, role, err)
+		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to %q", group, role),
+			func(ctx context.Context) (bool, error) {
+				// Whether the row is there, which is what the index refused.
+				// A binding has nothing to be in force: it grants at each
+				// member's next sign-in and holds nothing of its own.
+				return s.db.NewSelect().Model((*Binding)(nil)).
+					Where("group_name = ?", group).Where("product_id = ?", productID).
+					Where("role = ?", role).Exists(ctx)
+			})
 	}
 	return nil
 }
@@ -134,12 +135,11 @@ func (s *Store) BindAdmin(ctx context.Context, group string) error {
 	}
 	binding := &AdminBinding{GroupName: group, CreatedAt: s.now().Truncate(time.Microsecond)}
 	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
-		n, counted := s.db.NewSelect().Model((*AdminBinding)(nil)).
-			Where("group_name = ?", group).Count(ctx)
-		if counted == nil && n > 0 {
-			return nil
-		}
-		return fmt.Errorf("bind %q to administration: %w", group, err)
+		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to administration", group),
+			func(ctx context.Context) (bool, error) {
+				return s.db.NewSelect().Model((*AdminBinding)(nil)).
+					Where("group_name = ?", group).Exists(ctx)
+			})
 	}
 	return nil
 }
@@ -466,8 +466,14 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 // administration has one route back — editing the database by hand — and
 // nobody discovers that at a good moment.
 func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
+	// Somebody who has left cannot administer anything: they are refused at
+	// sign-in. Counted, a deactivated bootstrap administrator made this answer
+	// true on their strength alone — so the last admin group could be unbound
+	// and the deployment started cleanly with nobody able to administer it,
+	// which is exactly what this check exists to prevent.
 	bootstrapped, err := s.db.NewSelect().Model((*Account)(nil)).
-		Where("is_bootstrap = ?", true).Count(ctx)
+		Where("is_bootstrap = ?", true).
+		Where("deactivated_at IS NULL").Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read who was named as an administrator: %w", err)
 	}
@@ -484,7 +490,8 @@ func (s *Store) CanAdminister(ctx context.Context, mode Mode) (bool, error) {
 	}
 
 	administrators, err := s.db.NewSelect().Model((*Account)(nil)).
-		Where("is_admin = ?", true).Count(ctx)
+		Where("is_admin = ?", true).
+		Where("deactivated_at IS NULL").Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read who administers: %w", err)
 	}
@@ -561,8 +568,20 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 			if err := within.Claim(ctx, person.ID, identity); err != nil {
 				return err
 			}
+			// Named here, and readmitted. This is the documented way back
+			// into a deployment nobody can administer, and it did not work
+			// for the case that produces one: a departed administrator is
+			// refused at sign-in, and nothing else clears the date. Naming
+			// them in configuration is the deliberate act of letting them
+			// back in, so it is the act that undoes it.
+			//
+			// Here rather than in Ensure, which recording a person also
+			// calls: an administrator re-recording a departed colleague must
+			// not silently readmit them.
 			if _, err := db.NewUpdate().Model((*Account)(nil)).
-				Set("is_bootstrap = ?", true).Where("id = ?", person.ID).Exec(ctx); err != nil {
+				Set("is_bootstrap = ?", true).
+				Set("deactivated_at = NULL").
+				Where("id = ?", person.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("name %q as an administrator: %w", identity, err)
 			}
 		}

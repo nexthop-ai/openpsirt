@@ -32,7 +32,13 @@ type stubProvider struct {
 	says   *signin.Identity
 	fail   error
 	issuer string
+	// groups says whether this provider is configured to hand over group
+	// membership, which is what decides whether roles may be switched to
+	// group-bound at all.
+	groups bool
 }
+
+func (s *stubProvider) GroupsSource() bool { return s.groups }
 
 func (s *stubProvider) Name() string { return "stub" }
 
@@ -111,6 +117,19 @@ func signInOn(t *testing.T, on engines, fn func(t *testing.T, r *signInReach)) {
 			t.Fatal(err)
 		}
 		if err := rights.GrantRole(ctx, granted.ID, product.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		// A second person who also holds a role, so that a test about whose
+		// session comes back has two possible answers. With one, asserting
+		// the identity asserts the only value the provider stub could return.
+		other, err := rights.Ensure(ctx, "other", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.Claim(ctx, other.ID, "other"); err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, other.ID, product.ID, access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
 		// Somebody recorded and granted nothing, who must be refused exactly
@@ -530,6 +549,10 @@ func TestATamperedReturnAddressIsStillRefused(t *testing.T) {
 				"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
 			},
 			"return": "https://elsewhere.example/page",
+			// Sealed just now: a value with no time in it is refused for
+			// being stale, which is a different refusal from the one this
+			// test is about.
+			"minted": time.Now().UTC(),
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -607,6 +630,12 @@ func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
 		// they started this sign-in. The stub answers with a fixed one.
 		const state = "the-state"
 
+		r.provider.says = &signin.Identity{Subject: "2", Username: "other"}
+
+		// Who the provider will say signed in: the attacker, because this is
+		// the attacker's sign-in. The victim is somebody else entirely, and
+		// the point is that the session that comes back is never theirs.
+
 		// Planted in the victim's browser, which then completes it.
 		req := httptest.NewRequest(http.MethodGet,
 			"/v1/sign-in/stub/callback?state="+state+"&code=a-code", nil)
@@ -623,17 +652,31 @@ func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
 		if rec.Code != http.StatusFound {
 			t.Fatalf("completing the planted sign-in answered %d: %s", rec.Code, rec.Body.String())
 		}
+		// Found outside the loop, so an absent cookie fails rather than
+		// skipping the assertion: this sat behind a continue, and a callback
+		// issuing no session at all left the test green.
+		var session string
 		for _, cookie := range rec.Result().Cookies() {
-			if cookie.Name != access.CookieName(access.SessionCookie, true) || cookie.Value == "" {
-				continue
+			if cookie.Name == access.CookieName(access.SessionCookie, true) && cookie.Value != "" {
+				session = cookie.Value
 			}
-			who, _, err := r.rights.ResolveSession(t.Context(), cookie.Value)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if who.Identity != "granted" {
-				t.Errorf("the session handed to the browser is %q", who.Identity)
-			}
+		}
+		if session == "" {
+			t.Fatal("the planted sign-in completed and issued no session, so the " +
+				"assertion below would not have run")
+		}
+		who, _, err := r.rights.ResolveSession(t.Context(), session)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The attacker's own account, which is the whole of what the planted
+		// cookie buys: never the victim's. This asserted "granted", which is
+		// the only identity the stub could return — so the test named for the
+		// planted-cookie attack asserted an identity the stub was the sole
+		// possible source of.
+		if who.Identity != "other" {
+			t.Errorf("the session handed to the browser is %q, want the account the "+
+				"planted sign-in was minted for", who.Identity)
 		}
 	})
 }
@@ -658,3 +701,62 @@ func TestTheCookiesABrowserHoldsAreBoundToThisHost(t *testing.T) {
 		}
 	}
 }
+
+func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
+	// The window was a MaxAge on the cookie and nothing else, which is a
+	// request to the browser — and the browser holding it may be the one that
+	// planted it. The payload carried no time, so the server could not tell a
+	// one-minute-old value from a one-month-old one, and the signing key is
+	// minted once and never rotated: a sealed sign-in stayed acceptable for
+	// the life of the deployment.
+	twoSignIn(t, func(t *testing.T, r *signInReach) {
+		sealed := func(minted time.Time) string {
+			body, err := json.Marshal(map[string]any{
+				"pending": map[string]string{
+					"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
+				},
+				"minted": minted,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return r.sealed(t, body)
+		}
+		complete := func(cookie string) int {
+			req := httptest.NewRequest(http.MethodGet,
+				"/v1/sign-in/stub/callback?state=the-state&code=a-code", nil)
+			req.Header.Set("Cookie", "openpsirt_pending="+cookie)
+			rec := httptest.NewRecorder()
+			r.handler.ServeHTTP(rec, req)
+			return rec.Code
+		}
+
+		// Sealed just now, and accepted — so the refusals below are the age
+		// rather than the whole path being broken.
+		if got := complete(sealed(time.Now().UTC())); got != http.StatusFound {
+			t.Fatalf("a sign-in sealed just now answered %d", got)
+		}
+		// Older than the window it was given.
+		if got := complete(sealed(time.Now().UTC().Add(-2 * pendingLifeForTest))); got == http.StatusFound {
+			t.Error("a sign-in sealed long ago was still completed")
+		}
+		// And one carrying no time at all, which is what every value sealed
+		// before this check looks like.
+		body, err := json.Marshal(map[string]any{
+			"pending": map[string]string{
+				"State": "the-state", "Nonce": "the-nonce", "Verifier": "the-verifier",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := complete(r.sealed(t, body)); got == http.StatusFound {
+			t.Error("a sign-in carrying no mint time was read as fresh")
+		}
+	})
+}
+
+// pendingLifeForTest is the window a sign-in is given, which the package keeps
+// unexported. Stated here rather than reached for, so the test says what it
+// assumes.
+const pendingLifeForTest = 10 * time.Minute

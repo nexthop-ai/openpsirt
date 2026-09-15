@@ -404,14 +404,13 @@ func aboutBuild(stream, variant string, err error) error {
 func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 	product, stream, variant, vulnerability, component, version string) (int64, int64, int64, error) {
 
-	names := catalog.NewStore(in.DB.DB)
-	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
-		return 0, 0, 0, noSuchProduct()
+		return 0, 0, 0, err
 	}
-	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 	if err != nil {
-		return 0, 0, 0, nothingScannedThere()
+		return 0, 0, 0, err
 	}
 	issue, err := issueHere(ctx, in, subject, named.ProductID, vulnerability)
 	if err != nil {
@@ -431,11 +430,11 @@ func decidingAbout(ctx context.Context, in Ingest, subject access.Subject,
 	names := catalog.NewStore(in.DB.DB)
 	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
 	if err != nil {
-		return nil, 0, huma.Error404NotFound(err.Error())
+		return nil, 0, undeclared(in.Logger, err, "that build could not be looked up")
 	}
-	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 	if err != nil {
-		return nil, 0, nothingScannedThere()
+		return nil, 0, err
 	}
 
 	issue, err := issueHere(ctx, in, subject, named.ProductID, vulnerability)

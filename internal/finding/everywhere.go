@@ -58,8 +58,14 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	vulnerabilityID int64, limit int) ([]Sighting, int, error) {
 
 	limit = database.AWholeBuild.Of(limit)
+	// Not merely empty: "here is nothing" and "you cannot ask" are
+	// different statements, and this is the second. A person holding
+	// nothing is the first, and is answered below.
+	if subject.Kind != access.Person {
+		return nil, 0, access.Denied("read findings across products")
+	}
 	products, all := subject.Products()
-	if subject.Kind != access.Person || (!all && len(products) == 0) {
+	if !all && len(products) == 0 {
 		return nil, 0, nil
 	}
 

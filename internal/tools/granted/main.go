@@ -38,17 +38,29 @@ const (
 
 // allowed is where one may be named alone, and why.
 var allowed = []string{
-	// Where a subject is built, and where the two are resolved together. The
-	// duplicate-insert check for a per-product grant belongs here too: an
-	// estate row must not satisfy it, because holding a role everywhere does
-	// not make a second grant against one product a duplicate.
-	"internal/access/",
 	// The schema, which creates them.
 	"internal/database/migrate/",
 	// The test harness, which names every table in order to empty them.
 	"internal/dbtest/",
 	// This program, which names both in order to look for them.
 	"internal/tools/granted/",
+}
+
+// inside is the access package's own files that may name one alone, and why.
+//
+// The package was exempt whole, which is where four hand-written copies of the
+// union then lived — the one place this gate could not see them. It is checked
+// like everything else now, and what names one alone is named here.
+var inside = map[string]string{
+	// The duplicate-insert check for a grant held across every product. An
+	// estate row is what it is about, and a per-product one must not satisfy
+	// it: holding a role on one product does not make a grant covering all of
+	// them a duplicate.
+	"internal/access/estate.go": "the estate duplicate check",
+	// Declares the per-product grant's model, and nothing else here names a
+	// grant table: the union this file used to spell by hand is one builder
+	// now, in team.go, which names both.
+	"internal/access/store.go": "the per-product grant's model declaration",
 }
 
 func main() {
@@ -64,6 +76,9 @@ func main() {
 			if strings.HasPrefix(path, where) {
 				return nil
 			}
+		}
+		if _, named := inside[path]; named {
+			return nil
 		}
 		// Each table asked about independently, and the answers compared.
 		//
@@ -101,5 +116,6 @@ func main() {
 		}
 		os.Exit(1)
 	}
-	fmt.Printf("every query outside the access package asks both grant tables (%d files)\n", read)
+	fmt.Printf("every query asks both grant tables, beside the %d named for asking "+
+		"one (%d files checked)\n", len(inside), read)
 }

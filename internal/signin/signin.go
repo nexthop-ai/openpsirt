@@ -83,6 +83,16 @@ type Provider interface {
 	Begin(ctx context.Context, redirectURI string) (string, Pending, error)
 	// Complete exchanges what the provider sent back for who it says they are.
 	Complete(ctx context.Context, code string, pending Pending, redirectURI string) (*Identity, error)
+	// GroupsSource reports whether this provider is configured to hand over
+	// group membership at all.
+	//
+	// Asked because a deployment can be switched to group-bound roles at any
+	// time, and a provider configured without a source of groups then reports
+	// every arrival as belonging to nothing — so nobody derives any role and
+	// the deployment locks itself out, including whoever made the change.
+	// Empty is a legitimate configuration for a deployment assigning roles
+	// directly; it is only the pair that is the failure.
+	GroupsSource() bool
 }
 
 // newPending generates what one sign-in needs to survive its round trip.

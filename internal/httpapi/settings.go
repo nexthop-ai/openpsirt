@@ -194,15 +194,25 @@ func registerSettings(api huma.API, in Ingest) {
 						"every reader treats it as unset and falls back to the shipped value",
 						input.Body.Value))
 			}
+			// Refused here as well as at the sign-in that would use it, for
+			// the reason the markdown policy is enforced before storage:
+			// somebody who asks for a year should be told the limit now
+			// rather than discover it when nobody can sign in.
+			if input.Name == setting.SessionLifetime && d > access.MaxSessionLifetime {
+				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+					"a sign-in may last at most %s. Group membership is read at "+
+						"sign-in and never again, so this is how long a role a group "+
+						"withdrew can still be held", access.MaxSessionLifetime))
+			}
 		}
-		// What it held, read before it is overwritten: it is not
-		// derivable afterwards, and "who raised the floor to critical"
-		// is half the question somebody asks.
-		before, had, err := setting.NewStore(in.DB.DB).Get(ctx, input.Name)
+		// What it held, answered by the write that replaced it: it is not
+		// derivable afterwards, and "who raised the floor to critical" is half
+		// the question somebody asks. Read in a statement of its own it was
+		// the value at some earlier moment — two administrators moving the
+		// same setting at once both read the original, and the second wrote a
+		// prior value into an append-only trail that nothing ever held.
+		before, had, err := setting.NewStore(in.DB.DB).Change(ctx, input.Name, input.Body.Value)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "that setting could not be read", err)
-		}
-		if err := setting.NewStore(in.DB.DB).Set(ctx, input.Name, input.Body.Value); err != nil {
 			return nil, wentWrong(in.Logger, "that setting could not be recorded", err)
 		}
 		noteChange(ctx, in, trail.Setting, input.Name,

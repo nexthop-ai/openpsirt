@@ -163,7 +163,7 @@ func registerAttachments(api huma.API, in Ingest) {
 			"A file an administrator removed is still listed, saying so, because the text that " +
 			"pointed at it still does.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*struct {
@@ -212,7 +212,7 @@ func registerAttachments(api huma.API, in Ingest) {
 			"A file an administrator removed answers 410: the record and the reference remain, " +
 			"and the bytes are gone on purpose.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Token string `path:"token" doc:"The identifier text refers to, without the attachment: prefix"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := reading(ctx)

@@ -74,7 +74,7 @@ func registerElsewhere(api huma.API, in Ingest) {
 			"there to be told, not agreed to — and showing them as one number is how a decision " +
 			"comes to reach builds the person making it never knew about.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
@@ -94,11 +94,11 @@ func registerElsewhere(api huma.API, in Ingest) {
 		names := catalog.NewStore(in.DB.DB)
 		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(in.Logger, err, "that build could not be looked up")
 		}
-		here, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		here, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 
 		reach, err := finding.NewStore(in.DB.DB).Reaching(ctx, subject, *at, here.ID)
@@ -125,7 +125,7 @@ func registerReachAcross(api huma.API, in Ingest) {
 			"A build reached from two places of the finding is one thing to agree to, and " +
 			"carries the places of both.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`

@@ -8,7 +8,6 @@ package trail
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -158,7 +157,7 @@ func (s *Store) About(ctx context.Context, kind Kind, name string,
 		}
 		return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where("about = ?", name).
-				WhereOr(`about LIKE ? ESCAPE '#'`, likeEscaped(name)+" on %")
+				WhereOr(`about LIKE ?`+database.LikeClause, database.LikeEscaped(name)+" on %")
 		})
 	}
 
@@ -175,19 +174,6 @@ func (s *Store) About(ctx context.Context, kind Kind, name string,
 		return nil, 0, fmt.Errorf("read what changed about %q: %w", name, err)
 	}
 	return changes, total, nil
-}
-
-// likeEscaped makes a value match itself under LIKE and nothing else.
-func likeEscaped(value string) string {
-	var out strings.Builder
-	for _, r := range value {
-		switch r {
-		case '%', '_', '#':
-			out.WriteByte('#')
-		}
-		out.WriteRune(r)
-	}
-	return out.String()
 }
 
 // Said turns a value into what the trail stores, where absent means unset.

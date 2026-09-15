@@ -195,7 +195,15 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 		return existing, AlreadyHave, err
 
 	case NotNewer:
-		newest, _ := s.Newest(ctx, a.TargetID)
+		// What is already here, which is the whole content of the refusal. A
+		// read that failed is not "none": telling a producer their build holds
+		// no scan, in the sentence refusing the one they just sent, is the
+		// most confusing answer available.
+		newest, err := s.Newest(ctx, a.TargetID)
+		if err != nil {
+			return nil, NotNewer, fmt.Errorf(
+				"read what this variant already holds: %w", err)
+		}
 		held := "none"
 		if newest != nil {
 			held = newest.BuiltAt.Format(time.RFC3339Nano)

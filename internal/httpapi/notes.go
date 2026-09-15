@@ -11,7 +11,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -39,7 +38,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 			"from the rest. What is about a judgment at a place is a comment on that claim " +
 			"instead.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers where you may read a finding of this issue in this product, at its "+
+	}, anyPerson, "Answers where you may read a finding of this issue in this product, at its "+
 		"visibility — an issue with one undisclosed place here is undisclosed for this. "+
 		"Anywhere else it answers as an issue that is not there."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
@@ -155,7 +154,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 			"reading the note itself, asked of the issue rather than of the note, because two " +
 			"rules for one question is one rule out of step.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only where you may read what the note is about, which is the "+
+	}, anyPerson, "Answers only where you may read what the note is about, which is the "+
 		"note's own product and issue rather than anything in the path."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*listOutput[WasSaidBody], error) {
@@ -229,29 +228,6 @@ func noteAbout(ctx context.Context, in Ingest, subject access.Subject,
 		return 0, 0, "", wentWrong(in.Logger, "the issue could not be read", err)
 	}
 	return named.ID, issue, filed[issue], nil
-}
-
-// productForIssue resolves a product for a route that is about one issue in
-// it.
-//
-// Wider than productNamed by the case grants: somebody brought into one case
-// holds nothing on the product and may still act on the issue they were
-// brought in on, so refusing to resolve the product would refuse them the one
-// thing they were granted while telling them nothing they did not already
-// know. Every read past this still asks about the issue, which is where the
-// case grant is honored again. It is the rule the catalog already applies when
-// it resolves a build for somebody on a case.
-func productForIssue(ctx context.Context, in Ingest, subject access.Subject,
-	name string) (*catalog.Product, error) {
-
-	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
-	if err != nil {
-		return nil, noSuchProduct()
-	}
-	if !subject.Sees(product.ID) && len(subject.Cases(product.ID)) == 0 {
-		return nil, noSuchProduct()
-	}
-	return product, nil
 }
 
 // notesOut renders a thread, naming its authors in one lookup.

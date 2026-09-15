@@ -54,7 +54,7 @@ func registerReports(api huma.API, in Ingest) {
 			"Worked out when it is asked for. Nothing is precomputed or refreshed on a schedule " +
 			"until a measurement says it has to be.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
 		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
@@ -116,7 +116,7 @@ func registerReports(api huma.API, in Ingest) {
 			"the one expression the working list and the deadline also read, so a chart cannot " +
 			"disagree with a list about what counts as high.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*listOutput[ReleaseBody], error) {
 		subject, err := reading(ctx)
@@ -129,9 +129,9 @@ func registerReports(api huma.API, in Ingest) {
 		// answered 200 with an empty list for a product held by somebody else
 		// and 404 for a name nobody has, which hands anyone holding one
 		// product the name of every other by guessing.
-		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		releases, err := finding.NewStore(in.DB.DB).Releases(ctx, subject, named.ID)
 		if err != nil {
@@ -167,7 +167,7 @@ func registerReports(api huma.API, in Ingest) {
 			"public document, so including something undisclosed should be deliberate rather " +
 			"than something pasted in without noticing.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product        string `path:"product"`
 		From           string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
 		FromVariant    string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
@@ -185,17 +185,8 @@ func registerReports(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
 		locate := func(stream, variant string) (int64, error) {
-			named, err := names.LocateVisible(ctx, subject, input.Product, stream, variant)
-			if err != nil {
-				return 0, noSuchProduct()
-			}
-			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
-			if err != nil {
-				return 0, nothingScannedThere()
-			}
-			return target.ID, nil
+			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
 		}
 		from, err := locate(input.From, input.FromVariant)
 		if err != nil {
@@ -256,7 +247,7 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 			"product must be named: two products' tags interleave by date and mean nothing side " +
 			"by side.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Limit int `query:"limit" default:"12" minimum:"1" maximum:"50" doc:"How many releases, most recent kept"`
 	}) (*struct {
@@ -316,7 +307,7 @@ func registerNotes(api huma.API, in Ingest) {
 			"Where fixes are left out for not having been disclosed, the note says how many " +
 			"and never which.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product        string `path:"product"`
 		From           string `query:"from" required:"true" doc:"The earlier build's stream"`
 		FromVariant    string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
@@ -333,15 +324,7 @@ func registerNotes(api huma.API, in Ingest) {
 		}
 		names := catalog.NewStore(in.DB.DB)
 		locate := func(stream, variant string) (int64, error) {
-			named, err := names.LocateVisible(ctx, subject, input.Product, stream, variant)
-			if err != nil {
-				return 0, noSuchProduct()
-			}
-			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
-			if err != nil {
-				return 0, nothingScannedThere()
-			}
-			return target.ID, nil
+			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
 		}
 		from, err := locate(input.From, input.FromVariant)
 		if err != nil {
@@ -530,22 +513,21 @@ func registerCarrying(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		to, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		to, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		toTarget, err := names.ExistingTarget(ctx, to.StreamID, to.VariantID)
+		toTarget, err := targetRow(ctx, in, to.StreamID, to.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
-		from, err := names.LocateVisible(ctx, subject, input.Product, input.From, input.FromVariant)
+		from, err := locatedVisibly(ctx, in, subject, input.Product, input.From, input.FromVariant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		fromTarget, err := names.ExistingTarget(ctx, from.StreamID, from.VariantID)
+		fromTarget, err := targetRow(ctx, in, from.StreamID, from.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 
 		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,

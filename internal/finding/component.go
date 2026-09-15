@@ -81,7 +81,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// besides.
 			q = q.Where("f.vulnerability_id IN (?)",
 				q.NewSelect().TableExpr(`vulnerability AS "v"`).Column("v.id").
-					Where(`LOWER(v.description) LIKE ? ESCAPE '#'`,
+					Where(`LOWER(v.description) LIKE ?`+database.LikeClause,
 						"%"+containsTerm(contains)+"%"))
 		}
 		return q

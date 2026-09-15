@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
 // declaredBody builds a body the endpoint would accept, so that what a test
@@ -883,4 +885,162 @@ func TestAMalformedCredentialIsRefused(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestWhatAnOperationSaysItNeedsIsWhatItEnforces walks the document the server
+// builds and puts a pipeline key at every operation declaring a scope that
+// excludes one.
+//
+// The declaration wrote a document and nothing else for this scope: nearly
+// every operation carrying it said "any recognized credential" and then refused
+// every credential that is not a person, so the generated reference, the
+// extension a client generator reads, and an access review all stated a rule
+// the code contradicted.
+// Two operations really do mean any credential — a key reads back the scans it
+// sent — which is why the word could not simply be redefined.
+func TestWhatAnOperationSaysItNeedsIsWhatItEnforces(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		checked := 0
+		for _, op := range r.api.OpenAPI().Paths {
+			for method, operation := range map[string]*huma.Operation{
+				http.MethodGet: op.Get, http.MethodPost: op.Post,
+				http.MethodPut: op.Put, http.MethodDelete: op.Delete,
+			} {
+				if operation == nil || operation.Extensions == nil {
+					continue
+				}
+				asks, stated := operation.Extensions["x-openpsirt-requires"]
+				if !stated {
+					continue
+				}
+				scope := declaredScope(t, asks)
+				if scope != "person" && scope != "self" {
+					continue
+				}
+				// A path with its parameters filled in with names the fixture
+				// declares, so a refusal is about the credential rather than
+				// about a name nothing matches.
+				path := filled(operation.Path)
+				if strings.Contains(path, "{") {
+					continue
+				}
+				got := r.asKey(t, method, path)
+				if got != http.StatusForbidden && got != http.StatusUnauthorized {
+					t.Errorf("%s %s says it needs a signed-in person and answered a "+
+						"pipeline key %d", method, path, got)
+				}
+				checked++
+			}
+		}
+		// A sweep that reached nothing looks exactly like a sweep that found
+		// nothing wrong.
+		if checked < 20 {
+			t.Errorf("only %d operations were reached, so this proves little", checked)
+		}
+	})
+}
+
+// declaredScope reads the scope off an operation's declaration, whichever
+// shape the document put it in.
+func declaredScope(t *testing.T, asks any) string {
+	t.Helper()
+	encoded, err := json.Marshal(asks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		Scope string `json:"scope"`
+	}
+	if err := json.Unmarshal(encoded, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.Scope
+}
+
+// filled puts the fixture's own names into a templated path.
+func filled(path string) string {
+	for from, to := range map[string]string{
+		"{product}": "mine", "{stream}": "master", "{variant}": "broadcom",
+	} {
+		path = strings.ReplaceAll(path, from, to)
+	}
+	return path
+}
+
+// saying is a provider that reports whether it has a source of groups, and
+// nothing else. What is under test is the answer to that one question.
+type saying struct {
+	*stubProvider
+	groups bool
+}
+
+func (s *saying) GroupsSource() bool { return s.groups }
+
+func TestRolesCannotBeBoundToGroupsNothingCanReport(t *testing.T) {
+	// The other door to the lockout the mode switch already guards. A provider
+	// configured without a source of groups reports every arrival as belonging
+	// to nothing, so in group-bound mode nobody derives any role — and the
+	// deployment looks like a working one that admits nobody, including
+	// whoever made the change.
+	//
+	// The OIDC adapter supplies a default for the username claim and none for
+	// the groups claim, so this is the default configuration rather than an
+	// exotic one.
+	twoReach(t, func(t *testing.T, r *reach) {
+		// Something has to administer in the new mode, or the check beside
+		// this one refuses first and this would prove nothing.
+		if err := r.rights.BindAdmin(t.Context(), "admins"); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct {
+			what   string
+			groups bool
+			want   int
+		}{
+			{"a provider that reports no groups", false, http.StatusConflict},
+			{"a provider that does", true, http.StatusOK},
+		} {
+			handler := withProvider(t, r, c.groups)
+			req := httptest.NewRequest(http.MethodPut, "/v1/roles/mode",
+				strings.NewReader(`{"mode":"group-bound"}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set(testHeader, "admin")
+			fromOurOwnPage(req)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != c.want {
+				t.Errorf("%s: switching answered %d, want %d: %s",
+					c.what, rec.Code, c.want, rec.Body.String())
+			}
+			if c.want == http.StatusConflict && !contains(rec.Body.String(), "groups") {
+				t.Errorf("%s: the refusal does not say what is missing: %s",
+					c.what, rec.Body.String())
+			}
+		}
+	})
+}
+
+// withProvider is the server again, with one sign-in provider that either has
+// a source of groups or has not.
+func withProvider(t *testing.T, r *reach, groups bool) http.Handler {
+	t.Helper()
+	files, err := attach.NewFiles(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources, err := access.ParseSources("192.0.2.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil,
+		httpapi.Ingest{
+			DB: r.db, Queue: queue.New(r.db, queue.DefaultOptions()), Files: files,
+			Access: access.NewResolver(r.rights,
+				access.Trust{Header: testHeader, From: sources}),
+			Providers: map[string]signin.Provider{
+				"one": &saying{stubProvider: &stubProvider{}, groups: groups},
+			},
+		})
+	return handler
 }

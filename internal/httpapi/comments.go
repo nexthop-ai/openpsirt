@@ -24,7 +24,7 @@ func registerComments(api huma.API, in Ingest) {
 			"when. A comment that has been edited also carries when it was last changed.\n\n" +
 			"Comments are separate from the justification and never affect an approval.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*listOutput[CommentBody], error) {
 		subject, store, err := triaging(ctx, in)

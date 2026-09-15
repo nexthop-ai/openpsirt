@@ -131,10 +131,15 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 //
 // Matched on the issue's name and its aliases, because which identifier a
 // publisher chose is a preference of whichever database they consulted.
-func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID int64,
-	names []string, component string) ([]Statement, error) {
+func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID,
+	vulnerabilityID int64, names []string, component string) ([]Statement, error) {
 
-	if !subject.Sees(productID) {
+	// Asked about the issue rather than about the product, because what comes
+	// back is narrowed to this issue's names and this component — it is
+	// evidence for the one finding, and a collaborator brought in on that
+	// finding is who it is for. Asked product-wide, the detail route answered
+	// a fault for the one row their grant exists to let them open.
+	if !access.SeesOn(subject, productID, vulnerabilityID) {
 		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	if len(names) == 0 || strings.TrimSpace(component) == "" {

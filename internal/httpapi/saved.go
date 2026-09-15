@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
 )
 
@@ -59,7 +58,7 @@ func registerSaved(api huma.API, in Ingest) {
 			"names branches and variants that usually exist in no other, so one offered " +
 			"everywhere would be offered where it matches nothing.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers your own and nobody else's."),
+	}, anyPerson, "Answers your own and nobody else's."),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 		}) (*listOutput[SavedBody], error) {
@@ -98,7 +97,7 @@ func registerSaved(api huma.API, in Ingest) {
 			"Saving under a name you already use replaces it: the act is deciding what that " +
 			"name means, and refusing would make somebody delete before they could correct.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, anySubject, "Yours alone."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Yours alone."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Name    string `path:"name" maxLength:"120"`
 		Body    struct {
@@ -143,7 +142,7 @@ func registerSaved(api huma.API, in Ingest) {
 			"the same answer as somebody else's — the filters are personal, and the query " +
 			"says so rather than only the screen.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, anySubject, "Yours alone."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Yours alone."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Name    string `path:"name" maxLength:"120"`
 	}) (*struct{}, error) {
@@ -157,7 +156,7 @@ func registerSaved(api huma.API, in Ingest) {
 		}
 		if err := store.ForgetFilter(ctx, who.ID, product, input.Name); err != nil {
 			if errors.Is(err, saved.ErrNoSuchFilter) {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, huma.Error404NotFound(saved.ErrNoSuchFilter.Error())
 			}
 			return nil, wentWrong(in.Logger, "that filter could not be forgotten", err)
 		}
@@ -198,9 +197,9 @@ func filtersFor(ctx context.Context, in Ingest, name string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, name)
+	product, err := productNamedVisibly(ctx, in, subject, name)
 	if err != nil {
-		return 0, noSuchProduct()
+		return 0, err
 	}
 	return product.ID, nil
 }

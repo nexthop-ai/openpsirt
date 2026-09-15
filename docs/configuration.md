@@ -149,7 +149,7 @@ for a process and not for an install.
 | Variable | Meaning | Default |
 |---|---|---|
 | `OPENPSIRT_BOOTSTRAP_ADMINS` | Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. **A name written `provider:username` is refused and the process stops**, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart | unset |
-| `OPENPSIRT_SESSION_LIFETIME` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration | 12 hours |
+| `OPENPSIRT_SESSION_LIFETIME` | How long a sign-in lasts, where nothing has been set in the application. **An administrator's setting wins over this**, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration, and at most 30 days — group membership is read at sign-in and never again, so this is how long a role a group withdrew can still be held | 12 hours |
 
 ### An OpenID Connect provider
 
@@ -159,8 +159,8 @@ username, and two providers issuing them independently cannot be told apart.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_OIDC_ISSUER` | The provider's issuer address. Empty means no provider | unset |
-| `OPENPSIRT_OIDC_NAME` | What the sign-in button calls it | `oidc` |
+| `OPENPSIRT_OIDC_ISSUER` | The provider's issuer address. Empty means no provider. **Every endpoint the provider publishes must be on this host** — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network | unset |
+| `OPENPSIRT_OIDC_NAME` | What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes and no spaces. The process refuses to start otherwise | `oidc` |
 | `OPENPSIRT_OIDC_CLIENT_ID` | The client registered with the provider | unset |
 | `OPENPSIRT_OIDC_CLIENT_SECRET` | Its secret | unset |
 | `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
@@ -215,6 +215,14 @@ refuse a proxy arrival, so everybody reaches what they already hold.
 2. Set `OPENPSIRT_TRUSTED_HEADER` and `OPENPSIRT_TRUSTED_SOURCES`. Both are
    needed; half a configuration stops the process.
 3. Restart. Sign-in is by the name the proxy asserts.
+
+**The provider publishes an endpoint on another host.** The process refuses to
+start, naming the endpoint and the host. Pinning the fetch to the issuer does
+not stop the document naming somewhere else inside itself, and an issuer naming
+an authorization endpoint elsewhere turns every sign-in into a redirect of its
+choosing. There is no way to allow it: the deployment reaches this provider
+through a proxy that serves the whole of it from one host, or it signs in
+through the trusted header instead.
 
 **The provider is changing.** An identifier belongs to the provider that
 issued it, and the same string names somebody else at another one, so a

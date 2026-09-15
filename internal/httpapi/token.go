@@ -17,7 +17,10 @@ type TokenBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"What its owner calls it"`
 	// Product narrows it below its owner. What it reaches is the intersection,
 	// so naming something they cannot read reaches nothing.
-	Product string `json:"product,omitempty" doc:"Optionally, the one product it may reach"`
+	Product string `json:"product,omitempty" doc:"Optionally, the one product it may reach, by the name that addresses it"`
+	// ProductDisplayName is the human spelling, beside the address rather than
+	// in place of it: minting a token resolves the field above.
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
 	// Lifetime is how long it lasts, as a duration. There is a maximum, and
 	// there is no way to ask for one that never expires.
 	Lifetime string `json:"lifetime,omitempty" doc:"How long it lasts, such as \"720h\". There is a configured maximum"`
@@ -60,7 +63,7 @@ func registerTokens(api huma.API, in Ingest) {
 			"found when somebody leaves and nobody knows what breaks if it is turned off.",
 		Tags: []string{"Access"}, DefaultStatus: http.StatusCreated,
 	}, ownSubject, "Signed in, not through a token: a token cannot mint another."), func(ctx context.Context, input *struct{ Body TokenBody }) (*struct{ Body TokenBody }, error) {
-		subject, rights, names, err := mine(ctx, in)
+		subject, rights, _, err := mine(ctx, in)
 		if err != nil {
 			return nil, err
 		}
@@ -79,9 +82,9 @@ func registerTokens(api huma.API, in Ingest) {
 			// Resolved through what this person may see, so naming a product
 			// they cannot read answers as one that was never declared rather
 			// than telling them it exists.
-			product, err := names.VisibleProduct(ctx, subject, input.Body.Product)
+			product, err := productNamedVisibly(ctx, in, subject, input.Body.Product)
 			if err != nil {
-				return nil, noSuchProduct()
+				return nil, err
 			}
 			productID = &product.ID
 		}
@@ -140,7 +143,10 @@ func registerTokens(api huma.API, in Ingest) {
 		}
 		token, err := rights.TokenByName(ctx, subject.ID, input.Name)
 		if err != nil {
-			return nil, huma.Error404NotFound("no token of yours is called that")
+			return nil, absent(in.Logger, err, "that token could not be looked up",
+				func() error {
+					return huma.Error404NotFound("no token of yours is called that")
+				})
 		}
 		if err := rights.RevokeToken(ctx, token.ID); err != nil {
 			return nil, wentWrong(in.Logger, "cannot revoke a token", err)
@@ -178,8 +184,13 @@ func tokenList(ctx context.Context, names *catalog.Store, tokens []access.Token,
 			body.LastUsedAt = stamp(*token.LastUsedAt)
 		}
 		if token.ProductID != nil {
+			// The address, for the reason KeyBody carries it: minting
+			// resolves this field, and a display name resolves to nothing.
 			if product, err := names.ProductByID(ctx, *token.ProductID); err == nil {
-				body.Product = product.DisplayName
+				body.Product = product.Name
+				if product.DisplayName != product.Name {
+					body.ProductDisplayName = product.DisplayName
+				}
 			}
 		}
 		out.Body.Items = append(out.Body.Items, body)

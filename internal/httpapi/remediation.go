@@ -67,7 +67,7 @@ func registerRemediation(api huma.API, in Ingest) {
 			"thing that was fixed; an average weighted by how far a component fans out measures " +
 			"the dependency graph rather than anybody's work.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Days int `query:"days" default:"30" minimum:"1" maximum:"366" doc:"How far back to measure"`
 	}) (*RemediationOutput, error) {
@@ -119,7 +119,7 @@ func registerRemediation(api huma.API, in Ingest) {
 			"Counted over the judgments rather than the findings they cover, so the order is not " +
 			"decided by how far a component spreads through an image.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
 		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"How many deferrals make something worth listing. One is an ordinary judgment"`
 		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500"`
@@ -141,9 +141,9 @@ func registerRemediation(api huma.API, in Ingest) {
 			// nothing on answer alike. Telling them apart is a way
 			// to read the deployment's product list one guess at a
 			// time.
-			named, err := in.catalog().ProductByName(ctx, input.Product)
-			if err != nil || !subject.Sees(named.ID) {
-				return nil, noSuchProduct()
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
 			}
 			productID = named.ID
 		}

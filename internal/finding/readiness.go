@@ -7,6 +7,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Standing is what one build holds now, split by severity band.
@@ -113,7 +114,10 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 		OrderExpr("st.created_at DESC, st.id DESC").
 		Limit(1).
 		Scan(ctx, &release)
-	if err != nil || release.StreamID == 0 {
+	if err != nil && !database.IsNoRows(err) {
+		return nil, fmt.Errorf("read the last release cut from this branch: %w", err)
+	}
+	if release.StreamID == 0 {
 		out.Why = "no scanned release from this branch"
 		return out, nil
 	}

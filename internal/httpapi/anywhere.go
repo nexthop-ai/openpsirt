@@ -41,7 +41,7 @@ func registerAnywhere(api huma.API, in Ingest) {
 			"`differs`, which is a statement about a selection of builds. Both are on the " +
 			"per-product list, which is where a build can be named.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Narrowing
 		Paging
 	}) (*AnywhereOutput, error) {

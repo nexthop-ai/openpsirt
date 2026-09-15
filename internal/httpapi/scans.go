@@ -109,6 +109,22 @@ func (in Ingest) trail() *trail.Store {
 	return trail.NewStore(in.DB.DB)
 }
 
+// groupsReachable says whether anything configured here can report which
+// groups somebody is in: a provider with a source of them, or a trusted proxy
+// that reports them.
+//
+// Asked before roles are switched to group-bound. Without a source every
+// arrival belongs to nothing, so nobody derives any role and the deployment
+// locks itself out — including whoever made the change.
+func (in Ingest) groupsReachable() bool {
+	for _, provider := range in.Providers {
+		if provider.GroupsSource() {
+			return true
+		}
+	}
+	return in.Access != nil && in.Access.ReportsGroups()
+}
+
 // rights returns a store over who may do what, or nothing where there is no
 // database.
 func (in Ingest) rights() *access.Store {
@@ -251,7 +267,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// sender may not file against is reported as not declared, so that a
 		// stolen key cannot be used to read the shipping catalog one guess at
 		// a time.
-		return nil, huma.Error404NotFound(err.Error())
+		return nil, undeclared(in.Logger, err, "that build could not be looked up")
 	}
 
 	// A key authorizes an upload; it does not describe one. Every
@@ -574,7 +590,7 @@ func registerReceipts(api huma.API, in Ingest) {
 		names := catalog.NewStore(in.DB.DB)
 		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(in.Logger, err, "that build could not be looked up")
 		}
 
 		if subject.Kind == access.Pipeline &&
@@ -752,7 +768,7 @@ func registerCoverage(api huma.API, in Ingest) {
 			"been filed against is measured from when it was declared.\n\n" +
 			"How long counts as quiet is the `scanning.quiet-after` setting.",
 		Tags: []string{"Scans"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"How many to return. Quietest first, so the default is the answer for any estate somebody reads by hand"`
 		Offset int `query:"offset" minimum:"0" doc:"How many to skip"`
@@ -843,7 +859,7 @@ func registerCoverageExport(api huma.API, in Ingest) {
 			"nothing would be a different answer.\n\n" +
 			"The threshold `quiet` was computed against is stated in the file.",
 		Tags: []string{"Scans"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
 		ScopeQuery
 	}) (*huma.StreamResponse, error) {

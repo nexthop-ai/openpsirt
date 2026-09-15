@@ -52,7 +52,7 @@ func registerUpward(api huma.API, in Ingest) {
 			"branch first. A component the inventory placed nowhere has no chain and sits at " +
 			"the end.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers what you hold, whether or not you read the product."),
+	}, anyPerson, "Answers what you hold, whether or not you read the product."),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 			Stream  string `path:"stream"`

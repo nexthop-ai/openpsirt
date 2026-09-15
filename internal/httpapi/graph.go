@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -76,11 +75,11 @@ func registerGraph(api huma.API, in Ingest) {
 			"with five thousand children — so searching is the way in, and browsing is for " +
 			"answering \"what else is under this\" once you are already somewhere.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Term    string `query:"q" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
+		Term    string `query:"q" maxLength:"200" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many matches to return. Only read when searching"`
 	}) (*rootsOutput, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
@@ -138,7 +137,7 @@ func registerGraph(api huma.API, in Ingest) {
 			"versions, `version` says which — without it, a name that matches more than one is " +
 			"refused with 409, naming the choices, rather than guessed at.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`
@@ -200,14 +199,13 @@ func browsing(ctx context.Context, in Ingest, product, stream, variant string) (
 	if err != nil {
 		return access.Subject{}, 0, err
 	}
-	names := catalog.NewStore(in.DB.DB)
-	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
-		return access.Subject{}, 0, noSuchProduct()
+		return access.Subject{}, 0, err
 	}
-	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
 	if err != nil {
-		return access.Subject{}, 0, nothingScannedThere()
+		return access.Subject{}, 0, err
 	}
 	return subject, target.ID, nil
 }

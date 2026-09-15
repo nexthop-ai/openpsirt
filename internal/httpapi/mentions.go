@@ -7,7 +7,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // MentionableBody is somebody who could be named in a comment or a
@@ -32,7 +31,7 @@ func registerMentions(api huma.API, in Ingest) {
 			"undisclosed findings requires being able to read them.",
 		Tags: []string{"Triage"},
 	}, perProduct, "Asking about undisclosed findings needs private-read or "+
-		"private-triage."), func(ctx context.Context, input *struct {
+		"private-triage.", readRights()...), func(ctx context.Context, input *struct {
 		Product    string `path:"product"`
 		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"Which kind of finding the text is about"`
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name"`
@@ -42,9 +41,9 @@ func registerMentions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 
 		// Asking who may be told about an undisclosed finding is itself a

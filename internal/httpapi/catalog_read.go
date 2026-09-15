@@ -24,7 +24,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			"A scan may only be filed against something declared, so this is the first question " +
 			"to ask after an upload is refused for naming something unknown.",
 		Tags: []string{"Catalog"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, _ *struct{}) (*listOutput[ProductBody], error) {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, _ *struct{}) (*listOutput[ProductBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -86,7 +86,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			"A stream past its end-of-life date is listed and says so. It stops being a " +
 			"place a fix may be declared for, and what is open against it is still counted.",
 		Tags: []string{"Catalog"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, in *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 	}) (*listOutput[StreamBody], error) {
 		subject, err := reading(ctx)
@@ -99,7 +99,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		}
 		product, err := store.VisibleProduct(ctx, subject, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		rows, err := store.Streams(ctx, subject, product.ID)
 		if err != nil {
@@ -163,7 +163,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			"Each says whether it is customer-facing, which feeds how urgent a finding in it " +
 			"is, and defaults to customer-facing where nobody has said.",
 		Tags: []string{"Catalog"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, in *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 	}) (*listOutput[VariantBody], error) {
 		subject, err := reading(ctx)
@@ -176,7 +176,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		}
 		product, err := store.VisibleProduct(ctx, subject, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		rows, err := store.Variants(ctx, subject, product.ID)
 		if err != nil {
@@ -203,7 +203,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			"it, which is what keeps something introduced later from appearing to have shipped " +
 			"years ago.",
 		Tags: []string{"Catalog"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, in *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 	}) (*listOutput[VariantBody], error) {
@@ -217,7 +217,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		}
 		_, stream, err := store.VisibleStream(ctx, subject, in.Product, in.Stream)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 		rows, err := store.BuiltAs(ctx, subject, stream.ID)
 		if err != nil {

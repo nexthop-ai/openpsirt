@@ -11,7 +11,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -60,7 +59,7 @@ func registerDueExport(api huma.API, in Ingest) {
 			"with nothing said.\n\n" +
 			"`days_left` is negative once something is overdue.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
 		ScopeQuery
 		Days int `query:"days" default:"14" minimum:"0" maximum:"365" doc:"How far ahead to look"`
@@ -155,7 +154,7 @@ func registerComparisonExport(api huma.API, in Ingest) {
 			"**Public findings only unless you ask otherwise**, because the destination is " +
 			"usually a public document.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product        string `path:"product"`
 		Format         string `path:"format" enum:"csv,json"`
 		From           string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
@@ -168,17 +167,8 @@ func registerComparisonExport(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
 		locate := func(stream, variant string) (int64, error) {
-			named, err := names.LocateVisible(ctx, subject, input.Product, stream, variant)
-			if err != nil {
-				return 0, noSuchProduct()
-			}
-			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
-			if err != nil {
-				return 0, nothingScannedThere()
-			}
-			return target.ID, nil
+			return targetIDOf(ctx, in, subject, input.Product, stream, variant)
 		}
 		from, err := locate(input.From, input.FromVariant)
 		if err != nil {
@@ -248,7 +238,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 			"that summarizes it would be a way around them.\n\n" +
 			"Takes every filter the audit list takes, including the period.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Auditing
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
@@ -322,7 +312,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 			"agreed to, which is a different question, and `product` narrows it the way the " +
 			"screen does.",
 		Tags: []string{"Triage"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format  string `path:"format" enum:"csv,json"`
 		Mine    bool   `query:"mine" doc:"Write out what you proposed and nobody has agreed to, instead of what is waiting on you"`
 		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
@@ -410,7 +400,7 @@ func registerComponentExport(api huma.API, in Ingest) {
 			"Takes the same filters as the by-component list, and the line this deployment " +
 			"triages at is stated in the file.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Format  string `path:"format" enum:"csv,json"`
 		Stream  string `query:"stream"`

@@ -214,7 +214,7 @@ DEV_DIR  ?= $(DEMO_DIR)/dev
 DEV_DB   ?= $(DEV_DIR)/dev.db
 DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
 
 all: check build
 
@@ -490,7 +490,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved confined granted attached readable pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
+check: build vet lint unreachable unclaimed reserved confined granted attached readable negatives pins-check test-all govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -593,6 +593,14 @@ unreachable:
 # invisible to all of them at once.
 readable:
 	$(GO) run ./internal/tools/readable
+
+# A 404 whose body is an error's own text. It asserts that a name reaches
+# nothing and publishes whatever the error carried: thirty handlers wrote one,
+# the catalog readers under them returned the driver's message unwrapped, and a
+# connection failure reached whoever asked as "that product does not exist"
+# with the database host and port in the detail.
+negatives:
+	$(GO) run ./internal/tools/negatives
 
 # Names this code invents that an engine refuses to parse. Queries are written
 # once and run against four engines, and the four do not reserve the same

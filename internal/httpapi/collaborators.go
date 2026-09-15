@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -174,6 +173,14 @@ func collaboratorBodies(ctx context.Context, in Ingest, productID, issueID int64
 		return out, nil
 	}
 	rights := access.NewStore(in.DB.DB)
+	// Both halves. The identity is what the removal route resolves, and the
+	// display name is what a screen shows — one field each, because a list
+	// that published the label where the handle belongs is a grant on an
+	// embargoed case that the API can show and cannot withdraw.
+	handles, err := rights.Handles(ctx, people)
+	if err != nil {
+		return nil, err
+	}
 	names, err := rights.Names(ctx, people)
 	if err != nil {
 		return nil, err
@@ -195,11 +202,23 @@ func collaboratorBodies(ctx context.Context, in Ingest, productID, issueID int64
 		return nil, err
 	}
 	for _, id := range people {
-		row := added[id]
-		out = append(out, CollaboratorBody{
-			Identity: names[id], AddedBy: by[row.AddedBy],
+		// A person the grant reports and the rows do not is left out rather
+		// than published with a zero time: "0001-01-01" is not a date anybody
+		// should read as when somebody was brought into a case.
+		row, recorded := added[id]
+		if !recorded {
+			continue
+		}
+		body := CollaboratorBody{
+			Identity: handles[id], AddedBy: by[row.AddedBy],
 			AddedAt: row.AddedAt.Format(time.RFC3339),
-		})
+		}
+		// Empty where it would repeat the identity, so that omitempty keeps
+		// meaning "no display name" rather than "the same again".
+		if names[id] != handles[id] {
+			body.Name = names[id]
+		}
+		out = append(out, body)
 	}
 	return out, nil
 }
@@ -238,9 +257,13 @@ func caseAtHolding(ctx context.Context, in Ingest, product, vulnerability string
 		return access.Subject{}, nil, 0, 0,
 			noDatabase(in.Logger)
 	}
-	named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, product)
+	// A route about one named issue, so the wider of the two rules: somebody
+	// brought into a case here holds nothing on the product and is still
+	// answering about the one issue they were granted. What they may do with
+	// it is decided below, by the issue rather than by the product.
+	named, err := productForIssue(ctx, in, subject, product)
 	if err != nil {
-		return access.Subject{}, nil, 0, 0, noSuchProduct()
+		return access.Subject{}, nil, 0, 0, err
 	}
 	if triaging && !subject.Triages(access.Public, named.ID) {
 		// Asked before the name is resolved further, so a refusal says

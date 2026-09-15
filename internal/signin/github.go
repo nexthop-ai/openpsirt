@@ -27,7 +27,19 @@ type GitHub struct {
 	client *http.Client
 	// organization bounds whose teams count as groups. Without it every team
 	// in every organization somebody belongs to would map to roles here.
+	//
+	// Folded at construction, because GitHub's organization logins are
+	// case-insensitive to look up and canonical in what it hands back — so an
+	// operator's spelling and GitHub's need not match byte for byte.
 	organization string
+	// api is where the account and the teams are read from.
+	//
+	// A field rather than a literal so that this adapter can be driven against
+	// a stand-in, which is the only way anything here runs at all: every
+	// method of this type was unexecuted. Unexported, so nothing outside this
+	// package can point it anywhere — the guarded client still refuses any
+	// host but GitHub's in a real deployment.
+	api string
 }
 
 // GitHubConfig is what an operator supplies for GitHub sign-in.
@@ -67,12 +79,21 @@ func NewGitHub(cfg GitHubConfig) (*GitHub, error) {
 			Endpoint: github.Endpoint, Scopes: scopes,
 		},
 		client:       outward.Guarded(gitHubAPI, gitHubAuth),
-		organization: cfg.Organization,
+		organization: strings.ToLower(strings.TrimSpace(cfg.Organization)),
+		api:          "https://" + gitHubAPI,
 	}, nil
 }
 
 // Name is how a sign-in path names this provider.
 func (g *GitHub) Name() string { return "github" }
+
+// GroupsSource reports whether an organization was named.
+//
+// Without one, every team in every organization somebody belongs to would map
+// to roles here, so empty means groups are not read — the right answer for a
+// deployment assigning roles directly, and a lockout for one about to switch
+// to group-bound roles.
+func (g *GitHub) GroupsSource() bool { return g.organization != "" }
 
 // Issuer is who mints the identifiers GitHub hands over.
 //
@@ -82,27 +103,14 @@ func (g *GitHub) Issuer() string { return "https://github.com" }
 
 // Begin returns where to send the browser.
 func (g *GitHub) Begin(_ context.Context, redirectURI string) (string, Pending, error) {
-	pending, err := newPending()
-	if err != nil {
-		return "", Pending{}, err
-	}
-	config := g.config
-	config.RedirectURL = redirectURI
-
-	return config.AuthCodeURL(pending.State,
-		oauth2.SetAuthURLParam("code_challenge", pending.challenge()),
-		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-	), pending, nil
+	// No nonce: GitHub issues no identity token, so there is nothing to tie
+	// one to.
+	return beginPKCE(g.config, redirectURI, nil)
 }
 
 // Complete exchanges the code and asks GitHub who this is.
 func (g *GitHub) Complete(ctx context.Context, code string, pending Pending, redirectURI string) (*Identity, error) {
-	config := g.config
-	config.RedirectURL = redirectURI
-
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, g.client)
-	token, err := config.Exchange(ctx, code,
-		oauth2.SetAuthURLParam("code_verifier", pending.Verifier))
+	token, err := exchangePKCE(ctx, g.config, g.client, code, redirectURI, pending)
 	if err != nil {
 		return nil, fmt.Errorf("exchange what github sent back: %w", err)
 	}
@@ -113,7 +121,7 @@ func (g *GitHub) Complete(ctx context.Context, code string, pending Pending, red
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	}
-	if err := g.get(ctx, token, "https://api.github.com/user", &account); err != nil {
+	if err := g.get(ctx, token, g.api+"/user", &account); err != nil {
 		return nil, err
 	}
 	username, err := usernameFrom(account.Login)
@@ -167,12 +175,18 @@ func (g *GitHub) teams(ctx context.Context, token *oauth2.Token) ([]string, erro
 				Login string `json:"login"`
 			} `json:"organization"`
 		}
-		url := fmt.Sprintf("https://api.github.com/user/teams?per_page=%d&page=%d", teamPageSize, page)
+		url := fmt.Sprintf("%s/user/teams?per_page=%d&page=%d", g.api, teamPageSize, page)
 		if err := g.get(ctx, token, url, &memberships); err != nil {
 			return nil, err
 		}
 		for _, membership := range memberships {
-			if membership.Organization.Login != g.organization {
+			// Folded, because GitHub hands back the organization's canonical
+			// casing and the operator typed whatever they typed. Compared byte
+			// for byte, a mismatch of capitals skipped every membership —
+			// teams came back empty with no error, nobody derived any role in
+			// group-bound mode, and startup logged "sign-in configured" with
+			// the operator's own spelling echoed back.
+			if !strings.EqualFold(membership.Organization.Login, g.organization) {
 				continue
 			}
 			names = append(names, membership.Slug)
@@ -244,7 +258,7 @@ func (g *GitHub) verifiedEmail(ctx context.Context, token *oauth2.Token) (string
 		Primary  bool   `json:"primary"`
 		Verified bool   `json:"verified"`
 	}
-	if err := g.get(ctx, token, "https://api.github.com/user/emails", &addresses); err != nil {
+	if err := g.get(ctx, token, g.api+"/user/emails", &addresses); err != nil {
 		return "", false
 	}
 	fallback := ""

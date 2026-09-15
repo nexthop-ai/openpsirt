@@ -214,3 +214,65 @@ func TestAskingWhoReadsSomethingIsAskedWithASubject(t *testing.T) {
 		}
 	})
 }
+
+// TestASearchTermIsNotAPatternLanguage pins what a wildcard in a search box
+// does, on the picker where it matters most.
+//
+// Four LIKE predicates carried no ESCAPE while eight beside them did, so a "%"
+// or a "_" was a wildcard in four places and a literal in eight. This is the
+// picker that decides who may be named on an embargoed case: a term of "%"
+// answered with every person the deployment could offer, in one request.
+//
+// Every engine, because SQLite has no default escape character and the other
+// three disagree about a backslash — which is why the escape character here is
+// "#" and why the clause is always stated.
+func TestASearchTermIsNotAPatternLanguage(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		product := f.products["sonic"]
+
+		// Two identities differing only where a wildcard would not care.
+		for _, identity := range []string{"ana_ruiz", "anaxruiz"} {
+			person, err := f.store.Ensure(ctx, identity, "", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := f.store.Claim(ctx, person.ID, identity); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.store.GrantRole(ctx, person.ID, product, access.PrivateRead); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		asker := asking(f, access.Private)
+
+		// The underscore is a character, not "any character".
+		found, err := f.store.WhoCanRead(ctx, asker, product, access.Private, "ana_", 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(found) != 1 || found[0].Identity != "ana_ruiz" {
+			t.Errorf("searching %q found %v, want the one literal match",
+				"ana_", identities(found))
+		}
+
+		// And a bare wildcard is a name nobody has, rather than everybody.
+		everyone, err := f.store.WhoCanRead(ctx, asker, product, access.Private, "%", 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(everyone) != 0 {
+			t.Errorf("a term of %q answered with %v — the whole embargo picker in "+
+				"one request", "%", identities(everyone))
+		}
+	})
+}
+
+func identities(found []access.Mentionable) []string {
+	out := make([]string, 0, len(found))
+	for _, one := range found {
+		out = append(out, one.Identity)
+	}
+	return out
+}

@@ -19,6 +19,7 @@ Satisfies REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67.
 - [Path version](#path-version)
 - [Declared privileges](#declared-privileges)
 - [Representation](#representation)
+- [Addresses and labels](#addresses-and-labels)
 - [File organization](#file-organization)
 - [Limits](#limits)
 
@@ -108,6 +109,22 @@ reached the caller as a bad request carrying the statement text and, for a
 connection failure, the address and user it tried. Where the type cannot decide,
 the error is treated as a refusal.
 
+**A 404 is never built from an error's own text.** It asserts that a name
+reaches nothing, and the body then publishes whatever the error carried — for a
+store read, the driver's message. Thirty handlers wrote one, over readers that
+returned the driver's error unwrapped, so a connection failure reached an
+authenticated caller as "that product does not exist" with the database host,
+port and driver in the detail. A gate checks it.
+
+The one exception is named in place: the catalog's own not-declared error is
+composed from the names the caller supplied and fixed words, and a pipeline
+whose upload was refused has to be told which of the product, the branch and
+the variant it was. That arm is reached only once the sentinel has been tested.
+
+A read that could not be made is a fault rather than a 404. The split is one
+helper rather than a judgment made per route, because it was being made per
+route and made correctly at five sites of thirty-eight.
+
 A process with no database answers with one sentence. Every handler guards
 against it, because a nil pointer inside one is worse than a refusal. Each guard
 had invented its own wording — twenty-one of them, reading as twenty-one
@@ -191,7 +208,7 @@ Each operation carries a structured statement of what it asks of a caller
 
 | Field | Holds |
 |---|---|
-| Scope | The deployment, a product, yourself, any recognized credential, or answered without one |
+| Scope | The deployment, a product, yourself, any signed-in person, any recognized credential, or answered without one |
 | Roles | Any one of which is sufficient |
 | Note | Only where a rule is not a role |
 
@@ -215,6 +232,19 @@ gated operation as somebody holding none of its roles; a 2xx fails it.
 A gate refuses an operation declaring neither scope nor roles. An endpoint added
 without one is not broken, it is undocumented.
 
+**"Any signed-in person" and "any recognized credential" are two scopes, because
+a pipeline's key is not somebody.** Seventy-four operations declared the second
+and then refused every credential that is not a person, so the reference, the
+extension a client generator reads, and an access review all stated a rule the
+code contradicted. The word could not be redefined instead: two operations
+really do mean any credential — a key reads back the scans it sent, and the
+receipts for them.
+
+The part of a requirement that is about the subject alone is enforced before any
+handler runs, which is what makes the handler's own check the second statement
+of a rule rather than the only statement of one the document contradicts. A role
+on a product needs the product resolved and stays in the handler.
+
 The privileges page keeps only what a per-endpoint line cannot carry: what each
 role means, how roles are granted, what a declaration is and is not, and that
 seeing is never changing. Two rules in it are not roles and cannot be granted:
@@ -230,6 +260,32 @@ A caller receives the source and renders it themselves. The server has already
 refused what its policy forbids at submission (REQ-67), so the text is known-good
 under the rules in force when it was written; rules written since are the
 renderer's to apply. The rules are in `DESIGN-text.md`.
+
+## Addresses and labels
+
+A product, a person and a team each answer to two strings: the one that
+addresses it, and the one somebody declared to read. They are different
+wherever a display name is more than a recapitalization.
+
+| Rule | Reason |
+|---|---|
+| A field a write resolves carries the address | It is what the lookup matches. A listing that published the label there could not be used to undo what it listed |
+| The label goes beside it, never in place of it | A screen still shows what a person reads. Two fields is the only arrangement where both are true |
+| The label is absent where it repeats the address | So that "no display name" and "the same again" do not read alike |
+| A name in a path is the address | Folding only lowercases and trims, so a label matches no row |
+
+What this cost. A collaborator on an embargoed case was listed under
+their display name in a field called `identity`, and the removal route resolves
+that field — so somebody who should no longer see the case could be listed and
+not taken off. And a role on a product declared `acme-router` and displayed
+`Acme Router` was listed as `Acme Router`, which the withdraw beside it sent
+back, and nothing matched.
+
+The collaborator list had the other field already declared and never filled.
+The role, credential, binding, token and routing-rule listings had only the one,
+and the label is a new field beside it — which is a shipped addition to those
+response schemas, and a change of value in the field that was already there: a
+key now reads `acme-router` where it read `Acme Router`.
 
 ## File organization
 

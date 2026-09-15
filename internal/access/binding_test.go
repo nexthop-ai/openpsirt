@@ -2,6 +2,7 @@ package access_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -398,4 +399,99 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 			t.Error("administration granted here reads as a group's")
 		}
 	})
+}
+
+// TestUnbindingAGroupTakesTheRoleAtTheNextSignIn pins what withdrawing a
+// mapping does, which nothing demonstrated: Unbind was at 0.0%.
+//
+// Group membership is read at sign-in, so a mapping withdrawn takes effect at
+// each member's next one — which is what the endpoint's own description says,
+// and what "end their sessions" exists beside. The half worth pinning is that
+// it takes effect at all: the binding row goes, and the derived grant goes
+// with the next arrival rather than surviving it.
+func TestUnbindingAGroupTakesTheRoleAtTheNextSignIn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		product := f.products["sonic"]
+
+		if err := f.store.Bind(ctx, "security", product, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		// Binding what is already bound is not a failure — the branch
+		// DESIGN-access.md states in prose and nothing executed.
+		if err := f.store.Bind(ctx, "security", product, access.PrivateRead); err != nil {
+			t.Errorf("binding twice: %v", err)
+		}
+		bindings, err := f.store.Bindings(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bindings) != 1 {
+			t.Fatalf("binding twice left %d rows", len(bindings))
+		}
+
+		arrival := access.Arrival{ViaProxy: true, Username: "ana"}
+		subject, err := f.store.AdmitByGroups(ctx, arrival, []string{"security"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !subject.Reads(access.Private, product) {
+			t.Fatal("arriving in a bound group granted nothing, so this proves nothing")
+		}
+
+		// Withdrawn, and then they arrive again.
+		if err := f.store.Unbind(ctx, "security", product, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.AdmitByGroups(ctx, arrival, []string{"security"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody whose only group was unbound was admitted: %v", err)
+		}
+		// And nothing of theirs stands: a derived grant is replaced at every
+		// arrival, so the one the withdrawn binding made is gone.
+		held, err := f.store.Grants(ctx, mustPerson(t, f, "ana").ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, grant := range held {
+			if grant.Active {
+				t.Errorf("a role from a withdrawn binding still stands: %+v", grant)
+			}
+		}
+	})
+}
+
+// TestABindingIsMatchedWithItsCapitals pins the cost the Bind doc comment
+// states: a group name is the provider's identity rather than a name typed
+// here, so it is matched exactly.
+func TestABindingIsMatchedWithItsCapitals(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		product := f.products["sonic"]
+
+		if err := f.store.Bind(ctx, "security", product, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		// A different name as far as a provider is concerned, so it withdraws
+		// nothing — and says so by leaving the row.
+		if err := f.store.Unbind(ctx, "Security", product, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		bindings, err := f.store.Bindings(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bindings) != 1 || bindings[0].GroupName != "security" {
+			t.Errorf("unbinding a differently spelled group removed it: %+v", bindings)
+		}
+	})
+}
+
+// mustPerson reads somebody the fixture expects to exist.
+func mustPerson(t *testing.T, f *fixture, identity string) *access.Account {
+	t.Helper()
+	person, err := f.store.ByIdentity(t.Context(), identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return person
 }

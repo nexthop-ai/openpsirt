@@ -44,10 +44,18 @@ type Release struct {
 func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	productID int64) ([]Release, error) {
 
-	_, all := subject.Products()
-	if subject.Kind != access.Person || !subject.Sees(productID) {
+	// Not merely empty: "here is nothing" and "you cannot ask" are different
+	// statements, and a pipeline key asking this is the second. A person who
+	// cannot see the product is the first, and is answered below — this is a
+	// narrowed read, and an empty answer is the correct one for somebody the
+	// product does not exist for.
+	if subject.Kind != access.Person {
+		return nil, access.Denied("read what the releases hold")
+	}
+	if !subject.Sees(productID) {
 		return nil, nil
 	}
+	_, all := subject.Products()
 
 	var rows []struct {
 		Stream  string `bun:"stream"`
@@ -171,7 +179,10 @@ func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
 	// variant that credential is pinned to — `Releases` beside this checks the
 	// kind explicitly and this did not. No route reaches it as a pipeline
 	// today; the next one added would.
-	if subject.Kind != access.Person || !subject.Sees(productID) {
+	if subject.Kind != access.Person {
+		return nil, access.Denied("read what the releases hold")
+	}
+	if !subject.Sees(productID) {
 		return nil, nil
 	}
 	var runs []Run

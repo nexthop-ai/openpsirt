@@ -140,7 +140,11 @@ func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
 		Where("retired_at IS NULL").
 		Limit(1).Scan(ctx)
 	if err != nil {
-		return nil, ErrNoSuchTeam
+		// A read that could not be made is not an answer about what exists:
+		// every caller turns the sentinel into "no such team", and a database
+		// nobody can reach would have said that of every team there is.
+		return nil, database.FromRead(err, ErrNoSuchTeam,
+			fmt.Sprintf("look up the team called %q", name))
 	}
 	return team, nil
 }
@@ -334,34 +338,70 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 	if len(enough) == 0 {
 		return false, nil
 	}
-	reads, err := s.db.NewSelect().
-		TableExpr(`role_grant AS "rg"`).
-		Column("rg.id").
-		Where("rg.person_id = ?", personID).
-		Where("rg.product_id = ?", productID).
-		Where("rg.active = ?", true).
-		Where("rg.role IN (?)", bun.List(enough)).
-		Exists(ctx)
+	// Somebody who has left reads nothing, whatever their grants still say.
+	// Deactivation leaves the grant rows in place on purpose — it is the
+	// recorded act of leaving rather than an undoing of what they held — so
+	// every question of this shape has to ask the person as well.
+	here, err := s.here(ctx, personID)
+	if err != nil || !here {
+		return false, err
+	}
+	reads, err := holdingAny(s.db.NewSelect().
+		TableExpr(`person AS "p"`).ColumnExpr("p.id").
+		Where("p.id = ?", personID), "p.id", enough, productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether they may see this: %w", err)
 	}
-	if reads {
-		return true, nil
-	}
-	// A role held across every product is held here too. Asked as a second
-	// statement rather than folded into the one above, because this table
-	// names no product and a join would have to invent one.
-	everywhere, err := s.db.NewSelect().
-		TableExpr(`role_grant_all AS "rga"`).
-		Column("rga.id").
-		Where("rga.person_id = ?", personID).
-		Where("rga.active = ?", true).
-		Where("rga.role IN (?)", bun.List(enough)).
+	return reads, nil
+}
+
+// here reports whether this person is still someone the deployment answers
+// for: recorded, and not deactivated.
+//
+// One spelling, because "may this person do this" has to exclude somebody who
+// has left at every site that asks it, and it excluded them at one — the
+// mention picker, whose own doc gives the reason: they are refused at sign-in,
+// so offering their name mentions somebody who will never see it. The same
+// sentence applies to routing work to them and to counting administrators, and
+// was carried to neither.
+func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
+	live, err := s.db.NewSelect().Model((*Account)(nil)).
+		Where("id = ?", personID).
+		Where("deactivated_at IS NULL").
 		Exists(ctx)
 	if err != nil {
-		return false, fmt.Errorf("read whether they may see this anywhere: %w", err)
+		return false, fmt.Errorf("read whether they are still here: %w", err)
 	}
-	return everywhere, nil
+	return live, nil
+}
+
+// holdingAny narrows a query to the rows whose person holds one of these roles
+// here: granted on the product, or granted across every product, both in force.
+//
+// One builder, because the union was written out at every question that asked
+// it inside this package — and this package was exactly where
+// `internal/tools/granted` could not reach, since that gate refused a query
+// naming one table and not the other *outside* here. DESIGN-access.md records
+// what the union costs when it is spelled by hand: predicates missed
+// role_grant_all the day it was added, "each answering no for somebody who held
+// the role — which compiles and passes".
+//
+// person names the column holding the person in the caller's own query, so the
+// same rule attaches to a query about one person, about a team's members, or
+// about everybody who may be mentioned. It is written at the call site and
+// never supplied by anybody: a column name cannot be bound by a placeholder,
+// and the only safe source for one is the code (REQ-66).
+//
+// Two EXISTS rather than a union, because that is the shape all four engines
+// take: a union inside an EXISTS is a syntax error on SQLite.
+func holdingAny(q *bun.SelectQuery, person string, enough []Role, productID int64) *bun.SelectQuery {
+	return q.Where(`EXISTS (SELECT 1 FROM "role_grant" AS "g"
+			WHERE g.person_id = `+person+` AND g.active = ?
+			  AND g.product_id = ? AND g.role IN (?))
+		OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
+			WHERE ga.person_id = `+person+` AND ga.active = ?
+			  AND ga.role IN (?))`,
+		true, productID, bun.List(enough), true, bun.List(enough))
 }
 
 // rolesReading is which roles are enough to read at a visibility, asked of the
@@ -400,31 +440,18 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	// An administrator is not counted. Administration is not a read grant
 	// , and a team whose only qualifying member is an administrator is a
 	// queue nobody working the product can see.
-	reads, err := s.db.NewSelect().
+	// A member who has left is not a member who can read it. The team is a
+	// queue, and one whose only qualifying member is gone is a queue nobody
+	// working the product can see — the argument the administrator case above
+	// already makes, for a case nobody made it for.
+	reads, err := holdingAny(s.db.NewSelect().
 		TableExpr(`team_member AS "tmm"`).
-		Join(`JOIN "role_grant" AS "rg" ON rg.person_id = tmm.person_id`).
-		Column("tmm.person_id").
+		Join(`JOIN "person" AS "pe" ON pe.id = tmm.person_id`).
+		ColumnExpr("tmm.person_id").
 		Where("tmm.team_id = ?", teamID).
-		Where("rg.product_id = ?", productID).
-		Where("rg.active = ?", true).
-		Where("rg.role IN (?)", bun.List(enough)).
-		Exists(ctx)
+		Where("pe.deactivated_at IS NULL"), "tmm.person_id", enough, productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether anybody on that team may see this: %w", err)
 	}
-	if reads {
-		return true, nil
-	}
-	everywhere, err := s.db.NewSelect().
-		TableExpr(`team_member AS "tmm"`).
-		Join(`JOIN "role_grant_all" AS "rga" ON rga.person_id = tmm.person_id`).
-		Column("tmm.person_id").
-		Where("tmm.team_id = ?", teamID).
-		Where("rga.active = ?", true).
-		Where("rga.role IN (?)", bun.List(enough)).
-		Exists(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read whether anybody on that team may see this anywhere: %w", err)
-	}
-	return everywhere, nil
+	return reads, nil
 }

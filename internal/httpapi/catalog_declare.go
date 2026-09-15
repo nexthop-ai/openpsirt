@@ -59,14 +59,14 @@ func registerDeclaring(api huma.API, d Declaring) {
 		}
 		product, err := store.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 
 		var parentID *int64
 		if in.Body.Parent != "" {
 			parent, err := store.StreamByName(ctx, product.ID, in.Body.Parent)
 			if err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			parentID = &parent.ID
 		}
@@ -103,7 +103,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 		}
 		product, err := store.ProductByName(ctx, in.Product)
 		if err != nil {
-			return nil, huma.Error404NotFound(err.Error())
+			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
 
 		facing := true

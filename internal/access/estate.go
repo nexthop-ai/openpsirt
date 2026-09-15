@@ -44,17 +44,18 @@ func (s *Store) GrantEstateRole(ctx context.Context, personID int64, role Role) 
 		// is spelled differently on each of the four engines, and
 		// engine-specific SQL belongs in the database package rather than
 		// here (REQ-71).
-		n, counted := s.db.NewSelect().Model((*EstateGrant)(nil)).
-			Where("person_id = ?", personID).Where("role = ?", role).
-			// In force, like every other question about what somebody holds. A
-			// row set aside by a change of mode grants nothing, so reporting
-			// success on one would tell an administrator they had granted
-			// something that does not exist.
-			Where("active = ?", true).Count(ctx)
-		if counted == nil && n > 0 {
-			return nil
-		}
-		return fmt.Errorf("grant %q across every product: %w", role, err)
+		return s.alreadyThere(ctx, err,
+			fmt.Sprintf("grant %q across every product", role),
+			func(ctx context.Context) (bool, error) {
+				// In force, like every other question about what somebody
+				// holds. A row set aside by a change of mode grants nothing,
+				// so reporting success on one would tell an administrator they
+				// had granted something that does not exist.
+				n, err := s.db.NewSelect().Model((*EstateGrant)(nil)).
+					Where("person_id = ?", personID).Where("role = ?", role).
+					Where("active = ?", true).Count(ctx)
+				return n > 0, err
+			})
 	}
 	return nil
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -18,7 +17,13 @@ import (
 type RuleBody struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name" doc:"What to call it, so a placement can be explained in words"`
-	Team string `json:"team" doc:"Where work lands, by team name"`
+	Team string `json:"team" doc:"Where work lands, by the name that addresses the team"`
+	// TeamDisplayName is what to show beside it. The field above is what
+	// add-routing-rule resolves through TeamByName, which matches the folded
+	// name column — so a team declared "platform-security" and displayed
+	// "Platform Security" listed as the label, and sending that back found no
+	// team at all.
+	TeamDisplayName string `json:"team_display_name,omitempty" doc:"What to call that team, where it was declared with a display name"`
 	// Order is the whole of the precedence: first match wins.
 	Order int `json:"order" doc:"Where it sits among the others. The first rule that matches places the work"`
 	// Upstream is the key that matters: one rule naming a source package
@@ -58,10 +63,9 @@ func registerRouting(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		product, err := names.ProductByName(ctx, input.Product)
-		if err != nil || !subject.Sees(product.ID) {
-			return nil, noSuchProduct()
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
 		}
 		// A rule is configuration rather than a finding, so there is nothing
 		// in it for the data layer to narrow: a reader either gets the whole
@@ -84,8 +88,9 @@ func registerRouting(api huma.API, in Ingest) {
 		out.Body.Items = make([]RuleBody, 0, len(rules))
 		for _, rule := range rules {
 			out.Body.Items = append(out.Body.Items, RuleBody{
-				ID: rule.ID, Name: rule.Name, Team: teams[rule.TeamID],
-				Order: rule.Ordinal, Upstream: rule.Upstream, Beneath: rule.Beneath,
+				ID: rule.ID, Name: rule.Name, Team: teams[rule.TeamID].Address,
+				TeamDisplayName: teams[rule.TeamID].Display,
+				Order:           rule.Ordinal, Upstream: rule.Upstream, Beneath: rule.Beneath,
 			})
 		}
 		return out, nil
@@ -116,9 +121,9 @@ func registerRouting(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
-		if err != nil || !subject.Sees(product.ID) {
-			return nil, noSuchProduct()
+		product, err := productNamedVisibly(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
 		}
 		// Declared triage, like the rule it previews. What comes back is
 		// narrowed to what the asker may read, but a preview is part of
@@ -191,8 +196,13 @@ func registerRouting(api huma.API, in Ingest) {
 			nil, trail.Said("to "+team.Called(), true))
 		queueSweep(ctx, in, product)
 
+		shown := ""
+		if team.DisplayName != "" && team.DisplayName != team.Name {
+			shown = team.DisplayName
+		}
 		return &struct{ Body RuleBody }{Body: RuleBody{
-			ID: rule.ID, Name: rule.Name, Team: team.Called(), Order: rule.Ordinal,
+			ID: rule.ID, Name: rule.Name, Team: team.Name, TeamDisplayName: shown,
+			Order:    rule.Ordinal,
 			Upstream: rule.Upstream, Beneath: rule.Beneath,
 		}}, nil
 	})
@@ -215,7 +225,7 @@ func registerRouting(api huma.API, in Ingest) {
 				return nil, err
 			}
 			if err := finding.NewStore(in.DB.DB).RetireRule(ctx, subject, product, input.ID); err != nil {
-				return nil, huma.Error404NotFound(err.Error())
+				return nil, absent(in.Logger, err, "that rule could not be retired", noSuchRule)
 			}
 			noteChange(ctx, in, trail.Role,
 				"routing "+input.Product+" · "+strconv.FormatInt(input.ID, 10),
@@ -241,9 +251,9 @@ func routable(ctx context.Context, in Ingest, name string) (access.Subject, int6
 	if in.DB == nil {
 		return access.Subject{}, 0, nil, noDatabase(in.Logger)
 	}
-	product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, name)
-	if err != nil || !subject.Sees(product.ID) {
-		return access.Subject{}, 0, nil, noSuchProduct()
+	product, err := productNamedVisibly(ctx, in, subject, name)
+	if err != nil {
+		return access.Subject{}, 0, nil, err
 	}
 	if !subject.Holds(access.Assigner, product.ID) {
 		// Answered as a product that is not there, the way every other
@@ -268,15 +278,20 @@ func queueSweep(ctx context.Context, in Ingest, productID int64) {
 	}
 }
 
-// teamsByID is every team's shown name, by identifier.
-func teamsByID(ctx context.Context, in Ingest) (map[int64]string, error) {
+// teamsByID is every team's two names, by identifier: the one a write resolves
+// and the one a screen shows.
+func teamsByID(ctx context.Context, in Ingest) (map[int64]named, error) {
 	teams, err := access.NewStore(in.DB.DB).Teams(ctx)
 	if err != nil {
 		return nil, err
 	}
-	named := make(map[int64]string, len(teams))
+	by := make(map[int64]named, len(teams))
 	for _, team := range teams {
-		named[team.ID] = team.Called()
+		one := named{Address: team.Name}
+		if team.DisplayName != "" && team.DisplayName != team.Name {
+			one.Display = team.DisplayName
+		}
+		by[team.ID] = one
 	}
-	return named, nil
+	return by, nil
 }

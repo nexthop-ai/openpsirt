@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -48,7 +47,7 @@ func registerBundles(api huma.API, in Ingest) {
 			"severity, exploited, component, search, ecosystem and state. Not the rest: a " +
 			"filter that answers about a place or a deadline has no row here to narrow.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Stream    string `query:"stream" doc:"Limit to one branch or tag"`
 		Variant   string `query:"variant" doc:"Limit to one variant"`
@@ -180,7 +179,7 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 			"promise is the one read, so a replanned upgrade is a planned one with a later " +
 			"date.",
 		Tags: []string{"Remediation"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
@@ -192,14 +191,13 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		located, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
+		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
-		target, err := names.ExistingTarget(ctx, located.StreamID, located.VariantID)
+		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
 		if err != nil {
-			return nil, nothingScannedThere()
+			return nil, err
 		}
 		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, target.ID)
 		if err != nil {

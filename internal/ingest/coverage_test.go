@@ -1,6 +1,7 @@
 package ingest_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -167,16 +168,19 @@ func TestScanningTellsAPipelineKeyNothing(t *testing.T) {
 	// was last scanned by anybody is a fact about the deployment, and a key
 	// that could read it would learn about uploads it did not make.
 	//
-	// This pins the outcome rather than one guard. A subject that is not a
-	// person holds no products at all, so the products check refuses a key
-	// even with the explicit one removed — mutating either alone leaves this
-	// green, and that is a property of the two agreeing rather than a test
-	// that proves nothing.
+	// **Refused rather than answered empty.** "Here is nothing" and "you
+	// cannot ask" are different statements, and this is the second: a key
+	// holds no products, so an empty answer is what a person who holds nothing
+	// gets and says the wrong thing about a credential that may never ask.
+	//
+	// This asserted the empty answer, with a comment saying it pinned the
+	// outcome rather than one guard — and the outcome it pinned was the one
+	// the data layer was supposed to stop giving.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, _ access.Subject, ours, _ int64) {
 		pipeline := access.NewPipeline(1, "nightly", access.Scope{ProductID: ours})
 		rows, err := s.Scanning(t.Context(), pipeline, finding.Scope{}, 7*24*time.Hour)
-		if err != nil {
-			t.Fatal(err)
+		if !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a pipeline key asking when builds were last scanned got %v", err)
 		}
 		if len(rows) != 0 {
 			t.Errorf("a pipeline key was told about %d builds", len(rows))

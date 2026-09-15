@@ -361,7 +361,7 @@ func registerExport(api huma.API, in Ingest) {
 			"never in there.\n\n" +
 			"Takes every filter the findings list takes.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Format  string `path:"format" enum:"csv,json"`
 		Stream  string `query:"stream"`
@@ -449,7 +449,7 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 			"Takes every filter the cross-product list takes. `beneath` and `differs` are " +
 			"not offered here, for the reason that list gives.",
 		Tags: []string{"Findings"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
 		Narrowing
 	}) (*huma.StreamResponse, error) {

@@ -56,7 +56,7 @@ func registerRegister(api huma.API, in Ingest) {
 			"being checked, and a reconstruction would be a second answer about the past that " +
 			"has to be kept honest against the first.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
@@ -100,7 +100,7 @@ func registerRegister(api huma.API, in Ingest) {
 		Description: "The register as a file. Read with your own visibility as it streams, " +
 			"like every other export here.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Exports only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
@@ -216,7 +216,7 @@ func registerCompliance(api huma.API, in Ingest) {
 			"**A product is required** — a place identity carries no product, so this cannot " +
 			"be asked across the deployment.",
 		Tags: []string{"Reports"},
-	}, anySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 	}) (*listOutput[RateBody], error) {
 		subject, err := reading(ctx)

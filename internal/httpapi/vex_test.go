@@ -352,3 +352,89 @@ func TestADeploymentThatHasNotSaidWhoItPublishesAsAnswersAConflict(t *testing.T)
 		}
 	})
 }
+
+func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
+	// The document is the deployment's word about everything this build ships,
+	// which is a product-wide read. A case grant does not answer a
+	// product-wide question: somebody brought onto one embargoed issue holds
+	// nothing on the product, and the build lookup admits them only so that
+	// the names their own issue sits at resolve.
+	//
+	// The route stopped at that lookup, and the only authorization after it
+	// runs when the undisclosed preview is asked for. What went out was every
+	// approved statement about the build — unrelated issue identifiers, the
+	// components they sit in, the justification, and the free-text reasoning
+	// somebody wrote for a second person to check — about a product the reader
+	// may not otherwise see.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		embargoed := r.embargoed(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+
+		// Something for the document to carry, so that what is measured is a
+		// refusal rather than an empty answer either way.
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		var doc struct {
+			Statements []any `json:"statements"`
+		}
+		read(t, r, "reader", at, &doc)
+		if len(doc.Statements) == 0 {
+			t.Fatal("the document says nothing, so a refusal proves nothing")
+		}
+
+		// A judgment on the embargoed issue, which is what the collaborator is
+		// brought in to argue about and the thing their grant does reach.
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/findings/"+
+				embargoed+"/components/libnl-3-200/decision", dismissal)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
+		}
+		var decided struct {
+			IDs []int64 `json:"ids"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &decided); err != nil {
+			t.Fatal(err)
+		}
+
+		// Somebody holding nothing on this product. Before the grant the build
+		// is not theirs to name, which is the answer the grant must not
+		// change.
+		if got := asPerson(t, r, "outsider", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
+			t.Fatalf("somebody holding nothing here reached the document before any "+
+				"grant: %d", got.Code)
+		}
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing somebody in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The grant is live and reaches the case: they read what was decided
+		// about the issue they are on.
+		if got := asPerson(t, r, "outsider", http.MethodGet,
+			fmt.Sprintf("/v1/decisions/%d", decided.IDs[0]), ""); got.Code != http.StatusOK {
+			t.Fatalf("the collaborator does not reach their own case, so this proves "+
+				"nothing: %d %s", got.Code, got.Body.String())
+		}
+
+		// And the document is still not theirs to have.
+		if got := asPerson(t, r, "outsider", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
+			t.Errorf("a case collaborator holding nothing on the product received the "+
+				"build's whole document: %d %s", got.Code, got.Body.String())
+		}
+
+		// An administrator reads it by granting themselves reading, like
+		// anybody else: administering the catalog is not reading what is open
+		// against it, which is the rule the findings list already applies.
+		if got := asPerson(t, r, "admin", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
+			t.Errorf("an administrator holding no role on the product received the "+
+				"document: %d", got.Code)
+		}
+		read(t, r, "admin-reader", at, &doc)
+	})
+}

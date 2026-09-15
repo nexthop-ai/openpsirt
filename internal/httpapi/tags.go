@@ -6,7 +6,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -95,16 +94,17 @@ func registerTags(api huma.API, in Ingest) {
 			"its own, so the list is narrowed by the findings it was written on — reading it " +
 			"is a read act, and writing one is the act that asks for triage.",
 		Tags: []string{"Findings"},
-	}, perProduct, "Answers only the words on findings you may see."), func(ctx context.Context, input *struct {
+	}, perProduct, "Answers only the words on findings you may see.",
+		readRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*listOutput[string], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		named, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, input.Product)
+		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
-			return nil, noSuchProduct()
+			return nil, err
 		}
 		rows, err := finding.NewStore(in.DB.DB).TagsInUse(ctx, subject, named.ID)
 		if err != nil {
