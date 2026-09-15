@@ -26,12 +26,14 @@ import (
 // The set somebody narrows before claiming something about all of it. What
 // narrows it is theirs — a text match on what a report says is how a candidate
 // is found, never why a claim is true.
+// It answers with how many findings the whole narrowed set covers as well as
+// the page, because it has already counted them: the caller asked for both and
+// was running the whole narrowing twice for the second — on a set the store's
+// own comment sizes at 222,435 of 272,539 open rows.
 func (s *Store) AtComponent(ctx context.Context, subject access.Subject, targetID,
-	componentID int64, contains string, limit, offset int) ([]Deciding, int, error) {
+	componentID int64, contains string, limit, offset int) ([]Deciding, int, int, error) {
 
-	at, total, _, err := s.atComponent(ctx, subject, targetID, componentID, contains,
-		limit, offset)
-	return at, total, err
+	return s.atComponent(ctx, subject, targetID, componentID, contains, limit, offset)
 }
 
 // SizeAtComponent is how large a claim over the whole narrowed set would be:

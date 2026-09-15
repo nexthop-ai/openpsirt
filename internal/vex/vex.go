@@ -31,6 +31,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/version"
@@ -234,9 +235,23 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// published to every customer running a scanner.
 		Having("COUNT(cl.id) = COUNT(*)").
 		Having("COUNT(DISTINCT cl.outcome) = 1").
+		// One more than the ceiling, so that reaching it is distinguishable
+		// from landing on it exactly.
+		Limit(database.AWholeDocument.Most+1).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
+	}
+	// Refused rather than truncated. There is no second request for the rest
+	// of a document, and one that stopped at a ceiling would say "nothing is
+	// claimed about this" by omission about everything past it — to every
+	// customer running a scanner, which is the one thing a document of
+	// dismissals must never say.
+	if len(rows) > database.AWholeDocument.Most {
+		return nil, fmt.Errorf("%s %s %s stands on more than %d agreed dismissals, which is "+
+			"more than one document carries: a document that stopped at the limit would say "+
+			"nothing is claimed about everything past it",
+			product, stream, variant, database.AWholeDocument.Most)
 	}
 
 	moment := s.now().UTC()
@@ -330,11 +345,15 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Identifier      string `bun:"identifier"`
 	}
+	// Split and OR-ed rather than one list. A build with a thousand agreed
+	// dismissals is a thousand identifiers here and a large one is far more,
+	// and a statement binding them all is refused by two of the four engines.
+	where, args := database.InAnyOf("va.vulnerability_id", issues)
 	err := s.db.NewSelect().Model((*finding.Alias)(nil)).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = va.vulnerability_id`).
 		ColumnExpr(`va.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`va.identifier AS "identifier"`).
-		Where("va.vulnerability_id IN (?)", bun.List(issues)).
+		Where(where, args...).
 		// The other names, so not the one the statement is already
 		// filed under. The alias table holds every name an issue
 		// answers to including its own, which is what makes identity

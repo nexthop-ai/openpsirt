@@ -179,6 +179,17 @@ refuse an absurd request rather than to cut a page.
 | What makes it correct | The ceiling is above anything the list can hold, so nobody is looking at a page |
 | What ends it | The list growing past the ceiling on a real deployment. It gains an offset then, and the screen gains the control to use it |
 
+Four of them had outgrown it and gained the offset: what is running out of
+time, what is approaching disclosure, the extensions waiting for a second
+person, and the deferrals that keep repeating. Each grows with the estate, and
+each now answers with a total as well — a caller holding a full page cannot
+otherwise tell a clipped page from the whole list, and two screens were
+printing the length of their own page as the figure.
+
+The three that keep a limit alone are the pickers: who holds something, who may
+be mentioned, and what sits at the top of one build's tree. Each is a list
+somebody scrolls once.
+
 The bound is stated twice:
 
 | Layer | Behavior | Reason |

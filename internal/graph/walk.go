@@ -30,11 +30,25 @@ const depth = 64
 // build, and binding six thousand identifiers into a statement was the cost
 // of asking for it; the engine walking its own edges is the same set with
 // nothing crossing the wire.
+// **Bounded on depth and not on rows**, and a caller that materializes it has
+// to say what it does past a size. The subtree under a build's root is every
+// component in the build, so scanning this into a slice is unbounded by
+// construction; the two callers that pass it into a subquery never hold it.
 func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
+	return WithinAny(db, targetID, []int64{componentID})
+}
+
+// WithinAny is the same for a set of components, in one statement.
+//
+// One walk per named component was one recursive round trip each, in a Go loop
+// over every build of the product — so a rule naming a pattern that matches
+// broadly issued tens of thousands of them inside one request. The engine
+// walks from every anchor at once instead.
+func WithinAny(db *bun.DB, targetID int64, componentIDs []int64) *bun.RawQuery {
 	return bun.NewRawQuery(db, `WITH RECURSIVE "down" AS (
 		SELECT n.id AS "node", 0 AS "depth"
 		FROM "graph_node" AS "n"
-		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id = ?
+		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
 		UNION
 		SELECT e.child_id, d.depth + 1
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
@@ -42,7 +56,7 @@ func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 		  AND d.depth < ? AND e.parent_id <> e.child_id
 	)
 	SELECT DISTINCT n.component_id FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node`,
-		targetID, componentID, targetID, depth)
+		targetID, bun.List(componentIDs), targetID, depth)
 }
 
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
@@ -152,6 +166,14 @@ type step struct {
 // climb reads every way up from each of these components, to the bound, in
 // one statement: each row is a node on a route, with the node it was reached
 // from, so the routes can be unwound.
+//
+// **The recursive step does not repeat the build, and the two downward walks
+// do.** That asymmetry is the indexes rather than an omission: those walk on
+// `parent_id` and use the index leading on the build, so the build is its
+// leading column; this walks on `child_id` and uses the one leading on that,
+// which a build predicate cannot help and could push a planner off. The answer
+// is the same either way — a node identifier is unique across builds, so an
+// edge of another build cannot match a node of this one.
 func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64) ([]step, error) {
 	var rows []step
 	err := s.db.NewRaw(`WITH RECURSIVE "up" AS (

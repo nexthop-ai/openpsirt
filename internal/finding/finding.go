@@ -390,6 +390,10 @@ func PlaceIdentity(component, consumer string) string {
 type Store struct {
 	db  *bun.DB
 	now func() time.Time
+	// reach is how many places in one build a routing rule's pattern may
+	// name, or zero for the shipped number. Carried on the store so a test can
+	// bring it down to a fixture rather than building a fixture up to it.
+	reach int
 }
 
 // NewStore returns a store over db.

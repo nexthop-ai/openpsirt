@@ -333,6 +333,22 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	return late, total, nil
 }
 
+// whenOpened is the deadline each of these moments produces, as one
+// expression, so that a statement can carry a set of them rather than one.
+//
+// The arithmetic stays in Go, which is what keeps it portable — no engine
+// agrees on how to add days to a timestamp — and the statement writes
+// constants, which is what it did when it carried one moment.
+func whenOpened(column string, moments []time.Time, window time.Duration) (string, []any) {
+	said := "CASE " + column
+	args := make([]any, 0, len(moments)*2)
+	for _, at := range moments {
+		said += " WHEN ? THEN ?"
+		args = append(args, at, at.Add(window))
+	}
+	return said + " END", args
+}
+
 // Recompute rewrites the deadline on every open finding.
 //
 // The one event that makes a stored deadline wrong is somebody changing the
@@ -346,7 +362,8 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 // opened by one run and rated the same way lands on the same instant: the
 // arithmetic happens here, in Go, and the statement writes a constant. That
 // keeps it portable — no engine agrees on how to add days to a timestamp — and
-// it is a handful of statements rather than hundreds of thousands.
+// it is a handful of statements rather than hundreds of thousands: the
+// identifier range is walked once and the moments ride inside the statement.
 func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	// A product at a time, because severity sets the deadline and a rating
 	// belongs to a product: the same issue rated critical in one product and
@@ -438,16 +455,28 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			{windows.Medium, rated("medium")},
 		}
 
-		for _, at := range opened {
+		// The slice is the outer loop, and the moments are carried into the
+		// statement rather than looped over.
+		//
+		// The other way round, the statement count was moments × bands ×
+		// slices: a product scanned nightly for a year holds about 1,800
+		// distinct moments, so five builds and twenty-one slices came to
+		// 189,000 statements — against this function's own note promising a
+		// handful — almost all of them matching nothing, because one moment
+		// lives in one slice. The half-hour the caller allows expired partway
+		// and left the estate split between the old policy and the new with
+		// nothing to retry it.
+		for from := int64(0); from <= highest; from += recomputeSlice {
 			for _, each := range bands {
-				due := at.Add(each.window)
-				for from := int64(0); from <= highest; from += recomputeSlice {
+				for start := 0; start < len(opened); start += database.BatchSize {
+					chunk := opened[start:min(start+database.BatchSize, len(opened))]
+					said, args := whenOpened("opened_at", chunk, each.window)
 					query := s.db.NewUpdate().
 						Model((*Finding)(nil)).
-						Set("due_at = ?", due).
+						Set("due_at = "+said, args...).
 						Where("id > ?", from).
 						Where("id <= ?", from+recomputeSlice).
-						Where("opened_at = ?", at).
+						Where("opened_at IN (?)", bun.In(chunk)).
 						Where("closed_at IS NULL").
 						Where(inThisProduct, productID)
 					result, err := each.where(query).Exec(ctx)
@@ -489,15 +518,16 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		if err != nil {
 			return changed, fmt.Errorf("read when exploitation was learned: %w", err)
 		}
-		for _, at := range learned {
-			due := at.Add(windows.Exploited)
-			for from := int64(0); from <= highest; from += recomputeSlice {
+		for from := int64(0); from <= highest; from += recomputeSlice {
+			for start := 0; start < len(learned); start += database.BatchSize {
+				chunk := learned[start:min(start+database.BatchSize, len(learned))]
+				said, args := whenOpened("exploited_learned_at", chunk, windows.Exploited)
 				result, err := s.db.NewUpdate().
 					Model((*Finding)(nil)).
-					Set("due_at = ?", due).
+					Set("due_at = "+said, args...).
 					Where("id > ?", from).
 					Where("id <= ?", from+recomputeSlice).
-					Where("exploited_learned_at = ?", at).
+					Where("exploited_learned_at IN (?)", bun.In(chunk)).
 					Where("urgency_exploited = ?", true).
 					Where("closed_at IS NULL").
 					Where(inThisProduct, productID).Exec(ctx)

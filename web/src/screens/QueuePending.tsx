@@ -16,6 +16,16 @@ import { Severity } from "../ui/Severity";
 // selection or the batch that the claims use. They are here together because
 // what they have in common is exactly that.
 
+// said is how many there are, and "at least" where the page is all that is
+// known.
+//
+// A page length printed bare is a count of the page rather than of the list,
+// and the reader has no way to tell which they are looking at.
+function said(shown: number, total?: number): string {
+  if (total != null && total > 0) return total.toLocaleString();
+  return shown.toLocaleString();
+}
+
 // Embargo extensions waiting for a second person.
 //
 // **The reason is the whole of what is being agreed to.** An extension moves a
@@ -26,7 +36,15 @@ import { Severity } from "../ui/Severity";
 // asked may not be the one who agrees, which is the control the threshold
 // exists to reach; hiding it would leave somebody hunting for what is holding
 // their case up.
-export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[] }) {
+export function Embargoes({
+  waiting,
+  total,
+}: {
+  waiting: Body<"PendingExtensionBody">[];
+  // How many are waiting in all. The page length was printed as the figure,
+  // so the fifty-first request was not in the number and nothing said so.
+  total?: number;
+}) {
   const queries = useQueryClient();
   const agree = useMutation({
     mutationFn: async (id: number) =>
@@ -43,7 +61,7 @@ export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[]
       <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
         <h2>Extension requests</h2>
         <p>
-          {waiting.length.toLocaleString()} · somebody has asked to keep something hidden longer
+          {said(waiting.length, total)} · somebody has asked to keep something hidden longer
           than this deployment allows on one person&rsquo;s word. Reaching the date discloses
           nothing by itself; what is being agreed to is how long it stays hidden.
         </p>
@@ -107,7 +125,7 @@ export function Embargoes({ waiting }: { waiting: Body<"PendingExtensionBody">[]
 // products may rate the same issue differently. A row saying only "CVE-… low"
 // is a word an approver cannot act on: what they are agreeing to is a deadline
 // and a triage line in one named place.
-export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
+export function Ratings({ waiting, total }: { waiting: AssessmentRow[]; total?: number }) {
   const queries = useQueryClient();
   const agree = useMutation({
     mutationFn: async (id: number) =>
@@ -122,7 +140,7 @@ export function Ratings({ waiting }: { waiting: AssessmentRow[] }) {
       <div className="screen-head" id="ratings" style={{ marginTop: 22 }}>
         <h2>Ratings awaiting approval</h2>
         <p>
-          {waiting.length.toLocaleString()} · somebody says an issue is milder than the world does.
+          {said(waiting.length, total)} · somebody says an issue is milder than the world does.
           A rating holds in every build of the product it was made for, so it waits for a second
           person.
         </p>

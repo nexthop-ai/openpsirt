@@ -270,6 +270,7 @@ func registerDisclosure(api huma.API, in Ingest) {
 		ScopeQuery
 		Within int `query:"within" default:"30" minimum:"1" maximum:"365" doc:"How many days ahead to look"`
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
+		Offset int `query:"offset" minimum:"0" doc:"Where in the list to start"`
 	}) (*listOutput[EmbargoedBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -284,14 +285,17 @@ func registerDisclosure(api huma.API, in Ingest) {
 		}
 
 		store := finding.NewStore(in.DB.DB)
-		rows, err := store.Disclosing(ctx, subject, scope,
-			time.Duration(input.Within)*24*time.Hour, input.Limit)
+		rows, total, err := store.DisclosingPage(ctx, subject, scope,
+			time.Duration(input.Within)*24*time.Hour, input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is approaching disclosure could not be read", err)
 		}
 
 		now := time.Now().UTC()
 		out := &listOutput[EmbargoedBody]{}
+		// How many there are in all, so a caller holding a full page can tell
+		// a clipped page from the whole list.
+		out.Body.Total = total
 		out.Body.Items = make([]EmbargoedBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, EmbargoedBody{
@@ -442,7 +446,8 @@ func registerExtensions(api huma.API, in Ingest) {
 			"Agree with `POST /v1/disclosure-extensions/{id}/approval`.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Only where you may read undisclosed work."), func(ctx context.Context, input *struct {
-		Limit int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0" doc:"Where in the list to start"`
 	}) (*listOutput[PendingExtensionBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -451,11 +456,15 @@ func registerExtensions(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		rows, err := finding.NewStore(in.DB.DB).Pending(ctx, subject, input.Limit)
+		rows, total, err := finding.NewStore(in.DB.DB).PendingPage(ctx, subject,
+			input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is waiting could not be read", err)
 		}
 		out := &listOutput[PendingExtensionBody]{}
+		// How many are waiting in all, because the screen was printing the
+		// length of its own page as the number.
+		out.Body.Total = total
 		out.Body.Items = make([]PendingExtensionBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, PendingExtensionBody{

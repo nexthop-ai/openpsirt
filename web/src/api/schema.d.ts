@@ -6268,15 +6268,6 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        "List-repeated-deferralsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-repeated-deferralsResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["RepeatBody"][] | null;
-        };
         "List-unassignedResponse": {
             /**
              * Format: uri
@@ -6549,6 +6540,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ReleaseBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyRepeatBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyRepeatBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["RepeatBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -7934,6 +7936,8 @@ export interface components {
             agreed: number;
             alone: components["schemas"]["UnagreedBody"][] | null;
             bulk: components["schemas"]["BulkApprovalBody"][] | null;
+            /** @description A section reached the limit, so this is the worst of it rather than all of it */
+            capped?: boolean;
             /**
              * Format: int64
              * @description How far back this looked
@@ -8816,6 +8820,8 @@ export interface operations {
                 product?: string;
                 /** @description How far back to look, by when a claim was proposed */
                 days?: number;
+                /** @description How many rows each section carries at most. capped says a section reached it */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -9711,6 +9717,8 @@ export interface operations {
                 /** @description How many deferrals make something worth listing. One is an ordinary judgment */
                 at_least?: number;
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -9724,7 +9732,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-repeated-deferralsResponse"];
+                    "application/json": components["schemas"]["ListBodyRepeatBody"];
                 };
             };
             /** @description Error */
@@ -9750,6 +9758,8 @@ export interface operations {
                 /** @description How many days ahead to look */
                 within?: number;
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -9781,6 +9791,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -14375,6 +14387,8 @@ export interface operations {
                 /** @description How far ahead to look */
                 days?: number;
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;

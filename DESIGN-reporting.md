@@ -471,6 +471,15 @@ to, for the reason the record is: a judgment belongs to when it was argued, and
 dating it by its agreement moves it out of that period whenever an approval
 comes late.
 
+Every section is bounded and says when it reached the bound. None of them was:
+a deployment that had been triaging for a while answered one row per approved
+claim in force, and the last section then asked three more questions about each
+of them one at a time — thirty thousand sequential statements in one request on
+ten thousand claims, with nothing checking whether the caller was still there.
+What each claim covers now is one statement for the page. A capped section that
+read as complete would mislead the one reader this report is for, so it says it
+was capped.
+
 ## Exports
 
 Any list that can be read can be exported, as CSV or JSON. Ten lists export:

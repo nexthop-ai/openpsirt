@@ -416,9 +416,12 @@ export function Queue() {
         onGo={go}
       />
 
-      <Ratings waiting={(ratings.data?.items ?? []).filter((each) => each.needs_approval)} />
+      <Ratings
+        waiting={(ratings.data?.items ?? []).filter((each) => each.needs_approval)}
+        total={ratings.data?.total}
+      />
 
-      <Embargoes waiting={embargoes.data?.items ?? []} />
+      <Embargoes waiting={embargoes.data?.items ?? []} total={embargoes.data?.total} />
 
       <div className="screen-head" id="lapsed" style={{ marginTop: 22 }}>
         <h2>Lapsed decisions</h2>

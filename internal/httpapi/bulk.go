@@ -71,13 +71,10 @@ func registerBulk(api huma.API, in Ingest) {
 			return nil, noSuchFinding()
 		}
 
-		at, total, err := finding.NewStore(in.DB.DB).AtComponent(ctx, subject, target, component,
-			input.Contains, input.Limit, input.Offset)
-		if err != nil {
-			return nil, refusedFinding(in, err)
-		}
-		_, reaching, err := finding.NewStore(in.DB.DB).SizeAtComponent(ctx, subject, target,
-			component, input.Contains)
+		// One call, which already counts both. It was two, and the second ran
+		// the whole narrowing again for a number the first had in hand.
+		at, total, reaching, err := finding.NewStore(in.DB.DB).AtComponent(ctx, subject,
+			target, component, input.Contains, input.Limit, input.Offset)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}

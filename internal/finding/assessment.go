@@ -509,23 +509,31 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 				Scan(ctx, &learning); err != nil {
 				return fmt.Errorf("read what is learning this: %w", err)
 			}
-			if len(learning) > 0 {
-				if _, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("urgency_exploited = ?", true).
-					// Counted from this moment rather than from when the
-					// finding opened. Counted from the opening, an issue
-					// that became exploited after six months would land
-					// three days before it was known — a deadline nobody
-					// could have met.
-					//
-					// The moment is kept on the row as well as spent here,
-					// because every later recount has to arrive at the same
-					// answer and nothing else holds it.
-					Set("exploited_learned_at = ?", learnedAt).
-					Set("due_at = ?", learnedAt.Add(windows.Exploited)).
-					Where("id IN (?)", bun.List(learning)).Exec(ctx); err != nil {
-					return fmt.Errorf("mark what is being exploited: %w", err)
-				}
+			// Batched. This is every open finding of one issue across the
+			// deployment — a kernel flaw carries 45 places each across
+			// thousands of issues — and one statement binding that many
+			// parameters is refused by two of the four engines, inside the
+			// transaction a scan applies in, so the whole upload fails and
+			// retries into the same refusal.
+			if err := database.IDsInBatches(ctx, learning,
+				func(ctx context.Context, batch []int64) error {
+					_, err := tx.NewUpdate().Model((*Finding)(nil)).
+						Set("urgency_exploited = ?", true).
+						// Counted from this moment rather than from when the
+						// finding opened. Counted from the opening, an issue
+						// that became exploited after six months would land
+						// three days before it was known — a deadline nobody
+						// could have met.
+						//
+						// The moment is kept on the row as well as spent here,
+						// because every later recount has to arrive at the same
+						// answer and nothing else holds it.
+						Set("exploited_learned_at = ?", learnedAt).
+						Set("due_at = ?", learnedAt.Add(windows.Exploited)).
+						Where("id IN (?)", bun.In(batch)).Exec(ctx)
+					return err
+				}); err != nil {
+				return fmt.Errorf("mark what is being exploited: %w", err)
 			}
 		}
 

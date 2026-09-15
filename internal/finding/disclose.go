@@ -54,17 +54,30 @@ func (e Embargoed) Passed(now time.Time) bool { return !e.DiscloseAt.After(now) 
 // list; what the alternative costs is the disclosure the whole split exists to
 // prevent.
 func (s *Store) Disclosing(ctx context.Context, subject access.Subject, scope Scope,
-	within time.Duration, limit int) ([]Embargoed, error) {
+	within time.Duration, limit int) ([]Embargoed, int, error) {
+
+	return s.DisclosingPage(ctx, subject, scope, within, limit, 0)
+}
+
+// DisclosingPage is the same list, from a position in it, with how many there
+// are in all.
+//
+// Paged because a ceiling with no offset means what is past it cannot be read
+// through the API at all — not slowly, not at all — and the total because a
+// caller holding a full page cannot otherwise tell a clipped page from the
+// whole list.
+func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scope Scope,
+	within time.Duration, limit, offset int) ([]Embargoed, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second. A person holding
 	// nothing is the first, and is answered below.
 	if subject.Kind != access.Person {
-		return nil, access.Denied("read what is being disclosed")
+		return nil, 0, access.Denied("read what is being disclosed")
 	}
 	products, all := subject.Products()
 	if !all && len(products) == 0 {
-		return nil, nil
+		return nil, 0, nil
 	}
 	limit = database.InBulk.Of(limit)
 	if within <= 0 {
@@ -85,7 +98,7 @@ func (s *Store) Disclosing(ctx context.Context, subject access.Subject, scope Sc
 			}
 		}
 		if len(private) == 0 {
-			return nil, nil
+			return nil, 0, nil
 		}
 	}
 
@@ -114,18 +127,26 @@ func (s *Store) Disclosing(ctx context.Context, subject access.Subject, scope Sc
 		Where("f.disclose_at <= ?", s.now().UTC().Add(within)).
 		GroupExpr("v.identifier, v.description, " + EffectiveSeverityExpr +
 			", c.name, p.display_name, st.display_name, va.display_name").
-		OrderExpr("disclose_at, v.identifier").
-		Limit(limit)
+		OrderExpr("disclose_at, v.identifier")
 	if len(private) > 0 {
 		query = query.Where("st.product_id IN (?)", bun.List(private))
 	}
 	query = scope.Narrow(query)
 
-	var rows []Embargoed
-	if err := query.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what is approaching disclosure: %w", err)
+	// Counted over the grouping rather than the rows: a row here is an issue
+	// at a component however many places it sits at, and counting the places
+	// would say a number the list cannot show.
+	total, err := s.db.NewSelect().
+		TableExpr(`(?) AS "approaching"`, query).Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count what is approaching disclosure: %w", err)
 	}
-	return rows, nil
+
+	var rows []Embargoed
+	if err := query.Limit(limit).Offset(offset).Scan(ctx, &rows); err != nil {
+		return nil, 0, fmt.Errorf("read what is approaching disclosure: %w", err)
+	}
+	return rows, total, nil
 }
 
 // Extension is one time somebody moved the end of an embargo.
@@ -420,13 +441,25 @@ type Waiting struct {
 // Here it is a state of the case rather than a task, so it is shown and said
 // to be theirs.
 func (s *Store) Pending(ctx context.Context, subject access.Subject,
-	limit int) ([]Waiting, error) {
+	limit int) ([]Waiting, int, error) {
+
+	return s.PendingPage(ctx, subject, limit, 0)
+}
+
+// PendingPage is the same list, from a position in it, with how many there are
+// in all.
+//
+// Paged because a ceiling with no offset means what is past it cannot be read
+// through the API at all, and the total because a screen was printing the
+// length of its own page as the number of requests waiting.
+func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
+	limit, offset int) ([]Waiting, int, error) {
 
 	limit = database.AList.Of(limit)
 	// Not merely empty: "here is nothing" and "you cannot ask" are different
 	// statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, access.Denied("read which embargoes are pending")
+		return nil, 0, access.Denied("read which embargoes are pending")
 	}
 	products, all := subject.Products()
 	var readable []int64
@@ -436,7 +469,7 @@ func (s *Store) Pending(ctx context.Context, subject access.Subject,
 		}
 	}
 	if subject.Kind != access.Person || (!all && len(readable) == 0) {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	var rows []struct {
@@ -456,13 +489,16 @@ func (s *Store) Pending(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COALESCE(NULLIF(ps.display_name, ''), ps.identity, '') AS "asked_by_name"`).
 		Where("dx.needs_approval = ?", true).
 		Where("dx.approved_at IS NULL").
-		OrderExpr("dx.asked_at DESC").
-		Limit(limit)
+		OrderExpr("dx.asked_at DESC")
 	if !all {
 		query = query.Where("dx.product_id IN (?)", bun.List(readable))
 	}
-	if err := query.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read which embargoes are waiting to be moved: %w", err)
+	total, err := s.db.NewSelect().TableExpr(`(?) AS "waiting"`, query).Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count which embargoes are waiting to be moved: %w", err)
+	}
+	if err := query.Limit(limit).Offset(offset).Scan(ctx, &rows); err != nil {
+		return nil, 0, fmt.Errorf("read which embargoes are waiting to be moved: %w", err)
 	}
 	out := make([]Waiting, 0, len(rows))
 	for _, row := range rows {
@@ -471,5 +507,5 @@ func (s *Store) Pending(ctx context.Context, subject access.Subject,
 			Vulnerability: row.Vulnerability, AskedByName: row.AskedByName,
 		})
 	}
-	return out, nil
+	return out, total, nil
 }

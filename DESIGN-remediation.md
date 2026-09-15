@@ -347,6 +347,7 @@ customer — which is the reason the two-person approval on those claims exists.
 | A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |
 | Every statement carries the other names its issue answers to (REQ-18) | A customer holds identifiers their own scanner produced, matched under the name *its* database uses. The primary is not repeated among the aliases |
 | Ordered here rather than by the engine | Two documents generated from the same state are byte-for-byte identical |
+| A build with more statements than one document carries is refused, not truncated | There is no second request for the rest, so a document that stopped at a ceiling would say "nothing is claimed about this" by omission about everything past it — to every customer running a scanner, which is the one thing a document of dismissals must never say. The ceiling is well above anything real, and reaching it names the build and the number |
 
 A statement is made only where every open place agrees, and agrees the same way.
 The format says "this product, this component, not affected" and has no finer

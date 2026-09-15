@@ -372,7 +372,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 // Batched because a scan can describe tens of thousands of components, and one
 // query with that many bound parameters exceeds what some engines accept.
 func (c *Components) byIdentities(ctx context.Context, identities []string) (map[string]int64, error) {
-	const batch = 500
+	const batch = database.BatchSize
 	found := make(map[string]int64, len(identities))
 
 	for start := 0; start < len(identities); start += batch {
@@ -610,7 +610,7 @@ const foldedWidth = 191
 func (c *Components) fillSuppliers(ctx context.Context, described map[string]Described,
 	known map[string]int64) error {
 
-	byName := map[string][]string{}
+	byName := map[string][]int64{}
 	for identity, d := range described {
 		said := strings.TrimSpace(d.Supplier)
 		if said == "" {
@@ -618,19 +618,29 @@ func (c *Components) fillSuppliers(ctx context.Context, described map[string]Des
 		}
 		// Only rows that already exist: one being written this moment carries
 		// its supplier on the insert.
-		if _, have := known[identity]; !have {
+		id, have := known[identity]
+		if !have {
 			continue
 		}
-		byName[said] = append(byName[said], identity)
+		byName[said] = append(byName[said], id)
 	}
-	for said, identities := range byName {
-		_, err := c.db.NewUpdate().Model((*Component)(nil)).
-			Set("supplier = ?", said).
-			Where("identity IN (?)", bun.List(identities)).
-			Where(`"supplier" IS NULL OR "supplier" = ?`, "").
-			Exec(ctx)
+	// Batched, and on identifiers rather than on identity strings. A Debian
+	// inventory names one supplier for nearly every component, so a group here
+	// is the whole inventory — measured at 8,373 — and one statement binding
+	// that many parameters is refused by two of the four engines, inside the
+	// transaction the scan applies in. The read ten lines above batches for
+	// exactly this reason; the write beside it did not.
+	for said, ids := range byName {
+		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			_, err := c.db.NewUpdate().Model((*Component)(nil)).
+				Set("supplier = ?", said).
+				Where("id IN (?)", bun.In(batch)).
+				Where(`"supplier" IS NULL OR "supplier" = ?`, "").
+				Exec(ctx)
+			return err
+		})
 		if err != nil {
-			return fmt.Errorf("record who supplied %d components: %w", len(identities), err)
+			return fmt.Errorf("record who supplied %d components: %w", len(ids), err)
 		}
 	}
 	return nil

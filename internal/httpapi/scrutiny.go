@@ -72,6 +72,11 @@ type scrutinyOutput struct {
 		// own.
 		Agreed int `json:"agreed" doc:"Decisions a standing agreement covers in this period"`
 		Days   int `json:"days" doc:"How far back this looked"`
+		// Capped says a section reached the ceiling, so what is here is the
+		// worst of it rather than all of it. Said rather than implied: a
+		// report about a control that reads as complete while it is clipped
+		// misleads exactly the reader it is for.
+		Capped bool `json:"capped,omitempty" doc:"A section reached the limit, so this is the worst of it rather than all of it"`
 	}
 }
 
@@ -104,6 +109,7 @@ func registerScrutiny(api huma.API, in Ingest) {
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		Days    int    `query:"days" default:"90" minimum:"1" maximum:"3650" doc:"How far back to look, by when a claim was proposed"`
+		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500" doc:"How many rows each section carries at most. capped says a section reached it"`
 	}) (*scrutinyOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -125,13 +131,14 @@ func registerScrutiny(api huma.API, in Ingest) {
 		}
 		since := time.Now().UTC().AddDate(0, 0, -input.Days)
 
-		got, err := triage.NewStore(in.DB.DB).Scrutinize(ctx, subject, products, since)
+		got, err := triage.NewStore(in.DB.DB).Scrutinize(ctx, subject, products, since, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "how approvals are going could not be read", err)
 		}
 
 		out := &scrutinyOutput{}
 		out.Body.Days = input.Days
+		out.Body.Capped = got.Capped
 		out.Body.Alone = make([]UnagreedBody, 0, len(got.Alone))
 		for _, row := range got.Alone {
 			out.Body.Alone = append(out.Body.Alone, UnagreedBody{

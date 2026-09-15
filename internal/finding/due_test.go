@@ -779,3 +779,61 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 		}
 	})
 }
+
+func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
+	// The rewrite carries a set of openings in one statement rather than
+	// issuing one per opening: the other way round the statement count was
+	// openings × bands × identifier slices, which on a product scanned
+	// nightly for a year is 189,000 statements against this function's own
+	// note promising a handful — and almost all of them matched nothing,
+	// because one opening lives in one slice.
+	//
+	// What that shape has to get right, and one opening cannot show, is that
+	// each row lands on *its own* opening plus its own window.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+
+		reported := make([]finding.Reported, 0, 3)
+		named := []string{"CVE-2026-ONE", "CVE-2026-TWO", "CVE-2026-THREE"}
+		for _, each := range named {
+			high := found(each, swss)
+			high.Issue.Severity = "high"
+			reported = append(reported, high)
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+			t.Fatal(err)
+		}
+
+		// Three openings, days apart, so the three deadlines are far enough
+		// apart that a shared one is unmistakable. Written onto the rows,
+		// which is where the rewrite reads them from.
+		opened := map[string]time.Time{}
+		for i, each := range named {
+			seen := time.Now().UTC().Add(-time.Duration(10+i*10) * 24 * time.Hour).
+				Truncate(time.Microsecond)
+			opened[each] = seen
+			if _, err := f.db.DB.NewUpdate().TableExpr("finding AS f").
+				Set("opened_at = ?", seen).
+				Where(`f.vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v"`+
+					` WHERE v.identifier = ?)`, each).
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		shorter := testWindows
+		shorter.High = 15 * 24 * time.Hour
+		if _, err := f.store.Recompute(ctx, shorter); err != nil {
+			t.Fatal(err)
+		}
+
+		for each, seen := range opened {
+			want := seen.Add(shorter.High)
+			if got := f.deadline(t, each); got.Sub(want).Abs() > time.Second {
+				t.Errorf("%s is due %s, want %s — its own opening plus the window, not "+
+					"another finding's", each, got, want)
+			}
+		}
+	})
+}

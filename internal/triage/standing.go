@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -137,7 +138,11 @@ func (s *Store) groupByClaim(ctx context.Context, subject access.Subject, rows [
 		var comments []Comment
 		if err := s.db.NewSelect().Model(&comments).
 			Where("claim_id IN (?)", bun.List(sentBack)).
-			Order("id DESC").Scan(ctx); err != nil {
+			// Bounded. What is wanted is the newest comment on each claim
+			// that is with its author, and this read every comment ever
+			// written on every one of them to take one each — a claim people
+			// have argued over is a conversation, and a page holds many.
+			Order("id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read why this was sent back: %w", err)
 		}
 		for _, comment := range comments {
@@ -215,7 +220,11 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 		Where("de.vulnerability_id = ?", issueID).
 		Where("de.place_identity IN (?)", bun.List(places)).
 		Where("de.state IN (?, ?)", Withdrawn, LapsedState).
-		Order("de.id DESC").Scan(ctx); err != nil {
+		// Bounded, newest first. This is the whole history of what was
+		// decided at these places and then stopped applying, which on a
+		// long-lived product is every judgment ever made there — and a screen
+		// reads the recent ones.
+		Order("de.id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided here before: %w", err)
 	}
 	if len(rows) == 0 {
@@ -278,7 +287,13 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 		Where("claim.outcome = ?", NotApplicable).
 		Where("de.state = ?", Approved).
 		Where("de.live_key IS NOT NULL").
-		Order("de.id DESC").Scan(ctx); err != nil {
+		// Bounded in the statement rather than in the loop below. Five are
+		// offered and every approved dismissal at these places crossed the
+		// wire to pick them — a component at sixty places in a deployment
+		// that has been triaging for a while is a page of rows read to keep
+		// five. The ceiling is generous because the five are picked per
+		// claim and a claim writes a row per place.
+		Order("de.id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was argued about other issues here: %w", err)
 	}
 	if len(rows) == 0 {
@@ -314,7 +329,11 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	// reader may see rather than disclosing how many rows sit beyond it.
 	var all []Decision
 	if err := readableBy(s.db.NewSelect().Model(&all), subject, "de").
-		Where("claim_id IN (?)", bun.List(order)).Scan(ctx); err != nil {
+		Where("claim_id IN (?)", bun.List(order)).
+		// Five claims, each of which may be a bulk act over two thousand
+		// places. What is read off them is a count of issues and whether an
+		// agreement stands, and both are answered by a bounded read.
+		Limit(database.InBulk.Most).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what those claims cover: %w", err)
 	}
 	issues := map[int64]map[int64]bool{}

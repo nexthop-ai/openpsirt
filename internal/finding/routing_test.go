@@ -1,6 +1,7 @@
 package finding_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -255,6 +256,52 @@ func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
 				t.Errorf("named %q, the screen says %q is dealing with the whole fold",
 					named, seen.AssignedTo)
 			}
+		}
+	})
+}
+
+func TestARuleNamingMostOfABuildIsRefused(t *testing.T) {
+	// A rule says where in the tree something sits. A pattern matching most of
+	// a build is not that: a bare glob matched every open node, and each was a
+	// recursive walk of its own inside one request — from a route anybody who
+	// may triage the product can reach, and from the sweep that re-runs a
+	// saved rule on every pass.
+	//
+	// Refused rather than truncated, the way a rule matching nothing is
+	// refused: a rule quietly applying to part of what it names is worse than
+	// one nobody could save.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		where := f.team(t, "platform")
+
+		// The fixture is small, so the cap is brought down to it rather than
+		// the tree being grown to the cap: what is being checked is the
+		// refusal, and a fixture of two thousand components is a slow test
+		// that says the same thing.
+		narrow := finding.NewStoreReaching(f.db.DB, 1)
+		if _, err := narrow.AddRule(ctx, who, f.productID, where, "everything", "", "*"); err == nil {
+			t.Error("a rule naming most of the build was saved")
+		} else if !errors.Is(err, finding.ErrTooBroad) {
+			t.Errorf("refused with %q, which does not say what is wrong", err)
+		}
+		// And the preview says the same thing, so nobody is shown an answer
+		// for a rule they cannot save.
+		if _, err := narrow.WouldMatch(ctx, who, f.productID, "", "*", 20); err == nil {
+			t.Error("a preview answered for a rule that cannot be saved")
+		} else if !errors.Is(err, finding.ErrTooBroad) {
+			t.Errorf("the preview refused with %q", err)
+		}
+
+		// A pattern naming a place is still a rule.
+		if _, err := narrow.AddRule(ctx, who, f.productID, where, "the library",
+			"", "libnl-3-200"); err != nil {
+			t.Errorf("a rule naming one component was refused: %v", err)
 		}
 	})
 }

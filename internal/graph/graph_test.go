@@ -332,6 +332,12 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 		snap := graph.Snapshot{Root: root}
 		for i := range many {
 			c := at(fmt.Sprintf("pkg-%04d", i), "1.0")
+			// One supplier across the whole inventory, which is what a
+			// distribution's document looks like: the write that fills them in
+			// groups by the name, so that group is every component. Without a
+			// supplier on any of them the write was skipped, and the statement
+			// this test exists to size was never issued at all.
+			c.Supplier = "Debian"
 			snap.Components = append(snap.Components, c)
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: c})
 		}
@@ -342,6 +348,26 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 		}
 		if applied.NodesOpened != many+1 || applied.EdgesOpened != many {
 			t.Fatalf("opened %+v", applied)
+		}
+
+		// The supplier is filled in on a second sight of the same components,
+		// which is the path that names every one of them in one statement:
+		// the first scan carries it on the insert.
+		second := snap
+		second.Components = append([]graph.Described{}, snap.Components...)
+		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), second); err != nil {
+			t.Fatalf("applying a graph whose suppliers are filled in: %v", err)
+		}
+		// Counted rather than read: the point is the statement that wrote
+		// them, not the rows.
+		supplied, err := f.db.DB.NewSelect().Model((*graph.Component)(nil)).
+			Where("supplier = ?", "Debian").Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if supplied != many {
+			t.Errorf("%d of %d components carry the supplier the document named",
+				supplied, many)
 		}
 
 		// And closing them again, which names as many identifiers as opening

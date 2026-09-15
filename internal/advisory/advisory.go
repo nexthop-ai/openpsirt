@@ -215,26 +215,40 @@ func NewStore(db *bun.DB) *Store {
 func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.Named,
 	product, identifier string) (*Document, error) {
 
+	doc, _, _, err := s.forResolved(ctx, subject, who, product, identifier)
+	return doc, err
+}
+
+// forResolved is the same, answering with what it resolved on the way.
+//
+// Recording an issuance needs the product and the issue the document was built
+// from, and asked for them again it resolved both a second time — four round
+// trips for answers already in hand, and a window: an issue refiled under a
+// better-known name in between keyed the issuance on a row the hashed document
+// was not built from.
+func (s *Store) forResolved(ctx context.Context, subject access.Subject, who publisher.Named,
+	product, identifier string) (*Document, *catalog.Product, *finding.Vulnerability, error) {
+
 	if !who.Stated() {
-		return nil, missingPublisher(who)
+		return nil, nil, nil, missingPublisher(who)
 	}
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	// Authorized before the identifier is resolved, so a name nobody holds
 	// and a name somebody holds come back the same way.
 	if subject.Kind != access.Person || !subject.Sees(named.ID) {
-		return nil, ErrNoSuchIssue
+		return nil, nil, nil, ErrNoSuchIssue
 	}
 
 	issue, entered, err := s.ours(ctx, subject, named.ID, identifier)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	aliases, err := s.namesOf(ctx, issue.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	// What has already gone out for this flaw. A second document for the
 	// same one has to carry a higher version and a revision history, and
@@ -242,12 +256,12 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	// validation is one a customer's tooling drops.
 	gone, err := s.issuances(ctx, named.ID, issue.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	releases, err := s.releases(ctx, subject, named.ID, issue.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	now := s.now().UTC()
@@ -356,7 +370,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 		}},
 	}}}
 	doc.Vulnerabilities = []Vulnerability{vulnerability}
-	return doc, nil
+	return doc, named, issue, nil
 }
 
 // Release is one build of the product and where it stands on the issue.
@@ -594,15 +608,11 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		return nil, err
 	}
 
-	doc, err := s.For(ctx, subject, who, product, identifier)
-	if err != nil {
-		return nil, err
-	}
-	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
-	if err != nil {
-		return nil, err
-	}
-	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
+	// One resolution, which the document was built from. Asked again it was
+	// four more round trips for answers already in hand — and an issue refiled
+	// under a better-known name in between keyed the issuance on a row the
+	// hashed document was not built from.
+	doc, named, issue, err := s.forResolved(ctx, subject, who, product, identifier)
 	if err != nil {
 		return nil, err
 	}

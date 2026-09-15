@@ -3697,25 +3697,6 @@ components:
         - findings
         - cap
       type: object
-    List-repeated-deferralsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-repeated-deferralsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/RepeatBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
-      type: object
     List-unassignedResponse:
       additionalProperties: false
       properties:
@@ -4258,6 +4239,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/ReleaseBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyRepeatBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyRepeatBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/RepeatBody"
           type:
             - array
             - "null"
@@ -6587,6 +6590,9 @@ components:
           type:
             - array
             - "null"
+        capped:
+          description: A section reached the limit, so this is the worst of it rather than all of it
+          type: boolean
         days:
           description: How far back this looked
           format: int64
@@ -8130,6 +8136,17 @@ paths:
             maximum: 3650
             minimum: 1
             type: integer
+        - description: How many rows each section carries at most. capped says a section reached it
+          explode: false
+          in: query
+          name: limit
+          schema:
+            default: 100
+            description: How many rows each section carries at most. capped says a section reached it
+            format: int64
+            maximum: 500
+            minimum: 1
+            type: integer
       responses:
         "200":
           content:
@@ -9460,12 +9477,21 @@ paths:
             maximum: 500
             minimum: 1
             type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
+            type: integer
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-repeated-deferralsResponse"
+                $ref: "#/components/schemas/ListBodyRepeatBody"
           description: OK
         default:
           content:
@@ -9534,6 +9560,15 @@ paths:
             maximum: 500
             minimum: 1
             type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
+            type: integer
       responses:
         "200":
           content:
@@ -9579,6 +9614,15 @@ paths:
             format: int64
             maximum: 200
             minimum: 1
+            type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
             type: integer
       responses:
         "200":
@@ -17847,6 +17891,15 @@ paths:
             format: int64
             maximum: 200
             minimum: 1
+            type: integer
+        - description: Where in the list to start
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: Where in the list to start
+            format: int64
+            minimum: 0
             type: integer
       responses:
         "200":

@@ -157,6 +157,7 @@ optional by requirement, so ingest cannot make it mandatory.
 |---|---|
 | Content is split across rows | A single value of tens of megabytes runs into a maximum packet size on two of the four engines, and that limit is server configuration rather than anything a client can discover. Bounded rows stay inside every default in circulation and let a document be read as a stream |
 | Every statement is bounded, not only the one carrying a document | One real image opens tens of thousands of graph rows and produces over three hundred thousand findings. Sent as one statement each, those are tens of megabytes of SQL, which two engines refuse outright and all four hold in memory |
+| A membership test over a long list is split and OR-ed | A condition cannot be issued in pieces the way a write can, and a subtree or the aliases of a build's dismissals is thousands of identifiers. Split, each piece stays inside what all four accept |
 | The hash is computed from the bytes as they are stored | A hash the sender supplied describes the file they meant to send |
 
 ## Retention

@@ -787,6 +787,15 @@ the run is for is the *growth*, which is stable across both samples.
 | MySQL writes seven times slower than PostgreSQL and fifteen times slower than MariaDB | A nightly scan taking thirteen seconds is not an operational problem; the same code being fifteen times more expensive on one supported engine than on its own sibling is a fact to have before somebody chooses one |
 | The cost is per statement, not per row | A night issues **1,699 statements on every engine**. What differs is what one costs: **203 µs on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL**. The lever for making MySQL faster is issuing fewer statements |
 
+**Rewriting every deadline walks the identifier range once.** The moments a
+product's findings opened at ride inside the statement as a case over a batch of
+them, rather than one statement per moment. The other way round the count was
+moments × bands × identifier slices: a product scanned nightly for a year holds
+about 1,800 distinct moments, so five builds and twenty-one slices came to
+189,000 statements — almost all matching nothing, because one moment lives in
+one slice — and the half-hour the caller allows expired partway, leaving the
+estate split between the old policy and the new with nothing to retry it.
+
 A quiet night issues **more** statements than the first — 1,699 against 1,077 —
 because the first night is bulk inserts five hundred at a time and a quiet night
 is an update per finding that moved.

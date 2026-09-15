@@ -2,6 +2,7 @@ package finding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -58,6 +59,15 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 	if upstream == "" && beneath == "" {
 		return nil, fmt.Errorf("a rule that matches nothing places nothing: " +
 			"name a source package, a place in the tree, or both")
+	}
+	// A rule reaching most of a build is refused when it is written, not left
+	// to be discovered by the sweep that runs it every pass. Asked here rather
+	// than only at the preview, which is the handler's and which a second
+	// caller can forget.
+	if beneath != "" {
+		if _, err := s.beneathIn(ctx, productID, beneath); err != nil {
+			return nil, err
+		}
 	}
 	createdAt := s.now().UTC().Truncate(time.Microsecond)
 	var rule *Routing
@@ -228,7 +238,11 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		if len(beneath) == 0 {
 			return 0, 0, nil
 		}
-		page = page.Where("component_id IN (?)", bun.List(beneath))
+		// Split and OR-ed rather than one list: a subtree is thousands of
+		// components, and a statement binding that many parameters is refused
+		// by two of the four engines.
+		where, args := database.InAnyOf("component_id", beneath)
+		page = page.Where(where, args...)
 	}
 	if err := page.Scan(ctx, &ids); err != nil {
 		return 0, 0, fmt.Errorf("read what that rule would place: %w", err)
@@ -387,7 +401,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 				// empty one: it is what a typo looks like from here.
 				return q.Where("1 = 0"), nil
 			}
-			q = q.Where("f.component_id IN (?)", bun.List(under))
+			where, args := database.InAnyOf("f.component_id", under)
+			q = q.Where(where, args...)
 		}
 		return q, nil
 	}
@@ -476,19 +491,32 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 				}
 				return q.Where("c.name_folded = ?", name)
 			}).
+			// One more than the cap, so that reaching it is distinguishable
+			// from landing on it exactly.
+			Limit(RoutingReach+1).
 			Scan(ctx, &roots); err != nil {
 			return nil, fmt.Errorf("look for that component: %w", err)
 		}
-		for _, root := range roots {
-			var found []int64
-			if err := graph.Within(s.db, build, root).Scan(ctx, &found); err != nil {
-				return nil, fmt.Errorf("walk what sits under it: %w", err)
-			}
-			for _, id := range found {
-				if !seen[id] {
-					seen[id] = true
-					under = append(under, id)
-				}
+		if len(roots) > s.reaching() {
+			return nil, fmt.Errorf("%w: %q names more than %d places in one build, which is "+
+				"not a place in the tree but most of it — name something narrower",
+				ErrTooBroad, name, s.reaching())
+		}
+		if len(roots) == 0 {
+			continue
+		}
+		// One walk per build rather than one per named component. It was one
+		// recursive round trip each, inside a loop over every build of the
+		// product, so a pattern matching broadly issued tens of thousands of
+		// them in one request.
+		var found []int64
+		if err := graph.WithinAny(s.db, build, roots).Scan(ctx, &found); err != nil {
+			return nil, fmt.Errorf("walk what sits under it: %w", err)
+		}
+		for _, id := range found {
+			if !seen[id] {
+				seen[id] = true
+				under = append(under, id)
 			}
 		}
 	}
@@ -534,3 +562,40 @@ func mayRoute(by access.Subject, productID int64) error {
 	}
 	return nil
 }
+
+// reaching is the cap in force for this store.
+func (s *Store) reaching() int {
+	if s.reach > 0 {
+		return s.reach
+	}
+	return RoutingReach
+}
+
+// NewStoreReaching is a store whose rules may name at most this many places in
+// one build.
+//
+// For the test alone, which has to show the refusal without building a fixture
+// of two thousand components: what is being checked is that the cap refuses,
+// and a slow fixture says the same thing.
+func NewStoreReaching(db *bun.DB, reach int) *Store {
+	s := NewStore(db)
+	s.reach = reach
+	return s
+}
+
+// RoutingReach is how many places in one build a rule's pattern may name.
+//
+// A rule says where in the tree something sits, and a pattern matching most of
+// a build is not that — a bare `*` matched every open node, and each was a
+// recursive walk of its own inside one request. Refused rather than truncated,
+// the way a rule matching nothing is refused: a rule quietly applying to part
+// of what it names is worse than one nobody could save.
+//
+// A constant rather than a setting: what counts as an absurdly broad rule is
+// not a judgment about a deployment, and the number that is one — how much a
+// single pass may place — is already `routing.batch`.
+const RoutingReach = 2000
+
+// ErrTooBroad is returned when a rule's pattern names most of a build rather
+// than a place in it.
+var ErrTooBroad = errors.New("that names too much of the tree")
