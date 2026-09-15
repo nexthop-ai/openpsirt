@@ -30,6 +30,13 @@ type ReleasePoint struct {
 	BySeverity map[string]int
 }
 
+// ErrNoProductNamed is what a question about one product's line of releases
+// answers where no product was named.
+//
+// Its own answer rather than an empty list, because an empty list is what a
+// product with no releases looks like and the two are not the same statement.
+var ErrNoProductNamed = errors.New("release over release is a question about one product")
+
 // ReleaseTrend reports what is open against each tagged release of a product.
 //
 // **The axis follows what is being viewed**. A branch is scanned
@@ -42,13 +49,6 @@ type ReleasePoint struct {
 // two releases is a different question from what each shipped with, and the
 // answer would be an artifact of how far apart somebody cut them. Rates always
 // plot on calendar.
-// ErrNoProductNamed is what a question about one product's line of releases
-// answers where no product was named.
-//
-// Its own answer rather than an empty list, because an empty list is what a
-// product with no releases looks like and the two are not the same statement.
-var ErrNoProductNamed = errors.New("release over release is a question about one product")
-
 func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope Scope,
 	limit int) ([]ReleasePoint, error) {
 
