@@ -57,6 +57,10 @@ var inside = map[string]string{
 	// it: holding a role on one product does not make a grant covering all of
 	// them a duplicate.
 	"internal/access/estate.go": "the estate duplicate check",
+	// Declares the per-product grant's model, and nothing else here names a
+	// grant table: the union this file used to spell by hand is one builder
+	// now, in team.go, which names both.
+	"internal/access/store.go": "the per-product grant's model declaration",
 }
 
 func main() {

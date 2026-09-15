@@ -97,10 +97,14 @@ func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
 			// answers about itself, so a refusal here says nothing a refusal
 			// on the product did not.
 			if !sees {
-				return finding.Scope{}, false, noSuchProduct()
+				return finding.Scope{}, false, absent(in.Logger, err,
+					"that branch could not be looked up", noSuchProduct)
 			}
-			return finding.Scope{}, false, huma.Error404NotFound(
-				"that product has no branch or tag by that name")
+			return finding.Scope{}, false, absent(in.Logger, err,
+				"that branch could not be looked up", func() error {
+					return huma.Error404NotFound(
+						"that product has no branch or tag by that name")
+				})
 		}
 		scope.StreamID = &stream.ID
 	}
@@ -108,10 +112,14 @@ func resolveScope(ctx context.Context, in Ingest, subject access.Subject,
 		variant, err := names.VariantByName(ctx, product.ID, q.Variant)
 		if err != nil {
 			if !sees {
-				return finding.Scope{}, false, noSuchProduct()
+				return finding.Scope{}, false, absent(in.Logger, err,
+					"that variant could not be looked up", noSuchProduct)
 			}
-			return finding.Scope{}, false, huma.Error404NotFound(
-				"that product has no variant by that name")
+			return finding.Scope{}, false, absent(in.Logger, err,
+				"that variant could not be looked up", func() error {
+					return huma.Error404NotFound(
+						"that product has no variant by that name")
+				})
 		}
 		scope.VariantID = &variant.ID
 	}

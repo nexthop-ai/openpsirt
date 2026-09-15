@@ -65,7 +65,11 @@ export function Claim({ who }: { who: Who }) {
   const it = claim.data;
   if (!it) return null;
 
-  const mine = it.claim.proposed_by === who.identity || it.claim.proposed_by === who.name;
+  // The identity alone. A claim records who proposed it by the name they sign
+  // in under, and matching a display name as well made ownership turn on a
+  // label anybody can be given — which hid the Agree panel from somebody
+  // entitled to approve and showed Hold back to somebody who did not propose.
+  const mine = it.claim.proposed_by === who.identity;
   // What a file is attached to. Both halves have to be known: the issue says
   // which, and the product says whose, because the same identifier in two
   // products is two pieces of work with two sets of readers.
@@ -110,7 +114,7 @@ export function Claim({ who }: { who: Who }) {
       <Revisions claimId={id} />
       <Comments
         claimId={id}
-        mine={(wrote) => wrote === who.identity || wrote === who.name}
+        mine={(wrote) => wrote === who.identity}
         about={about}
         undisclosed={!!it.undisclosed}
       />

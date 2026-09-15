@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 // What to say when a name reaches nothing.
@@ -174,11 +175,11 @@ func severalComponents(several *graph.Ambiguous, sayWith string) error {
 // absent turns a store error into the right answer: the caller's own 404 for a
 // row that is not there, and a fault for a read that could not be made.
 //
-// One place, because the split was being made by hand at thirty-eight sites
-// and made correctly at five. Everywhere else a failed read was answered as an
-// authoritative negative — so a database nobody could reach told every
-// authenticated caller that their products, builds, issues and findings did
-// not exist, with the driver's own message in seven of the bodies.
+// One place, because the split was being made by hand at every call site and
+// made correctly at a handful of them. Everywhere else a failed read was
+// answered as an authoritative negative — so a database nobody could reach told
+// every authenticated caller that their products, builds, issues and findings
+// did not exist, with the driver's own message in some of the bodies.
 //
 // missing is the sentence for a name that reaches nothing, passed as the
 // function rather than called, so a caller cannot build one from the error.
@@ -187,9 +188,20 @@ func absent(logger *slog.Logger, err error, reading string, missing func() error
 	// A refusal answers as a name that is not there, which is the rule at the
 	// top of this file. Its own text names the product and the act, so it is
 	// the fixed sentence that goes out and never the error.
-	case errors.Is(err, access.ErrDenied),
-		errors.Is(err, catalog.ErrNotFound),
-		errors.Is(err, finding.ErrNoSuchIssue):
+	case errors.Is(err, access.ErrDenied):
+		return missing()
+	// The absence sentinels, named one at a time rather than matched by
+	// shape. Each package words absence for itself, and a store that has not
+	// been given a sentinel yet must fall through to the fault arm rather than
+	// be guessed at — which is how a failed read became "that does not exist"
+	// in the first place.
+	case errors.Is(err, catalog.ErrNotFound),
+		errors.Is(err, finding.ErrNoSuchIssue),
+		errors.Is(err, ingest.ErrNoScan),
+		errors.Is(err, access.ErrNoSuchTeam),
+		errors.Is(err, access.ErrNoSuchToken),
+		errors.Is(err, finding.ErrNoSuchRun),
+		errors.Is(err, access.ErrNoSuchPerson):
 		return missing()
 	default:
 		return wentWrong(logger, reading, err)
@@ -304,7 +316,7 @@ func targetIDOf(ctx context.Context, in Ingest, subject access.Subject,
 //
 // "Nothing has been scanned there" is an answer about the build. A read that
 // could not be made does not support it, and this is the reader with the most
-// callers in the tree — twenty-three, twenty-one of which answered 404.
+// callers in the tree — nearly all of which answered 404.
 func targetRow(ctx context.Context, in Ingest, streamID, variantID int64) (*catalog.Target, error) {
 	target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, streamID, variantID)
 	if err != nil {

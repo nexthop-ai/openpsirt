@@ -94,7 +94,8 @@ func registerTags(api huma.API, in Ingest) {
 			"its own, so the list is narrowed by the findings it was written on — reading it " +
 			"is a read act, and writing one is the act that asks for triage.",
 		Tags: []string{"Findings"},
-	}, perProduct, "Answers only the words on findings you may see."), func(ctx context.Context, input *struct {
+	}, perProduct, "Answers only the words on findings you may see.",
+		readRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*listOutput[string], error) {
 		subject, err := reading(ctx)

@@ -140,7 +140,11 @@ func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
 		Where("retired_at IS NULL").
 		Limit(1).Scan(ctx)
 	if err != nil {
-		return nil, ErrNoSuchTeam
+		// A read that could not be made is not an answer about what exists:
+		// every caller turns the sentinel into "no such team", and a database
+		// nobody can reach would have said that of every team there is.
+		return nil, database.FromRead(err, ErrNoSuchTeam,
+			fmt.Sprintf("look up the team called %q", name))
 	}
 	return team, nil
 }
@@ -374,13 +378,13 @@ func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
 // holdingAny narrows a query to the rows whose person holds one of these roles
 // here: granted on the product, or granted across every product, both in force.
 //
-// One builder, because the union was written out four times inside this
-// package — and this package is exactly where `internal/tools/granted` cannot
-// reach, since that gate refuses a query naming one table and not the other
-// *outside* here. DESIGN-access.md records what the union costs when it is
-// spelled by hand: five predicates missed role_grant_all the day it was added,
-// "each answering no for somebody who held the role — which compiles and
-// passes".
+// One builder, because the union was written out at every question that asked
+// it inside this package — and this package was exactly where
+// `internal/tools/granted` could not reach, since that gate refused a query
+// naming one table and not the other *outside* here. DESIGN-access.md records
+// what the union costs when it is spelled by hand: predicates missed
+// role_grant_all the day it was added, "each answering no for somebody who held
+// the role — which compiles and passes".
 //
 // person names the column holding the person in the caller's own query, so the
 // same rule attaches to a query about one person, about a team's members, or

@@ -10,11 +10,12 @@ import (
 // The two halves of an authorization-code exchange with a proof key, which
 // both adapters do the same way.
 //
-// Written out twice, once per provider, and the OIDC copy's own comment is the
-// record of that going wrong: the guarded client reached the key fetches and
-// not the token exchange — the one call carrying the secret — and the fix had
-// to be found and applied to one adapter. Every literal involved appeared
-// exactly twice in the tree, once per copy.
+// Written out once per provider, and the OIDC copy's own comment is the record
+// of that going wrong: the guarded client reached the key fetches and not the
+// token exchange — the one call carrying the secret — and the fix had to be
+// found and applied to one adapter. Every literal involved appeared in one copy
+// and its twin, which is what made a change to either invisible from the
+// other.
 //
 // A third provider, or any hardening here — a shorter timeout, a check that
 // the provider echoed the challenge method, a refusal of a downgraded redirect

@@ -123,7 +123,7 @@ the variant it was. That arm is reached only once the sentinel has been tested.
 
 A read that could not be made is a fault rather than a 404. The split is one
 helper rather than a judgment made per route, because it was being made per
-route and made correctly at five sites of forty.
+route and made correctly at five sites of thirty-eight.
 
 A process with no database answers with one sentence. Every handler guards
 against it, because a nil pointer inside one is worse than a refusal. Each guard
@@ -274,14 +274,18 @@ wherever a display name is more than a recapitalization.
 | The label is absent where it repeats the address | So that "no display name" and "the same again" do not read alike |
 | A name in a path is the address | Folding only lowercases and trims, so a label matches no row |
 
-What this cost, twice. A collaborator on an embargoed case was listed under
+What this cost. A collaborator on an embargoed case was listed under
 their display name in a field called `identity`, and the removal route resolves
 that field — so somebody who should no longer see the case could be listed and
 not taken off. And a role on a product declared `acme-router` and displayed
 `Acme Router` was listed as `Acme Router`, which the withdraw beside it sent
 back, and nothing matched.
 
-Both had the other field already declared and never filled.
+The collaborator list had the other field already declared and never filled.
+The role, credential, binding, token and routing-rule listings had only the one,
+and the label is a new field beside it — which is a shipped addition to those
+response schemas, and a change of value in the field that was already there: a
+key now reads `acme-router` where it read `Acme Router`.
 
 ## File organization
 

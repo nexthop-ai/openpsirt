@@ -143,7 +143,10 @@ func registerTokens(api huma.API, in Ingest) {
 		}
 		token, err := rights.TokenByName(ctx, subject.ID, input.Name)
 		if err != nil {
-			return nil, huma.Error404NotFound("no token of yours is called that")
+			return nil, absent(in.Logger, err, "that token could not be looked up",
+				func() error {
+					return huma.Error404NotFound("no token of yours is called that")
+				})
 		}
 		if err := rights.RevokeToken(ctx, token.ID); err != nil {
 			return nil, wentWrong(in.Logger, "cannot revoke a token", err)

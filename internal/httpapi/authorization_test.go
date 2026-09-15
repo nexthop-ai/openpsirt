@@ -891,10 +891,11 @@ func TestAMalformedCredentialIsRefused(t *testing.T) {
 // builds and puts a pipeline key at every operation declaring a scope that
 // excludes one.
 //
-// The declaration wrote a document and nothing else for this scope: seventy-four
-// operations said "any recognized credential" and then refused every credential
-// that is not a person, so the generated reference, the extension a client
-// generator reads, and an access review all stated a rule the code contradicted.
+// The declaration wrote a document and nothing else for this scope: nearly
+// every operation carrying it said "any recognized credential" and then refused
+// every credential that is not a person, so the generated reference, the
+// extension a client generator reads, and an access review all stated a rule
+// the code contradicted.
 // Two operations really do mean any credential — a key reads back the scans it
 // sent — which is why the word could not simply be redefined.
 func TestWhatAnOperationSaysItNeedsIsWhatItEnforces(t *testing.T) {

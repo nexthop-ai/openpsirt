@@ -329,6 +329,15 @@ const (
 type Store struct {
 	db  bun.IDB
 	now func() time.Time
+	// beforeInsert runs after the opening read and before the insert that may
+	// collide with another writer. Nil everywhere but the test that pins what
+	// happens when it does.
+	//
+	// A seam rather than a hope: without one the four writers race only if the
+	// scheduler happens to interleave them, so a run where nothing collided is
+	// indistinguishable from a run where the recovery worked — which is how a
+	// recovery broken on every server engine passed locally and failed in CI.
+	beforeInsert func()
 }
 
 // NewStore returns a store over db.
@@ -369,8 +378,11 @@ func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
 //
 // The order matters. Updating first means the common case — a setting somebody
 // has changed before — is one statement, and the insert is only reached the
-// first time. Two administrators setting the same thing at once resolve
-// against the primary key: one insert wins, the loser retries as an update.
+// first time. Two administrators setting a never-before-set value at once
+// resolve against the primary key: one insert wins and the loser goes round
+// again, landing in the update arm. That retry is a fresh transaction for the
+// reason SetIfAbsent's is — a read inside the transaction whose insert failed
+// sees nothing on two engines and is refused outright on a third.
 func (s *Store) Set(ctx context.Context, name, value string) error {
 	_, _, err := s.Change(ctx, name, value)
 	return err
@@ -389,6 +401,17 @@ func (s *Store) Set(ctx context.Context, name, value string) error {
 // is the difference between a deployment that never tuned this and one that
 // cleared it.
 func (s *Store) Change(ctx context.Context, name, value string) (before string, had bool, err error) {
+	for again := true; ; again = false {
+		before, had, err := s.change(ctx, name, value)
+		if again && database.IsDuplicate(err) {
+			continue
+		}
+		return before, had, err
+	}
+}
+
+// change is one attempt, letting a duplicate out for the caller to take again.
+func (s *Store) change(ctx context.Context, name, value string) (before string, had bool, err error) {
 	db, ok := database.Handle(s.db)
 	if !ok {
 		return "", false, fmt.Errorf("this store is already inside a transaction")
@@ -438,6 +461,13 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 
 		row := &Setting{Name: name, Value: value, UpdatedAt: now}
 		if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
+			// Out whole, so the caller opens a new transaction whose update
+			// can see the row the winner committed. Left to fall through, one
+			// of two administrators setting a never-before-set value at once
+			// was handed a raw constraint violation.
+			if database.IsDuplicate(err) {
+				return err
+			}
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
 		return nil
@@ -460,6 +490,28 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 // The answer is the stored value rather than a flag, because the caller wants
 // the key that won and does not care which process minted it.
 func (s *Store) SetIfAbsent(ctx context.Context, name, value string) (string, error) {
+	// **The retry is a fresh transaction, not a second read inside the failed
+	// one.** Reading again where the insert was refused does not work on any
+	// server engine: MySQL and MariaDB fixed the transaction's snapshot at the
+	// opening select, before the winner committed, so the read sees nothing;
+	// PostgreSQL has already aborted the transaction and refuses every
+	// statement after it. Only a new transaction has a view that includes the
+	// row the loser collided with.
+	//
+	// Once more and no further, the same shape a declaration uses: a row that
+	// keeps disappearing is not a race and must not become a loop.
+	for again := true; ; again = false {
+		stored, err := s.setIfAbsent(ctx, name, value)
+		if again && database.IsDuplicate(err) {
+			continue
+		}
+		return stored, err
+	}
+}
+
+// setIfAbsent is one attempt, letting a duplicate out for the caller to take
+// again.
+func (s *Store) setIfAbsent(ctx context.Context, name, value string) (string, error) {
 	db, ok := database.Handle(s.db)
 	if !ok {
 		return "", fmt.Errorf("this store is already inside a transaction")
@@ -477,17 +529,17 @@ func (s *Store) SetIfAbsent(ctx context.Context, name, value string) (string, er
 			return nil
 		}
 
+		if s.beforeInsert != nil {
+			s.beforeInsert()
+		}
 		row := &Setting{Name: name, Value: value, UpdatedAt: s.now().Truncate(time.Microsecond)}
 		if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
-			if !database.IsDuplicate(err) {
-				return fmt.Errorf("record the %q setting: %w", name, err)
+			// Out whole, so the caller opens a new transaction whose first
+			// read can see what the winner committed.
+			if database.IsDuplicate(err) {
+				return err
 			}
-			// Somebody else wrote it between the read above and this insert.
-			// Theirs is the value, and this call is a read of it.
-			if err := tx.NewSelect().Model(held).Where("name = ?", name).Scan(ctx); err != nil {
-				return fmt.Errorf("read the %q setting: %w", name, err)
-			}
-			stored = held.Value
+			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
 		return nil
 	})

@@ -2,11 +2,14 @@ package access
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Credential prefixes.
@@ -189,6 +192,12 @@ func (s Subject) narrowedTo(productID int64) Subject {
 	return s
 }
 
+// ErrNoSuchToken is what a name nobody has minted under comes back as.
+//
+// A sentinel rather than a sentence, because whoever asked has to tell it from
+// a read that could not be made: the first is a 404 and the second is a fault.
+var ErrNoSuchToken = errors.New("no token is recorded under that name")
+
 // Tokens lists somebody's own credentials.
 func (s *Store) Tokens(ctx context.Context, personID int64) ([]Token, error) {
 	var tokens []Token
@@ -228,7 +237,9 @@ func (s *Store) TokenByName(ctx context.Context, personID int64, name string) (*
 	token := new(Token)
 	if err := s.db.NewSelect().Model(token).
 		Where("person_id = ?", personID).Where("name = ?", name).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("no token of yours is called %q", name)
+		return nil, database.FromRead(err,
+			fmt.Errorf("no token of yours is called %q: %w", name, ErrNoSuchToken),
+			fmt.Sprintf("look up the token called %q", name))
 	}
 	return token, nil
 }

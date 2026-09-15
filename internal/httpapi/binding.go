@@ -369,11 +369,15 @@ func registerRevocation(api huma.API, a Administering) {
 		}
 		person, err := rights.ByIdentity(ctx, in.Identity)
 		if err != nil {
-			return nil, noSuchPerson()
+			return nil, absent(a.Logger, err, "that person could not be looked up",
+				noSuchPerson)
 		}
 		token, err := rights.TokenByName(ctx, person.ID, in.Name)
 		if err != nil {
-			return nil, huma.Error404NotFound("they hold no token called that")
+			return nil, absent(a.Logger, err, "that token could not be looked up",
+				func() error {
+					return huma.Error404NotFound("they hold no token called that")
+				})
 		}
 		if err := rights.RevokeToken(ctx, token.ID); err != nil {
 			return nil, wentWrong(a.Logger, "cannot revoke a token", err)

@@ -457,14 +457,14 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.
 				WhereOr("f.component_id IN (?)",
-					componentsWhere(q, "c.name_folded LIKE ? ESCAPE '#'", like)).
+					componentsWhere(q, "c.name_folded LIKE ?"+database.LikeClause, like)).
 				WhereOr("f.vulnerability_id IN (?)",
 					q.NewSelect().TableExpr(`vulnerability AS "v"`).Column("v.id").
-						Where("LOWER(v.identifier) LIKE ? ESCAPE '#'", like)).
+						Where("LOWER(v.identifier) LIKE ?"+database.LikeClause, like)).
 				WhereOr("f.vulnerability_id IN (?)",
 					q.NewSelect().TableExpr(`vulnerability_alias AS "va"`).
 						Column("va.vulnerability_id").
-						Where("LOWER(va.identifier) LIKE ? ESCAPE '#'", like))
+						Where("LOWER(va.identifier) LIKE ?"+database.LikeClause, like))
 		})
 	}
 	if names := trimmed(f.Exclude); len(names) > 0 {
@@ -478,7 +478,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		where := q.NewSelect().TableExpr(`component AS "c"`).Column("c.id")
 		where = where.WhereGroup(" AND ", func(g *bun.SelectQuery) *bun.SelectQuery {
 			for _, kind := range kinds {
-				g = g.WhereOr("LOWER(c.purl) LIKE ? ESCAPE '#'", "pkg:"+containsTerm(kind)+"/%")
+				g = g.WhereOr("LOWER(c.purl) LIKE ?"+database.LikeClause, "pkg:"+containsTerm(kind)+"/%")
 			}
 			return g
 		})

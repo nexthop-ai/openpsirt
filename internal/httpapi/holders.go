@@ -57,7 +57,7 @@ func registerHolders(api huma.API, in Ingest) {
 			"directory and needs administration.",
 		Tags: []string{"Triage"},
 	}, perProduct, "Asking about undisclosed findings needs private-read or "+
-		"private-triage."), func(ctx context.Context, input *struct {
+		"private-triage.", readRights()...), func(ctx context.Context, input *struct {
 		Product    string `path:"product"`
 		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"The visibility of the work being handed over"`
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals"`

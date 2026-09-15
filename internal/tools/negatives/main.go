@@ -2,7 +2,7 @@
 //
 // **A 404 asserts that a name reaches nothing.** Building its body from an
 // error publishes whatever that error carried, and the two failures compound:
-// thirty handlers wrote the 404 from the error, and the readers under them
+// the handlers wrote the 404 from the error, and the readers under them
 // returned the driver's message unwrapped. A connection failure reached an
 // authenticated caller as "that product does not exist", with the database
 // host, port and driver in the detail — a false statement about the catalog
@@ -10,8 +10,9 @@
 //
 // Only 404. The other refusals publish a store's own sentence deliberately,
 // and which of the two an error is has already been decided for them by the
-// helper that tells a refusal from a query that failed. Widening this to every
-// status would flag fifteen deliberate lines and teach people to ignore it.
+// helper that tells a refusal from a query that failed. Widened to every
+// status it would flag every one of those deliberate lines and teach people to
+// ignore it.
 //
 // What it does not cover: an error arm that answers the fixed 404 without
 // asking which error it is. That has the same wrong status with nothing

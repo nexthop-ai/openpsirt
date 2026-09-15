@@ -33,11 +33,11 @@ const (
 	// anyPerson is any credential belonging to somebody who signed in. A
 	// pipeline's key is not somebody.
 	//
-	// Seventy-four operations declared anySubject and then refused every
-	// credential that is not a person, so the generated reference, the
-	// extension a client generator reads, and an access review all stated a
-	// rule the code contradicted. The word could not simply be redefined,
-	// because two operations really do mean it.
+	// Nearly every operation carrying anySubject then refused every credential
+	// that is not a person, so the generated reference, the extension a client
+	// generator reads, and an access review all stated a rule the code
+	// contradicted. The word could not simply be redefined, because two
+	// operations really do mean it.
 	anyPerson = "person"
 	// ownSubject is whoever is asking, about themselves.
 	ownSubject = "self"

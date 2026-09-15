@@ -50,6 +50,15 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			{"issueHere", "/v1/products/mine/streams/master/variants/broadcom/findings/" +
 				"CVE-2026-9999/components/libnl-3-200"},
 			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			// The arms that were still answering per route rather than through
+			// the helper, so an unreachable database told an authenticated
+			// caller their run, person, token or notification did not exist.
+			{"a run on a build", "/v1/products/mine/streams/master/variants/broadcom/runs/1"},
+			{"a token of your own", "/v1/tokens"},
+			{"a branch named in a selection",
+				"/v1/products/mine/findings?stream=master"},
+			{"a document a build sent",
+				"/v1/products/mine/streams/master/variants/broadcom/scans/1/documents/1"},
 			{"productNamed", "/v1/products/mine/findings/components"},
 			{"the catalog's own reader", "/v1/products/mine/streams"},
 			{"the build lookup a document is generated from",

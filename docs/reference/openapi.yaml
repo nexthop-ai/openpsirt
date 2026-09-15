@@ -6320,7 +6320,10 @@ components:
           format: int64
           type: integer
         team:
-          description: Where work lands, by team name
+          description: Where work lands, by the name that addresses the team
+          type: string
+        team_display_name:
+          description: What to call that team, where it was declared with a display name
           type: string
         upstream:
           description: A source package name. Catches every binary package built from it
@@ -13692,7 +13695,7 @@ paths:
 
         Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
 
-        **Requires:** any recognized credential on the product. Asking about undisclosed findings needs private-read or private-triage.
+        **Requires:** public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
       operationId: list-holders
       parameters:
         - in: path
@@ -13746,6 +13749,11 @@ paths:
         - Triage
       x-openpsirt-requires:
         scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
         note: Asking about undisclosed findings needs private-read or private-triage.
   /v1/products/{product}/issues/{vulnerability}/advisory:
     get:
@@ -14566,7 +14574,7 @@ paths:
 
         `visibility` says which kind of finding the text is about. Asking about undisclosed findings requires being able to read them.
 
-        **Requires:** any recognized credential on the product. Asking about undisclosed findings needs private-read or private-triage.
+        **Requires:** public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
       operationId: list-mentionable
       parameters:
         - in: path
@@ -14620,6 +14628,11 @@ paths:
         - Triage
       x-openpsirt-requires:
         scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
         note: Asking about undisclosed findings needs private-read or private-triage.
   /v1/products/{product}/overview:
     get:
@@ -16970,7 +16983,7 @@ paths:
 
         **Only the words on findings you may read.** A tag row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
 
-        **Requires:** any recognized credential on the product. Answers only the words on findings you may see.
+        **Requires:** public-read or public-triage or private-read or private-triage on the product. Answers only the words on findings you may see.
       operationId: list-tags
       parameters:
         - in: path
@@ -16996,6 +17009,11 @@ paths:
         - Findings
       x-openpsirt-requires:
         scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
         note: Answers only the words on findings you may see.
   /v1/products/{product}/triage-floor:
     put:

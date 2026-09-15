@@ -2,7 +2,6 @@ package setting_test
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -167,8 +166,11 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 			t.Errorf("the change reports it held %q, held=%v, want \"high\"", before, had)
 		}
 
-		// Two at once: each answers something that was really there, and
-		// exactly one of them answers the original.
+		// Two at once. Nothing holds them at the line, so this does not force
+		// the interleave and does not claim to: what it pins is that whatever
+		// order they land in, neither reports a value nothing ever held. The
+		// collision itself is forced in race_test.go, where a seam holds each
+		// writer after its read.
 		var wait sync.WaitGroup
 		held := make([]string, 2)
 		failures := make([]error, 2)
@@ -196,52 +198,6 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 		}
 		if held[0] == held[1] {
 			t.Errorf("both callers report replacing %q, so one of them did not", held[0])
-		}
-	})
-}
-
-// TestAMintedSettingIsWrittenOnceAndEverybodyAgreesOnIt is the signing key.
-//
-// Two replicas starting together both found nothing and both minted, and the
-// second overwrote the first — so every session signed with the losing key
-// stopped verifying, a sign-in already in flight included.
-func TestAMintedSettingIsWrittenOnceAndEverybodyAgreesOnIt(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		dbtest.Reset(t, db)
-		ctx := t.Context()
-		store := setting.NewStore(db.DB)
-
-		const replicas = 4
-		var wait sync.WaitGroup
-		got := make([]string, replicas)
-		failures := make([]error, replicas)
-		wait.Add(replicas)
-		for i := range got {
-			go func() {
-				defer wait.Done()
-				got[i], failures[i] = store.SetIfAbsent(ctx, setting.SignInKey,
-					fmt.Sprintf("minted-by-%d", i))
-			}()
-		}
-		wait.Wait()
-		for i, err := range failures {
-			if err != nil {
-				t.Fatalf("replica %d could not mint: %v", i+1, err)
-			}
-		}
-		for i, key := range got {
-			if key != got[0] {
-				t.Errorf("replica %d signs with %q and replica 1 with %q", i+1, key, got[0])
-			}
-		}
-		// And what is stored is what they all answered, rather than a fifth
-		// value nobody is using.
-		stored, found, err := store.Get(ctx, setting.SignInKey)
-		if err != nil || !found {
-			t.Fatalf("the minted key is not stored: %v found=%v", err, found)
-		}
-		if stored != got[0] {
-			t.Errorf("the stored key is %q and everybody signs with %q", stored, got[0])
 		}
 	})
 }

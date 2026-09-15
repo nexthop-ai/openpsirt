@@ -80,7 +80,8 @@ func registerRun(api huma.API, in Ingest) {
 		}
 		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, target.ID, input.Run)
 		if err != nil {
-			return nil, huma.Error404NotFound("no such run on this build")
+			return nil, absent(in.Logger, err, "that run could not be looked up",
+				func() error { return huma.Error404NotFound("no such run on this build") })
 		}
 		body := RunBody{
 			RunID: ran.RunID, Scanner: ran.Scanner, ScannerVersion: ran.ScannerVersion,

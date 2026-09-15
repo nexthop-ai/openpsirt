@@ -52,6 +52,12 @@ type RanDetail struct {
 	OpenedExploited int
 }
 
+// ErrNoSuchRun is what a run this build never held comes back as.
+//
+// A sentinel rather than a sentence, because whoever asked has to tell it from
+// a read that could not be made: the first is a 404 and the second is a fault.
+var ErrNoSuchRun = errors.New("no such run on this build")
+
 // Ran reads one run of the scanner and what it changed.
 //
 // Narrowed like every other read: the counts carry the reader's visibility,
@@ -65,7 +71,10 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	if !subject.Sees(productID) {
-		return nil, fmt.Errorf("no build is declared there")
+		// A refusal, shaped by its caller into the same 404 a run that is not
+		// there gets. Said as a sentence it could not be told from a read that
+		// failed, which is what every caller then reported it as.
+		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	visible := access.Visible(subject, productID)
 	if len(visible) == 0 {
@@ -80,7 +89,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 	err = s.db.NewSelect().Model(&run).
 		Where("id = ?", runID).Where("target_id = ?", targetID).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("no such run on this build")
+		return nil, fmt.Errorf("no such run on this build: %w", ErrNoSuchRun)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read that run: %w", err)

@@ -276,7 +276,7 @@ func bySource(query *bun.SelectQuery, pattern string) *bun.SelectQuery {
 	const name = `COALESCE(NULLIF(c.upstream_folded, ''), c.name_folded)`
 	if glob, like := globbed(pattern); glob {
 		return query.Where(`component_id IN (SELECT c.id FROM "component" AS "c"
-			WHERE `+name+` LIKE ? ESCAPE '#')`, like)
+			WHERE `+name+` LIKE ?`+database.LikeClause+`)`, like)
 	}
 	return query.Where(`component_id IN (SELECT c.id FROM "component" AS "c"
 		WHERE `+name+` = ?)`, pattern)
@@ -475,7 +475,7 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 			Where("n.closed_scan_id IS NULL").
 			Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 				if glob, like := globbed(name); glob {
-					return q.Where("c.name_folded LIKE ? ESCAPE '#'", like)
+					return q.Where("c.name_folded LIKE ?"+database.LikeClause, like)
 				}
 				return q.Where("c.name_folded = ?", name)
 			}).

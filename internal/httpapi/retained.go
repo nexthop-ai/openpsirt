@@ -73,7 +73,8 @@ func registerRetained(api huma.API, in Ingest) {
 		}
 		if _, err := ingest.NewStore(in.DB.DB).Of(ctx, subject, target.ID,
 			input.Scan, sender); err != nil {
-			return nil, huma.Error404NotFound("no such scan on this build")
+			return nil, absent(in.Logger, err, "that scan could not be looked up",
+				func() error { return huma.Error404NotFound("no such scan on this build") })
 		}
 
 		documents := ingest.NewDocuments(in.DB.DB)

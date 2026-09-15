@@ -318,10 +318,18 @@ func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, erro
 	// "nobody" for somebody who is plainly there.
 	err := s.db.NewSelect().Model(person).Where("identity = ?", folded(identity)).Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("look up %q: %w", identity, err)
+		return nil, database.FromRead(err,
+			fmt.Errorf("nobody is recorded as %q: %w", identity, ErrNoSuchPerson),
+			fmt.Sprintf("look up %q", identity))
 	}
 	return person, nil
 }
+
+// ErrNoSuchPerson is what an identity nobody here holds comes back as.
+//
+// A sentinel rather than a sentence, because whoever asked has to tell it from
+// a read that could not be made: the first is a 404 and the second is a fault.
+var ErrNoSuchPerson = errors.New("nobody here is called that")
 
 // Resolve turns an identity into the subject it stands for.
 //
@@ -431,11 +439,11 @@ func (s *Store) Resolve(ctx context.Context, identity string) (Subject, error) {
 // alreadyThere turns a refused insert into success where the state the caller
 // asked for already holds.
 //
-// Five paths wrote this out, and none of them asked what the failure was — so
-// any insert error at all became success as long as a row was there, including
-// one caused by a concurrent insert that was then rolled back. The question is
-// only ever asked of a uniqueness violation, which is the one failure that
-// means "somebody got there first".
+// Every grant path wrote this out, and none of them asked what the failure was
+// — so any insert error at all became success as long as a row was there,
+// including one caused by a concurrent insert that was then rolled back. The
+// question is only ever asked of a uniqueness violation, which is the one
+// failure that means "somebody got there first".
 //
 // The predicate stays the caller's, because what "already holds" means is the
 // one part that genuinely differs: a grant asks whether it is in force, a
@@ -801,6 +809,13 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	// engines do not agree on what a case-insensitive comparison is, and
 	// one spelled the same way everywhere behaves the same way everywhere.
 	//
+	// **Folded here and again by the engine, and this is the caller where that
+	// still costs something.** Folding in Go is Unicode-aware and LOWER() on
+	// SQLite is ASCII-only, so a display name carrying a non-ASCII capital is
+	// found on three engines and missed on the fourth. An identity is an
+	// address and ASCII; a display name is free human text and has no folded
+	// column to compare against, unlike the component names that do.
+	//
 	// Escaped, because a search box is not a pattern language: a term of "%"
 	// matched every person the deployment could offer, in one request, from
 	// the picker that decides who may be named on an embargoed case.
@@ -873,19 +888,12 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 	if len(enough) == 0 {
 		return nil
 	}
-	return s.db.NewSelect().
+	return holdingAny(s.db.NewSelect().
 		TableExpr(`person AS "p"`).
 		ColumnExpr(`p.id AS "id"`).
 		ColumnExpr(`p.identity AS "identity"`).
 		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.identity) AS "name"`).
-		Where("p.deactivated_at IS NULL").
-		Where(`EXISTS (SELECT 1 FROM "role_grant" AS "g"
-			WHERE g.person_id = p.id AND g.active = ?
-			  AND g.product_id = ? AND g.role IN (?))
-			OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
-			WHERE ga.person_id = p.id AND ga.active = ?
-			  AND ga.role IN (?))`,
-			true, productID, bun.List(enough), true, bun.List(enough))
+		Where("p.deactivated_at IS NULL"), "p.id", enough, productID)
 }
 
 // Deactivate records that somebody has left, and Reactivate that they are

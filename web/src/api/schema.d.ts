@@ -1849,7 +1849,7 @@ export interface paths {
          *
          *     Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
          *
-         *     **Requires:** any recognized credential on the product. Asking about undisclosed findings needs private-read or private-triage.
+         *     **Requires:** public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
          */
         get: operations["list-holders"];
         put?: never;
@@ -2255,7 +2255,7 @@ export interface paths {
          *
          *     `visibility` says which kind of finding the text is about. Asking about undisclosed findings requires being able to read them.
          *
-         *     **Requires:** any recognized credential on the product. Asking about undisclosed findings needs private-read or private-triage.
+         *     **Requires:** public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
          */
         get: operations["list-mentionable"];
         put?: never;
@@ -3299,7 +3299,7 @@ export interface paths {
          *
          *     **Only the words on findings you may read.** A tag row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
          *
-         *     **Requires:** any recognized credential on the product. Answers only the words on findings you may see.
+         *     **Requires:** public-read or public-triage or private-read or private-triage on the product. Answers only the words on findings you may see.
          */
         get: operations["list-tags"];
         put?: never;
@@ -7802,8 +7802,10 @@ export interface components {
              * @description Where it sits among the others. The first rule that matches places the work
              */
             order: number;
-            /** @description Where work lands, by team name */
+            /** @description Where work lands, by the name that addresses the team */
             team: string;
+            /** @description What to call that team, where it was declared with a display name */
+            team_display_name?: string;
             /** @description A source package name. Catches every binary package built from it */
             upstream?: string;
         };

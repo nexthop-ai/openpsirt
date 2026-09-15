@@ -109,7 +109,8 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		}
 		person, err := store.ByIdentity(ctx, input.Identity)
 		if err != nil {
-			return nil, huma.Error404NotFound("no such person")
+			return nil, absent(a.Logger, err, "that person could not be looked up",
+				noSuchPerson)
 		}
 
 		body := AboutPersonBody{
@@ -351,7 +352,8 @@ func aboutPerson(ctx context.Context, a Administering, identity string) (
 	}
 	person, err := rights.ByIdentity(ctx, identity)
 	if err != nil {
-		return nil, access.Subject{}, nil, huma.Error404NotFound("no such person")
+		return nil, access.Subject{}, nil,
+			absent(a.Logger, err, "that person could not be looked up", noSuchPerson)
 	}
 	return rights, subject, person, nil
 }

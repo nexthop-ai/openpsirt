@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 func TestLoadDefaults(t *testing.T) {
@@ -169,5 +171,27 @@ func TestAutoMigrateIsOnUnlessTurnedOff(t *testing.T) {
 	}
 	if c.AutoMigrate {
 		t.Error("auto-migration should be off when set to false")
+	}
+}
+
+func TestASignInLifetimeOverTheCeilingIsRefusedAtStartup(t *testing.T) {
+	// The ceiling was enforced where a session is started and nowhere on the
+	// way in, so a deployment following the documented configuration started
+	// cleanly and then failed every browser sign-in with a fault — and the way
+	// back needed an administrator's key, because nobody could sign in.
+	t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://test.db")
+	t.Setenv("OPENPSIRT_SESSION_LIFETIME", "8760h")
+	if _, err := Load(); err == nil {
+		t.Fatal("a sign-in lasting a year was accepted at startup")
+	} else if !strings.Contains(err.Error(), access.MaxSessionLifetime.String()) {
+		t.Errorf("the refusal does not say the limit: %v", err)
+	}
+
+	// The ceiling itself, and the ordinary case, both start.
+	for _, lifetime := range []string{access.MaxSessionLifetime.String(), "12h"} {
+		t.Setenv("OPENPSIRT_SESSION_LIFETIME", lifetime)
+		if _, err := Load(); err != nil {
+			t.Errorf("a lifetime of %s was refused: %v", lifetime, err)
+		}
 	}
 }

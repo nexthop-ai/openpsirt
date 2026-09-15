@@ -17,7 +17,13 @@ import (
 type RuleBody struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name" doc:"What to call it, so a placement can be explained in words"`
-	Team string `json:"team" doc:"Where work lands, by team name"`
+	Team string `json:"team" doc:"Where work lands, by the name that addresses the team"`
+	// TeamDisplayName is what to show beside it. The field above is what
+	// add-routing-rule resolves through TeamByName, which matches the folded
+	// name column — so a team declared "platform-security" and displayed
+	// "Platform Security" listed as the label, and sending that back found no
+	// team at all.
+	TeamDisplayName string `json:"team_display_name,omitempty" doc:"What to call that team, where it was declared with a display name"`
 	// Order is the whole of the precedence: first match wins.
 	Order int `json:"order" doc:"Where it sits among the others. The first rule that matches places the work"`
 	// Upstream is the key that matters: one rule naming a source package
@@ -82,8 +88,9 @@ func registerRouting(api huma.API, in Ingest) {
 		out.Body.Items = make([]RuleBody, 0, len(rules))
 		for _, rule := range rules {
 			out.Body.Items = append(out.Body.Items, RuleBody{
-				ID: rule.ID, Name: rule.Name, Team: teams[rule.TeamID],
-				Order: rule.Ordinal, Upstream: rule.Upstream, Beneath: rule.Beneath,
+				ID: rule.ID, Name: rule.Name, Team: teams[rule.TeamID].Address,
+				TeamDisplayName: teams[rule.TeamID].Display,
+				Order:           rule.Ordinal, Upstream: rule.Upstream, Beneath: rule.Beneath,
 			})
 		}
 		return out, nil
@@ -189,8 +196,13 @@ func registerRouting(api huma.API, in Ingest) {
 			nil, trail.Said("to "+team.Called(), true))
 		queueSweep(ctx, in, product)
 
+		shown := ""
+		if team.DisplayName != "" && team.DisplayName != team.Name {
+			shown = team.DisplayName
+		}
 		return &struct{ Body RuleBody }{Body: RuleBody{
-			ID: rule.ID, Name: rule.Name, Team: team.Called(), Order: rule.Ordinal,
+			ID: rule.ID, Name: rule.Name, Team: team.Name, TeamDisplayName: shown,
+			Order:    rule.Ordinal,
 			Upstream: rule.Upstream, Beneath: rule.Beneath,
 		}}, nil
 	})
@@ -266,15 +278,20 @@ func queueSweep(ctx context.Context, in Ingest, productID int64) {
 	}
 }
 
-// teamsByID is every team's shown name, by identifier.
-func teamsByID(ctx context.Context, in Ingest) (map[int64]string, error) {
+// teamsByID is every team's two names, by identifier: the one a write resolves
+// and the one a screen shows.
+func teamsByID(ctx context.Context, in Ingest) (map[int64]named, error) {
 	teams, err := access.NewStore(in.DB.DB).Teams(ctx)
 	if err != nil {
 		return nil, err
 	}
-	named := make(map[int64]string, len(teams))
+	by := make(map[int64]named, len(teams))
 	for _, team := range teams {
-		named[team.ID] = team.Called()
+		one := named{Address: team.Name}
+		if team.DisplayName != "" && team.DisplayName != team.Name {
+			one.Display = team.DisplayName
+		}
+		by[team.ID] = one
 	}
-	return named, nil
+	return by, nil
 }

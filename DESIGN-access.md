@@ -520,6 +520,7 @@ sign-ins, which has to be swept and which anybody can fill.
 | The identity token must carry the value tying it to this sign-in | It belonging to a different one |
 | An identity token naming no subject is refused | Quietly reducing that deployment to matching by name |
 | A provider's stated address is used only where the provider says it verified it | An authorization waiting under somebody's work address being redeemable by anybody willing to claim it |
+| The sealed value carries when it was minted, and a stale one is refused | The window being a request to the browser and nothing else. The browser holding the value may be the one that planted it, and the key sealing it is never rotated — so without a time in the payload a sign-in sealed months ago stays acceptable |
 
 ## Outbound provider fetches
 
@@ -728,6 +729,21 @@ A deployment may not start unable to administer itself. In group-bound mode that
 means at least one group mapped to administration, or somebody named in
 configuration. The only route back from locking yourself out is editing the
 database by hand.
+
+| Rule | Reason |
+|---|---|
+| Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
+| A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
+
+**The session lifetime has a ceiling of thirty days.** It is the window in which
+a role a group withdrew can still be held, and it was whatever an administrator
+typed: a lifetime of a year made every browser sign-in last a year. Refused
+rather than quietly shortened, at the settings write and at startup, so that
+somebody who asks for more hears the limit rather than discovering it later.
+
+Thirty is a judgment rather than a commitment. Nothing has been decided about
+where the ceiling belongs, and somebody could reasonably say ninety — it is the
+owner's to settle, and `TODO.md` carries it until they do.
 
 ## The grant grid
 
@@ -1000,11 +1016,14 @@ purpose, because it goes to the person who has just been given that issue.
 ## Values a deployment mints
 
 Some settings are written by the deployment rather than typed by an operator.
-The signing key sessions are verified against is the one that matters.
+The key sealing a sign-in that is in flight is the one that matters. It is not
+what a session is verified against: a session is a random secret, hashed into a
+row and resolved by that hash, and losing this key costs only the sign-ins
+between the two mints.
 
 | Rule | Reason |
 |---|---|
-| Minted only where nothing holds one, and the answer is what is stored | Two replicas starting together both find nothing and both mint. Written as a plain set, the second overwrites the first — and every session signed with the losing key stops verifying, a sign-in already in flight included |
+| Minted only where nothing holds one, and the answer is what is stored | Two replicas starting together both find nothing and both mint. Written as a plain set, the second overwrites the first — and every sign-in already in flight, sealed with the losing key, is refused when the callback lands |
 | The caller takes whichever key won | It wants a key everybody agrees on, not the one it generated |
 
 **What a setting held is answered by the write that replaced it.** Read in a
