@@ -5459,6 +5459,7 @@ components:
           type: integer
         display_name:
           description: What people see. Defaults to the name
+          maxLength: 191
           type: string
         end_of_life:
           description: The date support ends for releases that have not stated their own, as YYYY-MM-DD
@@ -14088,7 +14089,7 @@ paths:
             schema:
               properties:
                 evidence:
-                  type: string
+                  type: boolean
                 file:
                   contentEncoding: binary
                   contentMediaType: application/octet-stream

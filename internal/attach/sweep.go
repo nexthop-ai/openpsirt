@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/background"
 )
 
 // betweenSweeps is how often uploads nothing refers to are looked for.
@@ -51,22 +53,12 @@ func NewKeeper(db *bun.DB, files Storage, logger *slog.Logger, after time.Durati
 	if after <= 0 {
 		after = keepUnattachedFor
 	}
-	return &Keeper{store: NewStore(db, files), logger: logger, after: after}
+	return &Keeper{store: NewStore(db, files).Reporting(logger), logger: logger, after: after}
 }
 
 // Run sweeps until the context ends.
 func (k *Keeper) Run(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		interval = betweenSweeps
-	}
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenSweeps, func(ctx context.Context) {
 		// Logged and carried on, like every other background pass here: a
 		// sweep that cannot run is not a reason to stop serving, and what it
 		// failed to collect is still there on the next one.
@@ -75,6 +67,5 @@ func (k *Keeper) Run(ctx context.Context, interval time.Duration) {
 		} else if gone > 0 {
 			k.logger.InfoContext(ctx, "removed uploads nothing refers to", "files", gone)
 		}
-		timer.Reset(interval)
-	}
+	})
 }

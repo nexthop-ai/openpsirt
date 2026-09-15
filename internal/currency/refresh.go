@@ -10,6 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -88,6 +89,12 @@ func NewRefresher(db *bun.DB, logger *slog.Logger, replica string) *Refresher {
 	}
 }
 
+// betweenCycles is how often the pass looks where the caller says nothing.
+//
+// Not the pause between one request and the next, which is betweenAsks: this
+// is the gap between one slice of components and the following one.
+const betweenCycles = time.Minute
+
 // Run asks, forever, until the context ends.
 //
 // The setting is read each cycle rather than at startup, so turning this on
@@ -95,15 +102,7 @@ func NewRefresher(db *bun.DB, logger *slog.Logger, replica string) *Refresher {
 // off. This is the one thing here that reaches the network, and an operator
 // who decides that was a mistake should not have to redeploy to stop it.
 func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
-
+	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
 		on, err := r.enabled(ctx)
 		switch {
 		case err != nil:
@@ -126,12 +125,10 @@ func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 			mine, err := r.asking(ctx, interval)
 			if err != nil {
 				r.logger.Error("deciding which replica asks upstream", "error", err)
-				timer.Reset(interval)
-				continue
+				return
 			}
 			if !mine {
-				timer.Reset(interval)
-				continue
+				return
 			}
 			if asked, err := r.Once(ctx); err != nil {
 				// Logged and carried on. An index having a bad day is not a
@@ -143,8 +140,7 @@ func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 				r.logger.Info("asked upstream what it has released", "components", asked)
 			}
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // asking reports whether this replica is the one that asks this cycle.

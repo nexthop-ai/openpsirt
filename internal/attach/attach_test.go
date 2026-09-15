@@ -580,3 +580,53 @@ func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
 
 // hush is a logger that writes nothing, for the background pass.
 func hush() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
+
+func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
+	// The guard ran after the loss it exists to prevent: the bytes were
+	// unlinked, the delete then matched nothing because the file had just
+	// been referred to, and the row stood pointing at bytes that were gone —
+	// counted as a collection that happened.
+	//
+	// The window is not contrived: text naming an attachment is saved after
+	// the transaction that wrote it, so a comment landing between the sweep's
+	// page and its delete loop is the ordinary race.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		racing := f.upload(t, who, "racing.log", []byte("text is about to point here"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Referred to between the sweep reading its page and acting on it,
+		// which is the window rather than a moment either side of it.
+		attach.AfterPage(f.store, func() {
+			if err := attach.Attached(ctx, f.db.DB, []string{racing.Token}, time.Now().UTC()); err != nil {
+				t.Error(err)
+			}
+		})
+
+		gone, err := f.store.Sweep(ctx, 24*time.Hour)
+		if err != nil {
+			t.Fatalf("sweep: %v", err)
+		}
+		if gone != 0 {
+			t.Errorf("the sweep reported collecting %d, and the file is referred to", gone)
+		}
+		// The record stands, and so do the bytes behind it.
+		found, err := f.store.Find(ctx, who, racing.Token)
+		if err != nil {
+			t.Fatalf("the sweep took a file text refers to: %v", err)
+		}
+		// Asked of the store rather than through Fetch, which for a file
+		// this size answers with an address and never opens anything — so a
+		// record standing over bytes that are gone reads as a working fetch
+		// until somebody follows the address.
+		body, err := f.files.Open(ctx, found.ObjectKey)
+		if err != nil {
+			t.Fatalf("the record stands and its bytes are gone: %v", err)
+		}
+		_ = body.Close()
+	})
+}

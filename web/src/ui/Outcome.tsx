@@ -45,7 +45,19 @@ const said: Record<string, { label: string; color: string; means: string }> = {
 // arrived: a server that grows an outcome before the interface does should
 // leave somebody reading something unfamiliar rather than a blank.
 export function called(outcome?: string): string {
-  return said[outcome ?? ""]?.label.toLowerCase() ?? outcome ?? "";
+  return of(outcome)?.label.toLowerCase() ?? outcome ?? "";
+}
+
+// What this map says about a word, or nothing.
+//
+// Asked through a guard rather than by indexing, because an object literal
+// inherits from the prototype: a server-supplied word that names a member of
+// it — `constructor`, `toString` — came back as a function, and the `?.` that
+// guards the lookup does not guard the field read after it. The render then
+// threw, on a value that arrived over the network.
+function of(outcome?: string): (typeof said)[string] | undefined {
+  const word = outcome ?? "";
+  return Object.hasOwn(said, word) ? said[word] : undefined;
 }
 
 // The same word as a chip carries it, capitalised.
@@ -56,11 +68,11 @@ export function called(outcome?: string): string {
 // being asked to agree with it. One map, and a word it does not know is still
 // shown as it arrived.
 export function labeled(outcome?: string): string {
-  return said[outcome ?? ""]?.label ?? outcome ?? "";
+  return of(outcome)?.label ?? outcome ?? "";
 }
 
 export function Outcome({ outcome }: { outcome?: string }) {
-  const it = said[outcome ?? ""];
+  const it = of(outcome);
   if (!it) return null;
   return (
     <span className="sev" title={it.means} style={{ "--c": it.color } as React.CSSProperties}>

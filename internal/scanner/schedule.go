@@ -10,6 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -48,16 +49,16 @@ func NewSchedule(db *database.DB, q *queue.Queue, logger *slog.Logger, replica s
 // replica does it.
 const ScheduleLease = "vulnerability.schedule"
 
+// betweenSchedules is how often this looks where the caller says nothing.
+//
+// Far more often than anything is due, and deliberately: what it looks *for*
+// is a setting an administrator may shorten, and a pass that woke only once a
+// day would take up to a day to notice they had.
+const betweenSchedules = 5 * time.Minute
+
 // Run asks until the context ends.
 func (s *Schedule) Run(ctx context.Context, interval time.Duration) {
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenSchedules, func(ctx context.Context) {
 		if asked, err := s.Once(ctx); err != nil {
 			// Logged and carried on, like every other background pass here. A
 			// cycle that cannot run is not a reason to stop the process, and
@@ -68,8 +69,7 @@ func (s *Schedule) Run(ctx context.Context, interval time.Duration) {
 		} else if asked > 0 {
 			s.logger.Info("asked for builds to be scanned again", "builds", asked)
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // Once puts a scan on the queue for everything that is due one, reporting how

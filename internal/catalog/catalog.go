@@ -157,8 +157,16 @@ func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*
 	if err := validName("product", name); err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(displayName) == "" {
+	// Trimmed and checked the way the name is, which the two siblings get for
+	// free by deriving it from the name. Stored as typed it was the one
+	// catalog field nothing looked at — a display name is what a screen puts
+	// in front of somebody and what a report is titled with.
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
 		displayName = name
+	}
+	if err := validName("product display", displayName); err != nil {
+		return nil, err
 	}
 	if _, err := s.ProductByName(ctx, name); err == nil {
 		return nil, fmt.Errorf("product %q: %w", name, ErrExists)

@@ -11920,7 +11920,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "multipart/form-data": {
-                    evidence: string;
+                    evidence: boolean;
                     /** Format: binary */
                     file: string;
                 };

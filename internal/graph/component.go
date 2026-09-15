@@ -455,14 +455,14 @@ func PartsOfPurl(purl string) Parts {
 		}
 	}
 
-	// The scheme is fixed by the specification. Anything else is not an
-	// identifier we can read, and guessing at one produces a link to a page
-	// about something else.
-	rest, found := strings.CutPrefix(body, "pkg:")
-	if !found {
-		if rest, found = strings.CutPrefix(body, "PKG:"); !found {
-			return Parts{}
-		}
+	// The scheme is fixed by the specification and is compared without regard
+	// to capitals, which is what the specification says of it — and what the
+	// canonical form beside this already did. Matched against two spellings,
+	// `Pkg:` got a real identity from one and an empty fold basis from the
+	// other, so the same component was two things depending on which asked.
+	scheme, rest, found := strings.Cut(body, ":")
+	if !found || !strings.EqualFold(scheme, "pkg") {
+		return Parts{}
 	}
 	// Cut the version from the right: a name contains no "@" and a version
 	// can.

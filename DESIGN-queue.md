@@ -11,6 +11,7 @@ Satisfies REQ-03, REQ-06, REQ-69.
 - [Exclusive handout](#exclusive-handout)
 - [Failure handling](#failure-handling)
 - [Claim renewal](#claim-renewal)
+- [Passes on a timer](#passes-on-a-timer)
 - [Leases](#leases)
 - [Backlog refusal](#backlog-refusal)
 - [What a failed job records](#what-a-failed-job-records)
@@ -107,6 +108,23 @@ Renewal is bounded in total, not only per renewal.
 
 Zero is no ceiling, for work whose caller states that it has no upper bound.
 That is asked for rather than arrived at by omission.
+
+## Passes on a timer
+
+One shape, in one place: a first tick at once, then the interval; a
+non-positive interval takes the pass's own default; the context ends the loop.
+
+| Rule | Reason |
+|---|---|
+| The first tick is immediate | A process that has just started is the moment a sweep is most worth running, because whatever accumulated while it was down is waiting |
+| Reporting stays with each pass | They log different things — what was collected, what was sent and what failed, a line per unit of work. A helper that owned the logging would be the call site written out again with a worse vocabulary |
+| A failed pass is logged and the loop goes on | A pass that cannot run is not a reason to stop serving, and what it failed to do is still there next time |
+
+It was written out in nine packages, and two of the nine had already diverged
+over whether the log line carries the trace context. Anything about how passes
+are scheduled — spreading nine goroutines that would otherwise wake together on
+a cold start, a measurement per pass, a first-run delay — was nine edits, and a
+missed one would have diverged in silence because nothing tested any of them.
 
 ## Leases
 

@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -50,17 +51,7 @@ func NewWatch(db *bun.DB, logger *slog.Logger) *Watch {
 
 // Run sweeps until the context ends.
 func (w *Watch) Run(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		interval = betweenSweeps
-	}
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenSweeps, func(ctx context.Context) {
 		if opened, cleared, err := w.Once(ctx); err != nil {
 			// Logged and carried on, like every other background pass here: a
 			// sweep that cannot run is not a reason to stop the process, and
@@ -75,8 +66,7 @@ func (w *Watch) Run(ctx context.Context, interval time.Duration) {
 		} else if gone > 0 {
 			w.logger.Info("cleared expired sessions", "sessions", gone)
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // tellAdministrators derives the two conditions that go to administrators and

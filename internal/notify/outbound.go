@@ -19,6 +19,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -117,24 +118,13 @@ func NewSignal(db *bun.DB, baseURL string, logger *slog.Logger, replica string) 
 
 // Run sweeps until the context ends.
 func (s *Signal) Run(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		interval = betweenPosts
-	}
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
 		if sent, failed, err := s.Once(ctx); err != nil {
 			s.logger.Error("carrying notifications to their destinations", "error", err)
 		} else if sent > 0 || failed > 0 {
 			s.logger.Info("notifications signalled", "sent", sent, "failed", failed)
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // Once carries what has not gone yet.

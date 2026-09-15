@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -24,6 +25,15 @@ type Store struct {
 	db    *bun.DB
 	files Storage
 	now   func() time.Time
+	// logger is where the one destructive pass in this package says what it
+	// destroyed and what it could not. Nil where a caller has not said, which
+	// every caller but the sweep is.
+	logger *slog.Logger
+	// afterPage runs between the collection pass reading its page and acting
+	// on it, so a test can put there what a comment saving its text does. The
+	// window is the whole of what the pass's guard is for, and waiting for it
+	// to happen by itself is a test that passes by not racing.
+	afterPage func()
 }
 
 // NewStore returns a store over db, keeping bytes in files.
@@ -32,6 +42,16 @@ type Store struct {
 // attachments are off and everything else works.
 func NewStore(db *bun.DB, files Storage) *Store {
 	return &Store{db: db, files: files, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// Reporting gives a store somewhere to say what a collection pass did.
+//
+// The pass is the only writer here that destroys somebody's data and the only
+// one that kept no record of what it destroyed — a count, with no key, no
+// filename and no issue. What it names is what an orphan can be found by.
+func (s *Store) Reporting(logger *slog.Logger) *Store {
+	s.logger = logger
+	return s
 }
 
 // Configured reports whether this deployment can hold files at all.
@@ -219,7 +239,10 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	if counted.n != size {
-		_ = s.files.Delete(ctx, key)
+		if removed := s.files.Delete(ctx, key); removed != nil && s.logger != nil {
+			s.logger.ErrorContext(ctx, "a short upload left bytes behind",
+				"key", key, "error", removed)
+		}
 		return nil, fmt.Errorf("%d bytes arrived of the %d declared", counted.n, size)
 	}
 
@@ -253,8 +276,13 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	if err != nil {
 		// The row is what the sweep can see, so a failure here leaves bytes
 		// nothing knows about. Removed now rather than left for a reaper that
-		// has no record to work from.
-		_ = s.files.Delete(ctx, key)
+		// has no record to work from — and where that removal fails too, the
+		// key is said out loud, because it is then the only thing that can
+		// find them.
+		if removed := s.files.Delete(ctx, key); removed != nil && s.logger != nil {
+			s.logger.ErrorContext(ctx, "an upload that could not be recorded left bytes behind",
+				"key", key, "error", removed)
+		}
 		return nil, fmt.Errorf("record an attachment: %w", err)
 	}
 	return row, nil

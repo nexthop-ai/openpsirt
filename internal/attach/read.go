@@ -221,24 +221,59 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 		return 0, fmt.Errorf("read what nothing refers to: %w", err)
 	}
 
-	gone := 0
+	if s.afterPage != nil {
+		s.afterPage()
+	}
+
+	gone, orphaned, failed := 0, 0, 0
 	for i := range stale {
 		row := &stale[i]
-		// The file first here, and the row after. This is the opposite order
-		// from a redaction and for the opposite reason: nothing refers to
-		// these, so a file removed with its row still present is collected
-		// again on the next pass, where a row removed first would leave bytes
-		// nothing can ever find.
-		if err := s.files.Delete(ctx, row.ObjectKey); err != nil {
-			return gone, err
-		}
-		if _, err := s.db.NewDelete().Model((*Attachment)(nil)).
+		// The row first, and the bytes after. The other order ran the guard
+		// after the loss it exists to prevent: a comment attaching the file
+		// between the page and this loop left the bytes unlinked, the delete
+		// matching nothing because the file is now referred to, and the row
+		// standing and pointing at bytes that are gone — reported as a
+		// collection that happened.
+		//
+		// It inverts which side can be orphaned. Bytes surviving a deleted
+		// row are recoverable, because the key is logged; a row surviving its
+		// bytes is not.
+		res, err := s.db.NewDelete().Model((*Attachment)(nil)).
 			Where("id = ?", row.ID).
 			Where("attached_at IS NULL").
-			Exec(ctx); err != nil {
-			return gone, fmt.Errorf("remove an attachment nothing refers to: %w", err)
+			Exec(ctx)
+		if err != nil {
+			failed++
+			continue
+		}
+		claimed, err := database.Affected(res)
+		if err != nil {
+			failed++
+			continue
+		}
+		if claimed == 0 {
+			// Somebody attached it while this pass was running, which is the
+			// outcome the guard is for. The bytes stay.
+			continue
+		}
+		if err := s.files.Delete(ctx, row.ObjectKey); err != nil {
+			// The row is gone and the bytes are not. Named, because the key
+			// is the only thing left that can find them — and because a
+			// return here abandoned every row after it in the page, so one
+			// undeletable object stalled collection for ever.
+			orphaned++
+			if s.logger != nil {
+				s.logger.ErrorContext(ctx,
+					"an attachment's record was removed and its bytes were not",
+					"key", row.ObjectKey, "filename", row.Filename, "error", err)
+			}
+			continue
 		}
 		gone++
+	}
+	if (orphaned > 0 || failed > 0) && s.logger != nil {
+		s.logger.WarnContext(ctx, "a collection pass could not finish every row",
+			"collected", gone, "orphaned", orphaned, "unreadable", failed)
 	}
 	return gone, nil
 }

@@ -70,6 +70,20 @@ export function pageSize(params: URLSearchParams): number {
   return PAGES.includes(asked as (typeof PAGES)[number]) ? asked : PAGE;
 }
 
+// A number the address carries, or nothing where it is not one.
+//
+// `Number("")` is 0 and `Number("soon")` is NaN, and both went to the server
+// as they were: NaN reached it as the text "NaN" and 0 reached a parameter
+// whose minimum is 1. The address is somebody else's text like any other, and
+// a value outside what the server takes is a parameter to leave off rather
+// than one to send wrong.
+export function num(raw: string | null, least: number, most: number): number | undefined {
+  if (raw === null || raw.trim() === "") return undefined;
+  const asked = Number(raw);
+  if (!Number.isFinite(asked) || asked < least || asked > most) return undefined;
+  return asked;
+}
+
 // The filters, as the server takes them. Every value is narrowed to what the
 // generated client will accept rather than asserted: a value the address
 // carries is somebody else's text, and the client's types are the only place
@@ -127,9 +141,13 @@ export function listQuery(params: URLSearchParams) {
   const publishers = params.getAll("vex_publisher").filter(Boolean);
   const weaknesses = params.getAll("weakness").filter(Boolean);
   const likelihood = Number(params.get("epss_at_least") ?? "");
+  // Both are a count of days the server takes from one upward, so a word, an
+  // empty box and a zero are all "do not ask about this" rather than values.
+  const openFor = num(params.get("open_for"), 1, Number.MAX_SAFE_INTEGER);
+  const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   return {
     limit: pageSize(params),
-    offset: Number(params.get("offset") ?? 0),
+    offset: num(params.get("offset"), 0, Number.MAX_SAFE_INTEGER) ?? 0,
     ...(sort ? { sort: sort as (typeof SORTS)[keyof typeof SORTS] } : {}),
     ...(sort && params.get("asc") === "yes" ? { asc: true } : {}),
     ...(floor !== "low" ? { severity: floor as "low" | "medium" | "high" | "critical" } : {}),
@@ -165,9 +183,9 @@ export function listQuery(params: URLSearchParams) {
         }
       : {}),
     ...(weaknesses.length > 0 ? { weakness: weaknesses } : {}),
-    ...(params.get("open_for") ? { open_for: Number(params.get("open_for")) } : {}),
+    ...(openFor !== undefined ? { open_for: openFor } : {}),
     ...(running === "overdue" ? { overdue: true } : {}),
-    ...(running && running !== "overdue" ? { due_within: Number(running) } : {}),
+    ...(dueWithin !== undefined ? { due_within: dueWithin } : {}),
     ...(params.get("sent_back") === "1" ? { sent_back: true } : {}),
     ...(params.get("differs") === "1" ? { differs: true } : {}),
     ...(publishers.length > 0 ? { vex_publisher: publishers } : {}),
@@ -285,7 +303,7 @@ export function fromAt(from: string, absolute: number, limit: number): string {
 // `?offset=0` into a link.
 export function usePaging(): { offset: number; go: (to: number) => void } {
   const [params, setParams] = useSearchParams();
-  const offset = Number(params.get("offset") ?? 0);
+  const offset = num(params.get("offset"), 0, Number.MAX_SAFE_INTEGER) ?? 0;
   return {
     offset,
     go(to: number) {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -57,19 +58,13 @@ func NewSweeperOfSize(db *database.DB, q *queue.Queue, logger *slog.Logger,
 	return &Sweeper{db: db, queue: q, logger: logger, name: name, batch: batch}
 }
 
+// betweenSweeps is how often this looks where the caller says nothing. Short,
+// because what it places is somebody's work arriving.
+const betweenSweeps = 10 * time.Second
+
 // Run works the sweep queue until the context ends.
 func (s *Sweeper) Run(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		interval = 10 * time.Second
-	}
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenSweeps, func(ctx context.Context) {
 		for {
 			placed, err := s.Once(ctx)
 			if err != nil {
@@ -83,8 +78,7 @@ func (s *Sweeper) Run(ctx context.Context, interval time.Duration) {
 			}
 			s.logger.Info("placed work by rule", "findings", placed)
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // Once claims one sweep and runs a batch of it, reporting how many findings it

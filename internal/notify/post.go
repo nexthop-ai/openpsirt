@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
@@ -108,17 +109,7 @@ func NewPost(db *bun.DB, channel Channel, baseURL string, logger *slog.Logger,
 
 // Run sweeps until the context ends.
 func (p *Post) Run(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		interval = betweenPosts
-	}
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
+	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
 		if sent, err := p.Digests(ctx); err != nil {
 			p.logger.Error("sending digests", "error", err)
 		} else if sent > 0 {
@@ -131,8 +122,7 @@ func (p *Post) Run(ctx context.Context, interval time.Duration) {
 			p.logger.Info("notifications sent",
 				"channel", p.channel.Name(), "sent", sent, "failed", failed)
 		}
-		timer.Reset(interval)
-	}
+	})
 }
 
 // waiting is one notification to carry, with where it goes.
