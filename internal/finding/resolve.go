@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
 // ErrNotOursToClose says a scanner's finding is not something a person closes.
@@ -55,6 +56,12 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 	because = strings.TrimSpace(because)
 	if because == "" {
 		return nil, ErrNoReason
+	}
+	// The submission policy, before the note is stored. A closure by a person
+	// is the one thing here nothing else evidences, so what it says is kept
+	// forever and read back on every screen that asks why.
+	if err := markdown.Check(because); err != nil {
+		return nil, err
 	}
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {

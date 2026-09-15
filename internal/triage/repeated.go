@@ -9,7 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Repeated is one place that keeps being put off.
@@ -61,12 +61,24 @@ const DefaultRepeatedAt = 2
 // component has consumers, and counting those would order the list by how far
 // a component spreads through an image.
 func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID int64,
-	atLeast, limit int) ([]Repeated, error) {
+	atLeast, limit int) ([]Repeated, int, error) {
+
+	return s.RepeatsPage(ctx, subject, productID, atLeast, limit, 0)
+}
+
+// RepeatsPage is the same list, from a position in it, with how many there are
+// in all.
+//
+// Paged because a ceiling with no offset means what is past it cannot be read
+// through the API at all — and this one grows with the estate, which is the
+// whole subject of the report.
+func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, productID int64,
+	atLeast, limit, offset int) ([]Repeated, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, access.Denied("read which deferrals repeat")
+		return nil, 0, access.Denied("read which deferrals repeat")
 	}
 	if atLeast <= 0 {
 		atLeast = DefaultRepeatedAt
@@ -82,7 +94,7 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 		// The report is per product already, and a rating belongs to one — so
 		// the word beside a repeated deferral is the word the team doing the
 		// deferring holds.
-		Join(finding.RatedFor(finding.RatedOnDecision)).
+		Join(rating.For(rating.OnDecision)).
 		// The argument, which is where the outcome and the date live.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		// Grouped on the product's identifier and the issue's, with the names
@@ -94,7 +106,7 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 		// unique, and it is not the one anybody reads.
 		ColumnExpr(`MIN(p.display_name) AS "product"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
-		ColumnExpr("MIN("+finding.EffectiveSeverityExpr+`) AS "severity"`).
+		ColumnExpr("MIN("+rating.EffectiveExpr+`) AS "severity"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).
 		// Counted over the deferrals that actually held. One taken back
 		// before it took effect put nothing off, and counting it would make
@@ -116,17 +128,22 @@ func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID i
 		Having("SUM(CASE WHEN "+heldSeconds(s.db)+" > 0 THEN 1 ELSE 0 END) >= ?", atLeast).
 		// The most put-off first, and then the longest: a list read from the
 		// top should start with the thing somebody has avoided most.
-		OrderExpr("times DESC, total_days DESC, vulnerability").
-		Limit(limit)
+		OrderExpr("times DESC, total_days DESC, vulnerability")
 
 	if productID > 0 {
 		q = q.Where("de.product_id = ?", productID)
 	}
 	q = readableBy(q, subject, "de")
-	if err := q.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what keeps being put off: %w", err)
+	// Counted over the grouping, which is a place rather than a deferral:
+	// the report's own subject is how many places keep being put off.
+	total, err := s.db.NewSelect().TableExpr(`(?) AS "repeating"`, q).Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count what keeps being put off: %w", err)
 	}
-	return rows, nil
+	if err := q.Limit(limit).Offset(offset).Scan(ctx, &rows); err != nil {
+		return nil, 0, fmt.Errorf("read what keeps being put off: %w", err)
+	}
+	return rows, total, nil
 }
 
 // deferredDays sums how long each deferral ran for, in whole days, through the
@@ -142,9 +159,9 @@ func deferredDays(db bun.IDB) string {
 // before that date, and never negative. Written as a CASE rather than with a
 // two-argument minimum, because the four engines spell that three ways.
 func heldSeconds(db bun.IDB) string {
-	ends := `(CASE WHEN de.state = '` + string(Withdrawn) + `'
+	ends := database.Composed(`(CASE WHEN de.state = '` + string(Withdrawn) + `'
 			AND de.ended_at IS NOT NULL AND de.ended_at < cl.deferred_until
-		THEN de.ended_at ELSE cl.deferred_until END)`
-	seconds := database.SecondsBetween(db, "de.proposed_at", ends)
+		THEN de.ended_at ELSE cl.deferred_until END)`)
+	seconds := database.SecondsBetween(db, database.Column(db, "de.proposed_at"), ends)
 	return "(CASE WHEN " + seconds + " > 0 THEN " + seconds + " ELSE 0 END)"
 }

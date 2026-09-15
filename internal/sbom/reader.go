@@ -295,6 +295,7 @@ func (c *reader) finish() (*Document, error) {
 		}
 		c.doc.Components = append(c.doc.Components, described)
 	}
+	c.doc.Unversioned = countUnversioned(c.doc.Components)
 
 	declared := make([]graph.Dependency, 0, len(c.edges)+len(c.contained))
 	for _, e := range c.edges {

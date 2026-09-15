@@ -671,6 +671,8 @@ export interface paths {
          *
          *     Set `expired=true` to list deferrals whose date has passed — the findings that have come back and need judging again.
          *
+         *     Set `stopped=true` for everything that has stopped standing — lapsed decisions and expired deferrals as one list. A decision can be both, so asking the two separately and adding the totals counts some of them twice.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-decisions"];
@@ -5088,8 +5090,11 @@ export interface components {
             deferred_until?: string;
             /** @description Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them */
             fixed_version?: string;
-            /** @description Required when it does not apply */
-            justification?: string;
+            /**
+             * @description Required when it does not apply
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
             /** @description Why this holds for every issue named */
@@ -5318,11 +5323,13 @@ export interface components {
             /** @description What pulls the component in. Absent where the build holds it directly */
             consumer?: string;
             due?: string;
-            justification?: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question */
             met?: boolean;
             opened: string;
-            outcome?: string;
+            /** @enum {string} */
+            outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half */
             place: string;
             proposed_at?: string;
@@ -5365,8 +5372,10 @@ export interface components {
             ended_at?: string;
             /** @description The package version the claim says the fix arrived in, where it claims one has */
             fixed_version?: string;
-            justification?: string;
-            outcome: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             proposed_at: string;
             proposed_by: string;
             /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away */
@@ -5890,7 +5899,8 @@ export interface components {
              * @description What it covers now, having reached it by matching rather than by anybody acting
              */
             covers_now: number;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
         };
         "Hand-back-assignmentsRequest": {
             /**
@@ -6002,7 +6012,8 @@ export interface components {
             deferred_days?: number;
             /** @description What the new line has */
             now: string;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The old words, to start from rather than start without */
             reasoning: string;
             vulnerability: string;
@@ -6090,8 +6101,11 @@ export interface components {
             id: number;
             /** @description The vulnerability, under the name it is filed here */
             issue: string;
-            /** @description The recognized reason it does not apply */
-            justification?: string;
+            /**
+             * @description The recognized reason it does not apply
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
@@ -6138,7 +6152,8 @@ export interface components {
             approved_by: string;
             /** Format: int64 */
             claim_id: number;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             product: string;
             /** Format: int64 */
             rows: number;
@@ -6254,15 +6269,6 @@ export interface components {
             items: components["schemas"]["AtComponentBody"][] | null;
             /** Format: int64 */
             total: number;
-        };
-        "List-repeated-deferralsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-repeated-deferralsResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["RepeatBody"][] | null;
         };
         "List-unassignedResponse": {
             /**
@@ -6536,6 +6542,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ReleaseBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyRepeatBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyRepeatBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["RepeatBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -7249,8 +7266,11 @@ export interface components {
              * @description How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else
              */
             defer_days?: number;
-            /** @description The recognized reason it does not apply, where the outcome takes one */
-            justification?: string;
+            /**
+             * @description The recognized reason it does not apply, where the outcome takes one
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /**
              * @description What it offers to say
              * @enum {string}
@@ -7918,6 +7938,8 @@ export interface components {
             agreed: number;
             alone: components["schemas"]["UnagreedBody"][] | null;
             bulk: components["schemas"]["BulkApprovalBody"][] | null;
+            /** @description A section reached the limit, so this is the worst of it rather than all of it */
+            capped?: boolean;
             /**
              * Format: int64
              * @description How far back this looked
@@ -8088,7 +8110,8 @@ export interface components {
              * @description How many distinct issues the claim covers
              */
             issues: number;
-            justification?: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             reasoning: string;
         };
         SittingBody: {
@@ -8188,11 +8211,13 @@ export interface components {
             elsewhere?: string;
             /** @description The package version the claim says the fix arrived in, where it claims one has */
             fixed_version?: string;
-            justification?: string;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
             kind: "finding" | "together" | "extension" | "returned";
             needs_approval?: boolean;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
              * @description How many of this finding's places the claim covers
@@ -8797,6 +8822,8 @@ export interface operations {
                 product?: string;
                 /** @description How far back to look, by when a claim was proposed */
                 days?: number;
+                /** @description How many rows each section carries at most. capped says a section reached it */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -9624,6 +9651,8 @@ export interface operations {
                 state?: "proposed" | "approved" | "withdrawn" | "lapsed";
                 /** @description Only deferrals whose date has passed */
                 expired?: boolean;
+                /** @description Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up */
+                stopped?: boolean;
                 limit?: number;
                 offset?: number;
             };
@@ -9692,6 +9721,8 @@ export interface operations {
                 /** @description How many deferrals make something worth listing. One is an ordinary judgment */
                 at_least?: number;
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -9705,7 +9736,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-repeated-deferralsResponse"];
+                    "application/json": components["schemas"]["ListBodyRepeatBody"];
                 };
             };
             /** @description Error */
@@ -9731,6 +9762,8 @@ export interface operations {
                 /** @description How many days ahead to look */
                 within?: number;
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -9762,6 +9795,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -9877,8 +9912,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -9979,8 +10014,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11231,8 +11266,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11376,8 +11411,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11483,8 +11518,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -11593,8 +11628,8 @@ export interface operations {
                 vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
                 /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
                 reassessed?: boolean;
-                /** @description Keep only what a person recorded here rather than what a scanner reported. Those are the only ones a person may close by hand, and the screen that records one is where somebody asks what has been recorded before */
-                recorded?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
                 /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
                 planned?: "planned" | "unplanned" | "either";
                 /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
@@ -14356,6 +14391,8 @@ export interface operations {
                 /** @description How far ahead to look */
                 days?: number;
                 limit?: number;
+                /** @description Where in the list to start */
+                offset?: number;
             };
             header?: never;
             path?: never;

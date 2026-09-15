@@ -6,6 +6,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -571,8 +572,8 @@ func (f *fixture) ratingsIn(t *testing.T, productID int64, identifier string) (s
 	}
 	err := f.db.DB.NewSelect().
 		TableExpr("vulnerability AS v").
-		Join(finding.RatedHere, productID).
-		ColumnExpr("COALESCE(v.severity, '') AS published").
+		Join(rating.Here, productID).
+		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &row)
@@ -609,13 +610,12 @@ func (f *fixture) issue(t *testing.T, identifier string) int64 {
 	return id
 }
 
-// recorded makes sure a person exists to hang a claim on.
+// recorded puts a person row in place at a known identifier, which the
+// subjects these tests build are matched on.
 //
 // An assessment names whoever made it, and that is a real reference rather
 // than a number in a column — the subjects these tests hold are made up, so
 // the row has to be put there for them.
-// recorded puts a person row in place at a known identifier, which the
-// subjects these tests build are matched on.
 //
 // Written column by column rather than through the access store because the
 // identifier has to be the one the subject carries, and a store assigns its
@@ -777,6 +777,64 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 		}
 		if clocked(branch) == 0 {
 			t.Error("the sweep took the deadline off the branch too")
+		}
+	})
+}
+
+func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
+	// The rewrite carries a set of openings in one statement rather than
+	// issuing one per opening: the other way round the statement count was
+	// openings × bands × identifier slices, which on a product scanned
+	// nightly for a year is 189,000 statements against this function's own
+	// note promising a handful — and almost all of them matched nothing,
+	// because one opening lives in one slice.
+	//
+	// What that shape has to get right, and one opening cannot show, is that
+	// each row lands on *its own* opening plus its own window.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+
+		reported := make([]finding.Reported, 0, 3)
+		named := []string{"CVE-2026-ONE", "CVE-2026-TWO", "CVE-2026-THREE"}
+		for _, each := range named {
+			high := found(each, swss)
+			high.Issue.Severity = "high"
+			reported = append(reported, high)
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+			t.Fatal(err)
+		}
+
+		// Three openings, days apart, so the three deadlines are far enough
+		// apart that a shared one is unmistakable. Written onto the rows,
+		// which is where the rewrite reads them from.
+		opened := map[string]time.Time{}
+		for i, each := range named {
+			seen := time.Now().UTC().Add(-time.Duration(10+i*10) * 24 * time.Hour).
+				Truncate(time.Microsecond)
+			opened[each] = seen
+			if _, err := f.db.DB.NewUpdate().TableExpr("finding AS f").
+				Set("opened_at = ?", seen).
+				Where(`f.vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v"`+
+					` WHERE v.identifier = ?)`, each).
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		shorter := testWindows
+		shorter.High = 15 * 24 * time.Hour
+		if _, err := f.store.Recompute(ctx, shorter); err != nil {
+			t.Fatal(err)
+		}
+
+		for each, seen := range opened {
+			want := seen.Add(shorter.High)
+			if got := f.deadline(t, each); got.Sub(want).Abs() > time.Second {
+				t.Errorf("%s is due %s, want %s — its own opening plus the window, not "+
+					"another finding's", each, got, want)
+			}
 		}
 	})
 }

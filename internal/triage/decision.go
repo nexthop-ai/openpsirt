@@ -111,7 +111,14 @@ type Approval struct {
 	ApprovedBy  int64      `bun:"approved_by,notnull"`
 	ApprovedAt  time.Time  `bun:"approved_at,notnull"`
 	WithdrawnAt *time.Time `bun:"withdrawn_at"`
-	Batch       *string    `bun:"batch"`
+	// WithdrawnBy is who took the agreement back, which is not who gave it.
+	//
+	// A proposer revising their own claim withdraws every agreement standing
+	// on the old words. With only the approver recorded, the queue reported
+	// that back to the proposer as somebody else having undone their
+	// agreement.
+	WithdrawnBy *int64  `bun:"withdrawn_by"`
+	Batch       *string `bun:"batch"`
 	// Covered is how many findings this claim covered when it was agreed to.
 	//
 	// Kept rather than worked out later. A decision reaches by matching, so a
@@ -173,6 +180,44 @@ type Store struct {
 // NewStore returns a store over db.
 func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// ErrAlreadyInTransaction is returned when a write entry point is called on a
+// store that is already inside a transaction.
+//
+// One sentence rather than thirteen copies of it: every entry point here
+// asserted the handle and refused in its own words, and the copies had already
+// drifted — two of them said something else.
+var ErrAlreadyInTransaction = errors.New("this store is already inside a transaction")
+
+// pool is the handle a write opens its transaction on.
+func (s *Store) pool() (*bun.DB, error) {
+	db, ok := database.Handle(s.db)
+	if !ok {
+		return nil, ErrAlreadyInTransaction
+	}
+	return db, nil
+}
+
+// writing runs do inside one transaction, with this store rebuilt over it.
+//
+// Named for the act rather than for the mechanism, so a reader can still see
+// which entry points open a transaction: each of them is a call to this, and
+// the ones that do not are the reads.
+//
+// The transaction is handed over beside the store because several of these
+// also write through the finding store, whose methods take the handle rather
+// than this one.
+func (s *Store) writing(ctx context.Context,
+	do func(ctx context.Context, within *Store, tx bun.Tx) error) error {
+
+	db, err := s.pool()
+	if err != nil {
+		return err
+	}
+	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+		return do(ctx, &Store{db: tx, now: s.now}, tx)
+	})
 }
 
 // Proposal is somebody claiming something about a finding.
@@ -274,14 +319,8 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 		return nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
-
 	var recorded *Decision
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		// Worked out here rather than taken from the caller, and re-worked on
 		// every attempt: what it turns on is the policy and what this place
 		// has already been put off for, both of which a retry re-reads.
@@ -329,14 +368,8 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposa
 		return nil, err
 	}
 
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, fmt.Errorf("this store is already inside a transaction")
-	}
-
 	var recorded []*Decision
-	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		within := &Store{db: tx, now: s.now}
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
 		// Asked per place rather than once for the set: the threshold reads
 		// the claim, and two places of one finding can differ in what they
@@ -483,6 +516,51 @@ func sameDay(a, b *time.Time) bool {
 	}
 }
 
+// Reasons checks an outcome against the reason and the mitigation stated
+// beside it.
+//
+// One function rather than the rule restated wherever a claim is put together.
+// A saved filter prefills a decision, and a combination it accepted that the
+// decision store refuses is a refusal that lands when somebody presses the
+// button rather than when they saved the thing that fills it in.
+//
+// The mitigation is separate from the reason because only one reason asks for
+// it, and a caller that carries no free text at all passes the empty string —
+// which refuses that one reason, correctly: there is nowhere for it to say
+// what stops it.
+func Reasons(outcome Outcome, justification Justification, mitigation string) error {
+	// The claim that something does not affect us *is* which of the
+	// recognized reasons applies, so it is not optional there — and it is
+	// meaningless on the others, which are claims about priority rather than
+	// about applicability.
+	switch outcome {
+	case NotApplicable:
+		if !justification.Valid() {
+			return fmt.Errorf("%q is not a recognized reason for something not applying", justification)
+		}
+		// Named, because the tool cannot notice this one going away.
+		// Every other reason is a claim about code and lapses when the
+		// code moves; this one is a claim about configuration, which
+		// can be removed with nothing moving at all.
+		if justification == MitigationsExist && strings.TrimSpace(mitigation) == "" {
+			return errors.New(
+				"say what stops it — a claim that mitigations already exist is about " +
+					"configuration rather than code, so nothing here will notice it being " +
+					"removed and the next person needs to know what to go and check")
+		}
+	default:
+		if justification != "" {
+			return fmt.Errorf("%q states why something does not apply, which %q does not claim",
+				justification, outcome)
+		}
+	}
+	if justification != MitigationsExist && strings.TrimSpace(mitigation) != "" {
+		return fmt.Errorf("naming what stops it belongs to %q and no other reason",
+			MitigationsExist)
+	}
+	return nil
+}
+
 // valid reports whether a proposal says enough to be recorded.
 //
 // It takes the moment rather than reading a clock, because a store's clock is
@@ -526,37 +604,8 @@ func (p Proposal) valid(now time.Time) error {
 	if err := keyable(p.Place); err != nil {
 		return err
 	}
-	// The claim that something does not affect us *is* which of the
-	// recognized reasons applies, so it is not optional there — and it is
-	// meaningless on the others, which are claims about priority rather than
-	// about applicability.
-	switch p.Outcome {
-	case NotApplicable:
-		if !p.Justification.Valid() {
-			return fmt.Errorf("%q is not a recognized reason for something not applying", p.Justification)
-		}
-		// Named, because the tool cannot notice this one going away.
-		// Every other reason is a claim about code and lapses when the
-		// code moves; this one is a claim about configuration, which
-		// can be removed with nothing moving at all.
-		if p.Justification == MitigationsExist && strings.TrimSpace(p.Mitigation) == "" {
-			return errors.New(
-				"say what stops it — a claim that mitigations already exist is about " +
-					"configuration rather than code, so nothing here will notice it being " +
-					"removed and the next person needs to know what to go and check")
-		}
-	}
-	if p.Justification != MitigationsExist && strings.TrimSpace(p.Mitigation) != "" {
-		return fmt.Errorf("naming what stops it belongs to %q and no other reason",
-			MitigationsExist)
-	}
-	switch p.Outcome {
-	case NotApplicable:
-	default:
-		if p.Justification != "" {
-			return fmt.Errorf("%q states why something does not apply, which %q does not claim",
-				p.Justification, p.Outcome)
-		}
+	if err := Reasons(p.Outcome, p.Justification, p.Mitigation); err != nil {
+		return err
 	}
 	if p.Outcome == Deferred && p.DeferredUntil == nil {
 		return errors.New("a deferral needs a date it returns on, or it is a decision never to look again")

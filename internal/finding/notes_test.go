@@ -170,3 +170,32 @@ func TestANoteWithNothingToSayIsNotWritten(t *testing.T) {
 		t.Errorf("a note was written for a release that fixed nothing:\n%s", notes)
 	}
 }
+
+func TestEveryClosureThatCountsAsAFixHasWordsForIt(t *testing.T) {
+	// One list rather than three projections of it. "What counts as a fix" was
+	// a positive list of four words spliced into SQL, a negative list of three
+	// in Go, and a third list of the same four as a switch returning prose —
+	// none of them checked by the compiler. An eighth closure was kept by the
+	// release note, rendered with nothing after it, and not counted by the
+	// remediation rate: one constant, two screens quietly disagreeing.
+	if len(finding.Resolving()) == 0 {
+		t.Fatal("nothing counts as a fix, so this checked nothing")
+	}
+	for _, each := range finding.Resolving() {
+		if !each.Resolves() {
+			t.Errorf("%q is in the list and does not read as resolving", each)
+		}
+		if finding.FixedBecause(each) == "" {
+			t.Errorf("%q counts as a fix and the note has no words for it, so a reader "+
+				"gets the issue and the component with nothing after it", each)
+		}
+	}
+	// And the three that are not fixes stay out on both surfaces.
+	for _, each := range []finding.Closure{
+		finding.Invalid, finding.Superseded, finding.Unexplained,
+	} {
+		if each.Resolves() {
+			t.Errorf("%q reads as an issue going away", each)
+		}
+	}
+}

@@ -23,6 +23,7 @@ import (
 // The source is read rather than the package being asked, because the names
 // are literals at their call sites: that is what makes them greppable, and a
 // list built beside them to satisfy a test is a second list to keep right.
+
 // sources is where a setting is read from the environment, and refusals is
 // where one is named in a message telling an operator to set it.
 //

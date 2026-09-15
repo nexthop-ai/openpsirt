@@ -98,9 +98,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 			ColumnExpr(`MAX(f.urgency) AS "urgency"`).
 			ColumnExpr(decidedAs("?", anyClaim), productID, "withdrawn")
 		q = decisionCounts(q, "?", []any{productID}, claimApproved).
-			Where(`f.target_id IN (SELECT tg.id FROM "target" AS "tg"
-				JOIN "stream" AS "st" ON st.id = tg.stream_id
-				WHERE st.product_id = ?)`, productID).
+			Where(inThisProductAs("f.target_id"), productID).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible))
 		if byBuild {

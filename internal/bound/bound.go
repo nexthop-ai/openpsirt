@@ -72,3 +72,33 @@ func Tail(s string, most int) string {
 	}
 	return cut
 }
+
+// HeadRunes keeps the first most characters.
+//
+// For a bound that is a number of characters rather than a number of bytes,
+// which is what every indexed name column in this schema is declared in:
+// PostgreSQL, MySQL and MariaDB all count a VARCHAR's length in characters.
+// Cut at the same number of bytes, a name written in a script that takes three
+// bytes a character was cut to a third of what the column holds — and where
+// the cut feeds a hash, two names differing only past that third folded
+// together.
+//
+// It is not the same function as Head with a bigger number. The two answer
+// different questions, and a caller bounding bytes — a message, a program's
+// output, anything going into a column declared in bytes — wants Head.
+func HeadRunes(s string, most int) string {
+	if most <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(s) <= most {
+		return s
+	}
+	kept := 0
+	for i := range s {
+		if kept == most {
+			return s[:i]
+		}
+		kept++
+	}
+	return s
+}

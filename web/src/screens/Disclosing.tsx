@@ -8,6 +8,7 @@ import { unwrap } from "../api/queries";
 import { Editor } from "../ui/Editor";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 
@@ -21,6 +22,10 @@ import { Wide } from "../ui/Wide";
 // **The list is itself a disclosure.** Every row on it is undisclosed by
 // definition, so a product somebody may not read undisclosed work in
 // contributes nothing to it, not even a count. That narrowing is the server's.
+// How many rows one request carries. The server's own default, named here so
+// the pager and the request cannot disagree about where a page ends.
+const PAGE = 100;
+
 export function Disclosing() {
   const queries = useQueryClient();
   const [days, setDays] = useState(30);
@@ -28,11 +33,16 @@ export function Disclosing() {
   const [until, setUntil] = useState("");
   const [because, setBecause] = useState("");
   const [said, setSaid] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
 
   const rows = useQuery({
-    queryKey: ["disclosing", days],
+    queryKey: ["disclosing", days, offset],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/disclosing", { params: { query: { within: days } } })),
+      unwrap(
+        await api.GET("/v1/disclosing", {
+          params: { query: { within: days, limit: PAGE, offset } },
+        }),
+      ),
   });
 
   const extend = useMutation({
@@ -62,13 +72,19 @@ export function Disclosing() {
     return <Failed error={rows.error} what="What is approaching disclosure could not be read." />;
   }
   const items = rows.data?.items ?? [];
+  const total = rows.data?.total;
+  // Counted over the page, and said so. The server does not answer how many of
+  // the whole list have gone past their date, and a figure computed from one
+  // page while the heading beside it says the whole would be two numbers about
+  // two populations under one sentence.
   const past = items.filter((row) => row.passed).length;
+  const partly = total !== undefined && total > items.length;
 
   return (
     <>
       <div className="screen-head">
         <h2>
-          Disclosing <span className="n">{items.length}</span>
+          Disclosing <span className="n">{(total ?? items.length).toLocaleString()}</span>
         </h2>
         <p>Embargoes running out, soonest first. Reaching a date discloses nothing on its own.</p>
         <label className="field" style={{ marginLeft: "auto" }}>
@@ -89,7 +105,9 @@ export function Disclosing() {
       )}
       {past > 0 && (
         <div className="alert" style={{ marginBottom: 12 }}>
-          <strong>{past} past its date</strong>
+          <strong>
+            {past} past its date{partly && " on this page"}
+          </strong>
           <span>The date has passed with no decision. Nothing has been published.</span>
         </div>
       )}
@@ -205,6 +223,9 @@ export function Disclosing() {
           </table>
         </Wide>
       )}
+      {/* On the screen whose whole job is catching a date before it arrives,
+          a row past the first page was counted and unreachable. */}
+      <Paged shown={items.length} total={total} offset={offset} limit={PAGE} onGo={setOffset} />
     </>
   );
 }

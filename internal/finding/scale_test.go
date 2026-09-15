@@ -16,8 +16,6 @@ package finding_test
 import (
 	"context"
 	"fmt"
-	"io"
-	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,7 +29,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // The shape of a real switch image, from the fixture this project keeps.
@@ -71,7 +68,6 @@ const (
 func TestMeasureAYearOfNightlyScans(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		dbtest.Reset(t, db)
 
 		cat := catalog.NewStore(db.DB)
@@ -110,7 +106,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		// by dividing. A cost that is flat in rows and proportional to
 		// statements is paid per statement.
 		statements := &counting{}
-		db.DB.AddQueryHook(statements)
+		db.AddQueryHook(statements)
 
 		built := time.Now().UTC().Add(-time.Duration(nights) * 24 * time.Hour)
 		seq := 0
@@ -326,7 +322,7 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 	list := time.Since(start)
 
 	start = time.Now()
-	due, err := store.RunningOut(ctx, who, finding.Scope{}, 30*24*time.Hour, 50)
+	due, _, err := store.RunningOut(ctx, who, finding.Scope{}, 30*24*time.Hour, 50)
 	if err != nil {
 		t.Fatalf("running out: %v", err)
 	}
@@ -334,7 +330,7 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 
 	start = time.Now()
 	points, err := store.Trend(ctx, who, finding.Scope{},
-		time.Now().UTC().Add(-12*7*24*time.Hour), 7*24*time.Hour, 12)
+		time.Now().UTC().Add(-12*7*24*time.Hour), 7*24*time.Hour, 12, finding.Within{})
 	if err != nil {
 		t.Fatalf("trend: %v", err)
 	}

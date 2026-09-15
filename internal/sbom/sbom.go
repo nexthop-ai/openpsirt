@@ -14,6 +14,7 @@
 package sbom
 
 import (
+	"strings"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -226,6 +227,24 @@ type Document struct {
 	// component, which is a thing content-derived identity can discover and
 	// the producer cannot.
 	SelfReferences int
+}
+
+// countUnversioned counts the components that state no version.
+//
+// Counted once over the deduplicated list rather than as each statement is
+// read: a document that names the same unversioned component in ten
+// relationships is one component that ships without a version, and counting
+// per statement reported ten. The root is not in Components and so is not
+// counted, which is right — its version changes on every build and nothing
+// matches a vulnerability against it.
+func countUnversioned(components []graph.Described) int {
+	n := 0
+	for _, described := range components {
+		if strings.TrimSpace(described.Version) == "" {
+			n++
+		}
+	}
+	return n
 }
 
 // Snapshot returns the graph the document describes, filing it against the

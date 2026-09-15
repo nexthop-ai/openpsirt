@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // What a list is narrowed to before it is paged.
@@ -292,9 +293,14 @@ type Filter struct {
 	// the injection ones — so one at a time is the wrong grain for the
 	// question people ask with it.
 	Weaknesses []string
-	// Recorded keeps only what a person entered here rather than what a
-	// scanner reported.
-	Recorded bool
+	// Origin keeps only what a person entered here, or only what a scanner
+	// reported. Empty asks for both.
+	//
+	// A word rather than a flag, because the question has three answers and a
+	// flag has two: the screen offered "Scanner" and could only send the
+	// absence of "entered by hand", so choosing it was indistinguishable from
+	// choosing nothing while the panel went on showing it as chosen.
+	Origin Origin
 	// Planned keeps or drops what a promised upgrade covers.
 	//
 	// **Derived, never stored.** A finding is covered when a standing
@@ -406,13 +412,13 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			// already, so the condition is asked of the row. Asked as a set
 			// of issues there is no one set: an issue rated critical in one
 			// product and low in another belongs to both answers.
-			q = q.Where(EffectiveSeverityExpr+" IN (?)", bun.List(words))
+			q = q.Where(rating.EffectiveExpr+" IN (?)", bun.List(words))
 		} else {
 			q = q.Where("f.vulnerability_id IN (?)",
 				q.NewSelect().TableExpr(`vulnerability AS "v"`).
-					Join(RatedHere, f.ProductID).
+					Join(rating.Here, f.ProductID).
 					Column("v.id").
-					Where(EffectiveSeverityExpr+" IN (?)", bun.List(words)))
+					Where(rating.EffectiveExpr+" IN (?)", bun.List(words)))
 		}
 	}
 	if f.Exploited {
@@ -608,8 +614,11 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Having("SUM(COALESCE(dd.planned, 0)) = 0")
 		}
 	}
-	if f.Recorded {
+	switch f.Origin {
+	case RecordedByHand:
 		q = q.Where("f.kind = ?", Entered)
+	case ReportedByAScanner:
+		q = q.Where("f.kind <> ?", Entered)
 	}
 	if f.SentBack {
 		// The same condition the row's own count is computed from, so the
@@ -636,17 +645,6 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	return q
 }
-
-// at is the moment the deadline filters compare against.
-//
-// The store's own clock where it set one, and the wall clock where nothing
-// did — a method rather than a bare field so that a caller who forgets cannot
-// get 1 January year one, which as a deadline reads as "everything is late".
-//
-// **Read through the store so a frozen clock reaches it.** Reading the wall
-// clock directly is what left the overdue filter untestable, and it meant one
-// request compared "is this overdue" against one moment and "is anything off
-// the clock" against another.
 
 // whatUpstreamDid keeps only the groups upstream has done one of these about.
 //
@@ -706,7 +704,10 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 		case "somebody":
 			says = append(says, "COUNT(f.assigned_to) = COUNT(*)")
 		case "me":
-			// Mine or my team's, everywhere the phrase appears.
+			// Mine or my team's, everywhere the phrase appears. A subject
+			// holding no party names nobody, so the phrase contributes
+			// nothing — which the guard below turns into an answer of nothing
+			// where it is the only thing asked for.
 			if len(f.HeldBy) == 0 {
 				continue
 			}
@@ -716,7 +717,12 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 		}
 	}
 	if len(says) == 0 {
-		return q
+		// Something was asked for and none of it could be turned into a
+		// condition: a word this does not know, or "mine" from a subject that
+		// holds no party. That is a narrowing that cannot be applied rather
+		// than no narrowing, and dropping it answered with every finding there
+		// is while the screen went on showing the filter as on.
+		return having(q, "1 = 0")
 	}
 	return having(q, "("+strings.Join(says, " OR ")+")", args...)
 }
@@ -790,6 +796,16 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 	return q
 }
 
+// at is the moment the deadline filters compare against.
+//
+// The store's own clock where it set one, and the wall clock where nothing
+// did — a method rather than a bare field so that a caller who forgets cannot
+// get 1 January year one, which as a deadline reads as "everything is late".
+//
+// **Read through the store so a frozen clock reaches it.** Reading the wall
+// clock directly is what left the overdue filter untestable, and it meant one
+// request compared "is this overdue" against one moment and "is anything off
+// the clock" against another.
 func (f Filter) at() time.Time {
 	if f.now != nil {
 		return f.now()
@@ -839,9 +855,9 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		counted = counted.Where("f.urgency < ?", int64(exploitedBand)).
 			Where("f.vulnerability_id IN (?)",
 				counted.NewSelect().TableExpr(`vulnerability AS "v"`).
-					Join(RatedHere, productID).
+					Join(rating.Here, productID).
 					Column("v.id").
-					Where(BandExpr+" NOT IN (?)", bun.List(words)))
+					Where(rating.BandExpr+" NOT IN (?)", bun.List(words)))
 	}
 	n, err := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, below.narrow(counted)).
@@ -1082,7 +1098,7 @@ func stateHaving(state string) string {
 	return ""
 }
 
-// contains prepares a term to be searched for literally.
+// containsTerm prepares a term to be searched for literally.
 //
 // A search box is not a pattern language. Typing `50%` means a component whose
 // name contains "50%", not every component containing "50" — and `a_b` means
@@ -1197,4 +1213,33 @@ func sortedBy(filter Filter) string {
 	// determine, and it is right to: a tie-break on a column that varies
 	// within a row is not a tie-break at all.
 	return sorted + ", " + GroupedOn
+}
+
+// Origin is where a finding came from, as a narrowing.
+//
+// Three answers rather than two, which is why it is a word: a list can be
+// asked for what a person recorded, for what a scanner reported, or for both.
+// As a flag the middle answer was unsendable, so the screen offered it and
+// filtered nothing.
+type Origin string
+
+const (
+	// RecordedByHand keeps only what a person entered here. Those are the only
+	// ones a person may close by hand.
+	RecordedByHand Origin = "manual"
+	// ReportedByAScanner keeps only what a scan found.
+	ReportedByAScanner Origin = "scanner"
+)
+
+// Origins are the words the narrowing takes.
+func Origins() []Origin { return []Origin{ReportedByAScanner, RecordedByHand} }
+
+// Valid reports whether o is one of them.
+func (o Origin) Valid() bool {
+	for _, known := range Origins() {
+		if o == known {
+			return true
+		}
+	}
+	return false
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
@@ -106,19 +107,16 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	// The worst thing in the bundle, as a rank rather than as a word, because
 	// the four engines do not agree on how words order. Folded exactly the way
 	// the line and the deadline fold them, so an unrated issue is a medium
-	// here as it is everywhere else.
-	const worst = `MAX(CASE
-		WHEN ` + EffectiveSeverityExpr + ` = 'critical' THEN 4
-		WHEN ` + EffectiveSeverityExpr + ` = 'high' THEN 3
-		WHEN ` + EffectiveSeverityExpr + ` IN ('low', 'negligible', 'none') THEN 1
-		ELSE 2 END)`
+	// here as it is everywhere else — which is what asking the fold rather
+	// than the raw word buys, and the ELSE below cannot fire because of it.
+	worst := "MAX(" + rankCase(rating.BandExpr, 0) + ")"
 
 	bundled := func(q *bun.SelectQuery) *bun.SelectQuery {
 		return filter.narrow(q.
 			TableExpr(`finding AS "f"`).
 			Join(`JOIN component AS "c" ON c.id = f.component_id`).
 			Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-			Join(RatedHere, productID).
+			Join(rating.Here, productID).
 			Where("f.target_id IN (?)", bun.List(targets)).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible)).
@@ -198,19 +196,11 @@ type Build struct {
 
 // worstWord turns the rank the bundle query folds severities to back into the
 // word, in the same four the rest of this speaks.
-func worstWord(rank int) string {
-	switch rank {
-	case 4:
-		return "critical"
-	case 3:
-		return "high"
-	case 1:
-		return "low"
-	case 2:
-		return "medium"
-	}
-	return ""
-}
+//
+// Read out of the one list rather than written back out as a switch: the
+// mapping and its inverse disagreeing about a word added later is the same
+// defect twice.
+func worstWord(rank int) string { return wordAt(rank) }
 
 // namesIn fills in which component names each bundle on the page covers.
 //
@@ -420,14 +410,20 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 	query := s.db.NewSelect().
 		TableExpr(`finding AS "f"`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		// This product's rating where it has stated one, which is what every
+		// other surface judges a finding by. Read without it, the strip on
+		// each row drew the published rating and a product that had re-rated
+		// an issue saw its own decision in the list and the world's in the
+		// bars over it.
+		Join(rating.Here, filter.ProductID).
 		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "band"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "band"`).
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.component_id IN (?)", bun.List(ids)).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.component_id, COALESCE(v.severity, '')")
+		GroupExpr("f.component_id, " + rating.EffectiveExpr)
 	if err := filter.narrow(query).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read how what is open here was rated: %w", err)
 	}
@@ -597,7 +593,7 @@ type PerBuild struct {
 func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope Scope,
 	component string) ([]PerBuild, error) {
 
-	_, visible, targets, err := s.inScope(ctx, subject, scope, &Filter{})
+	productID, visible, targets, err := s.inScope(ctx, subject, scope, &Filter{})
 	if err != nil {
 		return nil, err
 	}
@@ -715,7 +711,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	if err != nil {
 		return nil, err
 	}
-	bands, err := s.bandsPerBuild(ctx, targets, visible, name)
+	bands, err := s.bandsPerBuild(ctx, productID, targets, visible, name)
 	if err != nil {
 		return nil, err
 	}
@@ -969,7 +965,7 @@ func (s *Store) promisedPerBuild(ctx context.Context, targets []int64,
 //
 // Distinct issues, like the count beside it, so the parts sum to the whole
 // rather than to the number of places.
-func (s *Store) bandsPerBuild(ctx context.Context, targets []int64,
+func (s *Store) bandsPerBuild(ctx context.Context, productID int64, targets []int64,
 	visible []access.Visibility, name string) (map[[2]int64]map[string]int, error) {
 
 	var rows []struct {
@@ -982,15 +978,19 @@ func (s *Store) bandsPerBuild(ctx context.Context, targets []int64,
 		TableExpr(`finding AS "f"`).
 		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		// This product's rating where it has stated one. Every build here is
+		// in one product — the scope names it — so one bound identifier
+		// answers for all of them.
+		Join(rating.Here, productID).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "band"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "band"`).
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("c.name = ?", name).
-		GroupExpr("f.target_id, f.component_id, COALESCE(v.severity, '')").
+		GroupExpr("f.target_id, f.component_id, "+rating.EffectiveExpr).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read how what is open here was rated: %w", err)

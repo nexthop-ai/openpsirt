@@ -8,6 +8,21 @@ import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 
 export type Prepared = NonNullable<Body<"SavedBody">["prepares"]>;
+
+// The outcomes a saved filter may prepare, driven off the generated request
+// type rather than retyped as options. Fewer than a person may record one at a
+// time, and which are left out is the domain's statement rather than this
+// screen's. Written as a record so a word the domain gains and this does not
+// is a compile error, and so is one kept here after the domain drops it.
+type InBulk = Body<"PreparedBody">["outcome"];
+
+const PREPARES: Record<InBulk, string> = {
+  "not-applicable": "Not applicable",
+  deferred: "Deferred",
+  "wont-fix": "Will not fix",
+  "already-fixed": "Already fixed",
+  affected: "Affected",
+};
 export type Kept = Body<"SavedBody">;
 
 // The bounds on a prepared deferral's length, mirroring what the endpoint takes
@@ -103,7 +118,9 @@ export function Saved({
                     // hides the Because select and would otherwise keep what
                     // was chosen in it, storing a reason the decision endpoint
                     // refuses.
-                    ...(outcome === "not-applicable" && justification ? { justification } : {}),
+                    ...(outcome === "not-applicable" && justification
+                      ? { justification: justification as Prepared["justification"] }
+                      : {}),
                     reasoning: reasoning.trim(),
                     ...(outcome === "deferred" ? { defer_days: Number(days) } : {}),
                   },
@@ -208,11 +225,11 @@ export function Saved({
                 <span>It would say</span>
                 <select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
                   <option value="">Select one</option>
-                  <option value="not-applicable">Not applicable</option>
-                  <option value="deferred">Deferred</option>
-                  <option value="wont-fix">Will not fix</option>
-                  <option value="already-fixed">Already fixed</option>
-                  <option value="affected">Affected</option>
+                  {Object.entries(PREPARES).map(([word, label]) => (
+                    <option key={word} value={word}>
+                      {label}
+                    </option>
+                  ))}
                 </select>
               </label>
               {outcome === "not-applicable" && (

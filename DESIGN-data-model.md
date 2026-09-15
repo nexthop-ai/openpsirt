@@ -221,6 +221,16 @@ identity and expiry (REQ-08). The flag is what lets everything walking upward
 stop there. A scan naming no root of its own is filed against the unit it was
 sent for.
 
+The flag is **reconciled like any other column**. A node kept from the previous
+scan had everything else refreshed and this left alone, so a build that promoted
+a component to its own root — or demoted the old one — carried the previous
+answer until that node happened to close. Everything walking upward stops at the
+flag, so two flagged nodes or none is a tree that draws wrongly from the top.
+
+The root is also **not one of the build's components**. It is what the components
+are *in*, and the count beside the inventory said one more than the inventory
+lists.
+
 | Refused | Reason |
 |---|---|
 | A component with no name | It cannot be identified, so it cannot be tracked. A component with no *version* is kept: the format does not require one, nothing can match a vulnerability against a version nobody stated, and it ships regardless |
@@ -302,6 +312,7 @@ none, one source at two versions in one build with one of them already fixed.
 | **Hashed rather than spelled out** | A readable composite would have to be bounded to carry an index, and two keys agreeing to that bound would merge two source packages into one row — which, under one judgment covering the whole fold, writes decisions across both |
 | **A component stating no source package is its own** | Coverage is producer-supplied and thin: 564 of 786 Debian packages, 10 of 18 Alpine, 2 of 188 PyPI, and none of 1,684 Go modules or 3,880 generic components. Leaving those out of every grouping would leave the majority ungrouped |
 | **Folded for capitals, like every other matched name** | The four engines do not fold alike outside ASCII, so it is folded here rather than asked of one of them |
+| **Cut to a number of characters, not a number of bytes** | Every indexed name column here is declared in characters — PostgreSQL, MySQL and MariaDB all count a `VARCHAR`'s length that way — and the fold key hashes four cut names. Cut at the same number of *bytes*, a name in a script taking three bytes a character was cut to a third of the width the column holds, so two components whose names differ only past that third folded together and one judgment covered both. The cut could also land inside a character, which hashes mangled parts and stores invalid UTF-8 |
 | **It does not reach the two records that name what shipped** | The disposition register is one row per issue and place, and a VEX or CSAF statement is one per issue and component — the binary a customer's scanner matched on, not the source it was cut from. Folding either would publish a claim about a package nobody received |
 
 Not folded at ingest, which is a different proposal and was rejected on

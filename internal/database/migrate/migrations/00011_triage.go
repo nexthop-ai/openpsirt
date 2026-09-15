@@ -299,6 +299,13 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			-- Set when the reasoning was revised under it, or when somebody
 			-- took the decision back.
 			"withdrawn_at" ` + t.timestamp + ` NULL,
+			-- Who took it back, which is not who gave it.
+			--
+			-- A proposer revising their own claim withdraws every agreement
+			-- standing on the old words, and with only the approver on the row
+			-- the queue reported that back to them as somebody else undoing
+			-- their agreement. Null where nothing was withdrawn.
+			"withdrawn_by" ` + t.ref + ` NULL,
 			-- What a bulk approval was, so undoing one is undoing a batch
 			-- rather than hunting for what it touched.
 			"batch"        ` + t.hash + ` NULL,
@@ -341,7 +348,8 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 				REFERENCES "claim_approval"("id") ON DELETE SET NULL,
 			CONSTRAINT "claim_approval_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
 			CONSTRAINT "claim_approval_revision_fk" FOREIGN KEY ("revision_id") REFERENCES "claim_revision"("id"),
-			CONSTRAINT "claim_approval_approver_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id")
+			CONSTRAINT "claim_approval_approver_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id"),
+			CONSTRAINT "claim_approval_withdrawer_fk" FOREIGN KEY ("withdrawn_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
 		`CREATE INDEX "claim_approval_claim_idx" ON "claim_approval" ("claim_id")`,

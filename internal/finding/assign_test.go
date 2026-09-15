@@ -285,7 +285,7 @@ func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		at, atTotal, err := f.store.AtComponent(t.Context(), who, f.target,
+		at, atTotal, _, err := f.store.AtComponent(t.Context(), who, f.target,
 			library, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)

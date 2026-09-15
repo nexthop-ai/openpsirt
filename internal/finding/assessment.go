@@ -11,6 +11,8 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Assessment is what one product thinks of an issue, as against what was
@@ -110,6 +112,13 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 			"say why. An assessment outlives the version it was made about and reaches " +
 				"every build of this product, so the next person needs the argument")
 	}
+	// The same policy every other typed field goes through, run before the
+	// text is stored rather than when it is read back — which is what the
+	// policy says it is for, and what makes the column known to hold text that
+	// passed what was in force when it arrived.
+	if err := markdown.Check(reasoning); err != nil {
+		return nil, err
+	}
 
 	var recorded *Assessment
 	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
@@ -124,11 +133,15 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 			return ErrUnknownIssue
 		}
 		var issue struct {
-			Published string `bun:"severity"`
+			Published string `bun:"published"`
 		}
+		// The published word, aliased as what it is. Named "severity" it read
+		// as *the* severity of the issue here, which it is not — what the
+		// product holds is what everything else judges by — and the two sites
+		// below that do want the effective rating are a join away.
 		err = tx.NewSelect().
 			TableExpr(`vulnerability AS "v"`).
-			ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+			ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 			Where("v.id = ?", vulnerabilityID).
 			Scan(ctx, &issue)
 		if err != nil {
@@ -395,13 +408,17 @@ func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
 	assessed string) error {
 
 	var issue struct {
-		Severity   string `bun:"severity"`
+		Published  string `bun:"published"`
 		ScoreCenti int    `bun:"score_centi"`
 		Likelihood int    `bun:"likelihood_ppm"`
 	}
+	// The published word, aliased as what it is: this product's own rating
+	// arrives as the assessed argument, and Rating is what decides between
+	// them. Named "severity" it read as the rating in force, which is the one
+	// thing it must not be taken for here.
 	err := tx.NewSelect().
 		TableExpr(`vulnerability AS "v"`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 		ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
 		Where("v.id = ?", vulnerabilityID).
@@ -414,15 +431,15 @@ func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
 	// through — the rule for which of a published score, a published word and
 	// a rating of ours decides the number is one fact, and this project's bugs
 	// have all come from letting one fact into two rules.
-	rating := Rating{
-		Published: issue.Severity, Assessed: assessed,
+	inForce := Rating{
+		Published: issue.Published, Assessed: assessed,
 		ScoreCenti: issue.ScoreCenti, LikelihoodPPM: issue.Likelihood,
 	}
 
 	// Everything below the two flags, packed by the same function that packs
 	// it at ingest. The flags themselves are per finding, so they stay in the
 	// statement.
-	rest := Ranked{ScoreCenti: rating.Score(), LikelihoodPPM: rating.LikelihoodPPM}.Rank()
+	rest := Ranked{ScoreCenti: inForce.Score(), LikelihoodPPM: inForce.LikelihoodPPM}.Rank()
 	_, err = tx.NewUpdate().
 		Model((*Finding)(nil)).
 		Set("urgency = (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
@@ -501,18 +518,31 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 				Scan(ctx, &learning); err != nil {
 				return fmt.Errorf("read what is learning this: %w", err)
 			}
-			if len(learning) > 0 {
-				if _, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("urgency_exploited = ?", true).
-					// Counted from this moment rather than from when the
-					// finding opened. Counted from the opening, an issue
-					// that became exploited after six months would land
-					// three days before it was known — a deadline nobody
-					// could have met.
-					Set("due_at = ?", learnedAt.Add(windows.Exploited)).
-					Where("id IN (?)", bun.List(learning)).Exec(ctx); err != nil {
-					return fmt.Errorf("mark what is being exploited: %w", err)
-				}
+			// Batched. This is every open finding of one issue across the
+			// deployment — a kernel flaw carries 45 places each across
+			// thousands of issues — and one statement binding that many
+			// parameters is refused by two of the four engines, inside the
+			// transaction a scan applies in, so the whole upload fails and
+			// retries into the same refusal.
+			if err := database.IDsInBatches(ctx, learning,
+				func(ctx context.Context, batch []int64) error {
+					_, err := tx.NewUpdate().Model((*Finding)(nil)).
+						Set("urgency_exploited = ?", true).
+						// Counted from this moment rather than from when the
+						// finding opened. Counted from the opening, an issue
+						// that became exploited after six months would land
+						// three days before it was known — a deadline nobody
+						// could have met.
+						//
+						// The moment is kept on the row as well as spent here,
+						// because every later recount has to arrive at the same
+						// answer and nothing else holds it.
+						Set("exploited_learned_at = ?", learnedAt).
+						Set("due_at = ?", learnedAt.Add(windows.Exploited)).
+						Where("id IN (?)", bun.List(batch)).Exec(ctx)
+					return err
+				}); err != nil {
+				return fmt.Errorf("mark what is being exploited: %w", err)
 			}
 		}
 
@@ -574,23 +604,30 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 	// column, and an inner one, so a finding a person opened was left out of
 	// its own recount.
 	var groups []struct {
-		Exploited bool      `bun:"exploited"`
-		OpenedAt  time.Time `bun:"opened_at"`
-		Severity  string    `bun:"severity"`
+		Exploited bool       `bun:"exploited"`
+		OpenedAt  time.Time  `bun:"opened_at"`
+		LearnedAt *time.Time `bun:"learned_at"`
+		Severity  string     `bun:"severity"`
 	}
 	err = tx.NewSelect().
 		TableExpr(`finding AS "f"`).
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+		Join(rating.Here, productID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`f.opened_at AS "opened_at"`).
-		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
+		// Grouped on the learning as well, because it is the base an
+		// exploited deadline is counted from: grouped without it, the
+		// recount fell back to the opening and moved every exploited
+		// deadline back to a date that was already in the past.
+		ColumnExpr(`f.exploited_learned_at AS "learned_at"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
-		GroupExpr("f.urgency_exploited, f.opened_at, "+EffectiveSeverityExpr).
+		GroupExpr("f.urgency_exploited, f.opened_at, f.exploited_learned_at, "+
+			rating.EffectiveExpr).
 		Scan(ctx, &groups)
 	if err != nil {
 		return fmt.Errorf("read what this issue is open against: %w", err)
@@ -604,8 +641,14 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 			Where("urgency_exploited = ?", group.Exploited).
 			Where("opened_at = ?", group.OpenedAt).
 			Where(inThisProduct, productID)
+		if group.LearnedAt != nil {
+			q = q.Where("exploited_learned_at = ?", *group.LearnedAt)
+		} else {
+			q = q.Where("exploited_learned_at IS NULL")
+		}
 		if floor.Admits(group.Exploited, group.Severity) {
-			q = q.Set("due_at = ?", group.OpenedAt.Add(windows.For(group.Exploited, group.Severity)))
+			q = q.Set("due_at = ?", clockedFrom(group.Exploited, group.OpenedAt, group.LearnedAt).
+				Add(windows.For(group.Exploited, group.Severity)))
 		} else {
 			q = q.Set("due_at = NULL")
 		}
@@ -614,6 +657,21 @@ func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) err
 		}
 	}
 	return nil
+}
+
+// clockedFrom is the moment a deadline is counted from.
+//
+// The opening for everything but an exploited finding, and the moment
+// exploitation was learned for one of those: an issue that becomes exploited
+// six months in has a few days from the learning, and counting those days from
+// the opening lands the deadline before the day it was written. A row marked
+// exploited with no moment recorded falls back to the opening, because there
+// is nothing better to count from.
+func clockedFrom(exploited bool, openedAt time.Time, learnedAt *time.Time) time.Time {
+	if exploited && learnedAt != nil {
+		return *learnedAt
+	}
+	return openedAt
 }
 
 // Assessments lists what has been said about issues, newest first.
@@ -792,14 +850,14 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, claim.ProductID).
+		Join(rating.Here, claim.ProductID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
-		ColumnExpr(EffectiveSeverityExpr+` AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
 		Where("f.vulnerability_id = ?", claim.VulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", claim.ProductID).
-		GroupExpr("f.urgency_exploited, " + EffectiveSeverityExpr)
+		GroupExpr("f.urgency_exploited, " + rating.EffectiveExpr)
 	// The visibility half as well as the product. The visibility half alone
 	// admits every disclosed finding in the deployment, so an approver holding
 	// one product was told how many findings this issue has in products they

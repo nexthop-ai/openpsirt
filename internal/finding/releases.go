@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Release is one build of a product and how much stands open against it.
@@ -74,11 +75,11 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+		Join(rating.Here, productID).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`st.kind AS "kind"`).
 		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(BandExpr+` AS "band"`).
+		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		Where("st.product_id = ?", productID).

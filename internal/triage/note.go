@@ -13,7 +13,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
@@ -96,10 +95,18 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 		VulnerabilityID: vulnerabilityID, ProductID: productID, Body: body,
 		WrittenBy: subject.ID, WrittenAt: s.now().Truncate(time.Microsecond),
 	}
-	if _, err := s.db.NewInsert().Model(note).Exec(ctx); err != nil {
-		return nil, fmt.Errorf("record a note: %w", err)
+	// Both writes or neither. Attaching is what makes a file listable and
+	// keeps it from the sweep, so a note stored without it points at
+	// something already gone from the issue's file list.
+	if err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		if _, err := tx.NewInsert().Model(note).Exec(ctx); err != nil {
+			return fmt.Errorf("record a note: %w", err)
+		}
+		return noting(ctx, tx, body, note.WrittenAt)
+	}); err != nil {
+		return nil, err
 	}
-	return note, noting(ctx, s.db, body, note.WrittenAt)
+	return note, nil
 }
 
 // RewordNote changes a note, which only its author may do.
@@ -139,11 +146,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 	// that did not would leave the record saying a note was changed and
 	// nothing saying from what, which is worse than keeping no history
 	// because it looks like one.
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return nil, errors.New("this store is already inside a transaction")
-	}
-	if err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	if err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		if err := tx.NewSelect().Model(note).Where("id = ?", noteID).Scan(ctx); err != nil {
 			return ErrNoSuchNote
 		}
@@ -190,15 +193,18 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 			Where("id = ?", noteID).Exec(ctx); err != nil {
 			return fmt.Errorf("change a note: %w", err)
 		}
-		return nil
+		// An edit can add a reference the first version did not have, and it
+		// is attached in the same transaction as the text that refers to it:
+		// written afterwards and failing, the note points at a file the
+		// issue's list no longer offers and the sweep deletes. It can also
+		// take one away, and that does not un-attach the file: the revision
+		// that referred to it is still on record.
+		return noting(ctx, tx, body, edited)
 	}); err != nil {
 		return nil, err
 	}
 	note.Body, note.EditedAt = body, &edited
-	// An edit can add a reference the first version did not have. It can also
-	// take one away, and that does not un-attach the file: the revision that
-	// referred to it is still on record.
-	return note, noting(ctx, s.db, body, edited)
+	return note, nil
 }
 
 // Notes is what has been written about an issue in a product, oldest first.

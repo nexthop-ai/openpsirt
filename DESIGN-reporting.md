@@ -129,6 +129,7 @@ last release a customer actually has, which is rarely the previous one.
 | A fixed entry states what it moved to | "The component was upgraded, 3.7.0 → 3.9.0". That pair is written when the scan closes the finding, because the component that carried the issue is gone from the inventory by then and anything asking later holds one version and not two |
 | Each still-present entry states whether somebody tried | It carries the version its place arrived from where the version moved since. On the still-present column only: a fixed entry's closure reason already says what happened, and a new one had nothing to bump |
 | Explanations are read once for the whole list, not once per entry | A comparison against a release a customer has been on for a year has as many fixed entries as the note is long. The statement narrows by the issues and the components separately rather than by the pairs, because no engine here spells a comparison against a pair of columns the same way, so what comes back is a superset and the pairing is done on the way out |
+| Each entry is rated as its own product rates it | Read from the published rating alone, the document contradicted the findings list it was written from wherever a product had re-rated an issue — and this is the copy that leaves the building. The two builds can be in two products, so each half of the comparison is rated by its own |
 
 ## The release note
 
@@ -283,6 +284,8 @@ had.
 | Rule | Reason |
 |---|---|
 | The arithmetic is in Go rather than SQL | Subtracting two moments is spelled four ways across these engines, and so is a percentile |
+| Nearest rank is the first observation at or past that position | Three waits of one, two and thirty days have a median of two. Truncating instead of rounding up picks the one below, which for an odd count is not the middle and for a tail figure is not the tail |
+| A wait is measured from the finding the claim is about | A place is a pair of names with no product in it, so the same place sits in every product shipping that component. Matching on the place alone took the figure from another product's finding, and from findings the reader may not see |
 | Bounded, and it says so | At most the most recent few thousand claims in the window, with the answer stating how many and whether the ceiling was reached |
 | Throughput is per person, counted where the work happened | A claim belongs to the window it was proposed in, and an agreement to the window it was given in |
 | Send-backs are counted for the deployment, not per person | The record holds that a claim came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |
@@ -326,6 +329,7 @@ deadline, and whether the deadline was met.
 | One row per issue and place, whatever else is true of it | The agreement is read as a scalar rather than joined, because nothing makes an approval unique per decision — a second approver adds a row, and a join multiplied the finding. The page then held fewer rows than its total said, and because paging is by offset every page after that skipped one |
 | It states no triage line, because it applies none | Everything in the build is here, decided or not, which is the basis on which an auditor can rely on it. The file said it had been taken above a line and had not |
 | Everything is joined outward from the finding and joined left | A place nobody has decided about is the row this exists to show. Closed rows are included, and whether a deadline was met is answerable only for something that closed |
+| A judgment that lapsed is part of the record, and a superseded one is not | Asked of the decision's own columns rather than of the join. In the join it hid a lapsed judgment entirely, so the place reported as never decided and the register lost who proposed and who approved it — while the findings list called the same place lapsed |
 | The row names what pulls the component in, beside the place identity | The identity is derived from content, so it correlates two rows and names no location. A register whose only answer to "where" is sixty-four hex characters is one nobody can read, and where is what an auditor is asking |
 
 Current state, with no `as_of`. Reconstructing the view as of a past date was
@@ -468,6 +472,15 @@ to, for the reason the record is: a judgment belongs to when it was argued, and
 dating it by its agreement moves it out of that period whenever an approval
 comes late.
 
+Every section is bounded and says when it reached the bound. None of them was:
+a deployment that had been triaging for a while answered one row per approved
+claim in force, and the last section then asked three more questions about each
+of them one at a time — thirty thousand sequential statements in one request on
+ten thousand claims, with nothing checking whether the caller was still there.
+What each claim covers now is one statement for the page. A capped section that
+read as complete would mislead the one reader this report is for, so it says it
+was capped.
+
 ## Exports
 
 Any list that can be read can be exported, as CSV or JSON. Ten lists export:
@@ -536,6 +549,7 @@ severity word for the triage floor; on or off for upstream currency.
 |---|---|
 | Zero and negative are refused | Every reader treats them as unset, so storing one produces a setting that looks set and does nothing |
 | Only known names may be set | Storing an unknown one creates a setting nothing reads |
+| A triage line that is not one of the severity words reads as no line | The word admits nothing and narrows nothing, so a line outside the vocabulary was displayed everywhere as in force while every query let everything through. A line that cannot be enforced says so |
 | A failure to *read* a setting is not "unset" | Every caller has a default, so a database that could not answer would silently swap the deployment's configuration for the shipped one, including the threshold deciding which deferrals need a second person. That is reported |
 | Everything offered is read | The session lifetime was offered here while sign-in took its value from the environment and never looked. The order is the administrator's setting, then what the process was started with, then the built-in default |
 

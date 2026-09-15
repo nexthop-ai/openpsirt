@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -32,6 +33,14 @@ type Scrutiny struct {
 	Lapsed []LapsedApproval
 	// Grew is what was agreed to against what it covers now.
 	Grew []Grown
+	// Capped says a section reached the ceiling, so what is shown is the
+	// worst of it rather than all of it.
+	//
+	// Said rather than implied. Every section here is a control reporting on
+	// itself, and a capped list that reads as complete is the one thing a
+	// report like this must not be — a compliance reader is exactly who would
+	// be misled.
+	Capped bool
 }
 
 // Unagreed is risk hidden with no second person, grouped by what was claimed.
@@ -101,9 +110,20 @@ const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
 // about a control that answered more than the screens it summarizes would be
 // a way around the control it is reporting on.
 func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
-	productIDs []int64, since time.Time) (*Scrutiny, error) {
+	productIDs []int64, since time.Time, limit int) (*Scrutiny, error) {
 
+	// Every section bounded, like every other read in this package. None of
+	// them was: a deployment that has been triaging for a while answered one
+	// row per approved claim in force, and the last of them then issued three
+	// more round trips each — thirty thousand of them in one request on ten
+	// thousand claims, with nothing checking whether the caller was still
+	// there.
+	limit = database.AList.Of(limit)
 	out := &Scrutiny{}
+	// One more than the ceiling, so that reaching it is distinguishable from
+	// landing on it exactly.
+	room := limit + 1
+	capped := func(n int) bool { return n >= room }
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = readableBy(q, subject, "de")
 		if len(productIDs) > 0 {
@@ -135,9 +155,13 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where("cl.outcome <> ?", Affected).
 		Where(standing, held...).
 		Where(standingAlone).
-		GroupExpr("cl.outcome")).Scan(ctx, &alone)
+		GroupExpr("cl.outcome").
+		Limit(room)).Scan(ctx, &alone)
 	if err != nil {
 		return nil, fmt.Errorf("count what stands with one person behind it: %w", err)
+	}
+	if capped(len(alone)) {
+		out.Capped, alone = true, alone[:limit]
 	}
 	for _, row := range alone {
 		out.Alone = append(out.Alone, Unagreed{
@@ -167,9 +191,13 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where("ap.batch IS NOT NULL").
 		Where("ap.withdrawn_at IS NULL").
 		GroupExpr("ap.batch, pe.identity").
-		OrderExpr("written DESC")).Scan(ctx, &bulk)
+		OrderExpr("written DESC").
+		Limit(room)).Scan(ctx, &bulk)
 	if err != nil {
 		return nil, fmt.Errorf("read which agreements were given in bulk: %w", err)
+	}
+	if capped(len(bulk)) {
+		out.Capped, bulk = true, bulk[:limit]
 	}
 	for _, row := range bulk {
 		out.Bulk = append(out.Bulk, BulkApproval{
@@ -197,9 +225,13 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where("ap.withdrawn_at IS NULL").
 		GroupExpr("pr.identity, ape.identity").
-		OrderExpr("written DESC")).Scan(ctx, &pairs)
+		OrderExpr("written DESC").
+		Limit(room)).Scan(ctx, &pairs)
 	if err != nil {
 		return nil, fmt.Errorf("read who agrees with whom: %w", err)
+	}
+	if capped(len(pairs)) {
+		out.Capped, pairs = true, pairs[:limit]
 	}
 	for _, row := range pairs {
 		out.Pairs = append(out.Pairs, Pairing{
@@ -253,9 +285,13 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
 			` WHERE ad.id = ap.approved_by AND ad.is_admin = ?)`, true).
 		GroupExpr("de.claim_id, pe.identity, pd.name, cl.outcome").
-		OrderExpr("written DESC")).Scan(ctx, &lapsed)
+		OrderExpr("written DESC").
+		Limit(room)).Scan(ctx, &lapsed)
 	if err != nil {
 		return nil, fmt.Errorf("read which approvers have lost the right: %w", err)
+	}
+	if capped(len(lapsed)) {
+		out.Capped, lapsed = true, lapsed[:limit]
 	}
 	for _, row := range lapsed {
 		out.Lapsed = append(out.Lapsed, LapsedApproval{
@@ -287,47 +323,94 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where("ap.withdrawn_at IS NULL").
 		Where("ap.covered IS NOT NULL").
 		Where(standing, held...).
-		GroupExpr("de.claim_id, pe.identity, cl.outcome")).Scan(ctx, &grew)
+		GroupExpr("de.claim_id, pe.identity, cl.outcome").
+		OrderExpr("de.claim_id").
+		Limit(room)).Scan(ctx, &grew)
 	if err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
+	if capped(len(grew)) {
+		out.Capped, grew = true, grew[:limit]
+	}
+	// What each of them covers now, asked the way a finding asks whether a
+	// decision applies to it — in one statement over the whole page. It was
+	// three round trips per claim, in a loop, with nothing between them: on
+	// ten thousand claims that is thirty thousand sequential statements in one
+	// request, and the work carried on after the caller had gone.
+	claims := make([]int64, 0, len(grew))
 	for _, row := range grew {
-		// What it covers now, asked the way a finding asks whether a decision
-		// applies to it. One statement per claim rather than per row.
-		ids, err := s.decisionsOf(ctx, subject, row.ClaimID)
-		if err != nil {
-			return nil, err
-		}
-		if len(ids) == 0 {
-			continue
-		}
-		now, err := s.covering(ctx, subject, ids)
-		if err != nil {
-			return nil, err
-		}
-		if now <= row.Covered {
+		claims = append(claims, row.ClaimID)
+	}
+	now, err := s.coveringEach(ctx, subject, claims)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range grew {
+		if now[row.ClaimID] <= row.Covered {
 			continue
 		}
 		out.Grew = append(out.Grew, Grown{
 			ClaimID: row.ClaimID, ApprovedBy: row.Identity, ApprovedAt: row.ApprovedAt,
-			Outcome: Outcome(row.Outcome), Covered: row.Covered, CoversNow: now,
+			Outcome: Outcome(row.Outcome), Covered: row.Covered,
+			CoversNow: now[row.ClaimID],
 		})
 	}
 
 	return out, nil
 }
 
-// decisionsOf is which rows a claim wrote, narrowed to what the asker may see.
-func (s *Store) decisionsOf(ctx context.Context, subject access.Subject,
-	claimID int64) ([]int64, error) {
+// coveringEach counts what each of these claims covers right now.
+//
+// One statement for the page rather than three round trips per claim. The
+// visibilities are read once over the whole set rather than per claim: where a
+// set spans products the answer is the narrower one, which discloses less
+// rather than more, and that is the same rule the per-claim read followed.
+func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
+	claims []int64) (map[int64]int, error) {
 
+	covered := map[int64]int{}
+	if len(claims) == 0 {
+		return covered, nil
+	}
 	var ids []int64
-	err := readableBy(s.db.NewSelect().
+	if err := readableBy(s.db.NewSelect().
 		TableExpr(`decision AS "de"`).
 		ColumnExpr("de.id").
-		Where("de.claim_id = ?", claimID), subject, "de").Scan(ctx, &ids)
-	if err != nil {
-		return nil, fmt.Errorf("read which rows a claim wrote: %w", err)
+		Where("de.claim_id IN (?)", bun.List(claims)), subject, "de").
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read which rows these claims wrote: %w", err)
 	}
-	return ids, nil
+	if len(ids) == 0 {
+		return covered, nil
+	}
+	readable := readableVisibilities(subject, ids, s, ctx)
+
+	var rows []struct {
+		ClaimID int64 `bun:"claim_id"`
+		Covers  int   `bun:"covers"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`decision AS "de"`).
+		Join(`JOIN finding AS "f" ON f.vulnerability_id = de.vulnerability_id`+
+			" AND f.place_identity = de.place_identity").
+		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN stream AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
+		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`COUNT(*) AS "covers"`).
+		Where("de.id IN (?)", bun.List(ids)).
+		Where("f.closed_at IS NULL").
+		Where("COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr).
+		Where("COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr).
+		Where("f.visibility IN (?)", bun.List(readable)).
+		GroupExpr("de.claim_id").
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("count what these cover: %w", err)
+	}
+	for _, row := range rows {
+		covered[row.ClaimID] = row.Covers
+	}
+	return covered, nil
 }

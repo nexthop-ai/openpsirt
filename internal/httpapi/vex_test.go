@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
 func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
@@ -438,5 +440,45 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 				"document: %d", got.Code)
 		}
 		read(t, r, "admin-reader", at, &doc)
+	})
+}
+
+func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarge(t *testing.T) {
+	// Refused rather than truncated, because a document that stopped at a
+	// ceiling would say "nothing is claimed about this" by omission about
+	// everything past it. But the refusal has to reach the person asking:
+	// returned bare it fell through to "the document could not be generated"
+	// with a 500, which reads as the tool being broken rather than as
+	// something to narrow, and the sentence naming the build and the limit
+	// went only to the log.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		// Two dismissals agreed to, so a ceiling of one is past rather than
+		// reached: landing on the limit exactly is not a refusal.
+		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
+			claim, _ := r.claimed(t, "triager", issue, "linux-image", dismissal)
+			if ok := asPerson(t, r, "reviewer", http.MethodPost,
+				fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
+				t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
+			}
+		}
+
+		// The ceiling is brought down to the fixture rather than the fixture
+		// built up to twenty thousand, which is how the routing reach is
+		// tested and for the same reason. On the store rather than on the
+		// package variable, because the engines run in parallel.
+		who, err := r.rights.Resolve(t.Context(), "triager")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = vex.NewStoreCarrying(r.db.DB, 1).For(t.Context(), who,
+			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
+			"mine", "master", "broadcom", false)
+		if !errors.Is(err, vex.ErrTooLarge) {
+			t.Fatalf("a build past the ceiling answered %v, wanted a refusal naming itself", err)
+		}
+		if !strings.Contains(err.Error(), "mine") || !strings.Contains(err.Error(), "master") {
+			t.Errorf("the refusal does not say which build: %s", err)
+		}
 	})
 }

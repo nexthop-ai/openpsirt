@@ -126,6 +126,11 @@ export const DEADLINES = [
   ["", "Any"],
   ["overdue", "Overdue"],
   ["7", "Due within 7 days"],
+  // A fortnight, because that is what the front page's "due soon" tile
+  // navigates with. Absent here, the panel showed nothing chosen while the
+  // list was narrowed — a filter in force that the reader could neither see
+  // nor turn off.
+  ["14", "Due within 14 days"],
   ["30", "Due within 30 days"],
   ["90", "Due within 90 days"],
 ] as const;
@@ -278,7 +283,12 @@ export function activeFilters(params: URLSearchParams): Active[] {
   oneOf("support", "Support", SUPPORT, ["in-support", "past-eol"]);
   each("assigned", "Assigned to", ASSIGNED);
   if (at("reassessed") === "1") add("reassessed", "Rated differently here", "only");
-  if (at("recorded") === "1") add("recorded", "Origin", "Entered by hand");
+  // Not oneOf: `on` and `support` are read off the address with getAll, so
+  // naming both values means both, and origin is a single enum the reader
+  // takes with get — the both-values spelling came back as "scanner" alone and
+  // clearing the chip hid every hand-recorded finding with nothing left saying
+  // so. Leaving the parameter out already means both, on the wire and here.
+  pick("origin", "Origin", ORIGINS);
   if (at("unconfirmed") === "1") add("unconfirmed", "Not confirmed by a packager", "only");
   each("vex_publisher", "VEX publisher", []);
   each("vex_status", "VEX status", VEX_STATUS);
@@ -422,6 +432,7 @@ function Group({ legend, children }: { legend: string; children: React.ReactNode
 export function Filters({
   params,
   set,
+  setEach,
   setMany,
   tags,
   oneBuild,
@@ -429,6 +440,9 @@ export function Filters({
 }: {
   params: URLSearchParams;
   set: (key: string, value: string) => void;
+  // Several filters in one act. Two `set` calls in a row each build their
+  // change from the same parameters, so the second writes over the first.
+  setEach: (changes: Record<string, string>) => void;
   // The filters that take several values at once. Separate from `set` rather
   // than a set taking an array, because the address carries them as a repeated
   // parameter and replacing one word is not the same act as replacing all of
@@ -466,10 +480,7 @@ export function Filters({
           label="Known exploited"
           hint="Somebody is known to be exploiting this"
           on={at("exploited") === "1" || at("only") === "exploited"}
-          onChange={(on) => {
-            set("only", "");
-            flag("exploited", on);
-          }}
+          onChange={(on) => setEach({ only: "", exploited: on ? "1" : "" })}
         />
         <Flag
           label="Include below the triage line"
@@ -491,10 +502,7 @@ export function Filters({
           label="Fix version known"
           hint="An upstream fixed version is recorded"
           on={at("fixable") === "1" || at("only") === "hasFix"}
-          onChange={(on) => {
-            set("only", "");
-            flag("fixable", on);
-          }}
+          onChange={(on) => setEach({ only: "", fixable: on ? "1" : "" })}
         />
         <Flag
           label="Not confirmed by a packager"
@@ -554,9 +562,9 @@ export function Filters({
         <Pick
           label="Recorded by"
           hint="Only manually entered flaws can be closed by hand"
-          value={at("recorded") === "1" ? "manual" : ""}
+          value={at("origin")}
           options={ORIGINS}
-          onChange={(value) => set("recorded", value === "manual" ? "1" : "")}
+          onChange={(value) => set("origin", value)}
         />
         <Words
           label="VEX publisher"

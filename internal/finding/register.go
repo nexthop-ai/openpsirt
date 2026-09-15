@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Disposed is one known vulnerability in one build, and what was decided about
@@ -244,28 +245,36 @@ func (s *Store) registerQuery(productID int64,
 
 	return narrow(s.db.NewSelect()).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedHere, productID).
+		Join(rating.Here, productID).
 		Join(`JOIN component AS "c" ON c.id = f.component_id`).
 		// What pulls the component in. Left, because a build holds some
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		// Liveness is asked of the columns rather than of the join. In the
+		// join it hid a lapsed decision entirely, so a place whose judgment
+		// stopped applying reported as never decided and the register lost who
+		// proposed and who approved it — which is what a compliance reader
+		// comes here for. The findings list says "lapsed" about the same
+		// place, so the two surfaces disagreed.
 		Join(`LEFT JOIN decision AS "de" ON de.product_id = ?
 			AND de.vulnerability_id = f.vulnerability_id
-			AND de.place_identity = f.place_identity
-			AND de.live_key IS NOT NULL`, productID).
+			AND de.place_identity = f.place_identity`, productID).
 		Join(`LEFT JOIN claim AS "cl" ON cl.id = de.claim_id`).
 		Join(`LEFT JOIN person AS "pp" ON pp.id = de.proposed_by`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(EffectiveSeverityExpr + ` AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
-		ColumnExpr(`COALESCE(cl.outcome, '') AS "outcome"`).
-		ColumnExpr(`COALESCE(cl.justification, '') AS "justification"`).
-		ColumnExpr(`COALESCE(de.state, '') AS "decision_state"`).
-		ColumnExpr(`COALESCE(pp.identity, '') AS "proposed_by"`).
-		ColumnExpr(`de.proposed_at AS "proposed_at"`).
+		// A decision counts where it is live or where it lapsed. Lapsed is
+		// what happened to it and is part of the record; a superseded one is
+		// not, and reporting it would say a place is decided when it is not.
+		ColumnExpr(onTheRecord + `COALESCE(cl.outcome, '') ELSE '' END AS "outcome"`).
+		ColumnExpr(onTheRecord + `COALESCE(cl.justification, '') ELSE '' END AS "justification"`).
+		ColumnExpr(onTheRecord + `de.state ELSE '' END AS "decision_state"`).
+		ColumnExpr(onTheRecord + `COALESCE(pp.identity, '') ELSE '' END AS "proposed_by"`).
+		ColumnExpr(onTheRecord + `de.proposed_at ELSE NULL END AS "proposed_at"`).
 		// The agreement that put it in force, asked as a scalar rather than
 		// joined. Nothing makes an approval unique per decision — a second
 		// approver adds a row — and joined, each extra one multiplied the
@@ -273,24 +282,30 @@ func (s *Store) registerQuery(productID int64,
 		// findings. The page then held one row fewer than it said, and every
 		// later offset skipped one, so an auditor paging a register silently
 		// never saw some of it.
-		ColumnExpr(`COALESCE((SELECT p2.identity FROM "claim_approval" AS "da2"
+		ColumnExpr(onTheRecord + `COALESCE((SELECT p2.identity FROM "claim_approval" AS "da2"
 			JOIN "person" AS "p2" ON p2.id = da2.approved_by
 			WHERE da2.claim_id = de.claim_id AND da2.withdrawn_at IS NULL
-			ORDER BY da2.approved_at, da2.id LIMIT 1), '') AS "approved_by"`).
-		ColumnExpr(`(SELECT MIN(da3.approved_at) FROM "claim_approval" AS "da3"
-			WHERE da3.claim_id = de.claim_id AND da3.withdrawn_at IS NULL) AS "approved_at"`).
+			ORDER BY da2.approved_at, da2.id LIMIT 1), '') ELSE '' END AS "approved_by"`).
+		ColumnExpr(onTheRecord + `(SELECT MIN(da3.approved_at) FROM "claim_approval" AS "da3"
+			WHERE da3.claim_id = de.claim_id AND da3.withdrawn_at IS NULL)
+			ELSE NULL END AS "approved_at"`).
 		// And whether that agreement was carried rather than given. The same
 		// row the identity above comes from, ordered the same way, so the two
 		// cannot describe different approvals.
-		ColumnExpr(`COALESCE((SELECT CASE WHEN da4.carried_from IS NULL THEN 0 ELSE 1 END
+		ColumnExpr(onTheRecord + `COALESCE((SELECT CASE WHEN da4.carried_from IS NULL THEN 0 ELSE 1 END
 			FROM "claim_approval" AS "da4"
 			WHERE da4.claim_id = de.claim_id AND da4.withdrawn_at IS NULL
-			ORDER BY da4.approved_at, da4.id LIMIT 1), 0) AS "agreement_carried"`).
+			ORDER BY da4.approved_at, da4.id LIMIT 1), 0) ELSE 0 END AS "agreement_carried"`).
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`f.due_at AS "due_at"`).
 		OrderExpr("v.identifier, c.name, f.place_identity")
 }
+
+// onTheRecord opens the case expression each of the decision's own columns is
+// wrapped in: a decision is part of this record where it is live or where it
+// lapsed, and a superseded one is not.
+const onTheRecord = `CASE WHEN de.live_key IS NOT NULL OR de.state = 'lapsed' THEN `
 
 // disposedFrom is one row as the register states it.
 func disposedFrom(row registerRow) Disposed {

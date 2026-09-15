@@ -10,6 +10,8 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // What one run of the scanner did.
@@ -107,7 +109,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 	// rather than COUNT DISTINCT over two columns, which not every engine
 	// takes — the same shape the per-run counts on the receipts use, so the
 	// receipt and this screen cannot disagree about what a run opened.
-	count := func(column string, into map[string]int, exploited *int) error {
+	count := func(column runColumn, into map[string]int, exploited *int) error {
 		var rows []struct {
 			Band      string `bun:"band"`
 			Count     int    `bun:"count"`
@@ -117,14 +119,14 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			Distinct().
 			TableExpr(`finding AS "f"`).
 			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-			Join(RatedHere, productID).
-			ColumnExpr(BandExpr+` AS "band"`).
+			Join(rating.Here, productID).
+			ColumnExpr(rating.BandExpr+` AS "band"`).
 			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 			ColumnExpr(`f.component_id AS "component_id"`).
 			ColumnExpr(`CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END AS "exploited"`,
 				int64(exploitedBand)).
 			Where("f.target_id = ?", targetID).
-			Where("f."+column+" = ?", runID).
+			Where(string(database.Column(s.db, "f."+string(column)))+" = ?", runID).
 			Where("f.visibility IN (?)", bun.List(visible))
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
@@ -145,10 +147,10 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 		return nil
 	}
 
-	if err := count("opened_run_id", out.OpenedBy, &out.OpenedExploited); err != nil {
+	if err := count(openedByRun, out.OpenedBy, &out.OpenedExploited); err != nil {
 		return nil, err
 	}
-	if err := count("closed_run_id", out.ClosedBy, nil); err != nil {
+	if err := count(closedByRun, out.ClosedBy, nil); err != nil {
 		return nil, err
 	}
 	for _, n := range out.OpenedBy {
@@ -159,3 +161,19 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 	}
 	return out, nil
 }
+
+// runColumn is which of a finding's two run references a count is over.
+//
+// A named type rather than a string, for the reason RatedOn is one: a
+// placeholder cannot bind a column name, so this is the value that reaches the
+// statement text, and a closure taking a bare string leaves nothing between it
+// and a name arriving from a query parameter except that today's two callers
+// pass literals (REQ-66).
+type runColumn string
+
+const (
+	// openedByRun is the run that first reported a finding.
+	openedByRun runColumn = "opened_run_id"
+	// closedByRun is the run that stopped reporting it.
+	closedByRun runColumn = "closed_run_id"
+)

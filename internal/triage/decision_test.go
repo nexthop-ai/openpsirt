@@ -604,6 +604,64 @@ func TestUndoingABatchTouchesOnlyWhatTheUndoerMayReach(t *testing.T) {
 	})
 }
 
+func TestABatchIsUndoneWholeOrNotAtAll(t *testing.T) {
+	// A claim is one action over many places whose rows need not agree about
+	// visibility, and the agreement is one row keyed on the claim. Taking the
+	// agreement back while returning only the rows the undoer reaches left the
+	// rest standing as approved under an agreement the record says was
+	// withdrawn — the state the approval record exists to make impossible.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		const batch = "one-afternoon"
+		writes := f.privateTriager(t, "insider", "Insider")
+		agrees := f.privateTriager(t, "second-insider", "Second Insider")
+
+		open, hidden := f.at(), f.at()
+		open.PlaceIdentity, hidden.PlaceIdentity = "under-public", "under-private"
+		hidden.Visibility = access.Private
+		proposals := make([]triage.Proposal, 0, 2)
+		for _, at := range []triage.Place{open, hidden} {
+			proposals = append(proposals, triage.Proposal{
+				Place: at, Outcome: triage.NotApplicable,
+				Justification: triage.CodeNotInExecutePath,
+				Reasoning:     "The parser is never reached: we only call the encoder.",
+				By:            writes.ID, NeedsApproval: true,
+			})
+		}
+		recorded, err := f.store.ProposeMany(ctx, writes, proposals, triage.DefaultTogetherCap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := agreeTo(ctx, f.store, agrees, recorded[0].ClaimID, batch); err != nil {
+			t.Fatal(err)
+		}
+
+		// This one triages the disclosed findings here and not the others, so
+		// one row of the claim is outside their reach.
+		undone, err := f.store.UndoBatch(ctx, f.reviewer, batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if undone.Rows != 0 {
+			t.Errorf("%d rows returned to waiting from a claim the undoer reaches only part of",
+				undone.Rows)
+		}
+		for _, one := range recorded {
+			if state := f.stateOf(t, one.ID); state != triage.Approved {
+				t.Errorf("a row of the claim reads as %s after an undo that could not act on it whole",
+					state)
+			}
+		}
+		approvals, err := f.store.Approvals(ctx, agrees, recorded[0].ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if approvals[0].WithdrawnAt != nil {
+			t.Error("the agreement was taken back while the rows it covers stay approved")
+		}
+	})
+}
+
 func TestAPlaceThatStatesNoVisibilityIsTreatedAsUndisclosed(t *testing.T) {
 	// A place is assembled by whatever asked, and something that forgot to
 	// state this would otherwise make an undisclosed finding argueable by

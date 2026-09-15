@@ -15,13 +15,12 @@ import (
 // condition asked first, which is how the same question came to be answered
 // three ways.
 
-// acts is what one person may do with one product, as the three questions
-// these conditions ask of it.
+// acts is what one person may do with one product, as the questions these
+// conditions ask of it.
 //
 // Approving and reading are separate: Approver is a capability bounded by what
-// the person may read (ACC), so a claim waiting goes to somebody who holds
-// both and to nobody who holds one.
-// acts is what one person may do with one product.
+// the person may read, so a claim waiting goes to somebody who holds both and
+// to nobody who holds one.
 //
 // Reading and triaging are kept apart rather than folded into one pair,
 // because the conditions divide on exactly that: a message about work waiting

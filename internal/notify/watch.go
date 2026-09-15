@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -277,7 +278,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		Where("f.suppressed_by IS NULL").
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("f.urgency_exploited = ?", true).
-				WhereOr(finding.BandExpr+" = ?", "critical")
+				WhereOr(rating.BandExpr+" = ?", "critical")
 		}).
 		Where("NOT "+standing, args...).
 		GroupExpr("p.name, st.name, va.name, c.name, v.identifier, st.product_id, v.id").

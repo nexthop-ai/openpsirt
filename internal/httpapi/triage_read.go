@@ -82,9 +82,9 @@ type ClaimDetail struct {
 // identifier and its state belong to the row, and a claim page that carried
 // either would be offering an act at the wrong grain.
 func claimArgument(c triage.Claim, reasoning string) DecisionBody {
-	body := DecisionBody{ClaimID: c.ID, Outcome: string(c.Outcome), Reasoning: reasoning}
+	body := DecisionBody{ClaimID: c.ID, Outcome: outcome(c.Outcome), Reasoning: reasoning}
 	if c.Justification != nil {
-		body.Justification = *c.Justification
+		body.Justification = justification(*c.Justification)
 	}
 	if c.Mitigation != nil {
 		body.Mitigation = *c.Mitigation
@@ -151,22 +151,26 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"postponements (`deferred`), by `state` to separate what is approved from what is " +
 			"still waiting or has been withdrawn, and by `product` to limit to one product.\n\n" +
 			"Set `expired=true` to list deferrals whose date has passed — the findings that have " +
-			"come back and need judging again.",
+			"come back and need judging again.\n\n" +
+			"Set `stopped=true` for everything that has stopped standing — lapsed decisions and " +
+			"expired deferrals as one list. A decision can be both, so asking the two separately " +
+			"and adding the totals counts some of them twice.",
 		Tags: []string{"Triage"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `query:"product" doc:"Limit to one product, by name"`
-		Outcome string `query:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Limit to one outcome"`
-		State   string `query:"state" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to one state"`
-		Expired bool   `query:"expired" doc:"Only deferrals whose date has passed"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset  int    `query:"offset" minimum:"0"`
+		Product string  `query:"product" doc:"Limit to one product, by name"`
+		Outcome outcome `query:"outcome" doc:"Limit to one outcome"`
+		State   string  `query:"state" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to one state"`
+		Expired bool    `query:"expired" doc:"Only deferrals whose date has passed"`
+		Stopped bool    `query:"stopped" doc:"Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up"`
+		Limit   int     `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset  int     `query:"offset" minimum:"0"`
 	}) (*DecisionsOutput, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
 
-		filter := triage.Filter{Expired: input.Expired}
+		filter := triage.Filter{Expired: input.Expired, Stopped: input.Stopped}
 		if input.Outcome != "" {
 			filter.Outcomes = []triage.Outcome{triage.Outcome(input.Outcome)}
 		}

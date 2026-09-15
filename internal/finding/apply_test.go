@@ -133,8 +133,11 @@ func TestAnIssueBecomingExploitedIsClockedFromWhenThatWasLearned(t *testing.T) {
 			t.Fatal("nothing said this was exploited")
 		}
 		// Two hundred days of it sitting there unremarked, so the two ways of
-		// counting land months apart rather than milliseconds.
+		// counting land months apart rather than milliseconds. The run and
+		// the rows it opened both move: the finding carries its own opening,
+		// which is the base the wrong answer counts from.
 		f.backdate(t, opening, 200*24*time.Hour)
+		f.backdateOpenings(t, 200*24*time.Hour)
 
 		exploited := quiet
 		exploited.Issue.Exploited = true
@@ -159,6 +162,28 @@ func TestAnIssueBecomingExploitedIsClockedFromWhenThatWasLearned(t *testing.T) {
 			}
 			if !row.DueAt.Equal(want) {
 				t.Errorf("the deadline is %s, want %s — three days from the scan that learned it",
+					row.DueAt.Format(time.RFC3339), want.Format(time.RFC3339))
+			}
+		}
+
+		// And it stays there. Anything that recounts this issue's deadlines
+		// has to reach the same answer: counting from the opening is what the
+		// scan above refused to do, and a recount that does it anyway moves
+		// the deadline to a date five months in the past, silently, with
+		// nothing logged.
+		f.recorded(t, 1, "someone")
+		if _, err := f.store.Assess(t.Context(), f.holding(t, access.PublicTriage),
+			f.productID, f.issue(t, "CVE-2026-KEV"), "critical",
+			"Reachable from the network in how we ship it."); err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range f.open(t) {
+			if row.DueAt == nil {
+				t.Fatal("an exploited finding lost its deadline to a re-rating")
+			}
+			if !row.DueAt.Equal(want) {
+				t.Errorf("a re-rating moved the deadline to %s, want %s — it is counted from "+
+					"when exploitation was learned, and nothing since has changed that",
 					row.DueAt.Format(time.RFC3339), want.Format(time.RFC3339))
 			}
 		}

@@ -37,12 +37,12 @@ type JudgedBody struct {
 	Version   string `json:"version,omitempty"`
 	Consumer  string `json:"consumer,omitempty" doc:"What pulls the component in. Absent where the build holds it directly"`
 
-	Outcome       string `json:"outcome" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed"`
-	Justification string `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Mitigation    string `json:"mitigation,omitempty" doc:"What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks"`
-	DeferredUntil string `json:"deferred_until,omitempty"`
-	FixedVersion  string `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record"`
-	Reasoning     string `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart"`
+	Outcome       outcome       `json:"outcome"`
+	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Mitigation    string        `json:"mitigation,omitempty" doc:"What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks"`
+	DeferredUntil string        `json:"deferred_until,omitempty"`
+	FixedVersion  string        `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record"`
+	Reasoning     string        `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart"`
 
 	State    string `json:"state" enum:"proposed,approved,withdrawn,lapsed"`
 	Standing bool   `json:"standing" doc:"Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it"`
@@ -67,16 +67,16 @@ type Auditing struct {
 	// Repeatable, because "dismissed or deferred" and "waiting or sent back"
 	// are the questions somebody reading the record has, and one value cannot
 	// ask either. Repeat the parameter; any of what is named matches.
-	Product   []string `query:"product,explode" doc:"Limit to these products, by name. Repeatable; any of them matches"`
-	Outcome   []string `query:"outcome,explode" enum:"affected,not-applicable,deferred,wont-fix,already-fixed,upgrade-needed,patch-needed" doc:"Limit to these kinds of judgment. Repeatable; any of them matches"`
-	State     []string `query:"state,explode" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to these states. Repeatable; any of them matches"`
-	From      string   `query:"from" doc:"Only judgments proposed on or after this date, as YYYY-MM-DD"`
-	To        string   `query:"to" doc:"Only judgments proposed before this date, as YYYY-MM-DD"`
-	Alone     bool     `query:"alone" doc:"Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing"`
-	Proposer  string   `query:"proposed_by" doc:"Only judgments this person proposed, by sign-in identity"`
-	Approver  string   `query:"approved_by" doc:"Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match"`
-	Issue     string   `query:"issue" doc:"Only judgments about this vulnerability, under the name it is filed here"`
-	Component string   `query:"component" doc:"Only judgments about this component, by name"`
+	Product   []string  `query:"product,explode" doc:"Limit to these products, by name. Repeatable; any of them matches"`
+	Outcome   []outcome `query:"outcome,explode" doc:"Limit to these kinds of judgment. Repeatable; any of them matches"`
+	State     []string  `query:"state,explode" enum:"proposed,approved,withdrawn,lapsed" doc:"Limit to these states. Repeatable; any of them matches"`
+	From      string    `query:"from" doc:"Only judgments proposed on or after this date, as YYYY-MM-DD"`
+	To        string    `query:"to" doc:"Only judgments proposed before this date, as YYYY-MM-DD"`
+	Alone     bool      `query:"alone" doc:"Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing"`
+	Proposer  string    `query:"proposed_by" doc:"Only judgments this person proposed, by sign-in identity"`
+	Approver  string    `query:"approved_by" doc:"Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match"`
+	Issue     string    `query:"issue" doc:"Only judgments about this vulnerability, under the name it is filed here"`
+	Component string    `query:"component" doc:"Only judgments about this component, by name"`
 }
 
 // narrow turns what was asked for into what the store reads by, resolving the
@@ -198,14 +198,14 @@ func judgedBody(row triage.Judged) JudgedBody {
 			body := JudgedBody{
 				ID: row.ID, Issue: row.Issue, Product: row.Product,
 				Component: row.Component, Version: row.Version, Consumer: row.Consumer,
-				Outcome: string(row.Claim.Outcome), Reasoning: row.Reasoning,
+				Outcome: outcome(row.Claim.Outcome), Reasoning: row.Reasoning,
 				State: string(row.State), Standing: row.Standing(),
 				ProposedBy: row.ProposedByName, ProposedAt: stamp(row.ProposedAt),
 				TwoPeople: row.BySomebodyElse(),
 				Approvals: make([]AgreedBody, 0, len(row.Approvals)),
 			}
 			if row.Claim.Justification != nil {
-				body.Justification = *row.Claim.Justification
+				body.Justification = justification(*row.Claim.Justification)
 			}
 			if row.Claim.Mitigation != nil {
 				body.Mitigation = *row.Claim.Mitigation

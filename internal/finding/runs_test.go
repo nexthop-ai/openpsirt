@@ -532,3 +532,16 @@ func (f *fixture) holdingIn(t *testing.T, products []int64, roles ...access.Role
 	}
 	return access.NewPerson(1, "someone", false, grants, 101)
 }
+
+// backdateOpenings moves when every open finding was first seen, which is what
+// a deadline counted from the opening is counted from.
+func (f *fixture) backdateOpenings(t *testing.T, by time.Duration) {
+	t.Helper()
+	for _, row := range f.open(t) {
+		if _, err := f.db.DB.NewUpdate().TableExpr("finding").
+			Set("opened_at = ?", row.OpenedAt.Add(-by)).
+			Where("id = ?", row.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

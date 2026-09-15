@@ -2,6 +2,7 @@ package finding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -58,6 +59,15 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 	if upstream == "" && beneath == "" {
 		return nil, fmt.Errorf("a rule that matches nothing places nothing: " +
 			"name a source package, a place in the tree, or both")
+	}
+	// A rule reaching most of a build is refused when it is written, not left
+	// to be discovered by the sweep that runs it every pass. Asked here rather
+	// than only at the preview, which is the handler's and which a second
+	// caller can forget.
+	if beneath != "" {
+		if _, err := s.beneathIn(ctx, productID, beneath); err != nil {
+			return nil, err
+		}
 	}
 	createdAt := s.now().UTC().Truncate(time.Microsecond)
 	var rule *Routing
@@ -144,7 +154,8 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // **First match wins**, which is why the rules are applied in order
 // and each one only ever sees what the ones before it left.
 //
-// Returns how many findings it placed, and whether the batch filled.
+// Returns how many findings it placed, whether the batch filled, and the rules
+// it could not run.
 //
 // **Filling is measured by what was read, not by what was written.** The two
 // differ: the page is bounded on rows read and the write re-checks the holder,
@@ -153,23 +164,32 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // therefore stopped the sweep one human action into a product with fifty
 // thousand findings in it, silently, with the job reported successful and the
 // rest never routed.
-func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, error) {
+//
+// **A rule that has outgrown the bound places nothing and stops nothing else.**
+// It was accepted when it was written and the tree grew under it, which is not
+// a fault of the sweep's — and the condition is permanent, so returning it as a
+// job failure stopped that product's routing entirely, every rule ordered after
+// it included, with a retry that could never clear it. They come back named so
+// the caller can say which, because a rule that silently stopped placing is the
+// same shape as a rule nobody notices is wrong.
+func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, []int64, error) {
 	if cap <= 0 {
 		cap = setting.DefaultRoutingBatch
 	}
 	rules, err := s.Rules(ctx, productID)
 	if err != nil {
-		return 0, false, err
+		return 0, false, nil, err
 	}
 	if len(rules) == 0 {
-		return 0, false, nil
+		return 0, false, nil, nil
 	}
 	teams, err := s.partiesOf(ctx, rules)
 	if err != nil {
-		return 0, false, err
+		return 0, false, nil, err
 	}
 
 	placed, seen := 0, 0
+	var outgrown []int64
 	for _, rule := range rules {
 		if seen >= cap {
 			break
@@ -186,13 +206,17 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 		// undone for that batch: work the earlier rule had claimed went to a
 		// later one instead.
 		read, n, err := s.applyOne(ctx, productID, rule, party, cap-seen)
+		if errors.Is(err, ErrTooBroad) {
+			outgrown = append(outgrown, rule.ID)
+			continue
+		}
 		if err != nil {
-			return placed, false, err
+			return placed, false, outgrown, err
 		}
 		placed += n
 		seen += read
 	}
-	return placed, seen >= cap, nil
+	return placed, seen >= cap, outgrown, nil
 }
 
 // applyOne is one rule's share of a batch.
@@ -210,9 +234,7 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		Column("id").
 		Where("closed_at IS NULL").
 		Where("assigned_to IS NULL").
-		Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE st.product_id = ?)`, productID).
+		Where(inThisProduct, productID).
 		Limit(room)
 	if rule.Upstream != "" {
 		page = bySource(page, rule.Upstream)
@@ -230,7 +252,11 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		if len(beneath) == 0 {
 			return 0, 0, nil
 		}
-		page = page.Where("component_id IN (?)", bun.List(beneath))
+		// Split and OR-ed rather than one list: a subtree is thousands of
+		// components, and a statement binding that many parameters is refused
+		// by two of the four engines.
+		where, args := database.InAnyOf("component_id", beneath)
+		page = page.Where(where, args...)
 	}
 	if err := page.Scan(ctx, &ids); err != nil {
 		return 0, 0, fmt.Errorf("read what that rule would place: %w", err)
@@ -375,9 +401,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible)).
-			Where(`f.target_id IN (SELECT tg.id FROM "target" AS "tg"
-				JOIN "stream" AS "st" ON st.id = tg.stream_id
-				WHERE st.product_id = ?)`, productID)
+			Where(inThisProductAs("f.target_id"), productID)
 		if upstream != "" {
 			q = bySource(q, upstream)
 		}
@@ -391,7 +415,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 				// empty one: it is what a typo looks like from here.
 				return q.Where("1 = 0"), nil
 			}
-			q = q.Where("f.component_id IN (?)", bun.List(under))
+			where, args := database.InAnyOf("f.component_id", under)
+			q = q.Where(where, args...)
 		}
 		return q, nil
 	}
@@ -480,19 +505,35 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 				}
 				return q.Where("c.name_folded = ?", name)
 			}).
+			// One more than the cap, so that reaching it is distinguishable
+			// from landing on it exactly. The cap is the store's, not the
+			// constant: a store built with a smaller reach truncated at the
+			// shipped number and never tripped its own refusal, which is
+			// quietly applying to part of what a rule names.
+			Limit(s.reaching()+1).
 			Scan(ctx, &roots); err != nil {
 			return nil, fmt.Errorf("look for that component: %w", err)
 		}
-		for _, root := range roots {
-			var found []int64
-			if err := graph.Within(s.db, build, root).Scan(ctx, &found); err != nil {
-				return nil, fmt.Errorf("walk what sits under it: %w", err)
-			}
-			for _, id := range found {
-				if !seen[id] {
-					seen[id] = true
-					under = append(under, id)
-				}
+		if len(roots) > s.reaching() {
+			return nil, fmt.Errorf("%w: %q names more than %d places in one build, which is "+
+				"not a place in the tree but most of it — name something narrower",
+				ErrTooBroad, name, s.reaching())
+		}
+		if len(roots) == 0 {
+			continue
+		}
+		// One walk per build rather than one per named component. It was one
+		// recursive round trip each, inside a loop over every build of the
+		// product, so a pattern matching broadly issued tens of thousands of
+		// them in one request.
+		var found []int64
+		if err := graph.WithinAny(s.db, build, roots).Scan(ctx, &found); err != nil {
+			return nil, fmt.Errorf("walk what sits under it: %w", err)
+		}
+		for _, id := range found {
+			if !seen[id] {
+				seen[id] = true
+				under = append(under, id)
 			}
 		}
 	}
@@ -538,3 +579,40 @@ func mayRoute(by access.Subject, productID int64) error {
 	}
 	return nil
 }
+
+// reaching is the cap in force for this store.
+func (s *Store) reaching() int {
+	if s.reach > 0 {
+		return s.reach
+	}
+	return RoutingReach
+}
+
+// NewStoreReaching is a store whose rules may name at most this many places in
+// one build.
+//
+// For the test alone, which has to show the refusal without building a fixture
+// of two thousand components: what is being checked is that the cap refuses,
+// and a slow fixture says the same thing.
+func NewStoreReaching(db *bun.DB, reach int) *Store {
+	s := NewStore(db)
+	s.reach = reach
+	return s
+}
+
+// RoutingReach is how many places in one build a rule's pattern may name.
+//
+// A rule says where in the tree something sits, and a pattern matching most of
+// a build is not that — a bare `*` matched every open node, and each was a
+// recursive walk of its own inside one request. Refused rather than truncated,
+// the way a rule matching nothing is refused: a rule quietly applying to part
+// of what it names is worse than one nobody could save.
+//
+// A constant rather than a setting: what counts as an absurdly broad rule is
+// not a judgment about a deployment, and the number that is one — how much a
+// single pass may place — is already `routing.batch`.
+const RoutingReach = 2000
+
+// ErrTooBroad is returned when a rule's pattern names most of a build rather
+// than a place in it.
+var ErrTooBroad = errors.New("that names too much of the tree")

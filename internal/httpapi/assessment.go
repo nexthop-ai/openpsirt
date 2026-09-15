@@ -28,7 +28,7 @@ type AssessmentBody struct {
 	ProductName   string `json:"product_name,omitempty" doc:"How that product is spelled on screen"`
 	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"What this product rates it"`
 	Published     string `json:"published,omitempty" doc:"What was published when this was made, kept so a reader can see what we disagreed with"`
-	Reasoning     string `json:"reasoning" minLength:"1" doc:"Why. It outlives the version it was made about, so the next person needs the argument"`
+	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"Why. It outlives the version it was made about, so the next person needs the argument"`
 	State         string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
 	NeedsApproval bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
 	// What agreeing would do beyond moving things down a list, on the claims

@@ -3,7 +3,7 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { Became } from "./QueueMine";
-import { Embargoes, Ratings } from "./QueuePending";
+import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
@@ -107,15 +107,15 @@ export function Queue() {
     if (!found) return;
     document.getElementById(`claim-${wanted}`)?.scrollIntoView({ block: "center" });
   }, [found, wanted]);
-  const lapsed = useQuery({
-    queryKey: ["queue", "lapsed"],
+  // Lapsed and expired asked as one list. They overlap — a deferral that ran
+  // out on code that then moved is both — so two lists had to be merged and
+  // deduplicated here while the figure over them added the two totals and
+  // counted the overlap twice. One question answers both, and the number it
+  // comes back with is the number of rows.
+  const stopped = useQuery({
+    queryKey: ["queue", "stopped"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions", { params: { query: { state: "lapsed", limit: 50 } } })),
-  });
-  const expired = useQuery({
-    queryKey: ["queue", "expired"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions", { params: { query: { expired: true, limit: 50 } } })),
+      unwrap(await api.GET("/v1/decisions", { params: { query: { stopped: true, limit: 50 } } })),
   });
   // A milder rating of an issue waits for a second person the same way a
   // dismissal does, and there was nowhere to be that second person: the route
@@ -128,19 +128,27 @@ export function Queue() {
   // person, and it is a separate list rather than a queue card because what is
   // agreed to is not a claim about code — it is how long something stays
   // hidden, and nothing about a claim's shape fits it.
+  const [embargoAt, setEmbargoAt] = useState(0);
+  const [ratingAt, setRatingAt] = useState(0);
   const embargoes = useQuery({
-    queryKey: ["extensions", "pending"],
+    queryKey: ["extensions", "pending", embargoAt],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/disclosure-extensions", { params: { query: { limit: 50 } } })),
+      unwrap(
+        await api.GET("/v1/disclosure-extensions", {
+          params: { query: { limit: PENDING_PAGE, offset: embargoAt } },
+        }),
+      ),
     // Somebody who may read nothing undisclosed gets an empty list rather than
     // a refusal, so this is quiet on their screen rather than an error on it.
     retry: false,
   });
   const ratings = useQuery({
-    queryKey: ["queue", "assessments"],
+    queryKey: ["queue", "assessments", ratingAt],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/assessments", { params: { query: { state: "proposed", limit: 50 } } }),
+        await api.GET("/v1/assessments", {
+          params: { query: { state: "proposed", limit: PENDING_PAGE, offset: ratingAt } },
+        }),
       ),
   });
 
@@ -157,13 +165,7 @@ export function Queue() {
   const asked = [...exporting].length > 0 ? "?" + exporting.toString() : "";
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);
-  const seen = new Set<number>();
-  const stopped = [...(lapsed.data?.items ?? []), ...(expired.data?.items ?? [])].filter((row) => {
-    const id = row.decision?.id;
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
+  const rows = stopped.data?.items ?? [];
 
   async function approvePicked() {
     // Sequential rather than parallel: each is a separate claim and a refusal
@@ -416,34 +418,47 @@ export function Queue() {
         onGo={go}
       />
 
-      <Ratings waiting={(ratings.data?.items ?? []).filter((each) => each.needs_approval)} />
+      <Ratings
+        waiting={(ratings.data?.items ?? []).filter((each) => each.needs_approval)}
+        total={ratings.data?.total}
+        offset={ratingAt}
+        onGo={setRatingAt}
+        error={ratings.isError ? ratings.error : undefined}
+      />
 
-      <Embargoes waiting={embargoes.data?.items ?? []} />
+      {/* The extension read is deliberately quiet for somebody who may read
+          nothing undisclosed — an empty list rather than a refusal — so only a
+          real failure is handed on. */}
+      <Embargoes
+        waiting={embargoes.data?.items ?? []}
+        total={embargoes.data?.total}
+        offset={embargoAt}
+        onGo={setEmbargoAt}
+      />
 
       <div className="screen-head" id="lapsed" style={{ marginTop: 22 }}>
         <h2>Lapsed decisions</h2>
         <p>
-          {((lapsed.data?.total ?? 0) + (expired.data?.total ?? 0)).toLocaleString()} · nobody has
-          to agree to these again — two people already did — but each needs a fresh reason, because
+          {stopped.isError ? "—" : (stopped.data?.total ?? 0).toLocaleString()} · nobody has to
+          agree to these again — two people already did — but each needs a fresh reason, because
           what it was a claim about has moved.
         </p>
       </div>
-      {/* Two lists of fifty, merged. Not paged: a decision can be in both,
-          so pages of the two do not add up — but a full list is still said
-          to be one. */}
-      <Paged
-        shown={Math.max(lapsed.data?.items?.length ?? 0, expired.data?.items?.length ?? 0)}
-        limit={50}
-        what="shown of each kind"
-      />
-      {stopped.length === 0 ? (
+      {/* A read that did not happen is not a list of nothing. Without this the
+          section drew "0 ·" over "Nothing has lapsed." on a failed read, which
+          is the defect this whole change is about, one screen along from where
+          it was fixed. */}
+      <Paged shown={rows.length} total={stopped.data?.total} limit={50} />
+      {stopped.isError ? (
+        <Failed error={stopped.error} what="Lapsed decisions could not be read." />
+      ) : rows.length === 0 ? (
         <Empty
           title="Nothing has lapsed."
           detail="A decision the code moved out from under, or a deferral whose date has passed, would appear here."
         />
       ) : (
         <div className="queue">
-          {stopped.map((row) => (
+          {rows.map((row) => (
             <Stopped key={row.decision?.id} row={row} />
           ))}
         </div>
@@ -661,6 +676,8 @@ function Card({
               </span>
             ) : f.fix_state === "wont-fix" ? (
               <span>upstream declined</span>
+            ) : f.fix_state === "mixed" ? (
+              <span>upstream fix differs by build</span>
             ) : null}
             {typeof f.score === "number" && <span>CVSS {f.score.toFixed(1)}</span>}
             {f.description && f.description.length >= 200 && (

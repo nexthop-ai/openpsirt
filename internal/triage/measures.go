@@ -3,6 +3,7 @@ package triage
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Measures are the numbers about how this deployment is working, as opposed to
@@ -128,6 +130,18 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 		ProposedAt time.Time  `bun:"proposed_at"`
 		ApprovedAt *time.Time `bun:"approved_at"`
 	}
+	// The finding half of the join is narrowed on the ON clause rather than in
+	// WHERE. A place is a pair of names with no product in it, so the match
+	// alone reaches other products' findings and findings this reader may not
+	// see; and moving either condition to WHERE would turn the outer join into
+	// an inner one and flatten the figures the LEFT JOIN is there to keep.
+	sameProduct := `AND EXISTS (SELECT 1 FROM "target" AS "tg"
+			JOIN "stream" AS "st" ON st.id = tg.stream_id
+			WHERE tg.id = f.target_id AND st.product_id = de.product_id)`
+	mayRead, readArgs := readableFindingsOn(subject, "f", "de.product_id")
+	if mayRead != "" {
+		sameProduct += " AND " + mayRead
+	}
 	q := s.db.NewSelect().
 		TableExpr(`decision AS "de"`).
 		// The finding this was a claim about, for when it was first seen and
@@ -136,17 +150,22 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 		// closed still happened, and dropping it would make the figures
 		// flatter exactly where work was finished.
 		Join(`LEFT JOIN finding AS "f" ON f.vulnerability_id = de.vulnerability_id
-			AND f.place_identity = de.place_identity`).
+			AND f.place_identity = de.place_identity `+sameProduct, readArgs...).
 		Join(`LEFT JOIN vulnerability AS "v" ON v.id = de.vulnerability_id`).
+		// Rated as the product that made the decision rates it, which is the
+		// band every other surface groups this issue under. Read from the
+		// published word alone, a product that re-rated an issue measured its
+		// own turnaround under a severity nobody there uses.
+		Join(rating.For(rating.OnDecision)).
 		Join(`LEFT JOIN claim_approval AS "da" ON da.claim_id = de.claim_id
 			AND da.withdrawn_at IS NULL`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "severity"`).
+		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`de.proposed_at AS "proposed_at"`).
 		ColumnExpr(`MIN(da.approved_at) AS "approved_at"`).
 		Where("de.proposed_at >= ?", since).
 		Where("de.proposed_at < ?", until).
-		GroupExpr("de.id, de.proposed_at, COALESCE(v.severity, '')").
+		GroupExpr("de.id, de.proposed_at, " + rating.EffectiveExpr).
 		OrderExpr("de.proposed_at DESC").
 		Limit(measuredAtMost + 1)
 	q = readableBy(q, subject, "de")
@@ -345,7 +364,11 @@ func nearestRank(sorted []time.Duration, part float64) time.Duration {
 	if len(sorted) == 0 {
 		return 0
 	}
-	i := int(float64(len(sorted))*part) - 1
+	// Ceil rather than truncation: the nearest rank is the first position at
+	// or past p of the way through, which for three observations and a median
+	// is the second of them. Truncating picks the one below it, which for an
+	// odd count is not the middle and for a p90 is not the tail.
+	i := int(math.Ceil(float64(len(sorted))*part)) - 1
 	if i < 0 {
 		i = 0
 	}

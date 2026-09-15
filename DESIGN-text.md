@@ -86,11 +86,19 @@ against a pattern: `//somewhere.else/x` carries no scheme and is not relative, s
 a browser resolves it against the page's protocol and fetches it from another
 origin.
 
-Every field rendered as markdown passes the submission policy, including an
-address stored on its own — where work on a claim is happening, the address
-beside a fix target — and the summary of a recorded flaw. A field that skips the
-policy loses all three of its parts at once: the scheme check, the refusal of raw
+Every field a person types passes the submission policy, whether or not
+anything renders it: an assessment's reasoning, the reason an embargo is
+extended, the note on a closure by hand, the note on a build declared
+unaffected, and the summary recorded with an issuance. So does an address
+stored on its own — where work on a claim is happening, the address beside a
+fix target — and the summary of a recorded flaw. A field that skips the policy
+loses all three of its parts at once: the scheme check, the refusal of raw
 markup, and the length bound.
+
+**The check runs in the store, at the point the value is trimmed**, rather than
+in the handler that happens to be the first caller. That is what makes the
+policy hold for every path into the column, and a column written by two paths
+is only as bounded as the laxer of the two.
 
 Submission and sanitizing must agree on what survives. A link accepted at
 submission and deleted by the sanitizer is a link when it is written and plain

@@ -46,6 +46,31 @@ const (
 	FixMixed FixState = "mixed"
 )
 
+// agreedFixState is what a group's places say upstream did, or FixMixed where
+// they do not agree.
+//
+// Read off both ends of the group rather than off a minimum: a minimum alone
+// answers with one of the disagreeing values, so the filter selected the mixed
+// set and every row it returned claimed a definite state.
+func agreedFixState(least, most string) FixState {
+	if least != most {
+		return FixMixed
+	}
+	return FixState(least)
+}
+
+// agreedFixedIn is the version upstream fixed it in, or nothing where the
+// group's places disagree about whether it did.
+//
+// Empty rather than the least of them: a version taken from one of two
+// disagreeing rows is a fix version attached to a group that does not have one.
+func agreedFixedIn(least, most, fixedIn string) string {
+	if least != most {
+		return ""
+	}
+	return fixedIn
+}
+
 // Closure says why a finding stopped being present.
 //
 // A finding that closes without a reason is a finding nobody can account for,
@@ -98,6 +123,27 @@ const (
 	// closure here rests on does not exist for this one.
 	Fixed Closure = "fixed"
 )
+
+// Resolving is what counts as an issue actually going away.
+//
+// One list rather than three projections of it. It was a positive list of four
+// words spliced into SQL, a negative list of three in Go, and a third list of
+// the same four as a switch returning prose — none of them checked by the
+// compiler, and all three disagreeing about any closure added later. A closure
+// not named here is churn or a correction, never progress.
+func Resolving() []Closure {
+	return []Closure{Removed, Upgraded, Revised, Fixed}
+}
+
+// Resolves reports whether this closure is one of them.
+func (c Closure) Resolves() bool {
+	for _, each := range Resolving() {
+		if c == each {
+			return true
+		}
+	}
+	return false
+}
 
 // Run is one execution of a scanner over one variant.
 type Run struct {
@@ -178,7 +224,15 @@ type Finding struct {
 	// likelihood and the score — belong to the issue and are read from there.
 	Urgency       int64 `bun:"urgency,notnull"`
 	RankExploited bool  `bun:"urgency_exploited,notnull"`
-	RankShipped   bool  `bun:"urgency_shipped,notnull"`
+	// ExploitedLearnedAt is when exploitation was learned, which is what an
+	// exploited deadline is counted from.
+	//
+	// The row carries it because nothing else does: a recount later has to
+	// arrive at the same deadline the learning wrote, and counting from the
+	// opening moves it back to a date that may already be in the past. Null
+	// where the row is not exploited.
+	ExploitedLearnedAt *time.Time `bun:"exploited_learned_at"`
+	RankShipped        bool       `bun:"urgency_shipped,notnull"`
 	// AssignedTo is who is dealing with this, and AssignedAt is when they were
 	// given it. Absent means nobody, which is a state worth being able to ask
 	// about rather than an empty column: work nobody owns is the thing that
@@ -336,6 +390,10 @@ func PlaceIdentity(component, consumer string) string {
 type Store struct {
 	db  *bun.DB
 	now func() time.Time
+	// reach is how many places in one build a routing rule's pattern may
+	// name, or zero for the shipped number. Carried on the store so a test can
+	// bring it down to a fixture rather than building a fixture up to it.
+	reach int
 }
 
 // NewStore returns a store over db.

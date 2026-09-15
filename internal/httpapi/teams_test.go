@@ -406,3 +406,39 @@ func TestTakingSomebodyOffATeamTheyAreNotOnRecordsNothing(t *testing.T) {
 		}
 	})
 }
+
+func TestAnActThatCouldNotFinishLeavesNothingBehind(t *testing.T) {
+	// Two acts, each written as a statement per part. Declaring a team and
+	// putting people on it left the team standing with whoever came before the
+	// name that failed; recording somebody and granting them roles left the
+	// person and the roles named before the product that is not there. The
+	// caller is told nothing happened either way, so the administrator sends
+	// the corrected request again and grants the first ones twice.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+
+		// A team whose second member is nobody.
+		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"kernel","members":["triager","nobody-at-all"]}`); made.Code == http.StatusCreated {
+			t.Fatalf("a team naming somebody who is not there was recorded: %s", made.Body.String())
+		}
+		if got := asPerson(t, r, "admin", http.MethodGet, "/v1/teams", ""); got.Code == http.StatusOK &&
+			strings.Contains(got.Body.String(), `"kernel"`) {
+			t.Errorf("the team was left behind by a request that answered a refusal: %s",
+				got.Body.String())
+		}
+
+		// A person whose second role names a product nobody has declared.
+		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"newcomer","holds":[{"product":"mine","role":"public-triage"},`+
+				`{"product":"not-declared","role":"public-triage"}]}`); made.Code == http.StatusCreated {
+			t.Fatalf("a person holding a role on a product that is not there was recorded: %s",
+				made.Body.String())
+		}
+		got := asPerson(t, r, "admin", http.MethodGet, "/v1/people", "")
+		if got.Code == http.StatusOK && strings.Contains(got.Body.String(), `"newcomer"`) {
+			t.Errorf("the person was left behind by a request that answered a refusal: %s",
+				got.Body.String())
+		}
+	})
+}

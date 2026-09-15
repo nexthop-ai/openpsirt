@@ -311,6 +311,16 @@ every release, whose violations appear only on whichever engine somebody is leas
 likely to be developing against. A column named `rank` was accepted by three
 engines and refused by the fourth, where it had become a window function.
 
+A column reference a statement composes is quoted through one function, which
+is the package's to own. The character it uses is the engine's own answer
+rather than the standard quote the schema is written in: two of the four name
+the backtick and take both, so either works today, and asking makes it true of
+an engine that does not. It owned none, so every caller wrote identifiers bare
+and two helpers took a column name as an ordinary string parameter — with
+nothing between them and a name arriving from a query parameter except that
+every caller happened to pass a literal. What a caller may pass is a named type
+now: a quoted column, or an expression the caller composed and stands behind.
+
 Two engines quote with backticks by default, so their connections are asked for
 standard quoting. Backticks keep working and string literals are untouched: this
 changes what a double quote means, not what a quote means.
@@ -513,6 +523,21 @@ already there — cannot sit inside a transaction with the work that follows it.
 It runs on its own, and what needs the retry goes in the transaction. Three of
 the four engines carry on after a failed statement, so the quick loop never
 sees this.
+
+**An act is one transaction, and an act is what a person asked for.** Recording
+somebody and granting them the roles named, declaring a team and putting people
+on it, filling in a stream's parent and recording when it went out, storing a
+graph with what the build argued about its own patches: each is one request, and
+written as a statement per part a refusal partway through answers "nothing
+happened" over a database where half of it did. The caller then corrects the
+request and sends it again, and the half that landed lands twice.
+
+Two things stay outside it, deliberately:
+
+| Outside | Why |
+|---|---|
+| A job queued for what was written | A job pointing at an uncommitted graph is worse than one queued a moment late, so it is asked for after the commit — and a full backlog is not the write's failure |
+| The row the append-only trail gets | Written inside, it would describe a grant a later refusal rolled back, and the trail cannot take a line out again |
 
 A store handed a transaction joins it rather than refusing. Both spellings exist:
 

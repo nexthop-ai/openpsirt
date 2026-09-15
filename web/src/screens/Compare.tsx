@@ -343,9 +343,9 @@ function Columns({
     <div className="cmp">
       <Column
         kind="was-fixed"
-        title="Fixed"
+        title="No longer present"
         rows={fixed}
-        note="Superseded means the version moved and took the issue with it."
+        note="Why each one went is on the row. Superseded means the version moved and took the issue with it; unexplained means the component is unchanged and the scanner stopped reporting it. Neither is a fix."
       />
       <Column kind="newly" title="Introduced" rows={newly} />
       <Column

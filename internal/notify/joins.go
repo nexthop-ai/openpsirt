@@ -3,7 +3,7 @@ package notify
 import (
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // A finding with the names a message has to say.
@@ -29,7 +29,7 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		// And whatever the row's own product rates the issue. Every watch
 		// spans products, and a rating belongs to one — so what an alert
 		// calls critical is what the product it is about calls critical.
-		Join(finding.RatedFor(finding.RatedOnStream))
+		Join(rating.For(rating.OnStream))
 	if consumer {
 		q = q.Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`)
 	}

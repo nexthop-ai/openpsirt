@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -140,7 +141,13 @@ func registerRouting(api huma.API, in Ingest) {
 		}
 		caught, err := finding.NewStore(in.DB.DB).
 			WouldMatch(ctx, subject, product.ID, input.Upstream, input.Beneath, 20)
-		if err != nil {
+		switch {
+		case errors.Is(err, finding.ErrTooBroad):
+			// The same refusal writing the rule gives, in the same words: a
+			// preview that answered where the rule could not be saved would
+			// be a preview of something nobody can have.
+			return nil, huma.Error422UnprocessableEntity(err.Error())
+		case err != nil:
 			return nil, wentWrong(in.Logger, "what that rule would catch could not be read", err)
 		}
 		out := &CatchesOutput{}

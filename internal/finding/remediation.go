@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Remediation is how fast things are being fixed, and what is aging.
@@ -65,7 +66,7 @@ var agingBuckets = []struct {
 	{"over three months", 90, 0},
 }
 
-// resolvedExpr is what counts as an issue actually going away.
+// resolved keeps only what counts as an issue actually going away.
 //
 // **A closure is not a fix unless the issue went with it.** A bump that
 // carried the issue into the next version closed one row and opened another
@@ -78,7 +79,12 @@ var agingBuckets = []struct {
 // two.** A record taken back was never a finding, so it is not churn being
 // counted as progress — it is nothing at all, and counting it would make the
 // fix rate improve every time somebody corrected a filing mistake.
-const resolvedExpr = `f.closed_because IN ('removed', 'upgraded', 'revised', 'fixed')`
+// Bound rather than spliced, and built from Resolving rather than retyped
+// beside it: a value in a placeholder is the rule, and a literal here is the
+// shape somebody copies to a place where it does matter.
+func resolved(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.Where("f.closed_because IN (?)", bun.List(Resolving()))
+}
 
 // Remediation reports how fast issues are being closed and what is aging.
 func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope Scope,
@@ -115,16 +121,15 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedFor(RatedOnStream)).
-		ColumnExpr(BandExpr+` AS "band"`).
+		Join(rating.For(rating.OnStream)).
+		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`MAX(f.closed_at) AS "closed_at"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		Where("f.closed_at IS NOT NULL").
 		Where("f.closed_at >= ?", since).
-		Where(resolvedExpr).
 		GroupExpr("band, f.vulnerability_id")
-	closed = scope.Narrow(onlyReadable(closed, subject, products, all))
+	closed = resolved(scope.Narrow(onlyReadable(closed, subject, products, all)))
 
 	// The averaging happens over the grouped issues, in a statement of its
 	// own, because averaging inside the grouping would average the places.
@@ -193,7 +198,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		}
 		byBand := q.NewSelect().
 			TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(
-				byBandOf(q, s.db), subject, products, all))).
+				byBandOf(q), subject, products, all))).
 			ColumnExpr(`grouped.band AS "band"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
 			GroupExpr("grouped.band")
@@ -249,14 +254,19 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 // The band is taken as the strictest across the rows an issue groups to, which
 // is one value by construction: severity belongs to the issue rather than to
 // the place, and MIN over one value is that value.
-func byBandOf(from *bun.SelectQuery, db bun.IDB) *bun.SelectQuery {
+func byBandOf(from *bun.SelectQuery) *bun.SelectQuery {
 	return from.Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		ColumnExpr(`MIN(COALESCE(v.severity, '')) AS "band"`)
+		// Each row's own product rates it, read through the stream this query
+		// already joins. Without it the plan reported the published rating
+		// while the list it is a summary of reported the product's own.
+		Join(rating.For(rating.OnStream)).
+		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "band"`)
 }
 
 // secondsBetween averages how long an issue was open, through the one place an
 // engine is asked how to subtract two moments.
 func secondsBetween(db bun.IDB) string {
 	return "AVG(" + database.SecondsBetween(db,
-		"per_issue.opened_at", "per_issue.closed_at") + ")"
+		database.Column(db, "per_issue.opened_at"),
+		database.Column(db, "per_issue.closed_at")) + ")"
 }

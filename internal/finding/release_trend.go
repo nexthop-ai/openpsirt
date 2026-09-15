@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // ReleasePoint is one frozen point on a trend that follows releases.
@@ -90,7 +91,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(RatedFor(RatedOnStream)).
+		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`st.display_name AS "stream"`).
 		// When it went out, where somebody said, and when it was declared
 		// here otherwise. Ordering by the declaration alone made this chart an
@@ -98,7 +99,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		// shipped sorted after ones that came out later, and a year
 		// backfilled in an afternoon plotted as a single day.
 		ColumnExpr(`COALESCE(st.released_on, st.created_at) AS "created_at"`).
-		ColumnExpr(BandExpr+` AS "band"`).
+		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		Where("st.kind = ?", "tag").
 		Where("f.closed_at IS NULL")

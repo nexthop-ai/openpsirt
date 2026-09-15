@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Within narrows a trend to part of one build's tree.
@@ -108,11 +109,19 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		// This product's rating where it has stated one, folded to the four
+		// words that rank. The other chart on this screen reads it the same
+		// way, so a product that re-rated an issue does not see one severity
+		// on the release chart and another on the one beside it.
+		//
+		// Folded rather than taken raw: an issue with no published severity is
+		// stored as '' rather than NULL, and a scanner's own "unknown" is a
+		// word of its own, so the split grew keys the browser has no color for
+		// — and it draws them all as one "unrated" rung, which is three
+		// different nothings stacked under one name.
+		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		// An issue with no published severity is stored as '', not NULL, so
-		// the empty string is what has to be named — a COALESCE alone never
-		// fires and the chart's split gained a key with no name.
-		ColumnExpr(`COALESCE(NULLIF(v.severity, ''), 'unknown') AS "severity"`).
+		ColumnExpr(rating.BandExpr+` AS "severity"`).
 		// Off the row, not through the run that opened it. That join was an
 		// inner one, so a finding with no run — one somebody recorded by hand
 		// — did not appear on the chart at all rather than appearing wrongly.

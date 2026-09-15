@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -462,7 +463,8 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
 		Scored:   row.Scored == 1,
-		FixState: FixState(row.FixState), FixedIn: row.FixedIn,
+		FixState: agreedFixState(row.FixStateLeast, row.FixStateMost),
+		FixedIn:  agreedFixedIn(row.FixStateLeast, row.FixStateMost, row.FixedIn),
 		Matched:  Matched(row.Matched),
 		State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
 		SentBack: row.SentBack > 0,
@@ -615,7 +617,8 @@ type decorated struct {
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ScoreCenti    int        `bun:"score_centi"`
 	Scored        int        `bun:"scored"`
-	FixState      string     `bun:"fix_state"`
+	FixStateLeast string     `bun:"fix_state_least"`
+	FixStateMost  string     `bun:"fix_state_most"`
 	FixedIn       string     `bun:"fixed_in"`
 	Matched       string     `bun:"matched"`
 	ConsumerID    *int64     `bun:"consumer_id"`
@@ -791,7 +794,13 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
-		ColumnExpr(`MIN(f.fix_state) AS "fix_state"`).
+		// Both ends of what the places say, because a group whose places
+		// disagree is what FixMixed is for and a minimum alone cannot say it:
+		// the filter selected exactly that set and every row came back
+		// claiming one definite state, with a version taken from whichever of
+		// the disagreeing rows sorted first.
+		ColumnExpr(`MIN(f.fix_state) AS "fix_state_least"`).
+		ColumnExpr(`MAX(f.fix_state) AS "fix_state_most"`).
 		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
 		// Any of them: a group is an issue at a component, every place of it
 		// comes from one line of a scanner's report, and the applier writes
@@ -843,17 +852,17 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	return known, nil
 }
 
-// ends reduces a way down to the two steps worth showing and a count of what
-// was left out.
+// Ends returns the two ends of a way down and how many steps sit between
+// them: the part of the product a component belongs to, and what directly
+// pulls it in.
+//
+// Exported because a decision is described the same way wherever it is
+// listed, and a second spelling of which step is which is how two screens
+// disagree about where a component sits.
 //
 // The chain arrives build-first. The build itself is not one of the two: every
 // row in a list scoped to one build shares it, so naming it in every row says
 // nothing and costs the width that the parts which differ need.
-// Ends returns the two ends of a way down and how many steps sit between
-// them: the part of the product a component belongs to, and what directly
-// pulls it in. Exported because a decision is described the same way
-// wherever it is listed, and a second spelling of which step is which is how
-// two screens disagree about where a component sits.
 func Ends(down []graph.Step) (owner, parent string, middle int) {
 	switch len(down) {
 	case 0:
@@ -895,12 +904,18 @@ func firstLineOf(description string) string {
 	if stop := strings.Index(said, ". "); stop > 0 {
 		said = said[:stop+1]
 	}
+	// Measured in characters, which is what a reader sees. Measured in bytes,
+	// a summary written in a script taking three bytes a character was cut to
+	// a third of the line — and the search for a space to break at was a byte
+	// index into it, so a line with no space in its first 160 bytes reached
+	// the client cut inside a character.
 	const most = 160
-	if len(said) > most {
-		if space := strings.LastIndex(said[:most], " "); space > 0 {
-			return strings.TrimSpace(said[:space]) + "…"
+	if utf8.RuneCountInString(said) > most {
+		cut := bound.HeadRunes(said, most)
+		if space := strings.LastIndex(cut, " "); space > 0 {
+			return strings.TrimSpace(cut[:space]) + "…"
 		}
-		return bound.Head(said, most) + "…"
+		return cut + "…"
 	}
 	return strings.TrimSpace(said)
 }

@@ -96,8 +96,25 @@ func NewStore(db *bun.DB) *Store {
 // findings that are still present.
 func (s *Store) Apply(ctx context.Context, targetID, scanID int64, snap Snapshot) (Applied, error) {
 	var applied Applied
-
 	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		var err error
+		applied, err = ApplyWithin(ctx, tx, targetID, scanID, snap)
+		return err
+	})
+	return applied, err
+}
+
+// ApplyWithin is the same, inside a transaction the caller opened.
+//
+// Ingest stores a graph, what the build argued about its own patches and what
+// the inventory was made of, and those three are one act: a graph applied
+// beside claims that were not recorded reads as a build that withdrew every
+// patch it carries, and reopens every finding they suppressed.
+func ApplyWithin(ctx context.Context, tx bun.Tx, targetID, scanID int64,
+	snap Snapshot) (Applied, error) {
+
+	var applied Applied
+	err := func() error {
 		// Taken first, before anything is read. Two scans of one target can be
 		// in flight at once — the queue hands different jobs to different
 		// workers by design — and without this both would read the same open
@@ -163,7 +180,7 @@ func (s *Store) Apply(ctx context.Context, targetID, scanID int64, snap Snapshot
 
 		applied.EdgesOpened, applied.EdgesClosed, err = reconcileEdges(ctx, tx, targetID, scanID, wantedEdges)
 		return err
-	})
+	}()
 	return applied, err
 }
 
@@ -426,11 +443,17 @@ type Neighbor struct {
 func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int64,
 	name, version, ecosystem string) ([]Neighbor, []Neighbor, error) {
 
-	componentID, err := s.ComponentAs(ctx, targetID, name, version, ecosystem)
+	// Authorized before the name is resolved, which is what the two siblings
+	// here already do. The other way round a refusal was informative: a name
+	// the build does not hold answered 404, a name it holds twice answered 409
+	// naming every version and ecosystem, and a name it holds once answered
+	// 403 — so a subject who may not read findings here could read the
+	// build's inventory back one name at a time.
+	productID, readable, err := s.visibleIn(ctx, subject, targetID)
 	if err != nil {
 		return nil, nil, err
 	}
-	readable, err := s.visibleIn(ctx, subject, targetID)
+	componentID, err := s.ComponentAs(ctx, targetID, name, version, ecosystem)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -443,7 +466,7 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 		return nil, nil, err
 	}
 	// What is beneath each neighbor, both directions in one statement.
-	if err := s.filled(ctx, targetID, readable, above, below); err != nil {
+	if err := s.filled(ctx, productID, targetID, readable, above, below); err != nil {
 		return nil, nil, err
 	}
 	// Ordered after that, not before: what a branch is ranked on is what is
@@ -460,8 +483,8 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 // findings of its own, so without this every one of them reads zero while
 // the packages inside hold thousands — and a tree whose counts cannot tell a
 // full branch from an empty one is not something anybody can descend by.
-func (s *Store) filled(ctx context.Context, targetID int64, readable []access.Visibility,
-	lists ...[]Neighbor) error {
+func (s *Store) filled(ctx context.Context, productID, targetID int64,
+	readable []access.Visibility, lists ...[]Neighbor) error {
 
 	var ids []int64
 	for _, rows := range lists {
@@ -469,7 +492,7 @@ func (s *Store) filled(ctx context.Context, targetID int64, readable []access.Vi
 			ids = append(ids, row.ComponentID)
 		}
 	}
-	totals, err := s.beneath(ctx, targetID, readable, ids)
+	totals, err := s.beneath(ctx, productID, targetID, readable, ids)
 	if err != nil {
 		return err
 	}
@@ -515,7 +538,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 		return nil, nil, fmt.Errorf("look up what this build is: %w", err)
 	}
 
-	readable, err := s.visibleIn(ctx, subject, targetID)
+	productID, readable, err := s.visibleIn(ctx, subject, targetID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -531,7 +554,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 		// A document that named no root of its own. The children are still
 		// what somebody reads, so they are still filled in and ordered — the
 		// list is the screen either way.
-		if err := s.filled(ctx, targetID, readable, kids); err != nil {
+		if err := s.filled(ctx, productID, targetID, readable, kids); err != nil {
 			return nil, nil, err
 		}
 		ordered(kids)
@@ -541,7 +564,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	// number is the whole build's, and it was a second walk of the same
 	// edges when asked for on its own.
 	top := []Neighbor{*root}
-	if err := s.filled(ctx, targetID, readable, top, kids); err != nil {
+	if err := s.filled(ctx, productID, targetID, readable, top, kids); err != nil {
 		return nil, nil, err
 	}
 	root.Beneath = top[0].Beneath
@@ -743,13 +766,13 @@ func (s *Store) knowsBuild(ctx context.Context, subject access.Subject, targetID
 // The graph is browsed beside a findings list that is narrowed correctly, so a
 // count here that is not narrowed the same way is the more dangerous of the
 // two: nobody looking at it expects it to be a disclosure.
-func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID int64) ([]access.Visibility, error) {
+func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID int64) (int64, []access.Visibility, error) {
 	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if !subject.Sees(productID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	readable := []access.Visibility{}
 	if subject.Reads(access.Public, productID) {
@@ -759,9 +782,13 @@ func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID 
 		readable = append(readable, access.Private)
 	}
 	if len(readable) == 0 {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
-	return readable, nil
+	// The product comes back with what may be read in it, because the rating
+	// a band is drawn from belongs to that same product: a count severity-
+	// banded for one product while authorized against another is the fault
+	// this pair exists to make unspellable.
+	return productID, readable, nil
 }
 
 // Step is one component on the way down to another.
@@ -778,13 +805,17 @@ type Step struct {
 // components and few edges is a document that listed everything and said
 // where almost nothing went.
 func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int64) (int, int, error) {
-	if _, err := s.visibleIn(ctx, subject, targetID); err != nil {
+	if _, _, err := s.visibleIn(ctx, subject, targetID); err != nil {
 		return 0, 0, err
 	}
 	components, err := s.db.NewSelect().
 		TableExpr(`graph_node AS "n"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
+		// The build's own root is not one of its components, which is what the
+		// list beside this number already says. Counted, the header read one
+		// higher than the rows below it on every build.
+		Where("n.is_root = ?", false).
 		Count(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("count what this build holds: %w", err)
@@ -815,7 +846,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int64,
 	term string, limit int) ([]Neighbor, error) {
 
-	readable, err := s.visibleIn(ctx, subject, targetID)
+	_, readable, err := s.visibleIn(ctx, subject, targetID)
 	if err != nil {
 		return nil, err
 	}
@@ -837,7 +868,13 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		ColumnExpr(`(SELECT COUNT(*) FROM "finding" AS "f"
+		// Issues rather than finding rows, which is what this field is and
+		// what the two queries that browse to the same component answer.
+		// Counted as rows, a library reachable under three parents reported
+		// three times its real number — and the results are ordered by it, so
+		// deeply-vendored components with few real issues outranked shallow
+		// ones with many.
+		ColumnExpr(`(SELECT COUNT(DISTINCT f.vulnerability_id) FROM "finding" AS "f"
 			WHERE f.target_id = ? AND f.component_id = c.id
 			  AND f.closed_at IS NULL AND f.visibility IN (?)) AS "findings"`,
 			targetID, bun.List(readable)).

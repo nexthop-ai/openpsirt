@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/uptrace/bun"
 )
@@ -84,4 +85,33 @@ func IDsInBatches(ctx context.Context, ids []int64, fn func(context.Context, []i
 		}
 	}
 	return nil
+}
+
+// InAnyOf is a membership test over a list too long for one statement.
+//
+// The same ceiling `IDsInBatches` exists for, met on a read rather than a
+// write: a condition cannot be issued in pieces, so the list is split and the
+// pieces are OR-ed. Every engine takes that, and each `IN` stays within what
+// all four accept.
+//
+// Answers a condition that is never true for an empty list, which is what an
+// empty set means — and what `IN ()` is a syntax error for on two of the four.
+//
+// The column is an Expr rather than a plain string, for the reason Expr exists:
+// a placeholder cannot bind a column name, so this one is spliced into
+// statement text, and taking it as an ordinary string leaves nothing between
+// that splice and a name arriving from a query parameter except that today's
+// callers all pass literals (REQ-66).
+func InAnyOf(column Expr, ids []int64) (string, []any) {
+	if len(ids) == 0 {
+		return "1 = 0", nil
+	}
+	said := make([]string, 0, len(ids)/BatchSize+1)
+	args := make([]any, 0, len(ids)/BatchSize+1)
+	for start := 0; start < len(ids); start += BatchSize {
+		end := min(start+BatchSize, len(ids))
+		said = append(said, string(column)+" IN (?)")
+		args = append(args, bun.List(ids[start:end]))
+	}
+	return "(" + strings.Join(said, " OR ") + ")", args
 }

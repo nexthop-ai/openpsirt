@@ -7,6 +7,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -53,7 +54,7 @@ func Recordable() []string {
 //
 // No floor is enforced through this. What a line lets through goes through
 // Band, which folds an unrated issue to medium rather than below everything —
-// see BandExpr for why, and for what reading it the other way cost.
+// see rating.BandExpr for why, and for what reading it the other way cost.
 func Ranks(word string) int {
 	for i, known := range ranked {
 		if strings.EqualFold(word, known) {
@@ -61,6 +62,39 @@ func Ranks(word string) int {
 		}
 	}
 	return 0
+}
+
+// rankCase is the severity ordering as SQL, numbered from one in ranked's
+// order, over whatever expression the caller names.
+//
+// Built from the one list rather than written out again. The order was typed
+// out three more times — twice as SQL and once as the mapping back to words —
+// and Bands' own doc already records what that cost: a word added to one copy
+// and missing from another sorts one way and filters another.
+//
+// The ELSE is the caller's. The cross-product list needs zero, so that the
+// sentinel for "no line" compares below every rating; a caller naming an
+// expression that already folds every value needs none of it.
+func rankCase(over string, otherwise int) string {
+	// A simple CASE, so the expression is named once: written as a searched
+	// one it repeats, and an expression carrying a placeholder then wants four
+	// arguments where its caller binds one.
+	said := "CASE " + over
+	for i := len(ranked) - 1; i >= 0; i-- {
+		said += fmt.Sprintf(" WHEN '%s' THEN %d", ranked[i], i+1)
+	}
+	return said + fmt.Sprintf(" ELSE %d END", otherwise)
+}
+
+// wordAt is the severity word a rank stands for, empty for a rank no band has.
+//
+// The inverse of rankCase, read out of the same list rather than written back
+// out as a switch.
+func wordAt(rank int) string {
+	if rank < 1 || rank > len(ranked) {
+		return ""
+	}
+	return ranked[rank-1]
 }
 
 // Unrated is what a rating nobody recognizes is called, and what a rating
@@ -85,36 +119,7 @@ func BandOf(word string) string {
 	return strings.ToLower(strings.TrimSpace(word))
 }
 
-// BandExpr is the rating a finding is judged by, folded to one of the four
-// words that rank.
-//
-// Spelled once, and used by both the line and the deadline, because they were
-// briefly two rules reading the same fact and they disagreed: the deadline
-// treats an unrated issue as a medium, on the grounds that unknown is not
-// harmless, while the line was treating it as below everything. On a real
-// image that was **91,040 findings rated "unknown"** dropping out of the
-// working list *and* off any clock, which is the opposite of what an unknown
-// rating should cause. Every bug in this project's identity and expiry rules
-// came from letting one fact into two rules; this is that lesson arriving in a
-// third place. This product's where it has stated one, the published one
-// otherwise: being able to say a published rating is wrong is pointless if
-// everything that ranks and filters then ignores us.
-//
-// Read off the rating joined by RatedFor, so a query using this joins that
-// too and says which product it is asking about. A statement that reads the
-// expression without the join does not compile on any of the four engines,
-// which is the failure being chosen — the alternative is a query that silently
-// answers for the wrong product.
-const BandExpr = `CASE
-	WHEN COALESCE(ir.severity, v.severity, '') = 'critical' THEN 'critical'
-	WHEN COALESCE(ir.severity, v.severity, '') = 'high' THEN 'high'
-	WHEN COALESCE(ir.severity, v.severity, '') IN ('low', 'negligible', 'none') THEN 'low'
-	ELSE 'medium' END`
-
-// EffectiveSeverityExpr is the rating in force in one product, as a word.
-const EffectiveSeverityExpr = `COALESCE(ir.severity, v.severity, '')`
-
-// Band folds a severity word the same way BandExpr does.
+// Band folds a severity word the same way rating.BandExpr does.
 func Band(severity string) string {
 	switch severity {
 	case "critical", "high":
@@ -150,6 +155,38 @@ type Floor struct {
 	// decision about what is worth an afternoon, and what it is compared to is
 	// the product's own rating of the issue where it has made one.
 	ProductID int64
+}
+
+// TriageFloors are the words a line may be set to, least first, with the word
+// for no line at the head.
+//
+// One list rather than a copy per caller: what an operator may set and what
+// the line is then compared against are the same vocabulary, and a second
+// spelling of it is what let a word the line accepts be a word it cannot
+// enforce.
+func TriageFloors() []string {
+	out := make([]string, 0, len(ranked)+1)
+	return append(append(out, NoFloor), ranked...)
+}
+
+// FloorWord is a stored line as a word this understands, and whether it is one.
+//
+// Anything unrecognized answers NoFloor and false. A line that cannot be
+// enforced has to read as no line at all: Hides was true for any word that was
+// neither empty nor NoFloor, so a product set to something outside the
+// vocabulary displayed a line everywhere while every query let everything
+// through — the screens said a line was in force and nothing enforced one.
+func FloorWord(word string) (string, bool) {
+	matched := strings.ToLower(strings.TrimSpace(word))
+	if matched == "" || matched == NoFloor {
+		return NoFloor, true
+	}
+	for _, known := range ranked {
+		if matched == known {
+			return matched, true
+		}
+	}
+	return NoFloor, false
 }
 
 // Hides reports whether the line keeps anything out at all.
@@ -197,9 +234,9 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("f.urgency >= ?", int64(exploitedBand)).
 				WhereOr("f.vulnerability_id IN (?)",
 					q.NewSelect().TableExpr(`vulnerability AS "v"`).
-						Join(RatedHere, f.ProductID).
+						Join(rating.Here, f.ProductID).
 						Column("v.id").
-						Where(BandExpr+" IN (?)", bun.List(words)))
+						Where(rating.BandExpr+" IN (?)", bun.List(words)))
 		})
 	}
 	return q
@@ -238,7 +275,11 @@ func FloorFor(ctx context.Context, db bun.IDB, productID int64) (Floor, error) {
 		return Floor{}, fmt.Errorf("read what this product triages: %w", err)
 	}
 	if stated.Floor != nil && *stated.Floor != "" {
-		return Floor{Word: *stated.Floor, FromProduct: true, ProductID: productID}, nil
+		// Normalized here as well as refused at the write, so a value stored
+		// by anything else reads as no line rather than as a line nothing
+		// enforces.
+		word, known := FloorWord(*stated.Floor)
+		return Floor{Word: word, FromProduct: known, ProductID: productID}, nil
 	}
 	word, set, err := setting.NewStore(db).Get(ctx, setting.TriageFloor)
 	if err != nil {
@@ -247,5 +288,6 @@ func FloorFor(ctx context.Context, db bun.IDB, productID int64) (Floor, error) {
 	if !set || word == "" {
 		return Floor{Word: NoFloor, ProductID: productID}, nil
 	}
-	return Floor{Word: word, ProductID: productID}, nil
+	line, _ := FloorWord(word)
+	return Floor{Word: line, ProductID: productID}, nil
 }
