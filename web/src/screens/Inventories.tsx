@@ -3,7 +3,7 @@ import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Carried } from "../ui/Carried";
 import { CarriedPatches } from "../ui/CarriedPatches";
@@ -12,6 +12,7 @@ import { Failed } from "../ui/Failed";
 import { Fab } from "../ui/Drawer";
 import { Icon } from "../ui/Icons";
 import { UploadDrawer } from "../ui/Upload";
+import { Wide } from "../ui/Wide";
 
 // What each build uploaded, and what the scan of it found. A scan is what the
 // deployment does to an inventory after it arrives; what a person uploads, and
@@ -41,6 +42,11 @@ export function Inventories() {
     queryFn: async () => unwrap(await api.GET("/v1/scanning", { params: { query: { product } } })),
   });
   const quiet = (scanning.data?.items ?? []).filter((b) => b.quiet);
+  // How many there are, against how many are named. These rows are named
+  // rather than counted, so the page is what a reader sees — but a page short
+  // of the answer named some builds and stayed silent about the rest, which on
+  // this screen reads as "those are the quiet ones".
+  const quietTotal = scanning.data?.quiet ?? 0;
   // Silence on a release that has gone out of support is expected rather than
   // a fault, so it is said quietly rather than raised — but it is still said.
   // "Not scanned, and that is fine" and "not mentioned" are different answers.
@@ -85,6 +91,14 @@ export function Inventories() {
         </div>
       ))}
 
+      {quietTotal > quiet.length && (
+        <p className="hint" style={{ marginBottom: 10 }}>
+          {(quietTotal - quiet.length).toLocaleString()} more{" "}
+          {quietTotal - quiet.length === 1 ? "build has" : "builds have"} gone quiet here and are
+          not named above. The scan-coverage report lists every one of them.
+        </p>
+      )}
+
       {retired.length > 0 && (
         <p className="hint" style={{ marginBottom: 10 }}>
           {retired.map((build) => `${build.stream} · ${build.variant}`).join(", ")}
@@ -99,7 +113,7 @@ export function Inventories() {
           detail="A build pipeline uploads an inventory, or somebody does from the button above, and what became of it appears here."
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -211,7 +225,7 @@ export function Inventories() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       {measured && (
@@ -376,29 +390,43 @@ function Placed({ components, placed }: { components?: number; placed?: number }
   );
 }
 
+// The vocabulary the server declares for what an upload is doing, read out of
+// the generated client rather than retyped.
+type Uploaded = NonNullable<Body<"ReceiptBody">["state"]>;
+
 // The states an upload passes through, and the one it can end in.
+//
+// One table keyed on the vocabulary the server declares, rather than three
+// parallel ones over the same four words: a state added to one of the three
+// and not the others drew a label with the wrong color, or a color with no
+// label, and nothing here would have said so. Keyed on the generated union, a
+// fifth state is a compile error at this table rather than a silent neutral
+// badge.
+const STATES: Record<Uploaded, { cls: string; label: string; means: string }> = {
+  reading: {
+    cls: "waiting",
+    label: "Queued — parsing",
+    means: "accepted, not yet parsed",
+  },
+  scanning: {
+    cls: "waiting",
+    label: "Scanning",
+    means: "parsed; the vulnerability scan is still running",
+  },
+  scanned: { cls: "agreed", label: "Completed", means: "complete" },
+  failed: {
+    cls: "lapsed",
+    label: "Failed",
+    means: "it did not finish, and the reason is beside it",
+  },
+};
+
 function State({ state }: { state?: string }) {
-  const cls: Record<string, string> = {
-    reading: "waiting",
-    scanning: "waiting",
-    scanned: "agreed",
-    failed: "lapsed",
-  };
-  const label: Record<string, string> = {
-    reading: "Queued — parsing",
-    scanning: "Scanning",
-    scanned: "Completed",
-    failed: "Failed",
-  };
-  const means: Record<string, string> = {
-    reading: "accepted, not yet parsed",
-    scanning: "parsed; the vulnerability scan is still running",
-    scanned: "complete",
-    failed: "it did not finish, and the reason is beside it",
-  };
+  const it = state ? STATES[state as Uploaded] : undefined;
+  if (!it) return <span className="state open">{state ?? "—"}</span>;
   return (
-    <span className={`state ${cls[state ?? ""] ?? "open"}`} title={means[state ?? ""]}>
-      {label[state ?? ""] ?? state}
+    <span className={`state ${it.cls}`} title={it.means}>
+      {it.label}
     </span>
   );
 }

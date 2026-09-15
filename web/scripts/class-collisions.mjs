@@ -146,6 +146,7 @@ if (!/\.rounded-lg[\s,:{]/.test(ours.build(["rounded-lg"]))) {
 }
 
 const names = [...defined.keys()].sort();
+
 const emitted = compiler.build(names);
 const clashing = names.filter((name) =>
   new RegExp(`\\.${name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&")}(?=[\\s,:{>+~])`).test(emitted),
@@ -157,18 +158,46 @@ const clashing = names.filter((name) =>
 // code — `.ring` sat here styling nothing, and was only noticed because
 // Tailwind happened to define the same name.
 //
-// Matched against the whole of the source rather than against `className=`
-// alone, because class names are built as well as written: a template literal
-// puts `col ${kind}` in the markup and the modifier appears nowhere as a
-// literal, so anything stricter reports names that are plainly in use. That
-// makes this deliberately weak — it finds a name mentioned nowhere at all,
-// which is the case worth finding, and stays quiet otherwise.
+// Matched against what could reach an element — quoted and template text —
+// rather than against the whole of the source.
+//
+// Class names are built as well as written: a template literal puts
+// `col ${kind}` in the markup and the modifier appears nowhere as a literal,
+// so anything stricter than "a quoted run somewhere" reports names that are
+// plainly in use. That tolerance stays: a name at the head of a template still
+// matches, and so does one a helper returns.
+//
+// What does not stay is prose. Every one of these names is also an ordinary
+// English word somewhere in a comment — "editor", "found", "steps", "bar" —
+// and a space either side of a word in a sentence was a match, so ten rules
+// nothing applied were reported as in use by the check written to find exactly
+// that. Comments go first, then only the quoted runs are kept, nested ones
+// included: a class inside an interpolation is itself a quoted string.
+//
+// The generated client is left out for the same reason its two sibling gates
+// leave it out: it is the API document as TypeScript, and a word in an
+// operation's description is not markup.
 const sources = [];
 async function scripts(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) await scripts(full);
-    else if (/\.(tsx?|html)$/.test(entry.name)) sources.push(await readFile(full, "utf8"));
+    if (entry.isDirectory()) {
+      await scripts(full);
+      continue;
+    }
+    if (!/\.(tsx?|html)$/.test(entry.name) || entry.name === "schema.d.ts") continue;
+    const text = (await readFile(full, "utf8"))
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/(?<![:\w])\/\/[^\n]*/g, " ");
+    if (entry.name.endsWith(".html")) {
+      sources.push(text);
+      continue;
+    }
+    for (const [, single, double, template] of text.matchAll(
+      /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g,
+    )) {
+      sources.push(` ${single ?? double ?? template ?? ""} `);
+    }
   }
 }
 await scripts(src);
@@ -218,6 +247,12 @@ if (unused.length > 0) {
 // therefore quiet rather than noisy, which is the right way round for a check
 // that cannot see what a template literal will hold.
 const written = new Map();
+// What was looked at, as against what was found. `written` holds only the
+// names markup carries that no rule defines, so it is empty in a healthy
+// tree — it cannot say whether anything was examined, and the counts below
+// can.
+let markupSeen = 0;
+let classesSeen = 0;
 async function markupClasses(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -226,11 +261,14 @@ async function markupClasses(dir) {
       continue;
     }
     if (!/\.tsx?$/.test(entry.name) || entry.name === "schema.d.ts") continue;
+    markupSeen++;
     const lines = (await readFile(full, "utf8")).split("\n");
     lines.forEach((line, i) => {
       for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
         for (const word of (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, " ").split(/\s+/)) {
-          if (/^[A-Za-z][\w-]*$/.test(word) && !defined.has(word) && !written.has(word)) {
+          if (!/^[A-Za-z][\w-]*$/.test(word)) continue;
+          classesSeen++;
+          if (!defined.has(word) && !written.has(word)) {
             written.set(word, `${path.relative(src, full)}:${i + 1}`);
           }
         }
@@ -259,8 +297,25 @@ if (clashing.length > 0) {
   console.error(`\nRename ours — "was-fixed" rather than "fixed".`);
   process.exit(1);
 }
+// A gate that iterates a collection counts what it examined and fails on zero.
+//
+// All three checks above are loops over a set, and a set that came back empty
+// makes every one of them pass having looked at nothing — which is what a
+// stylesheet moved out from under `src/`, or a markup glob that stopped
+// matching, looks like from here. The summary line says what was examined;
+// this is what stops the number being nought.
+if (names.length === 0 || markupSeen === 0 || classesSeen === 0) {
+  console.error(
+    `this found ${names.length} class name(s) in the stylesheets and ` +
+      `${classesSeen} written on an element across ${markupSeen} file(s), ` +
+      "so it checked nothing.\n\n" +
+      "  Either the stylesheets or the markup moved out from under it.\n",
+  );
+  process.exit(1);
+}
+
 console.log(
   `no collisions: ${names.length} class names checked against Tailwind, ` +
     `${modifiers.size} used as a modifier checked against our own rules, ` +
-    `${written.size} applied in markup checked for having a rule`,
+    `${classesSeen} written on an element across ${markupSeen} files checked for having a rule`,
 );

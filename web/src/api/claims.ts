@@ -15,7 +15,11 @@ export type Claim = {
   key: string;
   id: number;
   decisionId: number;
-  kind: "finding" | "together" | "extension" | "returned";
+  // The server's own vocabulary, read out of the generated client. Restated
+  // here and narrowed by hand, the check that did the narrowing could not
+  // fail — its three comparisons exhausted every value but one — so a fifth
+  // kind would have been silently relabeled as a finding rather than caught.
+  kind: QueueRow["claim"]["kind"];
   derivedFrom: number | null;
   title: string;
   product: string;
@@ -44,12 +48,11 @@ export type Claim = {
 };
 
 export function claimOf(row: QueueRow): Claim {
-  const kind = row.claim.kind;
   return {
     key: `claim:${row.claim.id}`,
     id: row.claim.id,
     decisionId: row.decision.id ?? 0,
-    kind: kind === "together" || kind === "extension" || kind === "returned" ? kind : "finding",
+    kind: row.claim.kind,
     derivedFrom: row.claim.derived_from ?? null,
     title: row.place.vulnerability ?? "",
     product: row.place.product ?? "",

@@ -7,6 +7,7 @@ import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Sheet } from "./Sheet";
+import { Wide } from "../../ui/Wide";
 
 // What is still shipped and no longer maintained.
 //
@@ -32,7 +33,11 @@ export function Support() {
   const asked = new URLSearchParams(scope).toString();
 
   return (
-    <Sheet name="Releases out of support" answers="what is still shipped and no longer maintained.">
+    <Sheet
+      settled={ended.isSuccess}
+      name="Releases out of support"
+      answers="what is still shipped and no longer maintained."
+    >
       {ended.isPending ? (
         <Loading />
       ) : ended.isError ? (
@@ -59,7 +64,7 @@ export function Support() {
                 The whole of it as a file — <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
                 <a href={fileAt("json", asked)}>JSON</a>, with the day it was taken stated in it.
               </p>
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -105,7 +110,7 @@ export function Support() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
             </>
           )}
         </section>

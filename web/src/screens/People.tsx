@@ -9,6 +9,8 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { called, ROLES, type Role } from "../ui/roles";
 import { Access } from "./Access";
+import { Wide } from "../ui/Wide";
+import type { Who } from "../app/session";
 
 // Users and roles: who can see what, and who can decide about it.
 //
@@ -16,7 +18,7 @@ import { Access } from "./Access";
 // so this is what an administrator decided rather than who has turned up — and
 // being recorded grants a role, it does not let anybody in. They still sign in
 // through a configured provider.
-export function People() {
+export function People({ who: me }: { who: Who }) {
   const queries = useQueryClient();
   const [adding, setAdding] = useState(false);
   // Whose grid is open. One at a time: the grid is as wide as the table and
@@ -114,13 +116,22 @@ export function People() {
 
   const rows = people.data?.items ?? [];
   const derived = mode.data?.mode === "group-bound";
+  // A role source that could not be read is not a role source that assigns
+  // roles here. Reading it as "not group-bound" re-enabled every Manage button
+  // in a deployment where a direct grant is overwritten by the next sign-in,
+  // so an administrator's work is undone with nothing said.
+  const unreadMode = mode.isPending || mode.isError;
+  const cannotManage = derived || unreadMode;
 
   return (
     <>
       <div className="screen-head">
         <h2>Users and roles</h2>
         <p>Who can read and decide what</p>
-        <AddButton label="Add user" onClick={() => setAdding(true)} />
+        {/* Offered only to somebody the server will take it from. A control
+            that changes nothing is worse than a control that is not there,
+            because pressing it looks like it worked. */}
+        {me.admin && <AddButton label="Add user" onClick={() => setAdding(true)} />}
       </div>
 
       {grant.error != null && <Failed error={grant.error} what="That role could not be granted." />}
@@ -134,7 +145,7 @@ export function People() {
       {rows.length === 0 ? (
         <Empty title="Nobody is recorded yet." detail="Add somebody to give them a way in." />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -246,11 +257,15 @@ export function People() {
                         type="button"
                         className="linkish"
                         aria-expanded={openFor === person.identity}
-                        disabled={derived}
+                        disabled={!me.admin || cannotManage}
                         title={
-                          derived
-                            ? "Roles come from provider groups and would be overwritten"
-                            : "Every product against every capability, as a grid"
+                          !me.admin
+                            ? "Only an administrator grants and withdraws roles"
+                            : derived
+                              ? "Roles come from provider groups and would be overwritten"
+                              : unreadMode
+                                ? "Where roles come from could not be read"
+                                : "Every product against every capability, as a grid"
                         }
                         onClick={() =>
                           setOpenFor(openFor === person.identity ? "" : (person.identity ?? ""))
@@ -264,7 +279,12 @@ export function People() {
                         type="button"
                         className="linkish"
                         style={{ color: "var(--muted)" }}
-                        title="Sign them out everywhere"
+                        disabled={!me.admin}
+                        title={
+                          me.admin
+                            ? "Sign them out everywhere"
+                            : "Only an administrator ends somebody else's sessions"
+                        }
                         onClick={() => endSessions.mutate({ identity: person.identity ?? "" })}
                       >
                         End sessions
@@ -328,7 +348,7 @@ export function People() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       {derived && (
@@ -338,10 +358,20 @@ export function People() {
         </div>
       )}
 
+      {mode.isError && (
+        <div className="alert" style={{ marginTop: 12 }}>
+          <strong>Where roles come from could not be read</strong>
+          <span>
+            Granting one here would be overwritten at the next sign-in if this deployment takes
+            roles from provider groups, so the grids stay closed until it answers.
+          </span>
+        </div>
+      )}
+
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Role source</h3>
         <p className="hint" style={{ margin: 0 }}>
-          <b>{mode.data?.mode ?? "reading"}</b>
+          <b>{mode.isError ? "could not be read" : (mode.data?.mode ?? "reading")}</b>
           {(bindings.data?.items ?? []).length > 0 && (
             <>
               {" "}
@@ -353,7 +383,7 @@ export function People() {
           sign-in provider reports. Never both.
         </p>
         {(bindings.data?.items ?? []).length > 0 && (
-          <div className="tablewrap" style={{ marginTop: 10 }}>
+          <Wide style={{ marginTop: 10 }}>
             <table>
               <thead>
                 <tr>
@@ -376,7 +406,7 @@ export function People() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
         )}
       </div>
 
@@ -493,7 +523,7 @@ function Credentials() {
           Nothing is issued.
         </p>
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -581,7 +611,7 @@ function Credentials() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
 
       {issued && (

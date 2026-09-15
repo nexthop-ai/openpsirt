@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Wide } from "../ui/Wide";
 
 // Where a promise stands, said in words rather than left to a color.
 const STANDING: Record<string, string> = {
@@ -84,7 +85,7 @@ export function Upgrades() {
           }
         />
       ) : (
-        <div className="tablewrap">
+        <Wide>
           <table>
             <thead>
               <tr>
@@ -149,7 +150,7 @@ export function Upgrades() {
               })}
             </tbody>
           </table>
-        </div>
+        </Wide>
       )}
     </>
   );

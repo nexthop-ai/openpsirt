@@ -8,6 +8,7 @@ import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Severity } from "../../ui/Severity";
 import { Sheet } from "./Sheet";
+import { Wide } from "../../ui/Wide";
 
 // Whether work met the dates policy set for it.
 //
@@ -45,7 +46,11 @@ export function Compliance() {
   );
 
   return (
-    <Sheet name="Deadline compliance" answers="whether work met the dates policy set for it.">
+    <Sheet
+      settled={rates.isSuccess}
+      name="Deadline compliance"
+      answers="whether work met the dates policy set for it."
+    >
       {product === "" ? (
         <section className="panel">
           <Empty
@@ -95,7 +100,7 @@ export function Compliance() {
             <p className="hint" style={{ marginTop: 0 }}>
               Issues at components. A group is closed only when no place of it is still open.
             </p>
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -137,7 +142,7 @@ export function Compliance() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
           </section>
 
           {/* What a rate about deadlines cannot be about, said here rather

@@ -74,7 +74,7 @@ func registerEntry(api huma.API, in Ingest) {
 			Builds []struct {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
 				Variant string `json:"variant" minLength:"1" doc:"How that line is built"`
-			} `json:"builds" minItems:"1" doc:"Every build that ships it. One issue, one finding per build — which is the shape a scanner's findings already take"`
+			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, one finding per build — which is the shape a scanner's findings already take"`
 			Summary  string `json:"summary" minLength:"1" doc:"What the flaw is, in your own words"`
 			Severity string `json:"severity,omitempty" enum:"critical,high,medium,low,negligible,none" doc:"How bad it is. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
 			// The vector rather than a score. The number is derived from it
@@ -597,7 +597,7 @@ func registerAffects(api huma.API, in Ingest) {
 			Builds []struct {
 				Stream  string `json:"stream" minLength:"1"`
 				Variant string `json:"variant" minLength:"1"`
-			} `json:"builds" minItems:"1" doc:"Every build it affects, as the whole answer rather than a change to it"`
+			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding"`
 			Reason string `json:"reason,omitempty" doc:"Why any build is being taken out. Required whenever one is"`
 		}
 	}) (*struct{ Body AffectsBody }, error) {

@@ -23,6 +23,20 @@ type PerBuildBody struct {
 	// Purl is what an ecosystem and an upstream address are read out of.
 	Purl      string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
 	Ecosystem string `json:"ecosystem,omitempty" doc:"Which ecosystem the identifier names, read out of it rather than stored"`
+	// Where the package is published, worked out from the identifier by the
+	// one table that does that. The interface had a second table of its own,
+	// with a different membership and different answers for the same
+	// identifier — an Ubuntu package was sent to Debian's tracker, which is a
+	// record for different code.
+	//
+	// Named for what it is rather than "upstream", which already means
+	// something else in this vocabulary: on a finding it is what a fork was
+	// made from, and on a component it is the source package a binary was
+	// built from. One word for two unrelated senses is the thing this change
+	// is against, and nothing is compatible with anything yet, so the rename
+	// is free now and impossible later.
+	PackagePageURL  string `json:"package_page_url,omitempty" doc:"Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like"`
+	PackagePageName string `json:"package_page_name,omitempty" doc:"What to call that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is"`
 	// What an ecosystem's index says the package is, where one was asked and
 	// answered. Absent is the ordinary case rather than a gap.
 	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
@@ -116,9 +130,11 @@ func registerComponent(api huma.API, in Ingest) {
 				upgrades = append(upgrades, UpgradeBody{To: each.To, FixedHere: each.FixedHere,
 					Reached: each.Reached, Ordered: each.Ordered})
 			}
+			page, called := finding.PackagePage(build.Purl)
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
 				Stream: build.Stream, Variant: build.Variant, Version: build.Version,
 				Purl: build.Purl, Ecosystem: graph.EcosystemOf(build.Purl),
+				PackagePageURL: page, PackagePageName: called,
 				Summary: build.Summary, ProjectURL: build.ProjectURL,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
 				Fixable:  build.Fixable,

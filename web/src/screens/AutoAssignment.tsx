@@ -7,6 +7,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Suggest } from "../ui/Suggest";
+import { Wide } from "../ui/Wide";
 
 // The standing rules that hand work nobody holds to a team.
 //
@@ -209,6 +210,10 @@ export function AutoAssignment() {
         </div>
       )}
 
+      {/* A refused retirement is said. Without it the button re-enables, the
+          row stays, and the rule goes on placing work. */}
+      {retire.isError && <Failed error={retire.error} what="That rule could not be retired." />}
+
       {product === "" ? (
         <Empty
           title="Pick a product."
@@ -224,7 +229,7 @@ export function AutoAssignment() {
               detail="Without a rule, work nobody holds stays in the unassigned list until somebody picks it up."
             />
           ) : (
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -255,11 +260,14 @@ export function AutoAssignment() {
                       </td>
                       <td>{rule.team}</td>
                       <td>
+                        {/* A rule with no identifier is a row the server did
+                            not fully answer for, and asking to retire rule
+                            zero is a 404 dressed as an act. */}
                         <button
                           type="button"
                           className="linkish"
-                          disabled={retire.isPending}
-                          onClick={() => retire.mutate(rule.id ?? 0)}
+                          disabled={retire.isPending || rule.id == null}
+                          onClick={() => rule.id != null && retire.mutate(rule.id)}
                         >
                           Retire
                         </button>
@@ -268,7 +276,7 @@ export function AutoAssignment() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
           )}
 
           <div className="card" style={{ marginTop: 16 }}>

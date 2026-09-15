@@ -6,6 +6,7 @@ import { Failed } from "../ui/Failed";
 import { on } from "../ui/when";
 import { notACredential } from "../ui/noautofill";
 import { Paged } from "../ui/Paged";
+import { Wide } from "./Wide";
 
 // What a build says it deals with itself, over time.
 //
@@ -94,7 +95,7 @@ export function CarriedPatches({
             </p>
           ) : (
             <>
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -155,7 +156,7 @@ export function CarriedPatches({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
               <Paged
                 shown={rows.length}
                 total={total}

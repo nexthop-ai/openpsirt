@@ -130,17 +130,35 @@ export const DEADLINES = [
   ["90", "Due within 90 days"],
 ] as const;
 
-// The package kinds a real image carries, most numerous first. The name is the
-// one the package identifier spells, with the language beside it where they
-// differ — Rust is cargo and Python is pypi, and somebody looking for one of
-// those searches for the language.
+// The package kinds worth offering, most numerous first. The name is the one
+// the package identifier spells, with the language beside it where they differ
+// — Rust is cargo and Python is pypi, and somebody looking for one of those
+// searches for the language.
+//
+// **What the server takes is open, and this is what is offered.** The filter
+// carries whatever string arrives and matches the identifier against it, so
+// this list bounds the picker rather than the question — and a list short of
+// what an image actually holds is a capability that exists and cannot be
+// reached. `apk` and `rpm` were missing from it, so on an Alpine or RPM image
+// the majority of the inventory could not be narrowed to at all, while the
+// server would have answered either correctly.
+//
+// A kind this does not list is still askable: the address carries it, the
+// server matches it, and the chip above the list labels it with the word
+// itself. What it has no way to do is offer it, and the durable answer to that
+// is the kinds actually present travelling with the read rather than a longer
+// list here — which is a question the server does not answer yet.
 export const ECOSYSTEMS = [
   ["", "Any"],
   ["generic", "Generic"],
   ["golang", "Go (golang)"],
   ["deb", "Debian (deb)"],
+  ["rpm", "RPM"],
+  ["apk", "Alpine (apk)"],
   ["cargo", "Rust (cargo)"],
   ["pypi", "Python (pypi)"],
+  ["npm", "npm"],
+  ["gem", "Ruby (gem)"],
   ["oci", "Container image (oci)"],
   ["github", "GitHub"],
   ["maven", "Maven"],
@@ -712,7 +730,12 @@ export function Narrowed({
       <span className="hint">Narrowed by</span>
       {active.map((each) => (
         <button
-          key={each.key}
+          // The key and the value, because a multi-valued filter puts one
+          // entry here per value and they all carry the filter's key. Keyed
+          // on the key alone, two values of one filter were siblings with the
+          // same key, and removing either left the survivor drawing the one
+          // that went.
+          key={`${each.key} ${each.value}`}
           type="button"
           className="chip"
           aria-pressed

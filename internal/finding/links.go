@@ -132,6 +132,22 @@ func distributionAnswer(identifier string, parts graph.Parts) (Link, bool) {
 	return Link{}, false
 }
 
+// PackagePage is where the package an identifier names is published, or
+// nothing where this knows no address for that kind of package.
+//
+// Exported because the interface had a second table doing the same work, in a
+// second language, with a different membership and different answers: it sent
+// every Debian-family package to Debian's own tracker, so an Ubuntu package's
+// link landed on a record for different code with a different version history
+// and different advisory status. There is one table, and it is this one.
+func PackagePage(purl string) (address, name string) {
+	link, found := packagePage(graph.PartsOfPurl(purl))
+	if !found {
+		return "", ""
+	}
+	return link.URL, link.Name
+}
+
 // packagePage is where the package itself is published.
 //
 // Per ecosystem, because there is no general answer: an identifier says which
@@ -157,6 +173,24 @@ func packagePage(parts graph.Parts) (Link, bool) {
 			return Link{URL: "https://launchpad.net/ubuntu/+source/" + name, Name: "Ubuntu package"}, true
 		}
 		return Link{URL: "https://packages.debian.org/" + name, Name: "Debian package"}, true
+	// An RPM is not one distribution's, so the namespace decides — the same
+	// rule the arm above follows. Sent to Fedora unconditionally, as the
+	// interface's own table did, a SUSE or Rocky package landed on a record
+	// for different code, which is the failure that table was deleted for. A
+	// namespace this does not know produces nothing rather than a guess, which
+	// leaves the distribution's own answer for a CVE as what such a package
+	// gets.
+	case "rpm":
+		switch parts.Namespace {
+		case "fedora":
+			return Link{URL: "https://src.fedoraproject.org/rpms/" + name, Name: "Fedora package"}, true
+		case "opensuse", "suse":
+			return Link{
+				URL:  "https://build.opensuse.org/package/show/openSUSE:Factory/" + name,
+				Name: "openSUSE package",
+			}, true
+		}
+		return Link{}, false
 	case "golang":
 		// A module path is several segments and they are part of the name, so
 		// this is the one place a separator survives escaping.

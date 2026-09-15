@@ -8,6 +8,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
+import { Wide } from "../ui/Wide";
 
 // What became of what you proposed.
 //
@@ -42,7 +43,7 @@ export function Became({
     );
   }
   return (
-    <div className="tablewrap">
+    <Wide>
       <table>
         <thead>
           <tr>
@@ -60,7 +61,7 @@ export function Became({
           ))}
         </tbody>
       </table>
-    </div>
+    </Wide>
   );
 }
 
@@ -139,7 +140,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                   Holding them back makes them a claim of yours. Revise it to say what differs.
                 </span>
               </header>
-              <div className="tablewrap" style={{ boxShadow: "none" }}>
+              <Wide style={{ boxShadow: "none" }}>
                 <table>
                   <thead>
                     <tr>
@@ -177,7 +178,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
               {holding.size > 0 && (
                 <div className="mt-2">
                   {split.error != null && (

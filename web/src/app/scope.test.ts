@@ -80,6 +80,57 @@ describe("changing scope stays on the screen", () => {
       rescoped("/review-queue", { product: "sonic", stream: "master", variant: "broadcom" }),
     ).toBe(null);
   });
+
+  it("rewrites the address on the screens whose path names the product", () => {
+    // Staying put on these is not staying put: the path re-supplies the old
+    // product, which overwrites the choice that was just made.
+    expect(rescoped("/products/sonic", { product: "gnmi" })).toBe("/products/gnmi");
+    expect(rescoped("/products/sonic/streams", { product: "gnmi" })).toBe("/products/gnmi/streams");
+    expect(rescoped("/products/sonic/variants", { product: "gnmi" })).toBe(
+      "/products/gnmi/variants",
+    );
+    expect(rescoped("/products/sonic/comparison", { product: "gnmi" })).toBe(
+      "/products/gnmi/comparison",
+    );
+  });
+
+  it("drops what belonged to the product that was there", () => {
+    // A branch is one product's, so it cannot carry across to another; the
+    // address falls back to the new product's branch list.
+    expect(rescoped("/products/sonic/streams/master", { product: "gnmi" })).toBe(
+      "/products/gnmi/streams",
+    );
+    // A component is the same: it exists in one product's builds.
+    expect(rescoped("/products/sonic/components/libnl-3-200", { product: "gnmi" })).toBe(
+      "/products/gnmi",
+    );
+    // A branch that is part of the new selection is kept.
+    expect(rescoped("/products/sonic/streams/master", { product: "gnmi", stream: "202411" })).toBe(
+      "/products/gnmi/streams/202411",
+    );
+  });
+
+  it("sends every product to the catalog", () => {
+    expect(rescoped("/products/sonic", {})).toBe("/products");
+    expect(rescoped("/products/sonic/streams/master", {})).toBe("/products");
+  });
+
+  it("stays put where the address already names what was chosen", () => {
+    expect(rescoped("/products/sonic", { product: "sonic" })).toBe(null);
+    expect(rescoped("/products/sonic/streams/master", { product: "sonic", stream: "master" })).toBe(
+      null,
+    );
+  });
+
+  it("escapes a product somebody named with a slash in it", () => {
+    expect(rescoped("/products/sonic", { product: "a/b" })).toBe("/products/a%2Fb");
+  });
+
+  it("refuses a partial selection on a screen that exists for one build", () => {
+    // Those five screens are about a way down and have no answer for "every
+    // branch", so there is nowhere to land.
+    expect(rescoped(`${BUILD}/components`, { product: "sonic" })).toBe(null);
+  });
 });
 
 // What every narrowed screen sends, straight into a request. A level that

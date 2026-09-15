@@ -5,16 +5,24 @@ import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { findingsPath, scopeQuery, useScope } from "../../app/scope";
 import { Failed } from "../../ui/Failed";
+import { Loading } from "../../ui/Loading";
+import { Paged } from "../../ui/Paged";
 import { Empty } from "../../ui/Empty";
 import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords } from "./Window";
+import { WindowPicker, coveringWords, daysAsked, windowStart } from "./Window";
+import { Wide } from "../../ui/Wide";
 
 // How long the figures cover. Thirty days is the window the remediation
 // metrics names and the one people quote; the others are here because a month
 // is too short to see a quarter's shape and too long to see this week's.
 const WINDOWS = [7, 30, 90] as const;
+
+// The newest dismissals the sheet shows, and the most repeat deferrals it
+// lists. Both are pages of something larger, and both say so underneath.
+const NEWEST = 20;
+const REPEATS = 50;
 
 // The three outcomes that hide risk, and so the three that need a second
 // person. Named together because "what has been argued away" is asked of all
@@ -31,11 +39,6 @@ const DISMISSALS: ("not-applicable" | "wont-fix" | "already-fixed")[] = [
 function bandOrder(band: string): number {
   const at = (BANDS as readonly string[]).indexOf(band);
   return at < 0 ? BANDS.length : at;
-}
-
-// When the window this report is reading started, as a date the list takes.
-function windowStart(days: number): string {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
 
 // The findings list, narrowed to what one aging bucket counts. Built here
@@ -64,7 +67,7 @@ export function Overview() {
   const at = useScope();
   const scope = scopeQuery(at);
   const [params] = useSearchParams();
-  const days = Number(params.get("days") ?? 30);
+  const days = daysAsked(params, 30);
 
   const pace = useQuery({
     queryKey: ["remediation", scope, days],
@@ -97,7 +100,7 @@ export function Overview() {
               // by when the judgment was argued, which is what the record
               // dates by.
               from: windowStart(days),
-              limit: 20,
+              limit: NEWEST,
               ...(at.product ? { product: [at.product] } : {}),
             },
           },
@@ -113,13 +116,14 @@ export function Overview() {
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/deferrals/repeated", {
-          params: { query: { limit: 50, ...(at.product ? { product: at.product } : {}) } },
+          params: { query: { limit: REPEATS, ...(at.product ? { product: at.product } : {}) } },
         }),
       ),
   });
 
   return (
     <Sheet
+      settled={pace.isSuccess && measures.isSuccess && repeated.isSuccess && argued.isSuccess}
       name="Program overview"
       answers="how the work is going, rather than what it is."
       asked={coveringWords(days)}
@@ -128,7 +132,9 @@ export function Overview() {
 
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Keeping pace</h3>
-        {pace.isError ? (
+        {pace.isPending ? (
+          <Loading />
+        ) : pace.isError ? (
           <Failed error={pace.error} what="How fast things are fixed could not be read." />
         ) : (
           <>
@@ -157,7 +163,11 @@ export function Overview() {
             ) : (
               <ul className="files">
                 {Object.entries(pace.data?.time_to_fix ?? {})
-                  .sort()
+                  // Worst first, the way every other list here orders them.
+                  // A bare sort is alphabetical, which printed low above
+                  // medium under a heading the aging table forty lines down
+                  // orders correctly.
+                  .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
                   .map(([band, hours]) => (
                     <li key={band}>
                       <Severity word={band} /> <b>{Math.round((hours as number) / 24)}</b> days
@@ -172,7 +182,7 @@ export function Overview() {
                 whether anybody has looked. A bucket of lows that were all
                 argued and dismissed is a tidy record; a bucket with four
                 criticals nobody has read is a backlog. */}
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -230,7 +240,7 @@ export function Overview() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Wide>
             <p className="hint">
               &ldquo;Nobody has said&rdquo; counts what carries no standing judgment. A claim
               waiting on a second person suppresses nothing.
@@ -245,7 +255,16 @@ export function Overview() {
           quarter. */}
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>How long triage is taking</h3>
-        {measures.isError ? (
+        {/* Said inside the printing area rather than behind noprint: the
+            printed header states the sheet's scope over every section, and
+            this one does not take it. A sheet that states a scope three of its
+            four sections do not honour is one nobody can check. */}
+        <p className="hint" style={{ marginTop: 0 }}>
+          Every product in this deployment, whatever is picked above.
+        </p>
+        {measures.isPending ? (
+          <Loading />
+        ) : measures.isError ? (
           <Failed error={measures.error} what="How triage is going could not be read." />
         ) : (measures.data?.sampled ?? 0) === 0 ? (
           <p className="hint">Nothing was proposed in this window.</p>
@@ -255,7 +274,7 @@ export function Overview() {
               Three figures rather than an average, which would describe neither a busy day nor a
               slow quarter.
             </p>
-            <div className="tablewrap">
+            <Wide>
               <table>
                 <thead>
                   <tr>
@@ -308,7 +327,7 @@ export function Overview() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </Wide>
             <p className="hint">
               Measured over {(measures.data?.sampled ?? 0).toLocaleString()}{" "}
               {(measures.data?.sampled ?? 0) === 1 ? "claim" : "claims"}
@@ -325,7 +344,7 @@ export function Overview() {
             {(measures.data?.throughput ?? []).length === 0 ? (
               <p className="hint">Nobody in this window.</p>
             ) : (
-              <div className="tablewrap">
+              <Wide>
                 <table>
                   <thead>
                     <tr>
@@ -346,7 +365,7 @@ export function Overview() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Wide>
             )}
             <p className="hint">
               Dated by when the approval happened. Narrowed to what you may read.
@@ -358,10 +377,12 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Repeated deferrals</h3>
         <p className="hint">
-          One item deferred three times is a judgment; forty is an undocumented policy. Over the
-          whole record, not the window above.
+          One item deferred three times is a judgment; forty is an undocumented policy. This
+          product, not this build — and over the whole record, not the window above.
         </p>
-        {repeated.isError ? (
+        {repeated.isPending ? (
+          <Loading />
+        ) : repeated.isError ? (
           <Failed error={repeated.error} what="Repeat deferrals could not be read." />
         ) : (repeated.data?.items ?? []).length === 0 ? (
           <Empty
@@ -369,7 +390,7 @@ export function Overview() {
             detail="Deferrals are recorded either way; this lists only the ones that repeat."
           />
         ) : (
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -401,18 +422,25 @@ export function Overview() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
         )}
+        {/* The endpoint caps and reports no total, so the only honest thing to
+            say is that the cap was reached. A capped list drawn as the whole
+            of it is how "forty repeat deferrals" reads as the whole shape of a
+            program that has two hundred. */}
+        <Paged shown={(repeated.data?.items ?? []).length} limit={REPEATS} what="listed" />
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Dismissals</h3>
         <p className="hint">
-          Approved dismissals in this window, newest first. One row per place, the way{" "}
-          <Link to="/audit">the record</Link> lists them, so a judgment covering forty places is
-          forty rows. All three dismissal outcomes are here.
+          Approved dismissals in this window, newest first. This product, not this build. One row
+          per place, the way <Link to="/audit">the record</Link> lists them, so a judgment covering
+          forty places is forty rows. All three dismissal outcomes are here.
         </p>
-        {argued.isError ? (
+        {argued.isPending ? (
+          <Loading />
+        ) : argued.isError ? (
           <Failed error={argued.error} what="What was argued away could not be read." />
         ) : (argued.data?.items ?? []).length === 0 ? (
           <Empty
@@ -420,7 +448,7 @@ export function Overview() {
             detail="A dismissal appears here once a second person has agreed to it."
           />
         ) : (
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -467,8 +495,16 @@ export function Overview() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
         )}
+        {/* The record says how many there are; the sheet shows the newest
+            page of them. Without this the heading "approved dismissals in this
+            window" stands over twenty rows of ninety. */}
+        <Paged
+          shown={(argued.data?.items ?? []).length}
+          total={argued.data?.total}
+          limit={NEWEST}
+        />
       </section>
     </Sheet>
   );

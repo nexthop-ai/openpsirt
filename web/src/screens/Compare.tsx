@@ -52,25 +52,35 @@ export function Compare() {
     to_variant: toVariant,
     ...(undisclosed ? { include_undisclosed: "true" } : {}),
   }).toString();
-  const [notes, setNotes] = useState<string | null>(null);
+  // Asked for rather than always shown: most visits are somebody reading the
+  // columns, and a wall of markdown above them would be answering a question
+  // nobody asked yet. So the query is disabled until the button is pressed.
+  //
+  // A query rather than a bare fetch, because the prose says "nothing changed
+  // between those two" and a failed read that answered the empty string would
+  // say it about a comparison nobody was told failed.
+  const [wanted, setWanted] = useState(false);
   const [copied, setCopied] = useState(false);
-  async function fetchNotes() {
-    setCopied(false);
-    const answered = await api.GET("/v1/products/{product}/comparison/notes", {
-      params: {
-        path: { product },
-        query: {
-          from,
-          from_variant: fromVariant,
-          to,
-          to_variant: toVariant,
-          ...(undisclosed ? { include_undisclosed: true } : {}),
-        },
-      },
-      parseAs: "text",
-    });
-    setNotes(typeof answered.data === "string" ? answered.data : "");
-  }
+  const notes = useQuery({
+    queryKey: ["release-notes", product, from, fromVariant, to, toVariant, undisclosed],
+    enabled: wanted && ready,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/comparison/notes", {
+          params: {
+            path: { product },
+            query: {
+              from,
+              from_variant: fromVariant,
+              to,
+              to_variant: toVariant,
+              ...(undisclosed ? { include_undisclosed: true } : {}),
+            },
+          },
+          parseAs: "text",
+        }),
+      ) as unknown as string,
+  });
 
   const comparison = useQuery({
     queryKey: ["comparison", product, from, fromVariant, to, toVariant, undisclosed],
@@ -199,25 +209,40 @@ export function Compare() {
                 somebody reading the columns, and a wall of markdown above them
                 would be answering a question nobody asked yet. */}
             <div className="actions" style={{ marginTop: 14 }}>
-              <button type="button" className="btn" onClick={() => void fetchNotes()}>
-                {notes === null ? "Write release notes" : "Write them again"}
+              <button
+                type="button"
+                className="btn"
+                disabled={notes.isFetching}
+                onClick={() => {
+                  setCopied(false);
+                  if (wanted) void notes.refetch();
+                  else setWanted(true);
+                }}
+              >
+                {wanted ? "Write them again" : "Write release notes"}
               </button>
               {/* One file rather than three, with a column saying which of the
                   three parts a row belongs to: it is one comparison, and
                   three of anything that has to be kept together is three
                   chances to send somebody two of them. */}
-              <a className="btn quiet" href={`/v1/products/${product}/comparison.csv?${asked}`}>
+              <a
+                className="btn quiet"
+                href={`/v1/products/${encodeURIComponent(product)}/comparison.csv?${asked}`}
+              >
                 CSV
               </a>
-              <a className="btn quiet" href={`/v1/products/${product}/comparison.json?${asked}`}>
+              <a
+                className="btn quiet"
+                href={`/v1/products/${encodeURIComponent(product)}/comparison.json?${asked}`}
+              >
                 JSON
               </a>
-              {notes !== null && (
+              {notes.data !== undefined && (
                 <button
                   type="button"
                   className="btn quiet"
                   onClick={() => {
-                    void navigator.clipboard?.writeText(notes);
+                    void navigator.clipboard?.writeText(notes.data);
                     setCopied(true);
                   }}
                 >
@@ -225,8 +250,12 @@ export function Compare() {
                 </button>
               )}
             </div>
-            {notes !== null && (
-              <pre className="notes">{notes || "Nothing changed between those two."}</pre>
+            {wanted && notes.isPending && <Loading />}
+            {notes.isError && (
+              <Failed error={notes.error} what="The release notes could not be written." />
+            )}
+            {notes.data !== undefined && (
+              <pre className="notes">{notes.data || "Nothing changed between those two."}</pre>
             )}
           </>
         )}

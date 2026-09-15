@@ -61,6 +61,21 @@ gap somebody rediscovers by auditing.
 | Every person in the `internal/httpapi` fixtures is seeded with no display name | So the identity and the label coincide, and a field publishing the wrong one of the two cannot be told from a field publishing the right one. Giving those people names is what would make the two rows above checkable, and it is deliberately not done until each field is settled one at a time |
 | The twelve-week history cannot mark where a version moved | The chart draws what opened and closed; what it cannot draw is the release the build was shipping at the time, which is the thing that says whether the last upgrade worked. Counts are what the trend answers, and a version for each week is a new read over the scan history. The build comparison gives one pairwise `from` and `to`, never a series |
 
+## Waiting on the owner, from the interface audit
+
+Each is a proposal rather than a change. **One of them is a wrong answer on
+screen rather than a question** — the team queue below — and is marked as such,
+because a list that mixes those two reads as though none of it is urgent.
+
+| | |
+|---|---|
+| **Whether the unassigned screen survives** | A separate review proposes deleting it and pointing the rail at `/findings?assigned=nobody&state=undecided`, on the grounds that the findings list already does what it does and does it properly — deadline, EPSS, age, filters and sort, across every row. It is a product call, so the screen was fixed where it stood instead: the selection now carries its rows, and the heading says "open findings with nobody assigned" rather than "undecided", which is what the route actually answers |
+| **Whether that route should apply a decision predicate** | The screen said "undecided" and the store filters only on being open and unassigned — 8,400 rows against 7,471 for the equivalent findings narrowing, with "pending approval" at the top. The copy was corrected rather than the query, because narrowing it changes what the daily digest carries too |
+| **A team's queue cannot be opened, and the screen denies it exists** — *a defect, not a question* | The assignments screen lists a team holding work; opening it answers an empty 200, because `/v1/people/{identity}/assignments` is a route per person and a team is not one — so the screen renders "they are not holding anything" beside a row saying the team holds two. An answer that is wrong is worse than a view that is missing. What it needs is a route of its own; the "Unassign all" control now says what is true in the meantime, which is that a team queue empties as people take the work |
+| **The package-kind picker enumerates a set the API calls open** | The kind is read out of the identifier a producer wrote, so an image carrying `nuget`, `composer` or `swift` components can be narrowed to them through the address and not from the screen — and the next kind goes short the way `apk` and `rpm` did. The durable shape is the kinds actually present travelling with the read, with the labels a display map falling back to the raw word; that is a question the server does not answer yet, so it is a capability rather than a fix |
+| **A tracker reference in a durable comment is not gated** | One was found by reading. `internal/tools/readable` walks every file type and is the gate positioned to carry it, but its whole subject is bytes a text tool skips — a second, unrelated rule there would make its name a lie. It is a gate of its own or nothing |
+| **Eight other `internal/httpapi` tests hand-roll the scanned-build seed** | The one this touched now builds it once, in the file. The wider move is a helper in `internal/dbtest/fixture`, which seeds a catalog and has nothing for a scan, a graph or a finding |
+
 ## Measured, recorded, not fixed
 
 Nothing is made faster until it is measured slow. These were measured and left.

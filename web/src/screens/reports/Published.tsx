@@ -8,7 +8,8 @@ import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords } from "./Window";
+import { WindowPicker, coveringWords, daysAsked } from "./Window";
+import { Wide } from "../../ui/Wide";
 
 // How far back to look. A year by default, because publishing is rare enough
 // that a month of it is usually nothing and reads as a tool that is not working.
@@ -27,7 +28,7 @@ const WINDOWS = [90, 365, 3650] as const;
 export function Published() {
   const at = useScope();
   const [params] = useSearchParams();
-  const days = Number(params.get("days") ?? 365);
+  const days = daysAsked(params, 365);
   const product = at.product ?? "";
 
   const gone = useQuery({
@@ -45,6 +46,7 @@ export function Published() {
 
   return (
     <Sheet
+      settled={gone.isSuccess}
       name="Advisories issued"
       answers="what has been published about our own flaws, and what was published twice."
       asked={coveringWords(days)}
@@ -72,7 +74,7 @@ export function Published() {
             Newest first. A revision is an advisory published again. The digest lets a later draft
             be compared against what went out.
           </p>
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -81,6 +83,10 @@ export function Published() {
                   <th>Revision</th>
                   <th>Published</th>
                   <th>By</th>
+                  {/* What the sentence above promises. It is what makes "is
+                      what is published still what we would generate" a
+                      question anybody can answer. */}
+                  <th>Digest</th>
                   <th>Said</th>
                 </tr>
               </thead>
@@ -102,6 +108,9 @@ export function Published() {
                     </td>
                     <td>{on(row.issued_at)}</td>
                     <td className="id">{row.issued_by}</td>
+                    <td className="id" title={row.digest}>
+                      {row.digest ? row.digest.slice(0, 12) : <span className="hint">—</span>}
+                    </td>
                     <td className="hint" style={{ maxWidth: "40ch" }}>
                       {row.summary || "—"}
                     </td>
@@ -109,7 +118,7 @@ export function Published() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Wide>
         </section>
       )}
     </Sheet>

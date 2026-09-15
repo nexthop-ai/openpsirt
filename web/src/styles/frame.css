@@ -175,12 +175,6 @@ button {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.rail .foot {
-  margin-top: auto;
-  padding: 12px 10px 0;
-  font-size: 11px;
-  color: var(--side-faint);
-}
 
 /* ---------- top bar ---------- */
 
@@ -216,6 +210,7 @@ button {
 .topsearch:focus-within {
   border-color: var(--accent-line);
   background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .topsearch svg {
   width: 15px;
@@ -275,7 +270,12 @@ button {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--sev-critical);
-  color: #fff;
+  /* The token that flips with the look, not white. Every severity token in the
+     dark look is a light tint — the critical one is a pale salmon — so white on
+     it gives 2.54:1 at nine and a half pixels, bold, where 4.5:1 is the floor
+     for text. The sibling that draws a band over the same backgrounds already
+     reads this. */
+  color: var(--accent-ink);
   font-size: 9.5px;
   font-weight: 700;
   display: grid;
@@ -349,7 +349,7 @@ button {
   position: absolute;
   top: 40px;
   left: 0;
-  z-index: 40;
+  z-index: var(--z-menu);
   width: min(600px, 80vw);
   background: var(--surface);
   color: var(--ink);
@@ -513,4 +513,46 @@ button {
 .hint {
   color: var(--faint);
   font-size: var(--step--1);
+}
+
+/* ---------- two rules that are the page's rather than a screen's ---------- */
+
+/* Somebody who has asked their system for less movement gets none, which is
+   the whole page rather than any screen's part of it. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* A key named on a control, wherever one is named. */
+/* ---------- keys named on a control ---------- */
+
+kbd {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  background: var(--surface);
+  color: var(--ink);
+}
+kbd.onbtn {
+  border-color: rgb(255 255 255 / 45%);
+  background: rgb(255 255 255 / 18%);
+  color: inherit;
+  margin-left: 6px;
+}
+
+/* The sign-in wordmark, where a look has been chosen.
+   The `<picture>` beside it answers the system's setting; this answers the
+   stored one, which is what a person picked here and has to win over it. */
+:root[data-look="dark"] .signin-mark {
+  content: url("/brand/logo-dark.svg");
+}
+:root[data-look="light"] .signin-mark {
+  content: url("/brand/logo.svg");
 }

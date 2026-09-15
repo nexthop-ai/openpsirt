@@ -57,7 +57,7 @@ func registerDue(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		rows, err := finding.NewStore(in.DB.DB).RunningOut(ctx, subject, scope,
+		rows, total, err := finding.NewStore(in.DB.DB).RunningOut(ctx, subject, scope,
 			time.Duration(input.Days)*24*time.Hour, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is running out of time could not be read", err)
@@ -79,6 +79,10 @@ func registerDue(api huma.API, in Ingest) {
 
 		now := time.Now().UTC()
 		out := &listOutput[LateBody]{}
+		// How many there are in all, so a tile counting this list says what
+		// the list it opens says. Without it the front page reported its own
+		// page size as the figure.
+		out.Body.Total = total
 		out.Body.Items = make([]LateBody, 0, len(rows))
 		for _, row := range rows {
 			body := LateBody{

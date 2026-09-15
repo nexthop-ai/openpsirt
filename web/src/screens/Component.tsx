@@ -3,6 +3,7 @@ import { Holder, type Held } from "../ui/Holder";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap } from "../api/queries";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
@@ -12,9 +13,9 @@ import { on } from "../ui/when";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Pace } from "../ui/Charts";
-import { upstream } from "../ui/upstream";
 import { ROLLED } from "../ui/severities";
 import { Severity } from "../ui/Severity";
+import { Wide } from "../ui/Wide";
 
 // One component, and the one piece of work it is.
 //
@@ -33,16 +34,9 @@ import { Severity } from "../ui/Severity";
 // about the one asked for and says what the others are.
 type Build = Body<"PerBuildBody">;
 
-// The separator inside a key naming one build. Not a character either name can
-// hold, so a key cannot be two builds.
-const APART = "\u0000";
-
 // How many versions to offer before the rest are a count. A kernel names
 // twenty, and the question is which to take rather than what the whole set is.
 const SHOWN = 5;
-
-const keyOf = (row: { stream?: string; variant?: string }) =>
-  (row.stream ?? "") + APART + (row.variant ?? "");
 
 const findingsAt = (product: string, row: Build, component: string) =>
   `/products/${encodeURIComponent(product)}` +
@@ -118,7 +112,16 @@ export function Component() {
   }
 
   const sameVersion = rows.filter((row) => row.version === here.version);
-  const link = upstream(here.purl);
+  // Where the package is published, as the server worked it out. This screen
+  // had a table of its own in a second language, with a different membership
+  // and different answers for the same identifier — it sent every
+  // Debian-family package to Debian's tracker, so an Ubuntu package's link
+  // landed on a record for different code with a different version history and
+  // a different advisory status, while the server's own link for the same
+  // finding went to Launchpad. A link that lands on a record for the wrong
+  // thing costs more than no link, because it is followed before it is
+  // disbelieved.
+  const link = here.package_page_url ?? null;
   // The bands are declared worst first, so the first one present is the worst.
   const worst = ROLLED.find((band) => (here.by_severity ?? {})[band]);
 
@@ -194,7 +197,7 @@ export function Component() {
               new form rather than keeping the version and releases the old one
               opened with — which it would then submit. */}
           <Upgrade
-            key={keyOf(here) + APART + (here.version ?? "")}
+            key={buildKey(here, here.version)}
             product={product}
             component={component}
             here={here}
@@ -218,7 +221,15 @@ export function Component() {
                     {here.project_url.replace(/^https?:\/\//, "")}
                   </Outward>
                 ) : link ? (
-                  <Outward href={link}>{link.replace(/^https:\/\//, "")}</Outward>
+                  // What the record is, not what its address spells. Which
+                  // distribution's or which index's page this is decides
+                  // whether it answers the question a reader has, and a
+                  // hostname makes them work that out — the server names it
+                  // for exactly this, and stripping the scheme instead threw
+                  // the name away.
+                  <Outward href={link}>
+                    {here.package_page_name || link.replace(/^https:\/\//, "")}
+                  </Outward>
                 ) : (
                   <span className="hint">not known</span>
                 )}
@@ -338,19 +349,16 @@ function Sits({
             <select
               aria-label="Which build"
               style={{ width: "auto" }}
-              value={keyOf(here) + APART + (here.version ?? "")}
+              value={buildKey(here, here.version)}
               onChange={(event) => {
                 const row = builds.find(
-                  (each) => keyOf(each) + APART + (each.version ?? "") === event.target.value,
+                  (each) => buildKey(each, each.version) === event.target.value,
                 );
                 if (row) onBuild(row);
               }}
             >
               {builds.map((row) => (
-                <option
-                  key={keyOf(row) + row.version}
-                  value={keyOf(row) + APART + (row.version ?? "")}
-                >
+                <option key={buildKey(row, row.version)} value={buildKey(row, row.version)}>
                   {row.stream} · {row.variant} · {row.version}
                 </option>
               ))}
@@ -429,7 +437,7 @@ function Sits({
                   {(below.length - carrying.length).toLocaleString()} carry nothing
                 </span>
                 {carrying.length > 0 && (
-                  <div className="tablewrap plain">
+                  <Wide className="plain">
                     <table>
                       <tbody>
                         {carrying.slice(0, SHOWN).map((each, i) => (
@@ -466,7 +474,7 @@ function Sits({
                         )}
                       </tbody>
                     </table>
-                  </div>
+                  </Wide>
                 )}
               </>
             )}
@@ -542,7 +550,7 @@ function Landed({ here }: { here: Build }) {
         <p className="hint">Nothing fixes what is open here.</p>
       ) : (
         <>
-          <div className="tablewrap">
+          <Wide>
             <table>
               <thead>
                 <tr>
@@ -577,7 +585,7 @@ function Landed({ here }: { here: Build }) {
                 </tr>
               </tbody>
             </table>
-          </div>
+          </Wide>
           <p
             className="hint"
             style={{ marginTop: 8 }}
@@ -622,7 +630,7 @@ function Upgrade({
   const [said, setSaid] = useState<string | null>(null);
   // Every release shipping this version, because one bump moves all of them.
   const [chosen, setChosen] = useState<Set<string>>(
-    () => new Set(covering.map((row) => keyOf(row))),
+    () => new Set(covering.map((row) => buildKey(row, row.version))),
   );
 
   const plan = useMutation({
@@ -636,9 +644,11 @@ function Upgrade({
             reasoning: because,
             ...(holder?.kind === "team" ? { team: holder.identity } : {}),
             ...(holder?.kind === "person" ? { person: holder.identity } : {}),
+            // The build alone: one bump moves every release shipping the
+            // version, and what the server takes is the pair naming each.
             builds: [...chosen].map((each) => {
-              const [stream, variant] = each.split(APART);
-              return { stream: stream ?? "", variant: variant ?? "" };
+              const { stream, variant } = fromBuildKey(each);
+              return { stream, variant };
             }),
           },
         }),
@@ -813,7 +823,7 @@ function Upgrade({
         <span>Releases this is for</span>
         <p className="variants">
           {covering.map((row) => {
-            const key = keyOf(row);
+            const key = buildKey(row, row.version);
             const picked = chosen.has(key);
             return (
               <button
@@ -874,7 +884,7 @@ function Ships({
           {rows.length} {rows.length === 1 ? "release" : "releases"}
         </span>
       </div>
-      <div className="tablewrap">
+      <Wide>
         <table>
           <thead>
             <tr>
@@ -890,9 +900,9 @@ function Ships({
           <tbody>
             {rows.map((row) => (
               <tr
-                key={keyOf(row) + row.version}
+                key={buildKey(row, row.version)}
                 className={
-                  keyOf(row) === keyOf(here) && row.version === here.version ? "row on" : "row"
+                  buildKey(row, row.version) === buildKey(here, here.version) ? "row on" : "row"
                 }
               >
                 <td>
@@ -924,7 +934,7 @@ function Ships({
             ))}
           </tbody>
         </table>
-      </div>
+      </Wide>
     </div>
   );
 }

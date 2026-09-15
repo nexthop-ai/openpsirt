@@ -150,14 +150,60 @@ func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
 }
 
 // Teams lists the teams in use, by name.
-func (s *Store) Teams(ctx context.Context) ([]Team, error) {
+//
+// Bounded like every other listing. A picker declaring that it returns
+// twenty-five names appended every team there is after them, so a deployment
+// with two hundred teams answered a bounded question with an unbounded list.
+//
+// The term narrows in the statement rather than after it: filtering a bounded
+// read in the caller cuts before the match is looked for, so a team whose name
+// sorts late would be missing from a search that names it exactly.
+func (s *Store) Teams(ctx context.Context, term string, limit int) ([]Team, error) {
 	var teams []Team
-	if err := s.db.NewSelect().Model(&teams).
-		Where("retired_at IS NULL").
-		Order("name").Scan(ctx); err != nil {
+	query := narrowTeams(s.db.NewSelect().Model(&teams), term).
+		Order("name").
+		// Read in bulk rather than a screenful at a time: the picker asks for
+		// a screenful and the two callers that want every team say so with
+		// this kind's own ceiling. Bounded as a list somebody pages through,
+		// "all of them" fell past the 200 ceiling and took the 50-row default
+		// — so a deployment past fifty teams rendered every routing rule owned
+		// by an alphabetically-later team with a blank team name.
+		Limit(database.InBulk.Of(limit))
+	if err := query.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which teams there are: %w", err)
 	}
 	return teams, nil
+}
+
+// CountTeams is how many teams a term matches, in all.
+//
+// The same narrowing as the listing above, so a picker showing a few of them
+// can say how many there are without counting the few it was handed.
+func (s *Store) CountTeams(ctx context.Context, term string) (int, error) {
+	total, err := narrowTeams(s.db.NewSelect().Model((*Team)(nil)), term).Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("count which teams there are: %w", err)
+	}
+	return total, nil
+}
+
+// narrowTeams is the team listing's own matching, spelled once so the listing
+// and the count of it cannot come to narrow differently.
+func narrowTeams(query *bun.SelectQuery, term string) *bun.SelectQuery {
+	query = query.Where("retired_at IS NULL")
+	wanted := strings.TrimSpace(term)
+	if wanted == "" {
+		return query
+	}
+	// Matched without regard to capitals, the way every name a person types is
+	// matched here, and escaped: a search box is not a pattern language, and a
+	// term of "%" would answer with every team there is.
+	like := database.LikeContains(wanted)
+	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.WhereOr(`LOWER("name") LIKE ?`+database.LikeClause, like).
+			WhereOr(`LOWER(COALESCE(NULLIF("display_name", ''), "name")) LIKE ?`+
+				database.LikeClause, like)
+	})
 }
 
 // RetireTeam takes a team out of use. Its membership goes with it — the team

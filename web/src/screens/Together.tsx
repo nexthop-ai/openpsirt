@@ -1,9 +1,10 @@
 import { notACredential } from "../ui/noautofill";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import type { paths } from "../api/schema";
 import { usePaging } from "./list";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
@@ -18,6 +19,13 @@ import { Paged } from "../ui/Paged";
 // drawn as if it were all of them says "select all" against a number that is
 // not the whole.
 const PAGE = 500;
+
+// The body this screen sends, by the name the API document gives it. Taken
+// from the generated client rather than restated, so a field the server
+// requires cannot be left out of the call and noticed by nobody.
+type Claimed = NonNullable<
+  paths["/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions"]["post"]["requestBody"]
+>["content"]["application/json"];
 
 // One judgment about many issues at one component. The transpose of the usual
 // grouping: one issue across many places is what a decision already covers,
@@ -37,6 +45,11 @@ export function Together() {
   const queries = useQueryClient();
 
   const at = { product, stream, variant, component };
+  // The whole build, not the product and the component. Keyed on two of the
+  // four, the same component under two variants shared one draft and each
+  // cleared the other's — and what is kept here is the reasoning a second
+  // person is asked to agree to.
+  const draftKey = `together:${product}:${stream}:${variant}:${component}`;
 
   const issues = useQuery({
     queryKey: ["at-component", at, contains, offset],
@@ -52,42 +65,58 @@ export function Together() {
   });
 
   const decide = useMutation({
-    mutationFn: async (body: {
-      vulnerabilities: string[];
-      outcome: string;
-      justification?: string;
-      selected_by: string;
-      reasoning: string;
-    }) =>
+    // The body the generated client declares, so the two fields the server
+    // requires for a deferral and an already-fixed claim are checked here
+    // rather than refused there. Cast to `never`, the form could send a claim
+    // missing either and nothing in this file would notice.
+    mutationFn: async (body: Claimed) =>
       unwrap(
         await api.POST(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions",
-          { params: { path: at }, body: body as never },
+          { params: { path: at }, body },
         ),
       ),
     onSuccess: () => {
       // Cleared only once the server has taken it. A refused submission keeps
       // every word, which is the whole point of keeping a draft at all.
-      forget(`together:${product}:${component}`);
+      forget(draftKey);
       setPicked(new Set());
       void queries.invalidateQueries({ queryKey: ["at-component"] });
       void queries.invalidateQueries({ queryKey: ["queue"] });
     },
   });
 
-  const items = issues.data?.items ?? [];
+  // Memoized because the fallback is a fresh array each render, and the page
+  // is what the reach map below merges from: an array that changes identity
+  // every render would merge on every render.
+  const items = useMemo(() => issues.data?.items ?? [], [issues.data]);
   const everything = issues.data?.total ?? items.length;
   const cap = issues.data?.cap ?? 0;
 
-  // How far the selection reaches. Summed from the rows in hand, which is
-  // exact for anything picked from a page; a selection made with "select all
-  // matching" is the whole narrowed set, and the server has already counted
-  // that.
-  const reach = new Map(items.map((each) => [each.vulnerability ?? "", each.places ?? 0]));
+  // How far the selection reaches, in rows written rather than issues picked.
+  //
+  // The selection spans pages and a page does not, so this remembers every row
+  // it has seen rather than summing the page in hand: a selection made across
+  // two pages counted only the second and understated the write, which is the
+  // figure the over-cap warning is read off.
+  //
+  // A name it has still never seen came from "select all matching", which
+  // answers with names alone — so that case falls back to the server's own
+  // count of the whole narrowed set rather than to zero.
+  const [reach, setReach] = useState(() => new Map<string, number>());
+  const [merged, setMerged] = useState(items);
+  if (merged !== items) {
+    setMerged(items);
+    const next = new Map(reach);
+    for (const each of items) next.set(each.vulnerability ?? "", each.places ?? 0);
+    setReach(next);
+  }
   const everySelected = picked.size > 0 && picked.size === everything;
-  const writing = everySelected
-    ? (issues.data?.findings ?? 0)
-    : [...picked].reduce((sum, name) => sum + (reach.get(name) ?? 0), 0);
+  const unseen = [...picked].some((name) => !reach.has(name));
+  const writing =
+    everySelected || unseen
+      ? (issues.data?.findings ?? 0)
+      : [...picked].reduce((sum, name) => sum + (reach.get(name) ?? 0), 0);
   const over = cap > 0 && writing > cap;
 
   // Everything the filter matches, not everything on the page. Fetched in one
@@ -138,6 +167,11 @@ export function Together() {
         className="mb-4 flex flex-wrap gap-2"
         onSubmit={(event) => {
           event.preventDefault();
+          // A selection is made out of a population, so replacing the
+          // population replaces what was selected. Kept across a narrowing,
+          // issues ticked under the old question were submitted under the new
+          // one, with none of them on screen.
+          setPicked(new Set());
           setParams(typed ? { contains: typed } : {});
         }}
       >
@@ -267,7 +301,7 @@ export function Together() {
             pending={decide.isPending}
             error={decide.error}
             recorded={decide.data?.recorded}
-            draftKey={`together:${product}:${component}`}
+            draftKey={draftKey}
             mentions={{ product }}
           />
         </>
@@ -288,21 +322,17 @@ function Claim({
 }: {
   narrowed: string;
   count: number;
-  onClaim: (body: {
-    outcome: string;
-    justification?: string;
-    deferred_until?: string;
-    fixed_version?: string;
-    selected_by: string;
-    reasoning: string;
-  }) => void;
+  onClaim: (body: Omit<Claimed, "vulnerabilities">) => void;
   pending: boolean;
   error: unknown;
   recorded?: number;
   draftKey: string;
   mentions: { product: string };
 }) {
-  const [outcome, setOutcome] = useState("not-applicable");
+  // Typed against the closed vocabulary the server declares, so a word the
+  // form offers that the server does not take is a compile error rather than
+  // a refusal somebody reads after pressing submit.
+  const [outcome, setOutcome] = useState<Claimed["outcome"]>("not-applicable");
   const [justification, setJustification] = useState<Justification>(JUSTIFICATIONS[0].value);
   // Prefilled from the narrowing that is on, in the form the approver's
   // outlier check reads back — `contains "driver"` — and still editable, since
@@ -335,7 +365,7 @@ function Claim({
           <span className="mb-1 block text-[var(--muted)]">Outcome</span>
           <select
             value={outcome}
-            onChange={(event) => setOutcome(event.target.value)}
+            onChange={(event) => setOutcome(event.target.value as Claimed["outcome"])}
             className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
           >
             <option value="not-applicable">Not applicable</option>

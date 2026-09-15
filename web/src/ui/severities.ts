@@ -60,3 +60,13 @@ export const COLORS: Record<Band, string> = {
 export function isBand(word: string): word is Band {
   return (BANDS as readonly string[]).includes(word);
 }
+
+// bandOf is the word a rating is drawn with: one of the four, or "unrated".
+//
+// One answer, because there were four for the same row. A finding whose
+// vulnerability carries no severity was counted as a medium by the chart, drawn
+// as a low by the badge, given a low's stripe by the card, and given its own
+// band by the tree strip — four answers about one nothing, on one screen.
+export function bandOf(word: string | null | undefined): string {
+  return isBand(word ?? "") ? (word as string) : "unrated";
+}
