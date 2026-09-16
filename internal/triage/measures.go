@@ -108,8 +108,46 @@ type Worked struct {
 // of a window is never quoted as if it were the whole.
 const measuredAtMost = 5000
 
+// Measuring narrows the figures to part of the deployment.
+//
+// **Without it there were no per-team figures at all**, so a manager asking
+// how their own people are doing read the deployment's numbers and a large
+// deployment's answer was the same for everybody.
+type Measuring struct {
+	// Products keeps judgments made in these products.
+	Products []int64
+	// People keeps judgments these people **proposed** — a team, resolved to
+	// its members by whoever asked.
+	//
+	// By the proposer for both waits, including the wait for a second person:
+	// a claim belongs to whoever argued it, which is the rule the record of
+	// judgments already dates by. Narrowed by the approver instead, a team's
+	// "time to agree" would be about claims its people agreed to for somebody
+	// else.
+	People []int64
+}
+
+// narrow applies it to a query over the decision, aliased de, keyed on
+// whoever proposed.
+func (m Measuring) narrow(q *bun.SelectQuery) *bun.SelectQuery {
+	return m.by(q, "de.proposed_by")
+}
+
+// by is the same, for a count keyed on somebody else — an agreement is the
+// approver's work, and a team's throughput is what each of its people did
+// rather than what was done to the claims they wrote.
+func (m Measuring) by(q *bun.SelectQuery, person string) *bun.SelectQuery {
+	if len(m.Products) > 0 {
+		q = q.Where("de.product_id IN (?)", bun.List(m.Products))
+	}
+	if len(m.People) > 0 {
+		q = q.Where(person+" IN (?)", bun.List(m.People))
+	}
+	return q
+}
+
 // Measure works out the figures about how triage is going in a window.
-func (s *Store) Measure(ctx context.Context, subject access.Subject,
+func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measuring,
 	since, until time.Time) (Measures, error) {
 
 	if until.IsZero() {
@@ -168,7 +206,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 		GroupExpr("de.id, de.proposed_at, " + rating.EffectiveExpr).
 		OrderExpr("de.proposed_at DESC").
 		Limit(measuredAtMost + 1)
-	q = readableBy(q, subject, "de")
+	q = only.narrow(readableBy(q, subject, "de"))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return Measures{}, fmt.Errorf("read how long triage is taking: %w", err)
 	}
@@ -198,7 +236,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 	out.ToDecide = spreads(toDecide)
 	out.ToAgree = spreads(toAgree)
 
-	worked, err := s.throughput(ctx, subject, since, until)
+	worked, err := s.throughput(ctx, subject, only, since, until)
 	if err != nil {
 		return Measures{}, err
 	}
@@ -212,7 +250,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 		Where("de.sent_back_at IS NOT NULL").
 		Where("de.sent_back_at >= ?", since).
 		Where("de.sent_back_at < ?", until)
-	if err := readableBy(back, subject, "de").Scan(ctx, &out.SentBack); err != nil {
+	if err := only.narrow(readableBy(back, subject, "de")).Scan(ctx, &out.SentBack); err != nil {
 		return Measures{}, fmt.Errorf("read how much came back: %w", err)
 	}
 	return out, nil
@@ -224,7 +262,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 // one statement: a claim proposed, an agreement given, a claim sent back and a
 // claim withdrawn are four different rows in three places, and one query
 // counting all four would multiply them together.
-func (s *Store) throughput(ctx context.Context, subject access.Subject,
+func (s *Store) throughput(ctx context.Context, subject access.Subject, only Measuring,
 	since, until time.Time) ([]Worked, error) {
 
 	by := map[int64]*Worked{}
@@ -261,7 +299,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 			Where("de.proposed_at >= ?", since).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")
-		return readableBy(q, subject, "de")
+		return only.narrow(readableBy(q, subject, "de"))
 	}, func(w *Worked) *int { return &w.Proposed }); err != nil {
 		return nil, err
 	}
@@ -273,7 +311,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 			Where("de.proposed_at >= ?", since).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")
-		return readableBy(q, subject, "de")
+		return only.narrow(readableBy(q, subject, "de"))
 	}, func(w *Worked) *int { return &w.Withdrawn }); err != nil {
 		return nil, err
 	}
@@ -291,7 +329,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 			Where("da.approved_at >= ?", since).
 			Where("da.approved_at < ?", until).
 			GroupExpr("da.approved_by")
-		return readableBy(q, subject, "de")
+		return only.by(readableBy(q, subject, "de"), "da.approved_by")
 	}, func(w *Worked) *int { return &w.Approved }); err != nil {
 		return nil, err
 	}

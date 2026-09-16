@@ -7,6 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -74,6 +75,8 @@ func registerMeasures(api huma.API, in Ingest) {
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Period
+		Product string `query:"product" doc:"Limit to judgments made in one product, by name"`
+		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name"`
 	}) (*struct{ Body MeasuresBody }, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {
@@ -83,7 +86,37 @@ func registerMeasures(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		got, err := store.Measure(ctx, subject, since, until)
+		var only triage.Measuring
+		if input.Product != "" {
+			// Resolved against what the caller may see, and a product they may
+			// not read answers as one nobody declared — anything else turns a
+			// report into a way to ask which products exist.
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			only.Products = []int64{named.ID}
+		}
+		if input.Team != "" {
+			rights := access.NewStore(in.DB.DB)
+			team, err := rights.TeamByName(ctx, input.Team)
+			if err != nil {
+				return nil, absent(in.Logger, err, "that team could not be looked up",
+					func() error { return huma.Error404NotFound("no such team") })
+			}
+			members, err := rights.MembersOf(ctx, team.ID)
+			if err != nil {
+				return nil, wentWrong(in.Logger, "who is on that team could not be read", err)
+			}
+			// A team with nobody on it measures nothing rather than the
+			// deployment: an empty narrowing that widens is the failure every
+			// narrowing here is shaped to avoid.
+			only.People = members
+			if len(members) == 0 {
+				only.People = []int64{0}
+			}
+		}
+		got, err := store.Measure(ctx, subject, only, since, until)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "how triage is going could not be read", err)
 		}

@@ -11154,6 +11154,20 @@ paths:
             maximum: 3650
             minimum: 1
             type: integer
+        - description: Limit to judgments made in one product, by name
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to judgments made in one product, by name
+            type: string
+        - description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name
+          explode: false
+          in: query
+          name: team
+          schema:
+            description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name
+            type: string
       responses:
         "200":
           content:

@@ -10442,6 +10442,10 @@ export interface operations {
                 to?: string;
                 /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
+                /** @description Limit to judgments made in one product, by name */
+                product?: string;
+                /** @description Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name */
+                team?: string;
             };
             header?: never;
             path?: never;

@@ -314,6 +314,9 @@ had.
 | Bounded, and it says so | At most the most recent few thousand claims in the window, with the answer stating how many and whether the ceiling was reached |
 | Throughput is per person, counted where the work happened | A claim belongs to the window it was proposed in, and an agreement to the window it was given in |
 | Send-backs are counted for the deployment, not per person | The record holds that a claim came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |
+| It narrows to one product, or to one team's people | Without a scope there were no per-team figures at all, so a manager asking how their own people were doing read the deployment's numbers with their name on them |
+| A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A claim belongs to whoever argued it, which is the rule the record of judgments dates by — narrowed by the approver, a team's time to agree would be about claims its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
+| A team with nobody on it measures nothing | A narrowing that silently widens to the deployment is the one mistake a narrowing must not make |
 
 ## Repeated deferrals
 
