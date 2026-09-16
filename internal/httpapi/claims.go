@@ -202,6 +202,65 @@ func noSuchClaim() error {
 	return huma.Error404NotFound("no such claim")
 }
 
+// ReaffirmedBody is what one bulk re-affirmation did.
+type ReaffirmedBody struct {
+	ClaimID   int64   `json:"claim_id" doc:"The claim this action made, which is what a second person agrees to where one is needed"`
+	Decisions []int64 `json:"decisions"`
+	Places    int     `json:"places" doc:"How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
+	Waiting   bool    `json:"waiting" doc:"Whether a second person has to agree"`
+}
+
+// registerReaffirmClaim re-makes everything one action claimed.
+func registerReaffirmClaim(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "reaffirm-claim", Method: http.MethodPost,
+		Path:    "/v1/claims/{id}/reaffirmation",
+		Summary: "Re-affirm everything one action claimed",
+		Description: "Re-makes every row of this claim that stopped applying because an " +
+			"upstream version moved, at the versions each place has now, as one act with one " +
+			"reasoning.\n\n" +
+			"**Deciding is bulk-capable and re-deciding was not.** A team answering one kernel " +
+			"issue writes a decision at each of its places in one action; when the kernel " +
+			"moves, those lapse, and restoring them was one request each with a separately " +
+			"typed justification.\n\n" +
+			"Only the person who made the original may do this. It normally needs no second " +
+			"approver, for the reason the single form does not: two people already agreed, and " +
+			"a version bump is a prompt to re-check rather than a new claim.\n\n" +
+			"**One act, one approval.** Where any row would need approval again — the " +
+			"severity has risen since it was agreed to, or nothing was ever agreed to — the " +
+			"whole act does. An approver works at the unit the proposer acted at, and agreeing " +
+			"to part of an argument they were shown whole is not review.\n\n" +
+			"A place that is open nowhere any more is not re-made, which is a finding that " +
+			"closed rather than a fault. `reasoning` is required.",
+		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
+	}, anyPerson, "", triageRights()...), func(ctx context.Context, input *struct {
+		ID   int64 `path:"id"`
+		Body struct {
+			Reasoning string `json:"reasoning" minLength:"1" doc:"Why every one of them still holds, in markdown"`
+		}
+	}) (*struct{ Body ReaffirmedBody }, error) {
+		subject, store, err := triaging(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		made, err := store.ReaffirmClaim(ctx, subject, triage.ReaffirmingClaim{
+			PreviousClaimID: input.ID,
+			Reasoning:       input.Body.Reasoning,
+			By:              subject.ID,
+		})
+		if err != nil {
+			if errors.Is(err, triage.ErrNotTheirs) {
+				return nil, noSuchClaim()
+			}
+			return nil, refusedDecision(in.Logger, err)
+		}
+		return &struct{ Body ReaffirmedBody }{Body: ReaffirmedBody{
+			ClaimID: made.ClaimID, Decisions: made.Decisions,
+			Places: made.Places, Waiting: made.Waiting,
+		}}, nil
+	})
+}
+
 func claimBody(c triage.Claim, proposedBy string) ClaimBody {
 	body := ClaimBody{
 		ID: c.ID, Kind: string(c.Kind), ProposedBy: proposedBy,

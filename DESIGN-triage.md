@@ -817,6 +817,23 @@ rather than a tag across every row.
 | The default is written into the address | A chip above the list like every other filter, removable by clicking, traveling with a link somebody sends. That is why the parameter has a word for "either" |
 | Only the claim that currently stands counts | A promise that was withdrawn is not one |
 
+### Re-affirming a whole action
+
+A version bump lapses every row of the claim it moved under, so re-making them
+is one act at the grain the claim was made at.
+
+| Rule | Reason |
+|---|---|
+| One act, one reasoning, one new claim | Deciding is bulk-capable at three grains and re-deciding was capable at none. A team answering one kernel issue writes a decision at each of its 45 places in one action; restoring them was 45 requests with 45 separately typed justifications |
+| The rows are resolved here, not named | A caller free to name them would be choosing which agreements get carried forward, and would be naming rows it read before the write |
+| Each lapsed place is re-made at the versions it has now, in every build it is open in | The versions are what a decision expires on, so a place open at two versions is two decisions. A place open nowhere is not re-made, which is a finding that closed rather than a fault |
+| The claimant's, and nobody else's | An approver doing it becomes proposer of the new claim while their own earlier agreement is carried onto it, which is one person on both sides of the control |
+| Any row escalating sends the whole act back | An approver works at the unit the proposer acted at (REQ-28). Asked per row, an act covering 45 places could write 44 standing decisions and one waiting, which is agreeing to part of an argument somebody was shown whole |
+| The carried agreement is one row, taking effect on all of them together | An agreement is an agreement to a claim's words. Recorded per decision, one person agreeing once would appear in the record 45 times; taking effect per decision, half the act could stand while half waited |
+
+The lapsed population is reached by the findings list's `lapsed` state, and the
+act itself sits on the claim.
+
 ### Approval gate
 
 Both outcomes hide risk, which is the point: work with a plan and a date on it

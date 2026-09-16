@@ -110,6 +110,7 @@ export function Claim({ who }: { who: Who }) {
 
       <Argument claim={it} id={id} onChanged={again} />
       <Reasoning claim={it} about={about} onChanged={again} />
+      <Reaffirm claim={it} id={id} mine={mine} onDone={again} />
       <Answer claim={it} mine={mine} onAnswered={again} />
       <HoldBack claim={it} mine={mine} onHeld={again} />
       <Revisions claimId={id} />
@@ -254,6 +255,82 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
         </p>
       )}
       <Elsewhere id={id} where={claim.claim.elsewhere ?? ""} onSet={onChanged} />
+    </div>
+  );
+}
+
+// Re-making everything one action claimed, after the code moved under it.
+//
+// Offered on the claim rather than on each row, because that is the unit the
+// judgment was made at: a team answering one kernel issue writes a decision at
+// each of its places in one action, and restoring them one at a time is that
+// many separately typed justifications for one argument.
+//
+// The claimant's, and nobody else's. An approver doing this would become the
+// proposer of the new claim while their own earlier agreement is carried onto
+// it, which is one person on both sides of the control.
+function Reaffirm({
+  claim,
+  id,
+  mine,
+  onDone,
+}: {
+  claim: Claimed;
+  id: number;
+  mine: boolean;
+  onDone: () => void;
+}) {
+  const [reasoning, setReasoning] = useState("");
+  const [waiting, setWaiting] = useState<boolean | null>(null);
+  const again = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.POST("/v1/claims/{id}/reaffirmation", {
+          params: { path: { id } },
+          body: { reasoning: reasoning.trim() },
+        }),
+      ),
+    onSuccess: (made) => {
+      setWaiting(!!made?.waiting);
+      setReasoning("");
+      onDone();
+    },
+  });
+
+  if (!mine || claim.happened !== "lapsed") return null;
+  return (
+    <div className="card">
+      <header className="dhead">
+        <h3>Re-affirm</h3>
+      </header>
+      <p className="reading" style={{ marginTop: 0 }}>
+        The code moved under this. Saying it still holds re-makes every place it covered, at the
+        versions they have now.
+      </p>
+      <textarea
+        rows={3}
+        value={reasoning}
+        placeholder="Why it still holds, having checked again"
+        onChange={(event) => setReasoning(event.target.value)}
+      />
+      <div className="actions" style={{ marginTop: 10 }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={reasoning.trim() === "" || again.isPending}
+          onClick={() => again.mutate()}
+        >
+          Re-affirm all {claim.places > 1 ? `${claim.places} places` : ""}
+        </button>
+        {waiting !== null && (
+          <span className="hint" style={{ marginLeft: 10 }}>
+            {waiting
+              ? "Waiting for a second person: it is rated worse than when it was agreed to, or nothing had agreed to it."
+              : "Standing, with the earlier agreement carried onto it."}
+          </span>
+        )}
+      </div>
+      {again.isError && <Failed error={again.error} what="It could not be re-affirmed." />}
     </div>
   );
 }

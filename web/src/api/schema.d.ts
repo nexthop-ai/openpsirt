@@ -474,6 +474,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/claims/{id}/reaffirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-affirm everything one action claimed
+         * @description Re-makes every row of this claim that stopped applying because an upstream version moved, at the versions each place has now, as one act with one reasoning.
+         *
+         *     **Deciding is bulk-capable and re-deciding was not.** A team answering one kernel issue writes a decision at each of its places in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
+         *
+         *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version bump is a prompt to re-check rather than a new claim.
+         *
+         *     **One act, one approval.** Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+         *
+         *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
+         *
+         *     **Requires:** public-triage or private-triage
+         */
+        post: operations["reaffirm-claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/claims/{id}/reasoning": {
         parameters: {
             query?: never;
@@ -7432,6 +7462,16 @@ export interface components {
             /** @description What is missing, where there is nothing to compare against */
             why?: string;
         };
+        "Reaffirm-claimRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Reaffirm-claimRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Why every one of them still holds, in markdown */
+            reasoning: string;
+        };
         "Reaffirm-decisionRequest": {
             /**
              * Format: uri
@@ -7446,6 +7486,27 @@ export interface components {
             previous: number;
             /** @description Why it still holds, in markdown */
             reasoning: string;
+        };
+        ReaffirmedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReaffirmedBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The claim this action made, which is what a second person agrees to where one is needed
+             */
+            claim_id: number;
+            decisions: number[] | null;
+            /**
+             * Format: int64
+             * @description How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
+             */
+            places: number;
+            /** @description Whether a second person has to agree */
+            waiting: boolean;
         };
         ReceiptBody: {
             /** @description When the producer says the build was made */
@@ -9443,6 +9504,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "reaffirm-claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reaffirm-claimRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReaffirmedBody"];
+                };
             };
             /** @description Error */
             default: {

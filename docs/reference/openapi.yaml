@@ -5766,6 +5766,23 @@ components:
       required:
         - now
       type: object
+    Reaffirm-claimRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Reaffirm-claimRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        reasoning:
+          description: Why every one of them still holds, in markdown
+          minLength: 1
+          type: string
+      required:
+        - reasoning
+      type: object
     Reaffirm-decisionRequest:
       additionalProperties: false
       properties:
@@ -5787,6 +5804,40 @@ components:
       required:
         - previous
         - reasoning
+      type: object
+    ReaffirmedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ReaffirmedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        claim_id:
+          description: The claim this action made, which is what a second person agrees to where one is needed
+          format: int64
+          type: integer
+        decisions:
+          items:
+            format: int64
+            type: integer
+          type:
+            - array
+            - "null"
+        places:
+          description: How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
+          format: int64
+          type: integer
+        waiting:
+          description: Whether a second person has to agree
+          type: boolean
+      required:
+        - claim_id
+        - decisions
+        - places
+        - waiting
       type: object
     ReceiptBody:
       additionalProperties: false
@@ -9083,6 +9134,55 @@ paths:
         - Remediation
       x-openpsirt-requires:
         scope: product
+        any_of:
+          - public-triage
+          - private-triage
+  /v1/claims/{id}/reaffirmation:
+    post:
+      description: |-
+        Re-makes every row of this claim that stopped applying because an upstream version moved, at the versions each place has now, as one act with one reasoning.
+
+        **Deciding is bulk-capable and re-deciding was not.** A team answering one kernel issue writes a decision at each of its places in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
+
+        Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version bump is a prompt to re-check rather than a new claim.
+
+        **One act, one approval.** Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+
+        A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
+
+        **Requires:** public-triage or private-triage
+      operationId: reaffirm-claim
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reaffirm-claimRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReaffirmedBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Re-affirm everything one action claimed
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: person
         any_of:
           - public-triage
           - private-triage
