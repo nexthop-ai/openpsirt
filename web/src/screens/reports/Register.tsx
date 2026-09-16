@@ -12,6 +12,7 @@ import { Paged } from "../../ui/Paged";
 import { Severity } from "../../ui/Severity";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { STATES, type Stands, said } from "../../ui/states";
 import { Wide } from "../../ui/Wide";
 
 // How much of the register one page holds. The server's own ceiling is five
@@ -129,7 +130,7 @@ export function Register() {
                     setParams(next);
                   }}
                 >
-                  {SAID[word]}
+                  {said(word)}
                 </button>
               ))}
             </div>
@@ -393,15 +394,3 @@ function fileAt(
     (query ? `?${query}` : "")
   );
 }
-
-// The four words a row stands in, and what each is called on screen. The same
-// vocabulary the rows below use, because a control naming one thing and a row
-// naming another is two vocabularies for one fact.
-const STATES = ["undecided", "waiting", "agreed", "lapsed"] as const;
-type Stands = (typeof STATES)[number];
-const SAID: Record<Stands, string> = {
-  undecided: "nobody has said",
-  waiting: "waiting",
-  agreed: "agreed",
-  lapsed: "no longer stands",
-};

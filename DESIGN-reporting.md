@@ -92,7 +92,8 @@ number stays the sum of what the reader may see.
 ## The period a report covers
 
 Every report over a stretch of time takes one: deadline compliance,
-remediation, triage latency, approval coverage and where the effort went. Two
+remediation, triage latency, approval coverage, where the effort went, and
+what advisories went out. Two
 dates, or a rolling window of days, in one shape so that a screen linking from
 one report to another carries the same two parameters.
 
@@ -318,7 +319,7 @@ a manager has to answer without any of the others.
 | What came out of them is part of the answer | Forty arguments that dismissed forty and forty that promised forty upgrades are different quarters, and a report carrying only the volume says they are the same |
 | What a judgment was about is reached through the findings at its place | A decision names a place rather than a component. A judgment about something since removed still names what it was about, which is what a report about where the time went has to keep |
 | Dated by when a judgment was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the record dates by |
-| It takes the same period and the same scope the other reports do | One product or one team, so a manager reads their own quarter rather than the deployment's |
+| It takes the same period and the same scope the other reports do | One product or one team, so a manager reads their own quarter rather than the deployment's. The team is picked on the sheet, from the teams that exist |
 
 ## Triage latency
 

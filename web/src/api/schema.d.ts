@@ -47,6 +47,8 @@ export interface paths {
          *
          *     Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody who may not read it, and a count is as much a disclosure as a row.
          *
+         *     Asked for neither a period nor a window, this is the last 365 days. An auditor asking what went out in a financial year names the two dates instead.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-published-advisories"];
@@ -6950,17 +6952,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyWentBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyWentBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["WentBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         MatchBody: {
             /** @description This is another version in the same build, not another build */
             here?: boolean;
@@ -7281,6 +7272,21 @@ export interface components {
             /** @description The first day of the period. Absent where it runs from the beginning */
             from?: string;
             items: components["schemas"]["SpentBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
+            /** Format: int64 */
+            total?: number;
+        };
+        OverPeriodWentBodyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OverPeriodWentBodyBody.json
+             */
+            readonly $schema?: string;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
+            items: components["schemas"]["WentBody"][] | null;
             /** @description The day it ends, which is not itself in it */
             to: string;
             /** Format: int64 */
@@ -9214,7 +9220,11 @@ export interface operations {
             query?: {
                 /** @description Limit to one product, by name */
                 product?: string;
-                /** @description How far back to look, by when the advisory went out */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
             };
             header?: never;
@@ -9229,7 +9239,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyWentBody"];
+                    "application/json": components["schemas"]["OverPeriodWentBodyBody"];
                 };
             };
             /** @description Error */

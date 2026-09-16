@@ -8,7 +8,14 @@ import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords, daysAsked } from "./Window";
+import {
+  PeriodPicker,
+  WindowPicker,
+  asked,
+  coveringPeriod,
+  daysAsked,
+  periodAsked,
+} from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // How far back to look. A year by default, because publishing is rare enough
@@ -29,14 +36,18 @@ export function Published() {
   const at = useScope();
   const [params] = useSearchParams();
   const days = daysAsked(params, 365);
+  // An auditor asking what went out in a financial year names two dates; the
+  // window answers "lately", which is the other question.
+  const period = periodAsked(params);
+  const when = asked(period, days);
   const product = at.product ?? "";
 
   const gone = useQuery({
-    queryKey: ["published", product, days],
+    queryKey: ["published", product, when],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/advisories", {
-          params: { query: { days, ...(product ? { product } : {}) } },
+          params: { query: { ...when, ...(product ? { product } : {}) } },
         }),
       ),
   });
@@ -49,9 +60,10 @@ export function Published() {
       settled={gone.isSuccess}
       name="Advisories issued"
       answers="what has been published about our own flaws, and what was published twice."
-      asked={coveringWords(days)}
+      asked={coveringPeriod(period, days)}
     >
       <WindowPicker offered={WINDOWS} days={days} />
+      <PeriodPicker period={period} />
 
       {gone.isPending ? (
         <Loading />

@@ -8,6 +8,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Outcome } from "../ui/Outcome";
+import { drawn, said } from "../ui/states";
 import { Severity } from "../ui/Severity";
 import { Across } from "../ui/Charts";
 
@@ -321,24 +322,6 @@ function Pick({
 // grows arrives here instead of being silently absent.
 type Changed = Body<"ChangedBody">;
 
-// How far a row has been decided, in the words the register uses, so a reader
-// of both is reading one vocabulary. A row that is none of the four — some
-// places agreed and the rest never decided — says that rather than nothing.
-const SAID: Record<string, string> = {
-  undecided: "nobody has said",
-  waiting: "waiting for a second person",
-  agreed: "agreed",
-  lapsed: "no longer stands",
-};
-
-// And how each of those is drawn, by the same names every other screen uses.
-const STANDS: Record<string, string> = {
-  undecided: "open",
-  waiting: "waiting",
-  agreed: "agreed",
-  lapsed: "lapsed",
-};
-
 // Marks read as sentences rather than as field values, because a reader of a
 // release note is being told what happened rather than shown a column.
 const WENT: Record<string, string> = {
@@ -483,9 +466,7 @@ function Column({
                   {row.outcome ? (
                     <Outcome outcome={row.outcome} />
                   ) : (
-                    <span className={`state ${STANDS[row.state ?? ""] ?? "open"}`}>
-                      {SAID[row.state ?? ""] ?? "part decided"}
-                    </span>
+                    <span className={`state ${drawn(row.state)}`}>{said(row.state)}</span>
                   )}
                   {row.justification && <span className="hint"> {row.justification}</span>}
                   {row.due && <span className="hint"> · due {row.due}</span>}

@@ -39,18 +39,36 @@ const SHOWN = 50;
 // and one claim over a thousand are different afternoons.
 export function Effort() {
   const at = useScope();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const days = daysAsked(params, 90);
   const period = periodAsked(params);
   const when = asked(period, days);
   const product = at.product ?? "";
+  // Whose work, which is the question the report was built for: a manager
+  // asking how their own people are doing read the deployment's numbers
+  // otherwise. In the address like the period, so a narrowed sheet is
+  // something somebody sends.
+  const team = params.get("team") ?? "";
+
+  const teams = useQuery({
+    queryKey: ["teams"],
+    queryFn: async () => unwrap(await api.GET("/v1/teams", {})),
+    retry: false,
+  });
 
   const spent = useQuery({
-    queryKey: ["effort", when, product],
+    queryKey: ["effort", when, product, team],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/effort", {
-          params: { query: { ...when, limit: SHOWN, ...(product ? { product } : {}) } },
+          params: {
+            query: {
+              ...when,
+              limit: SHOWN,
+              ...(product ? { product } : {}),
+              ...(team ? { team } : {}),
+            },
+          },
         }),
       ),
   });
@@ -66,6 +84,30 @@ export function Effort() {
     >
       <WindowPicker offered={WINDOWS} days={days} />
       <PeriodPicker period={period} />
+
+      {(teams.data?.items ?? []).length > 0 && (
+        <div className="controls">
+          <label>
+            Whose{" "}
+            <select
+              value={team}
+              onChange={(e) => {
+                const next = new URLSearchParams(params);
+                if (e.target.value === "") next.delete("team");
+                else next.set("team", e.target.value);
+                setParams(next);
+              }}
+            >
+              <option value="">everyone</option>
+              {(teams.data?.items ?? []).map((one) => (
+                <option key={one.name} value={one.name}>
+                  {one.display_name || one.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {spent.isPending ? (
         <Loading />
