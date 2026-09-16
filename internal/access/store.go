@@ -35,6 +35,10 @@ type Account struct {
 	// a group gave is taken back when groups stop deciding, so somebody
 	// promoted inside the application survives a change of mode.
 	AdminDerived bool `bun:"admin_derived,notnull"`
+	// AdminDerivedAt is when a group last said so, refreshed at every sign-in
+	// that derives it. It is what bounds the flag for a credential that never
+	// signs in. Null where a person granted it.
+	AdminDerivedAt *time.Time `bun:"admin_derived_at"`
 	// Email is where to reach this person outside the application, and
 	// EmailDerived says a sign-in provider supplied it rather than
 	// somebody here. The pair works like the two above: a provider may
@@ -126,16 +130,21 @@ type Store struct {
 	// read where settings are read.
 	claimWindow time.Duration
 	// derivedFor is how long a grant a group derived stays in force without
-	// being derived again, carried the same way and for the same reason.
+	// being derived again.
 	//
-	// Zero leaves a derived grant in force indefinitely, which is what a
-	// deployment that assigns roles directly wants: it derives none, so
-	// nothing here applies to it.
-	derivedFor time.Duration
+	// A function rather than a value, and read per request rather than held,
+	// because what bounds it is a setting an administrator changes without a
+	// restart — the same reason the resolver holds the role mode that way. A
+	// held copy would go on using the window that was configured at startup,
+	// so an administrator shortening it to cut off somebody who has left would
+	// get no effect until the process was restarted.
+	//
+	// Nil, or a window of zero, leaves a derived grant in force indefinitely.
+	derivedFor func(context.Context) time.Duration
 }
 
 // DerivingWithin returns a store where a grant a group derived stays in force
-// for the given window after it was derived.
+// for the window the given function reports, asked each time it is needed.
 //
 // **What this bounds is staleness, not authentication.** Membership is read
 // when somebody signs in, and every sign-in replaces their derived grants
@@ -147,7 +156,7 @@ type Store struct {
 //
 // No mode is consulted because none is needed: a deployment that assigns roles
 // directly derives nothing, so it has no row this can reach.
-func (s *Store) DerivingWithin(window time.Duration) *Store {
+func (s *Store) DerivingWithin(window func(context.Context) time.Duration) *Store {
 	narrowed := *s
 	narrowed.derivedFor = window
 	return &narrowed
@@ -158,11 +167,27 @@ func (s *Store) DerivingWithin(window time.Duration) *Store {
 //
 // Only a derived one: what an administrator assigned is a standing decision
 // and does not go off.
-func (s *Store) stale(source Source, at time.Time) bool {
-	if s.derivedFor <= 0 || source != Derived {
+func (s *Store) stale(ctx context.Context, source Source, at time.Time) bool {
+	if s.derivedFor == nil || source != Derived {
 		return false
 	}
-	return s.now().Sub(at) > s.derivedFor
+	window := s.derivedFor(ctx)
+	if window <= 0 {
+		return false
+	}
+	return s.now().Sub(at) > window
+}
+
+// over is this store reading and writing through another connection.
+//
+// A copy with one field replaced, rather than a literal built field by field.
+// The literals drifted: each new field on the store is an edit in four places
+// and the three that are not in front of you are the ones that get missed,
+// which is how `claimWindow` came to be dropped by some of them.
+func (s *Store) over(db bun.IDB) *Store {
+	moved := *s
+	moved.db = db
+	return &moved
 }
 
 // handle returns the connection this store was built over, or reports that it
@@ -213,8 +238,7 @@ func (s *Store) Within(ctx context.Context,
 	do func(context.Context, *Store, bun.IDB) error) error {
 
 	return database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
-		return do(ctx, &Store{db: db, now: s.now, claimWindow: s.claimWindow,
-			derivedFor: s.derivedFor}, db)
+		return do(ctx, s.over(db), db)
 	})
 }
 
@@ -465,7 +489,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		if !grant.Role.Valid() {
 			continue
 		}
-		if boundDerived && s.stale(grant.Source, grant.CreatedAt) {
+		if boundDerived && s.stale(ctx, grant.Source, grant.CreatedAt) {
 			continue
 		}
 		grants[grant.ProductID] = append(grants[grant.ProductID], grant.Role)
@@ -482,7 +506,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	if len(estate) > 0 {
 		everywhere := make([]Role, 0, len(estate))
 		for _, grant := range estate {
-			if boundDerived && s.stale(grant.Source, grant.CreatedAt) {
+			if boundDerived && s.stale(ctx, grant.Source, grant.CreatedAt) {
 				continue
 			}
 			if grant.Role.Valid() {
@@ -504,7 +528,23 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	if err != nil {
 		return Subject{}, err
 	}
-	if !person.IsAdmin && len(grants) == 0 && len(cases) == 0 {
+	// Administration a group conferred is bounded the same way the roles it
+	// conferred are, and for the same reason: a group is what says so, and a
+	// credential that never signs in never asks a group again. Without this a
+	// person a group made an administrator, who minted a year-long token and
+	// then left, went on administering through it — and administration is what
+	// decides who may read anybody's notification feed.
+	//
+	// A stamp that is missing on a derived flag is treated as stale rather
+	// than as fresh. It means nothing has confirmed it since the column
+	// existed, which is the same thing the bound is for.
+	administers := person.IsAdmin
+	if boundDerived && person.AdminDerived {
+		if person.AdminDerivedAt == nil || s.stale(ctx, Derived, *person.AdminDerivedAt) {
+			administers = false
+		}
+	}
+	if !administers && len(grants) == 0 && len(cases) == 0 {
 		return Subject{}, ErrDenied
 	}
 
@@ -534,7 +574,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	for _, team := range teams {
 		on = append(on, team.PartyID)
 	}
-	return NewPerson(person.ID, person.Identity, person.IsAdmin, grants,
+	return NewPerson(person.ID, person.Identity, administers, grants,
 		person.PartyID, on...).OnCases(cases), nil
 }
 

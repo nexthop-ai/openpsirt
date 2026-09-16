@@ -285,6 +285,7 @@ function Tokens() {
               <tr>
                 <th>Name</th>
                 <th>Reaches</th>
+                <th>Carries</th>
                 <th>Expires</th>
                 <th>Last used</th>
                 <th />
@@ -305,6 +306,16 @@ function Tokens() {
                       </>
                     ) : (
                       <span className="hint">whatever you can reach</span>
+                    )}
+                  </td>
+                  {/* Absent means every role its owner holds, so a token that
+                      narrowed and did not say so read back as the widest kind
+                      there is. */}
+                  <td>
+                    {row.holds && row.holds.length > 0 ? (
+                      <span className="id">{row.holds.join(", ")}</span>
+                    ) : (
+                      <span className="hint">whatever you can do</span>
                     )}
                   </td>
                   <td className="hint">{on(row.expires_at) ?? "—"}</td>

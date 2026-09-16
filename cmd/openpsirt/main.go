@@ -258,12 +258,15 @@ func run(args []string, stdout, stderr *os.File) error {
 		// the session lifetime. A browser re-derives its roles at every
 		// sign-in; a personal token never signs in, so without a bound a
 		// group somebody left keeps granting them roles through that token
-		// for as long as it lasts. The same window, stated once, for both
-		// ways in.
-		Access: access.NewResolver(rights.DerivingWithin(cfg.SessionLifetime), access.Trust{
-			Header: cfg.TrustedHeader, From: cfg.TrustedSources,
-			GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
-		}).WithLogger(logger).WithMode(roleMode(settings)).OverPlainHTTP(cfg.PlainHTTP),
+		// for as long as it lasts. The same window, resolved the same way, for
+		// both ways in — including the administrator's setting, which is the
+		// one that decides and is read per request rather than at startup.
+		Access: access.NewResolver(
+			rights.DerivingWithin(httpapi.DerivedWindow(settings, cfg.SessionLifetime)),
+			access.Trust{
+				Header: cfg.TrustedHeader, From: cfg.TrustedSources,
+				GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
+			}).WithLogger(logger).WithMode(roleMode(settings)).OverPlainHTTP(cfg.PlainHTTP),
 		Providers:       providers,
 		BaseURL:         cfg.BaseURL,
 		PlainHTTP:       cfg.PlainHTTP,

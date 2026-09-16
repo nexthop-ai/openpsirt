@@ -48,7 +48,7 @@ components:
             - array
             - "null"
         told_total:
-          description: How many things they were told, of which the list above is a page
+          description: "How many things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
           format: int64
           type: integer
       required:
@@ -7386,7 +7386,7 @@ components:
           description: When it stops working
           type: string
         holds:
-          description: Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them
+          description: Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none
           items:
             enum:
               - approver

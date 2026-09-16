@@ -604,7 +604,7 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // administrator holding nothing on a product reads the public half of a feed
 // and not the embargoed half.
 //
-// The defence for answering it whole was that an administrator could grant
+// The defense for answering it whole was that an administrator could grant
 // themselves the product and read it anyway. They can, and that grant lands in
 // the administrative record within seconds, where this read left nothing at
 // all — so the two are not equivalent, and the cheaper of them was the silent

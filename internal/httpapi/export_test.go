@@ -698,7 +698,7 @@ func TestAFileWithNothingToStateStatesNothing(t *testing.T) {
 // indexOf is where a column sits, or -1.
 //
 // Used in place of a fixed position so that adding a column does not quietly
-// move an assertion onto its neighbour.
+// move an assertion onto its neighbor.
 func indexOf(row []string, name string) int {
 	for i, each := range row {
 		if each == name {

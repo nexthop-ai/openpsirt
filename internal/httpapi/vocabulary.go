@@ -3,6 +3,7 @@ package httpapi
 import (
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -94,3 +95,13 @@ type origin string
 
 // Schema answers with the words the narrowing takes.
 func (origin) Schema(huma.Registry) *huma.Schema { return words(finding.Origins()) }
+
+// role is a role somebody holds, as the access package lists them.
+//
+// Retyped beside the route it was a literal, which is the drift this file
+// exists to stop: `access.Roles` calls itself a floor rather than a ceiling, so
+// a role added there was accepted by the store and refused by the route.
+type role string
+
+// Schema offers the roles the access package knows.
+func (role) Schema(_ huma.Registry) *huma.Schema { return words(access.Roles()) }

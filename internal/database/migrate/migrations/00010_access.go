@@ -72,6 +72,16 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			-- deciding, so somebody promoted inside the application survives a
 			-- change of mode rather than losing access nothing can restore.
 			"admin_derived" ` + t.boolean + ` NOT NULL,
+			-- When a group last said so, refreshed at every sign-in that
+			-- derives it rather than only when the answer changes.
+			--
+			-- It is what bounds the flag for a personal token. A token never
+			-- signs in, so nothing re-derives its owner's administration while
+			-- it is being used, and without this somebody a group made an
+			-- administrator who then left went on administering through a
+			-- year-long token for as long as it lasted. Null where a person
+			-- rather than a group granted it, which never goes stale.
+			"admin_derived_at" ` + t.timestamp + ` NULL,
 			-- Where to reach this person outside the application, and which
 			-- of the two sources it came from. Null is the ordinary state:
 			-- an address is optional, and somebody without one is told

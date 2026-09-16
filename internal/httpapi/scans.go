@@ -366,9 +366,32 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// What this submission is, and what it hashes to: what it says about
 	// itself comes from the inventory, and whether we already hold it is
 	// asked of everything that arrived.
+	// Every door that turns an upload away records it, not only the last one.
+	// A producer posting a document nothing can read never reaches the arm
+	// below, so the build drew as quiet-and-never-refused — which the coverage
+	// report reads as a pipeline nobody wired up, telling the wrong person
+	// about the commoner of the two failures this record exists for.
+	note := func(reason string, builtAt *time.Time, hash *string) {
+		if in.DB == nil {
+			return
+		}
+		if noted := ingest.NewStore(in.DB.DB).Refused(ctx, subject, ingest.Refusal{
+			TargetID: target.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
+		}); noted != nil {
+			// Best-effort, and the one place that is right: a note about
+			// something that already failed, where failing the failure would
+			// turn a refusal the producer needs to read into a fault they
+			// cannot.
+			in.logger().ErrorContext(ctx, "could not record that an upload was refused",
+				"error", noted, "product", input.Product)
+		}
+	}
+
 	header, contentHash, inventoryHash, err := describe(parts, in.Limits)
 	if err != nil {
-		return nil, huma.Error422UnprocessableEntity("the upload could not be read", err)
+		refused := huma.Error422UnprocessableEntity("the upload could not be read", err)
+		note(refused.Error(), nil, nil)
+		return nil, refused
 	}
 
 	// A document that does not say when it was built cannot be ordered against
@@ -378,8 +401,10 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// takes no further scans at all, which is the same wedge the future-clock
 	// check exists to prevent, arriving through a door nobody guarded.
 	if header.BuiltAt.IsZero() {
-		return nil, huma.Error400BadRequest(
+		refused := huma.Error400BadRequest(
 			"the inventory does not say when it was built, and that is what orders scans against each other")
+		note(refused.Error(), nil, &contentHash)
+		return nil, refused
 	}
 
 	arriving := ingest.Arriving{
@@ -466,17 +491,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// a pipeline nobody wired up, against one failing nightly and telling
 		// its own log it succeeded.
 		refused := rejection(outcome, err)
-		if noted := ingest.NewStore(in.DB.DB).Refused(ctx, subject, ingest.Refusal{
-			TargetID: target.ID, Reason: refused.Error(),
-			BuiltAt: &header.BuiltAt, ContentHash: &contentHash,
-		}); noted != nil {
-			// Best-effort, and the one place that is right: this is a note
-			// about something that already failed, and failing the failure
-			// would turn a refusal the producer needs to read into a fault
-			// they cannot.
-			in.logger().ErrorContext(ctx, "could not record that an upload was refused",
-				"error", noted, "product", input.Product)
-		}
+		note(refused.Error(), &header.BuiltAt, &contentHash)
 		return nil, refused
 	case err != nil:
 		return nil, wentWrong(in.Logger, "the upload could not be recorded", err)

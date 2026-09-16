@@ -182,6 +182,11 @@ type Subject struct {
 	// its comments and its attachments, and a lookup at each of those is
 	// four answers that can disagree.
 	cases map[int64][]int64
+	// casesReadOnly takes the write half of a case grant away, for a
+	// credential narrowed to roles that do not include triage. Inverted so
+	// that the zero value acts, which is what every subject not narrowed this
+	// way should do.
+	casesReadOnly bool
 }
 
 // OnCase reports whether this subject was brought into one case: one issue, in
@@ -201,6 +206,22 @@ func (s Subject) OnCase(productID, vulnerabilityID int64) bool {
 		}
 	}
 	return false
+}
+
+// OnCaseToAct is OnCase asked where something is about to be written.
+//
+// A case grant is enough to write on its own: a note, an attachment and a
+// decision each accept it in place of triage, because somebody brought onto an
+// embargoed issue is brought on to work it rather than to watch. That is right
+// for the person and wrong for a credential they narrowed to reading — so a
+// token carrying no triage role keeps the case's read half and loses its write
+// half.
+//
+// Inverted on purpose. The zero value of a Subject may act, so a subject built
+// anywhere without going through a narrowing behaves as it did before this
+// existed, and the one place that takes the write half away says so.
+func (s Subject) OnCaseToAct(productID, vulnerabilityID int64) bool {
+	return !s.casesReadOnly && s.OnCase(productID, vulnerabilityID)
 }
 
 // Cases is every issue this subject collaborates on in one product. Empty

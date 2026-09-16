@@ -1,6 +1,7 @@
 package access_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -448,7 +449,7 @@ func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		bounded := f.store.DerivingWithin(24 * time.Hour)
+		bounded := f.store.DerivingWithin(func(context.Context) time.Duration { return 24 * time.Hour })
 		subject, err := bounded.ResolveToken(ctx, secret)
 		if err != nil {
 			t.Fatal(err)
@@ -525,6 +526,69 @@ func TestATokenCarriesOnlyTheRolesItWasMintedFor(t *testing.T) {
 			}
 			if got := subject.Triages(access.Public, f.products["sonic"]); got != c.triages {
 				t.Errorf("a token %s triages the product: %v, want %v", c.what, got, c.triages)
+			}
+		}
+	})
+}
+
+// TestAReadingTokenCannotWriteOnItsOwnersCase holds the line that narrowing a
+// token to reading takes the write half of a case grant with it.
+//
+// A case grant is enough to write on its own — a note, an attachment and a
+// decision each accept it in place of a triage role, because somebody brought
+// onto an embargoed issue is brought on to work it. Keeping the grant whole
+// through a narrowing meant a credential labelled "reading only" could still
+// record a decision on the embargoed issue it was minted for.
+//
+// The read half stays, which is the reason it is not simply dropped: a token
+// that cannot read the one case it exists for is no use to anybody.
+func TestAReadingTokenCannotWriteOnItsOwnersCase(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "collab", "Collab", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A case and nothing else, which is the shape that writes without a
+		// role. A reading role beside it so the narrowing has something to
+		// keep.
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		issues, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "SONIC-2026-8100", Severity: "high"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := issues["SONIC-2026-8100"]
+		if err := f.store.AddToCase(ctx, f.products["sonic"], issue, person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, c := range []struct {
+			what  string
+			holds []access.Role
+			acts  bool
+		}{
+			{"carrying everything", nil, true},
+			{"narrowed to reading", []access.Role{access.PublicRead}, false},
+			{"narrowed to triage", []access.Role{access.PublicTriage}, true},
+		} {
+			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			subject, err := f.store.ResolveToken(ctx, secret)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			// The read half is there whichever way it was narrowed.
+			if !subject.OnCase(f.products["sonic"], issue) {
+				t.Errorf("a token %s cannot read the case it was minted for", c.what)
+			}
+			if got := subject.OnCaseToAct(f.products["sonic"], issue); got != c.acts {
+				t.Errorf("a token %s writes on the case: %v, want %v", c.what, got, c.acts)
 			}
 		}
 	})

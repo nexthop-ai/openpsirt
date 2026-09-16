@@ -140,10 +140,13 @@ func rolesFor(holds []Role) (*string, error) {
 // the token names, so naming a role they do not hold reaches nothing rather
 // than granting it.
 //
-// **A case is not a role and is not touched.** Being brought into one is a
-// grant on a pair of a product and an issue rather than something in this
-// vocabulary, and dropping it here would make a read-only token unable to read
-// the one case it was minted for.
+// **A case keeps its read half and loses its write half.** Being brought into
+// one is a grant on a pair of a product and an issue rather than something in
+// this vocabulary, so dropping it would make a read-only token unable to read
+// the one case it was minted for. Keeping it whole is worse: a case grant is
+// enough to write on its own — a note, an attachment and a decision each accept
+// it in place of triage — so a token narrowed to reading would still have
+// recorded a decision on the embargoed issue it was minted for.
 func (s Subject) narrowedToRoles(holds string) Subject {
 	wanted := map[Role]bool{}
 	for _, word := range strings.Split(holds, ",") {
@@ -166,6 +169,10 @@ func (s Subject) narrowedToRoles(holds string) Subject {
 	// a token asked to carry some roles carries none of it.
 	s.Admin = false
 	s.unnarrowed = false
+	// And the case's write half goes unless a triage role was named, for the
+	// same reason: what a token carries is what it was asked to carry, and a
+	// case grant writes without any role at all.
+	s.casesReadOnly = !wanted[PublicTriage] && !wanted[PrivateTriage]
 	return s
 }
 

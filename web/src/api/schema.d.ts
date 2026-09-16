@@ -4218,7 +4218,7 @@ export interface components {
             told?: components["schemas"]["ToldBody"][] | null;
             /**
              * Format: int64
-             * @description How many things they were told, of which the list above is a page
+             * @description How many things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains
              */
             told_total: number;
         };
@@ -8372,7 +8372,7 @@ export interface components {
             readonly $schema?: string;
             /** @description When it stops working */
             expires_at?: string;
-            /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them */
+            /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none */
             holds?: ("approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage")[] | null;
             /** @description When it was last used */
             last_used_at?: string;

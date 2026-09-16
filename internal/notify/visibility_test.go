@@ -249,7 +249,7 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 // holding nothing on a product gets the public half of a feed and not the
 // embargoed half.
 //
-// The defence for answering it whole was that an administrator could grant
+// The defense for answering it whole was that an administrator could grant
 // themselves the product and read it anyway — which is true, and lands in the
 // administrative record within seconds, where this read left nothing. Both
 // routes reach the same rows and only one of them is accountable.

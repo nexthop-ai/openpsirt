@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -24,7 +25,7 @@ type TokenBody struct {
 	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
 	// Holds narrows which of its owner's roles it carries, the same way and
 	// for the same reason Product narrows where. Absent means all of them.
-	Holds []string `json:"holds,omitempty" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them"`
+	Holds []role `json:"holds,omitempty" doc:"Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none"`
 	// Lifetime is how long it lasts, as a duration. There is a maximum, and
 	// there is no way to ask for one that never expires.
 	Lifetime string `json:"lifetime,omitempty" doc:"How long it lasts, such as \"720h\". There is a configured maximum"`
@@ -111,9 +112,28 @@ func registerTokens(api huma.API, in Ingest) {
 			}
 		}
 
-		holds := make([]access.Role, 0, len(input.Body.Holds))
-		for _, word := range input.Body.Holds {
-			holds = append(holds, access.Role(word))
+		// Absent and empty are different requests and were the same value.
+		// Both arrived as a non-nil, zero-length slice and both stored NULL,
+		// which means every role its owner holds — so a script asking for a
+		// token that carries nothing was handed one that carries everything.
+		var holds []access.Role
+		if input.Body.Holds != nil {
+			if len(input.Body.Holds) == 0 {
+				return nil, huma.Error422UnprocessableEntity(
+					"a token carrying no role reaches nothing; leave holds out to carry all of them")
+			}
+			for _, word := range input.Body.Holds {
+				holds = append(holds, access.Role(word))
+			}
+			// Refused at the mint rather than stored. Narrowing intersects, so
+			// a token naming only roles its owner does not hold authenticates
+			// and then answers empty everywhere — and triage implies reading
+			// without being a reading role, so "reading only" asked of
+			// somebody holding private-triage alone is exactly that request.
+			if !subject.HoldsAnywhere(holds...) {
+				return nil, huma.Error422UnprocessableEntity(
+					"you hold none of those roles, so a token carrying them would reach nothing")
+			}
 		}
 
 		token, secret, err := rights.NewToken(ctx, subject.ID, input.Body.Name, productID, holds, lifetime, ceiling)
@@ -127,10 +147,10 @@ func registerTokens(api huma.API, in Ingest) {
 		// asked for after somebody leaves, when they are not there to ask.
 		// Named by owner and token, because a name is unique to its owner.
 		noteChange(ctx, in, trail.Credential, subject.Identity+" · "+token.Name,
-			nil, trail.Said(narrowedToProduct(input.Body.Product), true))
+			nil, trail.Said(narrowedTokenSays(input.Body.Product, holds), true))
 		return &struct{ Body TokenBody }{Body: TokenBody{
 			Name: token.Name, Product: input.Body.Product, Secret: secret,
-			ExpiresAt: stamp(token.ExpiresAt),
+			Holds: input.Body.Holds, ExpiresAt: stamp(token.ExpiresAt),
 		}}, nil
 	})
 
@@ -173,11 +193,23 @@ func registerTokens(api huma.API, in Ingest) {
 }
 
 // narrowedToProduct spells what a personal token may reach, for the trail.
-func narrowedToProduct(product string) string {
-	if product == "" {
-		return "everything its owner may reach"
+func narrowedTokenSays(product string, holds []access.Role) string {
+	where := product
+	if where == "" {
+		where = "everything its owner may reach"
 	}
-	return product
+	if len(holds) == 0 {
+		return where
+	}
+	// Both halves, because both decide what a leaked credential can do and the
+	// record is what justifies minting one without a second person. Written as
+	// one sentence rather than two rows: the trail records an act, and
+	// narrowing a token is one act however many ways it narrows.
+	words := make([]string, 0, len(holds))
+	for _, held := range holds {
+		words = append(words, string(held))
+	}
+	return where + ", carrying " + strings.Join(words, ", ")
 }
 
 // mine resolves whose tokens are being asked about.
@@ -207,6 +239,15 @@ func tokenList(ctx context.Context, names *catalog.Store, tokens []access.Token,
 		}
 		if token.LastUsedAt != nil {
 			body.LastUsedAt = stamp(*token.LastUsedAt)
+		}
+		// Absent here means every role its owner holds, so a narrowed token
+		// that did not say so read back as the widest kind there is — and
+		// nothing, not the screen offering the control nor somebody auditing
+		// what is outstanding, could tell which tokens only read.
+		if token.Holds != nil {
+			for _, word := range strings.Split(*token.Holds, ",") {
+				body.Holds = append(body.Holds, role(word))
+			}
 		}
 		if token.ProductID != nil {
 			// The address, for the reason KeyBody carries it: minting

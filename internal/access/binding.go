@@ -280,7 +280,7 @@ func (s *Store) AdmitByGroups(ctx context.Context, who Arrival, groups []string)
 	var person *Account
 	if err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		var err error
-		person, err = (&Store{db: tx, now: s.now}).admit(ctx, who, groups)
+		person, err = s.over(tx).admit(ctx, who, groups)
 		return err
 	}); err != nil {
 		return Subject{}, err
@@ -372,14 +372,27 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		// Nothing to have come from anywhere.
 		derived = false
 	}
-	if person.IsAdmin != effective || person.AdminDerived != derived {
+	// The stamp is written whenever a group is what says so, and not only when
+	// the answer changes: what it records is when a group last confirmed it,
+	// which is the question a credential that never signs in has to be
+	// measured against. Written only when the answer changes it would have
+	// recorded the last change instead, and a flag that has held steady for a
+	// year would read as a year stale.
+	var derivedAt *time.Time
+	if derived {
+		now := s.now().Truncate(time.Microsecond)
+		derivedAt = &now
+	}
+	if person.IsAdmin != effective || person.AdminDerived != derived || derived {
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
 			Set("is_admin = ?", effective).Set("admin_derived = ?", derived).
+			Set("admin_derived_at = ?", derivedAt).
 			Where("id = ?", person.ID).Exec(ctx); err != nil {
 			return nil, fmt.Errorf("record what %q administers: %w", person.Identity, err)
 		}
 		person.IsAdmin = effective
 		person.AdminDerived = derived
+		person.AdminDerivedAt = derivedAt
 	}
 
 	if err := s.replaceDerived(ctx, person.ID, roles); err != nil {
@@ -474,7 +487,7 @@ func (s *Store) SwitchTo(ctx context.Context, mode Mode) error {
 		return err
 	}
 	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		return (&Store{db: tx, now: s.now}).switchTo(ctx, mode)
+		return s.over(tx).switchTo(ctx, mode)
 	})
 }
 
@@ -641,7 +654,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 	// not a guarantee, and a start that fails after the clear leaves a
 	// database another node is already reading.
 	return database.Within(ctx, s.db, func(ctx context.Context, db bun.IDB) error {
-		within := &Store{db: db, now: s.now}
+		within := s.over(db)
 		clearing := db.NewUpdate().Model((*Account)(nil)).
 			Set("is_bootstrap = ?", false).Where("is_bootstrap = ?", true)
 		if len(named) > 0 {

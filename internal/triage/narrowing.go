@@ -229,7 +229,7 @@ func mayDecideOn(subject access.Subject, productID, vulnerabilityID int64,
 	visibility access.Visibility) bool {
 
 	return mayDecide(subject, productID, visibility) ||
-		subject.OnCase(productID, vulnerabilityID)
+		subject.OnCaseToAct(productID, vulnerabilityID)
 }
 
 // readableOn is readable with the case grant asked beside the product-wide
