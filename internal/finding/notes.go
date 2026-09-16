@@ -79,11 +79,6 @@ func Notes(about Note, c *Comparison) string {
 	return out.String()
 }
 
-// lead writes the line that makes the note re-checkable: which two builds, on
-// what day, measured against what.
-//
-// One line rather than a table, because it is prose somebody pastes into a
-// document of their own and a table there is somebody else's formatting.
 // nothingFixed is the whole document where a release fixed nothing.
 //
 // One sentence, naming the builds where they are known, and carrying what
@@ -135,6 +130,11 @@ func measuredWith(about Note) string {
 	return line
 }
 
+// lead writes the line that makes the note re-checkable: which two builds, on
+// what day, measured against what.
+//
+// One line rather than a table, because it is prose somebody pastes into a
+// document of their own and a table there is somebody else's formatting.
 func lead(out *strings.Builder, about Note) {
 	var said []string
 	if from := strings.TrimSpace(about.From); from != "" {
