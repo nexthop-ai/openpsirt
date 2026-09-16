@@ -117,7 +117,6 @@ var named = regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE)\s+("?)([A-Za-z_]
 // it. The alias is what tells it from a condition: a literal beginning with a
 // word this schema has a table of is otherwise a column of that name or a
 // qualified one.
-
 var opening = regexp.MustCompile(`(?i)\A\s*("?)([A-Za-z_][A-Za-z0-9_]*)"?\s+AS\b`)
 
 // alone matches a literal that is a table name and nothing else.
