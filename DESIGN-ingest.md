@@ -110,7 +110,7 @@ refuse it.
 |---|---|---|
 | 1 | Is the target declared, and may this sender file against it? | One query, naming which of product, stream or variant is missing. First, because how far behind the deployment is is not something an unauthorized sender may measure |
 | 2 | Is the backlog too deep? | The cheapest refusal once the sender is known. Deciding afterwards means storing tens of megabytes and discarding them, on a deployment already behind |
-| 3 | What does the inventory say about itself, and what is its hash? | One pass over the file answers both. The hash covers the bytes that arrived, not a value the sender supplied |
+| 3 | What does the inventory say about itself, and what does the submission hash to? | One pass over the inventory answers what it says about itself and hashes it; the claim documents are hashed beside it. Every hash covers the bytes that arrived, not a value the sender supplied |
 | 4 | The arrival decision | Below |
 | 5 | Store the documents and queue the work | One transaction. A scan row without documents is unreadable, documents without a job are work nobody picks up, and a job without either is a worker failing on something that was never there |
 
@@ -138,12 +138,15 @@ contents. Parsing is expensive; refusing is not.
 | Order | Question | Refusal reason |
 |---|---|---|
 | 1 | Is the build time in the future? | Once the current scan is dated ahead, nothing legitimate is ever newer and that variant takes no further scans at all |
-| 2 | Have we already taken this exact file? | Answered with success. Failing it turns a landed scan into a red build, and the usual response is retry logic that swallows errors |
+| 2 | Have we already taken this submission? | Answered with success. Failing it turns a landed scan into a red build, and the usual response is retry logic that swallows errors |
 | 3 | Is it newer than what is held? | Uploads do not arrive in the order they were made. Taking an older one replaces today's picture with yesterday's, reopening closed findings with no visible symptom |
 
 | Rule | Reason |
 |---|---|
-| Equal build times are refused | Neither is newer, so choosing between them would be a coin toss over which picture is current |
+| A submission is identified by everything in it | The inventory and the suppression documents together, each hashed as it arrived and folded together in a fixed order. Identity comes from content, and the claims are content: an inventory that has not changed, arriving beside judgments that have, is a new submission and is taken. Fingerprinting the inventory alone answered success to a build whose arguments about itself were then discarded — and the judgment that went nowhere is a finding the build had already answered coming back as noise |
+| A re-send of byte-identical documents still deduplicates | The claim digests are sorted before they are folded together, so the order the parts were sent in does not decide whether a retry is recognized |
+| An upload taken and not readable is not one we hold | Otherwise the identical bytes can never be sent again, however the reason they could not be read is put right. Such a submission is taken again on the row that already describes it: one row per set of bytes, carrying what became of the live attempt at them, and the documents of the attempt that failed are replaced by the ones arriving now |
+| Equal build times are refused, unless the inventory is the one held | Two different documents claiming one build time is a coin toss over which picture is current. The same inventory at that time with different judgments beside it is not a second picture: it is the one held, with what the build argues about it changed, which is why it was sent again. The later arrival is the one in force |
 | Ordering is by build time, not arrival | A few minutes of clock skew is tolerated, because build machines are seconds out rather than hours |
 | Timestamps are rounded to what the database keeps | Go carries nanoseconds and no supported engine stores them, so without rounding a value written and read back is fractionally *older* than the one in memory: a scan compares as newer than itself, and a second file claiming the same build time is accepted. A latent fault on every engine, exposed by one and passed by the others on timing luck |
 
@@ -638,6 +641,7 @@ alphabetical list buries the one that stopped among the ones that are fine.
 | A build nothing has ever been filed against is reported too, measured from declaration | A pipeline pointed at a name nobody declared is refused loudly; a build declared and never pointed at anything fails silently |
 | How long counts as quiet is a setting, shipping at a week | Long enough that a nightly build missing one night is not an alert, short enough that a pipeline switched off is noticed in the week it happened |
 | A release out of support is never reported as quiet (REQ-52) | It is still listed and still states how long it has been: "not scanned, and that is fine" and "not listed" are different answers |
+| Only a scan that could be read counts as having been heard from | A build whose upload is taken nightly and fails to parse nightly is exactly what this report is for. Counting the arrival drew it as perfectly quiet, on the one report whose subject is that silence must not look like health |
 | It is a person's question | A pipeline key sees the receipts for what it sent and nothing more |
 
 ## Receipts

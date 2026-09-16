@@ -33,7 +33,10 @@ type Coverage struct {
 	Stream     string
 	StreamKind string
 	Variant    string
-	// LastReceivedAt is when a scan last arrived, or nil where none ever has.
+	// LastReceivedAt is when a scan that could be read last arrived, or nil
+	// where none ever has. An upload that was taken and could not be parsed
+	// is not one of these: it is the producer being heard from and the build
+	// still not being scanned.
 	LastReceivedAt *time.Time
 	// Since is how long it has been, measured from the last arrival or, where
 	// there has never been one, from when the build was declared.
@@ -105,7 +108,13 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		ColumnExpr(`st.kind AS "stream_kind"`).
 		ColumnExpr(`va.name AS "variant"`).
 		ColumnExpr(`tg.created_at AS "declared_at"`).
-		ColumnExpr(`(SELECT MAX(sc.received_at) FROM scan AS "sc" WHERE sc.target_id = tg.id) AS "last_seen"`)
+		// Only a scan that could be read counts as having been heard from. A
+		// build whose upload is taken nightly and fails to parse nightly is
+		// the failure this report exists for, and counting the arrival drew
+		// it as perfectly quiet on the one report whose subject is that
+		// silence must not look like health.
+		ColumnExpr(`(SELECT MAX(sc.received_at) FROM scan AS "sc" `+
+			`WHERE sc.target_id = tg.id AND sc.status = ?) AS "last_seen"`, Accepted)
 	if !all {
 		query = query.Where("st.product_id IN (?)", bun.List(products))
 	}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -362,11 +363,12 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		return nil, wentWrong(in.Logger, "the target could not be recorded", err)
 	}
 
-	// One pass over the inventory answers both questions asked of an arriving
-	// scan: what it is, and whether we already hold it.
-	header, contentHash, err := describe(parts.Inventory, in.Limits)
+	// What this submission is, and what it hashes to: what it says about
+	// itself comes from the inventory, and whether we already hold it is
+	// asked of everything that arrived.
+	header, contentHash, inventoryHash, err := describe(parts, in.Limits)
 	if err != nil {
-		return nil, huma.Error422UnprocessableEntity("the inventory could not be read", err)
+		return nil, huma.Error422UnprocessableEntity("the upload could not be read", err)
 	}
 
 	// A document that does not say when it was built cannot be ordered against
@@ -383,6 +385,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	arriving := ingest.Arriving{
 		TargetID:      target.ID,
 		ContentHash:   contentHash,
+		InventoryHash: inventoryHash,
 		Serial:        header.Serial,
 		BuiltAt:       header.BuiltAt,
 		ParserVersion: version.Get().Version,
@@ -410,7 +413,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		result = UploadResult{
 			ScanID: scan.ID, Serial: header.Serial, BuiltAt: stamp(header.BuiltAt),
 		}
-		if taken != ingest.Accept {
+		if taken != ingest.Accept && taken != ingest.Retake {
 			return nil
 		}
 
@@ -419,6 +422,16 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// picks up, and a job without either is a worker failing on something
 		// that was never there.
 		documents := ingest.NewDocuments(tx)
+		if taken == ingest.Retake {
+			// These are the bytes that are already stored against that scan,
+			// since a submission is identified by all of it — so what the
+			// attempt that failed left behind is replaced rather than added
+			// to. Added to, the reader would find two inventories and read
+			// the first of them.
+			if err := documents.Remove(ctx, scan.ID); err != nil {
+				return err
+			}
+		}
 		if err := store(ctx, documents, scan.ID, ingest.InventoryKind, 0, parts.Inventory); err != nil {
 			return err
 		}
@@ -474,11 +487,56 @@ func rejection(outcome ingest.Outcome, err error) error {
 	return huma.NewError(http.StatusConflict, err.Error())
 }
 
-// describe reads what an inventory says about itself, and hashes it.
+// describe reads what an inventory says about itself, and hashes the whole
+// submission.
+//
+// The hash covers the suppression documents as well as the inventory. A
+// submission is identified by everything in it: an unchanged inventory
+// arriving beside judgments that have changed is a new submission, and
+// fingerprinting one half of it would answer success to a build whose
+// arguments about itself were then discarded.
+//
+// The claim digests are sorted before they are folded in, so a re-send of
+// byte-identical documents still deduplicates however the parts were ordered,
+// and each goes in under the name of what it is, on a line of its own — two
+// digests cannot run together into a third, and an inventory whose digest
+// happens to equal a claim's is still a different submission.
+//
+// The inventory's own digest comes back beside the submission's, because the
+// arrival decision needs both: what we hold is a submission, and what makes
+// one arriving at a build time already taken the same build re-argued rather
+// than a second document claiming that time is the inventory alone.
+func describe(parts *uploadParts, limits sbom.Limits) (sbom.Header, string, string, error) {
+	header, inventory, err := readInventory(parts.Inventory, limits)
+	if err != nil {
+		return sbom.Header{}, "", "", err
+	}
+	claims := make([]string, 0, len(parts.Suppressions))
+	for _, part := range parts.Suppressions {
+		if !part.IsSet {
+			continue
+		}
+		digest, err := hashOf(part)
+		if err != nil {
+			return sbom.Header{}, "", "", fmt.Errorf("a suppression document could not be read: %w", err)
+		}
+		claims = append(claims, digest)
+	}
+	slices.Sort(claims)
+
+	whole := sha256.New()
+	whole.Write([]byte("inventory " + inventory + "\n"))
+	for _, digest := range claims {
+		whole.Write([]byte("suppressions " + digest + "\n"))
+	}
+	return header, hex.EncodeToString(whole.Sum(nil)), inventory, nil
+}
+
+// readInventory reads what an inventory says about itself, and hashes it.
 //
 // Both in one pass: the file is seekable, but a second pass over tens of
 // megabytes buys nothing.
-func describe(file huma.FormFile, limits sbom.Limits) (sbom.Header, string, error) {
+func readInventory(file huma.FormFile, limits sbom.Limits) (sbom.Header, string, error) {
 	if !file.IsSet {
 		return sbom.Header{}, "", fmt.Errorf("no inventory was sent")
 	}
@@ -496,6 +554,18 @@ func describe(file huma.FormFile, limits sbom.Limits) (sbom.Header, string, erro
 		return sbom.Header{}, "", err
 	}
 	return header, hex.EncodeToString(digest.Sum(nil)), nil
+}
+
+// hashOf digests a part as it arrived.
+func hashOf(file huma.FormFile) (string, error) {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	digest := sha256.New()
+	if _, err := io.Copy(digest, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
 // store rewinds a part and puts it away.

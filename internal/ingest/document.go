@@ -281,6 +281,61 @@ func (c *chunkReader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// sameInventory says whether the inventory a scan arrived with hashed to this.
+//
+// The record of what a document was outlives its contents, so it answers for a
+// scan whose bytes have been let go as well as for one still held whole.
+func (d *Documents) sameInventory(ctx context.Context, scanID int64, hash string) (bool, error) {
+	if hash == "" {
+		return false, nil
+	}
+	held, err := d.db.NewSelect().Model((*Document)(nil)).
+		Where("scan_id = ?", scanID).
+		Where("kind = ?", InventoryKind).
+		Where("content_hash = ?", hash).
+		Count(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read what the inventory already held hashed to: %w", err)
+	}
+	return held > 0, nil
+}
+
+// Remove deletes the documents of a scan, contents and record together.
+//
+// For a submission taken again after the attempt to read it failed. What
+// identifies a submission is all of it, so the bytes arriving now are the
+// bytes already stored against that scan — replaced rather than added to,
+// because a second copy of an inventory is one a reader would read twice and
+// count twice.
+//
+// It runs in whatever handle it was given, a transaction included: the rows
+// going and the rows replacing them are one act, and a failure between them
+// would leave a scan with nothing to read.
+func (d *Documents) Remove(ctx context.Context, scanID int64) error {
+	var ids []int64
+	if err := d.db.NewSelect().Model((*Document)(nil)).
+		Column("id").
+		Where("scan_id = ?", scanID).
+		Scan(ctx, &ids); err != nil {
+		return fmt.Errorf("read which documents this scan has: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		_, err := d.db.NewDelete().Model((*chunk)(nil)).
+			Where("document_id IN (?)", bun.List(batch)).Exec(ctx)
+		return err
+	}); err != nil {
+		return fmt.Errorf("remove document content: %w", err)
+	}
+	if _, err := d.db.NewDelete().Model((*Document)(nil)).
+		Where("scan_id = ?", scanID).Exec(ctx); err != nil {
+		return fmt.Errorf("remove what this scan arrived with: %w", err)
+	}
+	return nil
+}
+
 // Held returns one document of one scan, for reading its contents back.
 //
 // **Addressed through the scan it belongs to**, not by its own identifier
