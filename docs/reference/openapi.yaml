@@ -2145,6 +2145,49 @@ components:
       required:
         - body
       type: object
+    ElsewhereBody:
+      additionalProperties: false
+      properties:
+        approved_at:
+          type: string
+        approved_by:
+          type: string
+        claim_id:
+          format: int64
+          type: integer
+        decision_id:
+          format: int64
+          type: integer
+        justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
+          type: string
+        outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
+          type: string
+        product:
+          description: The product it was decided in
+          type: string
+        reasoning:
+          type: string
+      required:
+        - product
+        - claim_id
+        - decision_id
+        - outcome
+        - reasoning
+      type: object
     EmbargoedBody:
       additionalProperties: false
       properties:
@@ -2351,6 +2394,13 @@ components:
         due:
           description: When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late
           type: string
+        elsewhere:
+          description: Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five
+          items:
+            $ref: "#/components/schemas/ElsewhereBody"
+          type:
+            - array
+            - "null"
         exploited:
           description: Somebody is known to be exploiting this
           type: boolean
@@ -2501,6 +2551,7 @@ components:
         - standing
         - previous
         - similar
+        - elsewhere
         - vex
       type: object
     Extend-disclosureRequest:

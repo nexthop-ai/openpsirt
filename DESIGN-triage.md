@@ -22,6 +22,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Approving a claim](#approving-a-claim)
 - [Setting rows aside](#setting-rows-aside)
 - [Holding part of a claim back](#holding-part-of-a-claim-back)
+- [Decided elsewhere](#decided-elsewhere)
 - [Extensions](#extensions)
 - [Decision lists on a finding](#decision-lists-on-a-finding)
 - [The review queue](#the-review-queue)
@@ -405,6 +406,25 @@ Narrowing within a fold is a different thing and is not offered. One judgment
 covers the whole fold, with no escape hatch. A claim still spans several folds —
 a judgment about many issues at one component, or one carried across builds —
 which is what makes splitting a real need that folding does not remove.
+
+## Decided elsewhere
+
+An approved claim about the same issue at the same place in another product,
+shown on the finding as a fourth block of evidence.
+
+A place identity is a hash of a consumer and a component with no product in it,
+deliberately, so that a place is recognized across variants. The same key
+recognizes it across products: two products shipping the same library under the
+same consumer are the same code in the same position, and a judgment one team
+made about it was reachable by nobody else.
+
+| Rule | Reason |
+|---|---|
+| **Evidence, never an outcome** | Another team's judgment about their product is not a judgment about this one. What is shipped around a component differs, which is the whole reason a place is a component at a position rather than a component |
+| Offered as a prefill for the reasoning, and the outcome is not carried across | The point of reading somebody else's argument is to judge whether it holds here. Carrying the outcome would make the screen decide |
+| Narrowed by what the subject may read, like every other query | A place identity spans products, so a join that did not carry the subject would hand somebody the reasoning, the approver and the existence of an embargoed judgment in a product they cannot see at all |
+| Approved claims only, and at most a handful | A proposal is nobody's conclusion yet, and a deployment carrying twenty products would otherwise put twenty blocks of somebody else's reasoning on a screen somebody is trying to decide on |
+| The same treatment a supplier's VEX statement gets | It is the same kind of thing: a judgment made by somebody else about code we also ship (REQ-31) |
 
 ## Extensions
 

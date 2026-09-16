@@ -5458,6 +5458,21 @@ export interface components {
             /** @description What it should say now, in markdown */
             body: string;
         };
+        ElsewhereBody: {
+            approved_at?: string;
+            approved_by?: string;
+            /** Format: int64 */
+            claim_id: number;
+            /** Format: int64 */
+            decision_id: number;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            /** @description The product it was decided in */
+            product: string;
+            reasoning: string;
+        };
         EmbargoedBody: {
             component: string;
             /** @description When the embargo ends. Reaching it discloses nothing */
@@ -5594,6 +5609,8 @@ export interface components {
             disclose_at?: string;
             /** @description When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late */
             due?: string;
+            /** @description Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five */
+            elsewhere: components["schemas"]["ElsewhereBody"][] | null;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
             /** @enum {string} */

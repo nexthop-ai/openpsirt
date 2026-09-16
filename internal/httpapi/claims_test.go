@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -1049,6 +1050,144 @@ func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
 		}
 		if !found {
 			t.Error("a re-affirmation needing a second person is not in the review queue")
+		}
+	})
+}
+
+// alsoScannedInto puts the same component and issue behind a second product,
+// so that a place identity — which carries no product, deliberately — is the
+// same key in both.
+func (r *reach) alsoScannedInto(t *testing.T, product, stream, variant string) {
+	t.Helper()
+	ctx := t.Context()
+	names := catalog.NewStore(r.db.DB)
+	located, err := names.Locate(ctx, product, stream, variant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	made, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: "elsewhere-" + product, BuiltAt: time.Now().UTC(),
+		ParserVersion: "test",
+	})
+	if err != nil || outcome != ingest.Accept {
+		t.Fatalf("record scan: %v %v", outcome, err)
+	}
+	if _, err := graph.NewStore(r.db.DB).Apply(ctx, target.ID, made.ID, graph.Snapshot{
+		Root:         seededRoot,
+		Components:   []graph.Described{seededLib},
+		Dependencies: []graph.Dependency{{Parent: seededRoot, Child: seededLib}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	findings := finding.NewStore(r.db.DB)
+	run, err := findings.Begin(ctx, finding.Run{
+		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
+		DatabaseVersion: "2026-08-28", RanHere: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+		Component: seededLib,
+		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
+	// A place identity is a hash of a consumer and a component with no product
+	// in it, deliberately, so that a place is recognized across variants. The
+	// same key recognizes it across products — two products shipping the same
+	// library under the same consumer are the same code in the same position —
+	// and nothing offered a team the judgment another team had already made
+	// about it. Deciding it again from scratch is the work the grouping exists
+	// to avoid.
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scanned(t)
+		r.alsoScannedInto(t, "theirs", "master", "mellanox")
+
+		// Somebody who triages both products, which is what makes the other
+		// team's judgment reachable at all.
+		theirs, err := catalog.NewStore(r.db.DB).ProductByName(ctx, "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, who := range []string{"triager", "reviewer"} {
+			person, err := r.rights.Ensure(ctx, who, "", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := r.rights.GrantRole(ctx, person.ID, theirs.ID,
+				access.PublicTriage); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// The other team decides, and agrees.
+		at := "/v1/products/theirs/streams/master/variants/mellanox" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
+		decided := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
+				`"reasoning":"The affected protocol is not compiled into our build."}`)
+		if decided.Code != http.StatusCreated {
+			t.Fatalf("deciding in the other product answered %d: %s",
+				decided.Code, decided.Body.String())
+		}
+		var made struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		if ok := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID), `{}`); ok.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
+		}
+
+		// And it is offered on this product's finding, as evidence.
+		here := "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200"
+		var evidence struct {
+			Elsewhere []struct {
+				Product    string `json:"product"`
+				Outcome    string `json:"outcome"`
+				Reasoning  string `json:"reasoning"`
+				ApprovedBy string `json:"approved_by"`
+			} `json:"elsewhere"`
+		}
+		read(t, r, "triager", here, &evidence)
+		if len(evidence.Elsewhere) != 1 {
+			t.Fatalf("this finding offers %d judgments from elsewhere, want the one: %+v",
+				len(evidence.Elsewhere), evidence.Elsewhere)
+		}
+		one := evidence.Elsewhere[0]
+		if one.Product != "theirs" || one.Outcome != "not-applicable" {
+			t.Errorf("the judgment offered is %+v", one)
+		}
+		if one.Reasoning == "" || one.ApprovedBy == "" {
+			t.Errorf("the judgment is offered with nothing to read: %+v", one)
+		}
+
+		// **And only to somebody who may read it.** A place identity spans
+		// products, so a join that did not carry the subject would hand
+		// somebody the reasoning, the approver and the existence of a judgment
+		// in a product they cannot see at all.
+		var blind struct {
+			Elsewhere []struct {
+				Product string `json:"product"`
+			} `json:"elsewhere"`
+		}
+		read(t, r, "reader", here, &blind)
+		if len(blind.Elsewhere) != 0 {
+			t.Errorf("somebody with no rights in the other product was shown %d of its "+
+				"judgments: %+v", len(blind.Elsewhere), blind.Elsewhere)
 		}
 	})
 }

@@ -752,6 +752,11 @@ type EvidenceBody struct {
 	Standing []StandingClaimBody `json:"standing" doc:"Live claims covering any of this finding's places, newest first. A proposed one is waiting for a second person"`
 	Previous []EarlierBody       `json:"previous" doc:"Decisions made at these places that lapsed or were withdrawn, newest first, with their reasoning"`
 	Similar  []SimilarBody       `json:"similar" doc:"Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five"`
+	// Elsewhere is what another product decided about this same issue at this
+	// same place. Evidence and a prefill, never an outcome: what is shipped
+	// around a component differs between products, which is the whole reason a
+	// place is a component at a position.
+	Elsewhere []ElsewhereBody `json:"elsewhere" doc:"Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five"`
 
 	// Vex is the third layer beside the build's own claims and our
 	// decisions : what a distribution or an upstream security team has
@@ -863,8 +868,8 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "where this sits could not be read", err)
 		}
-		body.Standing, body.Previous, body.Similar, err = decidedAbout(ctx, in, subject,
-			named.ProductID, issue, keyed)
+		body.Standing, body.Previous, body.Similar, body.Elsewhere, err = decidedAbout(ctx, in,
+			subject, named.ProductID, issue, keyed)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what was decided here could not be read", err)
 		}
@@ -908,7 +913,8 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Tags:     e.Tags,
 		Places:   make([]SittingBody, 0, len(e.Places)),
 		Standing: []StandingClaimBody{}, Previous: []EarlierBody{}, Similar: []SimilarBody{},
-		Vex: []VexSaidBody{},
+		Elsewhere: []ElsewhereBody{},
+		Vex:       []VexSaidBody{},
 	}
 	if !e.OpenedAt.IsZero() {
 		body.Opened = e.OpenedAt.Format(time.DateOnly)
