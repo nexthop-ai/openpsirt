@@ -26,6 +26,7 @@ this document is its own.
 - [Repeated deferrals](#repeated-deferrals)
 - [Subtree trends](#subtree-trends)
 - [The disposition register](#the-disposition-register)
+- [Shipping with known issues](#shipping-with-known-issues)
 - [The exception report](#the-exception-report)
 - [Dismissals and scan coverage](#dismissals-and-scan-coverage)
 - [The report catalog](#the-report-catalog)
@@ -376,6 +377,20 @@ Findings and decisions filter on when things happened instead: opened after,
 closed after, proposed after. Asking for what closed after a date is the one
 filter that changes what the list is *about* rather than narrowing it, and the
 caller states so by asking for it.
+
+## Shipping with known issues
+
+What a build still carries, with what stands about each. The comparison
+already answers it, so this is that screen's third column rather than a page
+of its own, and the catalog carries it with the selection made.
+
+| Rule | Reason |
+|---|---|
+| A still-present row says how far it has been decided, what was decided and when it is due | A list of what is still there with no way to tell an approved not-applicable from something nobody has looked at is not a list anybody can sign. Those are opposite answers to the question a release sign-off asks |
+| The outcome is stated only where every standing decision over the row's places says the same thing | A component argued away at one place and deferred at another is two claims, and stating either over the row would be a claim nobody made. The same rule the VEX document publishes under |
+| The state is counted the way the findings list counts it | One spelling of each of the four, so a row here and the same row on the list cannot say different things about how far it has been decided |
+| The column narrows to what nobody has agreed to | That is the coordinator's blocker list, and it is the one narrowing the sheet is read for |
+| It is read for the still-present entries alone | What was fixed needs no justification and what is newly present has not been looked at yet |
 
 ## The exception report
 

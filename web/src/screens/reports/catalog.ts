@@ -142,6 +142,16 @@ export const CATALOG: Report[] = [
     to: (at) => withProduct("/audit", at),
   },
   {
+    // The sign-off sheet. The comparison screen already answers it, so the
+    // catalog carries it with the selection made rather than a second page
+    // being built over the same query.
+    name: "Shipping with known issues",
+    answers:
+      "What a build still carries, with what stands about each: agreed and why, waiting on a second person, or nobody has said anything. The last of those is the release coordinator's blocker list.",
+    to: (at) => `/products/${encodeURIComponent(at.product ?? "")}/comparison`,
+    needs: (at) => (at.product ? null : "Pick a product to compare two of its builds."),
+  },
+  {
     name: "Release comparison",
     answers:
       "What changed between two builds — fixed, newly present, and still present — in the form a release note takes.",

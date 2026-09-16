@@ -4894,11 +4894,28 @@ export interface components {
              */
             closed_by_run?: number;
             component: string;
+            /** @description The soonest deadline among the places still open, as a date */
+            due?: string;
             /** @description The version the place held before the fix. Only on a fixed entry the version moved for */
             from_version?: string;
+            /**
+             * @description The recognized reason it does not apply, on a dismissal
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither */
             moved_to?: string;
+            /**
+             * @description What was decided, where every standing decision over its places says the same thing
+             * @enum {string}
+             */
+            outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             severity?: string;
+            /**
+             * @description How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
+             * @enum {string}
+             */
+            state?: "undecided" | "waiting" | "agreed" | "lapsed";
             vulnerability: string;
         };
         ClaimApprovalBody: {
