@@ -679,6 +679,7 @@ var tables = []string{
 	"graph_node",
 	"component",
 	"job",
+	"scan_refusal",
 	"scan",
 	"target",
 	"variant",

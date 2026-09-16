@@ -313,8 +313,12 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 // answers the first half of "silence looks exactly like health"; this is the
 // other half, which is whether anybody is trying.
 func TestCoverageSaysWhetherAnybodyIsTrying(t *testing.T) {
-	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
 		ctx := t.Context()
+		// The build rather than the product it is under. A refusal is recorded
+		// against the thing an upload was addressed to, and the fixture hands
+		// back product identifiers.
+		ours := targetOf(t, db, "master", "broadcom")
 
 		rows, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
@@ -374,4 +378,24 @@ func refusalsIn(t *testing.T, s *ingest.Store, reader access.Subject) []string {
 		told = append(told, *row.RefusedBecause)
 	}
 	return told
+}
+
+// targetOf is the build a release and a variant name, by their names.
+//
+// The coverage fixture hands back products, and a refusal is recorded against
+// the build an upload was addressed to. Looked up rather than threaded through
+// the fixture, so the tests that do not need it keep the signature they have.
+func targetOf(t *testing.T, db *database.DB, stream, variant string) int64 {
+	t.Helper()
+	var id int64
+	if err := db.DB.NewSelect().
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		ColumnExpr(`tg.id`).
+		Where("st.name = ?", stream).Where("va.name = ?", variant).
+		Scan(t.Context(), &id); err != nil {
+		t.Fatal(err)
+	}
+	return id
 }
