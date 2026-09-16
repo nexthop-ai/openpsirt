@@ -33,13 +33,29 @@ type Changed struct {
 	// is trying to find out.
 	FromVersion string `bun:"from_version"`
 	MovedTo     string `bun:"moved_to"`
+	// ClosedRun is the run that stopped reporting it, on an entry that left
+	// the affected list. An unexplained closure is a scanner fault to
+	// investigate rather than a fix, and the first question about one is which
+	// run it was — without that the reader is told something is wrong and
+	// given nowhere to look. Zero where a person closed it, which is the other
+	// way a finding closes.
+	ClosedRun int64 `bun:"closed_run"`
 }
 
 // Comparison is what changed between two builds.
+//
+// **What left the affected list is two sets, not one.** An upgrade, a carried
+// patch, a component no longer shipped and a flaw declared fixed are fixes. A
+// bump that carried the issue with it, a record taken back, and a closure
+// nothing explains are not — the last of those means the scanner stopped
+// reporting an unchanged component, which is a fault to investigate. Counted
+// together, a release coordinator quotes a number of fixes that includes them.
 type Comparison struct {
 	Fixed []Changed
-	Newly []Changed
-	Still []Changed
+	// Closed left the affected list without being fixed.
+	Closed []Changed
+	Newly  []Changed
+	Still  []Changed
 }
 
 // Compare reports what was fixed, what is newly present, and what is still
@@ -143,6 +159,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	for i := range comparison.Fixed {
 		went := gone[key(comparison.Fixed[i])]
 		comparison.Fixed[i].Because = went.Because
+		comparison.Fixed[i].ClosedRun = went.ClosedRun
 		// Only where moving is what closed it. On a component that was removed
 		// or a finding nothing explains, a pair of versions would be a
 		// sentence about a bump that did not happen.
@@ -151,6 +168,10 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 			comparison.Fixed[i].MovedTo = went.MovedTo
 		}
 	}
+	// Split once the reasons are in hand, through the one function that
+	// decides what counts as a fix. The screen used to make that judgment a
+	// second time, in a column heading, and it disagreed with this one.
+	comparison.Fixed, comparison.Closed = partition(comparison.Fixed)
 
 	had := map[string]bool{}
 	for _, c := range was {
@@ -315,6 +336,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 			Because       string `bun:"because"`
 			FromVersion   string `bun:"from_version"`
 			MovedTo       string `bun:"moved_to"`
+			ClosedRun     int64  `bun:"closed_run"`
 		}
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -330,6 +352,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 			// one a fix version is comparable to.
 			ColumnExpr(`COALESCE(NULLIF(cp.upstream_version, ''), cp.version) AS "from_version"`).
 			ColumnExpr(`COALESCE(f.moved_to, '') AS "moved_to"`).
+			ColumnExpr(`COALESCE(f.closed_run_id, 0) AS "closed_run"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.closed_at IS NOT NULL").
 			Where("v.identifier IN (?)", bun.List(issues)).
@@ -351,6 +374,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 				Because:     Closure(row.Because),
 				FromVersion: row.FromVersion,
 				MovedTo:     row.MovedTo,
+				ClosedRun:   row.ClosedRun,
 			}
 		}
 	}
@@ -363,6 +387,8 @@ type Gone struct {
 	Because     Closure
 	FromVersion string
 	MovedTo     string
+	// ClosedRun is the run that closed it, and zero where a person did.
+	ClosedRun int64
 }
 
 // pairKey identifies an issue at a component by name, which is what a

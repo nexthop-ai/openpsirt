@@ -335,10 +335,19 @@ func TestAComparisonLeavesOutWhatIsNotDisclosed(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, listed := entries(public.Fixed)["CVE-2026-QUIET"]; listed {
-			t.Error("an undisclosed finding is in a comparison nobody asked to include one in")
+		for _, half := range []map[string]finding.Changed{
+			entries(public.Fixed), entries(public.Closed),
+		} {
+			if _, listed := half["CVE-2026-QUIET"]; listed {
+				t.Error("an undisclosed finding is in a comparison nobody asked to " +
+					"include one in")
+			}
 		}
-		if _, listed := entries(public.Fixed)["CVE-2026-OPEN"]; !listed {
+		// The one nothing explains, which is where it belongs: it left the
+		// affected list without being fixed. Read from the disclosed half, so
+		// the check above is proved to be narrowing by visibility rather than
+		// answering nothing.
+		if _, listed := entries(public.Closed)["CVE-2026-OPEN"]; !listed {
 			t.Error("a public finding is missing, so the check above proves nothing")
 		}
 
@@ -373,6 +382,79 @@ func TestAComparisonLeavesOutWhatIsNotDisclosed(t *testing.T) {
 			t.Fatal(err)
 		} else if left != 0 {
 			t.Errorf("somebody who reads only disclosed work was told %d exist", left)
+		}
+	})
+}
+
+func TestAScannerFaultIsNotCountedAsAFix(t *testing.T) {
+	// A closure nothing explains means the component is unchanged and the
+	// scanner stopped reporting it, which is a fault to look into. A bump that
+	// carried the issue along is not a fix either. Counted with the fixes,
+	// both are quoted to a customer as work somebody did — which is what a
+	// screen reading the one list did, under a column headed "Fixed".
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		carried := []finding.Reported{
+			found("CVE-2026-REAL", swss),
+			found("CVE-2026-CARRIED", teamd),
+			found("CVE-2026-SILENT", teamd),
+		}
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), carried); err != nil {
+			t.Fatal(err)
+		}
+		earlier := f.target
+
+		later := f.anotherBuild(t, "v2")
+		f.shippedTo(t, later, twoConsumers())
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), carried); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), nil); err != nil {
+			t.Fatal(err)
+		}
+		// Written directly: how a reason is derived from an inventory is the
+		// applying side's subject and has its own tests. What is pinned here
+		// is which of the two lists each reason lands in. CVE-2026-SILENT is
+		// left as it closed, which is with nothing recorded.
+		for _, each := range []struct {
+			issue  string
+			reason finding.Closure
+		}{
+			{"CVE-2026-REAL", finding.Upgraded},
+			{"CVE-2026-CARRIED", finding.Superseded},
+		} {
+			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+				Set("closed_because = ?", each.reason).
+				Where("vulnerability_id = ?", f.issueID(t, each.issue)).
+				Where("closed_at IS NOT NULL").
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		who := f.holding(t, access.PublicRead)
+		comparison, err := f.store.Compare(ctx, who, earlier, later, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixed, closed := entries(comparison.Fixed), entries(comparison.Closed)
+		if _, listed := fixed["CVE-2026-REAL"]; !listed {
+			t.Error("an upgrade is missing from the fixes, so the checks below prove nothing")
+		}
+		for _, notAFix := range []string{"CVE-2026-CARRIED", "CVE-2026-SILENT"} {
+			if _, listed := fixed[notAFix]; listed {
+				t.Errorf("%s is counted as a fix", notAFix)
+			}
+			if _, listed := closed[notAFix]; !listed {
+				t.Errorf("%s left the affected list and is in neither half", notAFix)
+			}
+		}
+		// The run that stopped reporting it, so a reader told a closure is
+		// unexplained has somewhere to start. Being handed the fault and no
+		// way to look into it is the half of the answer nobody can act on.
+		if closed["CVE-2026-SILENT"].ClosedRun == 0 {
+			t.Error("an unexplained closure does not say which run stopped reporting it")
 		}
 	})
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Body } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -126,8 +126,8 @@ export function Compare() {
       <div className="screen-head">
         <h2>Release comparison</h2>
         <p>
-          {product} — what was fixed, what was introduced, and what is unchanged between any two
-          builds
+          {product} — what was fixed, what closed without being fixed, what was introduced, and what
+          is unchanged between any two builds
         </p>
       </div>
 
@@ -200,8 +200,10 @@ export function Compare() {
           <>
             <Columns
               fixed={comparison.data?.fixed ?? []}
+              closed={comparison.data?.closed_not_fixed ?? []}
               newly={comparison.data?.newly_present ?? []}
               still={comparison.data?.still_present ?? []}
+              runsAt={`/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(to)}/variants/${encodeURIComponent(toVariant)}/runs`}
             />
 
             {/* The same comparison in the form it is actually wanted in
@@ -330,20 +332,36 @@ const WENT: Record<string, string> = {
 
 function Columns({
   fixed,
+  closed,
   newly,
   still,
+  runsAt,
 }: {
   fixed: Changed[];
+  closed: Changed[];
   newly: Changed[];
   still: Changed[];
+  runsAt: string;
 }) {
   return (
     <div className="cmp">
+      {/* Two columns, because they are two different things and the count of
+          the first is what a release coordinator quotes. The server decides
+          which row goes where, through the one function the release note and
+          the remediation rate also read: a column that made the judgment for
+          itself put two scanner faults under "Fixed". */}
       <Column
         kind="was-fixed"
-        title="No longer present"
+        title="Fixed"
         rows={fixed}
-        note="Why each one went is on the row. Superseded means the version moved and took the issue with it; unexplained means the component is unchanged and the scanner stopped reporting it. Neither is a fix."
+        note="Upgraded, patched, removed, or a recorded flaw declared fixed."
+      />
+      <Column
+        kind="not-fixed"
+        title="Closed, not fixed"
+        rows={closed}
+        runsAt={runsAt}
+        note="Superseded means the version moved and took the issue with it. Unexplained means the component is unchanged and the scanner stopped reporting it, which is a fault to look into."
       />
       <Column kind="newly" title="Introduced" rows={newly} />
       <Column
@@ -361,11 +379,13 @@ function Column({
   title,
   rows,
   note,
+  runsAt,
 }: {
   kind: string;
   title: string;
   rows: Changed[];
   note?: string;
+  runsAt?: string;
 }) {
   const [all, setAll] = useState(false);
   const shown = all ? rows : rows.slice(0, SHOWN);
@@ -398,6 +418,15 @@ function Column({
                     {" — bumped from "}
                     <span className="id">{row.arrived_from}</span>
                     {", and the issue came with it"}
+                  </>
+                )}
+                {/* The run that stopped reporting it. Being told a closure is
+                    unexplained and given nowhere to look leaves the reader
+                    with the fault and no way to start on it. */}
+                {runsAt && row.because === "unexplained" && row.closed_by_run && (
+                  <>
+                    {" — "}
+                    <Link to={`${runsAt}/${row.closed_by_run}`}>the run that stopped</Link>
                   </>
                 )}
               </span>

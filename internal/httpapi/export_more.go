@@ -190,26 +190,35 @@ func registerComparisonExport(api huma.API, in Ingest) {
 		out := Exporting{
 			Header: []string{
 				"change", "issue", "component", "severity", "because",
-				"from version", "moved to", "arrived from",
+				"from version", "moved to", "arrived from", "closed by run",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				if offset > 0 {
 					return nil, nil
 				}
-				rows := make([][]string, 0,
-					len(comparison.Fixed)+len(comparison.Newly)+len(comparison.Still))
+				rows := make([][]string, 0, len(comparison.Fixed)+len(comparison.Closed)+
+					len(comparison.Newly)+len(comparison.Still))
 				for _, group := range []struct {
 					what string
 					of   []finding.Changed
 				}{
 					{"fixed", comparison.Fixed},
+					// Apart from the fixes, by the same split the screen and
+					// the release note read: a superseded bump and a closure
+					// nothing explains are not work anybody did.
+					{"closed, not fixed", comparison.Closed},
 					{"newly present", comparison.Newly},
 					{"still present", comparison.Still},
 				} {
 					for _, row := range group.of {
+						closedRun := ""
+						if row.ClosedRun != 0 {
+							closedRun = strconv.FormatInt(row.ClosedRun, 10)
+						}
 						rows = append(rows, []string{
 							group.what, row.Vulnerability, row.Component, row.Severity,
 							string(row.Because), row.FromVersion, row.MovedTo, row.ArrivedFrom,
+							closedRun,
 						})
 					}
 				}

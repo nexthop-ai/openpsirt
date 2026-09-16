@@ -4759,6 +4759,11 @@ export interface components {
              * @enum {string}
              */
             because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained";
+            /**
+             * Format: int64
+             * @description The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
+             */
+            closed_by_run?: number;
             component: string;
             /** @description The version the place held before the fix. Only on a fixed entry the version moved for */
             from_version?: string;
@@ -4930,13 +4935,15 @@ export interface components {
             written_at: string;
             written_by: string;
         };
-        "Compare-releasesResponse": {
+        ComparisonBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Compare-releasesResponse.json
+             * @example https://example.com/schemas/ComparisonBody.json
              */
             readonly $schema?: string;
+            /** @description Left the affected list without being fixed */
+            closed_not_fixed: components["schemas"]["ChangedBody"][] | null;
             fixed: components["schemas"]["ChangedBody"][] | null;
             newly_present: components["schemas"]["ChangedBody"][] | null;
             still_present: components["schemas"]["ChangedBody"][] | null;
@@ -11018,7 +11025,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Compare-releasesResponse"];
+                    "application/json": components["schemas"]["ComparisonBody"];
                 };
             };
             /** @description Error */

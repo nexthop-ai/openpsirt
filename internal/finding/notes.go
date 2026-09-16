@@ -193,18 +193,28 @@ func omitted(n int) string {
 // and mentioning it would describe a mistake of ours as news about their
 // software.
 func onlyFixes(rows []Changed) []Changed {
-	var fixed []Changed
+	fixed, _ := partition(rows)
+	return fixed
+}
+
+// partition splits what left the affected list into what was fixed and what
+// was not.
+//
+// **One spelling of the judgment, and both halves of it.** An allow-list
+// rather than named exclusions, and the same list the remediation rate counts:
+// a closure added later is not a fix on any surface until somebody says it is,
+// rather than progress on one and churn on the other. Returning the other half
+// as well is what stops a screen deciding it again — that is how a column
+// headed "Fixed" came to carry two scanner faults.
+func partition(rows []Changed) (fixed, closed []Changed) {
 	for _, row := range rows {
-		// An allow-list rather than three named exclusions, and the same list
-		// the remediation rate counts: a closure added later is not a fix on
-		// either surface until somebody says it is, rather than progress on
-		// one and churn on the other.
-		if !row.Because.Resolves() {
+		if row.Because.Resolves() {
+			fixed = append(fixed, row)
 			continue
 		}
-		fixed = append(fixed, row)
+		closed = append(closed, row)
 	}
-	return fixed
+	return fixed, closed
 }
 
 // section writes the lines, or nothing where there are none.

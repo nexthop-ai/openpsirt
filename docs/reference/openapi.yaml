@@ -990,6 +990,10 @@ components:
             - superseded
             - unexplained
           type: string
+        closed_by_run:
+          description: The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
+          format: int64
+          type: integer
         component:
           type: string
         from_version:
@@ -1268,16 +1272,23 @@ components:
         - written_by
         - written_at
       type: object
-    Compare-releasesResponse:
+    ComparisonBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/Compare-releasesResponse.json
+            - https://example.com/schemas/ComparisonBody.json
           format: uri
           readOnly: true
           type: string
+        closed_not_fixed:
+          description: Left the affected list without being fixed
+          items:
+            $ref: "#/components/schemas/ChangedBody"
+          type:
+            - array
+            - "null"
         fixed:
           items:
             $ref: "#/components/schemas/ChangedBody"
@@ -1298,6 +1309,7 @@ components:
             - "null"
       required:
         - fixed
+        - closed_not_fixed
         - newly_present
         - still_present
       type: object
@@ -11676,7 +11688,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Compare-releasesResponse"
+                $ref: "#/components/schemas/ComparisonBody"
           description: OK
         default:
           content:
