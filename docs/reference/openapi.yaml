@@ -6470,8 +6470,11 @@ components:
     RetiredBody:
       additionalProperties: false
       properties:
+        ended:
+          description: The date has passed. False is a release that is about to go out of support
+          type: boolean
         ended_days:
-          description: How many days ago support ended
+          description: How many days ago support ended. Negative where the date has not arrived, which is how many days are left
           format: int64
           type: integer
         ended_on:
@@ -6501,6 +6504,7 @@ components:
         - ended_on
         - ended_days
         - open
+        - ended
       type: object
     RetiredOutputBody:
       additionalProperties: false
@@ -6512,6 +6516,17 @@ components:
           format: uri
           readOnly: true
           type: string
+        ending:
+          description: Releases whose date has not arrived yet, soonest first. Empty unless within was asked for
+          items:
+            $ref: "#/components/schemas/RetiredBody"
+          type:
+            - array
+            - "null"
+        ending_open:
+          description: Issues open across those, which is what leaves every overdue count on the day they cross
+          format: int64
+          type: integer
         items:
           items:
             $ref: "#/components/schemas/RetiredBody"
@@ -6526,10 +6541,17 @@ components:
           description: How many releases are out of support
           format: int64
           type: integer
+        within:
+          description: How many days ahead this looked
+          format: int64
+          type: integer
       required:
         - items
         - total
         - open
+        - ending
+        - ending_open
+        - within
       type: object
     Revise-claimRequest:
       additionalProperties: false
@@ -18022,6 +18044,8 @@ paths:
 
         `inherited` means the date came from the product rather than from the release itself. `open` counts issues at components, not one per place — the same unit every release-level count here uses.
 
+        **`within` asks what is about to go**, in days ahead. Those come back under `ending`, soonest first and never mixed into what has already gone: the day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, so a warning and an exposure are two lists rather than one. `ended_days` is negative on those, which is how many days are left.
+
         Narrowed by what you may see, and ordered by what is open.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -18048,6 +18072,16 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
+        - description: Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone
+          explode: false
+          in: query
+          name: within
+          schema:
+            description: Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone
+            format: int64
+            maximum: 3650
+            minimum: 0
+            type: integer
       responses:
         "200":
           content:
@@ -18073,6 +18107,8 @@ paths:
         The same answer as a file: every release you can see whose end-of-life date has passed, how long ago that was, and how many issues are still open against it.
 
         `open` counts issues at components rather than one per place, the same unit every release-level count here uses. `inherited` means the date came from the product rather than from the release itself.
+
+        `within` writes out what is about to go as well, marked `ending` in the state column, with `ended_days` negative for how many days are left.
 
         The day the file was taken is stated in it, because how long ago a release ended is only readable against a date.
 
@@ -18108,6 +18144,16 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
+        - description: Also write out releases whose date falls inside this many days ahead, marked as not yet ended
+          explode: false
+          in: query
+          name: within
+          schema:
+            description: Also write out releases whose date falls inside this many days ahead, marked as not yet ended
+            format: int64
+            maximum: 3650
+            minimum: 0
+            type: integer
       responses:
         "200":
           description: OK

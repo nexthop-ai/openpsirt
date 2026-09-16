@@ -442,6 +442,24 @@ func (s *Store) TagStreams(ctx context.Context) ([]int64, error) {
 // deadline, whether a build going quiet is a fault, and what a screen says —
 // and this project's bugs have all come from letting one fact into two rules.
 func (s *Store) StreamsPastEndOfLife(ctx context.Context, at time.Time) ([]int64, error) {
+	return s.streamsEndingBy(ctx, at)
+}
+
+// StreamsEndingBy is which releases will have gone out of support by a date.
+//
+// The same question asked of a day that has not arrived. **Nothing warns
+// before a release crosses**: the day it does, the deadline comes off every
+// open finding on it, and a pile of work leaves every overdue count at once
+// with nobody having decided anything. Asking ahead is what makes that a date
+// somebody can plan for rather than a figure that moves overnight.
+func (s *Store) StreamsEndingBy(ctx context.Context, by time.Time) ([]int64, error) {
+	return s.streamsEndingBy(ctx, by)
+}
+
+// streamsEndingBy is the predicate both of those ask, spelled once: a release
+// answering to its own date where it states one and to its product's
+// otherwise.
+func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, error) {
 	day := at.UTC().Truncate(24 * time.Hour)
 	var past []int64
 	err := s.db.NewSelect().
@@ -487,8 +505,11 @@ type Retired struct {
 // that worked it out for itself would eventually describe a different set of
 // releases from the one whose deadlines were stripped, and it is the report
 // people would believe.
+// A release whose date has not arrived is included where `by` is later than
+// `at`, so one call answers both what has ended and what is about to. Which of
+// the two a row is, is the caller's to read off the date it carries.
 func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
-	at time.Time) ([]Retired, error) {
+	at, by time.Time) ([]Retired, error) {
 
 	// A person's question. A pipeline key reads back what it sent, and which
 	// releases a deployment has stopped supporting is not that.
@@ -502,7 +523,10 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 	if !all && len(products) == 0 {
 		return nil, nil
 	}
-	past, err := s.StreamsPastEndOfLife(ctx, at)
+	if by.Before(at) {
+		by = at
+	}
+	past, err := s.StreamsEndingBy(ctx, by)
 	if err != nil {
 		return nil, err
 	}

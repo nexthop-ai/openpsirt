@@ -3,9 +3,11 @@ package httpapi_test
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 )
@@ -118,6 +120,113 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 		release := rowsUnder(lines)[1]
 		if release[0] != "mine" || release[1] != "master" {
 			t.Errorf("the release is not in the file: %v", release)
+		}
+	})
+}
+
+// TestNothingWarnedBeforeAReleaseCrossed is the warning half.
+//
+// The day a release goes out of support the deadline comes off every open
+// finding on it, so a pile of work leaves every overdue count at once with
+// nobody having decided anything. The report was past-only, so the first sight
+// of it was the figures moving.
+func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		soon := time.Now().UTC().AddDate(0, 0, 20).Format(time.DateOnly)
+		ending := asPerson(t, r, "admin", http.MethodPut,
+			"/v1/products/mine/streams/master/end-of-life",
+			fmt.Sprintf(`{"on":%q}`, soon))
+		if ending.Code != http.StatusNoContent {
+			t.Fatalf("giving a release an end date answered %d: %s",
+				ending.Code, ending.Body.String())
+		}
+
+		asked := func(t *testing.T, query string) struct {
+			Items []struct {
+				Stream string `json:"stream"`
+			} `json:"items"`
+			Ending []struct {
+				Stream    string `json:"stream"`
+				EndedDays int    `json:"ended_days"`
+				Ended     bool   `json:"ended"`
+			} `json:"ending"`
+			EndingOpen int `json:"ending_open"`
+		} {
+			t.Helper()
+			var out struct {
+				Items []struct {
+					Stream string `json:"stream"`
+				} `json:"items"`
+				Ending []struct {
+					Stream    string `json:"stream"`
+					EndedDays int    `json:"ended_days"`
+					Ended     bool   `json:"ended"`
+				} `json:"ending"`
+				EndingOpen int `json:"ending_open"`
+			}
+			read(t, r, "private-triage", "/v1/releases/out-of-support"+query, &out)
+			return out
+		}
+
+		// Asked for nothing, this is the past-only report it has always been.
+		// A second population appearing unasked would change what every figure
+		// on the screen counts.
+		if now := asked(t, ""); len(now.Items) != 0 || len(now.Ending) != 0 {
+			t.Fatalf("a release that has not ended is already in the report: %+v", now)
+		}
+
+		// Asked ahead, it is a warning with a date on it.
+		ahead := asked(t, "?within=30")
+		if len(ahead.Items) != 0 {
+			t.Errorf("a release that has not ended is listed as out of support: %+v", ahead.Items)
+		}
+		if len(ahead.Ending) != 1 || ahead.Ending[0].Stream != "master" {
+			t.Fatalf("the release about to go is not in the warning: %+v", ahead.Ending)
+		}
+		if ahead.Ending[0].Ended {
+			t.Error("a release whose date has not arrived is reported as ended")
+		}
+		// Negative, which is the same figure read the other way: how long is
+		// left rather than how long ago.
+		if ahead.Ending[0].EndedDays >= 0 {
+			t.Errorf("a date twenty days ahead reads as %d days ago",
+				ahead.Ending[0].EndedDays)
+		}
+		// And what leaves every overdue count on the day it crosses, which is
+		// the number the warning is for.
+		if ahead.EndingOpen == 0 {
+			t.Error("the warning does not say what is open on what is about to go")
+		}
+
+		// A horizon short of the date says nothing, which is what makes the
+		// parameter a question rather than a switch.
+		if near := asked(t, "?within=5"); len(near.Ending) != 0 {
+			t.Errorf("a release ending in twenty days is warned about five days out: %+v",
+				near.Ending)
+		}
+
+		// The file says which of the two a row is, in a word: a spreadsheet
+		// sorted on the days column puts them either side of zero, and a
+		// reader has to notice a minus sign to tell them apart.
+		file := asPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/releases/out-of-support.csv?within=30", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d", file.Code)
+		}
+		reader := csv.NewReader(strings.NewReader(file.Body.String()))
+		reader.FieldsPerRecord = -1
+		lines, err := reader.ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := rowsUnder(lines)
+		at := indexOf(body[0], "state")
+		if at < 0 {
+			t.Fatalf("the file has no state column: %v", body[0])
+		}
+		if len(body) < 2 || body[1][at] != "ending" {
+			t.Errorf("the file does not say which population the row is: %v", body)
 		}
 	})
 }

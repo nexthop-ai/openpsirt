@@ -3461,6 +3461,8 @@ export interface paths {
          *
          *     `inherited` means the date came from the product rather than from the release itself. `open` counts issues at components, not one per place — the same unit every release-level count here uses.
          *
+         *     **`within` asks what is about to go**, in days ahead. Those come back under `ending`, soonest first and never mixed into what has already gone: the day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, so a warning and an exposure are two lists rather than one. `ended_days` is negative on those, which is how many days are left.
+         *
          *     Narrowed by what you may see, and ordered by what is open.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -3486,6 +3488,8 @@ export interface paths {
          * @description The same answer as a file: every release you can see whose end-of-life date has passed, how long ago that was, and how many issues are still open against it.
          *
          *     `open` counts issues at components rather than one per place, the same unit every release-level count here uses. `inherited` means the date came from the product rather than from the release itself.
+         *
+         *     `within` writes out what is about to go as well, marked `ending` in the state column, with `ended_days` negative for how many days are left.
          *
          *     The day the file was taken is stated in it, because how long ago a release ended is only readable against a date.
          *
@@ -7880,9 +7884,11 @@ export interface components {
             closed: number;
         };
         RetiredBody: {
+            /** @description The date has passed. False is a release that is about to go out of support */
+            ended: boolean;
             /**
              * Format: int64
-             * @description How many days ago support ended
+             * @description How many days ago support ended. Negative where the date has not arrived, which is how many days are left
              */
             ended_days: number;
             /** @description The date support ended, as YYYY-MM-DD */
@@ -7909,6 +7915,13 @@ export interface components {
              * @example https://example.com/schemas/RetiredOutputBody.json
              */
             readonly $schema?: string;
+            /** @description Releases whose date has not arrived yet, soonest first. Empty unless within was asked for */
+            ending: components["schemas"]["RetiredBody"][] | null;
+            /**
+             * Format: int64
+             * @description Issues open across those, which is what leaves every overdue count on the day they cross
+             */
+            ending_open: number;
             items: components["schemas"]["RetiredBody"][] | null;
             /**
              * Format: int64
@@ -7920,6 +7933,11 @@ export interface components {
              * @description How many releases are out of support
              */
             total: number;
+            /**
+             * Format: int64
+             * @description How many days ahead this looked
+             */
+            within: number;
         };
         "Revise-claimRequest": {
             /**
@@ -14328,6 +14346,8 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone */
+                within?: number;
             };
             header?: never;
             path?: never;
@@ -14364,6 +14384,8 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description Also write out releases whose date falls inside this many days ahead, marked as not yet ended */
+                within?: number;
             };
             header?: never;
             path: {
