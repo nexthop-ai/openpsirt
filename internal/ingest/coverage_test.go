@@ -303,3 +303,75 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 		}
 	})
 }
+
+// TestCoverageSaysWhetherAnybodyIsTrying holds the line that a build nobody
+// uploads to and a build whose uploads are turned away are distinguishable.
+//
+// Both are quiet. They are different faults with different people to tell: one
+// is a pipeline nobody wired up, the other is a pipeline failing nightly and
+// reporting success to its own log. Counting only the scans that could be read
+// answers the first half of "silence looks exactly like health"; this is the
+// other half, which is whether anybody is trying.
+func TestCoverageSaysWhetherAnybodyIsTrying(t *testing.T) {
+	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		ctx := t.Context()
+
+		rows, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range rows {
+			if row.LastRefusedAt != nil || row.RefusedBecause != nil {
+				t.Errorf("a build nothing was refused against reports one: %+v", row)
+			}
+		}
+
+		why := "the inventory does not say when it was built"
+		if err := s.Refused(ctx, reader, ingest.Refusal{TargetID: ours, Reason: why}); err != nil {
+			t.Fatal(err)
+		}
+		told := refusalsIn(t, s, reader)
+		if len(told) != 1 {
+			t.Fatalf("%d builds report a refusal, want the one it was recorded against", len(told))
+		}
+		if told[0] != why {
+			t.Errorf("the report does not repeat what the producer was told: %q", told[0])
+		}
+
+		// A producer retrying a document nothing can read writes one of these
+		// a minute. The row is replaced rather than added to, so what a report
+		// holds is the last refusal and not a history of one build.
+		later := "the inventory could not be read"
+		if err := s.Refused(ctx, reader, ingest.Refusal{TargetID: ours, Reason: later}); err != nil {
+			t.Fatal(err)
+		}
+		told = refusalsIn(t, s, reader)
+		if len(told) != 1 {
+			t.Fatalf("%d builds report a refusal after a second one, want one", len(told))
+		}
+		if told[0] != later {
+			t.Errorf("the report holds an older refusal than the last: %q", told[0])
+		}
+	})
+}
+
+// refusalsIn is what each build in the report says it was last refused for.
+func refusalsIn(t *testing.T, s *ingest.Store, reader access.Subject) []string {
+	t.Helper()
+	rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var told []string
+	for _, row := range rows {
+		if row.LastRefusedAt == nil {
+			continue
+		}
+		if row.RefusedBecause == nil {
+			t.Errorf("a refusal was recorded with no reason: %+v", row)
+			continue
+		}
+		told = append(told, *row.RefusedBecause)
+	}
+	return told
+}

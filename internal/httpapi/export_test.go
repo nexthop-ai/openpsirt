@@ -650,8 +650,18 @@ func TestCoverageStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T
 		if lines[0][0] != "# quiet after days" || lines[0][1] == "" {
 			t.Errorf("coverage does not state its threshold: %v", lines[0])
 		}
-		if lines[1][0] != "product" || lines[1][6] != "quiet" {
+		// Named rather than counted from, because an index moves silently when
+		// a column is added and the assertion goes on passing about the wrong
+		// one. The two that matter here are the first and the quiet flag the
+		// statement above was computed for.
+		if lines[1][0] != "product" || indexOf(lines[1], "quiet") < 0 {
 			t.Errorf("coverage's columns moved: %v", lines[1])
+		}
+		// The pair that tells a build nobody uploads to apart from one whose
+		// uploads are refused. Both read as quiet and they are different
+		// faults.
+		if indexOf(lines[1], "last_refused_at") < 0 || indexOf(lines[1], "refused_because") < 0 {
+			t.Errorf("coverage does not say whether anybody is trying: %v", lines[1])
 		}
 
 		// Narrowed the way the screen is. An export that built the list first
@@ -683,4 +693,17 @@ func TestAFileWithNothingToStateStatesNothing(t *testing.T) {
 			t.Errorf("the record's file has no items: %s", got.Body.String())
 		}
 	})
+}
+
+// indexOf is where a column sits, or -1.
+//
+// Used in place of a fixed position so that adding a column does not quietly
+// move an assertion onto its neighbour.
+func indexOf(row []string, name string) int {
+	for i, each := range row {
+		if each == name {
+			return i
+		}
+	}
+	return -1
 }

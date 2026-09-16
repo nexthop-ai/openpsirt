@@ -642,6 +642,9 @@ alphabetical list buries the one that stopped among the ones that are fine.
 | How long counts as quiet is a setting, shipping at a week | Long enough that a nightly build missing one night is not an alert, short enough that a pipeline switched off is noticed in the week it happened |
 | A release out of support is never reported as quiet (REQ-52) | It is still listed and still states how long it has been: "not scanned, and that is fine" and "not listed" are different answers |
 | Only a scan that could be read counts as having been heard from | A build whose upload is taken nightly and fails to parse nightly is exactly what this report is for. Counting the arrival drew it as perfectly quiet, on the one report whose subject is that silence must not look like health |
+| An upload turned away is recorded against the build, and the report says when and why | Quiet says nothing arrived. It does not say whether anybody tried, and those are different faults with different people to tell: a pipeline nobody wired up, against one failing nightly and reporting success to its own log. A refusal never becomes a scan, so without a row of its own the producer was told and the deployment was not |
+| One refusal per build, replaced | A producer retrying a document nothing can read writes one a minute. What a report asks is whether this build is being refused now, not for a history of it |
+| Recording a refusal is best-effort, and that is the one place it belongs | It is a note about something that already failed. Failing the failure would turn a refusal the producer needs to read into a fault they cannot |
 | It is a person's question | A pipeline key sees the receipts for what it sent and nothing more |
 
 ## Receipts

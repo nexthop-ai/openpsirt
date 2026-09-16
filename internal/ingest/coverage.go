@@ -38,6 +38,16 @@ type Coverage struct {
 	// is not one of these: it is the producer being heard from and the build
 	// still not being scanned.
 	LastReceivedAt *time.Time
+	// LastRefusedAt is when an upload against this build was last turned away,
+	// and RefusedBecause what the producer was told. Both nil where nothing
+	// has been refused.
+	//
+	// Beside the quiet count rather than folded into it: quiet says nothing
+	// arrived, and this says something arrived and was not taken. A build that
+	// is quiet and being refused is a pipeline failing nightly; one that is
+	// quiet and has never been refused is a pipeline nobody wired up.
+	LastRefusedAt  *time.Time
+	RefusedBecause *string
 	// Since is how long it has been, measured from the last arrival or, where
 	// there has never been one, from when the build was declared.
 	Since time.Duration
@@ -90,6 +100,11 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		Variant    string     `bun:"variant"`
 		DeclaredAt time.Time  `bun:"declared_at"`
 		LastSeen   *time.Time `bun:"last_seen"`
+		// LastRefused is when an upload against this build was last turned
+		// away, which is what tells a quiet build apart from one being
+		// refused. Null where nothing has been.
+		LastRefused *time.Time `bun:"last_refused"`
+		RefusedWhy  *string    `bun:"refused_why"`
 	}
 
 	// One row per declared build, with the newest arrival against it as a
@@ -114,7 +129,15 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		// it as perfectly quiet on the one report whose subject is that
 		// silence must not look like health.
 		ColumnExpr(`(SELECT MAX(sc.received_at) FROM "scan" AS "sc" `+
-			`WHERE sc.target_id = tg.id AND sc.status = ?) AS "last_seen"`, Accepted)
+			`WHERE sc.target_id = tg.id AND sc.status = ?) AS "last_seen"`, Accepted).
+		// And whether anybody is trying. Quiet says nothing arrived; this says
+		// whether something arrived and was turned away, which is a different
+		// fault with a different person to tell — a pipeline nobody wired up,
+		// against one failing nightly and reporting success to its own log.
+		ColumnExpr(`(SELECT sr.at FROM "scan_refusal" AS "sr" ` +
+			`WHERE sr.target_id = tg.id) AS "last_refused"`).
+		ColumnExpr(`(SELECT sr.reason FROM "scan_refusal" AS "sr" ` +
+			`WHERE sr.target_id = tg.id) AS "refused_why"`)
 	if !all {
 		query = query.Where("st.product_id IN (?)", bun.List(products))
 	}
@@ -158,6 +181,8 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 			StreamKind:     r.StreamKind,
 			Variant:        r.Variant,
 			LastReceivedAt: r.LastSeen,
+			LastRefusedAt:  r.LastRefused,
+			RefusedBecause: r.RefusedWhy,
 			Since:          since,
 			Retired:        retired[r.StreamID],
 			Quiet:          quietAfter > 0 && since > quietAfter && !retired[r.StreamID],

@@ -459,7 +459,25 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		// makes those readable rather than alarming.
 		in.logger().InfoContext(ctx, "an upload was refused",
 			"outcome", outcome, "serial", header.Serial, "product", input.Product)
-		return nil, rejection(outcome, err)
+		// And beside the log, a row the coverage report can read. A log line
+		// answers somebody already holding a terminal; the report is what says
+		// a build has gone quiet, and without this it cannot say whether
+		// anybody is trying. Those are different people and different faults:
+		// a pipeline nobody wired up, against one failing nightly and telling
+		// its own log it succeeded.
+		refused := rejection(outcome, err)
+		if noted := ingest.NewStore(in.DB.DB).Refused(ctx, subject, ingest.Refusal{
+			TargetID: target.ID, Reason: refused.Error(),
+			BuiltAt: &header.BuiltAt, ContentHash: &contentHash,
+		}); noted != nil {
+			// Best-effort, and the one place that is right: this is a note
+			// about something that already failed, and failing the failure
+			// would turn a refusal the producer needs to read into a fault
+			// they cannot.
+			in.logger().ErrorContext(ctx, "could not record that an upload was refused",
+				"error", noted, "product", input.Product)
+		}
+		return nil, refused
 	case err != nil:
 		return nil, wentWrong(in.Logger, "the upload could not be recorded", err)
 	}
@@ -884,6 +902,12 @@ type CoverageBody struct {
 	// LastReceivedAt is absent where nothing has ever been filed against this
 	// build, which is a different situation from a scan that failed.
 	LastReceivedAt string `json:"last_received_at,omitempty" doc:"When a scan last arrived. Absent where none ever has"`
+	// LastRefusedAt tells a build nobody uploads to apart from one whose
+	// uploads are being turned away. Both are quiet and they are different
+	// faults: a pipeline nobody wired up, against one failing nightly and
+	// telling its own log that it succeeded.
+	LastRefusedAt  string `json:"last_refused_at,omitempty" doc:"When an upload against this build was last turned away. Absent where none has been"`
+	RefusedBecause string `json:"refused_because,omitempty" doc:"What the producer was told the last time one was turned away, in the same words they were given"`
 	QuietDays      int    `json:"quiet_days" doc:"How long it has been, in days, measured from the last arrival or from when the build was declared"`
 	Quiet          bool   `json:"quiet,omitempty" doc:"Whether that is longer than this deployment allows"`
 	// Retired is reported rather than the row being left out. A release that
@@ -975,6 +999,12 @@ func registerCoverage(api huma.API, in Ingest) {
 			if row.LastReceivedAt != nil {
 				body.LastReceivedAt = stamp(*row.LastReceivedAt)
 			}
+			if row.LastRefusedAt != nil {
+				body.LastRefusedAt = stamp(*row.LastRefusedAt)
+			}
+			if row.RefusedBecause != nil {
+				body.RefusedBecause = *row.RefusedBecause
+			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		return out, nil
@@ -1040,7 +1070,8 @@ func registerCoverageExport(api huma.API, in Ingest) {
 			About: [2]string{"quiet after days", strconv.Itoa(int(quietAfter.Hours() / 24))},
 			Header: []string{
 				"product", "stream", "kind", "variant",
-				"last_received_at", "quiet_days", "quiet", "retired",
+				"last_received_at", "last_refused_at", "refused_because",
+				"quiet_days", "quiet", "retired",
 			},
 			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
 				if offset >= len(rows) {
@@ -1056,8 +1087,16 @@ func registerCoverageExport(api huma.API, in Ingest) {
 					if row.LastReceivedAt != nil {
 						last = stamp(*row.LastReceivedAt)
 					}
+					refused, why := "", ""
+					if row.LastRefusedAt != nil {
+						refused = stamp(*row.LastRefusedAt)
+					}
+					if row.RefusedBecause != nil {
+						why = *row.RefusedBecause
+					}
 					written = append(written, []string{
 						row.Product, row.Stream, row.StreamKind, row.Variant, last,
+						refused, why,
 						strconv.Itoa(int(row.Since.Hours() / 24)),
 						strconv.FormatBool(row.Quiet),
 						strconv.FormatBool(row.Retired),

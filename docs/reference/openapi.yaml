@@ -1399,6 +1399,9 @@ components:
         last_received_at:
           description: When a scan last arrived. Absent where none ever has
           type: string
+        last_refused_at:
+          description: When an upload against this build was last turned away. Absent where none has been
+          type: string
         product:
           type: string
         quiet:
@@ -1408,6 +1411,9 @@ components:
           description: How long it has been, in days, measured from the last arrival or from when the build was declared
           format: int64
           type: integer
+        refused_because:
+          description: What the producer was told the last time one was turned away, in the same words they were given
+          type: string
         retired:
           description: Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet
           type: boolean
