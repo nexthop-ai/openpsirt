@@ -62,7 +62,7 @@ func TestAChurnedVersionIsNotCountedAsAFix(t *testing.T) {
 		f.closeIt(t, "CVE-2026-3", finding.Unexplained, now.Add(-24*time.Hour))
 
 		got, err := f.store.Remediation(ctx, f.holding(t, access.PublicRead),
-			f.wholeProduct(), 30*24*time.Hour)
+			f.wholeProduct(), time.Time{}, time.Time{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +107,7 @@ func TestHowLongAFixTookIsCountedPerIssueAndNotPerPlace(t *testing.T) {
 		f.closeIt(t, "CVE-2026-1", finding.Upgraded, now)
 
 		got, err := f.store.Remediation(ctx, f.holding(t, access.PublicRead),
-			f.wholeProduct(), 30*24*time.Hour)
+			f.wholeProduct(), time.Time{}, time.Time{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -137,7 +137,7 @@ func TestWhatIsAgingIsCountedInTheBucketsPeopleAskIn(t *testing.T) {
 		f.aged(t, "CVE-2026-2", now.Add(-120*24*time.Hour))
 
 		got, err := f.store.Remediation(ctx, f.holding(t, access.PublicRead),
-			f.wholeProduct(), 30*24*time.Hour)
+			f.wholeProduct(), time.Time{}, time.Time{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,7 +170,7 @@ func TestSomebodyWhoReadsNothingMeasuresNothing(t *testing.T) {
 
 		stranger := access.NewPerson(9, "nobody@example.com", false,
 			map[int64][]access.Role{f.productID + 999: {access.PublicRead}}, 0)
-		got, err := f.store.Remediation(ctx, stranger, finding.Scope{}, 30*24*time.Hour)
+		got, err := f.store.Remediation(ctx, stranger, finding.Scope{}, time.Time{}, time.Time{})
 		if err != nil {
 			t.Fatal(err)
 		}

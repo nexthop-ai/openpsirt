@@ -36,8 +36,11 @@ type RemediationOutput struct {
 		// TimeToFix is by the severity a thing was rated, in hours. Absent for
 		// a rating nothing closed at, because a zero would read as instant.
 		TimeToFix map[string]float64 `json:"time_to_fix,omitempty" doc:"Average hours an issue closed in the window was open for, by severity. A severity nothing closed at is absent rather than zero"`
-		Aging     []BucketBody       `json:"aging" doc:"What is open now, by how long it has been"`
-		Days      int                `json:"days" doc:"The window these cover"`
+		Aging     []BucketBody       `json:"aging" doc:"What is open now, by how long it has been. About now whatever period was asked for"`
+		// The period these cover, said back, so a figure is never read apart
+		// from the window it was worked out over.
+		From string `json:"from,omitempty" doc:"The first day of the period. Absent where it runs from the beginning"`
+		To   string `json:"to" doc:"The day it ends, which is not itself in it"`
 	}
 }
 
@@ -58,7 +61,12 @@ func registerRemediation(api huma.API, in Ingest) {
 		OperationID: "get-remediation", Method: http.MethodGet, Path: "/v1/remediation",
 		Summary: "Report how fast findings are being fixed",
 		Description: "Fix velocity, average time to remediate by severity, and what is aging, " +
-			"over a window and narrowed by the scope picker.\n\n" +
+			"over a period and narrowed by the scope picker.\n\n" +
+			"**A period or a rolling window.** `from` and `to` name a stretch — a quarter, a " +
+			"financial year — and `days` is the rolling window ending now. They are two ways " +
+			"of saying when, so only one may be sent. What is **aging** is a statement about " +
+			"now whatever period was asked for: how long something has been open is answered " +
+			"by the clock.\n\n" +
 			"**A closure only counts as a fix if the issue actually went away.** A bump that " +
 			"carried the issue into the next version, and a finding a scanner silently stopped " +
 			"reporting, are not fixes — counting them measures churn and reports it as " +
@@ -69,7 +77,7 @@ func registerRemediation(api huma.API, in Ingest) {
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
-		Days int `query:"days" default:"30" minimum:"1" maximum:"366" doc:"How far back to measure"`
+		Period
 	}) (*RemediationOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -82,14 +90,17 @@ func registerRemediation(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		window := time.Duration(input.Days) * 24 * time.Hour
-		got, err := finding.NewStore(in.DB.DB).Remediation(ctx, subject, scope, window)
+		since, until, err := input.window(30, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+		got, err := finding.NewStore(in.DB.DB).Remediation(ctx, subject, scope, since, until)
 		if err != nil {
 			return nil, refused(in.Logger, err, "cannot measure how fast things are fixed")
 		}
 
 		out := &RemediationOutput{}
-		out.Body.Days = input.Days
+		out.Body.From, out.Body.To = stating(since, until)
 		out.Body.Aging = []BucketBody{}
 		out.Body.TimeToFix = map[string]float64{}
 		if got == nil {

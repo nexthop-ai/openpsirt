@@ -110,7 +110,7 @@ const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
 // about a control that answered more than the screens it summarizes would be
 // a way around the control it is reporting on.
 func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
-	productIDs []int64, since time.Time, limit int) (*Scrutiny, error) {
+	productIDs []int64, since, until time.Time, limit int) (*Scrutiny, error) {
 
 	// Every section bounded, like every other read in this package. None of
 	// them was: a deployment that has been triaging for a while answered one
@@ -129,8 +129,15 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		if len(productIDs) > 0 {
 			q = q.Where("de.product_id IN (?)", bun.List(productIDs))
 		}
+		// Dated by when the claim was proposed, which is what every section
+		// here is about: a judgment belongs to when it was argued, and dating
+		// it by its agreement would move it out of the period whenever an
+		// approval came late — the ordinary case.
 		if !since.IsZero() {
 			q = q.Where("de.proposed_at >= ?", since)
+		}
+		if !until.IsZero() {
+			q = q.Where("de.proposed_at < ?", until)
 		}
 		return q
 	}

@@ -12,6 +12,7 @@ this document is its own.
 
 - [The counting unit](#the-counting-unit)
 - [Computed on demand](#computed-on-demand)
+- [The period a report covers](#the-period-a-report-covers)
 - [Trends](#trends)
 - [Build comparison](#build-comparison)
 - [The release note](#the-release-note)
@@ -84,6 +85,22 @@ What would change this is a dashboard measured slow on a real deployment. The
 shape is then known and should not be reinvented under pressure — precompute at
 the grain access is granted at, one row per product per day, so a portfolio
 number stays the sum of what the reader may see.
+
+## The period a report covers
+
+Four reports take one: deadline compliance, remediation, triage latency and
+approval coverage. Two dates, or a rolling window of days, in one shape so that
+a screen linking from one report to another carries the same two parameters.
+
+| Rule | Reason |
+|---|---|
+| A period is two dates; a rolling window is a number of days | A window ending today cannot say "last financial year", which is the number an auditor asks for, and dates alone make "how are we doing lately" a date somebody has to work out |
+| Only one of the two may be sent, and sending both is refused | A caller who sent both meant one of them, and answering about the other is a figure quoted for the wrong period — the failure a period control exists to fix |
+| The end is the day it stops, not a day inside it | The same rule the record of judgments already used, so the two cannot come to mean different things |
+| A period that ends before it starts is refused | A report answering zero for one is indistinguishable from a quarter in which nothing happened |
+| Every report says back the period it covered | A figure read apart from its window is a number nobody can check |
+| **What is open is always now** | Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable — the same reason the register states current state with no `as_of`. A period bounds what closed in it |
+| The rate asked for no period is the lifetime figure | It is what that report has always answered, and a default window would quietly change what the number means for everybody reading it |
 
 ## Trends
 
@@ -200,6 +217,7 @@ keeps its deadline; only open rows lose one at end-of-life or below the floor.
 | A product is required | A place identity carries no product, and a decision correlated without one would reach decisions made in every product. Every severity band comes back even where empty, because a rate table with rows missing reads as one that has been narrowed |
 | The report says what carries no deadline | A rate about dates is silent about three populations that were never due: below the product's line, in a tag, and in a release out of support. The last has a report of its own and is linked from here |
 | Only the whole-of-it figure opens a list | The findings list reads a severity as that band or worse, so a link from one band's row would open more than the row counts — and a figure whose list holds something else is the failure a report is easiest to ship |
+| What is still open at all is a column, beside deferred and overdue | Those two were numerators with no denominator, so "eleven overdue" could not be read as a share of anything, which is what a rate is |
 
 ## Release readiness
 
@@ -256,7 +274,7 @@ to and a carry that happens silently is one nobody reviews.
 ## Remediation metrics
 
 Fix velocity, average time to remediate by severity, and aging buckets over a
-window. A finding records when it opened and when it closed, so how long
+period. A finding records when it opened and when it closed, so how long
 something took is a subtraction rather than a second record somebody maintains.
 
 The aging buckets are cut two ways. One number per bucket says a hundred

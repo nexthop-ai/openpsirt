@@ -677,6 +677,10 @@ export interface paths {
          *
          *     **A product is required** — a place identity carries no product, so this cannot be asked across the deployment.
          *
+         *     **A period, or the whole of it.** `from` and `to` bound what closed in them, which is the number a report on a quarter or a financial year is about; `days` is the rolling window, and only one of the two may be sent. Asked for neither, this is the lifetime figure.
+         *
+         *     **What is open is always now.** Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable and is not reconstructed.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-compliance-rate"];
@@ -998,6 +1002,8 @@ export interface paths {
          *     **The two waits come back three ways each** — the middle, what nine in ten came in under, and the longest — so a caller reads three numbers per wait rather than one.
          *
          *     **Per severity**, because a critical waiting a week and a low waiting a week are not the same fact.
+         *
+         *     **A period or a rolling window.** `from` and `to` name the stretch a manager or an auditor is reporting on; `days` is the rolling window, and the two are ways of saying the same thing so only one may be sent.
          *
          *     **Bounded, and it says so.** The two waits are worked out from at most the most recent few thousand claims in the window; `sampled` says how many and `capped` says whether the ceiling was reached. A figure quoted from part of a window without saying so is the one thing a number like this must not be.
          *
@@ -3503,7 +3509,9 @@ export interface paths {
         };
         /**
          * Report how fast findings are being fixed
-         * @description Fix velocity, average time to remediate by severity, and what is aging, over a window and narrowed by the scope picker.
+         * @description Fix velocity, average time to remediate by severity, and what is aging, over a period and narrowed by the scope picker.
+         *
+         *     **A period or a rolling window.** `from` and `to` name a stretch — a quarter, a financial year — and `days` is the rolling window ending now. They are two ways of saying when, so only one may be sent. What is **aging** is a statement about now whatever period was asked for: how long something has been open is answered by the clock.
          *
          *     **A closure only counts as a fix if the issue actually went away.** A bump that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
          *
@@ -7488,6 +7496,11 @@ export interface components {
             met: number;
             /**
              * Format: int64
+             * @description Still open at all, whatever their deadline. The denominator the deferred and overdue counts are read against
+             */
+            open: number;
+            /**
+             * Format: int64
              * @description Still open, past the deadline, with no deferral standing — plainly late
              */
             overdue: number;
@@ -7765,18 +7778,15 @@ export interface components {
              * @example https://example.com/schemas/RemediationOutputBody.json
              */
             readonly $schema?: string;
-            /** @description What is open now, by how long it has been */
+            /** @description What is open now, by how long it has been. About now whatever period was asked for */
             aging: components["schemas"]["BucketBody"][] | null;
-            /**
-             * Format: int64
-             * @description The window these cover
-             */
-            days: number;
             /**
              * Format: int64
              * @description Distinct issues that actually went away in the window
              */
             fixed: number;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
             /**
              * Format: int64
              * @description Distinct issues that appeared in it
@@ -7786,6 +7796,8 @@ export interface components {
             time_to_fix?: {
                 [key: string]: number;
             };
+            /** @description The day it ends, which is not itself in it */
+            to: string;
         };
         RepeatBody: {
             /** @description The furthest any of them reached */
@@ -8110,14 +8122,13 @@ export interface components {
             bulk: components["schemas"]["BulkApprovalBody"][] | null;
             /** @description A section reached the limit, so this is the worst of it rather than all of it */
             capped?: boolean;
-            /**
-             * Format: int64
-             * @description How far back this looked
-             */
-            days: number;
+            /** @description The first day of the period, by when a claim was proposed. Absent where it runs from the beginning */
+            from?: string;
             grew: components["schemas"]["GrownBody"][] | null;
             lapsed: components["schemas"]["LapsedApprovalBody"][] | null;
             pairs: components["schemas"]["PairingBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
         };
         SelectionBody: {
             /** @description The text the candidate list was narrowed by. Absent where it was not narrowed, which means every issue at the component was on the page */
@@ -9015,7 +9026,11 @@ export interface operations {
             query?: {
                 /** @description Limit to one product, by name */
                 product?: string;
-                /** @description How far back to look, by when a claim was proposed */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
                 /** @description How many rows each section carries at most. capped says a section reached it */
                 limit?: number;
@@ -9843,6 +9858,12 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
             };
             header?: never;
             path?: never;
@@ -10415,7 +10436,11 @@ export interface operations {
     "get-measures": {
         parameters: {
             query?: {
-                /** @description How far back to measure */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
             };
             header?: never;
@@ -14371,7 +14396,11 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How far back to measure */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
             };
             header?: never;

@@ -312,6 +312,9 @@ type RateBody struct {
 	// people stop deferring and start letting things run late silently.
 	Deferred int `json:"deferred" doc:"Still open with a standing deferral: somebody moved the date deliberately"`
 	Overdue  int `json:"overdue" doc:"Still open, past the deadline, with no deferral standing — plainly late"`
+	// Open is what the two numbers above are a share of. Without it they were
+	// numerators with no denominator, and a rate is a proportion.
+	Open int `json:"open" doc:"Still open at all, whatever their deadline. The denominator the deferred and overdue counts are read against"`
 }
 
 func registerCompliance(api huma.API, in Ingest) {
@@ -331,10 +334,18 @@ func registerCompliance(api huma.API, in Ingest) {
 			"A closed finding keeps the deadline it carried; only open ones lose theirs at " +
 			"end of life or below the triage line.\n\n" +
 			"**A product is required** — a place identity carries no product, so this cannot " +
-			"be asked across the deployment.",
+			"be asked across the deployment.\n\n" +
+			"**A period, or the whole of it.** `from` and `to` bound what closed in them, " +
+			"which is the number a report on a quarter or a financial year is about; `days` " +
+			"is the rolling window, and only one of the two may be sent. Asked for neither, " +
+			"this is the lifetime figure.\n\n" +
+			"**What is open is always now.** Deadlines are recomputed as the policy moves and " +
+			"dropped below the line and past end of life, so what stood open on a date gone " +
+			"by is not recoverable and is not reconstructed.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
+		Period
 	}) (*listOutput[RateBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -361,7 +372,14 @@ func registerCompliance(api huma.API, in Ingest) {
 					"identity carries no product and correlating decisions without " +
 					"one would reach every product in the deployment")
 		}
-		rates, err := finding.NewStore(in.DB.DB).Compliance(ctx, subject, scope)
+		// Nothing by default, which is the lifetime figure this has always
+		// answered. A default window would quietly change what the number
+		// means for everybody already reading it.
+		since, until, err := input.window(0, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+		rates, err := finding.NewStore(in.DB.DB).Compliance(ctx, subject, scope, since, until)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
@@ -371,6 +389,7 @@ func registerCompliance(api huma.API, in Ingest) {
 			out.Body.Items = append(out.Body.Items, RateBody{
 				Severity: rate.Severity, Closed: rate.Closed, Met: rate.Met,
 				Late: rate.Late, Deferred: rate.Deferred, Overdue: rate.Overdue,
+				Open: rate.Open,
 			})
 		}
 		return out, nil
