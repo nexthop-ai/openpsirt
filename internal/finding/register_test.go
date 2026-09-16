@@ -30,11 +30,11 @@ func TestTheRegistersPageIsTheSameWithoutItsCount(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicRead)
 
-		withCount, total, err := f.store.Register(t.Context(), who, f.target, 50, 0)
+		withCount, total, err := f.store.Register(t.Context(), who, f.target, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		without, err := f.store.RegisterPage(t.Context(), who, f.target, 50, 0)
+		without, err := f.store.RegisterPage(t.Context(), who, f.target, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,10 +54,10 @@ func TestTheRegistersPageIsTheSameWithoutItsCount(t *testing.T) {
 		// And the same refusal. A reader who may see nothing here has to be
 		// refused by both, or the export is the way around the check.
 		nobody := f.holdingIn(t, nil, access.PublicRead)
-		if _, err := f.store.RegisterPage(t.Context(), nobody, f.target, 50, 0); err == nil {
+		if _, err := f.store.RegisterPage(t.Context(), nobody, f.target, finding.Registering{}, 50, 0); err == nil {
 			t.Error("a page read without the count answered somebody holding nothing")
 		}
-		if err := f.store.RegisterEach(t.Context(), nobody, f.target,
+		if err := f.store.RegisterEach(t.Context(), nobody, f.target, finding.Registering{},
 			func(finding.Disposed) error { return nil }); err == nil {
 			t.Error("the walk answered somebody holding nothing")
 		}
@@ -82,12 +82,12 @@ func TestTheRegisterWalkedIsTheRegisterPaged(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicRead)
 
-		paged, err := f.store.RegisterPage(t.Context(), who, f.target, 500, 0)
+		paged, err := f.store.RegisterPage(t.Context(), who, f.target, finding.Registering{}, 500, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var walked []finding.Disposed
-		if err := f.store.RegisterEach(t.Context(), who, f.target,
+		if err := f.store.RegisterEach(t.Context(), who, f.target, finding.Registering{},
 			func(row finding.Disposed) error {
 				walked = append(walked, row)
 				return nil
@@ -112,7 +112,7 @@ func TestTheRegisterWalkedIsTheRegisterPaged(t *testing.T) {
 		// ends early and reads as complete.
 		stop := fmt.Errorf("enough")
 		seen := 0
-		err = f.store.RegisterEach(t.Context(), who, f.target, func(finding.Disposed) error {
+		err = f.store.RegisterEach(t.Context(), who, f.target, finding.Registering{}, func(finding.Disposed) error {
 			seen++
 			return stop
 		})
@@ -170,7 +170,7 @@ func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
 		f.recorded(t, 2, "approver")
 
 		decided := f.decidedAndLapsed(t, open[0])
-		rows, _, err := f.store.Register(ctx, f.holding(t, access.PublicRead), f.target, 50, 0)
+		rows, _, err := f.store.Register(ctx, f.holding(t, access.PublicRead), f.target, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -267,7 +267,7 @@ func TestTheRegisterCarriesWhyAPersonClosedSomething(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		register, _, err := f.store.Register(ctx, who, f.target, 50, 0)
+		register, _, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -288,6 +288,40 @@ func TestTheRegisterCarriesWhyAPersonClosedSomething(t *testing.T) {
 		}
 		if closed.ClosedNote != because {
 			t.Errorf("the register states the reason as %q", closed.ClosedNote)
+		}
+	})
+}
+
+func TestAStateWordTheRegisterDoesNotKnowKeepsNothing(t *testing.T) {
+	// A filter that silently widens is how a register reads as complete about
+	// rows it left out. The route's own vocabulary refuses an unknown word at
+	// the door, so this is the guard behind it: a caller inside this process
+	// asking for a word none of the four recognizes gets nothing, not
+	// everything.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		whole, err := f.store.RegisterPage(t.Context(), who, f.target,
+			finding.Registering{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(whole) == 0 {
+			t.Fatal("the fixture's register is empty, so this checks nothing")
+		}
+		nonsense, err := f.store.RegisterPage(t.Context(), who, f.target,
+			finding.Registering{States: []string{"whatever"}}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nonsense) != 0 {
+			t.Errorf("a word the register does not know kept %d of %d rows",
+				len(nonsense), len(whole))
 		}
 	})
 }

@@ -947,6 +947,8 @@ export interface paths {
          *
          *     **Narrowed the way every other read is**, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
          *
+         *     **Nothing affected is an answer**, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
+         *
          *     Answers by any name the issue goes by.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -14119,6 +14121,16 @@ export interface operations {
     "get-disposition-register": {
         parameters: {
             query?: {
+                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep rows whose standing judgment is one of these. Repeatable */
+                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep one component, by name */
+                component?: string;
+                /** @description Keep one vulnerability, under the name it is filed here */
+                issue?: string;
+                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
+                standing?: "open" | "closed";
                 limit?: number;
                 offset?: number;
             };
@@ -14154,7 +14166,18 @@ export interface operations {
     };
     "export-disposition-register": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep rows whose standing judgment is one of these. Repeatable */
+                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep one component, by name */
+                component?: string;
+                /** @description Keep one vulnerability, under the name it is filed here */
+                issue?: string;
+                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
+                standing?: "open" | "closed";
+            };
             header?: never;
             path: {
                 product: string;

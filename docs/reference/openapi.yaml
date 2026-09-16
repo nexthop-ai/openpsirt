@@ -11090,6 +11090,8 @@ paths:
 
         **Narrowed the way every other read is**, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
 
+        **Nothing affected is an answer**, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
+
         Answers by any name the issue goes by.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -17678,6 +17680,65 @@ paths:
           required: true
           schema:
             type: string
+        - description: Keep rows standing in any of these. Repeatable; any of them matches
+          explode: true
+          in: query
+          name: state
+          schema:
+            description: Keep rows standing in any of these. Repeatable; any of them matches
+            items:
+              enum:
+                - undecided
+                - waiting
+                - agreed
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep rows whose standing judgment is one of these. Repeatable
+          explode: true
+          in: query
+          name: outcome
+          schema:
+            description: Keep rows whose standing judgment is one of these. Repeatable
+            items:
+              enum:
+                - affected
+                - not-applicable
+                - deferred
+                - wont-fix
+                - already-fixed
+                - upgrade-needed
+                - patch-needed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep one component, by name
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep one component, by name
+            type: string
+        - description: Keep one vulnerability, under the name it is filed here
+          explode: false
+          in: query
+          name: issue
+          schema:
+            description: Keep one vulnerability, under the name it is filed here
+            type: string
+        - description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+          explode: false
+          in: query
+          name: standing
+          schema:
+            description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+            enum:
+              - open
+              - closed
+            type: string
         - explode: false
           in: query
           name: limit
@@ -17743,6 +17804,65 @@ paths:
             enum:
               - csv
               - json
+            type: string
+        - description: Keep rows standing in any of these. Repeatable; any of them matches
+          explode: true
+          in: query
+          name: state
+          schema:
+            description: Keep rows standing in any of these. Repeatable; any of them matches
+            items:
+              enum:
+                - undecided
+                - waiting
+                - agreed
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep rows whose standing judgment is one of these. Repeatable
+          explode: true
+          in: query
+          name: outcome
+          schema:
+            description: Keep rows whose standing judgment is one of these. Repeatable
+            items:
+              enum:
+                - affected
+                - not-applicable
+                - deferred
+                - wont-fix
+                - already-fixed
+                - upgrade-needed
+                - patch-needed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep one component, by name
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep one component, by name
+            type: string
+        - description: Keep one vulnerability, under the name it is filed here
+          explode: false
+          in: query
+          name: issue
+          schema:
+            description: Keep one vulnerability, under the name it is filed here
+            type: string
+        - description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+          explode: false
+          in: query
+          name: standing
+          schema:
+            description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+            enum:
+              - open
+              - closed
             type: string
       responses:
         "200":

@@ -261,3 +261,91 @@ func (r *reach) inventoryOf(t *testing.T, contents string) int64 {
 	}
 	return document.ID
 }
+
+// TestTheRegisterNarrows is what an auditor does with it.
+//
+// It took no filters at all, so "show me what nobody decided" on a build of a
+// quarter of a million rows was a spreadsheet and a search box.
+func TestTheRegisterNarrows(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		rows := func(t *testing.T, query string) []struct {
+			Vulnerability string `json:"vulnerability"`
+			State         string `json:"state"`
+			Outcome       string `json:"outcome"`
+		} {
+			t.Helper()
+			var out struct {
+				Items []struct {
+					Vulnerability string `json:"vulnerability"`
+					State         string `json:"state"`
+					Outcome       string `json:"outcome"`
+				} `json:"items"`
+				Total int `json:"total"`
+			}
+			read(t, r, "private-triage", at+query, &out)
+			// The count is of the narrowed list, not of the build: counted
+			// over the build, a filtered page says how many rows the build
+			// holds and every later offset is a page of a different list.
+			if out.Total != len(out.Items) {
+				t.Errorf("%q says %d rows and carries %d", query, out.Total, len(out.Items))
+			}
+			return out.Items
+		}
+
+		if whole := rows(t, ""); len(whole) != 2 {
+			t.Fatalf("the whole register holds %d rows, want both issues", len(whole))
+		}
+		// The row every other report leaves out, which is what an auditor is
+		// looking for.
+		undecided := rows(t, "?state=undecided")
+		if len(undecided) != 1 || undecided[0].Vulnerability != "CVE-2026-1000" {
+			t.Errorf("narrowed to undecided the register holds %+v", undecided)
+		}
+		waiting := rows(t, "?state=waiting")
+		if len(waiting) != 1 || waiting[0].Vulnerability != "CVE-2026-9999" {
+			t.Errorf("narrowed to waiting the register holds %+v", waiting)
+		}
+		// Two words is either of them, which is how "anything nobody has
+		// agreed to" is asked.
+		if both := rows(t, "?state=undecided&state=waiting"); len(both) != 2 {
+			t.Errorf("two words kept %d rows", len(both))
+		}
+		if dismissals := rows(t, "?outcome=not-applicable"); len(dismissals) != 1 {
+			t.Errorf("narrowed to a dismissal the register holds %+v", dismissals)
+		}
+		if named := rows(t, "?component=linux-image"); len(named) != 2 {
+			t.Errorf("narrowed to the component both sit on, %d rows", len(named))
+		}
+		if elsewhere := rows(t, "?component=nothing-is-called-this"); len(elsewhere) != 0 {
+			t.Errorf("a component the build does not hold kept %d rows", len(elsewhere))
+		}
+		if open := rows(t, "?standing=open"); len(open) != 2 {
+			t.Errorf("both are open and %d came back", len(open))
+		}
+		if closed := rows(t, "?standing=closed"); len(closed) != 0 {
+			t.Errorf("nothing is closed and %d came back", len(closed))
+		}
+
+		// And the file takes the same filters, so a spreadsheet taken from a
+		// narrowed screen is that narrowing rather than the whole build.
+		file := asPerson(t, r, "private-triage", http.MethodGet,
+			at+".csv?state=undecided", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d", file.Code)
+		}
+		lines, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body := rowsUnder(lines); len(body) != 2 {
+			t.Errorf("the narrowed file holds %d rows under its header", len(body)-1)
+		}
+		if !strings.Contains(file.Body.String(), "CVE-2026-1000") {
+			t.Error("the narrowed file does not hold the undecided row")
+		}
+	})
+}

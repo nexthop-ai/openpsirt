@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
@@ -46,7 +47,19 @@ export function Register() {
   // query key, so carrying page nine onto a build with two pages asks for rows
   // that are not there — and the empty answer draws as "nothing is known about
   // this build yet", with the footer inside the rows branch and so no way back.
-  const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}`;
+  const [params, setParams] = useSearchParams();
+  // What the register was narrowed to. In the address, so a narrowed register
+  // is something somebody sends rather than describes, and so the file beside
+  // it carries the same narrowing.
+  const states = params
+    .getAll("state")
+    .filter((word): word is Stands => (STATES as readonly string[]).includes(word));
+  const standing = params.get("standing") === "open";
+  const narrowed = {
+    ...(states.length > 0 ? { state: states } : {}),
+    ...(standing ? { standing: "open" as const } : {}),
+  };
+  const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}\u0000${params.toString()}`;
   const [shown, setShown] = useState(showing);
   if (shown !== showing) {
     setShown(showing);
@@ -55,14 +68,23 @@ export function Register() {
 
   const register = useQuery({
     enabled: whole,
-    queryKey: ["register", where, offset],
+    queryKey: ["register", where, narrowed, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/register", {
-          params: { path: where, query: { limit: PAGE, offset } },
+          params: {
+            path: where,
+            query: { limit: PAGE, offset, ...narrowed },
+          },
         }),
       ),
   });
+
+  // The narrowing as an address, for the two file links. Written from the same
+  // values the query above reads, so the file is the list on screen.
+  const asked = new URLSearchParams();
+  for (const word of states) asked.append("state", word);
+  if (standing) asked.set("standing", "open");
 
   const rows = register.data?.items ?? [];
   const total = register.data?.total ?? 0;
@@ -86,13 +108,55 @@ export function Register() {
         <Failed error={register.error} what="The register could not be read." />
       ) : (
         <section className="panel">
+          {/* An auditor's questions, asked of the whole answer rather than
+              of a narrower one: "what has nobody decided", "what is still
+              open". The register applies no triage line whatever is picked
+              here, which is what it is for. */}
+          <div className="controls">
+            <div className="seg" role="group" aria-label="What stands">
+              {STATES.map((word) => (
+                <button
+                  key={word}
+                  type="button"
+                  aria-pressed={states.includes(word)}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    const kept = states.includes(word)
+                      ? states.filter((each) => each !== word)
+                      : [...states, word];
+                    next.delete("state");
+                    for (const each of kept) next.append("state", each);
+                    setParams(next);
+                  }}
+                >
+                  {SAID[word]}
+                </button>
+              ))}
+            </div>
+            <label>
+              <input
+                type="checkbox"
+                checked={standing}
+                onChange={(e) => {
+                  const next = new URLSearchParams(params);
+                  if (e.target.checked) next.set("standing", "open");
+                  else next.delete("standing");
+                  setParams(next);
+                }}
+              />{" "}
+              Still open
+            </label>
+          </div>
+
           <h3>
             {total.toLocaleString()} {total === 1 ? "row" : "rows"}
+            {(states.length > 0 || standing) && <span className="hint"> narrowed</span>}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
             One row per issue and place, unfolded. Everything the build carries, decided or not and
             open or closed: <b>no triage line is applied</b>. The whole of it as a file —{" "}
-            <a href={fileAt(where, "csv")}>CSV</a> · <a href={fileAt(where, "json")}>JSON</a>.
+            <a href={fileAt(where, "csv", asked)}>CSV</a> ·{" "}
+            <a href={fileAt(where, "json", asked)}>JSON</a>, narrowed the same way.
           </p>
           <MeasuredWith measured={register.data?.measured} />
           {rows.length === 0 ? (
@@ -316,10 +380,28 @@ function RegisterState({ state }: { state?: string }) {
 
 // Where the file comes from. A link somebody follows rather than a request
 // this page makes, so the browser fetches it with the session it already has.
-function fileAt(at: { product: string; stream: string; variant: string }, format: string): string {
+function fileAt(
+  at: { product: string; stream: string; variant: string },
+  format: string,
+  asked: URLSearchParams,
+): string {
+  const query = asked.toString();
   return (
     `/v1/products/${encodeURIComponent(at.product)}` +
     `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}/register.${format}`
+    `/variants/${encodeURIComponent(at.variant)}/register.${format}` +
+    (query ? `?${query}` : "")
   );
 }
+
+// The four words a row stands in, and what each is called on screen. The same
+// vocabulary the rows below use, because a control naming one thing and a row
+// naming another is two vocabularies for one fact.
+const STATES = ["undecided", "waiting", "agreed", "lapsed"] as const;
+type Stands = (typeof STATES)[number];
+const SAID: Record<Stands, string> = {
+  undecided: "nobody has said",
+  waiting: "waiting",
+  agreed: "agreed",
+  lapsed: "no longer stands",
+};

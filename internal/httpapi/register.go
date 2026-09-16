@@ -138,6 +138,42 @@ func stringOrNone(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
 
+// Registering is what narrows the register, for the screen and for the file.
+//
+// One struct, because they are one question: an export taking a smaller set of
+// filters than the screen is a file that quietly answers something else.
+//
+// **An auditor's questions, and nothing that would make this a second findings
+// list.** What a register is asked is "show me what nobody decided", "show me
+// the dismissals", "show me this component" — each a way of reading the same
+// complete answer rather than a different question.
+type Registering struct {
+	State     []string  `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
+	Outcome   []outcome `query:"outcome,explode" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
+	Component string    `query:"component" doc:"Keep one component, by name"`
+	Issue     string    `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
+	Standing  string    `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
+}
+
+// narrow is what the store reads by, from what was asked for.
+func (r Registering) narrow() finding.Registering {
+	only := finding.Registering{
+		Component: r.Component, Issue: r.Issue,
+		Open: r.Standing == "open", Closed: r.Standing == "closed",
+	}
+	for _, word := range r.State {
+		if word != "" {
+			only.States = append(only.States, word)
+		}
+	}
+	for _, word := range r.Outcome {
+		if word != "" {
+			only.Outcomes = append(only.Outcomes, string(word))
+		}
+	}
+	return only
+}
+
 func registerRegister(api huma.API, in Ingest) {
 	const path = "/v1/products/{product}/streams/{stream}/variants/{variant}/register"
 	huma.Register(api, requiring(huma.Operation{
@@ -159,8 +195,9 @@ func registerRegister(api huma.API, in Ingest) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Limit   int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
-		Offset  int    `query:"offset" minimum:"0"`
+		Registering
+		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500"`
+		Offset int `query:"offset" minimum:"0"`
 	}) (*struct {
 		Body struct {
 			Items    []DisposedBody `json:"items"`
@@ -173,7 +210,7 @@ func registerRegister(api huma.API, in Ingest) {
 			return nil, err
 		}
 		rows, total, err := finding.NewStore(in.DB.DB).Register(ctx, subject, target,
-			input.Limit, input.Offset)
+			input.narrow(), input.Limit, input.Offset)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
@@ -208,6 +245,7 @@ func registerRegister(api huma.API, in Ingest) {
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
 		Format  string `path:"format" enum:"csv,json"`
+		Registering
 	}) (*huma.StreamResponse, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
@@ -249,21 +287,22 @@ func registerRegister(api huma.API, in Ingest) {
 			// the ones already written — 52 minutes for a real build, against
 			// 1.9 seconds for one cursor over the same rows in the same order.
 			Stream: func(ctx context.Context, each func([]string) error) error {
-				return store.RegisterEach(ctx, subject, target, func(row finding.Disposed) error {
-					body := disposedBody(row)
-					met := ""
-					if body.Met != nil {
-						met = strconv.FormatBool(*body.Met)
-					}
-					return each([]string{
-						body.Vulnerability, body.Severity, body.Component, body.Version,
-						body.Place, body.Consumer, body.State, string(body.Outcome), string(body.Justification),
-						body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
-						strconv.FormatBool(body.AgreementCarried),
-						body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
-						body.Due, met,
+				return store.RegisterEach(ctx, subject, target, input.narrow(),
+					func(row finding.Disposed) error {
+						body := disposedBody(row)
+						met := ""
+						if body.Met != nil {
+							met = strconv.FormatBool(*body.Met)
+						}
+						return each([]string{
+							body.Vulnerability, body.Severity, body.Component, body.Version,
+							body.Place, body.Consumer, body.State, string(body.Outcome), string(body.Justification),
+							body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
+							strconv.FormatBool(body.AgreementCarried),
+							body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
+							body.Due, met,
+						})
 					})
-				})
 			},
 		}
 		name := "register-" + strings.ToLower(input.Product+"-"+input.Stream+"-"+input.Variant)
