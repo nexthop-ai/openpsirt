@@ -78,6 +78,12 @@ func permitted(subject access.Subject, proposals []Proposal, now time.Time) erro
 // choosing which decisions apply where, and would be naming rows it read
 // before this ran — so they are resolved here, inside the transaction that
 // writes.
+//
+// **The component names a fold, not a package.** Naming any binary of a source
+// package reaches all of them, which is the grain the list somebody picked from
+// already shows and the grain a bump is done at: one vim row on that list is
+// four packages at sixty-one places, and keyed on one binary it took four
+// claims and four approvals to answer what reads as one thing.
 type TogetherAt struct {
 	TargetID         int64
 	ComponentID      int64
@@ -131,7 +137,16 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		recorded = recorded[:0]
 		claimID = 0
 
-		places, err := placesWithin(ctx, tx, subject, at)
+		// The fold, resolved inside the transaction that writes like
+		// everything else this turns on. The list somebody picked from folds
+		// the source package, so keying the write on one binary of it wrote a
+		// judgment covering part of what the screen said it covered.
+		fold, err := finding.InTheFold(ctx, tx, at.ComponentID)
+		if err != nil {
+			return err
+		}
+
+		places, err := placesWithin(ctx, tx, subject, at, fold)
 		if err != nil {
 			return err
 		}
@@ -201,7 +216,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 // who picked from the list they were shown with a bare "not found" and no way
 // to tell why.
 func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
-	at TogetherAt) ([]resolved, error) {
+	at TogetherAt, fold []int64) ([]resolved, error) {
 
 	var rows []struct {
 		ProductID         int64  `bun:"product_id"`
@@ -244,7 +259,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		// spell a boolean three ways.
 		ColumnExpr(`MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
 		Where("f.target_id = ?", at.TargetID).
-		Where("f.component_id = ?", at.ComponentID).
+		Where("f.component_id IN (?)", bun.List(fold)).
 		Where("f.closed_at IS NULL").
 		Where("f.vulnerability_id IN (?)", bun.List(at.VulnerabilityIDs)).
 		GroupExpr("st.product_id, f.vulnerability_id, f.place_identity, f.visibility, " +

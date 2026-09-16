@@ -706,6 +706,8 @@ in drivers a given image never builds.
 | Rule | |
 |---|---|
 | A separate decision per issue **and** per place | A claim built from one place of an issue would silence one consumer and leave the rest open while reporting it had covered them |
+| The component names a fold, not a binary package | The list somebody picks from folds the source package, so one vim row there is four packages at sixty-one places. Keyed on the binary that was named, the candidate list offered a quarter of what the row stood for and the judgment covered a quarter of what the person meant — four claims and four approvals to answer what reads as one thing |
+| The fold is read as a short list of identifiers, not reached through a join | These queries read their page off the finding table's covering index, and a join to the component's fold key put a third join under the aggregate: 0.35 s against 0.04 s on the kernel, which is 222,435 of 272,539 open rows. A fold is one source package at one version, so the list is short |
 | The places are resolved from the findings inside the writing transaction | A caller free to name a place would be choosing which decisions apply where, and a place read before the write is a fact about a database that has since moved |
 | How large the claim is, is said before it is submitted (REQ-27) | |
 | The claim may span more than one page of candidates | Selecting everything the narrowing matches fetches the rest rather than stopping at the page. A claim assembled a page at a time is eighteen claims where the person meant one |

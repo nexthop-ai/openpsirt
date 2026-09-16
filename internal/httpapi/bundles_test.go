@@ -773,3 +773,62 @@ func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
 		}
 	})
 }
+
+func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
+	// The by-issue list folds to the source package: curl, libcurl4t64 and
+	// libcurl3t64 are one row. Keyed on the binary that was named, the bulk
+	// screen offered a quarter of what that row stood for and the judgment
+	// covered a quarter of what the person meant — four claims and four
+	// approvals to answer what reads as one thing.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+
+		// The candidate list, asked about one binary of the fold.
+		var candidates struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+				Places        int    `json:"places"`
+			} `json:"items"`
+			Findings int `json:"findings"`
+		}
+		read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+			"/components/libcurl4t64/issues", &candidates)
+		// Both siblings carry the two fixable issues, and the third sits on
+		// one of them: three issues, five findings across the fold.
+		if len(candidates.Items) != 3 || candidates.Findings != 5 {
+			t.Errorf("the candidates are %d issues over %d findings, want 3 over 5: %+v",
+				len(candidates.Items), candidates.Findings, candidates.Items)
+		}
+		for _, item := range candidates.Items {
+			if item.Vulnerability == "CVE-2026-CURL1" && item.Places != 2 {
+				t.Errorf("an issue at both packages of the fold says %d places", item.Places)
+			}
+		}
+
+		// And the judgment written from it covers the fold, in one claim.
+		decided := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/components/libcurl4t64/decisions",
+			`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"the whole fold",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if decided.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
+		}
+		var written struct {
+			Recorded int     `json:"recorded"`
+			IDs      []int64 `json:"ids"`
+		}
+		if err := json.Unmarshal(decided.Body.Bytes(), &written); err != nil {
+			t.Fatal(err)
+		}
+		// Both packages of the fold carry that issue, so one act answers both.
+		// Keyed on the named binary it answered one and reported that it had
+		// covered what the list showed.
+		if written.Recorded != 2 || len(written.IDs) != 2 {
+			t.Errorf("one judgment wrote %d decisions, want the two places of the fold",
+				written.Recorded)
+		}
+	})
+}

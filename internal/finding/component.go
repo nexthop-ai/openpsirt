@@ -49,10 +49,20 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	}
 	limit = database.AComponentsWorth.Of(limit)
 
+	// Every package of the fold, not the one binary that was named. The
+	// by-issue list folds the same way, so the single vim row somebody picks
+	// from is four packages at sixty-one places — and keyed on one of them,
+	// this asked for a quarter of what the screen showed and the judgment
+	// covered a quarter of what the person meant, four times over.
+	fold, err := InTheFold(ctx, s.db, componentID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where("f.target_id = ?", targetID).
-			Where("f.component_id = ?", componentID).
+			Where("f.component_id IN (?)", bun.List(fold)).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible))
 		if contains != "" {
@@ -139,7 +149,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			ColumnExpr(`MIN(COALESCE(v.score_centi, 0)) AS "severity_centi"`).
 			ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`).
 			Where("f.target_id = ?", targetID).
-			Where("f.component_id = ?", componentID).
+			Where("f.component_id IN (?)", bun.List(fold)).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible)).
 			Where("f.vulnerability_id IN (?)", bun.List(issues)).
@@ -157,7 +167,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	// place per issue. A decision is keyed on a place, so a claim built from
 	// MIN(place_identity) covers one consumer and leaves the rest open while
 	// reporting that it covered them.
-	everywhere, err := s.placesOf(ctx, targetID, componentID, issues, visible)
+	everywhere, err := s.placesOf(ctx, targetID, fold, issues, visible)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -178,7 +188,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 }
 
 // placesOf reads every place a set of issues occupies at one component.
-func (s *Store) placesOf(ctx context.Context, targetID, componentID int64, issues []int64,
+func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issues []int64,
 	visible []access.Visibility) (map[int64][]Deciding, error) {
 
 	everywhere := map[int64][]Deciding{}
@@ -202,7 +212,7 @@ func (s *Store) placesOf(ctx context.Context, targetID, componentID int64, issue
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		Where("f.target_id = ?", targetID).
-		Where("f.component_id = ?", componentID).
+		Where("f.component_id IN (?)", bun.List(fold)).
 		Where("f.closed_at IS NULL").
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where("f.visibility IN (?)", bun.List(visible)).
