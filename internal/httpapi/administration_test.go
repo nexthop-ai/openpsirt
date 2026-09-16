@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,69 @@ import (
 	"testing"
 	"time"
 )
+
+// TestRecordingARoleReadsTheModeBeforeItOpensTheWrite pins that where roles
+// come from is read before the transaction recording somebody opens, rather
+// than from inside it.
+//
+// Read from inside, it reached the settings store, which holds the root
+// database handle. SQLite lends one connection, so the read waited for the
+// connection the transaction was already holding and the request never
+// answered at all: nobody could be given a role, and everything else touching
+// the database queued behind it for as long as the caller waited. The other
+// engines answered, through a second connection, which is the same read outside
+// the transaction with the symptom removed.
+//
+// Both arms, because the guard has two and neither ran anywhere: nothing else
+// in this package wires the mode, so the nil check short-circuited and a
+// running deployment was the only thing that executed the line.
+func TestRecordingARoleReadsTheModeBeforeItOpensTheWrite(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		for _, c := range []struct {
+			what   string
+			groups bool
+			want   int
+		}{
+			{"assigned directly", false, http.StatusCreated},
+			{"derived from groups", true, http.StatusConflict},
+		} {
+			t.Run(c.what, func(t *testing.T) {
+				on := deriving(t, r, c.groups)
+				body := `{"identity":"` + strings.ReplaceAll(c.what, " ", "-") + `",` +
+					`"holds":[{"product":"mine","role":"public-read"}]}`
+
+				// The request carries a deadline, because the failure this
+				// pins is one that never answers. A caller giving up is what
+				// releases it — the read inside the write fails, the write
+				// rolls back, and the connection comes back — so a deadline
+				// here is what a browser or a seeding script does, and it
+				// turns a suite that hangs until the binary panics into one
+				// failing line. Without it the goroutine holding the
+				// transaction outlives the test and blocks the fixture's own
+				// cleanup.
+				ctx, stop := context.WithTimeout(t.Context(), 10*time.Second)
+				defer stop()
+				req := httptest.NewRequest(http.MethodPost, "/v1/people",
+					strings.NewReader(body)).WithContext(ctx)
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set(testHeader, "admin")
+				fromOurOwnPage(req)
+				rec := httptest.NewRecorder()
+				on.handler.ServeHTTP(rec, req)
+
+				if ctx.Err() != nil {
+					t.Fatalf("recording somebody with a role, %s, never answered: "+
+						"the write is holding the connection something inside it is waiting for",
+						c.what)
+				}
+				if rec.Code != c.want {
+					t.Errorf("recording somebody with a role, %s, answered %d, wanted %d: %s",
+						c.what, rec.Code, c.want, rec.Body.String())
+				}
+			})
+		}
+	})
+}
 
 // TestGrantingARoleDoesNotAskWhetherItWorks holds the line that a grant is
 // written with what the caller decides and read back with what the server
