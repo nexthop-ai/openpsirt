@@ -2,14 +2,18 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 // DisposedBody is one known vulnerability in a build and what was decided
@@ -58,6 +62,82 @@ func (closure) Schema(huma.Registry) *huma.Schema {
 	return &huma.Schema{Type: huma.TypeString, Enum: offered}
 }
 
+// measuredWith reads the chain the register stands on: the upload, the
+// inventory in it, and the run that produced the findings.
+//
+// Nothing here fails the register. A provenance block that could refuse would
+// make the report a build has not finished scanning unreadable, which is the
+// build somebody is most likely asking about — so what cannot be read is
+// absent and says so by being absent.
+func measuredWith(ctx context.Context, in Ingest, subject access.Subject,
+	targetID int64, product, stream, variant string) *MeasuredBody {
+
+	scan, err := ingest.NewStore(in.DB.DB).Newest(ctx, targetID)
+	if err != nil || scan == nil {
+		return nil
+	}
+	measured := &MeasuredBody{
+		Scan: scan.ID, ScanHash: scan.ContentHash,
+		BuiltAt: scan.BuiltAt.UTC().Format(time.RFC3339),
+	}
+	if last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, targetID); err == nil &&
+		last != nil {
+		measured.Run, measured.Scanner = last.ID, last.Scanner
+		measured.ScannerVersion, measured.DatabaseVersion =
+			last.ScannerVersion, last.DatabaseVersion
+		measured.RanHere = last.RanHere
+		if last.FinishedAt != nil {
+			measured.RanAt = last.FinishedAt.UTC().Format(time.RFC3339)
+		}
+	}
+	// What arrived rather than what is still held, so a build whose contents
+	// were let go still names the inventory it was read from.
+	sent, err := ingest.NewDocuments(in.DB.DB).Sent(ctx, []int64{scan.ID})
+	if err != nil {
+		return measured
+	}
+	for _, document := range sent[scan.ID] {
+		if document.Kind != ingest.InventoryKind {
+			continue
+		}
+		held := document.DiscardedAt == nil
+		measured.Document, measured.DocumentHash = document.ID, document.ContentHash
+		measured.DocumentHeld = &held
+		if held {
+			measured.DocumentAt = fmt.Sprintf(
+				"/v1/products/%s/streams/%s/variants/%s/scans/%d/documents/%d",
+				url.PathEscape(product), url.PathEscape(stream), url.PathEscape(variant),
+				scan.ID, document.ID)
+		}
+		break
+	}
+	return measured
+}
+
+// stating is the same facts as a file's header.
+func (m *MeasuredBody) stating() []Stated {
+	if m == nil {
+		return nil
+	}
+	return []Stated{
+		{"scan", strconv.FormatInt(m.Scan, 10)},
+		{"inventory hash", m.DocumentHash},
+		{"scanner", strings.TrimSpace(m.Scanner + " " + m.ScannerVersion)},
+		{"vulnerability data", m.DatabaseVersion},
+		{"run", stringOrNone(m.Run)},
+		{"measured at", m.RanAt},
+	}
+}
+
+// stringOrNone writes an identifier nothing answered as nothing rather than as
+// a zero, which reads as a row that exists.
+func stringOrNone(id int64) string {
+	if id == 0 {
+		return ""
+	}
+	return strconv.FormatInt(id, 10)
+}
+
 func registerRegister(api huma.API, in Ingest) {
 	const path = "/v1/products/{product}/streams/{stream}/variants/{variant}/register"
 	huma.Register(api, requiring(huma.Operation{
@@ -83,8 +163,9 @@ func registerRegister(api huma.API, in Ingest) {
 		Offset  int    `query:"offset" minimum:"0"`
 	}) (*struct {
 		Body struct {
-			Items []DisposedBody `json:"items"`
-			Total int            `json:"total"`
+			Items    []DisposedBody `json:"items"`
+			Total    int            `json:"total"`
+			Measured *MeasuredBody  `json:"measured,omitempty" doc:"What the register was measured with. Absent where nothing has been uploaded to the build"`
 		}
 	}, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
@@ -98,11 +179,14 @@ func registerRegister(api huma.API, in Ingest) {
 		}
 		out := &struct {
 			Body struct {
-				Items []DisposedBody `json:"items"`
-				Total int            `json:"total"`
+				Items    []DisposedBody `json:"items"`
+				Total    int            `json:"total"`
+				Measured *MeasuredBody  `json:"measured,omitempty" doc:"What the register was measured with. Absent where nothing has been uploaded to the build"`
 			}
 		}{}
 		out.Body.Total = total
+		out.Body.Measured = measuredWith(ctx, in, subject, target,
+			input.Product, input.Stream, input.Variant)
 		out.Body.Items = make([]DisposedBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, disposedBody(row))
@@ -149,9 +233,10 @@ func registerRegister(api huma.API, in Ingest) {
 			// The build it is about, and nothing about a triage line: the
 			// register applies none, and the comment above says why saying so
 			// would be worse than silence.
-			About: []Stated{
+			About: append([]Stated{
 				{"build", input.Product + " " + input.Stream + " (" + input.Variant + ")"},
-			},
+			}, measuredWith(ctx, in, subject, target,
+				input.Product, input.Stream, input.Variant).stating()...),
 			Header: []string{
 				"issue", "severity", "component", "version", "place", "consumer", "state",
 				"outcome", "justification", "proposed by", "proposed at",

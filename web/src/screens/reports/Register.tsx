@@ -94,6 +94,7 @@ export function Register() {
             open or closed: <b>no triage line is applied</b>. The whole of it as a file —{" "}
             <a href={fileAt(where, "csv")}>CSV</a> · <a href={fileAt(where, "json")}>JSON</a>.
           </p>
+          <MeasuredWith measured={register.data?.measured} />
           {rows.length === 0 ? (
             <Empty
               title={total > 0 ? "Nothing on this page." : "Nothing is known about this build yet."}
@@ -238,6 +239,58 @@ export function Register() {
         </section>
       )}
     </Sheet>
+  );
+}
+
+// What the register was measured with.
+//
+// An auditor reads shipped artifact, inventory, run, scanner and database,
+// disposition. The rows are the last link, and without this the page states
+// them with nothing behind them — while the inventory that was read is one
+// click away and was reachable from nothing.
+function MeasuredWith({
+  measured,
+}: {
+  measured?: {
+    scan?: number;
+    built_at?: string;
+    scanner?: string;
+    scanner_version?: string;
+    database_version?: string;
+    ran_at?: string;
+    document_hash?: string;
+    document_held?: boolean;
+    document_at?: string;
+  } | null;
+}) {
+  if (!measured) return null;
+  const scanner = [measured.scanner, measured.scanner_version].filter(Boolean).join(" ");
+  const built = on(measured.built_at);
+  const ran = on(measured.ran_at);
+  return (
+    <p className="hint" style={{ marginTop: 0 }}>
+      Measured from upload <span className="id">{measured.scan}</span>
+      {built && ` built ${built}`}
+      {scanner && `, scanned by ${scanner}`}
+      {measured.database_version && ` against data of ${measured.database_version}`}
+      {ran && ` on ${ran}`}.{" "}
+      {measured.document_at ? (
+        <a href={measured.document_at}>The inventory it read</a>
+      ) : (
+        // A branch build's contents are let go once read, so the hash is still
+        // the record of what arrived and there is nothing to fetch. Said,
+        // rather than left looking like an omission.
+        <span>The inventory it read is no longer held</span>
+      )}
+      {measured.document_hash && (
+        <>
+          {" · "}
+          <span className="id" title={measured.document_hash}>
+            {measured.document_hash.slice(0, 12)}
+          </span>
+        </>
+      )}
+    </p>
   );
 }
 

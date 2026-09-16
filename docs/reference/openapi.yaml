@@ -3008,6 +3008,9 @@ components:
           type:
             - array
             - "null"
+        measured:
+          $ref: "#/components/schemas/MeasuredBody"
+          description: What the register was measured with. Absent where nothing has been uploaded to the build
         total:
           format: int64
           type: integer
@@ -4690,15 +4693,42 @@ components:
     MeasuredBody:
       additionalProperties: false
       properties:
+        built_at:
+          description: When the build it describes was built
+          type: string
         database_version:
           description: The vulnerability database it read
           type: string
+        document:
+          description: The inventory that was read, as the receipt names it
+          format: int64
+          type: integer
+        document_at:
+          description: Where to fetch the inventory that was read. Absent where its contents were let go
+          type: string
+        document_hash:
+          description: The hash of the inventory as it arrived
+          type: string
+        document_held:
+          description: Whether the inventory itself is still here
+          type: boolean
         ran_at:
           description: When that run finished
           type: string
         ran_here:
           description: We ran the scanner, rather than the build sending what its own found
           type: boolean
+        run:
+          description: The scanner run these came from
+          format: int64
+          type: integer
+        scan:
+          description: The upload the build's contents came from, as the receipt names it
+          format: int64
+          type: integer
+        scan_hash:
+          description: The hash of what was uploaded
+          type: string
         scanner:
           description: Which scanner produced the findings
           type: string

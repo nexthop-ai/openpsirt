@@ -5957,6 +5957,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["DisposedBody"][] | null;
+            /** @description What the register was measured with. Absent where nothing has been uploaded to the build */
+            measured?: components["schemas"]["MeasuredBody"];
             /** Format: int64 */
             total: number;
         };
@@ -6798,12 +6800,37 @@ export interface components {
             version?: string;
         };
         MeasuredBody: {
+            /** @description When the build it describes was built */
+            built_at?: string;
             /** @description The vulnerability database it read */
             database_version?: string;
+            /**
+             * Format: int64
+             * @description The inventory that was read, as the receipt names it
+             */
+            document?: number;
+            /** @description Where to fetch the inventory that was read. Absent where its contents were let go */
+            document_at?: string;
+            /** @description The hash of the inventory as it arrived */
+            document_hash?: string;
+            /** @description Whether the inventory itself is still here */
+            document_held?: boolean;
             /** @description When that run finished */
             ran_at?: string;
             /** @description We ran the scanner, rather than the build sending what its own found */
             ran_here?: boolean;
+            /**
+             * Format: int64
+             * @description The scanner run these came from
+             */
+            run?: number;
+            /**
+             * Format: int64
+             * @description The upload the build's contents came from, as the receipt names it
+             */
+            scan?: number;
+            /** @description The hash of what was uploaded */
+            scan_hash?: string;
             /** @description Which scanner produced the findings */
             scanner: string;
             scanner_version?: string;

@@ -338,6 +338,9 @@ deadline, and whether the deadline was met.
 | Everything is joined outward from the finding and joined left | A place nobody has decided about is the row this exists to show. Closed rows are included, and whether a deadline was met is answerable only for something that closed |
 | A judgment that lapsed is part of the record, and a superseded one is not | Asked of the decision's own columns rather than of the join. In the join it hid a lapsed judgment entirely, so the place reported as never decided and the register lost who proposed and who approved it — while the findings list called the same place lapsed |
 | The row names what pulls the component in, beside the place identity | The identity is derived from content, so it correlates two rows and names no location. A register whose only answer to "where" is sixty-four hex characters is one nobody can read, and where is what an auditor is asking |
+| It names what it was measured with: the upload, the inventory in it, the run, the scanner and the vulnerability data | The chain an auditor follows is shipped artifact, inventory, run, scanner and database, disposition. The register is the last link, and naming none of the first four leaves what it says standing on nothing a reader can check — while all of them are recorded |
+| The inventory is a link, not a hash | A hash nobody can fetch the bytes for is a claim rather than evidence. A tagged release keeps its documents and a branch build does not, so an inventory that was let go says so instead of reading as an omission |
+| Provenance never fails the report | A build nothing has finished scanning is the one somebody is most likely asking about, so what cannot be read is absent rather than an error |
 
 Current state, with no `as_of`. Reconstructing the view as of a past date was
 refused on two grounds. Each row carries the timestamps that evidence the thing

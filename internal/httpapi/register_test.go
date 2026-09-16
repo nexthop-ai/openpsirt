@@ -1,9 +1,15 @@
 package httpapi_test
 
 import (
+	"encoding/csv"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 func TestTheRegisterHoldsWhatNobodyHasDecided(t *testing.T) {
@@ -143,4 +149,115 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 			seen[key] = true
 		}
 	})
+}
+
+// TestTheRegisterNamesWhatItWasMeasuredWith is the auditor's chain.
+//
+// Shipped artifact, inventory, run, scanner and database, disposition. The
+// register is the last link and named none of the first four, so what it said
+// stood on nothing a reader could check — while every one of them was already
+// recorded, and the route that hands back the inventory it names already
+// existed and was reachable from nothing.
+func TestTheRegisterNamesWhatItWasMeasuredWith(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		document := r.inventoryOf(t, "the inventory this build shipped")
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		var register struct {
+			Measured struct {
+				Scan            int64  `json:"scan"`
+				ScanHash        string `json:"scan_hash"`
+				BuiltAt         string `json:"built_at"`
+				Run             int64  `json:"run"`
+				Scanner         string `json:"scanner"`
+				ScannerVersion  string `json:"scanner_version"`
+				DatabaseVersion string `json:"database_version"`
+				RanAt           string `json:"ran_at"`
+				Document        int64  `json:"document"`
+				DocumentHash    string `json:"document_hash"`
+				DocumentHeld    *bool  `json:"document_held"`
+				DocumentAt      string `json:"document_at"`
+			} `json:"measured"`
+		}
+		read(t, r, "triager", at, &register)
+		measured := register.Measured
+
+		if measured.Scan == 0 || measured.ScanHash == "" || measured.BuiltAt == "" {
+			t.Errorf("the register does not name the upload it describes: %+v", measured)
+		}
+		if measured.Run == 0 || measured.Scanner == "" || measured.ScannerVersion == "" ||
+			measured.DatabaseVersion == "" || measured.RanAt == "" {
+			t.Errorf("the register does not name the run it came from: %+v", measured)
+		}
+		if measured.Document != document || measured.DocumentHash == "" {
+			t.Errorf("the register does not name the inventory that was read: %+v", measured)
+		}
+		if measured.DocumentHeld == nil || !*measured.DocumentHeld {
+			t.Fatalf("the inventory is here and the register says otherwise: %+v", measured)
+		}
+
+		// And the link is one somebody can follow, which is the difference
+		// between evidence and a claim: the hash comes back over the bytes
+		// this hands over.
+		fetched := asPerson(t, r, "triager", http.MethodGet, measured.DocumentAt, "")
+		if fetched.Code != http.StatusOK {
+			t.Fatalf("the inventory the register names answered %d: %s",
+				fetched.Code, fetched.Body.String())
+		}
+		if fetched.Body.String() != "the inventory this build shipped" {
+			t.Errorf("the link hands back %q", fetched.Body.String())
+		}
+
+		// The file says the same, because a spreadsheet is where this is read
+		// six months later and it has nowhere else to carry it.
+		file := asPerson(t, r, "triager", http.MethodGet, at+".csv", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d", file.Code)
+		}
+		rows, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatalf("the register is not a spreadsheet: %v", err)
+		}
+		says := states(rows)
+		if says["scan"] == "" || says["inventory hash"] == "" || says["scanner"] == "" ||
+			says["vulnerability data"] == "" || says["measured at"] == "" {
+			t.Errorf("the file does not say what it was measured with: %v", says)
+		}
+	})
+}
+
+// inventoryOf gives the build's newest upload the inventory it was read from,
+// and finishes the run so it is one somebody could have read.
+func (r *reach) inventoryOf(t *testing.T, contents string) int64 {
+	t.Helper()
+	ctx := t.Context()
+	located, err := catalog.NewStore(r.db.DB).Locate(ctx, "mine", "master", "broadcom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := catalog.NewStore(r.db.DB).TargetFor(ctx, located.StreamID, located.VariantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, err := ingest.NewStore(r.db.DB).Newest(ctx, target.ID)
+	if err != nil || scan == nil {
+		t.Fatalf("the build has no upload to hang an inventory on: %v", err)
+	}
+	document, err := ingest.NewDocuments(r.db.DB).Write(ctx, scan.ID, ingest.InventoryKind, 0,
+		strings.NewReader(contents))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runID int64
+	if err := r.db.DB.NewSelect().Table("scan_run").ColumnExpr("id").
+		Where("target_id = ?", target.ID).Order("id DESC").Limit(1).
+		Scan(ctx, &runID); err != nil {
+		t.Fatal(err)
+	}
+	if err := finding.NewStore(r.db.DB).Finish(ctx, runID, "0.112.0", "2026-08-28",
+		"", nil); err != nil {
+		t.Fatal(err)
+	}
+	return document.ID
 }
