@@ -31,26 +31,23 @@ func registerEffort(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-effort", Method: http.MethodGet, Path: "/v1/effort",
 		Summary: "Report where triage effort went",
-		Description: "What the judgments in a period were about, worst first: which component " +
-			"in which product, how many arguments were made, how many places they reached, " +
-			"how many people made them, and what came out of them.\n\n" +
-			"**Every other figure here counts the backlog.** What is open, what is overdue, " +
-			"how long things wait. None of them answers the question a planning meeting " +
-			"asks — what did the quarter actually go into — and it is the one a manager has " +
-			"to answer without any of the others.\n\n" +
+		Description: "What the judgments in a period were about, most argued first: which " +
+			"component in which product, how many arguments were made, how many places they " +
+			"reached, how many people made them, and what came out of them.\n\n" +
 			"**Counted in claims, not in the rows they wrote.** A claim is one person's act; " +
-			"counting its rows measures how far a component fans out through an image " +
-			"rather than anybody's afternoon. Both numbers are here, because ten claims over " +
-			"ten places and one claim over a thousand are different afternoons.\n\n" +
-			"Takes the same period and the same scope the other reports do, and is narrowed " +
-			"by what you may see.",
+			"counting its rows measures how far a component fans out through an image. Both " +
+			"numbers come back.\n\n" +
+			"Dated by when a judgment was proposed. Asked for neither a period nor a window, " +
+			"this is the last 90 days.\n\n" +
+			"Takes the same period and scope the other reports do, and is narrowed by what " +
+			"you may see.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Period
 		Product string `query:"product" doc:"Limit to judgments made in one product, by name"`
 		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, by team name"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-	}) (*listOutput[SpentBody], error) {
+	}) (*overPeriod[SpentBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -70,7 +67,8 @@ func registerEffort(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refused(in.Logger, err, "cannot read where the work went")
 		}
-		out := &listOutput[SpentBody]{}
+		out := &overPeriod[SpentBody]{}
+		out.Body.From, out.Body.To = stating(since, until)
 		out.Body.Items = make([]SpentBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, SpentBody{

@@ -91,17 +91,19 @@ number stays the sum of what the reader may see.
 
 ## The period a report covers
 
-Four reports take one: deadline compliance, remediation, triage latency and
-approval coverage. Two dates, or a rolling window of days, in one shape so that
-a screen linking from one report to another carries the same two parameters.
+Every report over a stretch of time takes one: deadline compliance,
+remediation, triage latency, approval coverage and where the effort went. Two
+dates, or a rolling window of days, in one shape so that a screen linking from
+one report to another carries the same two parameters.
 
 | Rule | Reason |
 |---|---|
 | A period is two dates; a rolling window is a number of days | A window ending today cannot say "last financial year", which is the number an auditor asks for, and dates alone make "how are we doing lately" a date somebody has to work out |
 | Only one of the two may be sent, and sending both is refused | A caller who sent both meant one of them, and answering about the other is a figure quoted for the wrong period — the failure a period control exists to fix |
 | The end is the day it stops, not a day inside it | The same rule the record of judgments already used, so the two cannot come to mean different things |
-| A period that ends before it starts is refused | A report answering zero for one is indistinguishable from a quarter in which nothing happened |
-| Every report says back the period it covered | A figure read apart from its window is a number nobody can check |
+| A period that ends before it starts is refused, and so is one that holds no days | A report answering zero for either is indistinguishable from a quarter in which nothing happened. Two refusals, because the end is not itself in the period: naming one day twice asks for no days rather than for a day |
+| Every report says back the period it covered, with the end resolved | A figure read apart from its window is a number nobody can check, and a start with no end answered with nothing over figures that ran to now. An unstated *start* is the beginning and says so by being absent |
+| A default window belongs to the report, and each says which in its own words | They differ — thirty days, ninety, or the whole of it — and one shared parameter cannot carry three answers |
 | **What is open is always now** | Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable — the same reason the register states current state with no `as_of`. A period bounds what closed in it |
 | The rate asked for no period is the lifetime figure | It is what that report has always answered, and a default window would quietly change what the number means for everybody reading it |
 

@@ -59,9 +59,9 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	if until.IsZero() {
 		until = s.now().UTC()
 	}
-	if since.IsZero() {
-		since = until.AddDate(0, 0, -90)
-	}
+	// An absent start is the beginning, which is what a period's zero side
+	// means: a default substituted here is a figure over a window nobody
+	// asked for, under a response saying the period ran from the beginning.
 	limit = database.AList.Of(limit)
 
 	// What a judgment was about, reached through a finding at the place — the
@@ -93,12 +93,11 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			` AS "dismissed"`, bun.List([]Outcome{NotApplicable, WontFix, AlreadyFixed})).
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome = ? THEN de.claim_id END)`+
 			` AS "deferred"`, Deferred).
-		Where("de.proposed_at >= ?", since).
 		Where("de.proposed_at < ?", until).
 		GroupExpr("de.product_id, " + named).
 		OrderExpr("claims DESC, decisions DESC, component").
 		Limit(limit)
-	q = only.narrow(readableBy(q, subject, "de"))
+	q = only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where the work went: %w", err)
 	}

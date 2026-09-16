@@ -8,13 +8,17 @@ import (
 
 // Period is the stretch of time a report is asked about.
 //
+// The default window differs per report and lives in each handler's call to
+// window, so the operation that takes it says which in its own description:
+// one struct tag cannot carry three answers.
+//
 // **A rolling window cannot say "last financial year".** Every report here
 // took a number of days ending now, which answers "how are we doing lately"
 // and nothing else — and the two questions a manager and an auditor ask are
 // "how did the quarter go" and "what does the year on the certificate say".
 // Those are a pair of dates.
 //
-// One struct, so the four reports that take a period take it the same way and
+// One struct, so every report over a stretch of time takes it the same way and
 // a screen linking from one to another carries the same two parameters.
 type Period struct {
 	From string `query:"from" doc:"The first day of the period, as YYYY-MM-DD. Without an end the period runs to now"`
@@ -51,6 +55,11 @@ func (p Period) window(byDefault int, now time.Time) (time.Time, time.Time, erro
 		if from != nil {
 			since = *from
 		}
+		// The end, resolved here rather than left to each store. A report
+		// says the period back, and a start with no end answered "to: ''"
+		// over figures that ran all the way to now — the one field meant to
+		// make a figure checkable saying nothing.
+		until = now
 		if to != nil {
 			until = *to
 		}
@@ -61,12 +70,20 @@ func (p Period) window(byDefault int, now time.Time) (time.Time, time.Time, erro
 		until = now
 		since = now.AddDate(0, 0, -byDefault)
 	}
-	// An end before its start is a period with nothing in it, and a report
-	// answering zero for one is indistinguishable from a quarter in which
-	// nothing happened.
-	if !since.IsZero() && !until.IsZero() && !since.Before(until) {
-		return since, until, huma.Error422UnprocessableEntity(
-			"the period ends before it starts")
+	// A period with nothing in it, and a report answering zero for one is
+	// indistinguishable from a quarter in which nothing happened. Two
+	// refusals, because two dates the same way round is not a mistake about
+	// direction: the end is not itself in the period, so naming one day twice
+	// asks for no days at all.
+	if !since.IsZero() && !until.IsZero() {
+		if since.Equal(until) {
+			return since, until, huma.Error422UnprocessableEntity(
+				"the period holds no days: the end is not itself in it, so name a later one")
+		}
+		if since.After(until) {
+			return since, until, huma.Error422UnprocessableEntity(
+				"the period ends before it starts")
+		}
 	}
 	return since, until, nil
 }

@@ -107,3 +107,17 @@ describe("the period a sheet was asked for", () => {
     expect(coveringPeriod({ from: "", to: "2026-04-01" }, 30)).toBe("everything up to 2026-04-01");
   });
 });
+
+describe("what a sheet sends", () => {
+  it("sends no window where the sheet has no default", () => {
+    // Zero is not a window the server can answer for — the parameter carries
+    // a minimum of one — so a sheet whose default is the whole of it must
+    // leave it out. Sent, it comes back 422 and the sheet draws its own
+    // failure on load, which is what the deadline-compliance sheet did.
+    expect(asked2({ from: "", to: "" }, 0)).toEqual({});
+  });
+
+  it("still sends a window the sheet does have", () => {
+    expect(asked2({ from: "", to: "" }, 90)).toEqual({ days: 90 });
+  });
+});

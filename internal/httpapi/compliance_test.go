@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -325,6 +326,7 @@ func TestTwoWaysOfSayingWhenAreRefusedTogether(t *testing.T) {
 			"/v1/remediation?days=30&to=2026-01-01",
 			"/v1/measures?days=30&from=2026-01-01",
 			"/v1/approvals/scrutiny?days=30&from=2026-01-01",
+			"/v1/effort?days=30&from=2026-01-01",
 		} {
 			got := asPerson(t, r, "private-triage", http.MethodGet, at, "")
 			if got.Code != http.StatusUnprocessableEntity {
@@ -337,6 +339,16 @@ func TestTwoWaysOfSayingWhenAreRefusedTogether(t *testing.T) {
 			"/v1/compliance?product=mine&from=2026-06-01&to=2026-01-01", "")
 		if backwards.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a period ending before it starts answered %d", backwards.Code)
+		}
+		// And one naming the same day twice holds no days, because the end is
+		// not itself in it — a different mistake, said differently.
+		empty := asPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/compliance?product=mine&from=2026-01-01&to=2026-01-01", "")
+		if empty.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a period holding no days answered %d", empty.Code)
+		}
+		if !strings.Contains(empty.Body.String(), "no days") {
+			t.Errorf("an empty period is refused as a backwards one: %s", empty.Body.String())
 		}
 	})
 }

@@ -4398,28 +4398,6 @@ components:
       required:
         - items
       type: object
-    ListBodyRateBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyRateBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/RateBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
     ListBodyReleaseBody:
       additionalProperties: false
       properties:
@@ -4565,28 +4543,6 @@ components:
         items:
           items:
             $ref: "#/components/schemas/SettingBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
-    ListBodySpentBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodySpentBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/SpentBody"
           type:
             - array
             - "null"
@@ -5262,6 +5218,64 @@ components:
         - fixable
         - unmatched
         - rows
+      type: object
+    OverPeriodRateBodyBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OverPeriodRateBodyBody.json
+          format: uri
+          readOnly: true
+          type: string
+        from:
+          description: The first day of the period. Absent where it runs from the beginning
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/RateBody"
+          type:
+            - array
+            - "null"
+        to:
+          description: The day it ends, which is not itself in it
+          type: string
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - to
+      type: object
+    OverPeriodSpentBodyBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OverPeriodSpentBodyBody.json
+          format: uri
+          readOnly: true
+          type: string
+        from:
+          description: The first day of the period. Absent where it runs from the beginning
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SpentBody"
+          type:
+            - array
+            - "null"
+        to:
+          description: The day it ends, which is not itself in it
+          type: string
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - to
       type: object
     OverviewOutputBody:
       additionalProperties: false
@@ -8610,6 +8624,8 @@ paths:
 
         Everything is dated by when the claim was proposed, not by when it was agreed to, and narrowed by what you may see.
 
+        Asked for neither a period nor a window, this is the last 90 days.
+
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-approval-scrutiny
       parameters:
@@ -9918,7 +9934,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyRateBody"
+                $ref: "#/components/schemas/OverPeriodRateBodyBody"
           description: OK
         default:
           content:
@@ -10356,13 +10372,13 @@ paths:
   /v1/effort:
     get:
       description: |-
-        What the judgments in a period were about, worst first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
+        What the judgments in a period were about, most argued first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
 
-        **Every other figure here counts the backlog.** What is open, what is overdue, how long things wait. None of them answers the question a planning meeting asks — what did the quarter actually go into — and it is the one a manager has to answer without any of the others.
+        **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image. Both numbers come back.
 
-        **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image rather than anybody's afternoon. Both numbers are here, because ten claims over ten places and one claim over a thousand are different afternoons.
+        Dated by when a judgment was proposed. Asked for neither a period nor a window, this is the last 90 days.
 
-        Takes the same period and the same scope the other reports do, and is narrowed by what you may see.
+        Takes the same period and scope the other reports do, and is narrowed by what you may see.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-effort
@@ -10419,7 +10435,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodySpentBody"
+                $ref: "#/components/schemas/OverPeriodSpentBodyBody"
           description: OK
         default:
           content:
@@ -11484,6 +11500,8 @@ paths:
         **Send-backs are counted for the deployment rather than per person**: the record holds that a claim was sent back and not by whom, and the reason travels as a comment.
 
         Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
+
+        Asked for neither a period nor a window, this is the last 90 days.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-measures
@@ -18809,6 +18827,8 @@ paths:
         **A closure only counts as a fix if the issue actually went away.** A bump that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
 
         **Counted in issues, not in places.** One kernel flaw across sixty modules is one thing that was fixed; an average weighted by how far a component fans out measures the dependency graph rather than anybody's work.
+
+        Asked for neither a period nor a window, this is the last 30 days.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-remediation

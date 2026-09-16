@@ -92,7 +92,11 @@ export function stated(period: Asked): boolean {
 // rolling window otherwise. The two are ways of saying the same thing and the
 // server refuses both together.
 export function asked(period: Asked, days: number): { from?: string; to?: string; days?: number } {
-  if (!stated(period)) return { days };
+  // A sheet with no default window asks for none. Zero is not a window the
+  // server can answer for — it carries a minimum of one — so it is left out
+  // rather than sent and refused, which is how the deadline-compliance sheet
+  // drew its own failure on load.
+  if (!stated(period)) return days > 0 ? { days } : {};
   return { ...(period.from ? { from: period.from } : {}), ...(period.to ? { to: period.to } : {}) };
 }
 
@@ -157,6 +161,11 @@ export function WindowPicker({ offered, days }: { offered: readonly number[]; da
             onClick={() => {
               const next = new URLSearchParams(params);
               next.set("days", String(n));
+              // The two ways of saying when cannot travel together, so naming
+              // a window drops the period as naming dates drops the window.
+              // Without this the chip drew itself pressed and changed nothing.
+              next.delete("from");
+              next.delete("to");
               setParams(next);
             }}
           >

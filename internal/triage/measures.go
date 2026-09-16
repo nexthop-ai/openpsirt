@@ -100,6 +100,19 @@ type Worked struct {
 	Withdrawn int
 }
 
+// from bounds the start of a period where one was asked for, and leaves it
+// unbounded where none was.
+//
+// A zero start is the beginning, which is what a period's zero side means.
+// Written once because four statements here take it and a default substituted
+// in one of them is a figure over a window nobody asked for.
+func from(q *bun.SelectQuery, column string, since time.Time) *bun.SelectQuery {
+	if since.IsZero() {
+		return q
+	}
+	return q.Where(column+" >= ?", since)
+}
+
 // measuredAtMost is how many observations one figure is worked out from.
 //
 // The most recent ones in the window rather than a sample across it, because
@@ -153,9 +166,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	if until.IsZero() {
 		until = s.now().UTC()
 	}
-	if since.IsZero() {
-		since = until.AddDate(0, 0, -90)
-	}
+	// An absent start is the beginning, which is what a zero side of a period
+	// means. Substituted with a default, a caller asking for an end alone got
+	// a window it never asked for under a response saying otherwise.
 	out := Measures{Since: since, Until: until}
 
 	// The two spans, read as their endpoints. One query rather than two,
@@ -201,11 +214,13 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`de.proposed_at AS "proposed_at"`).
 		ColumnExpr(`MIN(da.approved_at) AS "approved_at"`).
-		Where("de.proposed_at >= ?", since).
 		Where("de.proposed_at < ?", until).
 		GroupExpr("de.id, de.proposed_at, " + rating.EffectiveExpr).
 		OrderExpr("de.proposed_at DESC").
 		Limit(measuredAtMost + 1)
+	if !since.IsZero() {
+		q = q.Where("de.proposed_at >= ?", since)
+	}
 	q = only.narrow(readableBy(q, subject, "de"))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return Measures{}, fmt.Errorf("read how long triage is taking: %w", err)
@@ -248,8 +263,10 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	back := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 		ColumnExpr(`COUNT(*) AS "number"`).
 		Where("de.sent_back_at IS NOT NULL").
-		Where("de.sent_back_at >= ?", since).
 		Where("de.sent_back_at < ?", until)
+	if !since.IsZero() {
+		back = back.Where("de.sent_back_at >= ?", since)
+	}
 	if err := only.narrow(readableBy(back, subject, "de")).Scan(ctx, &out.SentBack); err != nil {
 		return Measures{}, fmt.Errorf("read how much came back: %w", err)
 	}
@@ -296,10 +313,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 			ColumnExpr(`de.proposed_by AS "person"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
-			Where("de.proposed_at >= ?", since).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")
-		return only.narrow(readableBy(q, subject, "de"))
+		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Proposed }); err != nil {
 		return nil, err
 	}
@@ -308,10 +324,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 			ColumnExpr(`de.proposed_by AS "person"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
 			Where("de.state = ?", Withdrawn).
-			Where("de.proposed_at >= ?", since).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")
-		return only.narrow(readableBy(q, subject, "de"))
+		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Withdrawn }); err != nil {
 		return nil, err
 	}
@@ -326,10 +341,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 			ColumnExpr(`da.approved_by AS "person"`).
 			ColumnExpr(`COUNT(DISTINCT da.id) AS "number"`).
 			Where("da.withdrawn_at IS NULL").
-			Where("da.approved_at >= ?", since).
 			Where("da.approved_at < ?", until).
 			GroupExpr("da.approved_by")
-		return only.by(readableBy(q, subject, "de"), "da.approved_by")
+		return only.by(readableBy(from(q, "da.approved_at", since), subject, "de"), "da.approved_by")
 	}, func(w *Worked) *int { return &w.Approved }); err != nil {
 		return nil, err
 	}

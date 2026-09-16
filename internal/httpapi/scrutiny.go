@@ -107,7 +107,8 @@ func registerScrutiny(api huma.API, in Ingest) {
 			"what somebody agreed to against what the same claim reaches now — a claim reaches " +
 			"by matching, so a build appearing afterwards is covered with nobody acting.\n\n" +
 			"Everything is dated by when the claim was proposed, not by when it was agreed to, " +
-			"and narrowed by what you may see.",
+			"and narrowed by what you may see.\n\n" +
+			"Asked for neither a period nor a window, this is the last 90 days.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`

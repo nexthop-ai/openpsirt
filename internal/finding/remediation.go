@@ -108,9 +108,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	if until.IsZero() {
 		until = now
 	}
-	if since.IsZero() {
-		since = until.AddDate(0, 0, -30)
-	}
+	// An absent start is the beginning, which is what a zero side of a period
+	// means and what the reports beside this one already do. Substituted with
+	// a default here, a caller asking for an end alone got a window it never
+	// asked for under a response saying the period ran from the beginning.
 
 	out := &Remediation{TimeToFix: map[string]time.Duration{}}
 
@@ -133,8 +134,12 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MAX(f.closed_at) AS "closed_at"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		Where("f.closed_at IS NOT NULL").
-		Where("f.closed_at >= ?", since).
-		Where("f.closed_at < ?", until).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			if !since.IsZero() {
+				q = q.Where("f.closed_at >= ?", since)
+			}
+			return q.Where("f.closed_at < ?", until)
+		}).
 		GroupExpr("band, f.vulnerability_id")
 	closed = resolved(scope.Narrow(onlyReadable(closed, subject, products, all)))
 
@@ -163,8 +168,12 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.vulnerability_id").
-		Where("f.opened_at >= ?", since).
-		Where("f.opened_at < ?", until).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			if !since.IsZero() {
+				q = q.Where("f.opened_at >= ?", since)
+			}
+			return q.Where("f.opened_at < ?", until)
+		}).
 		GroupExpr("f.vulnerability_id")
 	count, err := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(opened, subject, products, all))).Count(ctx)

@@ -99,6 +99,8 @@ export interface paths {
          *
          *     Everything is dated by when the claim was proposed, not by when it was agreed to, and narrowed by what you may see.
          *
+         *     Asked for neither a period nor a window, this is the last 90 days.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-approval-scrutiny"];
@@ -885,13 +887,13 @@ export interface paths {
         };
         /**
          * Report where triage effort went
-         * @description What the judgments in a period were about, worst first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
+         * @description What the judgments in a period were about, most argued first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
          *
-         *     **Every other figure here counts the backlog.** What is open, what is overdue, how long things wait. None of them answers the question a planning meeting asks — what did the quarter actually go into — and it is the one a manager has to answer without any of the others.
+         *     **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image. Both numbers come back.
          *
-         *     **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image rather than anybody's afternoon. Both numbers are here, because ten claims over ten places and one claim over a thousand are different afternoons.
+         *     Dated by when a judgment was proposed. Asked for neither a period nor a window, this is the last 90 days.
          *
-         *     Takes the same period and the same scope the other reports do, and is narrowed by what you may see.
+         *     Takes the same period and scope the other reports do, and is narrowed by what you may see.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -1094,6 +1096,8 @@ export interface paths {
          *     **Send-backs are counted for the deployment rather than per person**: the record holds that a claim was sent back and not by whom, and the reason travels as a comment.
          *
          *     Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
+         *
+         *     Asked for neither a period nor a window, this is the last 90 days.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3654,6 +3658,8 @@ export interface paths {
          *     **A closure only counts as a fix if the issue actually went away.** A bump that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
          *
          *     **Counted in issues, not in places.** One kernel flaw across sixty modules is one thing that was fixed; an average weighted by how far a component fans out measures the dependency graph rather than anybody's work.
+         *
+         *     Asked for neither a period nor a window, this is the last 30 days.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -6801,17 +6807,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyRateBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyRateBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["RateBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyReleaseBody: {
             /**
              * Format: uri
@@ -6886,17 +6881,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["SettingBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodySpentBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodySpentBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["SpentBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -7271,6 +7255,36 @@ export interface components {
              * @description Issues whose description does not carry the term the set was narrowed by
              */
             unmatched: number;
+        };
+        OverPeriodRateBodyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OverPeriodRateBodyBody.json
+             */
+            readonly $schema?: string;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
+            items: components["schemas"]["RateBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
+            /** Format: int64 */
+            total?: number;
+        };
+        OverPeriodSpentBodyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OverPeriodSpentBodyBody.json
+             */
+            readonly $schema?: string;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
+            items: components["schemas"]["SpentBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
+            /** Format: int64 */
+            total?: number;
         };
         OverviewOutputBody: {
             /**
@@ -10124,7 +10138,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyRateBody"];
+                    "application/json": components["schemas"]["OverPeriodRateBodyBody"];
                 };
             };
             /** @description Error */
@@ -10412,7 +10426,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodySpentBody"];
+                    "application/json": components["schemas"]["OverPeriodSpentBodyBody"];
                 };
             };
             /** @description Error */

@@ -70,7 +70,8 @@ func registerMeasures(api huma.API, in Ingest) {
 			"holds that a claim was sent back and not by whom, and the reason travels as a " +
 			"comment.\n\n" +
 			"Narrowed to what you may read, like every count here — so two people asking get " +
-			"different answers rather than one of them getting an error.",
+			"different answers rather than one of them getting an error.\n\n" +
+			"Asked for neither a period nor a window, this is the last 90 days.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Period

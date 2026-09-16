@@ -385,7 +385,7 @@ func registerCompliance(api huma.API, in Ingest) {
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
 		Period
-	}) (*listOutput[RateBody], error) {
+	}) (*overPeriod[RateBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -422,7 +422,11 @@ func registerCompliance(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
-		out := &listOutput[RateBody]{}
+		out := &overPeriod[RateBody]{}
+		// Said back, like every other report over a stretch of time. Asked for
+		// no period this is the lifetime figure, and both sides are then empty
+		// — which is the honest answer rather than two invented dates.
+		out.Body.From, out.Body.To = stating(since, until)
 		out.Body.Items = make([]RateBody, 0, len(rates))
 		for _, rate := range rates {
 			out.Body.Items = append(out.Body.Items, RateBody{

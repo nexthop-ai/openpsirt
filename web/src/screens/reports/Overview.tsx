@@ -82,6 +82,9 @@ export function Overview() {
   // have to be narrowed by. One value, because a heading saying one stretch
   // over a list showing another is the failure this sheet is easiest to ship.
   const when = asked(period, days);
+  // A period naming only its end still runs from the beginning, so there is
+  // no date to narrow a list by — and a list narrowed by an empty one opens
+  // over all time beside a figure that counts one window.
   const began = stated(period) ? period.from : windowStart(days);
 
   const pace = useQuery({
@@ -165,14 +168,20 @@ export function Overview() {
                   the window, which is a different population from this list's
                   own — asking for it changes what the list is about rather
                   than narrowing it, and the list says so when it is asked. */}
-              <Link className="kpi" to={`${findingsPath(at)}?closed_after=${began}`}>
+              <Link
+                className="kpi"
+                to={`${findingsPath(at)}${began ? `?closed_after=${began}` : ""}`}
+              >
                 <span className="l">Fixed</span>
                 <span className="n">{(pace.data?.fixed ?? 0).toLocaleString()}</span>
                 <span className="d">
                   distinct issues that went away · a version carrying the issue forward is not a fix
                 </span>
               </Link>
-              <Link className="kpi" to={`${findingsPath(at)}?opened_after=${began}`}>
+              <Link
+                className="kpi"
+                to={`${findingsPath(at)}${began ? `?opened_after=${began}` : ""}`}
+              >
                 <span className="l">Appeared</span>
                 <span className="n">{(pace.data?.opened ?? 0).toLocaleString()}</span>
                 <span className="d">distinct issues, same window and unit as fixed</span>

@@ -74,7 +74,8 @@ func registerRemediation(api huma.API, in Ingest) {
 			"progress, so the figure moves in the right direction while nothing improves.\n\n" +
 			"**Counted in issues, not in places.** One kernel flaw across sixty modules is one " +
 			"thing that was fixed; an average weighted by how far a component fans out measures " +
-			"the dependency graph rather than anybody's work.",
+			"the dependency graph rather than anybody's work.\n\n" +
+			"Asked for neither a period nor a window, this is the last 30 days.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
