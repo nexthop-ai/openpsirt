@@ -27,6 +27,7 @@ this document is its own.
 - [Subtree trends](#subtree-trends)
 - [The disposition register](#the-disposition-register)
 - [Shipping with known issues](#shipping-with-known-issues)
+- [Everything known about one issue](#everything-known-about-one-issue)
 - [The exception report](#the-exception-report)
 - [Dismissals and scan coverage](#dismissals-and-scan-coverage)
 - [The report catalog](#the-report-catalog)
@@ -397,6 +398,22 @@ of its own, and the catalog carries it with the selection made.
 | The state is counted the way the findings list counts it | One spelling of each of the four, so a row here and the same row on the list cannot say different things about how far it has been decided |
 | The column narrows to what nobody has agreed to | That is the coordinator's blocker list, and it is the one narrowing the sheet is read for |
 | It is read for the still-present entries alone | What was fixed needs no justification and what is newly present has not been looked at yet |
+
+## Everything known about one issue
+
+A document: what the issue is, every build of ours that carries it, what was
+decided about each and the argument behind it. The form a customer inquiry is
+answered from, which was four screens and a copy-paste — so the answer was
+assembled differently every time.
+
+| Rule | Reason |
+|---|---|
+| It is internal, and says so on its first line | It carries the reasoning, which is this deployment's own argument rather than its word to a customer. What goes out is the advisory or the VEX document, and both say less on purpose. A document that does not say who it is for is one somebody forwards |
+| Markdown, served as markdown | The same reason the release note is: the point of it is that it goes straight into a reply |
+| Nothing of yours affected is a document, not a refusal | "Are you affected by this" could be answered yes and never no, and the second is the answer an inquiry is usually asking for |
+| An identifier nobody has seen and one that sits only in products you cannot read produce the same document | Told apart, the pair says which issues this deployment holds, one guess at a time |
+| Every address in it goes through the rule an address stored beside a claim goes through | It is a document somebody forwards, and a scheme a reader's machine acts on is not something to hand them |
+| It is bounded, and says when the list is a page of a longer one | An issue at a widely vendored component carries hundreds of judgments, and what this is for is being read |
 
 ## The exception report
 

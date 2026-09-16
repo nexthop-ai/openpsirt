@@ -11204,6 +11204,42 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/issues/{vulnerability}/document:
+    get:
+      description: |-
+        What the issue is, every build of yours that carries it, what was decided about each and the reasoning behind it, as markdown — the form a customer inquiry is answered from.
+
+        **It is an internal document and says so.** The reasoning is this deployment's own argument; what goes to a customer is the advisory or the VEX document, both of which are assembled elsewhere and say less on purpose.
+
+        **Narrowed by what you may see**, like every other read: two people asking get different documents rather than one of them getting an error.
+
+        Nothing of yours affected is an answer, and the document says that rather than refusing — which is what the inquiry is usually asking.
+
+        **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: get-issue-document
+      parameters:
+        - description: The issue, by any name it is known under
+          in: path
+          name: vulnerability
+          required: true
+          schema:
+            description: The issue, by any name it is known under
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Render everything known about one issue
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
   /v1/keys:
     get:
       description: |-

@@ -3,7 +3,10 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
@@ -93,5 +96,106 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 		}
 		unaffected(t, "approver", "/v1/issues/CVE-2026-9999")
 		unaffected(t, "triager", "/v1/issues/CVE-1999-0001")
+	})
+}
+
+// TestEverythingKnownAboutOneIssueIsADocument is the form a customer inquiry
+// is answered in.
+//
+// What the issue is, which of our builds carry it, what was decided about each
+// and the argument behind it, were four screens and a copy-paste — so the
+// answer was assembled differently every time and the half somebody forgot was
+// the half that mattered.
+func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			"/v1/claims/"+itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// An address from a feed that a reader's machine would act on, which
+		// is the class this document has to keep out of somebody's hands.
+		if _, err := finding.NewVulnerabilities(r.db.DB).Intern(t.Context(),
+			[]finding.Named{{
+				Identifier: "CVE-2026-9999",
+				References: []finding.Reference{{URL: "ms-msdt:calc", Kind: finding.Report}},
+			}}); err != nil {
+			t.Fatal(err)
+		}
+
+		got := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/issues/CVE-2026-9999/document", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("the document answered %d: %s", got.Code, got.Body.String())
+		}
+		if kind := got.Header().Get("Content-Type"); !strings.HasPrefix(kind, "text/markdown") {
+			t.Errorf("the document came back as %q", kind)
+		}
+		written := got.Body.String()
+
+		// It says who it is for. A document that does not is one somebody
+		// forwards, and this one carries our own argument.
+		if !strings.Contains(written, "Internal") {
+			t.Errorf("the document does not say it is internal:\n%s", written)
+		}
+		for _, wanted := range []string{
+			"CVE-2026-9999",
+			// What it is, where it is, and what was decided.
+			"read past the end of the buffer",
+			"libnl-3-200",
+			"not-applicable",
+			// The argument the judgment rests on, which is the half a second
+			// person is checking.
+			"The driver is not built for this image.",
+			// And who agreed, because a dismissal standing on one person is
+			// the thing an inquiry is most likely to be about.
+			"reviewer",
+			// Where it is written up, from what the report carried.
+			"https://nvd.nist.gov/vuln/detail/CVE-2026-9999",
+		} {
+			if !strings.Contains(written, wanted) {
+				t.Errorf("the document does not carry %q:\n%s", wanted, written)
+			}
+		}
+
+		// An address a reader's machine would act on is not something to hand
+		// somebody in a document they forward. The same rule an address
+		// stored beside a claim goes through.
+		if strings.Contains(written, "ms-msdt") {
+			t.Errorf("a scheme a machine acts on reached the document:\n%s", written)
+		}
+
+		// Somebody who reaches no product is told what an issue nobody has
+		// heard of gets, for the reason the issue's own route answers both
+		// alike: told apart, the pair says which issues this deployment holds.
+		hidden := asPerson(t, r, "approver", http.MethodGet,
+			"/v1/issues/CVE-2026-9999/document", "")
+		if hidden.Code != http.StatusOK {
+			t.Fatalf("somebody who reaches no product answered %d", hidden.Code)
+		}
+		if !strings.Contains(hidden.Body.String(), "Nothing you can see carries this issue") ||
+			strings.Contains(hidden.Body.String(), "libnl-3-200") {
+			t.Errorf("somebody who reaches no product was told where it is:\n%s",
+				hidden.Body.String())
+		}
+
+		// Nothing of yours affected is an answer rather than a refusal, which
+		// is what the inquiry is usually asking.
+		none := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/issues/CVE-1999-0001/document", "")
+		if none.Code != http.StatusOK {
+			t.Fatalf("an issue nothing carries answered %d", none.Code)
+		}
+		if !strings.Contains(none.Body.String(), "Nothing you can see carries this issue") {
+			t.Errorf("the document does not answer the question:\n%s", none.Body.String())
+		}
+		// And says nothing about the issue itself, for the reason the issue's
+		// own route says nothing: the two ways of not being affected answer
+		// alike.
+		if strings.Contains(none.Body.String(), "## What it is") {
+			t.Errorf("an unaffected document describes the issue:\n%s", none.Body.String())
+		}
 	})
 }

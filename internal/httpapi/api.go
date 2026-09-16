@@ -426,6 +426,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerVEX(api, in)
 	// One issue, everywhere it sits, across products.
 	registerIssue(api, in)
+	registerIssueDocument(api, in)
 	// The words people put on findings.
 	registerTags(api, in)
 	// The tree seen upward, for somebody narrowed to their own work.

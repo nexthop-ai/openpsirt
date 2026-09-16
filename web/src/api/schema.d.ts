@@ -964,6 +964,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/issues/{vulnerability}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Render everything known about one issue
+         * @description What the issue is, every build of yours that carries it, what was decided about each and the reasoning behind it, as markdown — the form a customer inquiry is answered from.
+         *
+         *     **It is an internal document and says so.** The reasoning is this deployment's own argument; what goes to a customer is the advisory or the VEX document, both of which are assembled elsewhere and say less on purpose.
+         *
+         *     **Narrowed by what you may see**, like every other read: two people asking get different documents rather than one of them getting an error.
+         *
+         *     Nothing of yours affected is an answer, and the document says that rather than refusing — which is what the inquiry is usually asking.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-issue-document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/keys": {
         parameters: {
             query?: never;
@@ -10509,6 +10537,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IssueOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-issue-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
