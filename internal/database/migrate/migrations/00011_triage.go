@@ -61,6 +61,25 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			-- Copied from the action rather than read off a row, so a claim
 			-- whose rows were all set aside still says how it was found.
 			"selected_by"  ` + t.free + ` NULL,
+			-- The same question answered by something other than the claimant's
+			-- word for it: the text the candidate list was narrowed by, how
+			-- many issues that narrowing reached when the claim was written,
+			-- and how many were then named.
+			--
+			-- Prose alone cannot be checked. "Drivers this image does not
+			-- build" over a set chosen by ticking everything is
+			-- indistinguishable in the record from an honest claim, and what
+			-- is asked for is how the set was chosen — which an approver has to
+			-- be able to act on. Two counts make it checkable without turning
+			-- a sentence into a filter: equal, the claim is exactly what the
+			-- narrowing returns; far apart, the sentence does not describe the
+			-- set.
+			--
+			-- Re-run here rather than sent along, for the reason the places
+			-- are: a count supplied by the caller is the caller's word twice.
+			"selected_where"   ` + t.free + ` NULL,
+			"selected_matched" INTEGER NULL,
+			"selected_named"   INTEGER NULL,
 			-- **What the claim says.** One act is one argument, so the argument
 			-- is here and not once per row underneath. It was on the row, and a
 			-- judgment reaching forty-four places was forty-four copies of one

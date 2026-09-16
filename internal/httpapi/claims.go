@@ -3,16 +3,20 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -202,6 +206,79 @@ func noSuchClaim() error {
 	return huma.Error404NotFound("no such claim")
 }
 
+// ReaffirmedBody is what one bulk re-affirmation did.
+type ReaffirmedBody struct {
+	ClaimID   int64   `json:"claim_id" doc:"The claim this action made, which is what a second person agrees to where one is needed"`
+	Decisions []int64 `json:"decisions"`
+	Places    int     `json:"places" doc:"How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
+	Waiting   bool    `json:"waiting" doc:"Whether a second person has to agree"`
+}
+
+// registerReaffirmClaim re-makes everything one action claimed.
+func registerReaffirmClaim(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "reaffirm-claim", Method: http.MethodPost,
+		Path:    "/v1/claims/{id}/reaffirmation",
+		Summary: "Re-affirm everything one action claimed",
+		Description: "Re-makes every row of this claim that stopped applying because an " +
+			"upstream version moved, at the versions each place has now, as one act with one " +
+			"reasoning.\n\n" +
+			"**Deciding is bulk-capable and re-deciding was not.** A team answering one kernel " +
+			"issue writes a decision at each of its places in one action; when the kernel " +
+			"moves, those lapse, and restoring them was one request each with a separately " +
+			"typed justification.\n\n" +
+			"Only the person who made the original may do this. It normally needs no second " +
+			"approver, for the reason the single form does not: two people already agreed, and " +
+			"a version bump is a prompt to re-check rather than a new claim.\n\n" +
+			"**One act, one approval.** Where any row would need approval again — the " +
+			"severity has risen since it was agreed to, or nothing was ever agreed to — the " +
+			"whole act does. An approver works at the unit the proposer acted at, and agreeing " +
+			"to part of an argument they were shown whole is not review.\n\n" +
+			"**Bounded like the judgment it re-makes.** The outcome comes from the claim, so " +
+			"re-affirming a bulk dismissal is a bulk judgment and is held to " +
+			"`triage.together-cap`; only a promise to upgrade goes through unbounded, because " +
+			"the next scan re-checks it.\n\n" +
+			"A place that is open nowhere any more is not re-made, which is a finding that " +
+			"closed rather than a fault. `reasoning` is required.",
+		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
+	}, anyPerson, "", triageRights()...), func(ctx context.Context, input *struct {
+		ID   int64 `path:"id"`
+		Body struct {
+			Reasoning string `json:"reasoning" minLength:"1" doc:"Why every one of them still holds, in markdown"`
+		}
+	}) (*struct{ Body ReaffirmedBody }, error) {
+		subject, store, err := triaging(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		// The bound a bulk judgment is held to, read the way every other bulk
+		// path reads it. Only a promise goes through unbounded, and which of
+		// the two this is comes from the claim being re-made rather than from
+		// the request.
+		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
+			triage.DefaultTogetherCap)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "the limit on one action could not be read", err)
+		}
+		made, err := store.ReaffirmClaim(ctx, subject, triage.ReaffirmingClaim{
+			PreviousClaimID: input.ID,
+			Reasoning:       input.Body.Reasoning,
+			By:              subject.ID,
+			Cap:             cap,
+		})
+		if err != nil {
+			if errors.Is(err, triage.ErrNotTheirs) {
+				return nil, noSuchClaim()
+			}
+			return nil, refusedDecision(in.Logger, err)
+		}
+		return &struct{ Body ReaffirmedBody }{Body: ReaffirmedBody{
+			ClaimID: made.ClaimID, Decisions: made.Decisions,
+			Places: made.Places, Waiting: made.Waiting,
+		}}, nil
+	})
+}
+
 func claimBody(c triage.Claim, proposedBy string) ClaimBody {
 	body := ClaimBody{
 		ID: c.ID, Kind: string(c.Kind), ProposedBy: proposedBy,
@@ -213,6 +290,14 @@ func claimBody(c triage.Claim, proposedBy string) ClaimBody {
 	}
 	if c.SelectedBy != nil {
 		body.SelectedBy = *c.SelectedBy
+	}
+	if c.SelectedMatched != nil && c.SelectedNamed != nil {
+		body.Selection = &SelectionBody{
+			Matched: *c.SelectedMatched, Named: *c.SelectedNamed,
+		}
+		if c.SelectedWhere != nil {
+			body.Selection.Contains = *c.SelectedWhere
+		}
 	}
 	return body
 }
@@ -301,11 +386,32 @@ type SimilarBody struct {
 	Issues        int           `json:"issues" doc:"How many distinct issues the claim covers"`
 }
 
+// ElsewhereBody is an approved claim about this same issue at this same place,
+// in another product.
+//
+// **Evidence, never an outcome.** Offered the way a supplier's VEX statement
+// is: something to read and to quote, prefilling a reasoning where somebody
+// asks for it and deciding nothing. Another team's judgment about their product
+// is not a judgment about this one — what is shipped around the component
+// differs, which is why a place is a component at a position rather than a
+// component.
+type ElsewhereBody struct {
+	Product       string        `json:"product" doc:"The product it was decided in"`
+	ClaimID       int64         `json:"claim_id"`
+	DecisionID    int64         `json:"decision_id"`
+	Outcome       outcome       `json:"outcome"`
+	Justification justification `json:"justification,omitempty"`
+	Reasoning     string        `json:"reasoning"`
+	ApprovedBy    string        `json:"approved_by,omitempty"`
+	ApprovedAt    string        `json:"approved_at,omitempty"`
+}
+
 // decidedAbout gathers what has been decided at a finding's places: what
-// stands, what stood before, and what was argued about other issues at the
-// same places.
+// stands, what stood before, what was argued about other issues at the same
+// places, and what another product decided about this same issue there.
 func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, productID, issueID int64,
-	at []finding.Deciding) ([]StandingClaimBody, []EarlierBody, []SimilarBody, error) {
+	at []finding.Deciding) ([]StandingClaimBody, []EarlierBody, []SimilarBody,
+	[]ElsewhereBody, error) {
 
 	store := triage.NewStore(in.DB.DB)
 	// What stands is matched by key — the place and the versions this build
@@ -320,15 +426,22 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	}
 	standing, err := store.StandingAt(ctx, subject, productID, issueID, at)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	earlier, err := store.EarlierAt(ctx, subject, productID, issueID, places)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	similar, err := store.SimilarAt(ctx, subject, productID, issueID, places)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	// The same issue at the same place in another product. A place identity
+	// carries no product, deliberately, so that a place is recognized across
+	// variants — and the same key recognizes it across products.
+	elsewhere, err := store.DecidedElsewhere(ctx, subject, productID, issueID, places)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	people := []int64{}
@@ -341,9 +454,12 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	for _, one := range similar {
 		people = append(people, one.ApprovedBy)
 	}
+	for _, one := range elsewhere {
+		people = append(people, one.ApprovedBy)
+	}
 	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	standingOut := make([]StandingClaimBody, 0, len(standing))
@@ -417,7 +533,55 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 		}
 		similarOut = append(similarOut, body)
 	}
-	return standingOut, earlierOut, similarOut, nil
+	products, err := decidedInWhat(ctx, in, elsewhere)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	elsewhereOut := make([]ElsewhereBody, 0, len(elsewhere))
+	for _, one := range elsewhere {
+		body := ElsewhereBody{
+			Product:       products[one.ProductID],
+			ClaimID:       one.Claim.ID,
+			DecisionID:    one.Decision.ID,
+			Outcome:       outcome(one.Claim.Outcome),
+			Justification: justification(orBlank(one.Claim.Justification)),
+			Reasoning:     one.Reasoning,
+		}
+		if one.ApprovedAt != nil {
+			body.ApprovedBy = names[one.ApprovedBy]
+			body.ApprovedAt = one.ApprovedAt.Format(time.RFC3339)
+		}
+		elsewhereOut = append(elsewhereOut, body)
+	}
+
+	return standingOut, earlierOut, similarOut, elsewhereOut, nil
+}
+
+// decidedInWhat is what the products a set of judgments were made in are called,
+// by identifier.
+//
+// Resolved here rather than carried on the judgment: a name is a fact about the
+// catalog, and the read that found the judgments is narrowed by what the
+// subject may see — so a name only ever reaches a reader who could already read
+// the judgment it belongs to.
+func decidedInWhat(ctx context.Context, in Ingest, rows []triage.Elsewhere) (map[int64]string, error) {
+	named := map[int64]string{}
+	if len(rows) == 0 {
+		return named, nil
+	}
+	ids := make([]int64, 0, len(rows))
+	for _, one := range rows {
+		ids = append(ids, one.ProductID)
+	}
+	var products []catalog.Product
+	if err := in.DB.DB.NewSelect().Model(&products).
+		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read which products these were decided in: %w", err)
+	}
+	for _, product := range products {
+		named[product.ID] = product.Name
+	}
+	return named, nil
 }
 
 func orBlank(s *string) string {

@@ -157,6 +157,22 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 			"target_id"      ` + t.ref + ` NOT NULL,
 			"parent_id"      ` + t.ref + ` NOT NULL,
 			"child_id"       ` + t.ref + ` NOT NULL,
+			-- What the producer said this dependency's scope is, in its own
+			-- word: a CycloneDX component scope, or an SPDX lifecycle scope
+			-- or relationship. Empty where it said nothing, which is most of
+			-- it.
+			--
+			-- A fact about the document received, in the same class as which
+			-- scanner found a finding and what it matched on. Nothing reads it
+			-- to decide anything: reading "build" as "does not ship" is wrong
+			-- for every compiled language, where a build-phase dependency is
+			-- routinely linked into the shipped artifact.
+			--
+			-- Bounded, unlike the columns carrying a producer's free text: the
+			-- vocabularies are the two formats' own and their longest word is
+			-- short. A producer inventing a longer one has said something
+			-- neither format defines, and it is not recorded.
+			"kind"           ` + t.kind + ` NOT NULL,
 			"opened_scan_id" ` + t.ref + ` NOT NULL,
 			"closed_scan_id" ` + t.refNull + ` NULL,
 			CONSTRAINT "graph_edge_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),

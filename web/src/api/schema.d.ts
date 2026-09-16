@@ -474,6 +474,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/claims/{id}/reaffirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-affirm everything one action claimed
+         * @description Re-makes every row of this claim that stopped applying because an upstream version moved, at the versions each place has now, as one act with one reasoning.
+         *
+         *     **Deciding is bulk-capable and re-deciding was not.** A team answering one kernel issue writes a decision at each of its places in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
+         *
+         *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version bump is a prompt to re-check rather than a new claim.
+         *
+         *     **One act, one approval.** Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+         *
+         *     **Bounded like the judgment it re-makes.** The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
+         *
+         *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
+         *
+         *     **Requires:** public-triage or private-triage
+         */
+        post: operations["reaffirm-claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/claims/{id}/reasoning": {
         parameters: {
             query?: never;
@@ -1641,7 +1673,7 @@ export interface paths {
          *
          *     **Whether a second person agrees depends on the date.** At or before the earliest deadline among what this covers, it stands on its own: nothing is hidden for longer than the policy already allowed. Past it, the promise defers the worst thing it covers and it waits for approval. The response says which.
          *
-         *     Bounded like every other action that writes many rows, against the places it resolves to rather than against what was named.
+         *     **Not bounded**, unlike a bulk judgment: this one writes as many rows as the component has open findings in the releases named.
          *
          *     **Saying who carries it is part of the act**, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a judgment one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
          *
@@ -2748,6 +2780,8 @@ export interface paths {
          * @description Records the same claim against every issue you name: one outcome, one justification, one reasoning, and a separate decision for every place each issue sits at, each keyed and expiring on its own.
          *
          *     You name the issues; the places are resolved here. `selected_by` says how you narrowed the list and is recorded with every claim, so "how were these chosen" has an answer later — but it is never the claim. The reasoning has to hold for every issue in the list, since "these matched a word" is not a defense anybody would accept.
+         *
+         *     **`contains` is the same question an approver can re-run.** Send the text you narrowed the candidate list by; the claim records how many issues that narrowing reaches, read here, against how many you named. Equal, the claim is exactly what that narrowing returns; far apart, the sentence does not describe the set.
          *
          *     Always needs a second person to agree, whatever the outcome.
          *
@@ -4759,6 +4793,11 @@ export interface components {
              * @enum {string}
              */
             because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained";
+            /**
+             * Format: int64
+             * @description The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
+             */
+            closed_by_run?: number;
             component: string;
             /** @description The version the place held before the fix. Only on a fixed entry the version moved for */
             from_version?: string;
@@ -4819,6 +4858,8 @@ export interface components {
             proposed_by: string;
             /** @description How a bulk set was narrowed. Never part of the claim itself */
             selected_by?: string;
+            /** @description The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one */
+            selection?: components["schemas"]["SelectionBody"];
         };
         ClaimDetail: {
             /**
@@ -4930,13 +4971,15 @@ export interface components {
             written_at: string;
             written_by: string;
         };
-        "Compare-releasesResponse": {
+        ComparisonBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Compare-releasesResponse.json
+             * @example https://example.com/schemas/ComparisonBody.json
              */
             readonly $schema?: string;
+            /** @description Left the affected list without being fixed */
+            closed_not_fixed: components["schemas"]["ChangedBody"][] | null;
             fixed: components["schemas"]["ChangedBody"][] | null;
             newly_present: components["schemas"]["ChangedBody"][] | null;
             still_present: components["schemas"]["ChangedBody"][] | null;
@@ -5094,6 +5137,8 @@ export interface components {
              * @example https://example.com/schemas/Decide-togetherRequest.json
              */
             readonly $schema?: string;
+            /** @description The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two */
+            contains?: string;
             /** @description Required when it is deferred. A date, as 2026-03-31 */
             deferred_until?: string;
             /** @description Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them */
@@ -5107,7 +5152,7 @@ export interface components {
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
             /** @description Why this holds for every issue named */
             reasoning: string;
-            /** @description How you narrowed this set. Recorded, and never part of the claim */
+            /** @description How you narrowed this set, in your own words. Recorded, and never part of the claim */
             selected_by: string;
             /** @description The issues this claim covers, by name */
             vulnerabilities: string[] | null;
@@ -5415,6 +5460,21 @@ export interface components {
             /** @description What it should say now, in markdown */
             body: string;
         };
+        ElsewhereBody: {
+            approved_at?: string;
+            approved_by?: string;
+            /** Format: int64 */
+            claim_id: number;
+            /** Format: int64 */
+            decision_id: number;
+            /** @enum {string} */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            /** @description The product it was decided in */
+            product: string;
+            reasoning: string;
+        };
         EmbargoedBody: {
             component: string;
             /** @description When the embargo ends. Reaching it discloses nothing */
@@ -5551,6 +5611,8 @@ export interface components {
             disclose_at?: string;
             /** @description When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late */
             due?: string;
+            /** @description Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five */
+            elsewhere: components["schemas"]["ElsewhereBody"][] | null;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
             /** @enum {string} */
@@ -7419,6 +7481,16 @@ export interface components {
             /** @description What is missing, where there is nothing to compare against */
             why?: string;
         };
+        "Reaffirm-claimRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Reaffirm-claimRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Why every one of them still holds, in markdown */
+            reasoning: string;
+        };
         "Reaffirm-decisionRequest": {
             /**
              * Format: uri
@@ -7433,6 +7505,27 @@ export interface components {
             previous: number;
             /** @description Why it still holds, in markdown */
             reasoning: string;
+        };
+        ReaffirmedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReaffirmedBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The claim this action made, which is what a second person agrees to where one is needed
+             */
+            claim_id: number;
+            decisions: number[] | null;
+            /**
+             * Format: int64
+             * @description How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
+             */
+            places: number;
+            /** @description Whether a second person has to agree */
+            waiting: boolean;
         };
         ReceiptBody: {
             /** @description When the producer says the build was made */
@@ -7969,6 +8062,20 @@ export interface components {
             lapsed: components["schemas"]["LapsedApprovalBody"][] | null;
             pairs: components["schemas"]["PairingBody"][] | null;
         };
+        SelectionBody: {
+            /** @description The text the candidate list was narrowed by. Absent where it was not narrowed, which means every issue at the component was on the page */
+            contains?: string;
+            /**
+             * Format: int64
+             * @description How many issues that narrowing reached when the claim was written, read here rather than taken from the caller
+             */
+            matched: number;
+            /**
+             * Format: int64
+             * @description How many the claim was then made about
+             */
+            named: number;
+        };
         "Send-claim-backRequest": {
             /**
              * Format: uri
@@ -8151,6 +8258,8 @@ export interface components {
              * @description The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument
              */
             decision?: number;
+            /** @description What the producer called this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it */
+            declared_as?: string;
             /** @description Name this when recording a decision about it */
             place: string;
             /** @description The build has already argued this place away */
@@ -9426,6 +9535,41 @@ export interface operations {
             };
         };
     };
+    "reaffirm-claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reaffirm-claimRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReaffirmedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "revise-claim": {
         parameters: {
             query?: never;
@@ -9900,6 +10044,8 @@ export interface operations {
                 support?: ("in-support" | "past-eol")[] | null;
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -10002,6 +10148,8 @@ export interface operations {
                 support?: ("in-support" | "past-eol")[] | null;
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11018,7 +11166,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Compare-releasesResponse"];
+                    "application/json": components["schemas"]["ComparisonBody"];
                 };
             };
             /** @description Error */
@@ -11254,6 +11402,8 @@ export interface operations {
                 support?: ("in-support" | "past-eol")[] | null;
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11399,6 +11549,8 @@ export interface operations {
                 support?: ("in-support" | "past-eol")[] | null;
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11506,6 +11658,8 @@ export interface operations {
                 support?: ("in-support" | "past-eol")[] | null;
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11616,6 +11770,8 @@ export interface operations {
                 support?: ("in-support" | "past-eol")[] | null;
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */

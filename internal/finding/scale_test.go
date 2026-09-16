@@ -252,13 +252,22 @@ func reports(versionOf func(int) string, extra int) []finding.Reported {
 	out := make([]finding.Reported, 0, issues+extra)
 	for v := range issues + extra {
 		part := at(fmt.Sprintf("package-%d", v%components), versionOf(v%components))
-		out = append(out, finding.Reported{
+		one := finding.Reported{
 			Issue: finding.Named{
 				Identifier: fmt.Sprintf("CVE-2026-%05d", v),
 				Severity:   [...]string{"low", "medium", "high", "critical"}[v%4],
 			},
 			Component: part,
-		})
+		}
+		// Two thirds of them name the version that fixes them, which is what
+		// a real image looks like: 5,047 of 7,612 open rows were fixable on
+		// the one this model is drawn from. Without it every bundle query
+		// measured here reads an empty set, which is not what anybody waits
+		// for.
+		if v%3 != 0 {
+			one.FixState, one.FixedIn = finding.FixedUpstream, "9.9"
+		}
+		out = append(out, one)
 	}
 	return out
 }
@@ -328,6 +337,18 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 	}
 	out := time.Since(start)
 
+	// What one bump would close, which is the screen a person works down.
+	// Measured slow on a real deployment at 2.2 s, which is why it is here:
+	// the group is over every open fixable row of every build in scope, and
+	// what a page costs is a question about the whole set rather than about
+	// the fifty rows it answers with.
+	start = time.Now()
+	bumps, bundles, err := store.Bundles(ctx, who, scope, 50, 0, finding.Filter{})
+	if err != nil {
+		t.Fatalf("fix bundles: %v", err)
+	}
+	bundled := time.Since(start)
+
 	start = time.Now()
 	points, err := store.Trend(ctx, who, finding.Scope{},
 		time.Now().UTC().Add(-12*7*24*time.Hour), 7*24*time.Hour, 12, finding.Within{})
@@ -340,6 +361,8 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 		list.Round(time.Millisecond), total,
 		out.Round(time.Millisecond), len(due),
 		trend.Round(time.Millisecond), len(points))
+	t.Logf("    fix bundles %s (%d of %d bumps)",
+		bundled.Round(time.Millisecond), len(bumps), bundles)
 }
 
 // counting counts the statements a store issues, so a night's cost can be
@@ -363,4 +386,117 @@ func per(took time.Duration, statements int64) time.Duration {
 		return 0
 	}
 	return took / time.Duration(statements)
+}
+
+// bigIssues is how many distinct vulnerabilities one build carries, for the
+// measurement that reproduces a page a person waits on.
+//
+// The year of nights above never builds a large *open* set — findings close as
+// versions move, so its open population stays near 1,300 groups while its table
+// grows to 148,614 rows. The bundle query scans what is open, so that model
+// answers a different question from the one asked. A real switch image carried
+// 272,539 open rows, 5,047 of them fixable; this reaches the same order in one
+// night by carrying more issues rather than more nights.
+const bigIssues = 6_000
+
+func TestMeasureAFixBundlePage(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		store := finding.NewStore(db.DB)
+		scans := ingest.NewStore(db.DB)
+		who := access.NewPerson(1, "a reader", false,
+			map[int64][]access.Role{product.ID: {access.PrivateRead}}, 0)
+
+		scan, _, err := scans.Record(ctx, ingest.Arriving{
+			TargetID: target.ID, ContentHash: "bundles", BuiltAt: time.Now().UTC(),
+			ParserVersion: "measure",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		versionOf := func(int) string { return "1.0" }
+		if _, err := graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID,
+			shape(versionOf)); err != nil {
+			t.Fatal(err)
+		}
+		run, err := store.Begin(ctx, finding.Run{
+			TargetID: target.ID, Scanner: "measure",
+			ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		start := time.Now()
+		applied, err := store.Apply(ctx, target.ID, run.ID, reports(versionOf, bigIssues-issues))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("opened %d findings in %s", applied.Opened, time.Since(start).Round(time.Second))
+		if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
+			t.Fatal(err)
+		}
+
+		var open int
+		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+			ColumnExpr("COUNT(*)").Where("f.closed_at IS NULL").Scan(ctx, &open); err != nil {
+			t.Fatal(err)
+		}
+		var fixable int
+		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+			ColumnExpr("COUNT(*)").Where("f.closed_at IS NULL").
+			Where("f.fixed_in IS NOT NULL").Where("f.fixed_in <> ?", "").
+			Scan(ctx, &fixable); err != nil {
+			t.Fatal(err)
+		}
+
+		scope := finding.Scope{
+			ProductID: &product.ID, StreamID: &branch.ID, VariantID: &variant.ID,
+		}
+		// Three runs, because the first pays for a cold cache and what a person
+		// waits for is the ordinary one.
+		var took time.Duration
+		var bundles int
+		for range 3 {
+			at := time.Now()
+			page, total, err := store.Bundles(ctx, who, scope, 50, 0, finding.Filter{})
+			if err != nil {
+				t.Fatalf("fix bundles: %v", err)
+			}
+			took = time.Since(at)
+			bundles = total
+			t.Logf("fix bundles %s (%d of %d bumps)",
+				took.Round(time.Millisecond), len(page), total)
+		}
+		// The findings list beside it, over the same rows: it reads its page
+		// off an index that covers it, and the difference between the two is
+		// what this measurement is for.
+		at := time.Now()
+		_, groups, err := store.Groups(ctx, who, scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("findings list %s (%d groups) — same rows, an index that covers it",
+			time.Since(at).Round(time.Millisecond), groups)
+		t.Logf("%d open, %d fixable, %d bumps", open, fixable, bundles)
+	})
 }

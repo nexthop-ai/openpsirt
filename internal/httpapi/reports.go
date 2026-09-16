@@ -25,6 +25,18 @@ type PointBody struct {
 	BySeverity map[string]int `json:"by_severity"`
 }
 
+// ComparisonBody is what changed between two builds.
+//
+// **What left the affected list is two lists, not one.** A bump that carried
+// the issue with it, a record taken back and a closure nothing explains are
+// not fixes, and a caller reading one list quotes scanner faults as work done.
+type ComparisonBody struct {
+	Fixed  []ChangedBody `json:"fixed"`
+	Closed []ChangedBody `json:"closed_not_fixed" doc:"Left the affected list without being fixed"`
+	Newly  []ChangedBody `json:"newly_present"`
+	Still  []ChangedBody `json:"still_present"`
+}
+
 // ChangedBody is one issue that differs between two builds.
 type ChangedBody struct {
 	Vulnerability string `json:"vulnerability"`
@@ -34,6 +46,7 @@ type ChangedBody struct {
 	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was bumped from since the earlier build. Only on still-present entries, where it means the bump did not reach the fix"`
 	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
 	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
+	ClosedRun     int64  `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
 }
 
 func registerReports(api huma.API, in Ingest) {
@@ -174,13 +187,7 @@ func registerReports(api huma.API, in Ingest) {
 		To             string `query:"to" required:"true" doc:"The later build's stream"`
 		ToVariant      string `query:"to_variant" required:"true" doc:"The later build's variant"`
 		IncludePrivate bool   `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
-	}) (*struct {
-		Body struct {
-			Fixed []ChangedBody `json:"fixed"`
-			Newly []ChangedBody `json:"newly_present"`
-			Still []ChangedBody `json:"still_present"`
-		}
-	}, error) {
+	}) (*struct{ Body ComparisonBody }, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -203,14 +210,13 @@ func registerReports(api huma.API, in Ingest) {
 			return nil, refusedFinding(in, err)
 		}
 
-		out := &struct {
-			Body struct {
-				Fixed []ChangedBody `json:"fixed"`
-				Newly []ChangedBody `json:"newly_present"`
-				Still []ChangedBody `json:"still_present"`
-			}
-		}{}
+		out := &struct{ Body ComparisonBody }{}
 		out.Body.Fixed = changed(comparison.Fixed, true, false)
+		// The other half of what left, kept apart from it. A bump that carried
+		// the issue along and a closure nothing explains are not fixes, and a
+		// release coordinator quoting one number for both quotes scanner
+		// faults as work done.
+		out.Body.Closed = changed(comparison.Closed, true, false)
 		out.Body.Newly = changed(comparison.Newly, false, false)
 		// Only the still-present column says what a place was bumped from. On
 		// a fixed entry the closure already says what happened, and on a new
@@ -403,6 +409,7 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 		if why {
 			body.Because = string(row.Because)
 			body.FromVersion, body.MovedTo = row.FromVersion, row.MovedTo
+			body.ClosedRun = row.ClosedRun
 		}
 		if bumped {
 			body.ArrivedFrom = row.ArrivedFrom

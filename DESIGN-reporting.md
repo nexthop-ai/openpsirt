@@ -28,6 +28,7 @@ this document is its own.
 - [The exception report](#the-exception-report)
 - [Dismissals and scan coverage](#dismissals-and-scan-coverage)
 - [The report catalog](#the-report-catalog)
+- [What a fix-bundle page costs](#what-a-fix-bundle-page-costs)
 - [Exports](#exports)
 - [Settings](#settings)
 - [Limits](#limits)
@@ -125,6 +126,9 @@ last release a customer actually has, which is rarely the previous one.
 | Public findings only unless asked otherwise | The destination is usually a public document. Where the two builds differ in what the reader may see, the narrower answer governs |
 | Ordered worst first and stably | A release note that reorders between reads is one nobody can diff |
 | Bounded by the size of a build, not the calendar | Every open entry of both builds, which is what diffing them means. There is no page of a diff |
+| What left the affected list is two sets | An upgrade, a carried patch, a component no longer shipped and a recorded flaw declared fixed are fixes. A bump that carried the issue with it, a record taken back, and a closure nothing explains are not — the last means the component is unchanged and the scanner stopped reporting it, which is a fault to investigate. One list, and the number a release coordinator quotes includes them |
+| The split is made once, where the release note and the remediation rate read it | The screen made the same judgment a second time, in a column heading, and the two disagreed: a column headed "Fixed" carried two unexplained closures with an explanatory note about the one reason not in it |
+| An entry that left says which run stopped reporting it | An unexplained closure is a fault, and the first question about one is which run. Told it is unexplained and given nowhere to look, a reader has the fault and no way to start on it. Absent where a person closed the finding, which is the other way one closes |
 | Each fixed entry states why | "Fixed by upgrading to 2.4" and "fixed by a carried patch" are different sentences, and the closure reason distinguishes them. `superseded` means the version moved and the issue came with it — before that reason existed, such a bump put one issue in both the fixed and the newly-present column of the same document |
 | A fixed entry states what it moved to | "The component was upgraded, 3.7.0 → 3.9.0". That pair is written when the scan closes the finding, because the component that carried the issue is gone from the inventory by then and anything asking later holds one version and not two |
 | Each still-present entry states whether somebody tried | It carries the version its place arrived from where the version moved since. On the still-present column only: a fixed entry's closure reason already says what happened, and a new one had nothing to bump |
@@ -157,6 +161,8 @@ builds, and this is a document going to a customer.
 | A lead line makes it re-checkable | Which two builds, when the later one was last measured, and the scanner and vulnerability-database versions it was measured with. A vulnerability database ships bad data and is corrected, and "which data said so" is the question a note kept for a year has to answer |
 | Dated by the measurement, not the request | That is the moment the answer reflects, and it is the same for everybody. Dated by the request, two people reading the same comparison hold documents that disagree |
 | Builds are named the way a customer knows them | From the catalog's display names. A heading reading "main container" puts internals on the first line of somebody else's document |
+| Fixes are grouped by what was done, not by the issue | One kernel upgrade closes 917 issues at once, and a bullet per issue states the same version pair 917 times in a document going to a customer — while the part a reader is looking for, which version to move to, is the part that repeats. The move is stated once and the issues it closed are listed under it |
+| A group is the component with its closure reason and its version pair | Two upgrades of one component in one comparison are two different answers to "what do I move to", and folding on the component alone states one of them over both |
 | An empty section is not written | A heading with nothing under it is a question about whether something is missing |
 | A release that fixed nothing says so, in a sentence | The operation answered nothing at all, and zero bytes is also what a truncated response, the wrong pair of builds and a request that went astray look like. A sentence is not a heading over nothing, so the rule above still holds: what comes back names the two builds and what measured them, and carries no section |
 | What was left out is counted | A reader cannot otherwise tell a release that fixed nothing undisclosed from one whose undisclosed fixes were taken off the page. A number and never the entries, and zero for a reader who could not have seen them anyway |
@@ -481,6 +487,37 @@ ten thousand claims, with nothing checking whether the caller was still there.
 What each claim covers now is one statement for the page. A capped section that
 read as complete would mislead the one reader this report is for, so it says it
 was capped.
+
+## What a fix-bundle page costs
+
+Measured rather than asserted, because it was reported slow on a real
+deployment at 2.2 s and "the design says it should be fine" is a sentence with
+a word doing too much work in it.
+
+One build, 204,000 open findings, 136,000 of them naming a version that fixes
+them, folding to 700 bumps — the same two-thirds-fixable ratio a real switch
+image has, at the same order of open rows.
+
+| | Fix bundles | The findings list, over the same rows |
+|---|--:|--:|
+| SQLite | 1.28 s | 0.19 s |
+| PostgreSQL | 1.29 s | 0.43 s |
+| MariaDB | 1.49 s | 0.52 s |
+| MySQL | 1.56 s | 0.48 s |
+
+The findings list groups those rows into 6,000 groups off an index that covers
+everything it reads. The bundle query groups the same rows into 700 and takes
+three to eight times as long, because two of the columns it reads are not in
+any index it can use: the version that fixes a finding, and the fold key, which
+is on the component rather than on the finding.
+
+**Nothing is built on that yet.** Grouping on the component instead of the fold
+saves six percent, so the fold is not where the time goes, and the remaining
+candidates are a stored fold key on the finding and an index that covers the
+fix version. The first is a derived value stored for speed, which has to be
+asked for rather than added while building something else.
+
+The measurement is `make measure`, and it runs on every engine.
 
 ## Exports
 

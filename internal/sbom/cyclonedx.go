@@ -181,6 +181,10 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		// and which field wins must not.
 		supplier  string
 		publisher string
+		// What the producer said the component's scope is, read like the two
+		// above rather than acted on during the object: key order is the
+		// producer's choice.
+		scope string
 	)
 	// Charged on the way in, before anything is held, for the reason the
 	// count itself records.
@@ -213,6 +217,13 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			// which one the producer happened to write first, and key order is
 			// the producer's choice.
 			return c.into(&publisher)
+		case "scope":
+			// What the producer said about the component, which is where this
+			// format states it: "required", "optional", or "excluded", which
+			// the specification defines as not distributed. Recorded against
+			// the component and carried to the edges arriving at it, because
+			// the graph is where a scope can be asked about.
+			return c.into(&scope)
 		case "pedigree":
 			return c.pedigree(&described, &carried)
 		case "components":
@@ -254,6 +265,10 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		claim.Targets = []Target{{Purl: described.Purl, Name: described.Name}}
 		c.doc.Suppressions = append(c.doc.Suppressions, claim)
 	}
+	// Recorded once the component is fully read, for the same reason the
+	// supplier is: identity is what it is keyed by, and identity is not known
+	// until the fields it is derived from have all arrived.
+	c.scoped(described, scope)
 	return described, ref, nested, nil
 }
 

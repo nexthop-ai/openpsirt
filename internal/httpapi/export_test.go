@@ -608,8 +608,8 @@ func TestTheTwoListsThatCouldNotLeaveTheScreenNowCan(t *testing.T) {
 		}
 
 		// And the comparison, which is one file with a column saying which of
-		// its three parts a row belongs to: three files are three chances to
-		// send somebody two of them.
+		// its parts a row belongs to: four files are four chances to send
+		// somebody three of them.
 		r.alsoIn(t, "vs")
 		changed := lines(t, "/v1/products/mine/comparison.csv"+
 			"?from=master&from_variant=broadcom&to=master&to_variant=vs")
@@ -618,7 +618,7 @@ func TestTheTwoListsThatCouldNotLeaveTheScreenNowCan(t *testing.T) {
 		}
 		for _, row := range changed[1:] {
 			switch row[0] {
-			case "fixed", "newly present", "still present":
+			case "fixed", "closed, not fixed", "newly present", "still present":
 			default:
 				t.Errorf("a row says it changed by %q", row[0])
 			}

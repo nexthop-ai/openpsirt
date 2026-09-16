@@ -52,8 +52,13 @@ type Upgrade struct {
 // deadline it defers the worst thing it covers and a second person agrees.
 // Worked out here rather than by the caller, because the deadline is a fact
 // about the set this resolves and the caller does not have it.
-func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject, up Upgrade,
-	cap int) (Declared, error) {
+//
+// **It takes no bound.** A bulk judgment takes one and this does not, and the
+// difference is reversibility rather than size: nothing re-checks a dismissal,
+// so one sentence answering a thousand findings has to stay a size a reviewer
+// can follow, while the next scan re-checks every row a promise names.
+func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
+	up Upgrade) (Declared, error) {
 
 	if strings.TrimSpace(up.Reasoning) == "" {
 		return Declared{}, fmt.Errorf("say why this is being upgraded")
@@ -165,7 +170,24 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject, up Upgr
 				})
 			}
 		}
-		if err := allowed(subject, proposals, cap, s.now()); err != nil {
+		// Every check a bulk judgment makes except the bound. A promise to
+		// upgrade is not bounded: the cap is there so that one sentence
+		// answering a thousand findings stays a size a reviewer can follow,
+		// and nothing re-checks a dismissal afterwards — while the next scan
+		// re-checks every row a promise names. Narrowing one would make the
+		// record false, because the bump closes what it closes.
+		//
+		// One kernel bump in a real image reaches 4,485 findings across 44,016
+		// places, and a cumulative bundle reaches 243,945. Bounded at the
+		// shipped two thousand, the highest-value action in the data was
+		// refused by a factor of twenty-two, and the only escape offered was
+		// raising a setting that guards the dismissal path this one has
+		// nothing to do with.
+		//
+		// What one of that size costs to commit is measured rather than
+		// assumed: 8.3 s on SQLite, 8.4 s on MariaDB, 10.9 s on MySQL and
+		// 23.9 s on PostgreSQL, under "make measure".
+		if err := permitted(subject, proposals, s.now()); err != nil {
 			return err
 		}
 		out.Issues, out.Components = len(issues), len(components)

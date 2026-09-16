@@ -396,8 +396,11 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 		}
 		for _, to := range e.to {
 			// Already charged where the ends were read, so the edge is
-			// recorded rather than charged twice.
-			c.edges = append(c.edges, refEdge{parent: e.from, child: to})
+			// recorded rather than charged twice. The scope rides along as
+			// what the producer said, and nothing reads it to decide
+			// anything.
+			c.edges = append(c.edges,
+				refEdge{parent: e.from, child: to, kind: scopeWord(e.scope)})
 		}
 		return nil
 	case spdx3Ancestors[e.kinds]:

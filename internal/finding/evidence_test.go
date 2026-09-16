@@ -94,7 +94,7 @@ func TestTwoRowsSharingOnePlaceReadAsOnePlace(t *testing.T) {
 	chains := map[int64][]graph.Step{
 		walkable: {{Name: "sonic-broadcom"}, {Name: "host-image"}, {Name: "opennsl-modules"}},
 	}
-	places := placesOf(rows, chains, map[int64]string{10: "6.12.41-1"})
+	places := placesOf(rows, chains, map[int64]string{10: "6.12.41-1"}, nil)
 
 	if len(places) != 1 {
 		t.Fatalf("%d places for one pair of names, want 1", len(places))
@@ -120,7 +120,7 @@ func TestAPlaceIsSuppressedOnlyWhereEveryRowOfItIs(t *testing.T) {
 		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
 			ComponentID: 10, ConsumerID: &walkable, Suppressed: false},
 	}
-	places := placesOf(rows, nil, nil)
+	places := placesOf(rows, nil, nil, nil)
 	if len(places) != 1 {
 		t.Fatalf("%d places for one pair of names, want 1", len(places))
 	}
@@ -143,7 +143,7 @@ func TestAClaimStandingOnEitherRowStandsAtThePlace(t *testing.T) {
 			Decision: &decision, Claim: &claim,
 		},
 	}
-	places := placesOf(rows, nil, nil)
+	places := placesOf(rows, nil, nil, nil)
 	if len(places) != 1 {
 		t.Fatalf("%d places for one pair of names, want 1", len(places))
 	}
@@ -167,7 +167,7 @@ func TestWhereBothRowsAreDecidedTheEarlierDecisionAnswers(t *testing.T) {
 		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
 			Decision: &earlier, Claim: &earlierClaim},
 	}
-	places := placesOf(rows, nil, nil)
+	places := placesOf(rows, nil, nil, nil)
 	if places[0].Decision == nil || *places[0].Decision != earlier {
 		t.Errorf("the place reads decision %s, want the lowest identifier",
 			numbered(places[0].Decision))

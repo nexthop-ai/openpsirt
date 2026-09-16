@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
@@ -304,9 +305,26 @@ func (s *Store) approvalToCarry(ctx context.Context, claimID, notBy int64) (*App
 // carryApproval records that a re-affirmed claim stands on the agreement its
 // predecessor had.
 func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, previous Decision) error {
+	return s.carryApprovalTo(ctx, []*Decision{made}, claim, previous)
+}
+
+// carryApprovalTo is the same for every row of one act.
+//
+// **One approval row, however many decisions it stands over.** An agreement is
+// an agreement to a claim's words, and the claim is what an approver reads —
+// written per decision, one person agreeing once would appear in the record
+// forty five times. The rows it takes effect on are updated together, because
+// a bulk re-affirmation where half the rows stood and half waited is an
+// approver having agreed to part of an argument they were shown whole.
+func (s *Store) carryApprovalTo(ctx context.Context, made []*Decision, claim Claim,
+	previous Decision) error {
+
+	if len(made) == 0 {
+		return nil
+	}
 	// The concrete path this refuses: propose, have it agreed to, revise
 	// (which withdraws the agreement), let a version bump lapse it, re-affirm.
-	earlier, err := s.approvalToCarry(ctx, previous.ClaimID, made.ProposedBy)
+	earlier, err := s.approvalToCarry(ctx, previous.ClaimID, made[0].ProposedBy)
 	if err != nil {
 		return err
 	}
@@ -339,9 +357,13 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 	// while those are still the words the claim rests on — otherwise a
 	// re-affirmation revised between being written and being approved would
 	// stand on an agreement to text nobody read.
+	ids := make([]int64, 0, len(made))
+	for _, one := range made {
+		ids = append(ids, one.ID)
+	}
 	result, err := s.db.NewUpdate().Model((*Decision)(nil)).
 		Set("state = ?", Approved).
-		Where("id = ?", made.ID).
+		Where("id IN (?)", bun.List(ids)).
 		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE ac.id = ? AND ac.revision_id = ?)`,
 			claim.ID, *claim.RevisionID).Exec(ctx)
 	if err != nil {
@@ -351,10 +373,12 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 	if err != nil {
 		return fmt.Errorf("carry an approval forward: %w", err)
 	}
-	if changed == 0 {
+	if changed != int64(len(ids)) {
 		return fmt.Errorf("the reasoning changed while this was being agreed to")
 	}
-	made.State = Approved
+	for _, one := range made {
+		one.State = Approved
+	}
 	return nil
 }
 
@@ -795,4 +819,331 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 		}
 	}
 	return total, nil
+}
+
+// ReaffirmingClaim is somebody saying every lapsed row of one action still
+// holds.
+type ReaffirmingClaim struct {
+	// PreviousClaimID names the action whose rows stopped applying. The rows
+	// are resolved here, for the reason a bulk judgment's places are: a caller
+	// free to name them would be choosing which agreements get carried
+	// forward.
+	PreviousClaimID int64
+	// Reasoning is the fresh reason, for all of them. One act is one argument,
+	// which is what makes it one thing a second person can read.
+	Reasoning string
+	By        int64
+	// Cap bounds a re-affirmed **judgment**, which this mostly is: the outcome
+	// comes from the claim being re-made, so re-affirming a bulk dismissal
+	// comes through here. A promise carries no bound, because the next scan
+	// re-checks it; nothing re-checks a dismissal, which is the reason the cap
+	// exists (REQ-27).
+	Cap int
+}
+
+// Reaffirmed is what one bulk re-affirmation did.
+type Reaffirmed struct {
+	ClaimID int64
+	// Decisions are the rows it wrote, and Places how many distinct places
+	// they cover. A place at two versions in two builds is two rows, because
+	// the versions are what a decision expires on.
+	Decisions []int64
+	Places    int
+	// Waiting says a second person has to agree. One act, one approval: where
+	// any row would need full approval, the whole of it does, because an
+	// approver works at the unit the proposer acted at.
+	Waiting bool
+}
+
+// ReaffirmClaim re-makes every lapsed row of one action, in one act.
+//
+// **Deciding is bulk-capable at three grains and re-deciding was capable at
+// none.** A team answering one kernel issue writes a decision at each of its 45
+// places in one action; when the kernel moves, those 45 lapse and restoring
+// them was 45 requests with 45 separately typed justifications. This is the one
+// path that is safe to make cheap — a version bump is a prompt to re-check
+// rather than a new claim, and the earlier agreement is already carried
+// forward — and it was the one path with no bulk form.
+//
+// It also breaks nothing REQ-28 asks for: approval, send-back and undo already
+// operate on the claim, and re-affirmation operated on the row.
+//
+// Every escalation rule the single form applies is applied here, per row, and
+// any one of them puts the whole act through full approval. An act whose rows
+// were approved separately would be an approver agreeing to part of an argument
+// they were shown whole.
+func (s *Store) ReaffirmClaim(ctx context.Context, subject access.Subject,
+	r ReaffirmingClaim) (Reaffirmed, error) {
+
+	if r.By != subject.ID {
+		return Reaffirmed{}, fmt.Errorf("a decision is recorded as made by whoever made it")
+	}
+	var out Reaffirmed
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		out = Reaffirmed{}
+		made, err := within.reaffirmClaim(ctx, subject, r)
+		if err != nil {
+			return err
+		}
+		out = made
+		return nil
+	})
+	return out, err
+}
+
+// reaffirmClaim is the whole of it, in the transaction that writes.
+//
+// Everything it turns on is read in here: which rows lapsed, where they sit
+// now, how bad each issue is judged to be today, and whether there is an
+// agreement to carry. Read outside, every one of them is an answer about a
+// database that has since moved.
+func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
+	r ReaffirmingClaim) (Reaffirmed, error) {
+
+	previous := new(Claim)
+	if err := s.db.NewSelect().Model(previous).
+		Where("id = ?", r.PreviousClaimID).Scan(ctx); err != nil {
+		return Reaffirmed{}, ErrNotTheirs
+	}
+	var lapsed []Decision
+	if err := s.db.NewSelect().Model(&lapsed).
+		Where("de.claim_id = ?", r.PreviousClaimID).
+		Where("de.state = ?", LapsedState).
+		Order("de.id ASC").Scan(ctx); err != nil {
+		return Reaffirmed{}, fmt.Errorf("read what lapsed under that claim: %w", err)
+	}
+	// Authorized against the rows before anything else is said about the
+	// claim, and asked of every one, because a claim covering a disclosed
+	// place and an undisclosed one is not one a public triager may re-make in
+	// part.
+	//
+	// **Before the proposer check, not after** (REQ-42). Refusing on the
+	// proposer first answered a claim in a product the caller cannot see
+	// differently from one that does not exist — one sentence against a bare
+	// refusal — which turns walking claim identifiers into a directory of
+	// every product in the deployment.
+	for _, row := range lapsed {
+		if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
+			return Reaffirmed{}, ErrNotTheirs
+		}
+	}
+	if len(lapsed) == 0 {
+		return Reaffirmed{}, ErrNotTheirs
+	}
+	// The same rule the single form applies, asked once because a claim has
+	// one proposer. Without it an approver could re-affirm, becoming proposer
+	// of the new claim while their own earlier agreement is carried onto it.
+	if previous.ProposedBy != subject.ID {
+		return Reaffirmed{}, fmt.Errorf(
+			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
+	}
+
+	where, err := s.whereTheyAreNow(ctx, subject, lapsed)
+	if err != nil {
+		return Reaffirmed{}, err
+	}
+
+	// Whether a second person has to agree, decided over the whole act before
+	// any of it is written. Any row escalating carries the rest with it: an
+	// approver works at the unit the proposer acted at, and splitting the act
+	// would be agreeing to part of an argument they were shown whole.
+	carryable, err := s.approvalToCarry(ctx, r.PreviousClaimID, subject.ID)
+	if err != nil {
+		return Reaffirmed{}, err
+	}
+	severity := map[[2]int64]int{}
+	full := false
+	for _, row := range lapsed {
+		key := [2]int64{row.ProductID, row.VulnerabilityID}
+		if _, asked := severity[key]; !asked {
+			now, err := s.severityOf(ctx, row.ProductID, row.VulnerabilityID)
+			if err != nil {
+				return Reaffirmed{}, err
+			}
+			severity[key] = now
+		}
+		if needsFullApproval(row, severity[key], carryable != nil) {
+			full = true
+		}
+	}
+
+	justification, mitigation, fixedVersion := "", "", ""
+	if previous.Justification != nil {
+		justification = *previous.Justification
+	}
+	if previous.Mitigation != nil {
+		mitigation = *previous.Mitigation
+	}
+	if previous.FixedVersion != nil {
+		fixedVersion = *previous.FixedVersion
+	}
+
+	proposals := make([]Proposal, 0, len(lapsed))
+	places := map[string]bool{}
+	// One place, however many rows of the claim lapsed at it. A place identity
+	// is names alone while a decision is keyed on the versions too, so one
+	// component at two versions under one consumer is two lapsed rows sharing
+	// a place — and walking both would resolve the same current place twice,
+	// write the same live key twice, and refuse the whole act with "a decision
+	// already stands here", which is false.
+	done := map[string]bool{}
+	for _, row := range lapsed {
+		key := placeKey(row.ProductID, row.VulnerabilityID, row.PlaceIdentity)
+		if done[key] {
+			continue
+		}
+		done[key] = true
+		for _, at := range where[key] {
+			// The visibility it had. A re-affirmation says the same claim
+			// still holds; it is not an occasion to change who may see it.
+			at.Visibility = row.Visibility
+			places[row.PlaceIdentity] = true
+			proposals = append(proposals, Proposal{
+				Place: at, Outcome: previous.Outcome,
+				Justification: Justification(justification),
+				Mitigation:    mitigation,
+				DeferredUntil: previous.DeferredUntil,
+				FixedVersion:  fixedVersion,
+				Reasoning:     r.Reasoning, By: r.By,
+				SeverityCenti: severity[[2]int64{row.ProductID, row.VulnerabilityID}],
+				NeedsApproval: full,
+			})
+		}
+	}
+	if len(proposals) == 0 {
+		return Reaffirmed{}, fmt.Errorf(
+			"%w: none of what lapsed is open anywhere any more", ErrNothingOpen)
+	}
+	// Bounded unless it is a promise. What decides is the outcome being
+	// re-made rather than the act being a re-affirmation: this path carries
+	// the previous claim's outcome, so a lapsed bulk dismissal re-made here is
+	// a bulk judgment and nothing re-checks it. Unbounded it would write as
+	// many rows as it liked, and with the earlier agreement carried on, nobody
+	// would stand between the request and the rows.
+	if previous.Outcome == UpgradeNeeded {
+		if err := permitted(subject, proposals, s.now()); err != nil {
+			return Reaffirmed{}, err
+		}
+	} else if err := allowed(subject, proposals, r.Cap, s.now()); err != nil {
+		return Reaffirmed{}, err
+	}
+
+	// One act, one claim, one argument — the shape every other bulk write
+	// here takes.
+	claim, err := s.newClaim(ctx, FindingClaim, r.By, &r.PreviousClaimID, "", proposals[0])
+	if err != nil {
+		return Reaffirmed{}, err
+	}
+	written, err := s.proposeAll(ctx, claim, proposals)
+	if err != nil {
+		return Reaffirmed{}, err
+	}
+	out := Reaffirmed{ClaimID: claim.ID, Places: len(places), Waiting: full}
+	for _, one := range written {
+		out.Decisions = append(out.Decisions, one.ID)
+	}
+	if full {
+		return out, nil
+	}
+	// Carried once, onto the claim, because an approval is an agreement to one
+	// claim's words. Written per row it would be one agreement recorded forty
+	// five times.
+	if err := s.carryApprovalTo(ctx, written, *claim, lapsed[0]); err != nil {
+		return Reaffirmed{}, err
+	}
+	return out, nil
+}
+
+// placeKey identifies a lapsed row's place within its product.
+func placeKey(productID, vulnerabilityID int64, placeIdentity string) string {
+	return fmt.Sprintf("%d\x00%d\x00%s", productID, vulnerabilityID, placeIdentity)
+}
+
+// whereTheyAreNow is the versions each lapsed place sits at today, which is
+// what the re-made decisions expire on.
+//
+// **Narrowed by the two lists rather than by the pairs.** No engine here spells
+// a comparison against a pair of columns the same way, so the statement asks
+// for the issues and the places separately — a superset — and the pairing is
+// done on the way back.
+//
+// A place at two versions in two builds comes back twice, and is two decisions:
+// the versions are what a decision expires on, so one row could not stand for
+// both. A place that is open nowhere comes back not at all, which is a finding
+// that closed rather than a fault.
+func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
+	lapsed []Decision) (map[string][]Place, error) {
+
+	issues := map[int64]bool{}
+	identities := map[string]bool{}
+	products := map[int64]bool{}
+	for _, row := range lapsed {
+		issues[row.VulnerabilityID] = true
+		identities[row.PlaceIdentity] = true
+		products[row.ProductID] = true
+	}
+	at := map[string][]Place{}
+	for productID := range products {
+		visible := access.Visible(subject, productID)
+		if len(visible) == 0 {
+			return nil, ErrNotTheirs
+		}
+		var rows []struct {
+			VulnerabilityID   int64  `bun:"vulnerability_id"`
+			PlaceIdentity     string `bun:"place_identity"`
+			ComponentUpstream string `bun:"component_upstream"`
+			ConsumerUpstream  string `bun:"consumer_upstream"`
+			OnTag             int    `bun:"on_tag"`
+		}
+		err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+			ColumnExpr(`f.place_identity AS "place_identity"`).
+			ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
+			ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
+			ColumnExpr(`MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
+			Where("st.product_id = ?", productID).
+			Where("f.closed_at IS NULL").
+			Where("f.visibility IN (?)", bun.List(visible)).
+			Where("f.vulnerability_id IN (?)", bun.List(keysOf(issues))).
+			Where("f.place_identity IN (?)", bun.List(wordsOf(identities))).
+			GroupExpr("f.vulnerability_id, f.place_identity, c.upstream_version, c.version, "+
+				"uc.upstream_version, uc.version").
+			Scan(ctx, &rows)
+		if err != nil {
+			return nil, fmt.Errorf("read where these sit now: %w", err)
+		}
+		for _, row := range rows {
+			key := placeKey(productID, row.VulnerabilityID, row.PlaceIdentity)
+			at[key] = append(at[key], Place{
+				ProductID: productID, VulnerabilityID: row.VulnerabilityID,
+				PlaceIdentity:     row.PlaceIdentity,
+				ComponentUpstream: row.ComponentUpstream,
+				ConsumerUpstream:  row.ConsumerUpstream,
+				OnTag:             row.OnTag == 1,
+			})
+		}
+	}
+	return at, nil
+}
+
+// keysOf and wordsOf are a set as a list, for binding into a statement.
+func keysOf(set map[int64]bool) []int64 {
+	out := make([]int64, 0, len(set))
+	for key := range set {
+		out = append(out, key)
+	}
+	return out
+}
+
+func wordsOf(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for word := range set {
+		out = append(out, word)
+	}
+	return out
 }

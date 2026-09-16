@@ -29,7 +29,8 @@ import (
 // too, and a finding cannot import a triage decision.
 const DefaultTogetherCap = setting.DefaultTogetherCap
 
-// allowed is what every proposal has to satisfy before any of them is written.
+// allowed is what every proposal in a bulk **judgment** has to satisfy before
+// any of them is written.
 //
 // Checked over the whole set first, because refusing halfway is the failure
 // these actions exist to avoid — and the bound is on the rows about to be
@@ -43,6 +44,19 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 		return fmt.Errorf("that is %d findings and the limit here is %d: narrow it, "+
 			"or raise the limit deliberately", len(proposals), cap)
 	}
+	return permitted(subject, proposals, now)
+}
+
+// permitted is everything except the bound: may this subject decide here, is
+// each proposal well formed, and is it recorded as made by whoever made it.
+//
+// **Split out because a bulk promise carries no bound.** What the cap is for is
+// reviewability — one sentence answering a thousand findings has to stay a size
+// a reviewer can follow, because nothing re-checks a dismissal afterwards. A
+// promise to upgrade is the one bulk write that verifies itself: the next scan
+// re-checks every row it names, and narrowing it makes the record false, since
+// the bump closes what it closes. The distinction is reversibility, not size.
+func permitted(subject access.Subject, proposals []Proposal, now time.Time) error {
 	for _, p := range proposals {
 		if !mayDecideOn(subject, p.Place.ProductID, p.Place.VulnerabilityID, visibilityOf(p.Place)) {
 			return ErrNotTheirs
@@ -64,10 +78,21 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 // choosing which decisions apply where, and would be naming rows it read
 // before this ran — so they are resolved here, inside the transaction that
 // writes.
+//
+// **The component names a fold, not a package.** Naming any binary of a source
+// package reaches all of them, which is the grain the list somebody picked from
+// already shows and the grain a bump is done at: one vim row on that list is
+// four packages at sixty-one places, and keyed on one binary it took four
+// claims and four approvals to answer what reads as one thing.
 type TogetherAt struct {
 	TargetID         int64
 	ComponentID      int64
 	VulnerabilityIDs []int64
+	// Contains is the text the candidate list was narrowed by, empty where it
+	// was not. Re-run here rather than believed: what is recorded beside the
+	// claimant's prose is how many issues that narrowing reaches, against how
+	// many were named.
+	Contains string
 }
 
 // resolved is a place a judgment is about to be written against, with how bad
@@ -117,17 +142,26 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		recorded = recorded[:0]
 		claimID = 0
 
-		places, err := placesWithin(ctx, tx, subject, at)
+		// The fold, resolved inside the transaction that writes like
+		// everything else this turns on. The list somebody picked from folds
+		// the source package, so keying the write on one binary of it wrote a
+		// judgment covering part of what the screen said it covered.
+		fold, err := finding.InTheFold(ctx, tx, at.ComponentID)
+		if err != nil {
+			return err
+		}
+
+		places, err := placesWithin(ctx, tx, subject, at, fold)
 		if err != nil {
 			return err
 		}
 		if len(places) == 0 {
 			return fmt.Errorf("%w against that component", ErrNothingOpen)
 		}
-		// There is always a cap (REQ-27), so an unset one is the shipped
-		// number rather than none: the two siblings that take this argument
-		// fill it in the same way, and this one read "zero means unbounded" —
-		// which is the one reading the rule does not have.
+		// A bulk judgment is bounded, so an unset cap is the shipped number
+		// rather than none: the siblings that take this argument fill it in
+		// the same way, and this one read "zero means unbounded" — which is
+		// the one reading the rule does not have.
 		if cap <= 0 {
 			cap = DefaultTogetherCap
 		}
@@ -136,7 +170,16 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 				"selection, or raise the limit deliberately", len(places), cap)
 		}
 
-		claim, err := within.newClaim(ctx, TogetherClaim, subject.ID, nil, p.SelectedBy, p)
+		// The narrowing as something other than the claimant's word for it,
+		// re-run against the same rows the write is about to land on.
+		narrowing, err := finding.NarrowedWithin(ctx, tx, subject, at.TargetID, fold,
+			at.Contains, len(at.VulnerabilityIDs))
+		if err != nil {
+			return err
+		}
+
+		claim, err := within.newClaimNarrowed(ctx, TogetherClaim, subject.ID, nil,
+			p.SelectedBy, &narrowing, p)
 		if err != nil {
 			return err
 		}
@@ -187,7 +230,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 // who picked from the list they were shown with a bare "not found" and no way
 // to tell why.
 func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
-	at TogetherAt) ([]resolved, error) {
+	at TogetherAt, fold []int64) ([]resolved, error) {
 
 	var rows []struct {
 		ProductID         int64  `bun:"product_id"`
@@ -230,7 +273,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		// spell a boolean three ways.
 		ColumnExpr(`MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
 		Where("f.target_id = ?", at.TargetID).
-		Where("f.component_id = ?", at.ComponentID).
+		Where("f.component_id IN (?)", bun.List(fold)).
 		Where("f.closed_at IS NULL").
 		Where("f.vulnerability_id IN (?)", bun.List(at.VulnerabilityIDs)).
 		GroupExpr("st.product_id, f.vulnerability_id, f.place_identity, f.visibility, " +

@@ -310,8 +310,23 @@ each fact.
 | The version | `version` | `versionInfo` | `software_packageVersion` |
 | The package identifier and the database key | fields of the component | external references, by type | a field of the package, or external identifiers by type |
 | Structure | `dependencies`, and one component nested in another | relationships, stated either way round | relationships, stated one way round |
+| A dependency's scope | a component's `scope` | the relationship type: build, development, runtime, optional, test | a `scope` on the relationship |
 | What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` or `descendantOf` |
 | What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** | **cannot be stated** |
+
+**The scoped SPDX 2 relationships place their target.** `BUILD_DEPENDENCY_OF`,
+`DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF` are
+edges carrying what the producer called them; only `TEST_DEPENDENCY_OF` places
+nothing, which is the exception the third version's `test` scope gets too. What
+the word means, and what nothing may read into it, is in `DESIGN-findings.md`.
+
+**A component whose only incoming relationship was one of those four now has a
+consumer where it had none**, so its place identity moves and decisions written
+against the old one stop covering it. An instance that already ingested SPDX 2
+inventories has to be recreated for that reason and one other: the graph edge
+gained a column with no default, which an existing database never re-applies.
+Before the first release there is no schema compatibility, so recreation is the
+answer to both.
 
 **The root is resolved at the end rather than where it is named.** One format
 states it inline with everything it says about it; the other points at a

@@ -611,3 +611,152 @@ func TestTwoNamesThatDifferInsideTheColumnAreTwoComponents(t *testing.T) {
 		}
 	})
 }
+
+func TestWhatAProducerCalledADependencyIsStoredWithTheEdge(t *testing.T) {
+	// "Not in the runtime path", "build-time only", "test-only" is the largest
+	// defensible deferral class a vendor has, and it was the one thing the
+	// tool could not express: a component a producer marked as not distributed
+	// produced findings identical to one that ships. What is stored is what
+	// the producer said, and nothing reads it to decide anything.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		scoped := tree()
+		scoped.Dependencies[0].Kind = "build"
+
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), scoped); err != nil {
+			t.Fatal(err)
+		}
+		kinds := openEdgeKinds(t, f)
+		if kinds["curl"] != "build" {
+			t.Errorf("the edge into curl says %q, want %q", kinds["curl"], "build")
+		}
+		if kinds["openssl"] != "" {
+			t.Errorf("an edge nobody scoped says %q", kinds["openssl"])
+		}
+
+		// A producer that starts describing the same pair differently has said
+		// something different, and an edge carrying the earlier word while the
+		// document says another is a record of what nobody sent.
+		relabelled := tree()
+		relabelled.Dependencies[0].Kind = "excluded"
+		applied, err := f.store.Apply(ctx, f.targetID, f.scan(t), relabelled)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied.EdgesOpened != 1 || applied.EdgesClosed != 1 {
+			t.Errorf("relabelling one edge applied %+v, want one opened and one closed", applied)
+		}
+		if kinds := openEdgeKinds(t, f); kinds["curl"] != "excluded" {
+			t.Errorf("the edge into curl says %q, want %q", kinds["curl"], "excluded")
+		}
+
+		// And an unchanged rebuild is still unchanged, which is what keeps the
+		// stored volume tracking real change rather than the calendar.
+		again, err := f.store.Apply(ctx, f.targetID, f.scan(t), relabelled)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !again.Unchanged() {
+			t.Errorf("a rebuild describing the same graph wrote %+v", again)
+		}
+	})
+}
+
+// openEdgeKinds is what each open edge says, by the name of the component it
+// arrives at.
+func openEdgeKinds(t *testing.T, f *fixture) map[string]string {
+	t.Helper()
+	var rows []struct {
+		Name string `bun:"name"`
+		Kind string `bun:"kind"`
+	}
+	err := f.db.DB.NewSelect().
+		TableExpr(`"graph_edge" AS "e"`).
+		Join(`JOIN "graph_node" AS "n" ON n.id = e.child_id`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		ColumnExpr(`c.name AS "name"`).
+		ColumnExpr(`e.kind AS "kind"`).
+		Where("e.target_id = ?", f.targetID).
+		Where("e.closed_scan_id IS NULL").
+		Scan(t.Context(), &rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("no open edges were read, so this checked nothing")
+	}
+	kinds := map[string]string{}
+	for _, row := range rows {
+		kinds[row.Name] = row.Kind
+	}
+	return kinds
+}
+
+func TestTheListCanAskWhatAProducerCalledSomethingAndNothingElseReadsIt(t *testing.T) {
+	// A filter is the whole of what the declaration is for. It is a question
+	// somebody asks — "what did the inventory call build-time only" — and
+	// never an answer: nothing ranks by it, nothing prefills an outcome from
+	// it, and nothing is hidden by it unless it is asked for here.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		scoped := tree()
+		for i, dep := range scoped.Dependencies {
+			if dep.Child.Name == curl.Name {
+				scoped.Dependencies[i].Kind = "build"
+			}
+		}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), scoped); err != nil {
+			t.Fatal(err)
+		}
+
+		issue := f.anIssue(t, "CVE-2026-SCOPE")
+		f.opens(t, issue, f.componentNamed(t, curl.Name), "under-root-curl")
+		f.opens(t, f.anIssue(t, "CVE-2026-SSL"), f.componentNamed(t, openssl.Name), "under-root-ssl")
+
+		findings := finding.NewStore(f.db.DB)
+		_, all, err := findings.Groups(ctx, everyone(f), f.scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if all != 2 {
+			t.Fatalf("the unnarrowed list counts %d groups, want 2", all)
+		}
+
+		// Asked for, it narrows.
+		_, said, err := findings.Groups(ctx, everyone(f), f.scope, 50, 0,
+			finding.Filter{DeclaredAs: []string{"build"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if said != 1 {
+			t.Errorf("narrowed to what the producer called build, the list counts %d, want 1", said)
+		}
+
+		// And a word nothing was declared as keeps nothing, rather than
+		// keeping everything: a filter that silently matches all of it reads
+		// as an answer.
+		_, none, err := findings.Groups(ctx, everyone(f), f.scope, 50, 0,
+			finding.Filter{DeclaredAs: []string{"excluded"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if none != 0 {
+			t.Errorf("narrowed to a word nothing carries, the list counts %d, want 0", none)
+		}
+
+		// And the finding's own screen says it, which is the other half of
+		// what recording it is for: a filter finds the population and the
+		// evidence block is where somebody decides about one of them.
+		detail, err := findings.Detail(ctx, everyone(f), f.targetID, issue,
+			f.componentNamed(t, curl.Name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(detail.Places) != 1 {
+			t.Fatalf("the finding sits at %d places, want 1", len(detail.Places))
+		}
+		if got := detail.Places[0].DeclaredAs; got != "build" {
+			t.Errorf("the place says the producer called it %q, want %q", got, "build")
+		}
+	})
+}

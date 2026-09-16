@@ -49,10 +49,20 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	}
 	limit = database.AComponentsWorth.Of(limit)
 
+	// Every package of the fold, not the one binary that was named. The
+	// by-issue list folds the same way, so the single vim row somebody picks
+	// from is four packages at sixty-one places — and keyed on one of them,
+	// this asked for a quarter of what the screen showed and the judgment
+	// covered a quarter of what the person meant, four times over.
+	fold, err := InTheFold(ctx, s.db, componentID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where("f.target_id = ?", targetID).
-			Where("f.component_id = ?", componentID).
+			Where("f.component_id IN (?)", bun.List(fold)).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible))
 		if contains != "" {
@@ -139,7 +149,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			ColumnExpr(`MIN(COALESCE(v.score_centi, 0)) AS "severity_centi"`).
 			ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`).
 			Where("f.target_id = ?", targetID).
-			Where("f.component_id = ?", componentID).
+			Where("f.component_id IN (?)", bun.List(fold)).
 			Where("f.closed_at IS NULL").
 			Where("f.visibility IN (?)", bun.List(visible)).
 			Where("f.vulnerability_id IN (?)", bun.List(issues)).
@@ -157,7 +167,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	// place per issue. A decision is keyed on a place, so a claim built from
 	// MIN(place_identity) covers one consumer and leaves the rest open while
 	// reporting that it covered them.
-	everywhere, err := s.placesOf(ctx, targetID, componentID, issues, visible)
+	everywhere, err := s.placesOf(ctx, targetID, fold, issues, visible)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -178,7 +188,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 }
 
 // placesOf reads every place a set of issues occupies at one component.
-func (s *Store) placesOf(ctx context.Context, targetID, componentID int64, issues []int64,
+func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issues []int64,
 	visible []access.Visibility) (map[int64][]Deciding, error) {
 
 	everywhere := map[int64][]Deciding{}
@@ -202,7 +212,7 @@ func (s *Store) placesOf(ctx context.Context, targetID, componentID int64, issue
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		Where("f.target_id = ?", targetID).
-		Where("f.component_id = ?", componentID).
+		Where("f.component_id IN (?)", bun.List(fold)).
 		Where("f.closed_at IS NULL").
 		Where("f.vulnerability_id IN (?)", bun.List(issues)).
 		Where("f.visibility IN (?)", bun.List(visible)).
@@ -302,4 +312,68 @@ type ComponentGroup struct {
 	// stops a component being put aside on the strength of its size alone.
 	Exploited bool
 	Urgency   int64
+}
+
+// Narrowing is a bulk selection as something other than the caller's word for
+// it: the text the candidate list was narrowed by, how many issues that
+// narrowing reaches now, and how many the caller went on to name.
+//
+// **`selected_by` is prose and nothing can check it.** A claim reading
+// "drivers this image does not build" over a set actually chosen by ticking
+// everything is indistinguishable in the record from an honest one, and the
+// decision that asks for how a set was chosen asks for something an approver
+// can act on. Two numbers make it checkable without turning prose into a
+// filter: equal, the claim is exactly what that narrowing returns; far apart,
+// the sentence does not describe the set.
+type Narrowing struct {
+	// Contains is the text the list was narrowed by, empty where it was not.
+	Contains string
+	// Matched is how many distinct issues that narrowing reaches at this fold
+	// in this build, read in the transaction that writes the claim.
+	Matched int
+	// Named is how many the caller went on to claim about.
+	Named int
+}
+
+// NarrowedWithin re-runs a bulk selection's narrowing inside the transaction
+// that is about to write the claim.
+//
+// Re-run rather than taken from the caller, for the reason the places are: a
+// count sent along with the request is the caller's word twice over. Read with
+// the same visibility rule the candidate list used, so the two numbers compare
+// against each other rather than against different populations.
+func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, targetID int64,
+	fold []int64, contains string, named int) (Narrowing, error) {
+
+	productID, err := productOf(ctx, tx, targetID)
+	if err != nil {
+		return Narrowing{}, err
+	}
+	visible := access.Visible(subject, productID)
+	if len(visible) == 0 {
+		return Narrowing{}, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+
+	q := tx.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr("f.vulnerability_id").
+		Where("f.target_id = ?", targetID).
+		Where("f.component_id IN (?)", bun.List(fold)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.vulnerability_id")
+	if contains != "" {
+		// The same escaped match the candidate list makes. Spliced raw, a term
+		// holding a percent selects far more than the box said — and this is
+		// the number an approver checks the claim against.
+		q = q.Where("f.vulnerability_id IN (?)",
+			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
+				Where(`LOWER(v.description) LIKE ?`+database.LikeClause,
+					"%"+containsTerm(contains)+"%"))
+	}
+	matched, err := tx.NewSelect().TableExpr(`(?) AS "grouped"`, q).Count(ctx)
+	if err != nil {
+		return Narrowing{}, fmt.Errorf("count what that narrowing reaches: %w", err)
+	}
+	return Narrowing{Contains: contains, Matched: matched, Named: named}, nil
 }

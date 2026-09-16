@@ -216,14 +216,20 @@ func TestARelationshipStatedEitherWayRoundIsTheSameEdge(t *testing.T) {
 
 func TestWhatBuiltSomethingIsNotWhatItShipped(t *testing.T) {
 	// The format states a hundred and forty kinds of relationship, and most of
-	// them are not structure. A test dependency, a build tool and a thing that
-	// generated a file are each a statement about the build rather than about
-	// what is in the product — so none of them puts a component under another,
-	// and the component is still held and still counted as sitting under
-	// nothing.
+	// them are not structure. A tool that built something, a thing that
+	// generated a file and a test dependency are each a statement about the
+	// build rather than about what is in the product — so none of them puts a
+	// component under another, and the component is still held and still
+	// counted as sitting under nothing.
+	//
+	// A build-phase or development dependency is not in this list. It is a
+	// dependency the producer scoped, and dropping it is the inference this
+	// reader's third-version sibling refuses by name: a crate or a module
+	// linked into a binary is stated as a build-phase dependency and is inside
+	// what the product ships.
 	for _, kind := range []string{
 		"BUILD_TOOL_OF", "DEV_TOOL_OF", "TEST_TOOL_OF", "TEST_DEPENDENCY_OF",
-		"DEV_DEPENDENCY_OF", "BUILD_DEPENDENCY_OF", "TEST_CASE_OF", "GENERATES",
+		"TEST_CASE_OF", "GENERATES",
 		"GENERATED_FROM", "EXAMPLE_OF", "DOCUMENTATION_OF", "AMENDS", "OTHER",
 	} {
 		t.Run(kind, func(t *testing.T) {
@@ -240,6 +246,46 @@ func TestWhatBuiltSomethingIsNotWhatItShipped(t *testing.T) {
 				t.Errorf("%d components sit under nothing, want 1", doc.Unrooted)
 			}
 		})
+	}
+}
+
+func TestAScopedDependencyIsAnEdgeSayingWhatTheProducerCalledIt(t *testing.T) {
+	// This version spells a lifecycle phase as a relationship type where the
+	// third spells it as a scope on an ordinary dependency, and the two say
+	// the same thing. Dropped, the component sat under nothing and the
+	// producer's word was gone with it; recorded, the edge is there and says
+	// what it was called.
+	//
+	// Nothing reads the word to decide anything. Reading "build" as "does not
+	// ship" is wrong for every compiled language.
+	for _, tc := range []struct {
+		stated string
+		want   string
+	}{
+		{"BUILD_DEPENDENCY_OF", "build"},
+		{"DEV_DEPENDENCY_OF", "development"},
+	} {
+		t.Run(tc.stated, func(t *testing.T) {
+			body := strings.Replace(minimalSPDX,
+				`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-a", "relationshipType": "DEPENDS_ON"}`,
+				`{"spdxElementId": "SPDXRef-a", "relatedSpdxElement": "SPDXRef-root", "relationshipType": "`+
+					tc.stated+`"}`, 1)
+			doc := read(t, body)
+			if got := edges(doc); !slices.Equal(got, []string{"product -> libc"}) {
+				t.Fatalf("edges are %v, want the library under the product", got)
+			}
+			if got := doc.Dependencies[0].Kind; got != tc.want {
+				t.Errorf("the edge says %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	// And the one that places nothing still places nothing, which is the
+	// exception both readers make and the only one.
+	body := strings.Replace(minimalSPDX, `"relationshipType": "DEPENDS_ON"`,
+		`"relationshipType": "TEST_DEPENDENCY_OF"`, 1)
+	if doc := read(t, body); len(doc.Dependencies) != 0 {
+		t.Errorf("a test dependency became %d edge(s)", len(doc.Dependencies))
 	}
 }
 

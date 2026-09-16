@@ -1,6 +1,11 @@
 package finding
 
-import "github.com/uptrace/bun"
+import (
+	"context"
+	"fmt"
+
+	"github.com/uptrace/bun"
+)
 
 // What a fold is, in SQL.
 //
@@ -75,4 +80,38 @@ func InTheFoldOf(q *bun.SelectQuery, componentID int64) *bun.SelectQuery {
 	return q.Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Where(FoldedOn+` = (SELECT "c2".fold_key FROM "component" AS "c2" WHERE "c2".id = ?)`,
 			componentID)
+}
+
+// InTheFold is every component of the fold the named one belongs to,
+// identifier first.
+//
+// **Read as identifiers and bound back in, rather than joined.** The queries
+// that narrow by a component read their page off finding's covering index, and
+// reaching the fold key through a join puts a third join under the aggregate —
+// 0.35 s against 0.04 s on the kernel, which is 222,435 of 272,539 open rows on
+// a real image. A fold is one source package at one version, so what comes back
+// is the binary packages built from it and is short.
+//
+// The named component is always in it, so a component whose producer stated no
+// source package folds to itself and every caller narrows to exactly what it
+// narrowed to before.
+func InTheFold(ctx context.Context, db bun.IDB, componentID int64) ([]int64, error) {
+	var ids []int64
+	err := db.NewSelect().
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr("c.id").
+		Where(FoldedOn+` = (SELECT "c2".fold_key FROM "component" AS "c2" WHERE "c2".id = ?)`,
+			componentID).
+		OrderExpr("c.id").
+		Scan(ctx, &ids)
+	if err != nil {
+		return nil, fmt.Errorf("read the packages of this fold: %w", err)
+	}
+	if len(ids) == 0 {
+		// A component nothing describes is not a fold of nothing: narrowing to
+		// an empty list would silently answer about everything or about
+		// nothing depending on the engine.
+		return []int64{componentID}, nil
+	}
+	return ids, nil
 }

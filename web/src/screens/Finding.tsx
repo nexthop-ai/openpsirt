@@ -318,6 +318,11 @@ export function Finding() {
     place: placeOf.get(p.decision_id) ?? "",
   }));
   const similar: Similar[] = it.similar ?? [];
+  // What another product decided about this same issue at this same place.
+  // Evidence and a prefill, never an outcome: what is shipped around a
+  // component differs between products, which is the whole reason a place is a
+  // component at a position rather than a component.
+  const elsewhere = it.elsewhere ?? [];
   // Whether anything here is still to answer. One named predicate rather than
   // the same test written at four sites: the fifth was written in a different
   // unit — a count of distinct places against a count of chain rows — and
@@ -879,6 +884,52 @@ export function Finding() {
                         }}
                       >
                         Apply decision #{s.decision_id} to this issue →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {elsewhere.length > 0 && !extending && (
+              <div className="card">
+                <h3>Decided elsewhere</h3>
+                {/* Never an outcome and never a default. Another team's
+                    judgment about their product is not a judgment about this
+                    one — what is shipped around the component differs — so
+                    this offers words to start from and decides nothing. */}
+                <p className="reading" style={{ marginBottom: 8 }}>
+                  The same issue at the same place in another product. Somebody else&apos;s judgment
+                  about their build, to read rather than to take.
+                </p>
+                {elsewhere.map((e) => (
+                  <div key={`${e.product} ${e.decision_id}`} className="prior">
+                    <header>
+                      <span className="id">{e.product}</span>{" "}
+                      {e.justification && <Because code={e.justification} />}
+                      <span className="hint">
+                        {e.outcome}
+                        {e.approved_by && <> · approved by {e.approved_by}</>}
+                        {e.approved_at && <> on {on(e.approved_at)}</>}
+                      </span>
+                    </header>
+                    <div className="why">
+                      <Markdown source={e.reasoning ?? ""} />
+                    </div>
+                    <div className="actions">
+                      {/* The reasoning alone. Carrying the outcome across
+                          would be this screen deciding, and the point of
+                          reading somebody else's argument is to judge whether
+                          it holds here. */}
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() =>
+                          startFrom({
+                            reasoning: `${e.reasoning ?? ""}\n\n_Quoted from ${e.product}; checked here._`,
+                          })
+                        }
+                      >
+                        Start from these words →
                       </button>
                     </div>
                   </div>

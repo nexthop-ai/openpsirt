@@ -193,49 +193,116 @@ func omitted(n int) string {
 // and mentioning it would describe a mistake of ours as news about their
 // software.
 func onlyFixes(rows []Changed) []Changed {
-	var fixed []Changed
-	for _, row := range rows {
-		// An allow-list rather than three named exclusions, and the same list
-		// the remediation rate counts: a closure added later is not a fix on
-		// either surface until somebody says it is, rather than progress on
-		// one and churn on the other.
-		if !row.Because.Resolves() {
-			continue
-		}
-		fixed = append(fixed, row)
-	}
+	fixed, _ := partition(rows)
 	return fixed
 }
 
+// partition splits what left the affected list into what was fixed and what
+// was not.
+//
+// **One spelling of the judgment, and both halves of it.** An allow-list
+// rather than named exclusions, and the same list the remediation rate counts:
+// a closure added later is not a fix on any surface until somebody says it is,
+// rather than progress on one and churn on the other. Returning the other half
+// as well is what stops a screen deciding it again — that is how a column
+// headed "Fixed" came to carry two scanner faults.
+func partition(rows []Changed) (fixed, closed []Changed) {
+	for _, row := range rows {
+		if row.Because.Resolves() {
+			fixed = append(fixed, row)
+			continue
+		}
+		closed = append(closed, row)
+	}
+	return fixed, closed
+}
+
 // section writes the lines, or nothing where there are none.
+//
+// **Grouped by the remediation, not by the issue.** One kernel upgrade closes
+// 917 issues at once, and a bullet per issue repeats the same version pair 917
+// times in a document going to a customer. The upgrade is stated once and the
+// issues it closed are listed under it, which is the shape the reader is
+// looking for: they want to know what to move to, and then which advisories
+// that answers.
 func section(out *strings.Builder, rows []Changed) {
 	if len(rows) == 0 {
 		return
 	}
-	// Worst first, then by name, so two runs over the same pair of builds
-	// produce the same document — a release note that reorders between reads
-	// is one nobody can diff.
-	ordered := append([]Changed(nil), rows...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		a, b := Ranks(ordered[i].Severity), Ranks(ordered[j].Severity)
-		if a != b {
-			return a > b
-		}
-		if ordered[i].Vulnerability != ordered[j].Vulnerability {
-			return ordered[i].Vulnerability < ordered[j].Vulnerability
-		}
-		return ordered[i].Component < ordered[j].Component
-	})
-
 	out.WriteString("\n")
-	for _, row := range ordered {
-		fmt.Fprintf(out, "- %s in %s", row.Vulnerability, row.Component)
-		if row.Severity != "" {
-			fmt.Fprintf(out, " (%s)", row.Severity)
+	for _, g := range grouped(rows) {
+		fmt.Fprintf(out, "- %s%s\n", g.component, how(g.rows[0]))
+		for _, row := range g.rows {
+			fmt.Fprintf(out, "  - %s", row.Vulnerability)
+			if row.Severity != "" {
+				fmt.Fprintf(out, " (%s)", row.Severity)
+			}
+			out.WriteString("\n")
 		}
-		out.WriteString(how(row))
-		out.WriteString("\n")
 	}
+}
+
+// remediation is one thing that was done and every issue it closed.
+type remediation struct {
+	component string
+	rows      []Changed
+}
+
+// grouped folds the fixed entries onto what was done about them, worst first.
+//
+// The key is the component with the closure reason and the version pair,
+// because those are what the line above the list states: two upgrades of the
+// same component in one comparison are two different answers to "what do I
+// move to", and folding them together would state one of them over both.
+//
+// Ordered worst first at both levels, and by name where two rank alike, so two
+// runs over the same comparison produce the same document — a release note
+// that reorders between reads is one nobody can diff.
+func grouped(rows []Changed) []remediation {
+	at := map[string]int{}
+	var groups []remediation
+	for _, row := range rows {
+		k := strings.Join([]string{
+			row.Component, string(row.Because), row.FromVersion, row.MovedTo,
+		}, "\x00")
+		i, seen := at[k]
+		if !seen {
+			i = len(groups)
+			at[k] = i
+			groups = append(groups, remediation{component: row.Component})
+		}
+		groups[i].rows = append(groups[i].rows, row)
+	}
+
+	worst := func(g remediation) int {
+		high := -1
+		for _, row := range g.rows {
+			if r := Ranks(row.Severity); r > high {
+				high = r
+			}
+		}
+		return high
+	}
+	for i := range groups {
+		sort.SliceStable(groups[i].rows, func(a, b int) bool {
+			ra, rb := Ranks(groups[i].rows[a].Severity), Ranks(groups[i].rows[b].Severity)
+			if ra != rb {
+				return ra > rb
+			}
+			return groups[i].rows[a].Vulnerability < groups[i].rows[b].Vulnerability
+		})
+	}
+	sort.SliceStable(groups, func(a, b int) bool {
+		wa, wb := worst(groups[a]), worst(groups[b])
+		if wa != wb {
+			return wa > wb
+		}
+		if groups[a].component != groups[b].component {
+			return groups[a].component < groups[b].component
+		}
+		return groups[a].rows[0].MovedTo < groups[b].rows[0].MovedTo
+	})
+	return groups
 }
 
 // how says what was done about it, and to what version where the version

@@ -774,10 +774,17 @@
 
 .cmp {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
-@media (width <= 900px) {
+/* Two wide before one, because four columns of issue identifiers on a laptop
+   wraps every row. */
+@media (width <= 1200px) {
+  .cmp {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (width <= 700px) {
   .cmp {
     grid-template-columns: 1fr;
   }
@@ -792,6 +799,9 @@
 }
 .col.was-fixed > header {
   border-bottom-color: var(--ok);
+}
+.col.not-fixed > header {
+  border-bottom-color: var(--sev-medium);
 }
 .col.newly > header {
   border-bottom-color: var(--sev-exploited);

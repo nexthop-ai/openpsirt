@@ -381,3 +381,128 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	}
 	return out, nil
 }
+
+// Elsewhere is an approved claim about this same issue at this same place, in
+// another product.
+//
+// **A place identity carries no product, deliberately, so that a place is
+// recognized across variants.** The same key recognizes it across products: two
+// products shipping the same library under the same consumer are the same code
+// in the same position, and a judgment one team made about it is evidence the
+// other has no other way to reach.
+type Elsewhere struct {
+	Claim     Claim
+	Decision  Decision
+	Reasoning string
+	// Product is which product it was decided in, by identifier. The name is
+	// resolved by the caller, which is where names are resolved.
+	ProductID  int64
+	ApprovedBy int64
+	ApprovedAt *time.Time
+}
+
+// DecidedElsewhere reads approved claims about this issue at these places in
+// other products, newest first.
+//
+// **Evidence, and never an outcome.** It is offered the way a supplier's VEX
+// statement is: as something to read and to quote, prefilling a reasoning where
+// somebody asks for it and deciding nothing. Another team's judgment about
+// their product is not a judgment about this one — what is shipped around the
+// component differs, which is the whole reason a place is a component at a
+// position rather than a component.
+//
+// **Narrowed by what the subject may read**, like every other query here, and
+// for a sharper reason than most: the rows are in another product, so a join
+// that did not carry the subject would hand somebody the reasoning, the
+// approver and the existence of an embargoed judgment in a product they cannot
+// see at all.
+func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, productID,
+	issueID int64, places []string) ([]Elsewhere, error) {
+
+	if len(places) == 0 {
+		return nil, nil
+	}
+	var rows []Decision
+	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
+		Where("de.product_id <> ?", productID).
+		Where("de.vulnerability_id = ?", issueID).
+		Where("de.place_identity IN (?)", bun.List(places)).
+		Where("de.state = ?", Approved).
+		Where("de.live_key IS NOT NULL").
+		Order("de.id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what was decided about this elsewhere: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	// One entry per claim, and at most a handful. A deployment carrying twenty
+	// products would otherwise put twenty blocks of somebody else's reasoning
+	// on a screen somebody is trying to decide on.
+	order := []int64{}
+	representative := map[int64]Decision{}
+	for _, row := range rows {
+		if _, seen := representative[row.ClaimID]; seen {
+			continue
+		}
+		representative[row.ClaimID] = row
+		order = append(order, row.ClaimID)
+		if len(order) == similarOffered {
+			break
+		}
+	}
+
+	var claims []Claim
+	if err := s.db.NewSelect().Model(&claims).
+		Where("id IN (?)", bun.List(order)).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the claims decided elsewhere: %w", err)
+	}
+	byID := make(map[int64]Claim, len(claims))
+	for _, claim := range claims {
+		byID[claim.ID] = claim
+	}
+
+	picked := make([]Decision, 0, len(order))
+	for _, claimID := range order {
+		picked = append(picked, representative[claimID])
+	}
+	reasoning, err := s.currentReasoning(ctx, picked)
+	if err != nil {
+		return nil, err
+	}
+
+	// Not one that has since been taken back, which both siblings in this file
+	// already ask. Undoing a batch withdraws its agreement and deliberately
+	// leaves the decision approved where another agreement still stands, so
+	// without this the newest row is the withdrawn one and the block names
+	// whoever took it back as the approver.
+	var approvals []Approval
+	if err := s.db.NewSelect().Model(&approvals).
+		Where("claim_id IN (?)", bun.List(order)).
+		Where("withdrawn_at IS NULL").
+		Order("id DESC").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read who agreed elsewhere: %w", err)
+	}
+	approver := map[int64]Approval{}
+	for _, approval := range approvals {
+		if _, seen := approver[approval.ClaimID]; !seen {
+			approver[approval.ClaimID] = approval
+		}
+	}
+
+	out := make([]Elsewhere, 0, len(order))
+	for _, claimID := range order {
+		row := representative[claimID]
+		one := Elsewhere{
+			Claim: byID[claimID], Decision: row, Reasoning: reasoning[row.ID],
+			ProductID: row.ProductID,
+		}
+		if agreed, ok := approver[claimID]; ok {
+			one.ApprovedBy = agreed.ApprovedBy
+			at := agreed.ApprovedAt
+			one.ApprovedAt = &at
+		}
+		out = append(out, one)
+	}
+	return out, nil
+}

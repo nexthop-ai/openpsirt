@@ -150,7 +150,7 @@ func (s *Schedule) leaseFor(ctx context.Context) time.Duration {
 
 // dueLimit is how many re-scans one cycle asks for.
 //
-// A bound rather than none, for the reason every bulk write here has one: a
+// A bound rather than none, for the reason every bulk judgment here has one: a
 // deployment tracking a great many builds would otherwise fill the queue in
 // one pass and push a producer's arriving inventories behind work that is not
 // urgent. What is left over is still due on the next cycle.

@@ -714,3 +714,262 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 		}
 	})
 }
+
+func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
+	// One bound governed two actions with opposite risk profiles. A bulk
+	// dismissal is bounded because nothing re-checks it: one sentence
+	// answering a thousand findings has to stay a size a reviewer can follow.
+	// A promise to upgrade is the one bulk write that verifies itself — the
+	// next scan re-checks every row it names — and narrowing one makes the
+	// record false, because the bump closes what it closes.
+	//
+	// In a real image one kernel bump reached 4,485 findings across 44,016
+	// places. Held to the shipped two thousand, the highest-value action in
+	// the data was refused by a factor of twenty-two, and the only escape was
+	// raising a setting that guards the dismissal path.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		// One, so anything covering more than a single place is past it. The
+		// fold here is five places.
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+			`{"value":"1"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The judgment, refused, which is what keeps this test honest: the cap
+		// is in force and reaching this path.
+		judged := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-CURL1/components/libcurl4t64/decision",
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
+				`"reasoning":"The transfer path is never reached."}`)
+		if judged.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a bulk judgment past the cap answered %d: %s",
+				judged.Code, judged.Body.String())
+		}
+
+		// And the promise, written.
+		promised := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/components/libcurl4t64/upgrade",
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
+				`"reasoning":"Taking the 8.5.0 bump.",`+
+				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+		if promised.Code != http.StatusCreated {
+			t.Fatalf("a promise past the cap answered %d: %s",
+				promised.Code, promised.Body.String())
+		}
+		var done struct {
+			Decisions int `json:"decisions"`
+			Issues    int `json:"issues"`
+		}
+		if err := json.Unmarshal(promised.Body.Bytes(), &done); err != nil {
+			t.Fatal(err)
+		}
+		// Everything the fold covers, not one row of it. A promise narrowed to
+		// the cap would record a bump answering one place when it answers
+		// five.
+		if done.Decisions <= 1 || done.Issues != 3 {
+			t.Errorf("the promise recorded %+v, want every place of the three issues", done)
+		}
+	})
+}
+
+func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
+	// The by-issue list folds to the source package: curl, libcurl4t64 and
+	// libcurl3t64 are one row. Keyed on the binary that was named, the bulk
+	// screen offered a quarter of what that row stood for and the judgment
+	// covered a quarter of what the person meant — four claims and four
+	// approvals to answer what reads as one thing.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+
+		// The candidate list, asked about one binary of the fold.
+		var candidates struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+				Places        int    `json:"places"`
+			} `json:"items"`
+			Findings int `json:"findings"`
+		}
+		read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+			"/components/libcurl4t64/issues", &candidates)
+		// Both siblings carry the two fixable issues, and the third sits on
+		// one of them: three issues, five findings across the fold.
+		if len(candidates.Items) != 3 || candidates.Findings != 5 {
+			t.Errorf("the candidates are %d issues over %d findings, want 3 over 5: %+v",
+				len(candidates.Items), candidates.Findings, candidates.Items)
+		}
+		for _, item := range candidates.Items {
+			if item.Vulnerability == "CVE-2026-CURL1" && item.Places != 2 {
+				t.Errorf("an issue at both packages of the fold says %d places", item.Places)
+			}
+		}
+
+		// And the judgment written from it covers the fold, in one claim.
+		decided := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/components/libcurl4t64/decisions",
+			`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"the whole fold",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if decided.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
+		}
+		var written struct {
+			Recorded int     `json:"recorded"`
+			IDs      []int64 `json:"ids"`
+		}
+		if err := json.Unmarshal(decided.Body.Bytes(), &written); err != nil {
+			t.Fatal(err)
+		}
+		// Both packages of the fold carry that issue, so one act answers both.
+		// Keyed on the named binary it answered one and reported that it had
+		// covered what the list showed.
+		if written.Recorded != 2 || len(written.IDs) != 2 {
+			t.Errorf("one judgment wrote %d decisions, want the two places of the fold",
+				written.Recorded)
+		}
+	})
+}
+
+func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
+	// The server resolves the places itself, correctly and for exactly this
+	// reason, and took the claimant's word for how the issue list was chosen.
+	// A claim reading "drivers this image does not build" over a set picked by
+	// ticking everything is indistinguishable in the record from an honest
+	// one, and what is asked for is how the set was chosen — which an approver
+	// has to be able to act on.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/components/libcurl4t64/decisions"
+
+		// Everything the component holds, described as though it were a subset.
+		everything := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"vulnerabilities":["CVE-2026-CURL1","CVE-2026-CURL2"],`+
+				`"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"only the ones in the transfer path",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if everything.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s",
+				everything.Code, everything.Body.String())
+		}
+		var made struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(everything.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+
+		var detail struct {
+			Claim struct {
+				SelectedBy string `json:"selected_by"`
+				Selection  *struct {
+					Contains string `json:"contains"`
+					Matched  int    `json:"matched"`
+					Named    int    `json:"named"`
+				} `json:"selection"`
+			} `json:"claim"`
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		claim := detail.Claim
+		if claim.Selection == nil {
+			t.Fatal("a bulk claim records no narrowing an approver could re-run")
+		}
+		// Three issues are open at the fold and none was narrowed away, so the
+		// sentence claiming a subset is visible as one: named two of the three
+		// with no narrowing at all.
+		if claim.Selection.Contains != "" {
+			t.Errorf("the claim says it narrowed by %q", claim.Selection.Contains)
+		}
+		if claim.Selection.Matched != 3 || claim.Selection.Named != 2 {
+			t.Errorf("the narrowing reached %d and named %d, want 3 and 2",
+				claim.Selection.Matched, claim.Selection.Named)
+		}
+		// And the prose is kept, because it is what the person meant to say.
+		if claim.SelectedBy != "only the ones in the transfer path" {
+			t.Errorf("the claimant's own words are %q", claim.SelectedBy)
+		}
+	})
+}
+
+func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
+	// The empty-term path proves the record exists; this one proves the term
+	// is re-run. Without it the escaped match that produces the number an
+	// approver checks the claim against could be deleted and every test would
+	// still pass, while the screen sends it on every narrowed claim.
+	eachReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedSiblings(t)
+		// One of the three issues says something the others do not. A percent
+		// sign in the text as well, because the escape is what stops a term
+		// holding one from selecting far more than the box said — and this is
+		// the set a bulk judgment is then recorded against.
+		if _, err := r.db.DB.NewUpdate().Table("vulnerability").
+			Set("description = ?", "A 100% reachable fault in the transfer driver.").
+			Where("identifier = ?", "CVE-2026-CURL1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/components/libcurl4t64/decisions"
+		decided := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"the transfer driver","contains":"driver",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if decided.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
+		}
+		var made struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		var detail struct {
+			Claim struct {
+				Selection *struct {
+					Contains string `json:"contains"`
+					Matched  int    `json:"matched"`
+					Named    int    `json:"named"`
+				} `json:"selection"`
+			} `json:"claim"`
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		if detail.Claim.Selection == nil {
+			t.Fatal("a narrowed claim records no narrowing")
+		}
+		one := detail.Claim.Selection
+		// One of the three matches that word, and one was claimed about: the
+		// sentence describes the set, which is what the two numbers say.
+		if one.Contains != "driver" || one.Matched != 1 || one.Named != 1 {
+			t.Errorf("the narrowing reads %+v, want driver reaching 1 and naming 1", one)
+		}
+
+		// And a term holding a percent matches the text that holds one rather
+		// than everything. Spliced raw it is a wildcard, and the claim would
+		// record three where the person saw one.
+		escaped := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"vulnerabilities":["CVE-2026-CURL2"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"the ones mentioning a percentage","contains":"100%",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if escaped.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s", escaped.Code, escaped.Body.String())
+		}
+		if err := json.Unmarshal(escaped.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		if detail.Claim.Selection == nil {
+			t.Fatal("a narrowed claim records no narrowing")
+		}
+		if got := detail.Claim.Selection.Matched; got != 1 {
+			t.Errorf("a term holding a percent reached %d issues, want the one whose "+
+				"text holds it", got)
+		}
+	})
+}

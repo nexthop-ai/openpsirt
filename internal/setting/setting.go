@@ -103,11 +103,17 @@ const (
 	DueHigh      = "remediation.due.high"
 	DueMedium    = "remediation.due.medium"
 	DueLow       = "remediation.due.low"
-	// TogetherCap is how many findings one action may claim about at once.
-	// A bound rather than none, because a single action writing an unbounded
-	// number of rows is a denial of service somebody triggers by accident. How
-	// generous it should be is a judgment about a product — a kernel's list is
-	// long — so it is tuned here rather than compiled in.
+	// TogetherCap is how many findings one bulk **judgment** may cover at
+	// once. A bound rather than none, because a single action writing an
+	// unbounded number of rows is a denial of service somebody triggers by
+	// accident. How generous it should be is a judgment about a product — a
+	// kernel's list is long — so it is tuned here rather than compiled in.
+	//
+	// **A promise to upgrade is not bounded by this, and by nothing else
+	// either.** The distinction is reversibility rather than size: nothing
+	// re-checks a dismissal, so one sentence answering a thousand findings has
+	// to stay a size a reviewer can follow, while the next scan re-checks
+	// every row a promise names.
 	TogetherCap = "triage.together-cap"
 	// QuietAfter is how long a declared build may go without a scan arriving
 	// before it is reported as having gone quiet.
@@ -159,7 +165,7 @@ const (
 	// that is refused is a build.
 	QueueBacklog = "queue.backlog"
 	// RoutingBatch is how many findings one pass of the routing sweep may
-	// place. A bulk write is bounded, and the bound is a setting: an
+	// place. A bulk judgment is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
 	RoutingBatch = "routing.batch"
@@ -167,7 +173,7 @@ const (
 	// product.
 	//
 	// A ceiling on rows one person writes one at a time, which is the
-	// neighboring case to a bulk write and is bounded for the same reason:
+	// neighboring case to a bulk judgment and is bounded for the same reason:
 	// nothing else stopped a script, or a keyboard shortcut held down, from
 	// filling the table — and the panel that lists them reads every row it
 	// finds on every open. Settable because how many narrowings a person
@@ -265,8 +271,8 @@ const DefaultRoutingBatch = 2000
 // hundred is a suspicious number.
 const DefaultSavedPerPerson = 100
 
-// DefaultTogetherCap is how many rows one action may write where nobody has
-// said.
+// DefaultTogetherCap is how many rows one bulk judgment may write where nobody
+// has said.
 //
 // Generous, because the case this exists for is a kernel: a real image put
 // 305,487 findings against one, and a person narrowing that down to the

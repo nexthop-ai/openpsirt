@@ -22,6 +22,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Approving a claim](#approving-a-claim)
 - [Setting rows aside](#setting-rows-aside)
 - [Holding part of a claim back](#holding-part-of-a-claim-back)
+- [Decided elsewhere](#decided-elsewhere)
 - [Extensions](#extensions)
 - [Decision lists on a finding](#decision-lists-on-a-finding)
 - [The review queue](#the-review-queue)
@@ -406,6 +407,25 @@ covers the whole fold, with no escape hatch. A claim still spans several folds �
 a judgment about many issues at one component, or one carried across builds —
 which is what makes splitting a real need that folding does not remove.
 
+## Decided elsewhere
+
+An approved claim about the same issue at the same place in another product,
+shown on the finding as a fourth block of evidence.
+
+A place identity is a hash of a consumer and a component with no product in it,
+deliberately, so that a place is recognized across variants. The same key
+recognizes it across products: two products shipping the same library under the
+same consumer are the same code in the same position, and a judgment one team
+made about it was reachable by nobody else.
+
+| Rule | Reason |
+|---|---|
+| **Evidence, never an outcome** | Another team's judgment about their product is not a judgment about this one. What is shipped around a component differs, which is the whole reason a place is a component at a position rather than a component |
+| Offered as a prefill for the reasoning, and the outcome is not carried across | The point of reading somebody else's argument is to judge whether it holds here. Carrying the outcome would make the screen decide |
+| Narrowed by what the subject may read, like every other query | A place identity spans products, so a join that did not carry the subject would hand somebody the reasoning, the approver and the existence of an embargoed judgment in a product they cannot see at all |
+| Approved claims only, and at most a handful | A proposal is nobody's conclusion yet, and a deployment carrying twenty products would otherwise put twenty blocks of somebody else's reasoning on a screen somebody is trying to decide on |
+| The same treatment a supplier's VEX statement gets | It is the same kind of thing: a judgment made by somebody else about code we also ship (REQ-31) |
+
 ## Extensions
 
 An extension records an existing judgment against a new issue at the same places,
@@ -706,6 +726,8 @@ in drivers a given image never builds.
 | Rule | |
 |---|---|
 | A separate decision per issue **and** per place | A claim built from one place of an issue would silence one consumer and leave the rest open while reporting it had covered them |
+| The component names a fold, not a binary package | The list somebody picks from folds the source package, so one vim row there is four packages at sixty-one places. Keyed on the binary that was named, the candidate list offered a quarter of what the row stood for and the judgment covered a quarter of what the person meant — four claims and four approvals to answer what reads as one thing |
+| The fold is read as a short list of identifiers, not reached through a join | These queries read their page off the finding table's covering index, and a join to the component's fold key put a third join under the aggregate: 0.35 s against 0.04 s on the kernel, which is 222,435 of 272,539 open rows. A fold is one source package at one version, so the list is short |
 | The places are resolved from the findings inside the writing transaction | A caller free to name a place would be choosing which decisions apply where, and a place read before the write is a fact about a database that has since moved |
 | How large the claim is, is said before it is submitted (REQ-27) | |
 | The claim may span more than one page of candidates | Selecting everything the narrowing matches fetches the rest rather than stopping at the page. A claim assembled a page at a time is eighteen claims where the person meant one |
@@ -713,6 +735,7 @@ in drivers a given image never builds.
 | What is exploited or critical can be excluded before claiming | Take the bulk, hand-triage the handful the judgment should not cover |
 | It always needs a second person, whatever the outcome | The short-deferral exception is about one finding somebody is putting off for a fortnight; one person answering hundreds in a single action is the case a second pair of eyes exists for |
 | Two limits: how many issues a request may name, and how many findings it may write | Each name may sit at many places, so a limit checked against the names would let a request naming two thousand issues write sixty thousand rows |
+| **The bound is reversibility, not size** | A judgment is bounded because nothing re-checks it: one sentence answering a thousand findings has to stay a size a reviewer can follow. A promise to upgrade is not, because the next scan re-checks every row it names, and narrowing one makes the record false — the bump closes what it closes. One cap governed both, and the highest-value action in a real image was refused by a factor of twenty-two while the only escape raised the guard on the dismissal path |
 
 The candidate list carries both numbers and the limit: how many issues the
 narrowing holds, how many findings those sit at, and how many one action may
@@ -732,6 +755,17 @@ supports it written into the reasoning.
 How the set was narrowed is recorded with every claim in it, separately from the
 reasoning. Narrowing is how a candidate was found; the reasoning is why the
 claim is true. "These matched a word" is not a defense anybody would accept.
+
+**Prose alone cannot be checked**, so the narrowing is recorded twice: in the
+claimant's words, and as something an approver can re-run.
+
+| Rule | Reason |
+|---|---|
+| The narrowing is re-run where the claim is written, and what it reached is stored beside how many were named | A claim reading "drivers this image does not build" over a set chosen by ticking everything is indistinguishable in the record from an honest one. Equal counts say the claim is exactly what that narrowing returns; far apart, the sentence does not describe the set |
+| Re-run rather than sent | A count supplied with the request is the claimant's word twice over, which is the thing being fixed. The places are resolved here for the same reason |
+| Read with the same visibility rule the candidate list used | Two numbers compared against each other have to be counts of the same population |
+| It is evidence, and refuses nothing | A person may legitimately claim about part of what a narrowing returns — that is what picking from the list is. What was missing was any way for the approver to see that they had |
+| The claimant's own sentence is kept | It says what they meant, which the counts do not |
 
 ## Fix bundles
 
@@ -787,6 +821,8 @@ somebody decided and what a release was waiting on could come to disagree.
 | Recorded on the component's own screen | Ticking the releases the promise is for, naming the version and the date, and saying why. Ticking releases that need different versions is **two promises** |
 | Saying who carries it is part of the act | A person or a team, in the same transaction, so a promise nobody carries and a holder with no promise are both impossible. The handover is product-wide, and the level that matters is the strictest in the set — one embargoed finding among fifty makes the handover a disclosure |
 | The upgrade is reachable as a claim | Where its reasoning, its approval and the conversation about it already live |
+| **No bound on how much one promise covers** | Every other check a bulk judgment makes still applies — who may decide, what each proposal must carry, who it is recorded as made by — and the count is not one of them. A real image put one kernel bump at 4,485 findings across 44,016 places, and a cumulative bundle at 243,945; narrowing that to a cap would record a bump answering part of what it answers |
+| One transaction, not chunked and not a job | The cap was doing two jobs and only one was reviewability. The other was transaction size, and it was measured rather than assumed, on the act itself: a promise over 243,950 places takes 8.3 s on SQLite, 8.4 s on MariaDB, 10.9 s on MySQL and 23.9 s on PostgreSQL, from 44,030 places at 1.2 s, 2.4 s, 3.5 s and 4.8 s. That is a deliberate one-off act at the largest size the data can ask for, so there is nothing for a chunk or a queue to solve |
 
 What it covers is derived, never marked. A covered finding is one a standing
 promise reaches, which the decision already records, so the mark is a join
@@ -800,6 +836,23 @@ rather than a tag across every row.
 | It is what the by-issue list asks unless told otherwise | Deciding covered work again one finding at a time is what the promise was made instead of. The by-component view is untouched, because that is where the upgrade is managed |
 | The default is written into the address | A chip above the list like every other filter, removable by clicking, traveling with a link somebody sends. That is why the parameter has a word for "either" |
 | Only the claim that currently stands counts | A promise that was withdrawn is not one |
+
+### Re-affirming a whole action
+
+A version bump lapses every row of the claim it moved under, so re-making them
+is one act at the grain the claim was made at.
+
+| Rule | Reason |
+|---|---|
+| One act, one reasoning, one new claim | Deciding is bulk-capable at three grains and re-deciding was capable at none. A team answering one kernel issue writes a decision at each of its 45 places in one action; restoring them was 45 requests with 45 separately typed justifications |
+| The rows are resolved here, not named | A caller free to name them would be choosing which agreements get carried forward, and would be naming rows it read before the write |
+| Each lapsed place is re-made at the versions it has now, in every build it is open in | The versions are what a decision expires on, so a place open at two versions is two decisions. A place open nowhere is not re-made, which is a finding that closed rather than a fault |
+| The claimant's, and nobody else's | An approver doing it becomes proposer of the new claim while their own earlier agreement is carried onto it, which is one person on both sides of the control |
+| Any row escalating sends the whole act back | An approver works at the unit the proposer acted at (REQ-28). Asked per row, an act covering 45 places could write 44 standing decisions and one waiting, which is agreeing to part of an argument somebody was shown whole |
+| The carried agreement is one row, taking effect on all of them together | An agreement is an agreement to a claim's words. Recorded per decision, one person agreeing once would appear in the record 45 times; taking effect per decision, half the act could stand while half waited |
+
+The lapsed population is reached by the findings list's `lapsed` state, and the
+act itself sits on the claim.
 
 ### Approval gate
 

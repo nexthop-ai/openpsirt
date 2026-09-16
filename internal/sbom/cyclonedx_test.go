@@ -789,3 +789,48 @@ func TestWhoSuppliedAComponentIsKeptWithoutMovingIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestAComponentsScopeIsRecordedOnTheEdgesIntoIt(t *testing.T) {
+	// "Not in the runtime path", "build-time only", "test-only" is the largest
+	// defensible deferral class a vendor has, and this format states it on the
+	// component. Read and dropped, a component the producer marked as not
+	// distributed produced findings identical to one that ships, and nothing
+	// anywhere said the producer had spoken.
+	//
+	// Nothing reads the word to decide anything: it is recorded as what the
+	// producer said, in the producer's own word.
+	for _, tc := range []struct {
+		stated string
+		want   string
+	}{
+		{"required", "required"},
+		{"optional", "optional"},
+		{"excluded", "excluded"},
+		// A word the format does not define says nothing this can interpret,
+		// and a column of arbitrary strings is a filter nobody can offer.
+		{"whatever-the-producer-felt-like", ""},
+		{"", ""},
+	} {
+		t.Run(tc.stated, func(t *testing.T) {
+			stated := ""
+			if tc.stated != "" {
+				stated = `, "scope": "` + tc.stated + `"`
+			}
+			doc := read(t, strings.Replace(minimal,
+				`"purl": "pkg:deb/debian/libc6@2.41"`,
+				`"purl": "pkg:deb/debian/libc6@2.41"`+stated, 1))
+			if len(doc.Dependencies) != 1 {
+				t.Fatalf("read %d edges, want 1", len(doc.Dependencies))
+			}
+			if got := doc.Dependencies[0].Kind; got != tc.want {
+				t.Errorf("the edge says %q, want %q", got, tc.want)
+			}
+			// And the component is held whatever it was scoped as. A scope is
+			// a fact about the document, not a reason to stop tracking
+			// something.
+			if len(doc.Components) != 1 {
+				t.Errorf("read %d components, want 1", len(doc.Components))
+			}
+		})
+	}
+}

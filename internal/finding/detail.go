@@ -181,7 +181,7 @@ type Evidence struct {
 //
 // No query in it, for the reason evidenceFrom has none.
 func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
-	shipped map[int64]string) []Sitting {
+	shipped map[int64]string, scopes map[[2]int64]string) []Sitting {
 
 	places := make([]Sitting, 0, len(rows))
 	at := make(map[string]int, len(rows))
@@ -221,12 +221,19 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 			}
 			continue
 		}
+		// What the producer called the edge into here. A place under the
+		// build itself is pulled in by nothing, which is the zero key.
+		var puller int64
+		if row.ConsumerID != nil {
+			puller = *row.ConsumerID
+		}
 		at[row.PlaceIdentity] = len(places)
 		places = append(places, Sitting{
 			PlaceIdentity: row.PlaceIdentity,
 			Component:     row.Component, Consumer: row.Consumer,
 			Suppressed: row.Suppressed, Decision: row.Decision, Claim: row.Claim,
 			Urgency: row.Urgency, Chain: walked,
+			DeclaredAs: scopes[[2]int64{row.ComponentID, puller}],
 		})
 	}
 	return places
@@ -358,6 +365,11 @@ type Sitting struct {
 	Consumer   string
 	Suppressed bool
 	Urgency    int64
+	// DeclaredAs is what the producer called this dependency, where it said
+	// anything: a CycloneDX component scope, or an SPDX lifecycle scope. It is
+	// evidence and nothing reads it to decide anything — not the ranking, not
+	// a prefilled outcome, and nothing is hidden by it.
+	DeclaredAs string
 	// Decision is the claim already standing here, where one does. Once
 	// one judgment can cover a chosen subset of places, a finding half
 	// answered has to look different from one nobody has touched —
@@ -622,7 +634,20 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, err
 	}
 
-	evidence.Places = placesOf(rows, chains, shipped)
+	// What the producer said each of these dependencies is, where it said
+	// anything. Read here rather than joined into the statement above: three
+	// more joins on a query already reaching five tables, for a word most
+	// inventories never state.
+	components := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		components = append(components, row.ComponentID)
+	}
+	scopes, err := graph.NewStore(s.db).DeclaredScopes(ctx, targetID, components)
+	if err != nil {
+		return nil, err
+	}
+
+	evidence.Places = placesOf(rows, chains, shipped, scopes)
 
 	// Who is dealing with it. Read here rather than left to a caller, so that
 	// the screen somebody reads a finding on is the screen they can hand it
