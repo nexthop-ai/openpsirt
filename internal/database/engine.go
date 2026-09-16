@@ -68,6 +68,11 @@ type Target struct {
 	DSN string
 	// Redacted is the URL with any password removed, safe to log.
 	Redacted string
+	// RequireEncryption says the deployment has stated that this connection
+	// must be encrypted, and one that is not is refused. It is asked of the
+	// connection rather than of the URL, because the engines spell the
+	// transport differently and a server may ignore what was asked for.
+	RequireEncryption bool
 }
 
 // ParseURL turns a database URL into something a driver can open.

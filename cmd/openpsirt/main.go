@@ -393,6 +393,7 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 	if err != nil {
 		return nil, err
 	}
+	target.RequireEncryption = cfg.DBRequireEncryption
 	db, err := database.OpenWithPool(ctx, target, database.Pool{
 		MaxOpen:     cfg.DBMaxOpen,
 		MaxIdle:     cfg.DBMaxIdle,
@@ -409,10 +410,15 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 	logger.Info("database connected",
 		"engine", db.Server.Engine, "version", db.Server.Version,
 		"transport", db.Server.Transport, "url", target.Redacted)
+	// Only where the deployment has not stated that encryption is required: a
+	// connection that did not get it is refused above where it has, so
+	// reaching here means this is the state that was chosen.
 	if db.Server.Engine.IsProduction() && db.Server.Transport == "none" {
 		logger.Warn("the database connection is not encrypted",
 			"engine", db.Server.Engine,
-			"remedy", "ask for encryption in OPENPSIRT_DATABASE_URL: sslmode=verify-full, or tls=true")
+			"remedy", "ask for encryption in OPENPSIRT_DATABASE_URL: sslmode=verify-full, "+
+				"or tls=true — and set "+database.RequiredEncryption+" to refuse a "+
+				"connection that does not get it")
 	}
 	if !db.Server.Engine.IsProduction() {
 		logger.Warn("this database is for development and testing only",

@@ -138,12 +138,60 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 		return nil, fmt.Errorf("%s %s is too old: %s or later is required",
 			server.Engine, server.Version, floor)
 	}
+	if err := encryptionAsAsked(server, target); err != nil {
+		_ = sqldb.Close()
+		return nil, err
+	}
 
 	// bun's dialect is chosen from the URL's scheme, which is right even when
 	// the server turns out to be MariaDB: the two share a dialect.
 	db := &DB{DB: bun.NewDB(sqldb, dialect()), Server: server}
 	DefaultPool().apply(db)
 	return db, nil
+}
+
+// RequiredEncryption is what a deployment says about the transport.
+//
+// Both drivers negotiate opportunistically — encrypted where the server offers
+// it, cleartext where it does not, and neither says which happened — so every
+// deployment took whatever it was given. That stays available and is now one
+// of two stated choices rather than the only behavior.
+const RequiredEncryption = "OPENPSIRT_DB_REQUIRE_ENCRYPTION"
+
+// encryptionAsAsked refuses a connection that did not get the encryption the
+// deployment said it must have.
+//
+// Asked of the connection rather than of the URL. The engines spell the
+// transport differently and each spelling has several values — `sslmode` has
+// six, `tls` has four and a custom name — so a check reading the URL would be
+// three parsers agreeing about what "encrypted" means, and would still be
+// wrong about a server that ignored what was asked for.
+//
+// A server that will not say is refused too. What the requirement asks for is
+// certainty, and "we could not find out" is not it.
+func encryptionAsAsked(server Server, target Target) error {
+	if !target.RequireEncryption {
+		return nil
+	}
+	if server.Engine == SQLite {
+		return fmt.Errorf(
+			"%s is set and this is SQLite, which is a file opened directly: "+
+				"there is no connection to encrypt", RequiredEncryption)
+	}
+	switch server.Transport {
+	case "none":
+		return fmt.Errorf(
+			"%s is set and the connection to %s at %s is in cleartext: "+
+				"ask for encryption in the database URL — sslmode=verify-full for "+
+				"PostgreSQL, tls=true for MySQL and MariaDB — or unset it",
+			RequiredEncryption, server.Engine, target.Redacted)
+	case "unknown":
+		return fmt.Errorf(
+			"%s is set and %s at %s would not say whether this connection is "+
+				"encrypted, so it cannot be relied on",
+			RequiredEncryption, server.Engine, target.Redacted)
+	}
+	return nil
 }
 
 func driverFor(e Engine) (driver string, dialect func() schema.Dialect, err error) {

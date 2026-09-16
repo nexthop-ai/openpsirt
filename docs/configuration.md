@@ -56,6 +56,7 @@ writes `text`.
 | `OPENPSIRT_DB_MAX_IDLE` | Most connections kept open idle | `25` |
 | `OPENPSIRT_DB_IDLE_TIMEOUT` | How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back | `1m` |
 | `OPENPSIRT_DB_CONN_LIFETIME` | How long a connection is used before it is replaced | `30m` |
+| `OPENPSIRT_DB_REQUIRE_ENCRYPTION` | Refuse to start where the connection to the database is not encrypted. See below | `false` |
 
 ### Encrypting the database connection
 
@@ -72,6 +73,21 @@ nobody checked. Ask for certainty in the URL.
 
 Anything the URL says about the transport is left alone, so `tls=skip-verify`
 or a `sslmode` of your own reaches the driver as written.
+
+**Say so where it is required.** With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set,
+the process asks the connection what it negotiated and refuses to start where
+that is cleartext — naming the URL, without its password, and what to put in
+it. Asking for encryption in the URL and being given none is a deployment that
+believes it is encrypted and is not, and nothing else says otherwise: the
+process logs the transport at every start, which is a line somebody has to
+read.
+
+| Where it is set | |
+|---|---|
+| The connection is encrypted | Nothing happens. The transport is logged as it always is |
+| The connection is in cleartext | Refused at startup, naming the setting |
+| The server will not say which | Refused. What this asks for is certainty, and "we could not find out" is not it |
+| The database is SQLite | Refused. A file opened directly has no connection to encrypt, and quietly doing nothing is what a setting that changes nothing looks like |
 
 ## Scanning
 

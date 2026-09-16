@@ -134,8 +134,9 @@ and the version required both named. The alternative is a failure much later, in
 whichever query first needs something the server cannot do.
 
 The connection is asked one further question at startup: what encryption it
-negotiated. That answer never stops a start — a server that will not say is
-still a server that answered the version question.
+negotiated. On its own that answer never stops a start — a server that will not
+say is still a server that answered the version question. It stops one where
+the deployment has said that encryption is required.
 
 ## Connection encryption
 
@@ -150,6 +151,10 @@ unless asked.
 | The default | Encrypted where the server offers it, cleartext where it does not, no certificate checked. The same on every engine, so one URL grammar no longer means two transports |
 | What it is not | A guarantee. A deployment needing one says so in the URL, and whatever the URL says about the transport is left as written — this sets a floor, it does not override an answer only the deployment can give |
 | How anybody knows | The connection is asked what it negotiated, and the answer is in the line that logs the engine and version. A production engine connected in cleartext is warned about by name, with the setting that fixes it |
+| Required is a stated choice | A deployment says that encryption is required, and a connection that did not get it is refused as the process starts. Taking whatever the server offers stays available and is the other choice; what changed is that it is chosen rather than the only behavior |
+| Required is asked of the connection, never of the URL | The engines spell the transport differently and each spelling has several values, so a check reading the URL would be three parsers agreeing about what "encrypted" means — and would still be wrong about a server that ignored what was asked for |
+| A server that will not say is refused under it | What the requirement asks for is certainty, and "we could not find out" is not it |
+| Required against SQLite is refused | A file opened directly has no connection to encrypt. Accepting it would make the setting one that changes nothing, which is worse than not offering it |
 
 Asked rather than assumed, because the intention and the outcome differ exactly
 when it matters: a server that does not offer encryption is answered in

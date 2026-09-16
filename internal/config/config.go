@@ -57,6 +57,13 @@ type Config struct {
 	DBMaxIdle     int
 	DBIdleTimeout time.Duration
 	DBLifetime    time.Duration
+	// DBRequireEncryption states that the connection to the database must be
+	// encrypted, and one that is not is refused as the process starts. Off is
+	// what every deployment had: encrypted where the server offers it, and
+	// cleartext where it does not. Both are choices now, and which one is in
+	// force is stated rather than inherited from what a server happened to
+	// offer.
+	DBRequireEncryption bool
 	// ScannerPath is where the vulnerability scanner lives. Empty means
 	// whatever the environment resolves.
 	//
@@ -303,6 +310,9 @@ func Load() (Config, error) {
 		DBMaxIdle:          r.number("DB_MAX_IDLE", 25),
 		DBIdleTimeout:      r.duration("DB_IDLE_TIMEOUT", time.Minute),
 		DBLifetime:         r.duration("DB_CONN_LIFETIME", 30*time.Minute),
+		// No default of its own and it follows nothing: a deployment either
+		// states this or it does not.
+		DBRequireEncryption: r.boolean("DB_REQUIRE_ENCRYPTION", false),
 	}
 	if r.err != nil {
 		return Config{}, r.err
