@@ -115,7 +115,11 @@ func (s *Store) ResolveToken(ctx context.Context, presented string) (Subject, er
 		// The account is gone, so the token is too.
 		return Subject{}, ErrDenied
 	}
-	subject, err := s.Resolve(ctx, person.Identity)
+	// Derived grants have to be fresh for a token. A token never signs in, so
+	// nothing re-derives what its owner holds while it is being used, and a
+	// group they left would go on granting them roles through it until they
+	// next signed in — which for somebody who has gone is never.
+	subject, err := s.resolve(ctx, person.Identity, true)
 	if err != nil {
 		return Subject{}, err
 	}

@@ -403,3 +403,75 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		}
 	})
 }
+
+// TestATokenStopsCarryingARoleAGroupStoppedDeriving holds the line that a grant
+// a group derived has to have been derived recently to still grant anything
+// through a personal token.
+//
+// Membership is read at sign-in, and a sign-in replaces somebody's derived
+// grants whole — so a browser's are never older than its session. A token never
+// signs in. It resolves through its owner and reads whatever their last sign-in
+// wrote, so without a bound a group somebody left went on granting them roles
+// through that token until they next signed in, which for somebody who has gone
+// is never.
+//
+// The window is the session lifetime, which is the same one the access document
+// already names as how long a role a group withdrew can still be held. It was
+// true of a browser and false of a token.
+//
+// What an administrator assigned is untouched. That is a standing decision
+// rather than a reading of somebody's membership, and it does not go off.
+func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "scripted", "Scripted", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Assigned on one product and derived on the other, so that what the
+		// window takes away is distinguishable from the token simply failing.
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		derived := access.Grant{
+			PersonID: person.ID, ProductID: f.products["onie"],
+			Role: access.PublicRead, Source: access.Derived, Active: true,
+			// Older than the window below, which is what a person who stopped
+			// signing in leaves behind.
+			CreatedAt: time.Now().UTC().Add(-48 * time.Hour),
+		}
+		if _, err := f.db.DB.NewInsert().Model(&derived).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		_, secret, err := f.store.NewToken(ctx, person.ID, "scripting", nil, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		bounded := f.store.DerivingWithin(24 * time.Hour)
+		subject, err := bounded.ResolveToken(ctx, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if subject.Reads(access.Public, f.products["onie"]) {
+			t.Error("a token carried a role no group has derived since before the window")
+		}
+		if !subject.Reads(access.Public, f.products["sonic"]) {
+			t.Error("a token lost a role an administrator assigned, which does not go off")
+		}
+
+		// And the same grant, derived inside the window, still grants.
+		if _, err := f.db.DB.NewUpdate().Model((*access.Grant)(nil)).
+			Set("created_at = ?", time.Now().UTC()).
+			Where("id = ?", derived.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		subject, err = bounded.ResolveToken(ctx, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !subject.Reads(access.Public, f.products["onie"]) {
+			t.Error("a freshly derived role granted nothing, so the window refuses everything")
+		}
+	})
+}

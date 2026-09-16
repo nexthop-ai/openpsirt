@@ -759,6 +759,15 @@ typed: a lifetime of a year made every browser sign-in last a year. Refused
 rather than quietly shortened, at the settings write and at startup, so that
 somebody who asks for more hears the limit rather than discovering it later.
 
+**It bounds a personal token as well, and does so differently.** Membership is
+read at sign-in and a sign-in replaces somebody's derived grants whole, so a
+browser's are never older than its session. A token never signs in: it resolves
+through its owner and reads whatever their last sign-in wrote. So a derived
+grant is in force for a token only while it is younger than this window, and a
+group somebody left stops granting them roles through a token even if they never
+sign in again. What an administrator assigned is untouched — that is a standing
+decision rather than a reading of somebody's membership.
+
 Thirty is a judgment rather than a commitment. Nothing has been decided about
 where the ceiling belongs, and somebody could reasonably say ninety — it is the
 owner's to settle, and `TODO.md` carries it until they do.

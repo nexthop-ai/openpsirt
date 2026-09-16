@@ -524,7 +524,7 @@ reach the filesystem and restart the process.
 |---|---|
 | The five deadline windows | Exploited, critical, high, medium, low |
 | The deferral threshold | How long something may be put off before a second person has to agree |
-| The session lifetime | Also the window in which somebody who moved out of a team still holds what the team gave them |
+| The session lifetime | Also the window in which somebody who moved out of a team still holds what the team gave them, through a browser and through a personal token alike |
 | The token ceiling | The longest a personal token may last |
 | The limit on one action | How many findings a single judgment may cover |
 | The triage floor | The severity below which findings are recorded and counted but kept off the working list. A product may state its own |
