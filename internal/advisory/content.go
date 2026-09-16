@@ -218,28 +218,36 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 
 // remediationsFor is what a reader can do, from what is true now.
 //
+// **Stated for the releases that carry the flaw**, which is who a remediation
+// is for: CSAF § 3.2.3.12.6 defines the product identifiers as what the item
+// applies to, and § 3.2.3.12.1 defines a vendor fix as one for the affected
+// product. Pointed at the releases that are already fixed, the customer who
+// has to act reads an advisory with no remediation for them, and the release
+// that needs nothing is told to update. Which release to move to is what the
+// details say.
+//
 // **Nothing about planned work.** A commitment is one build's plan, agreed to
 // inside this deployment; the same sentence in a published advisory is a
-// promise to a customer about a date. Whether to make one is the publisher's,
-// so a remediation states a release that no longer carries the flaw and says
-// nothing where every release still does — which is what the format reads
-// silence as anyway.
+// promise to a customer about a date, and whether to make one is the
+// publisher's.
 func remediationsFor(fixed, affected []string) []Remediation {
+	// Nothing to remediate where nothing carries it: a document about a flaw
+	// every release has left behind is a record rather than a warning.
+	if len(affected) == 0 {
+		return nil
+	}
 	if len(fixed) > 0 {
 		return []Remediation{{
 			Category:   "vendor_fix",
 			Details:    "Update to a release in which this flaw is fixed.",
-			ProductIDs: fixed,
-		}}
-	}
-	if len(affected) > 0 {
-		return []Remediation{{
-			Category:   "none_available",
-			Details:    "No release fixing this is available.",
 			ProductIDs: affected,
 		}}
 	}
-	return nil
+	return []Remediation{{
+		Category:   "none_available",
+		Details:    "No release fixing this is available.",
+		ProductIDs: affected,
+	}}
 }
 
 // distributionFor is how far the document may travel.
@@ -259,20 +267,29 @@ func distributionFor(status string) *Distribution {
 
 // profileOf is the category the document may honestly declare.
 //
-// The security-advisory profile requires more than the generic one: notes on
-// the document and on the vulnerability, somewhere to go, a product tree and a
-// statement about each release. A document declaring a profile it fails is
-// dropped by the tooling that reads it, which is the one use a generated
-// advisory has — so where the deployment holds nothing to point at, the
-// document says it is a base document rather than claiming a profile and
-// failing its tests.
+// **CSAF 2.0 § 4.4.** The security-advisory profile is the base profile plus a
+// product tree, the vulnerabilities, and notes and a status on each of them.
+// Notes and references on the *document* are § 4.3's requirement — the
+// informational advisory, which is the profile for a document that carries no
+// vulnerabilities at all and therefore has nothing but prose and somewhere to
+// go.
+//
+// Gated on § 4.3's list, a flaw nobody outside has written up — which is
+// every flaw of our own before a feed carries it — declared the base profile,
+// and a customer's tooling filtering for security advisories skipped it.
 //
 // The VEX profile is a separate question and is not assembled here: its point
 // is the not-affected justification.
 func profileOf(doc *Document) string {
-	if len(doc.Document.Notes) == 0 || len(doc.Document.References) == 0 {
-		return "csaf_base"
-	}
+	return Categorized(doc)
+}
+
+// Categorized is the same question asked of a document somebody already has.
+//
+// Exported so the rule can be watched to fail: the arm that refuses is
+// unreachable through the store, because every document it assembles carries a
+// product tree and one vulnerability.
+func Categorized(doc *Document) string {
 	if len(doc.ProductTree.Branches) == 0 || len(doc.Vulnerabilities) == 0 {
 		return "csaf_base"
 	}

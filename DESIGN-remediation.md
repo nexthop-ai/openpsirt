@@ -331,8 +331,8 @@ held. Nothing is sent anywhere.
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
 | The document's version is the last number its own revision history states | Counted separately the two disagreed the moment an advisory had been issued once, and a validator compares them. The two agreed by accident only for a document nobody had published, which is why it went unseen |
 | The publisher's category is one of the six the standard names, refused at startup otherwise | The value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them — which is the one use a generated advisory has |
-| The document declares the profile it satisfies, worked out from what it turned out to carry | The security-advisory profile requires notes on the document and on the vulnerability, somewhere to go, a product tree and a statement per release. Declared unconditionally, a document missing any of them fails the profile's own tests and is dropped by the tooling that reads it |
-| A flaw nobody has written up anywhere generates a base document | It has nowhere to point, and the alternative is claiming a profile it fails. The document earns the advisory profile when there is somewhere — which is what happens as a flaw of ours is assigned a name and the feeds start carrying it |
+| The document declares the profile it satisfies, worked out from what it turned out to carry | Declared unconditionally, a document missing a profile-mandatory element fails that profile's own tests and is dropped by the tooling that reads it |
+| The security-advisory profile is the product tree, the vulnerabilities, and notes and a status on each | The standard's own list. Notes and references on the *document* belong to the informational advisory — the profile for a document carrying no vulnerabilities at all — and gating on those declared a base document for every flaw of ours that nobody outside had written up yet, which a customer's tooling filtering for security advisories skips |
 
 ### What the document carries
 
@@ -345,7 +345,7 @@ somebody deciding whether to act.
 | References | The issue's write-up and everywhere else a report points, each address once | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's |
 | Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector under a scheme this deployment does not score yields nothing rather than a number under the wrong formula |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gave it so somebody could reply, not so it could be published, and "anonymous" is a real answer to the question the credit field asks |
-| Remediations | The releases that no longer carry the flaw | Nothing about planned work. A commitment is one build's internal plan; the same sentence in a published advisory is a promise to a customer about a date, and making one is the publisher's |
+| Remediations | Stated for the releases that still carry the flaw | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. Which release to move to is what the details say. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
 | Distribution | The same fact the tracking status reads — a draft is RED, a disclosed document is WHITE | Handing a draft to somebody who may pass it on is the disclosure the embargo exists to hold. The labels are the standard's four, which is why a final document is WHITE rather than the word the protocol renamed it to |
 
 An address a report supplied goes through the rule an address stored beside a
@@ -432,9 +432,8 @@ its own product is a vendor, which is what the format wants to be told.
 ## Not built
 
 The CSAF document's VEX profile. The generated document is categorized as a
-security advisory, or as a base document where it carries too little for that,
-rather than as VEX — that profile's point is "not affected, and here is why",
-and those justifications are not assembled into it.
+security advisory rather than as VEX — that profile's point is "not affected,
+and here is why", and those justifications are not assembled into it.
 The vocabulary is already correct; what is missing is the mapping from a
 decision to the releases it covers. This does not concern the OpenVEX document
 above, which is built and is a different document for a different reader.

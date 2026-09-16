@@ -93,13 +93,13 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		if doc.Document.CSAFVersion != "2.0" {
 			t.Errorf("the document claims CSAF %q", doc.Document.CSAFVersion)
 		}
-		// The category follows what the document can support. Nothing has
-		// been written up anywhere for a flaw recorded a moment ago, so it
-		// carries no references and cannot meet the security-advisory
-		// profile's own tests — and a document declaring a profile it fails
-		// is one a reader's tooling drops. The other arm, where there is
-		// somewhere to point, is covered where the document is assembled.
-		if doc.Document.Category != "csaf_base" {
+		// A flaw of our own, recorded a moment ago and written up nowhere.
+		// That is the security-advisory profile's whole subject — CSAF § 4.4
+		// asks for a product tree, the vulnerabilities and notes and a status
+		// on each, and asks nothing of the document's own notes or
+		// references. Declared the base profile, a customer's tooling
+		// filtering for security advisories skips it.
+		if doc.Document.Category != "csaf_security_advisory" {
 			t.Errorf("the document is categorized %q", doc.Document.Category)
 		}
 		if doc.Document.Tracking.ID != recorded.Identifier {

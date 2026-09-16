@@ -500,9 +500,13 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Stated for the release that still carries it, which is who a
+		// remediation is for: the one that is already fixed has nothing to do,
+		// and naming it leaves the customer who has to act reading an advisory
+		// with no remediation in it.
 		fix := doc.Vulnerabilities[0].Remediations
 		if len(fix) != 1 || fix[0].Category != "vendor_fix" ||
-			!slices.Equal(fix[0].ProductIDs, []string{"sonic:" + fixtures.TagName + ":broadcom"}) {
+			!slices.Equal(fix[0].ProductIDs, []string{"sonic:master:broadcom"}) {
 			t.Errorf("the remediations read %+v", fix)
 		}
 	})
@@ -516,14 +520,30 @@ func TestTheDocumentDeclaresOnlyAProfileItSatisfies(t *testing.T) {
 		ctx := t.Context()
 		identifier := f.recorded(t, f.master)
 
-		// Nothing is held to point at, so the profile cannot be satisfied and
-		// the document does not claim it.
+		// A flaw of our own that nobody outside has written up: no references
+		// anywhere, and the security-advisory profile asks for none. Gated on
+		// the informational advisory's list instead, this declared the base
+		// profile and a customer's tooling filtering for security advisories
+		// skipped it.
 		doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
 		if err != nil {
 			t.Fatalf("generating: %v", err)
 		}
-		if doc.Document.Category != "csaf_base" {
-			t.Errorf("a document with nothing to point at declares %q", doc.Document.Category)
+		if len(doc.Document.References) != 0 {
+			t.Fatalf("the fixture holds references, so this checks nothing: %+v",
+				doc.Document.References)
+		}
+		if doc.Document.Category != "csaf_security_advisory" {
+			t.Errorf("a flaw nobody has written up declares %q", doc.Document.Category)
+		}
+		required(t, doc)
+
+		// And a document that carries nothing to make a statement about is
+		// not one: the profile is the product tree and the vulnerabilities.
+		bare := *doc
+		bare.Vulnerabilities = nil
+		if got := advisory.Categorized(&bare); got != "csaf_base" {
+			t.Errorf("a document with no vulnerabilities declares %q", got)
 		}
 
 		f.pointsAt(t, identifier, "https://example.test/advisories/1")
@@ -566,9 +586,11 @@ func required(t *testing.T, doc *advisory.Document) {
 		"/document/tracking/version", "/document/tracking/initial_release_date",
 		"/document/tracking/current_release_date", "/document/tracking/revision_history",
 	}
+	// CSAF 2.0 § 4.4: the base profile plus these. Notes and references on
+	// the document are § 4.3's requirement — the informational advisory,
+	// which carries no vulnerabilities at all.
 	profile := []string{
-		"/document/notes", "/document/references", "/product_tree",
-		"/vulnerabilities", "/vulnerabilities/0/notes",
+		"/product_tree", "/vulnerabilities", "/vulnerabilities/0/notes",
 		"/vulnerabilities/0/product_status",
 	}
 	wanted := generic
@@ -608,7 +630,7 @@ func required(t *testing.T, doc *advisory.Document) {
 
 	// The notes are the one element with a condition beyond being present:
 	// the categories a reader of a note can act on.
-	for _, pointer := range []string{"/document/notes", "/vulnerabilities/0/notes"} {
+	for _, pointer := range []string{"/vulnerabilities/0/notes"} {
 		if doc.Document.Category != "csaf_security_advisory" {
 			continue
 		}
