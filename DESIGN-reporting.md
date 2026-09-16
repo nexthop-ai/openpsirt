@@ -22,6 +22,7 @@ this document is its own.
 - [Holder workload](#holder-workload)
 - [Inheritance preview](#inheritance-preview)
 - [Remediation metrics](#remediation-metrics)
+- [Where the effort went](#where-the-effort-went)
 - [Triage latency](#triage-latency)
 - [Repeated deferrals](#repeated-deferrals)
 - [Subtree trends](#subtree-trends)
@@ -299,6 +300,24 @@ the answer comes back as a fraction of a day: declaring it a whole number scanne
 on none of the four — one refused a float outright and three handed back a
 decimal string.
 
+## Where the effort went
+
+What the judgments in a period were about, most argued first: the component,
+the product, how many arguments were made, how far they reached, how many
+people made them, and what came out of them.
+
+Every other figure here counts the backlog. None of them answers what a
+planning meeting asks — what the quarter actually went into — and it is the one
+a manager has to answer without any of the others.
+
+| Rule | Reason |
+|---|---|
+| Counted in claims, with the places beside them | A claim is one person's act. Counted by its rows, this would measure how far a component fans out through an image, and the component every image vendors would be the answer every quarter. Both, because ten claims over ten places and one claim over a thousand are different afternoons |
+| What came out of them is part of the answer | Forty arguments that dismissed forty and forty that promised forty upgrades are different quarters, and a report carrying only the volume says they are the same |
+| What a judgment was about is reached through the findings at its place | A decision names a place rather than a component. A judgment about something since removed still names what it was about, which is what a report about where the time went has to keep |
+| Dated by when a judgment was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the record dates by |
+| It takes the same period and the same scope the other reports do | One product or one team, so a manager reads their own quarter rather than the deployment's |
+
 ## Triage latency
 
 Two waits, per severity, because a critical waiting a week and a low waiting a
@@ -515,6 +534,7 @@ disposition register have sections above.
 | Scan coverage | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. The front page names the three quietest and the inventories screen answers for one product; this answers for the estate |
 | Releases out of support | The releases whose date has passed, and — asked for — the ones about to, how long ago or how long there is left, and how many issues are still open against each, ordered by what is open. Past end-of-life the deadline is removed from every open finding, so none of that pile is overdue, none is due soon, and none of it reaches a figure built on either. That is correct — no work will land there — and it is what makes asking the only way to see it. A date inherited from the product says so: a release following a date and one that stated the same date are different, and only the first moves when the product changes its mind |
 | Rubber-stamp | How much a second pair of eyes actually did. Its sections are below |
+| Where the effort went | What the judgments in a period were about, most argued first, with what came out of them. It has a section of its own above |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
 | Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, because the published document belongs to whoever published it and the digest is what makes comparing the two possible |

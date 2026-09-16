@@ -65,6 +65,12 @@ export const CATALOG: Report[] = [
       "How much a second pair of eyes actually did: what stands on one person, who agrees with whom, what was agreed in bulk, and what covers more now than when somebody agreed to it.",
   },
   {
+    slug: "where-the-effort-went",
+    name: "Where the effort went",
+    answers:
+      "What the judgments in a period were about, most argued first: which component, how many arguments, how far they reached, and what came out of them. Every other report counts the backlog; this one says what the quarter went into.",
+  },
+  {
     slug: "deadline-compliance",
     name: "Deadline compliance",
     answers:

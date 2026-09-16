@@ -876,6 +876,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/effort": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report where triage effort went
+         * @description What the judgments in a period were about, worst first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
+         *
+         *     **Every other figure here counts the backlog.** What is open, what is overdue, how long things wait. None of them answers the question a planning meeting asks — what did the quarter actually go into — and it is the one a manager has to answer without any of the others.
+         *
+         *     **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image rather than anybody's afternoon. Both numbers are here, because ten claims over ten places and one claim over a thousand are different afternoons.
+         *
+         *     Takes the same period and the same scope the other reports do, and is narrowed by what you may see.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-effort"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/findings": {
         parameters: {
             query?: never;
@@ -6861,6 +6889,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodySpentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodySpentBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SpentBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyStreamBody: {
             /**
              * Format: uri
@@ -8497,6 +8536,41 @@ export interface components {
             place: string;
             /** @description The build has already argued this place away */
             suppressed?: boolean;
+        };
+        SpentBody: {
+            /**
+             * Format: int64
+             * @description Arguments made about it in the period
+             */
+            claims: number;
+            /** @description What the judgments were about, by name. Empty where nothing in any build carries the place any more */
+            component: string;
+            /**
+             * Format: int64
+             * @description Places those reached
+             */
+            decisions: number;
+            /**
+             * Format: int64
+             * @description Claims that put it off
+             */
+            deferred: number;
+            /**
+             * Format: int64
+             * @description Claims that argued it away
+             */
+            dismissed: number;
+            /**
+             * Format: int64
+             * @description How many different people argued about it
+             */
+            people: number;
+            product: string;
+            /**
+             * Format: int64
+             * @description Claims that promised work: an upgrade or a backport
+             */
+            promised: number;
         };
         "Split-claimRequest": {
             /**
@@ -10299,6 +10373,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-effort": {
+        parameters: {
+            query?: {
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
+                /** @description Limit to judgments made in one product, by name */
+                product?: string;
+                /** @description Limit to judgments this team's members proposed, by team name */
+                team?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodySpentBody"];
+                };
             };
             /** @description Error */
             default: {

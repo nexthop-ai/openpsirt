@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -86,35 +85,9 @@ func registerMeasures(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		var only triage.Measuring
-		if input.Product != "" {
-			// Resolved against what the caller may see, and a product they may
-			// not read answers as one nobody declared — anything else turns a
-			// report into a way to ask which products exist.
-			named, err := productNamedVisibly(ctx, in, subject, input.Product)
-			if err != nil {
-				return nil, err
-			}
-			only.Products = []int64{named.ID}
-		}
-		if input.Team != "" {
-			rights := access.NewStore(in.DB.DB)
-			team, err := rights.TeamByName(ctx, input.Team)
-			if err != nil {
-				return nil, absent(in.Logger, err, "that team could not be looked up",
-					func() error { return huma.Error404NotFound("no such team") })
-			}
-			members, err := rights.MembersOf(ctx, team.ID)
-			if err != nil {
-				return nil, wentWrong(in.Logger, "who is on that team could not be read", err)
-			}
-			// A team with nobody on it measures nothing rather than the
-			// deployment: an empty narrowing that widens is the failure every
-			// narrowing here is shaped to avoid.
-			only.People = members
-			if len(members) == 0 {
-				only.People = []int64{0}
-			}
+		only, err := measuring(ctx, in, subject, input.Product, input.Team)
+		if err != nil {
+			return nil, err
 		}
 		got, err := store.Measure(ctx, subject, only, since, until)
 		if err != nil {

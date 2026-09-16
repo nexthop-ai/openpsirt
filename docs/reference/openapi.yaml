@@ -4574,6 +4574,28 @@ components:
       required:
         - items
       type: object
+    ListBodySpentBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodySpentBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SpentBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyStreamBody:
       additionalProperties: false
       properties:
@@ -7342,6 +7364,48 @@ components:
       required:
         - place
         - component
+      type: object
+    SpentBody:
+      additionalProperties: false
+      properties:
+        claims:
+          description: Arguments made about it in the period
+          format: int64
+          type: integer
+        component:
+          description: What the judgments were about, by name. Empty where nothing in any build carries the place any more
+          type: string
+        decisions:
+          description: Places those reached
+          format: int64
+          type: integer
+        deferred:
+          description: Claims that put it off
+          format: int64
+          type: integer
+        dismissed:
+          description: Claims that argued it away
+          format: int64
+          type: integer
+        people:
+          description: How many different people argued about it
+          format: int64
+          type: integer
+        product:
+          type: string
+        promised:
+          description: "Claims that promised work: an upgrade or a backport"
+          format: int64
+          type: integer
+      required:
+        - product
+        - component
+        - claims
+        - decisions
+        - people
+        - promised
+        - dismissed
+        - deferred
       type: object
     Split-claimRequest:
       additionalProperties: false
@@ -10289,6 +10353,86 @@ paths:
         any_of:
           - private-triage
         note: Not the person who asked for it.
+  /v1/effort:
+    get:
+      description: |-
+        What the judgments in a period were about, worst first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
+
+        **Every other figure here counts the backlog.** What is open, what is overdue, how long things wait. None of them answers the question a planning meeting asks — what did the quarter actually go into — and it is the one a manager has to answer without any of the others.
+
+        **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image rather than anybody's afternoon. Both numbers are here, because ten claims over ten places and one claim over a thousand are different afternoons.
+
+        Takes the same period and the same scope the other reports do, and is narrowed by what you may see.
+
+        **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: get-effort
+      parameters:
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+            format: int64
+            maximum: 3650
+            minimum: 1
+            type: integer
+        - description: Limit to judgments made in one product, by name
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to judgments made in one product, by name
+            type: string
+        - description: Limit to judgments this team's members proposed, by team name
+          explode: false
+          in: query
+          name: team
+          schema:
+            description: Limit to judgments this team's members proposed, by team name
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodySpentBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Report where triage effort went
+      tags:
+        - Reports
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
   /v1/findings:
     get:
       description: |-

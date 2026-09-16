@@ -2,6 +2,7 @@ import { type ReactElement } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Compliance } from "./Compliance";
 import { Coverage } from "./Coverage";
+import { Effort } from "./Effort";
 import { Overview } from "./Overview";
 import { Published } from "./Published";
 import { Register } from "./Register";
@@ -23,6 +24,7 @@ export const PAGES: Record<string, ReactElement> = {
   "deadline-compliance": <Compliance />,
   "disposition-register": <Register />,
   "advisories-issued": <Published />,
+  "where-the-effort-went": <Effort />,
 };
 
 export function Report() {
