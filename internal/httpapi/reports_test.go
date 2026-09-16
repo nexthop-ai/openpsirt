@@ -1,9 +1,11 @@
 package httpapi_test
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -181,6 +183,63 @@ func TestARowDecidedTwoWaysStatesNeither(t *testing.T) {
 		if outcome, why := r.standsOn(t, "CVE-2026-9999"); outcome != "" || why != "" {
 			t.Errorf("a row argued away at one place and deferred at another states "+
 				"%q with reason %q", outcome, why)
+		}
+	})
+}
+
+func TestTheComparisonFileSaysWhatTheScreenSays(t *testing.T) {
+	// An export answering less than the screen it was taken from is a file
+	// that quietly answers something else. The sign-off column is the whole
+	// point of the still-present list, and downloaded it was nine columns in
+	// which an approved not-applicable and a row nobody had looked at read
+	// alike.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
+			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
+		}
+
+		file := asPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/products/mine/comparison.csv?from=master&from_variant=broadcom"+
+				"&to=master&to_variant=broadcom&include_undisclosed=true", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d: %s", file.Code, file.Body.String())
+		}
+		lines, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := rowsUnder(lines)
+		at := map[string]int{}
+		for i, column := range body[0] {
+			at[column] = i
+		}
+		for _, wanted := range []string{"state", "outcome", "justification", "due"} {
+			if _, held := at[wanted]; !held {
+				t.Fatalf("the file has no %s column: %v", wanted, body[0])
+			}
+		}
+		var agreed, undecided int
+		for _, row := range body[1:] {
+			switch row[at["issue"]] {
+			case "CVE-2026-9999":
+				agreed++
+				if row[at["state"]] != "agreed" || row[at["outcome"]] != "not-applicable" {
+					t.Errorf("the agreed row reads state %q outcome %q",
+						row[at["state"]], row[at["outcome"]])
+				}
+			case "CVE-2026-1000":
+				undecided++
+				if row[at["state"]] != "undecided" || row[at["outcome"]] != "" {
+					t.Errorf("the undecided row reads state %q outcome %q",
+						row[at["state"]], row[at["outcome"]])
+				}
+			}
+		}
+		if agreed != 1 || undecided != 1 {
+			t.Errorf("the file holds %d agreed and %d undecided rows", agreed, undecided)
 		}
 	})
 }

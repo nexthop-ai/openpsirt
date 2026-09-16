@@ -47,9 +47,9 @@ type BundleBody struct {
 // BundleQuery is what narrows the fix-bundle list.
 //
 // One struct for the screen and the file, because they are one question. An
-// export declaring its own parameters drifts from the list it came from — two
-// here did, and nineteen filters arrived and were dropped before the handler
-// ran, with nothing rejecting an undeclared parameter to say so.
+// export declaring its own parameters drifts from the list it came from, and
+// nothing rejects an undeclared parameter — so the filters a caller sent
+// arrive and are dropped before the handler runs, with no error and no clue.
 type BundleQuery struct {
 	Stream    string     `query:"stream" doc:"Limit to one branch or tag"`
 	Variant   string     `query:"variant" doc:"Limit to one variant"`

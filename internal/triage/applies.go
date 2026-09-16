@@ -299,7 +299,11 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 				`WHERE fc.id = de.claim_id AND fc.deferred_until IS NOT NULL `+
 				`AND fc.deferred_until <= ?))`, LapsedState, s.now())
 		}
-		return q
+		// What the judgment was about, through the one spelling the record's
+		// own page uses. Stated in the filter and applied by only one of the
+		// two readers, a caller that set any of the three got the whole
+		// unnarrowed list back with no complaint.
+		return aboutTheSamePlaces(q, subject, f)
 	}
 
 	total, err := narrow(s.db.NewSelect().Model((*Decision)(nil))).Count(ctx)

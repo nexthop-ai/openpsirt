@@ -75,6 +75,54 @@ func (j Judged) BySomebodyElse() bool {
 	return false
 }
 
+// aboutTheSamePlaces narrows to what a judgment was about: one issue, one
+// component, one build.
+//
+// All three are reached through the findings at the place, because a decision
+// names a place rather than a component and names no build at all — it is
+// keyed on the product, the issue and the place, so that it carries across the
+// releases that share the code. A judgment about something since removed
+// still names what it was about, which is what an audit asks for.
+//
+// Written once because the record's page and its file both narrow this way,
+// and a filter applied by one of them and not the other is a list somebody
+// reads as narrowed.
+func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *bun.SelectQuery {
+	if f.Issue != "" {
+		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS "iv"`+
+			` WHERE iv.id = de.vulnerability_id AND iv.identifier = ?)`, f.Issue)
+	}
+	if f.Component != "" {
+		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
+			` JOIN "component" AS "cc" ON cc.id = cf.component_id`+
+			` WHERE cf.vulnerability_id = de.vulnerability_id`+
+			` AND cf.place_identity = de.place_identity AND cc.name = ?)`, f.Component)
+	}
+	// One build, with the build's own product required to be the one that
+	// made the judgment: a place identity carries no product, so the match
+	// alone would answer with another product's judgment about the same code.
+	//
+	// Narrowed by what this reader may see, like the rows themselves: an
+	// undisclosed finding is what puts a place in a build, and a judgment
+	// matching through one is a judgment matched by something not shown.
+	if f.TargetID != 0 {
+		mayRead, readArgs := readableFindingsOn(subject, "bf", "de.product_id")
+		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
+			JOIN "target" AS "bt" ON bt.id = bf.target_id
+			JOIN "stream" AS "bs" ON bs.id = bt.stream_id
+			WHERE bf.vulnerability_id = de.vulnerability_id
+			  AND bf.place_identity = de.place_identity
+			  AND bf.target_id = ? AND bs.product_id = de.product_id`
+		args := []any{f.TargetID}
+		if mayRead != "" {
+			clause += " AND " + mayRead
+			args = append(args, readArgs...)
+		}
+		q = q.Where(clause+")", args...)
+	}
+	return q
+}
+
 // Audit returns the judgments made in a period, newest first, with everything
 // needed to read one without opening it.
 //
@@ -134,43 +182,7 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 				` WHERE ap.claim_id = de.claim_id AND ap.withdrawn_at IS NULL`+
 				` AND ape.identity = ?)`, f.Approver)
 		}
-		if f.Issue != "" {
-			q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS "iv"`+
-				` WHERE iv.id = de.vulnerability_id AND iv.identifier = ?)`, f.Issue)
-		}
-		// The component is reached through a finding at the place, the same
-		// way what a judgment was about is read for the rows themselves. A
-		// judgment about something since removed still names it, which is
-		// exactly what an audit asks for.
-		if f.Component != "" {
-			q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
-				` JOIN "component" AS "cc" ON cc.id = cf.component_id`+
-				` WHERE cf.vulnerability_id = de.vulnerability_id`+
-				` AND cf.place_identity = de.place_identity AND cc.name = ?)`, f.Component)
-		}
-		// One build. Reached the same way, and with the build's own product
-		// required to be the one that made the judgment: a place identity
-		// carries no product, so the match alone would answer with another
-		// product's judgment about the same code.
-		//
-		// Narrowed by what this reader may see, like the rows themselves: an
-		// undisclosed finding is what puts a place in a build, and a judgment
-		// matching through one is a judgment matched by something not shown.
-		if f.TargetID != 0 {
-			mayRead, readArgs := readableFindingsOn(subject, "bf", "de.product_id")
-			clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
-				JOIN "target" AS "bt" ON bt.id = bf.target_id
-				JOIN "stream" AS "bs" ON bs.id = bt.stream_id
-				WHERE bf.vulnerability_id = de.vulnerability_id
-				  AND bf.place_identity = de.place_identity
-				  AND bf.target_id = ? AND bs.product_id = de.product_id`
-			args := []any{f.TargetID}
-			if mayRead != "" {
-				clause += " AND " + mayRead
-				args = append(args, readArgs...)
-			}
-			q = q.Where(clause+")", args...)
-		}
+		q = aboutTheSamePlaces(q, subject, f)
 		return q
 	}
 

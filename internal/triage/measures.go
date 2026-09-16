@@ -275,10 +275,11 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 
 // throughput is what each person got through in the window.
 //
-// Four counts from three tables, keyed on the person rather than joined into
-// one statement: a claim proposed, an agreement given, a claim sent back and a
-// claim withdrawn are four different rows in three places, and one query
-// counting all four would multiply them together.
+// Three counts from two tables, keyed on the person rather than joined into
+// one statement: a claim proposed, one withdrawn and an agreement given are
+// different rows in different places, and one query counting them together
+// would multiply them. How much came back is counted for the deployment
+// rather than per person, so it is read beside these rather than among them.
 func (s *Store) throughput(ctx context.Context, subject access.Subject, only Measuring,
 	since, until time.Time) ([]Worked, error) {
 

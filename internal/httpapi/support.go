@@ -223,10 +223,13 @@ func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
 		if scope.StreamID != nil && *scope.StreamID != release.StreamID {
 			continue
 		}
-		// Truncated toward zero either way, so a date three days ahead reads
-		// as three days left rather than as two: both halves of this are a
-		// count of whole days somebody plans in.
-		since := int(now.Sub(release.EndedOn).Hours() / 24)
+		// Whole days from today, which is the day the store's own predicate
+		// is truncated to. Counted from the instant, a release ending
+		// tomorrow read as zero days left on the screen that exists to warn
+		// about it: the difference is a few hours, and truncation toward zero
+		// swallowed it.
+		today := now.Truncate(24 * time.Hour)
+		since := int(today.Sub(release.EndedOn).Hours() / 24)
 		rows = append(rows, RetiredBody{
 			Product: release.Product, Stream: release.Stream,
 			Kind: string(release.Kind), EndedOn: release.EndedOn.Format(time.DateOnly),
@@ -244,6 +247,12 @@ func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
 			// What has ended is exposure now; what is about to is a date
 			// somebody can still act before.
 			return rows[i].Ended
+		case !rows[i].Ended && rows[i].EndedDays != rows[j].EndedDays:
+			// Soonest first among those, which is what the warning is for and
+			// what it says it is: ordered by what is open, the release with
+			// the most work outranked the one about to cross, and the one
+			// about to cross is the only one anybody can still act before.
+			return rows[i].EndedDays > rows[j].EndedDays
 		case rows[i].Open != rows[j].Open:
 			return rows[i].Open > rows[j].Open
 		case rows[i].EndedDays != rows[j].EndedDays:

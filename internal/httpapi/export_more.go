@@ -203,6 +203,7 @@ func registerComparisonExport(api huma.API, in Ingest) {
 			Header: []string{
 				"change", "issue", "component", "severity", "because",
 				"from version", "moved to", "arrived from", "closed by run",
+				"state", "outcome", "justification", "due",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				if offset > 0 {
@@ -213,24 +214,35 @@ func registerComparisonExport(api huma.API, in Ingest) {
 				for _, group := range []struct {
 					what string
 					of   []finding.Changed
+					// stands says the rows carry what the build decided about
+					// them, which is true of what is still there and of
+					// nothing else: what was fixed needs no justification and
+					// what is newly present has not been looked at yet.
+					stands bool
 				}{
-					{"fixed", comparison.Fixed},
+					{what: "fixed", of: comparison.Fixed},
 					// Apart from the fixes, by the same split the screen and
 					// the release note read: a superseded bump and a closure
 					// nothing explains are not work anybody did.
-					{"closed, not fixed", comparison.Closed},
-					{"newly present", comparison.Newly},
-					{"still present", comparison.Still},
+					{what: "closed, not fixed", of: comparison.Closed},
+					{what: "newly present", of: comparison.Newly},
+					{what: "still present", of: comparison.Still, stands: true},
 				} {
-					for _, row := range group.of {
+					// Read through the same function the screen reads, so the
+					// file cannot come to answer less than the screen it was
+					// taken from — which is what it did: an approved
+					// not-applicable and a row nobody had looked at were the
+					// same nine columns.
+					for _, body := range changed(group.of, true, group.stands) {
 						closedRun := ""
-						if row.ClosedRun != 0 {
-							closedRun = strconv.FormatInt(row.ClosedRun, 10)
+						if body.ClosedRun != 0 {
+							closedRun = strconv.FormatInt(body.ClosedRun, 10)
 						}
 						rows = append(rows, []string{
-							group.what, row.Vulnerability, row.Component, row.Severity,
-							string(row.Because), row.FromVersion, row.MovedTo, row.ArrivedFrom,
-							closedRun,
+							group.what, body.Vulnerability, body.Component, body.Severity,
+							body.Because, body.FromVersion, body.MovedTo, body.ArrivedFrom,
+							closedRun, body.State, string(body.Outcome),
+							string(body.Justification), body.Due,
 						})
 					}
 				}

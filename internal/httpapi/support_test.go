@@ -188,9 +188,11 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 			t.Error("a release whose date has not arrived is reported as ended")
 		}
 		// Negative, which is the same figure read the other way: how long is
-		// left rather than how long ago.
-		if ahead.Ending[0].EndedDays >= 0 {
-			t.Errorf("a date twenty days ahead reads as %d days ago",
+		// left rather than how long ago — and it is the whole number of days
+		// somebody plans in. Counted from the instant rather than from today,
+		// a release ending tomorrow read as zero days left.
+		if ahead.Ending[0].EndedDays != -20 {
+			t.Errorf("a date twenty days ahead reads as %d days",
 				ahead.Ending[0].EndedDays)
 		}
 		// And what leaves every overdue count on the day it crosses, which is
@@ -204,6 +206,18 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		if near := asked(t, "?within=5"); len(near.Ending) != 0 {
 			t.Errorf("a release ending in twenty days is warned about five days out: %+v",
 				near.Ending)
+		}
+
+		// And the warning is ordered by when each one goes, which is what it
+		// says it is: ordered by what is open, the release with the most work
+		// outranks the one about to cross.
+		r.endingIn(t, "v1.0", 3)
+		ordered := asked(t, "?within=30")
+		if len(ordered.Ending) != 2 {
+			t.Fatalf("two releases are about to go and %d came back", len(ordered.Ending))
+		}
+		if ordered.Ending[0].Stream != "v1.0" || ordered.Ending[0].EndedDays != -3 {
+			t.Errorf("the soonest is not first: %+v", ordered.Ending)
 		}
 
 		// The file says which of the two a row is, in a word: a spreadsheet
@@ -229,4 +243,24 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 			t.Errorf("the file does not say which population the row is: %v", body)
 		}
 	})
+}
+
+// endingIn declares a second release of the product with its own end-of-life
+// date, so an ordering over more than one row means something.
+//
+// A second release rather than a second variant: the report is per release,
+// and two variants of one are one row.
+func (r *reach) endingIn(t *testing.T, stream string, days int) {
+	t.Helper()
+	made := asPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/streams",
+		fmt.Sprintf(`{"name":%q,"kind":"tag","parent":"master"}`, stream))
+	if made.Code != http.StatusCreated {
+		t.Fatalf("declaring a release answered %d: %s", made.Code, made.Body.String())
+	}
+	on := time.Now().UTC().AddDate(0, 0, days).Format(time.DateOnly)
+	ended := asPerson(t, r, "admin", http.MethodPut,
+		"/v1/products/mine/streams/"+stream+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
+	if ended.Code != http.StatusNoContent {
+		t.Fatalf("giving it an end date answered %d: %s", ended.Code, ended.Body.String())
+	}
 }
