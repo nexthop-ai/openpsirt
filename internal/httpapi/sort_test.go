@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -80,13 +81,21 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 }
 
 func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
-	// The enum is built from finding.SortKeys, so asking whether the two
-	// lists match is asking whether a list equals itself. What is worth
-	// checking here is that every order the document offers answers over
-	// HTTP at all — whether the store has an expression for each is asked in
-	// the package that holds the expressions.
+	// The enums are built from the store's own lists, so asking whether those
+	// match is asking whether a list equals itself. What is worth checking
+	// here is that every order the document offers answers over HTTP at all
+	// — whether the store has an expression for each is asked in the package
+	// that holds the expressions.
+	//
+	// Asked of each route with its own vocabulary rather than of one route
+	// with everybody's: a bump has an issue count and a build count that a
+	// finding has not, so the two lists offer different words and a check
+	// that sent one list's words to the other route would be asking the
+	// wrong question.
 	twoReach(t, func(t *testing.T, r *reach) {
-		var declared []string
+		r.scannedTwoIssues(t)
+
+		declared := map[string][]string{}
 		for path, item := range r.api.OpenAPI().Paths {
 			if item.Get == nil {
 				continue
@@ -103,19 +112,35 @@ func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
 					}
 					offered = append(offered, word)
 				}
-				declared = offered
+				declared[path] = offered
 			}
 		}
 		if len(declared) == 0 {
 			t.Fatal("no endpoint declares a sort order, so this proves nothing")
 		}
 
-		for _, word := range declared {
-			got := asPerson(t, r, "triager", http.MethodGet,
-				"/v1/products/mine/findings?sort="+word, "")
-			if got.Code != http.StatusOK {
-				t.Errorf("sorting by %q answered %d: %s", word, got.Code, got.Body.String())
+		// The fixture's own build, which is what the placeholders in a path
+		// stand for.
+		named := strings.NewReplacer(
+			"{product}", "mine", "{stream}", "master", "{variant}", "broadcom",
+			"{format}", "json")
+		asked := 0
+		for path, words := range declared {
+			for _, word := range words {
+				at := named.Replace(path) + "?sort=" + word
+				if strings.Contains(at, "{") {
+					t.Fatalf("%s names something this test cannot stand in for", path)
+				}
+				got := asPerson(t, r, "triager", http.MethodGet, at, "")
+				if got.Code != http.StatusOK {
+					t.Errorf("%s sorted by %q answered %d: %s",
+						path, word, got.Code, got.Body.String())
+				}
+				asked++
 			}
+		}
+		if asked == 0 {
+			t.Fatal("no order was asked for, so this checked nothing")
 		}
 	})
 }

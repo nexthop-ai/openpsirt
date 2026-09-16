@@ -56,6 +56,7 @@ writes `text`.
 | `OPENPSIRT_DB_MAX_IDLE` | Most connections kept open idle | `25` |
 | `OPENPSIRT_DB_IDLE_TIMEOUT` | How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back | `1m` |
 | `OPENPSIRT_DB_CONN_LIFETIME` | How long a connection is used before it is replaced | `30m` |
+| `OPENPSIRT_DB_REQUIRE_ENCRYPTION` | Refuse to start where the connection to the database is not encrypted. See below | `false` |
 
 ### Encrypting the database connection
 
@@ -73,12 +74,27 @@ nobody checked. Ask for certainty in the URL.
 Anything the URL says about the transport is left alone, so `tls=skip-verify`
 or a `sslmode` of your own reaches the driver as written.
 
+**Say so where it is required.** With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set,
+the process asks the connection what it negotiated and refuses to start where
+that is cleartext — naming the URL, without its password, and what to put in
+it. Asking for encryption in the URL and being given none is a deployment that
+believes it is encrypted and is not, and nothing else says otherwise: the
+process logs the transport at every start, which is a line somebody has to
+read.
+
+| Where it is set | |
+|---|---|
+| The connection is encrypted | Nothing happens. The transport is logged as it always is |
+| The connection is in cleartext | Refused at startup, naming the setting |
+| The server will not say which | Refused. What this asks for is certainty, and "we could not find out" is not it |
+| The database is SQLite | Refused. A file opened directly has no connection to encrypt, and quietly doing nothing is what a setting that changes nothing looks like |
+
 ## Scanning
 
 | Variable | Meaning | Default |
 |---|---|---|
 | `OPENPSIRT_SCANNER_PATH` | Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in | unset |
-| `OPENPSIRT_SCANNER_TIMEOUT` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below the two hours a worker may hold one job for, and the process refuses to start where it does not | `30m` |
+| `OPENPSIRT_SCANNER_TIMEOUT` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
 | `GRYPE_DB_CACHE_DIR` | Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
 | `GRYPE_DB_AUTO_UPDATE` | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
 
@@ -332,6 +348,24 @@ WARN attachment links cross the network in the clear endpoint=http://minio.inter
 This is not `OPENPSIRT_PLAIN_HTTP`, which is about serving this application
 without TLS and loosens cookies. One is a file on the way out and the other a
 session on the way in; a deployment can want either without the other.
+
+## The work queue
+
+Reading a scan and running a scanner are jobs in a queue held in the database.
+Each bound below is what a deployment sizes; left unset, the built-in value
+applies, and each takes effect at the next start rather than at once.
+
+How deep the queue may get before uploads are refused is not here: it is a
+setting an administrator changes on screen, because the refusal lands on a
+build server and waiting for a restart is not a remedy.
+
+| Variable | What it does | Default |
+|---|---|---|
+| `OPENPSIRT_QUEUE_MAX_ATTEMPTS` | How many times a job is tried before it is set aside with its last error | `5` |
+| `OPENPSIRT_QUEUE_CLAIM_TIMEOUT` | How long a claim is honored with nothing heard from the worker holding it, after which another worker may take the job. It bounds a worker going silent, not how long a job may take | `30m` |
+| `OPENPSIRT_QUEUE_HEARTBEAT` | How often a running job renews its claim. Well under the claim timeout, so several renewals may fail before the claim is at risk — a value that is not below it is refused at startup | `5m` |
+| `OPENPSIRT_QUEUE_MAX_HOLD` | How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and `OPENPSIRT_SCANNER_TIMEOUT`, which the process checks at startup | `2h` |
+| `OPENPSIRT_QUEUE_BACKOFF` | How long a failed job waits before it is tried again, multiplied by the attempt | `30s` |
 
 ## Reading a scan file
 

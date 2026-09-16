@@ -267,6 +267,186 @@ func TestTheSameFileSentAgainReportsSuccess(t *testing.T) {
 	})
 }
 
+// A second suppression document, differing from the first in the issue it
+// argues about. What a build changes between two uploads of one inventory is
+// its judgment about itself.
+const secondSuppression = `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": "urn:y", "version": 1,
+ "statements": [{"vulnerability": {"name": "CVE-2026-2"}, "status": "not_affected",
+ "products": [{"@id": "pkg:deb/debian/libc6"}]}]}`
+
+func TestAnUnchangedInventoryWithChangedJudgmentsIsTaken(t *testing.T) {
+	// A build whose contents have not moved and which has since worked out
+	// that three issues do not apply to it re-sends the same inventory with
+	// different claims beside it. Hashing the inventory alone answered 200
+	// and dropped the claims, so the findings the build had already answered
+	// stayed open behind a success.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		built := nowish()
+		body := inventory(built, "libc6")
+
+		code, first := f.send(t, upload(t, f.path, body, suppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("first upload returned %d, want 202", code)
+		}
+		code, again := f.send(t, upload(t, f.path, body, secondSuppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("the same inventory with changed claims returned %d, want 202", code)
+		}
+		if again.Outcome != "queued" || again.ScanID == first.ScanID {
+			t.Fatalf("second upload reported %+v, want a scan of its own", again)
+		}
+
+		// The claims arrived with a scan and are stored against it, so the
+		// second submission has to be work of its own: applied to the first
+		// scan, the record would say that upload carried arguments it did not
+		// carry.
+		docs, err := ingest.NewDocuments(f.db.DB).List(t.Context(), again.ScanID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(docs) != 2 {
+			t.Errorf("held %d documents for the second submission, want an inventory and its claims", len(docs))
+		}
+		if depth, _ := f.queue.Depth(t.Context(), queue.Parse); depth != 2 {
+			t.Errorf("%d jobs waiting, want one per submission", depth)
+		}
+	})
+}
+
+func TestTheWholeSubmissionSentAgainIsStillOneWeHold(t *testing.T) {
+	// The same documents in a different part order is the same submission:
+	// the claim digests are sorted before they are folded together, so a
+	// pipeline that builds its request from a directory listing is not
+	// answered as though the build had changed its mind.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		built := nowish()
+		body := inventory(built, "libc6")
+
+		code, first := f.send(t, upload(t, f.path, body, suppression, secondSuppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("first upload returned %d, want 202", code)
+		}
+		code, again := f.send(t, upload(t, f.path, body, secondSuppression, suppression))
+		if code != http.StatusOK {
+			t.Fatalf("the same submission reordered returned %d, want 200", code)
+		}
+		if again.Outcome != "already_held" || again.ScanID != first.ScanID {
+			t.Errorf("second upload reported %+v, want the first scan %d", again, first.ScanID)
+		}
+		if depth, _ := f.queue.Depth(t.Context(), queue.Parse); depth != 1 {
+			t.Errorf("%d jobs waiting after a repeat, want 1", depth)
+		}
+	})
+}
+
+func TestBytesThatCouldNotBeReadAreTakenAgain(t *testing.T) {
+	// An upload that was accepted and then failed to parse still counted as
+	// one we hold, so the identical bytes could never be sent again however
+	// the reason they could not be read was put right.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		built := nowish()
+		body := inventory(built, "libc6")
+
+		code, first := f.send(t, upload(t, f.path, body, suppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("first upload returned %d, want 202", code)
+		}
+		scans := ingest.NewStore(f.db.DB)
+		if err := scans.MarkFailed(t.Context(), first.ScanID, fmt.Errorf("the reader fell over")); err != nil {
+			t.Fatal(err)
+		}
+
+		code, again := f.send(t, upload(t, f.path, body, suppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("the same bytes after a failure returned %d, want 202", code)
+		}
+		// The same row: one set of bytes at one build is one submission, and
+		// what changes is which attempt at it is the live one.
+		if again.ScanID != first.ScanID || again.Outcome != "queued" {
+			t.Errorf("the retake reported %+v, want scan %d queued", again, first.ScanID)
+		}
+		held, err := scans.ByID(t.Context(), first.ScanID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held.Status != ingest.Accepted || held.Failure != "" {
+			t.Errorf("the scan reads as %q: %q", held.Status, held.Failure)
+		}
+		// One inventory, not two. A second copy is one the reader would read
+		// and count twice.
+		docs, err := ingest.NewDocuments(f.db.DB).List(t.Context(), first.ScanID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(docs) != 2 {
+			t.Errorf("held %d documents after the retake, want an inventory and its claims", len(docs))
+		}
+		if depth, _ := f.queue.Depth(t.Context(), queue.Parse); depth != 2 {
+			t.Errorf("%d jobs waiting, want the first and the one that will read it again", depth)
+		}
+	})
+}
+
+func TestBytesThatCouldNotBeReadAreTakenAgainBesideAnAcceptedScan(t *testing.T) {
+	// The retake with something already accepted at that build time, which is
+	// the arrangement the re-argued arm produces: one submission of a build
+	// lands and is read, a second with different judgments lands and fails to
+	// parse, and the producer re-sends it once the reader is fixed.
+	//
+	// Taken as a new scan, the insert collides with the row those bytes
+	// already have and the producer is answered success pointing at a scan
+	// that still reads failed — with nothing stored and nothing queued.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		built := nowish()
+		body := inventory(built, "libc6")
+
+		code, first := f.send(t, upload(t, f.path, body, suppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("first upload returned %d, want 202", code)
+		}
+		code, second := f.send(t, upload(t, f.path, body, secondSuppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("the same inventory re-argued returned %d, want 202", code)
+		}
+		scans := ingest.NewStore(f.db.DB)
+		if err := scans.MarkFailed(t.Context(), second.ScanID, fmt.Errorf("the reader fell over")); err != nil {
+			t.Fatal(err)
+		}
+
+		code, again := f.send(t, upload(t, f.path, body, secondSuppression))
+		if code != http.StatusAccepted {
+			t.Fatalf("the same bytes after a failure returned %d, want 202", code)
+		}
+		if again.ScanID != second.ScanID {
+			t.Errorf("the retake reported scan %d, want the row those bytes already have (%d)",
+				again.ScanID, second.ScanID)
+		}
+		held, err := scans.ByID(t.Context(), second.ScanID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held.Status != ingest.Accepted || held.Failure != "" {
+			t.Errorf("the scan reads as %q: %q", held.Status, held.Failure)
+		}
+		docs, err := ingest.NewDocuments(f.db.DB).List(t.Context(), second.ScanID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(docs) != 2 {
+			t.Errorf("held %d documents after the retake, want an inventory and its claims", len(docs))
+		}
+		if depth, _ := f.queue.Depth(t.Context(), queue.Parse); depth != 3 {
+			t.Errorf("%d jobs waiting, want one per submission and one to read it again", depth)
+		}
+		// And the build stands on the retaken submission, not on the one
+		// before it: they share a build time, and what settles a tie is which
+		// arrived last.
+		if first.ScanID == second.ScanID {
+			t.Fatal("the two submissions became one scan")
+		}
+	})
+}
+
 func TestAnOlderScanIsRefusedAsAConflict(t *testing.T) {
 	// Taking it would replace today's picture with yesterday's, reopening
 	// closed findings with no symptom anyone would notice.

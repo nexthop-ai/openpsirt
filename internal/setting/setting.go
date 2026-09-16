@@ -167,7 +167,7 @@ const (
 	// product.
 	//
 	// A ceiling on rows one person writes one at a time, which is the
-	// neighbouring case to a bulk write and is bounded for the same reason:
+	// neighboring case to a bulk write and is bounded for the same reason:
 	// nothing else stopped a script, or a keyboard shortcut held down, from
 	// filling the table — and the panel that lists them reads every row it
 	// finds on every open. Settable because how many narrowings a person
@@ -264,6 +264,20 @@ const DefaultRoutingBatch = 2000
 // of rows one person can write is a table nobody meant to fill, not because a
 // hundred is a suspicious number.
 const DefaultSavedPerPerson = 100
+
+// DefaultTogetherCap is how many rows one action may write where nobody has
+// said.
+//
+// Generous, because the case this exists for is a kernel: a real image put
+// 305,487 findings against one, and a person narrowing that down to the
+// drivers their build does not include is doing the right thing with a long
+// list. The bound is there because an unbounded write is something somebody
+// triggers by accident, not because two thousand is a suspicious number.
+//
+// Here rather than in the package that first needed it, because the packages
+// that read it cannot all see each other: recording a flaw bounds what it
+// opens, and a finding cannot import a triage decision.
+const DefaultTogetherCap = 2000
 
 // DefaultQueueBacklog is how much work of one kind may wait where nobody has
 // said.

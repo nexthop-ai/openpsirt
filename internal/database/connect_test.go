@@ -1,6 +1,7 @@
 package database_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -126,5 +127,70 @@ func TestSQLiteIsOpenedForSpeedAndAURLMayOverrideIt(t *testing.T) {
 	}
 	if got := read(t, base, "foreign_keys"); got != "1" {
 		t.Errorf("foreign_keys = %q, wanted 1", got)
+	}
+}
+
+func TestAConnectionIsRefusedWhereEncryptionWasRequiredAndNotGot(t *testing.T) {
+	// Both drivers negotiate opportunistically and neither says which way it
+	// went, so every deployment took whatever the server offered. A
+	// deployment that needs certainty states it, and what it gets is a
+	// refusal rather than a line in a log somebody has to read.
+	//
+	// Asked of the answer the connection gave rather than of a live server:
+	// what this decides is a comparison, and a test against whichever
+	// transport a test server happens to negotiate would pass for the wrong
+	// reason on one engine and skip on another.
+	for _, c := range []struct {
+		what     string
+		server   database.Server
+		required bool
+		refused  bool
+		mentions string
+	}{
+		{
+			"encrypted, which is what was asked for",
+			database.Server{Engine: database.Postgres, Transport: "TLSv1.3"},
+			true, false, "",
+		},
+		{
+			"cleartext where the deployment said it must be encrypted",
+			database.Server{Engine: database.Postgres, Transport: "none"},
+			true, true, "cleartext",
+		},
+		{
+			"a server that would not say, which is not certainty either",
+			database.Server{Engine: database.MySQL, Transport: "unknown"},
+			true, true, "would not say",
+		},
+		{
+			"a file opened directly, which has no connection to encrypt",
+			database.Server{Engine: database.SQLite, Transport: "none"},
+			true, true, "no connection to encrypt",
+		},
+		{
+			"cleartext where the deployment said nothing, which is the other choice",
+			database.Server{Engine: database.Postgres, Transport: "none"},
+			false, false, "",
+		},
+	} {
+		err := database.EncryptionAsAsked(c.server, database.Target{
+			Engine: c.server.Engine, Redacted: "postgres://user@host:5432/openpsirt",
+			RequireEncryption: c.required,
+		})
+		if (err != nil) != c.refused {
+			t.Errorf("%s: refused=%v (%v), want %v", c.what, err != nil, err, c.refused)
+			continue
+		}
+		if err == nil {
+			continue
+		}
+		if !strings.Contains(err.Error(), c.mentions) {
+			t.Errorf("%s: the refusal does not say %q: %v", c.what, c.mentions, err)
+		}
+		// Naming the setting is what makes the refusal actionable: whoever
+		// meets it is the operator who set it.
+		if !strings.Contains(err.Error(), database.RequiredEncryption) {
+			t.Errorf("%s: the refusal does not name the setting: %v", c.what, err)
+		}
 	}
 }

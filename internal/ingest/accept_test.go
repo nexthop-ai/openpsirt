@@ -1,6 +1,9 @@
 package ingest_test
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"testing"
@@ -163,6 +166,71 @@ func TestNewestIsTheMostRecentlyBuilt(t *testing.T) {
 		}
 		if newest.ContentHash != "newer" {
 			t.Errorf("newest is %q", newest.ContentHash)
+		}
+	})
+}
+
+func TestTheBuildInForceIsTheJudgmentsThatArrivedLast(t *testing.T) {
+	// One build re-sent with different judgments beside it is two
+	// submissions at one build time, so which one the picture stands on
+	// cannot be left to whichever row the engine hands back first.
+	each(t, func(t *testing.T, s *ingest.Store, v int64) {
+		ctx := t.Context()
+		built := time.Now().UTC().Add(-time.Hour)
+		inventory := []byte(`{"bomFormat":"CycloneDX"}`)
+		digest := sha256.Sum256(inventory)
+		hash := hex.EncodeToString(digest[:])
+
+		first := arriving(v, "first-submission", built)
+		first.InventoryHash = hash
+		taken, _, err := s.Record(ctx, first)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// What the arrival decision reads to tell a build re-argued from a
+		// second document claiming the same build time.
+		if _, err := ingest.NewDocuments(s.DB()).Write(ctx, taken.ID,
+			ingest.InventoryKind, 0, bytes.NewReader(inventory)); err != nil {
+			t.Fatal(err)
+		}
+
+		second := arriving(v, "second-submission", built)
+		second.InventoryHash = hash
+		again, outcome, err := s.Record(ctx, second)
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("outcome %v, err %v: the same inventory re-argued is a new submission", outcome, err)
+		}
+		newest, err := s.Newest(ctx, v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if newest.ID != again.ID {
+			t.Errorf("the build stands on scan %d, want the judgments that arrived last (%d)", newest.ID, again.ID)
+		}
+	})
+}
+
+func TestASecondDocumentClaimingTheSameBuildTimeIsStillRefused(t *testing.T) {
+	// The exception is narrow: the same inventory with new judgments. Two
+	// different inventories at one build time is a coin toss over which
+	// picture is current, and stays refused.
+	each(t, func(t *testing.T, s *ingest.Store, v int64) {
+		ctx := t.Context()
+		built := time.Now().UTC().Add(-time.Hour)
+		first := arriving(v, "one", built)
+		first.InventoryHash = "aaaa"
+		taken, _, err := s.Record(ctx, first)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ingest.NewDocuments(s.DB()).Write(ctx, taken.ID,
+			ingest.InventoryKind, 0, bytes.NewReader([]byte("one"))); err != nil {
+			t.Fatal(err)
+		}
+		second := arriving(v, "two", built)
+		second.InventoryHash = "bbbb"
+		if _, outcome, _ := s.Record(ctx, second); outcome != ingest.NotNewer {
+			t.Errorf("outcome %v, want NotNewer", outcome)
 		}
 	})
 }

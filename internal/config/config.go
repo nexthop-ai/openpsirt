@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
 
@@ -56,6 +57,13 @@ type Config struct {
 	DBMaxIdle     int
 	DBIdleTimeout time.Duration
 	DBLifetime    time.Duration
+	// DBRequireEncryption states that the connection to the database must be
+	// encrypted, and one that is not is refused as the process starts. Off is
+	// what every deployment had: encrypted where the server offers it, and
+	// cleartext where it does not. Both are choices now, and which one is in
+	// force is stated rather than inherited from what a server happened to
+	// offer.
+	DBRequireEncryption bool
 	// ScannerPath is where the vulnerability scanner lives. Empty means
 	// whatever the environment resolves.
 	//
@@ -68,6 +76,21 @@ type Config struct {
 	// a worker, and a deployment whose inventories legitimately take longer
 	// than the default has to be able to raise it.
 	ScannerTimeout time.Duration
+
+	// The queue's own bounds, each of which the documents describe as
+	// something a deployment sizes. Here rather than among the stored
+	// settings because of the layering: the setting package reads the
+	// database, so the database and queue packages cannot read a setting
+	// without inverting that import. The consequence to accept is that
+	// changing one needs a restart.
+	//
+	// How deep the queue may get is the exception and is a stored setting: an
+	// operator meeting a refused upload wants that remedy without one.
+	QueueMaxAttempts  int
+	QueueClaimTimeout time.Duration
+	QueueHeartbeat    time.Duration
+	QueueMaxHold      time.Duration
+	QueueBackoff      time.Duration
 
 	// The bounds one execution of the scanner is read within. Each is what a
 	// deployment may lower or raise; left unset, the package's own defaults
@@ -210,6 +233,10 @@ const envPrefix = "OPENPSIRT_"
 // operator has no reason to look.
 func Load() (Config, error) {
 	var r reader
+	// What the queue is built with where nothing says otherwise, read from
+	// the queue rather than restated: two spellings of one default disagree
+	// the first time either moves.
+	queueing := queue.DefaultOptions()
 	c := Config{
 		Addr:                env("ADDR", ":8080"),
 		BaseURL:             env("BASE_URL", ""),
@@ -224,6 +251,12 @@ func Load() (Config, error) {
 		IngestMaxStatements: r.number("INGEST_MAX_STATEMENTS", 0),
 		IngestMaxDepth:      r.number("INGEST_MAX_DEPTH", 0),
 		IngestMaxDocuments:  r.number("INGEST_MAX_DOCUMENTS", 0),
+
+		QueueMaxAttempts:  r.number("QUEUE_MAX_ATTEMPTS", queueing.MaxAttempts),
+		QueueClaimTimeout: r.duration("QUEUE_CLAIM_TIMEOUT", queueing.ClaimTimeout),
+		QueueHeartbeat:    r.duration("QUEUE_HEARTBEAT", queueing.Heartbeat),
+		QueueMaxHold:      r.duration("QUEUE_MAX_HOLD", queueing.MaxHold),
+		QueueBackoff:      r.duration("QUEUE_BACKOFF", queueing.Backoff),
 
 		ScannerMaxOutput:     r.number("SCANNER_MAX_OUTPUT", 0),
 		ScannerMaxComplaint:  r.number("SCANNER_MAX_COMPLAINT", 0),
@@ -277,6 +310,9 @@ func Load() (Config, error) {
 		DBMaxIdle:          r.number("DB_MAX_IDLE", 25),
 		DBIdleTimeout:      r.duration("DB_IDLE_TIMEOUT", time.Minute),
 		DBLifetime:         r.duration("DB_CONN_LIFETIME", 30*time.Minute),
+		// No default of its own and it follows nothing: a deployment either
+		// states this or it does not.
+		DBRequireEncryption: r.boolean("DB_REQUIRE_ENCRYPTION", false),
 	}
 	if r.err != nil {
 		return Config{}, r.err

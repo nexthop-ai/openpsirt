@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // ErrNotOursToSay is what an issue a scanner reported answers.
@@ -138,6 +139,12 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 
 		here := map[int64]bool{}
 		var closing []int64
+		// How many rows this would open, counted as they are resolved.
+		opened := 0
+		// Which builds are being taken out, as against how many rows that
+		// is: a build holding the component in two places is one build.
+		out.Closed = 0
+		leaving := map[int64]bool{}
 		for i := range rows {
 			row := &rows[i]
 			// Only a flaw somebody recorded. A scanned issue's build set is
@@ -155,10 +162,21 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			here[row.TargetID] = true
 			if !wanted[row.TargetID] {
 				closing = append(closing, row.ID)
+				leaving[row.TargetID] = true
 			}
 		}
 		if len(closing) > 0 && because == "" {
 			return ErrNoReason
+		}
+
+		// Bounded by what is written, as recording is: a build added to the
+		// set opens one row per place the component sits at there, so a
+		// component two things pull in doubles what a request naming a long
+		// list of builds writes.
+		cap, err := setting.NewStore(tx).Count(ctx,
+			setting.TogetherCap, setting.DefaultTogetherCap)
+		if err != nil {
+			return fmt.Errorf("read how much one action may write: %w", err)
 		}
 
 		// Widening first. A build added and then immediately closed by the
@@ -176,13 +194,33 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 				// moved under a retry. Reported rather than guessed at.
 				return fmt.Errorf("the builds changed while this was being written; try again")
 			}
-			row := openIn(target, vulnerabilityID, componentID, names[target], &rows[0], now)
-			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
-				return fmt.Errorf("record it against another build: %w", err)
+			// One row per place, as recording it did: where the component
+			// sits comes from the build's own graph, so a flaw filed against
+			// another build is keyed the way a scan of that build would key
+			// it.
+			sittings, err := sittingsOf(ctx, tx, target, componentID)
+			if err != nil {
+				return err
 			}
+			opened += len(sittings)
+			if opened > cap {
+				return fmt.Errorf("%w: those builds hold it at %d places or more, "+
+					"and one action here writes %d", ErrTooManyPlaces, opened, cap)
+			}
+			for _, sitting := range sittings {
+				row := openIn(target, vulnerabilityID, componentID, names[target],
+					sitting, &rows[0], now)
+				if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
+					return fmt.Errorf("record it against another build: %w", err)
+				}
+			}
+			// Builds, not rows. A build holding the component in two places
+			// is one build added, and what this reports is the set somebody
+			// just stated.
 			out.Added++
 		}
 
+		out.Closed = len(leaving)
 		if len(closing) == 0 {
 			return nil
 		}
@@ -201,11 +239,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			if err != nil {
 				return fmt.Errorf("take %d builds back out: %w", len(batch), err)
 			}
-			affected, err := database.Affected(result)
-			if err != nil {
+			if _, err := database.Affected(result); err != nil {
 				return fmt.Errorf("take %d builds back out: %w", len(batch), err)
 			}
-			out.Closed += int(affected)
 			return nil
 		})
 	})
@@ -223,13 +259,14 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 // first. Working it out again from today's settings would give the newest build
 // a later deadline for the same flaw.
 func openIn(targetID, vulnerabilityID, componentID int64, name string,
-	like *Finding, now time.Time) *Finding {
+	where sits, like *Finding, now time.Time) *Finding {
 
 	return &Finding{
 		TargetID: targetID, Kind: Entered, Visibility: like.Visibility,
 		VulnerabilityID: vulnerabilityID,
 		ComponentID:     componentID,
-		PlaceIdentity:   PlaceIdentity(name, ""),
+		ConsumerID:      optional(where.consumerID),
+		PlaceIdentity:   PlaceIdentity(name, where.consumer),
 		LastChangedAt:   now,
 		OpenedAt:        now,
 		Urgency:         like.Urgency,

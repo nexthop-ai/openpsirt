@@ -62,7 +62,7 @@ var runs = map[tier][]string{
 	documents: {"docs-check", "unclaimed"},
 	web:       {"web-check"},
 	code: {"build", "vet", "lint", "unreachable", "readable", "negatives", "confined", "granted",
-		"attached", "test"},
+		"narrowed", "attached", "test"},
 	api:     {"openapi-current", "web-api"},
 	engines: {"reserved", "test-all", "check-engines"},
 	// Everything, the container and the chart included. Those are the one
@@ -79,7 +79,7 @@ var runs = map[tier][]string{
 // The order targets are printed in, which is the order make runs them.
 var order = []string{
 	"build", "vet", "lint", "unreachable", "readable", "negatives", "reserved", "confined", "granted",
-	"attached",
+	"narrowed", "attached",
 	"docs-check", "unclaimed", "openapi-current",
 	"test", "test-all", "check-engines", "web-check", "web-api", "check", "check-packaging",
 }

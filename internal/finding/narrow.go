@@ -77,6 +77,48 @@ var order = map[SortKey]struct {
 	BySeverity:   {expr: "MAX(COALESCE(v.score_centi, 0))", issue: true},
 }
 
+// orderedBy is what an asked-for key sorts by, with the direction applied and
+// nothing else — the tie-break that makes paging stable differs per list and
+// is the caller's to append.
+//
+// One builder rather than one per list. Three lists sort on the same six keys
+// and each had written out the same lookup, the same direction and the same
+// null-last case, so a key that behaved differently on one of them was a
+// difference nobody could see.
+//
+// The expression comes from the allowlist and never from the request. A
+// caller's key that is not in it falls back to the one named here, which is
+// each list's own default rather than a shared one.
+//
+// A finding with no deadline sorts last whichever way it is asked, because "no
+// deadline" is not early and not late. That is spelled as a leading
+// null-ordering column rather than as NULLS LAST, which two of the four
+// engines do not have.
+func orderedBy(filter Filter, fallback SortKey) string {
+	by, known := order[filter.SortBy]
+	if !known {
+		by = order[fallback]
+	}
+	return directed(by.expr, filter.SortBy == ByDeadline, filter.Ascending)
+}
+
+// directed applies a direction to an expression the allowlist supplied, and
+// puts what has no value last where the expression can have none.
+//
+// Sorting nothing last is spelled as a leading null-ordering column rather
+// than as NULLS LAST, which two of the four engines do not have.
+func directed(expr string, nothingLast, ascending bool) string {
+	way := "DESC"
+	if ascending {
+		way = "ASC"
+	}
+	sorted := expr + " " + way
+	if nothingLast {
+		sorted = "CASE WHEN " + expr + " IS NULL THEN 1 ELSE 0 END, " + sorted
+	}
+	return sorted
+}
+
 // SortKeys are the orders somebody may ask for, in the order they are offered.
 //
 // One list. The query parameter's enum is built from this at registration and
@@ -101,6 +143,12 @@ func SortKeys() []SortKey {
 // arbitrary subset each time. It also makes the total meaningless, which is the
 // number people quote.
 type Filter struct {
+	// BundleSort is which order the fix-bundle list pages in, and is read by
+	// that list alone: a bundle is a bump rather than a finding, so what it is
+	// worth ordering by — how many issues it closes, how many builds hold it —
+	// has no meaning on a list of findings, and the six the findings list
+	// takes do not all have one on a bump. The direction below is shared.
+	BundleSort BundleSortKey
 	// MinSeverity keeps issues rated at this word or worse. Empty — or "low",
 	// which excludes nothing — keeps everything, including issues carrying no
 	// rating at all.
@@ -1186,24 +1234,8 @@ func trimmed(names []string) []string {
 // the fixed keys and which direction, and neither reaches the statement as
 // text: the key selects a stored expression, and the direction selects one of
 // two words written here.
-//
-// A finding with no deadline sorts last whichever way it is asked, because "no
-// deadline" is not early and not late. That is spelled as a leading
-// null-ordering column rather than as NULLS LAST, which two of the four
-// engines do not have.
 func sortedBy(filter Filter) string {
-	by, known := order[filter.SortBy]
-	if !known {
-		by = order[ByUrgency]
-	}
-	way := "DESC"
-	if filter.Ascending {
-		way = "ASC"
-	}
-	sorted := by.expr + " " + way
-	if filter.SortBy == ByDeadline {
-		sorted = "CASE WHEN " + by.expr + " IS NULL THEN 1 ELSE 0 END, " + sorted
-	}
+	sorted := orderedBy(filter, ByUrgency)
 	// Always the same tie-break, so that paging is stable: two rows equal on
 	// the sorted column must not swap between pages, which drops one row and
 	// repeats another across a boundary.

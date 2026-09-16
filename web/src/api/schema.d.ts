@@ -1579,6 +1579,8 @@ export interface paths {
          *
          *     **Public findings only unless you ask otherwise**, as the comparison itself is. Where fixes are left out for not having been disclosed, the note says how many and never which.
          *
+         *     A release that fixed nothing answers with a sentence saying so, not with an empty body: zero bytes is also what a truncated response and the wrong pair of builds look like.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-release-notes"];
@@ -1763,7 +1765,7 @@ export interface paths {
          *
          *     It is also how a person finds the one package worth hiding. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58 — a fact no list of issues makes visible, because ordered by urgency it just looks like a long list.
          *
-         *     Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. Ask for `sort=severity` (or `urgency`) to order by the worst instead, which is the other question somebody reads this to answer.
+         *     Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. `sort` takes every key the findings list takes, read of the package rather than of one finding — the worst of what is open against it (`severity`, `urgency`, `epss`), the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how far it reaches (`places`) — and `asc` orders the other way.
          *
          *     `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
@@ -1822,6 +1824,8 @@ export interface paths {
          *     Grouping is presentation: one act still writes one decision per component and per place.
          *
          *     Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about a place or a deadline has no row here to narrow.
+         *
+         *     Ordered worst first, and `sort` takes any of: what the bump would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -5319,6 +5323,13 @@ export interface components {
             /** @description Who agreed. Two different people is the whole of the control, so both names are carried rather than a count */
             approved_by?: string;
             closed?: string;
+            /**
+             * @description Why it closed, in the tool's terms. Only on a closed row
+             * @enum {string}
+             */
+            closed_because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained" | "invalid" | "fixed";
+            /** @description Why a person closed it, in their words. Only where a person did */
+            closed_note?: string;
             component: string;
             /** @description What pulls the component in. Absent where the build holds it directly */
             consumer?: string;
@@ -5441,7 +5452,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many builds it was recorded against. One issue, one finding per build
+             * @description How many builds it was recorded against
              */
             builds: number;
             /** @description What in the build carries it */
@@ -5450,6 +5461,11 @@ export interface components {
             due_at?: string;
             /** @description What this deployment filed it as, such as SONIC-2026-0001 */
             identifier: string;
+            /**
+             * Format: int64
+             * @description How many findings that opened. One per place the component sits in, in each build
+             */
+            places: number;
             /**
              * @description Whether it has been disclosed
              * @enum {string}
@@ -7495,7 +7511,7 @@ export interface components {
              * @example https://example.com/schemas/Record-findingRequest.json
              */
             readonly $schema?: string;
-            /** @description Every build that ships it. One issue, one finding per build — which is the shape a scanner's findings already take */
+            /** @description Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take */
             builds: components["schemas"]["Item"][] | null;
             /** @description What carries it. Omit for the build itself */
             component?: string;
@@ -11687,6 +11703,10 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
+                /** @description Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                sort?: "urgency" | "severity" | "issues" | "places" | "builds" | "deadline";
+                /** @description Order the other way — fewest, least urgent, nearest deadline first */
+                asc?: boolean;
                 limit?: number;
                 offset?: number;
             };

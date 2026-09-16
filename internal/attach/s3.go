@@ -130,6 +130,21 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	if err != nil {
 		return nil, fmt.Errorf("object store credentials: %w", err)
 	}
+	// **The address guard does not apply here, deliberately.** Everything the
+	// guard exists for is an address that arrived from outside: a sign-in
+	// provider's endpoints come from a discovery document somebody else
+	// publishes, so they are pinned, refused a redirect and refused an
+	// address inside this network. An object-store endpoint was typed in by
+	// the operator, and pointing it at something on their own network — a
+	// MinIO on this host, storage on the next rack — is the ordinary
+	// deployment rather than the attack. Routing it through the guard would
+	// refuse that and protect against nothing.
+	//
+	// What the exemption costs, which is less than it sounds: the endpoint is
+	// read from the environment once, at startup, and no administrator can
+	// change it from inside the application. So aiming these requests
+	// anywhere is something whoever deploys the process can already do by
+	// other means, and the control is who may deploy it.
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		if endpoint != "" {
 			o.BaseEndpoint = aws.String(endpoint)

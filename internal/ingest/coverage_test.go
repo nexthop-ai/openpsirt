@@ -208,6 +208,51 @@ func TestScanningJudgesNothingWithoutAThreshold(t *testing.T) {
 	})
 }
 
+func TestAnUploadThatCouldNotBeReadIsNotBeingHeardFrom(t *testing.T) {
+	// A build whose upload arrives nightly and fails to parse nightly read as
+	// perfectly quiet=false — on the one report whose subject is that silence
+	// must not look like health.
+	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
+		ctx := t.Context()
+		before, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(before) != 2 || before[1].Variant != "broadcom" || before[1].Quiet {
+			t.Fatalf("the scanned build is not the quiet=false one to begin with: %+v", before)
+		}
+
+		// The one scan it has could not be read.
+		var id int64
+		if err := db.DB.NewSelect().Table("scan").Column("id").
+			Where("content_hash = ?", "recent").Scan(ctx, &id); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.MarkFailed(ctx, id, errors.New("the inventory could not be read")); err != nil {
+			t.Fatal(err)
+		}
+
+		after, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var build *ingest.Coverage
+		for i := range after {
+			if after[i].Variant == "broadcom" {
+				build = &after[i]
+			}
+		}
+		if build == nil {
+			t.Fatalf("the build went missing: %+v", after)
+		}
+		// Measured from declaration, like a build nothing was ever filed
+		// against, because nothing readable ever was.
+		if build.LastReceivedAt != nil {
+			t.Errorf("an upload nothing could read counts as having been heard from: %+v", build)
+		}
+	})
+}
+
 func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 	// A dead release not being scanned is expected rather than a fault,
 	// and without this the coverage view — the thing that catches a

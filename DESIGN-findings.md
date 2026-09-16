@@ -294,11 +294,11 @@ somebody holds and a name nobody holds identically (REQ-43).
 | A name another issue already answers to is refused, checked before the write | A constraint violation cannot distinguish "already recorded" from "that would merge two issues" |
 | It starts undisclosed, and recording one asks for the private triage right (REQ-37) | Defaulting the other way makes the dangerous mistake the quiet one. Somebody who may argue about known issues in shipped components has not been handed the ones nobody has announced. Already-public is a flag on the request, asking the ordinary right |
 
-One identifier, one finding per build. The same code goes out on several lines
-and as several variants at once, so a flaw in it is not a fact about one build.
-This is the shape a scanner's findings already have, so it lists, ranks, comes
-due, carries decisions, groups across variants and appears in a comparison
-exactly as a reported one does.
+One identifier, one finding per place in every build. The same code goes out on
+several lines and as several variants at once, so a flaw in it is not a fact
+about one build. This is the shape a scanner's findings already have, so it
+lists, ranks, comes due, carries decisions, groups across variants and appears
+in a comparison exactly as a reported one does.
 
 | Rule | Reason |
 |---|---|
@@ -306,6 +306,8 @@ exactly as a reported one does.
 | One product | The identifier is minted per product, so a flaw in two products is two records |
 | Every row gets the same embargo, rank and deadline | They are the same flaw. A build added later copies them, or the newest build would get a later deadline for the same flaw |
 | What carries it is a component of the build, or the build itself | Naming nothing puts it on the root, which is honest where the flaw is in how the pieces fit together. Naming something the build does not hold is refused |
+| It is a component at a place, keyed exactly as a scanned one is (REQ-17) | The place is derived from the build's own graph rather than asked for: the entry path has already resolved the component there, and a component can sit in more than one place at once, which a form question could not express and which is why one recording opens one finding per place. Recorded as sitting directly under the product whatever the graph said, a flaw a person recorded and the same flaw a scan found were two places and two decisions — triaging either did nothing for the other |
+| Recorded against the build itself, the place is the build's root, which has no name of its own | The product's name differs per variant, so a place keyed on it is a different place in each of them: one flaw across three variants was three places and three decisions. The scan path collapses a root parent for the same reason |
 | A name the build holds more than once is refused with the choices | A name is not unique within a build and not rarely: a real switch image ships three vendored copies of one library, and thirteen names in it are held at one version by two components. The resolution goes through the same lookup every other component reference takes — it did not, and took the first row a name matched |
 
 ## Reporter details
@@ -370,6 +372,7 @@ still reading as present, invisibly.
 | A scanner's finding is refused | The evidence exists, and overruling it is what computing resolution was chosen to prevent |
 | Closed per build, across every place the issue sits at there | A fix ships in a release |
 | It carries who, when and why | A closure with no reason is refused |
+| The reason is published, on the register | What is required of a person is readable: the category says a fix happened, the sentence says what the fix was, and the second is what somebody has years later. The refusal is a promise to whoever typed it that the sentence goes somewhere. A closure a scan performed carries a category and no sentence, because nobody typed one. It is not in a release note: a person's internal words are not a customer document, and a comparison of two builds already says what was fixed in the terms a release note needs |
 | It asks the same right recording it asked, checked against each row | Somebody who may argue about disclosed findings has not been handed the undisclosed ones |
 | Nothing reopens one | Undoing a closure needs somewhere to keep the closure that was undone, which is a table rather than a column |
 
@@ -924,7 +927,7 @@ question next year should find the answer rather than the question.
 | `Store.Enter` | Fifty lines of refusals, each with its own reason, and one transaction. Both belong to the act; what it needed was the transaction discipline, which it has |
 | `fix.go` | Two responsibilities with a clean read-and-write seam, and one subject — upgrade commitments. Splitting it now would be splitting to hit a number. The cut is there when the write half grows |
 | The schema migrations | Each is one list of `CREATE TABLE` statements. The length is the schema, the comment beside each column is what makes it legible, and splitting a table group across two functions would break the ordering the chain exists to check |
-| `sortedBy` and `sortedAcross` | Twenty near-identical lines whose tie-breaks genuinely differ. Both already read from the one allowlist, which is the half that matters; a shared function taking the tie-break as an argument saves a line and costs a call site that has to be read to know which list it is |
+| `sortedBy`, `sortedAcross` and the by-component order | The lookup, the direction and the null-last case are one function the three call. Their tie-breaks genuinely differ and stayed with each list, which is what a reader of one of them needs beside it: a shared function taking the tie-break as an argument would put it back at the call site as an argument nobody can read |
 
 ## Limits
 

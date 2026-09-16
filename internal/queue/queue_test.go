@@ -983,3 +983,42 @@ func moving(t *testing.T, q *queue.Queue, from time.Time) func(time.Duration) {
 	queue.SetClock(q, func() time.Time { return time.Unix(0, at.Load()).UTC() })
 	return func(by time.Duration) { at.Add(int64(by)) }
 }
+
+func TestBoundsThatCannotWorkTogetherAreRefusedAtStartup(t *testing.T) {
+	// The bounds are a deployment's to size, and two pairs of them are only
+	// meaningful against each other. What a wrong pair produces — work handed
+	// to a second worker while the first is still doing it, or work cancelled
+	// while it is running normally — reads as a fault in the work rather than
+	// in the configuration, so it is refused where it is written rather than
+	// met later.
+	//
+	// No database: these are the values compared, not anything stored.
+	sound := queue.DefaultOptions()
+	if err := sound.Check(); err != nil {
+		t.Fatalf("the defaults do not pass their own check: %v", err)
+	}
+
+	renewedTooLate := sound
+	renewedTooLate.Heartbeat = sound.ClaimTimeout
+	if err := renewedTooLate.Check(); err == nil {
+		t.Error("a claim renewed no more often than it goes stale was accepted")
+	} else if !strings.Contains(err.Error(), "QUEUE_HEARTBEAT") {
+		t.Errorf("the refusal does not name the setting: %v", err)
+	}
+
+	cutOffTooSoon := sound
+	cutOffTooSoon.MaxHold = sound.ClaimTimeout
+	if err := cutOffTooSoon.Check(); err == nil {
+		t.Error("a hold ceiling no larger than the claim timeout was accepted")
+	} else if !strings.Contains(err.Error(), "QUEUE_MAX_HOLD") {
+		t.Errorf("the refusal does not name the setting: %v", err)
+	}
+
+	// Zero is what a caller with no upper bound of its own states, and it is
+	// not a pair to compare.
+	noCeiling := sound
+	noCeiling.MaxHold = 0
+	if err := noCeiling.Check(); err != nil {
+		t.Errorf("work stated as having no ceiling was refused: %v", err)
+	}
+}

@@ -43,6 +43,11 @@ const (
 	NotNewer
 	// BuiltInFuture, so its timestamp cannot be trusted.
 	BuiltInFuture
+	// Retake it: we hold these bytes and the attempt to read them failed, so
+	// they are taken again on the row that already describes them. A failed
+	// upload is not one we hold — otherwise the identical bytes can never be
+	// sent again once whatever defeated the reader has been fixed.
+	Retake
 )
 
 // String names the outcome for logs and errors.
@@ -61,6 +66,8 @@ func (o Outcome) String() string {
 		return "not newer"
 	case BuiltInFuture:
 		return "built in the future"
+	case Retake:
+		return "retake"
 	}
 	return "unknown"
 }
@@ -93,8 +100,15 @@ var ErrNoScan = errors.New("no such scan")
 type Arriving struct {
 	// TargetID is the already-resolved target.
 	TargetID int64
-	// ContentHash is the hex digest of the file exactly as received.
+	// ContentHash identifies the whole submission: the inventory and the
+	// suppression documents that arrived with it, folded together. Two
+	// uploads with the same hash are the same submission.
 	ContentHash string
+	// InventoryHash is the digest of the inventory part alone. It is what
+	// tells a build re-argued at the same build time from a second, different
+	// document claiming that time: the first is the picture we hold with new
+	// judgments beside it, the second a coin toss over which is current.
+	InventoryHash string
 	// BuiltAt is when the producer says the scan was made. This orders scans,
 	// not the time we happened to receive them: uploads retry, transfer slowly
 	// and queue, so arrival order says nothing about which is newer.
@@ -157,9 +171,10 @@ func NewStore(db bun.IDB) *Store {
 //
 // The order of these checks matters. A future build time is refused first,
 // because accepting one would mean nothing legitimate could ever be newer and
-// the target would take no further scans. A file we already hold is next, so a
-// retry after a timeout that actually succeeded reports success rather than
-// failing the pipeline for work that landed. Only then does age matter.
+// the target would take no further scans. A submission we already hold is
+// next, so a retry after a timeout that actually succeeded reports success
+// rather than failing the pipeline for work that landed. Only then does age
+// matter.
 func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 	built := asStored(a.BuiltAt)
 	if built.After(s.now().Add(futureTolerance)) {
@@ -170,7 +185,7 @@ func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 	if err != nil {
 		return Accept, err
 	}
-	if seen != nil {
+	if seen != nil && seen.Status == Accepted {
 		return AlreadyHave, nil
 	}
 
@@ -179,7 +194,32 @@ func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 		return Accept, err
 	}
 	if newest != nil && !built.After(asStored(newest.BuiltAt)) {
+		// The same build, re-argued. An inventory identical to the one held
+		// for this build time, arriving with different judgments beside it,
+		// is not a second picture competing with the first: it is the picture
+		// we already hold with the build's arguments about it changed, and
+		// those judgments are why the submission was sent again.
+		if built.Equal(asStored(newest.BuiltAt)) {
+			again, err := NewDocuments(s.db).sameInventory(ctx, newest.ID, a.InventoryHash)
+			if err != nil {
+				return Accept, err
+			}
+			if again {
+				// These exact bytes may already have a row whose attempt
+				// failed, and then it is that row that is taken again: a
+				// second row under the same content hash is what the
+				// uniqueness on the table refuses, and the insert would
+				// collide and answer success pointing at the failed one.
+				if seen != nil {
+					return Retake, nil
+				}
+				return Accept, nil
+			}
+		}
 		return NotNewer, nil
+	}
+	if seen != nil {
+		return Retake, nil
 	}
 	return Accept, nil
 }
@@ -198,6 +238,15 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 	case AlreadyHave:
 		existing, err := s.byContent(ctx, a.TargetID, a.ContentHash)
 		return existing, AlreadyHave, err
+
+	case Retake:
+		// The row stays: it is what says these bytes arrived at this build,
+		// and one row per set of bytes is what the uniqueness on the table
+		// means. What changes is that this attempt is the live one — the
+		// previous attempt's failure is no longer what happened to this
+		// submission.
+		taken, err := s.retake(ctx, a)
+		return taken, Retake, err
 
 	case NotNewer:
 		// What is already here, which is the whole content of the refusal. A
@@ -253,7 +302,12 @@ func (s *Store) Newest(ctx context.Context, targetID int64) (*Scan, error) {
 	err := s.db.NewSelect().Model(scan).
 		Where("target_id = ?", targetID).
 		Where("status = ?", Accepted).
-		Order("built_at DESC").
+		// The later arrival wins a tie, and a tie is possible: one build
+		// re-sent with different judgments is two submissions at one build
+		// time. Without the second column the engine picks, and which
+		// judgments a build currently stands behind would be whichever row it
+		// happened to hand back.
+		Order("built_at DESC", "id DESC").
 		Limit(1).
 		Scan(ctx)
 	if err != nil {
@@ -307,6 +361,33 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 		return fmt.Errorf("record that scan %d failed: %w", id, err)
 	}
 	return nil
+}
+
+// retake makes an arriving submission the live attempt at bytes we already
+// hold and could not read.
+//
+// Everything about who sent it and what will read it is this attempt's: the
+// reader version that failed is not the one about to run, and the credential
+// that sends the retry need not be the one that sent the first try.
+func (s *Store) retake(ctx context.Context, a Arriving) (*Scan, error) {
+	scan, err := s.byContent(ctx, a.TargetID, a.ContentHash)
+	if err != nil {
+		return nil, err
+	}
+	if scan == nil {
+		return nil, fmt.Errorf("retake scan: the submission is no longer held")
+	}
+	scan.Status = Accepted
+	scan.Failure = ""
+	scan.ReceivedAt = s.now().Truncate(storedPrecision)
+	scan.ParserVersion = a.ParserVersion
+	scan.Credential = a.Credential
+	if _, err := s.db.NewUpdate().Model(scan).
+		Column("status", "failure", "received_at", "parser_version", "credential").
+		WherePK().Exec(ctx); err != nil {
+		return nil, fmt.Errorf("retake scan %d: %w", scan.ID, err)
+	}
+	return scan, nil
 }
 
 // truncate bounds what is stored from a message that quotes a scan file.

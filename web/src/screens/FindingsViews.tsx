@@ -157,15 +157,30 @@ export function ByComponent({
   }
 
   const most = rows[0]?.issues ?? 0;
-  const worstFirst = (query as { sort?: string }).sort === "severity";
+  const asked = (query as { sort?: string }).sort ?? "";
+  const worstFirst = asked === "severity";
+  // What this list is ordered by, which is not always its own default: the
+  // findings list's controls carry across, and every key it offers is one
+  // this view honors — read of the package rather than of one finding. Saying
+  // "ordered by issue count" while the rows come back deadline-ordered is the
+  // shape this whole view exists to report.
+  const orderedBy: Record<string, string> = {
+    "": "issue count",
+    urgency: "how urgent the worst of each is",
+    severity: "the worst rating in each",
+    epss: "how likely the worst of each is to be exploited",
+    age: "the oldest thing in each",
+    deadline: "the soonest deadline in each",
+    places: "how far each reaches",
+  };
 
   return (
     <>
       <p className="hint" style={{ margin: "0 0 8px" }}>
-        Ordered by issue count — <b>issues</b> is rows in the by-issue view and <b>places</b> is how
-        many places those occupy in what you are looking at. Making urgency the order instead would
-        reproduce the by-issue list at worse resolution, so the weight is the order and each row
-        says what its weight is made of.{" "}
+        Ordered by {orderedBy[asked] ?? asked} — <b>issues</b> is rows in the by-issue view and{" "}
+        <b>places</b> is how many places those occupy in what you are looking at. Making urgency the
+        order by default would reproduce the by-issue list at worse resolution, so the weight is the
+        order unless you ask for another and each row says what its weight is made of.{" "}
         {/* The same answer as a file, narrowed the same way. This is
             the shape a release meeting argues over, and taking it away meant
             copying the table out. */}
@@ -355,6 +370,13 @@ export function ByBump({
     ...(query.q ? { q: query.q } : {}),
     ...(first(query.ecosystem) ? { ecosystem: first(query.ecosystem) } : {}),
     ...(first(query.state) ? { state: first(query.state) } : {}),
+    // What each bump would close, which is what the line above this table
+    // says the order is and what somebody reads this view to decide. The
+    // list's own default is worst-first, which is the findings list's
+    // question asked again; the sort is not taken from the findings
+    // controls, whose keys are about a finding and half of which a bump has
+    // no answer for.
+    sort: "issues",
   };
 
   const bundles = useQuery({

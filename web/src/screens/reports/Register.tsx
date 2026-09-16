@@ -117,6 +117,7 @@ export function Register() {
                       <th>Proposed</th>
                       <th>Agreed</th>
                       <th>Due</th>
+                      <th>Closed</th>
                       <th>Met</th>
                     </tr>
                   </thead>
@@ -180,6 +181,28 @@ export function Register() {
                           )}
                         </td>
                         <td>{row.due ? on(row.due) : <span className="hint">none</span>}</td>
+                        <td>
+                          {/* The reason as well as the date. A closure with no
+                              reason is refused of whoever writes one, and the
+                              words they typed were readable nowhere — so a
+                              person was required to say why and nobody could
+                              find out. Drawn as plain text: it goes through
+                              the submission policy on the way in, like every
+                              other field a person types, and what that bounds
+                              is what may be rendered rather than what must
+                              be — a line in a table is not a document. */}
+                          {row.closed ? (
+                            <>
+                              {on(row.closed)}
+                              {row.closed_because && (
+                                <span className="hint"> · {row.closed_because}</span>
+                              )}
+                              {row.closed_note && <div className="hint">{row.closed_note}</div>}
+                            </>
+                          ) : (
+                            <span className="hint">—</span>
+                          )}
+                        </td>
                         <td>
                           {/* Answerable only for something that closed: an open
                               row has not missed its deadline, it has not

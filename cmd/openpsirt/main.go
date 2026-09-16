@@ -223,6 +223,17 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 
 	queueing := queue.DefaultOptions()
+	// What the deployment sizes. How deep the queue may get is not among
+	// these: it is a stored setting, so an operator meeting a refused upload
+	// has a remedy that does not need a restart.
+	queueing.MaxAttempts = cfg.QueueMaxAttempts
+	queueing.ClaimTimeout = cfg.QueueClaimTimeout
+	queueing.Heartbeat = cfg.QueueHeartbeat
+	queueing.MaxHold = cfg.QueueMaxHold
+	queueing.Backoff = cfg.QueueBackoff
+	if err := queueing.Check(); err != nil {
+		return err
+	}
 	// The ceiling on one hold is what cuts a long scan off, and it is the only
 	// bound here that can: the claim is renewed for as long as the scan runs,
 	// so the claim timeout never reaches it. A scanner allowed to run past the
@@ -382,6 +393,7 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 	if err != nil {
 		return nil, err
 	}
+	target.RequireEncryption = cfg.DBRequireEncryption
 	db, err := database.OpenWithPool(ctx, target, database.Pool{
 		MaxOpen:     cfg.DBMaxOpen,
 		MaxIdle:     cfg.DBMaxIdle,
@@ -398,10 +410,15 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 	logger.Info("database connected",
 		"engine", db.Server.Engine, "version", db.Server.Version,
 		"transport", db.Server.Transport, "url", target.Redacted)
+	// Only where the deployment has not stated that encryption is required: a
+	// connection that did not get it is refused above where it has, so
+	// reaching here means this is the state that was chosen.
 	if db.Server.Engine.IsProduction() && db.Server.Transport == "none" {
 		logger.Warn("the database connection is not encrypted",
 			"engine", db.Server.Engine,
-			"remedy", "ask for encryption in OPENPSIRT_DATABASE_URL: sslmode=verify-full, or tls=true")
+			"remedy", "ask for encryption in OPENPSIRT_DATABASE_URL: sslmode=verify-full, "+
+				"or tls=true — and set "+database.RequiredEncryption+" to refuse a "+
+				"connection that does not get it")
 	}
 	if !db.Server.Engine.IsProduction() {
 		logger.Warn("this database is for development and testing only",

@@ -39,7 +39,12 @@ type EnteredBody struct {
 	Component  string `json:"component" doc:"What in the build carries it"`
 	Visibility string `json:"visibility" enum:"public,private" doc:"Whether it has been disclosed"`
 	DueAt      string `json:"due_at,omitempty" doc:"When it has to be answered by"`
-	Builds     int    `json:"builds" doc:"How many builds it was recorded against. One issue, one finding per build"`
+	Builds     int    `json:"builds" doc:"How many builds it was recorded against"`
+	// Places is how many findings that made. A component can sit in more than
+	// one place in a build, and a finding is a component at a place, so a
+	// flaw recorded against one build can open several — which is what a
+	// scanned finding of the same flaw at the same component would open.
+	Places int `json:"places" doc:"How many findings that opened. One per place the component sits in, in each build"`
 }
 
 func registerEntry(api huma.API, in Ingest) {
@@ -74,7 +79,7 @@ func registerEntry(api huma.API, in Ingest) {
 			Builds []struct {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
 				Variant string `json:"variant" minLength:"1" doc:"How that line is built"`
-			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, one finding per build — which is the shape a scanner's findings already take"`
+			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take"`
 			Summary  string `json:"summary" minLength:"1" doc:"What the flaw is, in your own words"`
 			Severity string `json:"severity,omitempty" enum:"critical,high,medium,low,negligible,none" doc:"How bad it is. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
 			// The vector rather than a score. The number is derived from it
@@ -148,6 +153,9 @@ func registerEntry(api huma.API, in Ingest) {
 				return nil, huma.Error404NotFound(finding.ErrNothingScanned.Error())
 			case errors.Is(err, finding.ErrNoBuild), errors.Is(err, finding.ErrSeveralProducts):
 				return nil, asked(in.Logger, err)
+			case errors.Is(err, finding.ErrTooManyPlaces):
+				// The caller's to narrow, and the sentence says by how much.
+				return nil, asked(in.Logger, err)
 			}
 			return nil, refusedFinding(in, err)
 		}
@@ -160,9 +168,16 @@ func registerEntry(api huma.API, in Ingest) {
 			Status int
 			Body   EnteredBody
 		}{Status: http.StatusCreated}
+		// Builds and places are different numbers: one flaw at a component
+		// that two things pull in is two findings in one build.
+		builds := map[int64]bool{}
+		for _, row := range rows {
+			builds[row.TargetID] = true
+		}
 		out.Body = EnteredBody{
 			Identifier: identifier, Component: component,
-			Visibility: string(rows[0].Visibility), Builds: len(rows),
+			Visibility: string(rows[0].Visibility),
+			Builds:     len(builds), Places: len(rows),
 		}
 		// Every row got the same one, because they are the same flaw.
 		if rows[0].DueAt != nil {
@@ -655,6 +670,7 @@ func registerAffects(api huma.API, in Ingest) {
 				return nil, severalComponents(several, "version, and ecosystem where two share one")
 			case errors.Is(err, finding.ErrNotOursToSay),
 				errors.Is(err, finding.ErrNoReason),
+				errors.Is(err, finding.ErrTooManyPlaces),
 				errors.Is(err, finding.ErrNoBuild),
 				errors.Is(err, finding.ErrSeveralProducts):
 				return nil, asked(in.Logger, err)

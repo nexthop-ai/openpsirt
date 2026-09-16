@@ -776,11 +776,80 @@ func (c consumers) of(componentID int64) []int64 {
 }
 
 // openPlaces reads every place in a variant.
+func openPlaces(ctx context.Context, db bun.IDB, targetID int64) (consumers, error) {
+	return placeEdges(ctx, db, targetID, 0)
+}
+
+// sits is one place a component occupies: what pulls it in, by identifier and
+// by name. A component sitting directly under the build is pulled in by
+// nothing and its consumer has no name, for the reason PlaceIdentity gives.
+type sits struct {
+	consumerID int64
+	consumer   string
+}
+
+// sittingsOf reads where one component sits, with the name of each thing
+// that pulls it in.
+//
+// For a finding somebody records by hand: a person names a component and the
+// places are derived from the build's own graph, exactly as a scan's are. A
+// component can sit in more than one place at once, which is why the answer is
+// a list — and which is why a form asking "where does it sit" could not
+// express it.
+func sittingsOf(ctx context.Context, db bun.IDB, targetID, componentID int64) ([]sits, error) {
+	at, err := placeEdges(ctx, db, targetID, componentID)
+	if err != nil {
+		return nil, err
+	}
+	ids := at.of(componentID)
+	names, err := componentNames(ctx, db, ids)
+	if err != nil {
+		return nil, err
+	}
+	places := make([]sits, 0, len(ids))
+	for _, id := range ids {
+		places = append(places, sits{consumerID: id, consumer: names[id]})
+	}
+	return places, nil
+}
+
+// componentNames names components by identifier, leaving out the one that is
+// no component at all.
+func componentNames(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
+	wanted := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id != 0 {
+			wanted = append(wanted, id)
+		}
+	}
+	names := map[int64]string{}
+	if len(wanted) == 0 {
+		return names, nil
+	}
+	var rows []struct {
+		ID   int64  `bun:"id"`
+		Name string `bun:"name"`
+	}
+	if err := db.NewSelect().
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr(`c.id AS "id"`).
+		ColumnExpr(`c.name AS "name"`).
+		Where("c.id IN (?)", bun.List(wanted)).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what pulls it in: %w", err)
+	}
+	for _, row := range rows {
+		names[row.ID] = row.Name
+	}
+	return names, nil
+}
+
+// placeEdges reads where things sit in a variant, all of them or one of them.
 //
 // A component under the product itself is recorded as being under nothing: the
 // product's name differs per variant, so keying on it would stop the same
 // place being recognized across them.
-func openPlaces(ctx context.Context, db bun.IDB, targetID int64) (consumers, error) {
+func placeEdges(ctx context.Context, db bun.IDB, targetID, componentID int64) (consumers, error) {
 	var edges []struct {
 		ChildComponentID  int64 `bun:"child_component_id"`
 		ParentComponentID int64 `bun:"parent_component_id"`
@@ -795,6 +864,12 @@ func openPlaces(ctx context.Context, db bun.IDB, targetID int64) (consumers, err
 		ColumnExpr(`parent.is_root AS "parent_is_root"`).
 		Where("e.target_id = ?", targetID).
 		Where("e.closed_scan_id IS NULL").
+		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
+			if componentID == 0 {
+				return q
+			}
+			return q.Where("child.component_id = ?", componentID)
+		}).
 		Scan(ctx, &edges)
 	if err != nil {
 		return nil, fmt.Errorf("read where things sit: %w", err)

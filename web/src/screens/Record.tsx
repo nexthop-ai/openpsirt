@@ -607,9 +607,10 @@ export function Record() {
           {whole ? (
             <span className="hint">
               Against {streams.length * variants.length}{" "}
-              {streams.length * variants.length === 1 ? "build" : "builds"} — one issue, one finding
-              in each. A build that does not hold the component is refused rather than skipped, so
-              deselect it if research says it is not affected.
+              {streams.length * variants.length === 1 ? "build" : "builds"} — one issue, and one
+              finding for each place the component sits at in each of them. A build that does not
+              hold the component is refused rather than skipped, so deselect it if research says it
+              is not affected.
             </span>
           ) : (
             <span className="hint">
