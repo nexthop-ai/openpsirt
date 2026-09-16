@@ -41,7 +41,32 @@ type ReadinessBody struct {
 	// Floor is the line both counts are at or above, named so a shared number
 	// says whose it is.
 	Floor string `json:"floor,omitempty" doc:"The least severity counted, or empty where everything is"`
+	// Blocking is what the count is made of, worst first: the work nobody has
+	// agreed to ship with. A number with no list behind it is a number
+	// somebody has to go and assemble by hand before they can do anything
+	// about it, and this is read at exactly the moment there is no time for
+	// that.
+	Blocking []BlockingBody `json:"blocking" doc:"What nobody has agreed to ship with, worst first. Bounded; total says how many there are"`
+	// Blockers is how many there are altogether, which is what the list is a
+	// page of.
+	Blockers int `json:"blockers" doc:"How many pieces of work nobody has agreed to ship with"`
 }
+
+// BlockingBody is one thing standing between a branch and a release.
+type BlockingBody struct {
+	Vulnerability string `json:"vulnerability"`
+	Component     string `json:"component"`
+	Severity      string `json:"severity,omitempty"`
+	Exploited     bool   `json:"exploited,omitempty"`
+	Places        int    `json:"places" doc:"How many places of the build it sits at"`
+	State         string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"How far it has been decided. Anything agreed is not in this list"`
+	Due           string `json:"due,omitempty"`
+}
+
+// blocking is how many of the worst are listed. A release conversation reads
+// the top of this and the number beside it; the findings list is where the
+// whole of it is worked.
+const blocking = 20
 
 func registerReadiness(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
@@ -60,7 +85,12 @@ func registerReadiness(api huma.API, in Ingest) {
 			"and `why` says what is missing rather than reporting zeroes, because a release " +
 			"that shipped clean and a release nobody scanned are not the same answer.\n\n" +
 			"Counted as issues at components at or above the deployment's line, which `floor` " +
-			"names.",
+			"names.\n\n" +
+			"**`blocking` is what the count is made of**: the work nobody has agreed to ship " +
+			"with, worst first, read through the findings list's own reader with the same " +
+			"line — so the list it opens is the list it counts. Anything agreed is absent, " +
+			"because agreeing is the decision to ship with it. `blockers` says how many " +
+			"there are altogether.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -95,6 +125,37 @@ func registerReadiness(api huma.API, in Ingest) {
 		if ready.Shipped != nil {
 			shipped := buildCounts(*ready.Shipped)
 			out.Body.Shipped = &shipped
+		}
+
+		// What the count is made of. The same reader the findings list uses,
+		// with the same line and the same narrowing, so the list this opens
+		// is the list this counts.
+		scope := finding.Scope{
+			ProductID: &named.ProductID, StreamID: &named.StreamID, VariantID: &named.VariantID,
+		}
+		groups, blockers, err := finding.NewStore(in.DB.DB).Groups(ctx, subject, scope,
+			blocking, 0, finding.Filter{
+				Floor: ready.Floor,
+				// Everything nobody has agreed to. An agreed row is a
+				// decision somebody made to ship with it, which is the
+				// opposite of a blocker.
+				States: []string{"undecided", "waiting", "lapsed"},
+			})
+		if err != nil {
+			return nil, refusedFinding(in, err)
+		}
+		out.Body.Blockers = blockers
+		out.Body.Blocking = make([]BlockingBody, 0, len(groups))
+		for _, group := range groups {
+			one := BlockingBody{
+				Vulnerability: group.Vulnerability, Component: group.Component,
+				Severity: group.Severity, Exploited: group.Exploited,
+				Places: group.Places, State: group.State,
+			}
+			if group.DueAt != nil {
+				one.Due = group.DueAt.Format(time.DateOnly)
+			}
+			out.Body.Blocking = append(out.Body.Blocking, one)
 		}
 		return out, nil
 	})

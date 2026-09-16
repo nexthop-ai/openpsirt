@@ -3231,6 +3231,8 @@ export interface paths {
          *
          *     Counted as issues at components at or above the deployment's line, which `floor` names.
          *
+         *     **`blocking` is what the count is made of**: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-readiness"];
@@ -4629,6 +4631,23 @@ export interface components {
              * @enum {string}
              */
             role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin";
+        };
+        BlockingBody: {
+            component: string;
+            due?: string;
+            exploited?: boolean;
+            /**
+             * Format: int64
+             * @description How many places of the build it sits at
+             */
+            places: number;
+            severity?: string;
+            /**
+             * @description How far it has been decided. Anything agreed is not in this list
+             * @enum {string}
+             */
+            state?: "undecided" | "waiting" | "lapsed";
+            vulnerability: string;
         };
         Branch: {
             branches?: components["schemas"]["Branch"][] | null;
@@ -7627,6 +7646,13 @@ export interface components {
              * @example https://example.com/schemas/ReadinessBody.json
              */
             readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description How many pieces of work nobody has agreed to ship with
+             */
+            blockers: number;
+            /** @description What nobody has agreed to ship with, worst first. Bounded; total says how many there are */
+            blocking: components["schemas"]["BlockingBody"][] | null;
             /** @description The least severity counted, or empty where everything is */
             floor?: string;
             now: components["schemas"]["BuildCountsBody"];

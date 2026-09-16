@@ -233,6 +233,9 @@ of a build pipeline.
 | The same variant on both sides | A branch built for one chip beside a release built for another compares two different pieces of software, and the difference reads as a regression |
 | The release is the newest one cut from this branch that has been scanned here | A tag is cut at a moment and never moves. One declared and never built has no counts, and answering with zeroes would report a clean release that does not exist, so the comparison is absent and what is missing is stated |
 | A tag is not compared against itself | It is one frozen point and was not cut into anything |
+| The count carries the list it is made of, worst first and bounded | A number read at the moment there is no time to assemble what it is made of is a number nobody can act on, and this is the screen a release conversation happens in |
+| Anything agreed to is absent from that list | Agreeing is the decision to ship with it, which is the opposite of a blocker. What is left is undecided, waiting on a second person, or standing on a judgment that lapsed |
+| It is read through the findings list's own reader, with the same line | So the list it opens is the list it counts |
 
 Counted as issues at components, at or above the deployment's line, with the line
 named beside the number (REQ-30).
