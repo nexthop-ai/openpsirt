@@ -10,6 +10,19 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
+// bundleSort is the query parameter for which order the fix-bundle list pages
+// in, built from the store's own list the way the findings list's is.
+type bundleSort string
+
+// Schema answers with the orders the store knows, in its order.
+func (bundleSort) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(finding.BundleSortKeys()))
+	for _, key := range finding.BundleSortKeys() {
+		offered = append(offered, string(key))
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
+}
+
 // BundleBody is one upstream bump and everything it would close.
 type BundleBody struct {
 	Upstream string `json:"upstream" doc:"What the bump is of: the source package where one is recorded, and the component's own name otherwise"`
@@ -45,20 +58,27 @@ func registerBundles(api huma.API, in Ingest) {
 			"per place.\n\n" +
 			"Takes the same selection as the findings list, and six of its filters: " +
 			"severity, exploited, component, search, ecosystem and state. Not the rest: a " +
-			"filter that answers about a place or a deadline has no row here to narrow.",
+			"filter that answers about a place or a deadline has no row here to narrow.\n\n" +
+			"Ordered worst first, and `sort` takes any of: what the bump would close " +
+			"(`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is " +
+			"(`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). " +
+			"`asc` orders the other way. The default answers what should worry you; " +
+			"`sort=issues` answers what to do this afternoon.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product   string `path:"product"`
-		Stream    string `query:"stream" doc:"Limit to one branch or tag"`
-		Variant   string `query:"variant" doc:"Limit to one variant"`
-		Severity  string `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse"`
-		Exploited bool   `query:"exploited" doc:"Keep only bumps closing something known to be exploited"`
-		Component string `query:"component" doc:"Keep only bumps moving a component of this name"`
-		Search    string `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
-		Ecosystem string `query:"ecosystem" doc:"Keep only components of one package kind"`
-		State     string `query:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided"`
-		Limit     int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset    int    `query:"offset" minimum:"0"`
+		Product   string     `path:"product"`
+		Stream    string     `query:"stream" doc:"Limit to one branch or tag"`
+		Variant   string     `query:"variant" doc:"Limit to one variant"`
+		Severity  string     `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse"`
+		Exploited bool       `query:"exploited" doc:"Keep only bumps closing something known to be exploited"`
+		Component string     `query:"component" doc:"Keep only bumps moving a component of this name"`
+		Search    string     `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
+		Ecosystem string     `query:"ecosystem" doc:"Keep only components of one package kind"`
+		State     string     `query:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided"`
+		Sort      bundleSort `query:"sort" doc:"Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for"`
+		Ascending bool       `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
+		Limit     int        `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset    int        `query:"offset" minimum:"0"`
 	}) (*struct {
 		Body struct {
 			Items []BundleBody `json:"items"`
@@ -76,6 +96,7 @@ func registerBundles(api huma.API, in Ingest) {
 				MinSeverity: input.Severity, Exploited: input.Exploited,
 				Components: []string{input.Component}, Search: input.Search,
 				Ecosystems: []string{input.Ecosystem}, States: []string{input.State},
+				BundleSort: finding.BundleSortKey(input.Sort), Ascending: input.Ascending,
 				Floor: floor,
 			})
 		if err != nil {

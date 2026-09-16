@@ -373,3 +373,152 @@ func TestAWordAnAdvisoryWroteWhereAVersionBelongsIsNotTheUpgrade(t *testing.T) {
 		}
 	})
 }
+
+// Ordering the two grouped lists: the by-component view and the bump list.
+//
+// Both group findings, and both answer a question about the group rather than
+// about a finding — the worst thing in this package, the soonest deadline
+// this bump would meet. The by-component view took the six keys the findings
+// list takes and honoured two of them, discarding the direction in silence;
+// the bump list took no order at all.
+
+// ranked is a finding of a stated severity, so an ordering test can put one
+// group above another on something other than how many rows it has.
+//
+// The number as well as the word: what the severity key orders by is the
+// score, and two issues rated in words alone are a tie the tie-break decides.
+func ranked(id string, component graph.Described, severity string, score float64) finding.Reported {
+	one := found(id, component)
+	one.Issue.Severity = severity
+	one.Issue.Score = score
+	one.Issue.Likelihood = score / 100
+	return one
+}
+
+// spread opens three issues at one place and two issues at two places, so
+// that "most issues" and "most places" are different answers and an ordering
+// that ignores what was asked shows up as the same list twice.
+func spread(t *testing.T, f *fixture) {
+	t.Helper()
+	f.shipped(t, twoConsumers())
+	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		ranked("CVE-2026-1", swss, "high", 7.5),
+		ranked("CVE-2026-2", swss, "high", 7.5),
+		ranked("CVE-2026-3", swss, "high", 7.5),
+		ranked("CVE-2026-4", libnl, "critical", 9.8),
+		ranked("CVE-2026-5", libnl, "low", 2.1),
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		spread(t, f)
+		who := f.holding(t, access.PublicTriage)
+		leader := func(filter finding.Filter) string {
+			t.Helper()
+			groups, _, err := f.store.ComponentGroups(t.Context(), who, f.wholeProduct(), 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(groups) == 0 {
+				t.Fatal("the by-component view is empty")
+			}
+			return groups[0].Component
+		}
+
+		// Where the weight is, which is what this view is for and what it
+		// answers when nothing is asked.
+		if got := leader(finding.Filter{}); got != swss.Name {
+			t.Errorf("unasked, the view leads with %q rather than the package holding the most issues", got)
+		}
+		// How far it reaches. Three issues at one place against two issues at
+		// two places: a view that ignores the key answers the same as above.
+		if got := leader(finding.Filter{SortBy: finding.ByPlaces}); got != libnl.Name {
+			t.Errorf("sort=places leads with %q rather than the package sitting in the most places", got)
+		}
+		// The worst of what is open against it.
+		if got := leader(finding.Filter{SortBy: finding.BySeverity}); got != libnl.Name {
+			t.Errorf("sort=severity leads with %q rather than the package holding the critical", got)
+		}
+		// And the other way round, which was accepted and discarded: the
+		// caller asking for the least of something was answered with the most.
+		if got := leader(finding.Filter{SortBy: finding.ByPlaces, Ascending: true}); got != swss.Name {
+			t.Errorf("asc=true leads with %q, which is what descending answers", got)
+		}
+	})
+}
+
+func TestEveryOrderTheGroupedListsOfferAreOrdersTheyRun(t *testing.T) {
+	// The expressions are aggregates over a grouped statement, two of them
+	// need the issue joined, and one of them orders on something that can be
+	// absent. None of that is visible until the engine reads it, and the
+	// engines disagree about what a grouped query may order by.
+	each(t, func(t *testing.T, f *fixture) {
+		spread(t, f)
+		who := f.holding(t, access.PublicTriage)
+		for _, by := range finding.SortKeys() {
+			for _, way := range []bool{false, true} {
+				filter := finding.Filter{SortBy: by, Ascending: way}
+				if _, total, err := f.store.ComponentGroups(t.Context(), who,
+					f.wholeProduct(), 50, 0, filter); err != nil || total != 2 {
+					t.Errorf("by component, sorting by %q ascending=%v answered %d: %v",
+						by, way, total, err)
+				}
+			}
+		}
+		for _, by := range finding.BundleSortKeys() {
+			for _, way := range []bool{false, true} {
+				filter := finding.Filter{BundleSort: by, Ascending: way}
+				if _, total, err := f.store.Bundles(t.Context(), who,
+					f.wholeProduct(), 50, 0, filter); err != nil || total == 0 {
+					t.Errorf("by bump, sorting by %q ascending=%v answered %d: %v",
+						by, way, total, err)
+				}
+			}
+		}
+		// A key nobody allows is the list's own default rather than a failure
+		// or a key reaching the statement.
+		hostile := finding.Filter{BundleSort: "builds); DROP TABLE finding; --"}
+		if _, total, err := f.store.Bundles(t.Context(), who, f.wholeProduct(), 50, 0,
+			hostile); err != nil || total == 0 {
+			t.Errorf("a bump order nobody allows made the list fail rather than fall back: %v", err)
+		}
+	})
+}
+
+func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
+	// The order a small team needs: the existing ranking answers what should
+	// worry somebody, and nothing answered what to do this afternoon.
+	each(t, func(t *testing.T, f *fixture) {
+		spread(t, f)
+		who := f.holding(t, access.PublicTriage)
+		leader := func(filter finding.Filter) finding.Bundle {
+			t.Helper()
+			bundles, _, err := f.store.Bundles(t.Context(), who, f.wholeProduct(), 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(bundles) == 0 {
+				t.Fatal("nothing has a version to move to")
+			}
+			return bundles[0]
+		}
+
+		// Worst first unasked: the bump carrying the critical.
+		if got := leader(finding.Filter{}); got.Upstream != libnl.Name {
+			t.Errorf("unasked, the list leads with %q rather than the bump closing the critical", got.Upstream)
+		}
+		// Most closed first when that is what was asked.
+		if got := leader(finding.Filter{BundleSort: finding.BundlesByIssues}); got.Upstream != swss.Name {
+			t.Errorf("sort=issues leads with %q rather than the bump closing the most", got.Upstream)
+		}
+		// And the fewest, which is the direction half of the same question.
+		if got := leader(finding.Filter{
+			BundleSort: finding.BundlesByIssues, Ascending: true,
+		}); got.Upstream != libnl.Name {
+			t.Errorf("asc=true leads with %q, which is what descending answers", got.Upstream)
+		}
+	})
+}

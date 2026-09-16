@@ -355,6 +355,13 @@ export function ByBump({
     ...(query.q ? { q: query.q } : {}),
     ...(first(query.ecosystem) ? { ecosystem: first(query.ecosystem) } : {}),
     ...(first(query.state) ? { state: first(query.state) } : {}),
+    // What each bump would close, which is what the line above this table
+    // says the order is and what somebody reads this view to decide. The
+    // list's own default is worst-first, which is the findings list's
+    // question asked again; the sort is not taken from the findings
+    // controls, whose keys are about a finding and half of which a bump has
+    // no answer for.
+    sort: "issues",
   };
 
   const bundles = useQuery({

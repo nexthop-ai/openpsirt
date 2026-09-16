@@ -1763,7 +1763,7 @@ export interface paths {
          *
          *     It is also how a person finds the one package worth hiding. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58 — a fact no list of issues makes visible, because ordered by urgency it just looks like a long list.
          *
-         *     Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. Ask for `sort=severity` (or `urgency`) to order by the worst instead, which is the other question somebody reads this to answer.
+         *     Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. `sort` takes every key the findings list takes, read of the package rather than of one finding — the worst of what is open against it (`severity`, `urgency`, `epss`), the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how far it reaches (`places`) — and `asc` orders the other way. Four of the six were accepted and discarded, so a caller asking which package has something due this week was answered with which package has the most findings.
          *
          *     `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
@@ -1822,6 +1822,8 @@ export interface paths {
          *     Grouping is presentation: one act still writes one decision per component and per place.
          *
          *     Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about a place or a deadline has no row here to narrow.
+         *
+         *     Ordered worst first, and `sort` takes any of: what the bump would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -11694,6 +11696,10 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
+                /** @description Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                sort?: "urgency" | "severity" | "issues" | "places" | "builds" | "deadline";
+                /** @description Order the other way — fewest, least urgent, nearest deadline first */
+                asc?: boolean;
                 limit?: number;
                 offset?: number;
             };

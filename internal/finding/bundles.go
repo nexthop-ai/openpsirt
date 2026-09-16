@@ -137,10 +137,10 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
 		ColumnExpr(worst + ` AS "worst"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		// Worst first. A bundle is worth doing for its worst member, and one
-		// closing nine hundred low findings is not the one to do before a
-		// bundle closing one that is being exploited.
-		OrderExpr("urgency DESC, issues DESC, upstream, fixed_in").
+		// Worst first unless somebody asks otherwise, and every order is
+		// through the allowlist above: the key selects a stored expression
+		// and the direction selects one of two words written there.
+		OrderExpr(bundleSorted(filter)).
 		Limit(limit).Offset(offset)
 	if err := page.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what one bump would close: %w", err)
@@ -302,13 +302,23 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr("f.component_id").
+		// The issue is joined only where the order needs it, the way the
+		// findings list does it: the default page reads finding's covering
+		// index and nothing else, and a join added for everybody would pay
+		// for a sort most callers never ask for.
+		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
+			if by, known := order[filter.SortBy]; known && by.issue {
+				return q.Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`)
+			}
+			return q
+		}).
 		// By weight, not by urgency, unless asked. The question this view
 		// answers is where the volume is, and making urgency the default
 		// would reproduce the findings list at worse resolution — but "which
 		// of these is worst" is the other question somebody reads this to
 		// answer, and refusing to answer it sends them back to a list of six
 		// thousand rows to find out.
-		OrderExpr(componentOrder(filter.SortBy)).
+		OrderExpr(componentOrder(filter)).
 		Limit(limit).Offset(offset)
 	if err = filter.narrow(page).Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what is open by component: %w", err)
@@ -371,19 +381,107 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	return groups, total, nil
 }
 
+// BundleSortKey is which order the fix-bundle list pages in.
+//
+// Its own vocabulary rather than the findings list's. A bundle is one bump: it
+// has an issue count and a build count, which a finding does not, and it has
+// no age of its own. The two lists answer different questions, and an
+// allowlist covering both would offer each of them keys that mean nothing
+// there.
+type BundleSortKey string
+
+const (
+	// BundlesByUrgency is the default: a bundle is worth doing for its worst
+	// member, and one closing nine hundred low findings is not the one to do
+	// before a bundle closing one that is being exploited.
+	BundlesByUrgency BundleSortKey = "urgency"
+	// BundlesBySeverity is the worst rating in the bundle, as the band rather
+	// than the urgency — which puts what is being exploited in a band of its
+	// own above every rating.
+	BundlesBySeverity BundleSortKey = "severity"
+	// BundlesByIssues is how many distinct issues the bump closes, which is
+	// the "what should I do this afternoon" order: on a seeded image one
+	// kernel bump closed 4,485 of 8,377 open findings.
+	BundlesByIssues BundleSortKey = "issues"
+	// BundlesByPlaces is how many findings those sit at.
+	BundlesByPlaces BundleSortKey = "places"
+	// BundlesByBuilds is how many builds of the selection hold any of it,
+	// which is what says whether one bump is a release-wide job.
+	BundlesByBuilds BundleSortKey = "builds"
+	// BundlesByDeadline is the soonest deadline the bump would meet. A bundle
+	// with none sorts last whichever direction is asked for.
+	BundlesByDeadline BundleSortKey = "deadline"
+)
+
+// bundleOrder is the expression each key sorts by, and whether it can have no
+// value. Keyed by the constant rather than by a string a caller supplies: what
+// reaches the statement is this map's value, never its lookup.
+var bundleOrder = map[BundleSortKey]struct {
+	expr    string
+	nothing bool
+}{
+	BundlesByUrgency:  {expr: "urgency"},
+	BundlesBySeverity: {expr: "worst"},
+	BundlesByIssues:   {expr: "issues"},
+	BundlesByPlaces:   {expr: "places"},
+	BundlesByBuilds:   {expr: "builds"},
+	BundlesByDeadline: {expr: "MIN(f.due_at)", nothing: true},
+}
+
+// BundleSortKeys are the orders somebody may ask this list for, in the order
+// they are offered.
+//
+// One list, as the findings list has one: the query parameter's enum is built
+// from this at registration and the interface's own union is generated from
+// the document that enum produces, so an order added here is offered and one
+// removed here is refused.
+func BundleSortKeys() []BundleSortKey {
+	return []BundleSortKey{
+		BundlesByUrgency, BundlesBySeverity, BundlesByIssues,
+		BundlesByPlaces, BundlesByBuilds, BundlesByDeadline,
+	}
+}
+
+// byBump is the order a bundle list has unless somebody asks for another, and
+// the tie-break under every other order: two rows equal on the sorted column
+// must not swap between pages.
+const byBump = "urgency DESC, issues DESC, upstream, fixed_in"
+
+// bundleSorted is how the fix-bundle list is ordered.
+//
+// The list had no order to ask for at all, though every field worth ordering
+// by was already on the row. The ranking it has answers what should worry
+// somebody; nothing answered what to do this afternoon.
+func bundleSorted(filter Filter) string {
+	by, asked := bundleOrder[filter.BundleSort]
+	if !asked {
+		return byBump
+	}
+	return directed(by.expr, by.nothing, filter.Ascending) + ", " + byBump
+}
+
+// byWeight is where the volume is, which is the question the by-component view
+// exists to answer and what it orders by unless somebody asks otherwise. It is
+// also the tie-break under every other order, so that a page boundary is a
+// boundary rather than a place rows move across.
+const byWeight = "issues DESC, places DESC, f.component_id"
+
 // componentOrder is how the by-component view is ordered.
 //
-// Weight by default and urgency on request, both with the same tie-breaks so
-// that a page boundary is a boundary rather than a place rows move across.
+// Weight by default, and any of the keys the findings list takes on request —
+// through the same allowlist and with the same direction, because this is the
+// same population grouped one level up. It answered two of the six and
+// discarded the direction in silence, so somebody asking which package has
+// something due this week was told which package has the most findings.
 //
 // The urgency is what is already read for the exploited flag, so asking for it
 // costs nothing: exploited ranks in a band of its own above every severity,
 // which is what "worst" means everywhere else here.
-func componentOrder(by SortKey) string {
-	if by == BySeverity || by == ByUrgency {
-		return "urgency DESC, issues DESC, places DESC, f.component_id"
+func componentOrder(filter Filter) string {
+	if _, asked := order[filter.SortBy]; !asked {
+		return byWeight
 	}
-	return "issues DESC, places DESC, f.component_id"
+	return orderedBy(filter, ByUrgency) + ", " + byWeight
 }
 
 // bandsFor is how the issues open against each component were rated.

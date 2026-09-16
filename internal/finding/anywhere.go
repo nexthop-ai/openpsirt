@@ -363,17 +363,5 @@ var lineAt = rankCase("COALESCE(NULLIF(p.triage_floor, ''), ?)", 0)
 // not swap between pages, and across products the pair that was enough is not
 // — one issue in one component can be a row in a dozen products.
 func sortedAcross(filter Filter) string {
-	by, known := order[filter.SortBy]
-	if !known {
-		by = order[ByUrgency]
-	}
-	way := "DESC"
-	if filter.Ascending {
-		way = "ASC"
-	}
-	sorted := by.expr + " " + way
-	if filter.SortBy == ByDeadline {
-		sorted = "CASE WHEN " + by.expr + " IS NULL THEN 1 ELSE 0 END, " + sorted
-	}
-	return sorted + ", st.product_id, f.vulnerability_id, " + FoldedOn
+	return orderedBy(filter, ByUrgency) + ", st.product_id, f.vulnerability_id, " + FoldedOn
 }
