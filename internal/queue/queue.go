@@ -132,6 +132,28 @@ func DefaultOptions() Options {
 	}
 }
 
+// Check reports a set of bounds that cannot work together.
+//
+// The bounds are a deployment's to size, and two of them are only meaningful
+// against each other. Refused as the process starts rather than discovered
+// later: what a wrong pair produces is work handed to a second worker while
+// the first is still doing it, which looks like a fault in the work.
+func (o Options) Check() error {
+	if o.Heartbeat > 0 && o.ClaimTimeout > 0 && o.Heartbeat >= o.ClaimTimeout {
+		return fmt.Errorf(
+			"OPENPSIRT_QUEUE_HEARTBEAT is %s and OPENPSIRT_QUEUE_CLAIM_TIMEOUT is %s: "+
+				"a claim renewed no more often than it goes stale is handed to a second "+
+				"worker while the first is still holding it", o.Heartbeat, o.ClaimTimeout)
+	}
+	if o.MaxHold > 0 && o.ClaimTimeout > 0 && o.MaxHold <= o.ClaimTimeout {
+		return fmt.Errorf(
+			"OPENPSIRT_QUEUE_MAX_HOLD is %s and OPENPSIRT_QUEUE_CLAIM_TIMEOUT is %s: "+
+				"a ceiling on one hold that is not above the claim timeout cancels work "+
+				"that is running normally", o.MaxHold, o.ClaimTimeout)
+	}
+	return nil
+}
+
 // Queue hands out work and records what happened to it.
 type Queue struct {
 	db   *database.DB

@@ -223,6 +223,17 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 
 	queueing := queue.DefaultOptions()
+	// What the deployment sizes. How deep the queue may get is not among
+	// these: it is a stored setting, so an operator meeting a refused upload
+	// has a remedy that does not need a restart.
+	queueing.MaxAttempts = cfg.QueueMaxAttempts
+	queueing.ClaimTimeout = cfg.QueueClaimTimeout
+	queueing.Heartbeat = cfg.QueueHeartbeat
+	queueing.MaxHold = cfg.QueueMaxHold
+	queueing.Backoff = cfg.QueueBackoff
+	if err := queueing.Check(); err != nil {
+		return err
+	}
 	// The ceiling on one hold is what cuts a long scan off, and it is the only
 	// bound here that can: the claim is renewed for as long as the scan runs,
 	// so the claim timeout never reaches it. A scanner allowed to run past the

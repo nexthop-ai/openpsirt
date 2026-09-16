@@ -14,6 +14,7 @@ Satisfies REQ-03, REQ-06, REQ-69.
 - [Passes on a timer](#passes-on-a-timer)
 - [Leases](#leases)
 - [Backlog refusal](#backlog-refusal)
+- [Bounds a deployment sizes](#bounds-a-deployment-sizes)
 - [What a failed job records](#what-a-failed-job-records)
 - [Transaction boundary](#transaction-boundary)
 - [Limits](#limits)
@@ -160,6 +161,27 @@ administrator sets. The caller is told to retry.
 | The depth counts work held by a worker that has stopped reporting | Counting only what is waiting reads a queue in the middle of a reclaim cycle as empty: every row sits in the claimed state, held by workers that died, and the one number an operator has says there is nothing to do |
 | A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
 | Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
+
+## Bounds a deployment sizes
+
+Five bounds are read from the environment as the process starts. How deep the
+queue may get is the sixth and is a stored setting.
+
+| Bound | What it decides |
+|---|---|
+| Attempts | How many times a job is tried before it is set aside |
+| Claim timeout | How long a claim is honored with nothing heard from the worker holding it |
+| Heartbeat | How often a running job renews its claim |
+| The ceiling on one hold | How long one claim may be renewed for altogether |
+| Backoff | How long a failed job waits, multiplied by the attempt |
+
+| Rule | Reason |
+|---|---|
+| The environment, not a stored setting | The settings store reads the database, so the database and the queue cannot read a setting without inverting that import. What it costs is that changing one needs a restart, which is said here rather than discovered |
+| How deep the queue may get is the exception | That refusal lands on a build server, and the operator meeting it needs a remedy that is not a restart |
+| Zero or negative is refused rather than taken | The rule every setting is held to. So "no ceiling on one hold" cannot be asked for from the environment: it is what a caller whose work has no upper bound of its own states where the queue is built |
+| Two pairs are compared as the process starts | A heartbeat no shorter than the claim timeout hands running work to a second worker; a hold ceiling no larger than the claim timeout cancels work that is running normally. Both read as a fault in the work rather than in the configuration, so the process refuses to start and names the pair |
+| The defaults live where the queue is built | The documents and the chart restate nothing: two spellings of one default disagree the first time either moves |
 
 ## What a failed job records
 
