@@ -539,12 +539,28 @@ func (s *Store) Waiting(ctx context.Context, subject access.Subject,
 //     written for somebody who cannot open it. An administrator grants roles,
 //     so this hands them nothing they could not hand themselves.
 func readable(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
-	products, all := subject.Products()
-	if all {
+	if _, all := subject.Products(); all {
 		// The deployment itself, which reads everything by definition.
 		return q
 	}
 	if subject.Admin {
+		// Reading their own. An embargo notice names administrators among its
+		// audiences (`DESIGN-notifications.md`), so a line addressed to one is
+		// theirs to read whatever they hold on the product it is about.
+		return q
+	}
+	return byProduct(q, subject)
+}
+
+// byProduct is readable's product half, with no arm for administration.
+//
+// Separate because administration is not a visibility grant. Reading a list
+// addressed to somebody else is the one read of this table that is not the
+// reader's own, and there the administrator flag says who may ask rather than
+// what the answer contains.
+func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
+	products, all := subject.Products()
+	if all {
 		return q
 	}
 	var private []int64
@@ -582,9 +598,17 @@ func readable(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // somebody else. Enforced here rather than at the handler, because that is
 // where the rest of this table's rules live (REQ-42 and REQ-43).
 //
-// Not narrowed by what the person could read: what they were told is a fact
-// about what was sent, and hiding the private half would answer the question
-// with exactly the part that does not matter.
+// **Narrowed by what the reader may see, and the flag is not a way to see
+// more.** The administrator flag decides who may ask this question; the rows
+// that come back are the ones the asker could read on their own account, so an
+// administrator holding nothing on a product reads the public half of a feed
+// and not the embargoed half.
+//
+// The defence for answering it whole was that an administrator could grant
+// themselves the product and read it anyway. They can, and that grant lands in
+// the administrative record within seconds, where this read left nothing at
+// all — so the two are not equivalent, and the cheaper of them was the silent
+// one.
 func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int64,
 	limit, offset int) ([]Notification, int, error) {
 
@@ -594,7 +618,7 @@ func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int
 	limit = database.AList.Of(limit)
 
 	theirs := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("person_id = ?", personID)
+		return byProduct(q.Where("person_id = ?", personID), subject)
 	}
 	total, err := theirs(s.db.NewSelect().Model((*Notification)(nil))).Count(ctx)
 	if err != nil {

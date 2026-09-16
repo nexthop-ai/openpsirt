@@ -239,3 +239,99 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 		}
 	})
 }
+
+// TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility holds the line
+// that administering is permission to ask the question, not permission to see
+// more in the answer.
+//
+// The flag says who may read a list addressed to somebody else. What comes back
+// is what the asker could read on their own account, so an administrator
+// holding nothing on a product gets the public half of a feed and not the
+// embargoed half.
+//
+// The defence for answering it whole was that an administrator could grant
+// themselves the product and read it anyway — which is true, and lands in the
+// administrative record within seconds, where this read left nothing. Both
+// routes reach the same rows and only one of them is accountable.
+func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// One administrator holding nothing, and one holding private read on
+		// the product. The pair is the whole of the test: the same flag, the
+		// same question, two different answers.
+		bare, err := rights.Ensure(ctx, "bare@example.com", "Bare", access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+
+		ids, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "SONIC-2026-7100", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		vulnerability := ids["SONIC-2026-7100"]
+
+		store := notify.NewStore(db.DB)
+		for _, row := range []struct {
+			body    string
+			private bool
+		}{{"a public one", false}, {"an embargoed one", true}} {
+			telling := notify.Telling{
+				PersonID: subjectOf.ID, Kind: notify.Assigned,
+				Body: row.body, Link: "/findings",
+				ProductID: &product.ID, Private: row.private,
+			}
+			if row.private {
+				telling.VulnerabilityID = &vulnerability
+			}
+			if err := store.Tell(ctx, telling); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		for _, c := range []struct {
+			what  string
+			who   *access.Account
+			want  int
+			shown string
+		}{
+			{"holding nothing on the product", bare, 1, "a public one"},
+			{"holding private read", reader, 2, ""},
+		} {
+			rows, total, err := store.ToldTo(ctx, asks(t, db, c.who), subjectOf.ID, 50, 0)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			if len(rows) != c.want || total != c.want {
+				t.Errorf("an administrator %s read %d rows and a count of %d, want %d of each",
+					c.what, len(rows), total, c.want)
+			}
+			// The count has to narrow with the rows. A total taken over the
+			// whole feed would say how much is being withheld, which is the
+			// existence of an embargo stated as a number.
+			if c.shown != "" && (len(rows) != 1 || rows[0].Body != c.shown) {
+				t.Errorf("an administrator %s read %+v, want only %q",
+					c.what, rows, c.shown)
+			}
+		}
+	})
+}
