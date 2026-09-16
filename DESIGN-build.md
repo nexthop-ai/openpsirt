@@ -114,6 +114,7 @@ of ours needs no edit.
 | `make unreachable` | Exported code nothing reaches |
 | `make negatives` | A 404 built from an error's own text: it asserts a name reaches nothing, and publishes whatever the error carried |
 | `make granted` | Every query outside the access package asks both grant tables |
+| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read |
 | `make attached` | A doc comment describing something other than the declaration it sits on |
 | `make confined` | Engine-specific code outside the two places allowed to hold it |
 | `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
@@ -146,7 +147,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `attached`, `test` |
+| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
