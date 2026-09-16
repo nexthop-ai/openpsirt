@@ -372,6 +372,16 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 		}
 
+		// Where roles come from, read before the transaction opens and carried
+		// into it. The closure below holds the connection it writes through,
+		// and SQLite lends one, so a read taken through the root handle from
+		// inside it waits for a connection the transaction cannot release
+		// until the read returns.
+		deriving := access.Direct
+		if a.Mode != nil {
+			deriving = a.Mode(ctx)
+		}
+
 		// Recording somebody, how they may be reached and what they hold is
 		// one act. Written as a statement each, a product name nobody has
 		// declared answered 422 with the person recorded and the roles named
@@ -409,17 +419,15 @@ func registerAdministration(api huma.API, a Administering) {
 					return wentWrong(a.Logger, "where to reach them could not be recorded", err)
 				}
 			}
-			if len(in.Body.Holds) > 0 {
+			if len(in.Body.Holds) > 0 && deriving == access.GroupBound {
 				// Roles come from one place at a time. Assigning one while
 				// groups decide would produce exactly the hybrid that has no
 				// answer to "where did this access come from" — and worse than
 				// the drift that rule anticipates, since nothing re-derives an
 				// assignment, so it would outlive every group change without
 				// ever having had a group behind it.
-				if a.Mode != nil && a.Mode(ctx) == access.GroupBound {
-					return huma.Error409Conflict(
-						"roles are derived from groups here, so they are granted by binding a group rather than a person")
-				}
+				return huma.Error409Conflict(
+					"roles are derived from groups here, so they are granted by binding a group rather than a person")
 			}
 			for _, hold := range in.Body.Holds {
 				if hold.Everywhere {

@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
@@ -1047,6 +1049,52 @@ func TestRolesCannotBeBoundToGroupsNothingCanReport(t *testing.T) {
 			}
 		}
 	})
+}
+
+// deriving is r with the role-assignment mode wired, answering group-bound or
+// direct.
+//
+// It is the one piece of an API's configuration that a running deployment
+// always sets and nothing here did, so the guard reading it short-circuited on
+// nil in every test and neither of its arms was ever executed.
+func deriving(t *testing.T, r *reach, groups bool) *reach {
+	t.Helper()
+	files, err := attach.NewFiles(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources, err := access.ParseSources("192.0.2.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := setting.NewStore(r.db)
+	if groups {
+		if _, _, err := settings.Change(t.Context(), setting.RoleMode,
+			string(access.GroupBound)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Wired the way the process wires it — a read of the stored mode, through
+	// a store holding the root database handle — rather than a closure over a
+	// constant. A constant exercises both arms of the guard and neither can
+	// deadlock, which is the difference between testing what the guard decides
+	// and testing where it reads from.
+	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil,
+		httpapi.Ingest{
+			DB: r.db, Queue: queue.New(r.db, queue.DefaultOptions()), Files: files,
+			Access: access.NewResolver(r.rights,
+				access.Trust{Header: testHeader, From: sources}),
+			Mode: func(ctx context.Context) access.Mode {
+				stored, _, err := settings.Get(ctx, setting.RoleMode)
+				if err != nil {
+					return access.Direct
+				}
+				return access.AsMode(stored)
+			},
+		})
+	with := *r
+	with.handler = handler
+	return &with
 }
 
 // withProvider is the server again, with one sign-in provider that either has
