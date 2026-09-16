@@ -29,7 +29,8 @@ import (
 // too, and a finding cannot import a triage decision.
 const DefaultTogetherCap = setting.DefaultTogetherCap
 
-// allowed is what every proposal has to satisfy before any of them is written.
+// allowed is what every proposal in a bulk **judgment** has to satisfy before
+// any of them is written.
 //
 // Checked over the whole set first, because refusing halfway is the failure
 // these actions exist to avoid — and the bound is on the rows about to be
@@ -43,6 +44,19 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 		return fmt.Errorf("that is %d findings and the limit here is %d: narrow it, "+
 			"or raise the limit deliberately", len(proposals), cap)
 	}
+	return permitted(subject, proposals, now)
+}
+
+// permitted is everything except the bound: may this subject decide here, is
+// each proposal well formed, and is it recorded as made by whoever made it.
+//
+// **Split out because a bulk promise carries no bound.** What the cap is for is
+// reviewability — one sentence answering a thousand findings has to stay a size
+// a reviewer can follow, because nothing re-checks a dismissal afterwards. A
+// promise to upgrade is the one bulk write that verifies itself: the next scan
+// re-checks every row it names, and narrowing it makes the record false, since
+// the bump closes what it closes. The distinction is reversibility, not size.
+func permitted(subject access.Subject, proposals []Proposal, now time.Time) error {
 	for _, p := range proposals {
 		if !mayDecideOn(subject, p.Place.ProductID, p.Place.VulnerabilityID, visibilityOf(p.Place)) {
 			return ErrNotTheirs
@@ -124,10 +138,10 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		if len(places) == 0 {
 			return fmt.Errorf("%w against that component", ErrNothingOpen)
 		}
-		// There is always a cap (REQ-27), so an unset one is the shipped
-		// number rather than none: the two siblings that take this argument
-		// fill it in the same way, and this one read "zero means unbounded" —
-		// which is the one reading the rule does not have.
+		// A bulk judgment is bounded, so an unset cap is the shipped number
+		// rather than none: the sibling that takes this argument fills it in
+		// the same way, and this one read "zero means unbounded" — which is
+		// the one reading the rule does not have.
 		if cap <= 0 {
 			cap = DefaultTogetherCap
 		}

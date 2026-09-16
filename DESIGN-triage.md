@@ -713,6 +713,7 @@ in drivers a given image never builds.
 | What is exploited or critical can be excluded before claiming | Take the bulk, hand-triage the handful the judgment should not cover |
 | It always needs a second person, whatever the outcome | The short-deferral exception is about one finding somebody is putting off for a fortnight; one person answering hundreds in a single action is the case a second pair of eyes exists for |
 | Two limits: how many issues a request may name, and how many findings it may write | Each name may sit at many places, so a limit checked against the names would let a request naming two thousand issues write sixty thousand rows |
+| **The bound is reversibility, not size** | A judgment is bounded because nothing re-checks it: one sentence answering a thousand findings has to stay a size a reviewer can follow. A promise to upgrade is not, because the next scan re-checks every row it names, and narrowing one makes the record false — the bump closes what it closes. One cap governed both, and the highest-value action in a real image was refused by a factor of twenty-two while the only escape raised the guard on the dismissal path |
 
 The candidate list carries both numbers and the limit: how many issues the
 narrowing holds, how many findings those sit at, and how many one action may
@@ -787,6 +788,8 @@ somebody decided and what a release was waiting on could come to disagree.
 | Recorded on the component's own screen | Ticking the releases the promise is for, naming the version and the date, and saying why. Ticking releases that need different versions is **two promises** |
 | Saying who carries it is part of the act | A person or a team, in the same transaction, so a promise nobody carries and a holder with no promise are both impossible. The handover is product-wide, and the level that matters is the strictest in the set — one embargoed finding among fifty makes the handover a disclosure |
 | The upgrade is reachable as a claim | Where its reasoning, its approval and the conversation about it already live |
+| **No bound on how much one promise covers** | Every other check a bulk judgment makes still applies — who may decide, what each proposal must carry, who it is recorded as made by — and the count is not one of them. A real image put one kernel bump at 4,485 findings across 44,016 places, and a cumulative bundle at 243,945; narrowing that to a cap would record a bump answering part of what it answers |
+| One transaction, not chunked and not a job | The cap was doing two jobs and only one was reviewability. The other was transaction size, and it was measured rather than assumed: 243,945 places in one transaction take 5.3 s on MariaDB, 6.7 s on SQLite, 6.9 s on MySQL and 17.3 s on PostgreSQL, growing linearly from 44,016 at 0.9 s, 1.3 s, 1.6 s and 3.1 s. That is a deliberate one-off act at the largest size the data can ask for, so there is nothing for a chunk or a queue to solve |
 
 What it covers is derived, never marked. A covered finding is one a standing
 promise reaches, which the decision already records, so the mark is a join

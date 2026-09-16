@@ -11,7 +11,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -202,8 +201,10 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 			"earliest deadline among what this covers, it stands on its own: nothing is " +
 			"hidden for longer than the policy already allowed. Past it, the promise defers " +
 			"the worst thing it covers and it waits for approval. The response says which.\n\n" +
-			"Bounded like every other action that writes many rows, against the places it " +
-			"resolves to rather than against what was named.\n\n" +
+			"**Not bounded.** A bulk judgment is, because nothing re-checks one and a " +
+			"sentence answering a thousand findings has to stay a size a reviewer can " +
+			"follow. A promise is re-checked by the next scan, and narrowing it would make " +
+			"the record false: the bump closes what it closes.\n\n" +
 			"**Saying who carries it is part of the act**, not a second one: name a `person` " +
 			"or a `team`, and every finding the promise covers is handed to them in the same " +
 			"transaction, so a promise nobody is carrying and a holder with no promise are " +
@@ -249,16 +250,14 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		limit, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
-			triage.DefaultTogetherCap)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the limit on one action could not be read", err)
-		}
+		// No limit read, because this one is not bounded. The setting bounds
+		// a bulk judgment, which nothing re-checks; the next scan re-checks
+		// every row a promise names.
 		done, err := store.PlanUpgrade(ctx, subject, triage.Upgrade{
 			ProductID: product.ID, Component: input.Component,
 			To: input.Body.To, By: by, Builds: builds, Reasoning: input.Body.Reasoning,
 			HoldBy: holder,
-		}, limit)
+		})
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}

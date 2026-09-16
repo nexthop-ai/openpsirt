@@ -714,3 +714,62 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 		}
 	})
 }
+
+func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
+	// One bound governed two actions with opposite risk profiles. A bulk
+	// dismissal is bounded because nothing re-checks it: one sentence
+	// answering a thousand findings has to stay a size a reviewer can follow.
+	// A promise to upgrade is the one bulk write that verifies itself — the
+	// next scan re-checks every row it names — and narrowing one makes the
+	// record false, because the bump closes what it closes.
+	//
+	// In a real image one kernel bump reached 4,485 findings across 44,016
+	// places. Held to the shipped two thousand, the highest-value action in
+	// the data was refused by a factor of twenty-two, and the only escape was
+	// raising a setting that guards the dismissal path.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		// One, so anything covering more than a single place is past it. The
+		// fold here is five places.
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+			`{"value":"1"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The judgment, refused, which is what keeps this test honest: the cap
+		// is in force and reaching this path.
+		judged := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-CURL1/components/libcurl4t64/decision",
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
+				`"reasoning":"The transfer path is never reached."}`)
+		if judged.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a bulk judgment past the cap answered %d: %s",
+				judged.Code, judged.Body.String())
+		}
+
+		// And the promise, written.
+		promised := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/components/libcurl4t64/upgrade",
+			`{"to":"8.5.0-1","by":"`+aheadOfUs+`",`+
+				`"reasoning":"Taking the 8.5.0 bump.",`+
+				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+		if promised.Code != http.StatusCreated {
+			t.Fatalf("a promise past the cap answered %d: %s",
+				promised.Code, promised.Body.String())
+		}
+		var done struct {
+			Decisions int `json:"decisions"`
+			Issues    int `json:"issues"`
+		}
+		if err := json.Unmarshal(promised.Body.Bytes(), &done); err != nil {
+			t.Fatal(err)
+		}
+		// Everything the fold covers, not one row of it. A promise narrowed to
+		// the cap would record a bump answering one place when it answers
+		// five.
+		if done.Decisions <= 1 || done.Issues != 3 {
+			t.Errorf("the promise recorded %+v, want every place of the three issues", done)
+		}
+	})
+}
