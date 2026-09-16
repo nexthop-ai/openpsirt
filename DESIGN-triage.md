@@ -736,6 +736,17 @@ How the set was narrowed is recorded with every claim in it, separately from the
 reasoning. Narrowing is how a candidate was found; the reasoning is why the
 claim is true. "These matched a word" is not a defense anybody would accept.
 
+**Prose alone cannot be checked**, so the narrowing is recorded twice: in the
+claimant's words, and as something an approver can re-run.
+
+| Rule | Reason |
+|---|---|
+| The narrowing is re-run where the claim is written, and what it reached is stored beside how many were named | A claim reading "drivers this image does not build" over a set chosen by ticking everything is indistinguishable in the record from an honest one. Equal counts say the claim is exactly what that narrowing returns; far apart, the sentence does not describe the set |
+| Re-run rather than sent | A count supplied with the request is the claimant's word twice over, which is the thing being fixed. The places are resolved here for the same reason |
+| Read with the same visibility rule the candidate list used | Two numbers compared against each other have to be counts of the same population |
+| It is evidence, and refuses nothing | A person may legitimately claim about part of what a narrowing returns — that is what picking from the list is. What was missing was any way for the approver to see that they had |
+| The claimant's own sentence is kept | It says what they meant, which the counts do not |
+
 ## Fix bundles
 
 One row per bump with what it would close, and one act that answers the whole of

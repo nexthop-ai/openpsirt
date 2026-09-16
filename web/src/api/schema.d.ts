@@ -2749,6 +2749,8 @@ export interface paths {
          *
          *     You name the issues; the places are resolved here. `selected_by` says how you narrowed the list and is recorded with every claim, so "how were these chosen" has an answer later — but it is never the claim. The reasoning has to hold for every issue in the list, since "these matched a word" is not a defense anybody would accept.
          *
+         *     **`contains` is the same question an approver can re-run.** Send the text you narrowed the candidate list by; the claim records how many issues that narrowing reaches, read here, against how many you named. Equal, the claim is exactly what that narrowing returns; far apart, the sentence does not describe the set.
+         *
          *     Always needs a second person to agree, whatever the outcome.
          *
          *     Bounded. At most 2000 names per request, and a limit on how many findings one action may write, set under `triage.together-cap`. The limit is checked against the findings this resolves to, which is more than the number of names.
@@ -4824,6 +4826,8 @@ export interface components {
             proposed_by: string;
             /** @description How a bulk set was narrowed. Never part of the claim itself */
             selected_by?: string;
+            /** @description The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one */
+            selection?: components["schemas"]["SelectionBody"];
         };
         ClaimDetail: {
             /**
@@ -5101,6 +5105,8 @@ export interface components {
              * @example https://example.com/schemas/Decide-togetherRequest.json
              */
             readonly $schema?: string;
+            /** @description The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two */
+            contains?: string;
             /** @description Required when it is deferred. A date, as 2026-03-31 */
             deferred_until?: string;
             /** @description Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them */
@@ -5114,7 +5120,7 @@ export interface components {
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
             /** @description Why this holds for every issue named */
             reasoning: string;
-            /** @description How you narrowed this set. Recorded, and never part of the claim */
+            /** @description How you narrowed this set, in your own words. Recorded, and never part of the claim */
             selected_by: string;
             /** @description The issues this claim covers, by name */
             vulnerabilities: string[] | null;
@@ -7975,6 +7981,20 @@ export interface components {
             grew: components["schemas"]["GrownBody"][] | null;
             lapsed: components["schemas"]["LapsedApprovalBody"][] | null;
             pairs: components["schemas"]["PairingBody"][] | null;
+        };
+        SelectionBody: {
+            /** @description The text the candidate list was narrowed by. Absent where it was not narrowed, which means every issue at the component was on the page */
+            contains?: string;
+            /**
+             * Format: int64
+             * @description How many issues that narrowing reached when the claim was written, read here rather than taken from the caller
+             */
+            matched: number;
+            /**
+             * Format: int64
+             * @description How many the claim was then made about
+             */
+            named: number;
         };
         "Send-claim-backRequest": {
             /**

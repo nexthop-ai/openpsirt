@@ -105,6 +105,19 @@ type PlaceBody struct {
 	Place         string `json:"place" minLength:"1" doc:"Which place in the build, as the findings list gives it"`
 }
 
+// SelectionBody is the narrowing behind a bulk claim, re-run when the claim was
+// written.
+//
+// **Two counts rather than a sentence.** A claim reading "drivers this image
+// does not build" over a set chosen by ticking everything is indistinguishable
+// in the record from an honest one. Equal counts mean the claim is exactly what
+// that narrowing returns; far apart, the sentence does not describe the set.
+type SelectionBody struct {
+	Contains string `json:"contains,omitempty" doc:"The text the candidate list was narrowed by. Absent where it was not narrowed, which means every issue at the component was on the page"`
+	Matched  int    `json:"matched" doc:"How many issues that narrowing reached when the claim was written, read here rather than taken from the caller"`
+	Named    int    `json:"named" doc:"How many the claim was then made about"`
+}
+
 // ClaimBody is one proposer's action: what the review queue lists and what an
 // approver agrees to.
 type ClaimBody struct {
@@ -114,6 +127,10 @@ type ClaimBody struct {
 	ProposedBy  string `json:"proposed_by"`
 	ProposedAt  string `json:"proposed_at" doc:"When the action was taken, as a date and time"`
 	SelectedBy  string `json:"selected_by,omitempty" doc:"How a bulk set was narrowed. Never part of the claim itself"`
+	// Selection is the same question answered by something an approver can
+	// re-run. Prose alone cannot be checked, and what a decision asks for is
+	// how a set was chosen.
+	Selection *SelectionBody `json:"selection,omitempty" doc:"The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one"`
 	// Elsewhere is where this is being worked on outside here. Stored and
 	// never fetched.
 	Elsewhere string `json:"elsewhere,omitempty" doc:"A ticket, a thread or a change. Stored and never fetched"`

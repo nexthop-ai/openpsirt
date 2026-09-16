@@ -313,3 +313,67 @@ type ComponentGroup struct {
 	Exploited bool
 	Urgency   int64
 }
+
+// Narrowing is a bulk selection as something other than the caller's word for
+// it: the text the candidate list was narrowed by, how many issues that
+// narrowing reaches now, and how many the caller went on to name.
+//
+// **`selected_by` is prose and nothing can check it.** A claim reading
+// "drivers this image does not build" over a set actually chosen by ticking
+// everything is indistinguishable in the record from an honest one, and the
+// decision that asks for how a set was chosen asks for something an approver
+// can act on. Two numbers make it checkable without turning prose into a
+// filter: equal, the claim is exactly what that narrowing returns; far apart,
+// the sentence does not describe the set.
+type Narrowing struct {
+	// Contains is the text the list was narrowed by, empty where it was not.
+	Contains string
+	// Matched is how many distinct issues that narrowing reaches at this fold
+	// in this build, read in the transaction that writes the claim.
+	Matched int
+	// Named is how many the caller went on to claim about.
+	Named int
+}
+
+// NarrowedWithin re-runs a bulk selection's narrowing inside the transaction
+// that is about to write the claim.
+//
+// Re-run rather than taken from the caller, for the reason the places are: a
+// count sent along with the request is the caller's word twice over. Read with
+// the same visibility rule the candidate list used, so the two numbers compare
+// against each other rather than against different populations.
+func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, targetID int64,
+	fold []int64, contains string, named int) (Narrowing, error) {
+
+	productID, err := productOf(ctx, tx, targetID)
+	if err != nil {
+		return Narrowing{}, err
+	}
+	visible := access.Visible(subject, productID)
+	if len(visible) == 0 {
+		return Narrowing{}, access.Denied(fmt.Sprintf("read findings in product %d", productID))
+	}
+
+	q := tx.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr("f.vulnerability_id").
+		Where("f.target_id = ?", targetID).
+		Where("f.component_id IN (?)", bun.List(fold)).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("f.vulnerability_id")
+	if contains != "" {
+		// The same escaped match the candidate list makes. Spliced raw, a term
+		// holding a percent selects far more than the box said — and this is
+		// the number an approver checks the claim against.
+		q = q.Where("f.vulnerability_id IN (?)",
+			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
+				Where(`LOWER(v.description) LIKE ?`+database.LikeClause,
+					"%"+containsTerm(contains)+"%"))
+	}
+	matched, err := tx.NewSelect().TableExpr(`(?) AS "grouped"`, q).Count(ctx)
+	if err != nil {
+		return Narrowing{}, fmt.Errorf("count what that narrowing reaches: %w", err)
+	}
+	return Narrowing{Contains: contains, Matched: matched, Named: named}, nil
+}

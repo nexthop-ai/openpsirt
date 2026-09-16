@@ -135,6 +135,10 @@ func registerBulk(api huma.API, in Ingest) {
 			"has an answer later — but it is never the claim. The reasoning has to hold for " +
 			"every issue in the list, since \"these matched a word\" is not a defense anybody " +
 			"would accept.\n\n" +
+			"**`contains` is the same question an approver can re-run.** Send the text you " +
+			"narrowed the candidate list by; the claim records how many issues that narrowing " +
+			"reaches, read here, against how many you named. Equal, the claim is exactly what " +
+			"that narrowing returns; far apart, the sentence does not describe the set.\n\n" +
 			"Always needs a second person to agree, whatever the outcome.\n\n" +
 			"Bounded. At most 2000 names per request, and a limit on how many findings one " +
 			"action may write, set under `triage.together-cap`. The limit is checked against " +
@@ -147,7 +151,8 @@ func registerBulk(api huma.API, in Ingest) {
 		Component string `path:"component"`
 		Body      struct {
 			Vulnerabilities []string      `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this claim covers, by name"`
-			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"How you narrowed this set. Recorded, and never part of the claim"`
+			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"How you narrowed this set, in your own words. Recorded, and never part of the claim"`
+			Contains        string        `json:"contains,omitempty" maxLength:"200" doc:"The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two"`
 			Outcome         outcomeInBulk `json:"outcome"`
 			Justification   justification `json:"justification,omitempty" doc:"Required when it does not apply"`
 			DeferredUntil   string        `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
@@ -222,6 +227,7 @@ func registerBulk(api huma.API, in Ingest) {
 		// caller's selection decide which places a decision lands on.
 		claimID, recorded, err := store.Together(ctx, subject, triage.TogetherAt{
 			TargetID: target, ComponentID: component, VulnerabilityIDs: issues,
+			Contains: input.Body.Contains,
 		}, triage.Proposal{
 			Outcome:       triage.Outcome(input.Body.Outcome),
 			Justification: triage.Justification(input.Body.Justification),

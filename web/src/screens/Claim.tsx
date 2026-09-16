@@ -212,6 +212,23 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
           {claim.claim.selected_by && (
             <span className="hint">narrowed by: {claim.claim.selected_by}</span>
           )}
+          {/* The same question answered by something the approver can check.
+              A sentence cannot be re-run: "drivers this image does not build"
+              over a set chosen by ticking everything reads the same as an
+              honest claim. Equal counts mean the claim is exactly what the
+              narrowing returns. */}
+          {claim.claim.selection && (
+            <span
+              className="hint"
+              title="Re-run when the claim was written, not taken from whoever made it"
+            >
+              {claim.claim.selection.contains
+                ? `contains "${claim.claim.selection.contains}" reaches `
+                : "no narrowing, which reaches "}
+              {claim.claim.selection.matched.toLocaleString()} · claimed about{" "}
+              {claim.claim.selection.named.toLocaleString()}
+            </span>
+          )}
         </div>
       </div>
       {claim.finding && (

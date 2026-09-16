@@ -475,6 +475,11 @@ function Claim({
                 ...(needsDate ? { deferred_until: until } : {}),
                 ...(needsVersion ? { fixed_version: fixedVersion.trim() } : {}),
                 selected_by: selectedBy,
+                // The narrowing itself, beside the sentence about it. The
+                // server re-runs it and records what it reaches against what
+                // was named, so an approver has something to check rather
+                // than only something to read.
+                ...(narrowed ? { contains: narrowed } : {}),
                 reasoning,
               });
             }}

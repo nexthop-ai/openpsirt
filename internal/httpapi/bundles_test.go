@@ -832,3 +832,65 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 		}
 	})
 }
+
+func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
+	// The server resolves the places itself, correctly and for exactly this
+	// reason, and took the claimant's word for how the issue list was chosen.
+	// A claim reading "drivers this image does not build" over a set picked by
+	// ticking everything is indistinguishable in the record from an honest
+	// one, and what is asked for is how the set was chosen — which an approver
+	// has to be able to act on.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/components/libcurl4t64/decisions"
+
+		// Everything the component holds, described as though it were a subset.
+		everything := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"vulnerabilities":["CVE-2026-CURL1","CVE-2026-CURL2"],`+
+				`"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"only the ones in the transfer path",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if everything.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s",
+				everything.Code, everything.Body.String())
+		}
+		var made struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(everything.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+
+		var detail struct {
+			Claim struct {
+				SelectedBy string `json:"selected_by"`
+				Selection  *struct {
+					Contains string `json:"contains"`
+					Matched  int    `json:"matched"`
+					Named    int    `json:"named"`
+				} `json:"selection"`
+			} `json:"claim"`
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		claim := detail.Claim
+		if claim.Selection == nil {
+			t.Fatal("a bulk claim records no narrowing an approver could re-run")
+		}
+		// Three issues are open at the fold and none was narrowed away, so the
+		// sentence claiming a subset is visible as one: named two of the three
+		// with no narrowing at all.
+		if claim.Selection.Contains != "" {
+			t.Errorf("the claim says it narrowed by %q", claim.Selection.Contains)
+		}
+		if claim.Selection.Matched != 3 || claim.Selection.Named != 2 {
+			t.Errorf("the narrowing reached %d and named %d, want 3 and 2",
+				claim.Selection.Matched, claim.Selection.Named)
+		}
+		// And the prose is kept, because it is what the person meant to say.
+		if claim.SelectedBy != "only the ones in the transfer path" {
+			t.Errorf("the claimant's own words are %q", claim.SelectedBy)
+		}
+	})
+}

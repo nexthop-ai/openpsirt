@@ -214,6 +214,14 @@ func claimBody(c triage.Claim, proposedBy string) ClaimBody {
 	if c.SelectedBy != nil {
 		body.SelectedBy = *c.SelectedBy
 	}
+	if c.SelectedMatched != nil && c.SelectedNamed != nil {
+		body.Selection = &SelectionBody{
+			Matched: *c.SelectedMatched, Named: *c.SelectedNamed,
+		}
+		if c.SelectedWhere != nil {
+			body.Selection.Contains = *c.SelectedWhere
+		}
+	}
 	return body
 }
 

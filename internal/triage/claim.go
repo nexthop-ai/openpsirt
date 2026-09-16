@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
@@ -36,6 +37,14 @@ type Claim struct {
 	// on its rows, so a claim whose rows were all set aside still says how it
 	// was found.
 	SelectedBy *string `bun:"selected_by"`
+	// SelectedWhere, SelectedMatched and SelectedNamed are the same question
+	// answered by something an approver can re-run: the text the candidate
+	// list was narrowed by, how many issues that narrowing reached when the
+	// claim was written, and how many were then named. Nil on a claim that was
+	// not a bulk selection.
+	SelectedWhere   *string `bun:"selected_where"`
+	SelectedMatched *int    `bun:"selected_matched"`
+	SelectedNamed   *int    `bun:"selected_named"`
 	// What the claim says, held once because one act is one argument.
 	//
 	// These were on the row. A judgment reaching forty-four places was
@@ -166,6 +175,15 @@ const (
 func (s *Store) newClaim(ctx context.Context, kind ClaimKind, by int64, derivedFrom *int64,
 	selectedBy string, p Proposal) (*Claim, error) {
 
+	return s.newClaimNarrowed(ctx, kind, by, derivedFrom, selectedBy, nil, p)
+}
+
+// newClaimNarrowed is the same, for the one action that also records a
+// narrowing something other than the claimant can check.
+func (s *Store) newClaimNarrowed(ctx context.Context, kind ClaimKind, by int64,
+	derivedFrom *int64, selectedBy string, narrowing *finding.Narrowing,
+	p Proposal) (*Claim, error) {
+
 	claim := &Claim{
 		Kind: kind, ProposedBy: by, ProposedAt: s.now().Truncate(time.Microsecond),
 		DerivedFrom:   derivedFrom,
@@ -176,6 +194,12 @@ func (s *Store) newClaim(ctx context.Context, kind ClaimKind, by int64, derivedF
 	if strings.TrimSpace(selectedBy) != "" {
 		how := selectedBy
 		claim.SelectedBy = &how
+	}
+	if narrowing != nil {
+		where, matched, named := narrowing.Contains, narrowing.Matched, narrowing.Named
+		claim.SelectedWhere = &where
+		claim.SelectedMatched = &matched
+		claim.SelectedNamed = &named
 	}
 	if strings.TrimSpace(p.Mitigation) != "" {
 		named := strings.TrimSpace(p.Mitigation)

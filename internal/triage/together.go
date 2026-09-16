@@ -88,6 +88,11 @@ type TogetherAt struct {
 	TargetID         int64
 	ComponentID      int64
 	VulnerabilityIDs []int64
+	// Contains is the text the candidate list was narrowed by, empty where it
+	// was not. Re-run here rather than believed: what is recorded beside the
+	// claimant's prose is how many issues that narrowing reaches, against how
+	// many were named.
+	Contains string
 }
 
 // resolved is a place a judgment is about to be written against, with how bad
@@ -165,7 +170,16 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 				"selection, or raise the limit deliberately", len(places), cap)
 		}
 
-		claim, err := within.newClaim(ctx, TogetherClaim, subject.ID, nil, p.SelectedBy, p)
+		// The narrowing as something other than the claimant's word for it,
+		// re-run against the same rows the write is about to land on.
+		narrowing, err := finding.NarrowedWithin(ctx, tx, subject, at.TargetID, fold,
+			at.Contains, len(at.VulnerabilityIDs))
+		if err != nil {
+			return err
+		}
+
+		claim, err := within.newClaimNarrowed(ctx, TogetherClaim, subject.ID, nil,
+			p.SelectedBy, &narrowing, p)
 		if err != nil {
 			return err
 		}
