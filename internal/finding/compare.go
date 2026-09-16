@@ -520,12 +520,20 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		}
 	}
 
-	// And what was decided, where something stands. One row per distinct
-	// answer, so a group whose places were answered two different ways comes
-	// back as two — which is what says the row has no single claim behind it.
+	// And what was decided, where something stands. One row per claim, so a
+	// group answered by two claims comes back as two — which is what says the
+	// row has no single judgment behind it.
+	//
+	// **Grouped on the claim rather than on its words.** MySQL and MariaDB
+	// compare only the first `max_sort_length` bytes of a long text for
+	// GROUP BY, and a justification is bounded at sixty-four kilobytes — so
+	// two claims whose reasoning differs only past the first kilobyte counted
+	// as one there and as two on PostgreSQL. A claim identifier compares the
+	// same everywhere.
 	var said []struct {
 		Vulnerability string `bun:"vulnerability"`
 		Component     string `bun:"component"`
+		Claim         int64  `bun:"claim"`
 		Outcome       string `bun:"outcome"`
 		Justification string `bun:"justification"`
 	}
@@ -542,31 +550,45 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`cl.id AS "claim"`).
 		ColumnExpr(`cl.outcome AS "outcome"`).
-		ColumnExpr(`COALESCE(cl.justification, '') AS "justification"`).
+		// One value per group, because the group is one claim: which bytes an
+		// engine compares to take the minimum cannot change the answer.
+		ColumnExpr(`COALESCE(MIN(cl.justification), '') AS "justification"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("v.identifier, c.name, cl.outcome, cl.justification").
+		GroupExpr("v.identifier, c.name, cl.id, cl.outcome").
 		Scan(ctx, &said)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)
 	}
-	// **Only where they agree.** A component argued away at one place and
-	// deferred at another is two claims, and stating either over the row
-	// would be a claim nobody made — the rule the VEX document publishes
-	// under, asked here of the same rows.
-	answers := map[string]int{}
+	// **Only where they agree, and agreement is about the outcome.** A
+	// component argued away at one place and deferred at another is two
+	// claims, and stating either over the row would be a claim nobody made —
+	// the rule the VEX document publishes under. Two claims reaching the same
+	// outcome in different words are not that: they agree, and what the row
+	// cannot state is which wording, so it states the outcome and no reason.
+	outcomes := map[string]map[string]bool{}
+	claims := map[string]int{}
 	for _, row := range said {
-		answers[pairKey(row.Vulnerability, row.Component)]++
+		at := pairKey(row.Vulnerability, row.Component)
+		if outcomes[at] == nil {
+			outcomes[at] = map[string]bool{}
+		}
+		outcomes[at][row.Outcome] = true
+		claims[at]++
 	}
 	for _, row := range said {
 		at := pairKey(row.Vulnerability, row.Component)
-		if answers[at] != 1 {
+		if len(outcomes[at]) != 1 {
 			continue
 		}
 		held := out[at]
-		held.Outcome, held.Justification = row.Outcome, row.Justification
+		held.Outcome = row.Outcome
+		if claims[at] == 1 {
+			held.Justification = row.Justification
+		}
 		out[at] = held
 	}
 	return out, nil

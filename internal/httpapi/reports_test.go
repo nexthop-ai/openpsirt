@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -158,4 +159,115 @@ func TestWhatIsStillThereSaysWhetherAnybodyDecidedIt(t *testing.T) {
 			t.Errorf("a row nobody has decided reads as %+v", open)
 		}
 	})
+}
+
+// The sign-off sheet's agreement rule, from both sides.
+//
+// A component argued away at one place and deferred at another is two claims,
+// and stating either over the row would be a claim nobody made — the rule the
+// VEX document already publishes under, asked here of the same rows. Two
+// claims that reach the same outcome in different words are not that: they
+// agree, and what the row cannot state is which wording.
+//
+// Two tests because a place answered once cannot be answered again: a
+// decision already stands there, which is the refusal working.
+func TestARowDecidedTwoWaysStatesNeither(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		places := r.twoPlacesOf(t, "CVE-2026-9999")
+		r.agreedAt(t, places[0], dismissal)
+		r.agreedAt(t, places[1], `{"outcome":"deferred","deferred_until":"2030-01-01",`+
+			`"reasoning":"Held until the next point release."}`)
+
+		if outcome, why := r.standsOn(t, "CVE-2026-9999"); outcome != "" || why != "" {
+			t.Errorf("a row argued away at one place and deferred at another states "+
+				"%q with reason %q", outcome, why)
+		}
+	})
+}
+
+func TestTwoClaimsAgreeingOnTheOutcomeStateItAndNoReason(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		places := r.twoPlacesOf(t, "CVE-2026-9999")
+		r.agreedAt(t, places[0], dismissal)
+		// The same outcome for a different recognized reason. Counted as
+		// disagreement, the sign-off column went blank on a row every place
+		// of which had been argued away — which is the opposite of what the
+		// column is read for.
+		r.agreedAt(t, places[1],
+			`{"outcome":"not-applicable","justification":"component_not_present",`+
+				`"reasoning":"The module is not shipped in this image at all."}`)
+
+		outcome, why := r.standsOn(t, "CVE-2026-9999")
+		if outcome != "not-applicable" {
+			t.Errorf("two claims agreeing on the outcome state %q", outcome)
+		}
+		// And no reason, because the row cannot say which of the two.
+		if why != "" {
+			t.Errorf("a row answered by two claims states one of their reasons: %q", why)
+		}
+	})
+}
+
+// twoPlacesOf is the places one issue sits at in the seeded build.
+func (r *reach) twoPlacesOf(t *testing.T, vulnerability string) []string {
+	t.Helper()
+	r.scannedAtTwoPlaces(t)
+	var found struct {
+		Places []struct {
+			Place string `json:"place"`
+		} `json:"places"`
+	}
+	read(t, r, "triager", findingAt(vulnerability), &found)
+	if len(found.Places) < 2 {
+		t.Fatalf("the fixture holds this issue at %d places, so there is nothing to prove",
+			len(found.Places))
+	}
+	out := make([]string, 0, len(found.Places))
+	for _, one := range found.Places {
+		out = append(out, one.Place)
+	}
+	return out
+}
+
+// agreedAt records a judgment about one place and has a second person agree.
+func (r *reach) agreedAt(t *testing.T, place, body string) {
+	t.Helper()
+	made := asPerson(t, r, "triager", http.MethodPost,
+		"/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/places/"+place+"/decision", body)
+	if made.Code != http.StatusCreated {
+		t.Fatalf("deciding a place answered %d: %s", made.Code, made.Body.String())
+	}
+	var claim struct {
+		ClaimID int64 `json:"claim_id"`
+	}
+	if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+		t.Fatal(err)
+	}
+	if ok := asPerson(t, r, "reviewer", http.MethodPost,
+		fmt.Sprintf("/v1/claims/%d/approval", claim.ClaimID), `{}`); ok.Code != http.StatusOK {
+		t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
+	}
+}
+
+// standsOn is what the comparison says stands about one still-present row.
+func (r *reach) standsOn(t *testing.T, vulnerability string) (string, string) {
+	t.Helper()
+	var out struct {
+		Still []struct {
+			Vulnerability string `json:"vulnerability"`
+			Outcome       string `json:"outcome"`
+			Justification string `json:"justification"`
+		} `json:"still_present"`
+	}
+	read(t, r, "private-triage",
+		"/v1/products/mine/comparison?from=master&from_variant=broadcom"+
+			"&to=master&to_variant=broadcom&include_undisclosed=true", &out)
+	for _, row := range out.Still {
+		if row.Vulnerability == vulnerability {
+			return row.Outcome, row.Justification
+		}
+	}
+	t.Fatalf("%s is not in the comparison", vulnerability)
+	return "", ""
 }

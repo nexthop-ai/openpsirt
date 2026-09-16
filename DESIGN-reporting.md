@@ -415,7 +415,9 @@ of its own, and the catalog carries it with the selection made.
 | Rule | Reason |
 |---|---|
 | A still-present row says how far it has been decided, what was decided and when it is due | A list of what is still there with no way to tell an approved not-applicable from something nobody has looked at is not a list anybody can sign. Those are opposite answers to the question a release sign-off asks |
-| The outcome is stated only where every standing decision over the row's places says the same thing | A component argued away at one place and deferred at another is two claims, and stating either over the row would be a claim nobody made. The same rule the VEX document publishes under |
+| The outcome is stated only where every standing decision over the row's places reaches the same one | A component argued away at one place and deferred at another is two claims, and stating either over the row would be a claim nobody made. The same rule the VEX document publishes under |
+| Agreement is about the outcome, and the reason is stated only where one claim answered the row | Two claims can argue a component away for different recognized reasons and still agree it does not apply; counted as disagreement, the column went blank on a row every place of which had been argued away. Which of the two reasons it was is what the row cannot say |
+| The claims behind a row are told apart by their identifiers, never by their words | A justification is a long-text column on two of the four engines, which compare a bounded prefix for grouping. Told apart by the text, two engines could disagree about whether a row has one answer or two |
 | The state is counted the way the findings list counts it | One spelling of each of the four, so a row here and the same row on the list cannot say different things about how far it has been decided |
 | The column narrows to what nobody has agreed to | That is the coordinator's blocker list, and it is the one narrowing the sheet is read for |
 | It is read for the still-present entries alone | What was fixed needs no justification and what is newly present has not been looked at yet |
