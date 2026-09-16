@@ -385,6 +385,19 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			body = fmt.Sprintf("%s was declared %d days ago and nothing has ever been "+
 				"filed against it.", where, days)
 		}
+		// Something did arrive and was turned away, which is the opposite of
+		// nothing having failed. This is the one surface that reaches a person
+		// rather than waiting to be looked at, so it is the one that must not
+		// send them looking for a pipeline nobody wired up.
+		if row.LastRefusedAt != nil {
+			why := ""
+			if row.RefusedBecause != nil {
+				why = ": " + *row.RefusedBecause
+			}
+			body = fmt.Sprintf("%s has not been scanned for %d days, and an upload "+
+				"against it was turned away on %s%s", where, days,
+				row.LastRefusedAt.Format("2006-01-02"), why)
+		}
 		holding = append(holding, Holds{
 			// Hashed rather than the three names joined.
 			//

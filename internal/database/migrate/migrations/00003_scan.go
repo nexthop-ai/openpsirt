@@ -70,11 +70,50 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 		// the path of every ingest, so it gets its own index rather than a
 		// scan of everything ever received.
 		`CREATE INDEX "scan_newest_idx" ON "scan" ("target_id", "status", "built_at")`,
+
+		// An upload refused before it became a scan.
+		//
+		// A scan row records what was taken. Something turned away at the
+		// door never becomes one, so the two commonest real ingest failures —
+		// a document nothing can read, and a clock that never moves, so every
+		// build after the first is refused as older than what is held — left
+		// the deployment nothing to look at. The producer was told and
+		// nobody here was.
+		//
+		// What that cost is a coverage report that can say a build has gone
+		// quiet and cannot say whether anybody is trying. Those want
+		// different people: one is a pipeline nobody wired up, the other is a
+		// pipeline failing nightly and reporting success to its own log.
+		//
+		// Kept per target rather than per attempt-and-forever: a producer
+		// retrying a broken document writes one of these a minute, and what
+		// anybody reads is the most recent.
+		`CREATE TABLE "scan_refusal" (
+			"id"           ` + t.id + `,
+			"target_id"    ` + t.ref + ` NOT NULL,
+			"at"           ` + t.timestamp + ` NOT NULL,
+			-- Why it was turned away, in the words the producer was given, so
+			-- the two ends of the conversation say the same thing.
+			"reason"       ` + t.text + ` NOT NULL,
+			-- What sent it, where a credential did. Null for the paths that
+			-- do not carry one, which reads as "not known" rather than as
+			-- nobody.
+			"credential"   ` + t.name + ` NULL,
+			-- What the document said it was built from, where it got far
+			-- enough to say. The out-of-order case is exactly the one where
+			-- this is the useful field.
+			"built_at"     ` + t.timestamp + ` NULL,
+			"content_hash" ` + t.hash + ` NULL,
+			CONSTRAINT "scan_refusal_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			-- One per target. A refusal replaces the one before it, because
+			-- what a report asks is whether this build is being refused now.
+			CONSTRAINT "scan_refusal_target_unique" UNIQUE ("target_id")
+		)` + t.suffix,
 	}
 
 	return apply(ctx, tx, statements)
 }
 
 func downScan(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "scan")
+	return dropTables(ctx, tx, "scan_refusal", "scan")
 }

@@ -44,7 +44,7 @@ type AboutPersonBody struct {
 	// Told is what was sent to them, newest first, read and cleared
 	// included: what somebody was told is a fact about what was sent.
 	Told      []ToldBody `json:"told,omitempty"`
-	ToldTotal int        `json:"told_total" doc:"How many things they were told, of which the list above is a page"`
+	ToldTotal int        `json:"told_total" doc:"How many things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"`
 }
 
 // HeldChangeBody is one role granted or withdrawn.

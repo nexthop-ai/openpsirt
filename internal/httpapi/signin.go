@@ -177,21 +177,10 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 		return
 	}
 
-	// The administrator's setting first, then whatever the deployment was
-	// started with, then the built-in. The setting is offered on the
-	// administration screen, so it has to be the one that decides — a value
-	// somebody sets there and nothing reads is worse than not offering it.
-	lifetime := access.DefaultSessionLifetime
-	if in.SessionLifetime > 0 {
-		lifetime = in.SessionLifetime
-	}
-	if in.DB != nil {
-		chosen, err := setting.NewStore(in.DB.DB).Duration(r.Context(), setting.SessionLifetime, lifetime)
-		if err != nil {
-			wentWrongHere(w, in, "how long a sign-in lasts could not be read", err)
-			return
-		}
-		lifetime = chosen
+	lifetime, err := sessionWindow(r.Context(), in)
+	if err != nil {
+		wentWrongHere(w, in, "how long a sign-in lasts could not be read", err)
+		return
 	}
 	issued, err := rights.StartSession(r.Context(), person.ID, lifetime)
 	if err != nil {
@@ -491,4 +480,58 @@ func wentWrongHere(w http.ResponseWriter, in Ingest, what string, err error) {
 		in.logger().Error(what, "error", err)
 	}
 	Problem(w, http.StatusInternalServerError, "something went wrong")
+}
+
+// sessionWindow is how long a sign-in lasts here.
+//
+// The administrator's setting first, then whatever the deployment was started
+// with, then the built-in. The setting is offered on the administration screen,
+// so it has to be the one that decides — a value somebody sets there and
+// nothing reads is worse than not offering it.
+//
+// One spelling, because two things ask: a sign-in, for the session it is about
+// to issue, and the bound on a grant a group derived, which is the same window
+// seen from the other side. Written twice they drift, and the pair is only
+// meaningful while they agree.
+func sessionWindow(ctx context.Context, in Ingest) (time.Duration, error) {
+	var settings *setting.Store
+	if in.DB != nil {
+		settings = setting.NewStore(in.DB.DB)
+	}
+	return SessionWindow(ctx, settings, in.SessionLifetime)
+}
+
+// SessionWindow is sessionWindow for a caller holding the pieces rather than
+// the whole of what the server was built with.
+//
+// Exported because the process wires the same window into the bound on a
+// derived grant, and it does so while the server is still being assembled.
+func SessionWindow(ctx context.Context, settings *setting.Store, configured time.Duration) (time.Duration, error) {
+	lifetime := access.DefaultSessionLifetime
+	if configured > 0 {
+		lifetime = configured
+	}
+	if settings == nil {
+		return lifetime, nil
+	}
+	return settings.Duration(ctx, setting.SessionLifetime, lifetime)
+}
+
+// DerivedWindow is sessionWindow for the bound on a grant a group derived,
+// asked per request.
+//
+// A read that fails answers with the window configured rather than with none.
+// None would mean a derived grant never goes stale, so a database that cannot
+// answer would quietly restore the thing this bound exists to stop.
+func DerivedWindow(settings *setting.Store, configured time.Duration) func(context.Context) time.Duration {
+	return func(ctx context.Context) time.Duration {
+		window, err := SessionWindow(ctx, settings, configured)
+		if err != nil {
+			if configured > 0 {
+				return configured
+			}
+			return access.DefaultSessionLifetime
+		}
+		return window
+	}
 }

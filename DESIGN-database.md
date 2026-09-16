@@ -696,6 +696,9 @@ is the same kind of claim.
 | How large a stored document is | A person asking whether retention is affordable. Derivable from the chunks, and kept because deriving it means reading the blobs to answer a question about their size |
 | When a finding last moved | A finding open for years outlives whatever record of the change was kept elsewhere |
 | When an identity was bound to a person | The audit trail for the one decision that cannot be undone by editing a role |
+| What sent the upload that was refused | A person. "Which of our pipelines is the broken one" is the first question a deployment with several asks, and a refusal that names only the build does not answer it |
+| What the refused document said it was built from | A person, for the out-of-order failure specifically: the refusal says the clock did not move, and this is what it said the time was |
+| What the refused upload hashed to | A person, comparing the refusal against what the producer believes it sent. It is also how a producer retrying one broken document is told apart from one sending a differently broken document each night, which are different faults and read the same in the count |
 
 A column that is written, never read, and has no answer to "who would want it" is
 a defect. That is how the redundant indexes above were found.

@@ -93,7 +93,7 @@ func TestATokenStopsWorkingOnceItHasRunOut(t *testing.T) {
 		at := time.Date(2026, 8, 29, 9, 0, 0, 0, time.UTC)
 		store, person := atClock(t, db, &at)
 
-		_, secret, err := store.NewToken(t.Context(), person, "scripting", nil, time.Hour, 0)
+		_, secret, err := store.NewToken(t.Context(), person, "scripting", nil, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

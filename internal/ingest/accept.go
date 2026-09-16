@@ -14,6 +14,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -408,6 +409,78 @@ func (s *Store) Made(ctx context.Context, scanID int64, components, placed int) 
 		Where("id = ?", scanID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record what the inventory was made of: %w", err)
+	}
+	return nil
+}
+
+// Refusal is an upload turned away before it became a scan.
+//
+// One row per target, replaced each time. What a report asks is whether this
+// build is being refused now, and a producer retrying a document nothing can
+// read would otherwise write one of these a minute.
+type Refusal struct {
+	bun.BaseModel `bun:"table:scan_refusal,alias:sr"`
+
+	ID       int64     `bun:"id,pk,autoincrement"`
+	TargetID int64     `bun:"target_id,notnull"`
+	At       time.Time `bun:"at,notnull"`
+	// Reason is what the producer was told, so both ends of the conversation
+	// say the same thing when somebody compares them.
+	Reason      string     `bun:"reason,notnull"`
+	Credential  *string    `bun:"credential"`
+	BuiltAt     *time.Time `bun:"built_at"`
+	ContentHash *string    `bun:"content_hash"`
+}
+
+// Refused records that an upload was turned away.
+//
+// **Best-effort by design, and the one place that is right.** This is a note
+// about something that already failed; failing the failure would turn a
+// refusal the producer needs to see into a fault it cannot read. The caller
+// logs what comes back and answers the producer either way.
+//
+// The subject is who was turned away, not a narrowing: this writes one row
+// about one build and reads nothing back.
+func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) error {
+	r.At = s.now().Truncate(time.Microsecond)
+	// Who was turned away comes from the subject rather than from the caller.
+	// The caller already has the name in two shapes and would be choosing
+	// between them here, which is one place for the record to disagree with
+	// what the request was actually resolved as.
+	if r.Credential == nil && subject.Identity != "" {
+		identity := subject.Identity
+		r.Credential = &identity
+	}
+	r.Reason = truncate(r.Reason, 2000)
+
+	// An update and then an insert, rather than an upsert: there is no
+	// portable spelling of one, two of the four engines want ON CONFLICT and
+	// the other two ON DUPLICATE KEY UPDATE, and engine-specific SQL is
+	// confined to migration data-definition and the queue's locking. The
+	// update first because a target being refused once is a target being
+	// refused repeatedly, so the row is nearly always already there.
+	res, err := s.db.NewUpdate().Model((*Refusal)(nil)).
+		Set("at = ?", r.At).
+		Set("reason = ?", r.Reason).
+		Set("credential = ?", r.Credential).
+		Set("built_at = ?", r.BuiltAt).
+		Set("content_hash = ?", r.ContentHash).
+		Where("target_id = ?", r.TargetID).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("record that an upload was refused: %w", err)
+	}
+	changed, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record that an upload was refused: %w", err)
+	}
+	if changed > 0 {
+		return nil
+	}
+	// Two refusals for one target arriving together resolve on the unique
+	// constraint: one inserts and the loser is the one this arm refuses, which
+	// is a refusal recorded by the other request rather than one lost.
+	if _, err := s.db.NewInsert().Model(&r).Exec(ctx); err != nil {
+		return fmt.Errorf("record that an upload was refused: %w", err)
 	}
 	return nil
 }

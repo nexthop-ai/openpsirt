@@ -48,7 +48,7 @@ components:
             - array
             - "null"
         told_total:
-          description: How many things they were told, of which the list above is a page
+          description: "How many things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
           format: int64
           type: integer
       required:
@@ -1399,6 +1399,9 @@ components:
         last_received_at:
           description: When a scan last arrived. Absent where none ever has
           type: string
+        last_refused_at:
+          description: When an upload against this build was last turned away. Absent where none has been
+          type: string
         product:
           type: string
         quiet:
@@ -1408,6 +1411,9 @@ components:
           description: How long it has been, in days, measured from the last arrival or from when the build was declared
           format: int64
           type: integer
+        refused_because:
+          description: What the producer was told the last time one was turned away, in the same words they were given
+          type: string
         retired:
           description: Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet
           type: boolean
@@ -7379,6 +7385,20 @@ components:
         expires_at:
           description: When it stops working
           type: string
+        holds:
+          description: Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none
+          items:
+            enum:
+              - approver
+              - assigner
+              - public-read
+              - private-read
+              - public-triage
+              - private-triage
+            type: string
+          type:
+            - array
+            - "null"
         last_used_at:
           description: When it was last used
           type: string

@@ -608,3 +608,48 @@ func TestAnInventoryWithNoBuildTimeIsRefused(t *testing.T) {
 		}
 	})
 }
+
+// TestEveryDoorThatTurnsAnUploadAwayRecordsIt holds the line that a refusal is
+// recorded whichever way the upload was refused.
+//
+// The record exists so the coverage report can tell a build nobody uploads to
+// from one whose uploads are being turned away. Wired to one arm it told the
+// wrong story about the other: a producer posting a document nothing can read —
+// the commoner of the two failures the table was made for — still drew as
+// quiet-and-never-refused, which reads as a pipeline nobody wired up.
+//
+// Through the door rather than against the store, because that is where the
+// arms are and the store was never the part that was missing.
+func TestEveryDoorThatTurnsAnUploadAwayRecordsIt(t *testing.T) {
+	for _, c := range []struct {
+		what string
+		body string
+		want int
+	}{
+		{"a document nothing can read", "{ not an inventory", http.StatusUnprocessableEntity},
+		{"one that does not say when it was built", inventory(time.Time{}, "libc6"), http.StatusBadRequest},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+				if code, _ := f.send(t, upload(t, f.path, c.body)); code != c.want {
+					t.Fatalf("%s answered %d, want %d", c.what, code, c.want)
+				}
+				var recorded []struct {
+					Reason string `bun:"reason"`
+				}
+				if err := f.db.DB.NewSelect().Table("scan_refusal").
+					Column("reason").Scan(t.Context(), &recorded); err != nil {
+					t.Fatal(err)
+				}
+				if len(recorded) != 1 {
+					t.Fatalf("%s left %d refusals behind, want one", c.what, len(recorded))
+				}
+				// The words the producer was given, so both ends of the
+				// conversation say the same thing when somebody compares them.
+				if recorded[0].Reason == "" {
+					t.Errorf("%s recorded a refusal with no reason", c.what)
+				}
+			})
+		})
+	}
+}

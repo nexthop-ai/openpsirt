@@ -164,7 +164,7 @@ func TestATokenDecidesOnlyWhatItsOwnerCould(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, secret, err := r.rights.NewToken(ctx, person.ID, "scripting", nil, 0, 0)
+		_, secret, err := r.rights.NewToken(ctx, person.ID, "scripting", nil, nil, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestATokenDecidesOnlyWhatItsOwnerCould(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, weak, err := r.rights.NewToken(ctx, reader.ID, "dispatching", nil, 0, 0)
+		_, weak, err := r.rights.NewToken(ctx, reader.ID, "dispatching", nil, nil, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

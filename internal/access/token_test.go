@@ -1,6 +1,7 @@
 package access_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func holder(t *testing.T, f *fixture) (*access.Account, string) {
 	if err := f.store.GrantRole(ctx, person.ID, f.products["onie"], access.PublicRead); err != nil {
 		t.Fatal(err)
 	}
-	_, secret, err := f.store.NewToken(ctx, person.ID, "scripting", nil, time.Hour, 0)
+	_, secret, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +82,7 @@ func TestANarrowedTokenReachesLessThanItsOwnerAndNeverMore(t *testing.T) {
 		person, _ := holder(t, f)
 
 		sonic := f.products["sonic"]
-		_, narrowed, err := f.store.NewToken(ctx, person.ID, "sonic-only", &sonic, time.Hour, 0)
+		_, narrowed, err := f.store.NewToken(ctx, person.ID, "sonic-only", &sonic, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,7 +126,7 @@ func TestATokenNarrowedToAProductCarriesNoAdministration(t *testing.T) {
 			t.Fatal(err)
 		}
 		sonic := f.products["sonic"]
-		_, secret, err := f.store.NewToken(ctx, person.ID, "narrow", &sonic, time.Hour, 0)
+		_, secret, err := f.store.NewToken(ctx, person.ID, "narrow", &sonic, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -148,17 +149,17 @@ func TestATokenHasToExpireAndCannotOutlastTheCeiling(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, _, err := f.store.NewToken(ctx, person.ID, "too-long", nil, 48*time.Hour, 24*time.Hour); err == nil {
+		if _, _, err := f.store.NewToken(ctx, person.ID, "too-long", nil, nil, 48*time.Hour, 24*time.Hour); err == nil {
 			t.Error("a token was minted past the ceiling")
 		}
-		token, _, err := f.store.NewToken(ctx, person.ID, "unstated", nil, 0, 0)
+		token, _, err := f.store.NewToken(ctx, person.ID, "unstated", nil, nil, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !token.ExpiresAt.After(token.CreatedAt) {
 			t.Error("a token with no lifetime stated does not expire")
 		}
-		if _, _, err := f.store.NewToken(ctx, person.ID, "  ", nil, time.Hour, 0); err == nil {
+		if _, _, err := f.store.NewToken(ctx, person.ID, "  ", nil, nil, time.Hour, 0); err == nil {
 			t.Error("a token was minted with no name")
 		}
 	})
@@ -231,7 +232,7 @@ func TestATokenCannotMintOrWithdrawAnother(t *testing.T) {
 			t.Fatal(err)
 		}
 		sonic := f.products["sonic"]
-		_, narrow, err := f.store.NewToken(ctx, boss.ID, "narrow", &sonic, time.Hour, 0)
+		_, narrow, err := f.store.NewToken(ctx, boss.ID, "narrow", &sonic, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,7 +250,7 @@ func TestATokenCannotMintOrWithdrawAnother(t *testing.T) {
 
 		// And the same holds for one that was never narrowed: the limit is on
 		// minting, not on how wide the token happens to be.
-		_, wide, err := f.store.NewToken(ctx, boss.ID, "wide", nil, time.Hour, 0)
+		_, wide, err := f.store.NewToken(ctx, boss.ID, "wide", nil, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -281,10 +282,10 @@ func TestTwoCredentialsMayNotShareAName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, time.Hour, 0); err != nil {
+		if _, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, time.Hour, 0); err == nil {
+		if _, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0); err == nil {
 			t.Error("one person was given two tokens with one name")
 		}
 	})
@@ -300,7 +301,7 @@ func TestATokenDefaultsToWhateverTheCeilingAllows(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		token, _, err := f.store.NewToken(ctx, person.ID, "unstated", nil, 0, 24*time.Hour)
+		token, _, err := f.store.NewToken(ctx, person.ID, "unstated", nil, nil, 0, 24*time.Hour)
 		if err != nil {
 			t.Fatalf("a mint that stated no lifetime was refused: %v", err)
 		}
@@ -360,7 +361,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, secret, err := f.store.NewToken(ctx, person.ID, "pinned", &here, time.Hour, 0)
+		_, secret, err := f.store.NewToken(ctx, person.ID, "pinned", &here, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -400,6 +401,195 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		}
 		if !narrowed.Reads(access.Public, here) {
 			t.Error("a narrowed token does not read the product it is pinned to")
+		}
+	})
+}
+
+// TestATokenStopsCarryingARoleAGroupStoppedDeriving holds the line that a grant
+// a group derived has to have been derived recently to still grant anything
+// through a personal token.
+//
+// Membership is read at sign-in, and a sign-in replaces somebody's derived
+// grants whole — so a browser's are never older than its session. A token never
+// signs in. It resolves through its owner and reads whatever their last sign-in
+// wrote, so without a bound a group somebody left went on granting them roles
+// through that token until they next signed in, which for somebody who has gone
+// is never.
+//
+// The window is the session lifetime, which is the same one the access document
+// already names as how long a role a group withdrew can still be held. It was
+// true of a browser and false of a token.
+//
+// What an administrator assigned is untouched. That is a standing decision
+// rather than a reading of somebody's membership, and it does not go off.
+func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "scripted", "Scripted", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Assigned on one product and derived on the other, so that what the
+		// window takes away is distinguishable from the token simply failing.
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		derived := access.Grant{
+			PersonID: person.ID, ProductID: f.products["onie"],
+			Role: access.PublicRead, Source: access.Derived, Active: true,
+			// Older than the window below, which is what a person who stopped
+			// signing in leaves behind.
+			CreatedAt: time.Now().UTC().Add(-48 * time.Hour),
+		}
+		if _, err := f.db.DB.NewInsert().Model(&derived).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		_, secret, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		bounded := f.store.DerivingWithin(func(context.Context) time.Duration { return 24 * time.Hour })
+		subject, err := bounded.ResolveToken(ctx, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if subject.Reads(access.Public, f.products["onie"]) {
+			t.Error("a token carried a role no group has derived since before the window")
+		}
+		if !subject.Reads(access.Public, f.products["sonic"]) {
+			t.Error("a token lost a role an administrator assigned, which does not go off")
+		}
+
+		// And the same grant, derived inside the window, still grants.
+		if _, err := f.db.DB.NewUpdate().Model((*access.Grant)(nil)).
+			Set("created_at = ?", time.Now().UTC()).
+			Where("id = ?", derived.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		subject, err = bounded.ResolveToken(ctx, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !subject.Reads(access.Public, f.products["onie"]) {
+			t.Error("a freshly derived role granted nothing, so the window refuses everything")
+		}
+	})
+}
+
+// TestATokenCarriesOnlyTheRolesItWasMintedFor holds the line that a token can
+// be narrowed to some of what its owner may do, and that the narrowing is an
+// intersection rather than a grant.
+//
+// A credential handed to a script that only reads should not also be able to
+// triage, and until it could be narrowed the only way to get one was to hold
+// nothing else yourself. Minting it needs no second person precisely because it
+// can only ever reach less: naming a role its owner does not hold reaches
+// nothing through it.
+func TestATokenCarriesOnlyTheRolesItWasMintedFor(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "scripted", "Scripted", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, role := range []access.Role{access.PublicRead, access.PublicTriage} {
+			if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], role); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		for _, c := range []struct {
+			what    string
+			holds   []access.Role
+			reads   bool
+			triages bool
+		}{
+			{"narrowed to reading", []access.Role{access.PublicRead}, true, false},
+			{"naming both", []access.Role{access.PublicRead, access.PublicTriage}, true, true},
+			{"naming none", nil, true, true},
+			// Named but not held. The intersection is empty on this product,
+			// which is the property that makes minting safe: a token cannot
+			// ask for more than its owner has.
+			{"naming a role its owner does not hold", []access.Role{access.Approver}, false, false},
+		} {
+			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			subject, err := f.store.ResolveToken(ctx, secret)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			if got := subject.Reads(access.Public, f.products["sonic"]); got != c.reads {
+				t.Errorf("a token %s reads the product: %v, want %v", c.what, got, c.reads)
+			}
+			if got := subject.Triages(access.Public, f.products["sonic"]); got != c.triages {
+				t.Errorf("a token %s triages the product: %v, want %v", c.what, got, c.triages)
+			}
+		}
+	})
+}
+
+// TestAReadingTokenCannotWriteOnItsOwnersCase holds the line that narrowing a
+// token to reading takes the write half of a case grant with it.
+//
+// A case grant is enough to write on its own — a note, an attachment and a
+// decision each accept it in place of a triage role, because somebody brought
+// onto an embargoed issue is brought on to work it. Keeping the grant whole
+// through a narrowing meant a credential labelled "reading only" could still
+// record a decision on the embargoed issue it was minted for.
+//
+// The read half stays, which is the reason it is not simply dropped: a token
+// that cannot read the one case it exists for is no use to anybody.
+func TestAReadingTokenCannotWriteOnItsOwnersCase(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "collab", "Collab", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A case and nothing else, which is the shape that writes without a
+		// role. A reading role beside it so the narrowing has something to
+		// keep.
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		issues, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "SONIC-2026-8100", Severity: "high"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := issues["SONIC-2026-8100"]
+		if err := f.store.AddToCase(ctx, f.products["sonic"], issue, person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, c := range []struct {
+			what  string
+			holds []access.Role
+			acts  bool
+		}{
+			{"carrying everything", nil, true},
+			{"narrowed to reading", []access.Role{access.PublicRead}, false},
+			{"narrowed to triage", []access.Role{access.PublicTriage}, true},
+		} {
+			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			subject, err := f.store.ResolveToken(ctx, secret)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			// The read half is there whichever way it was narrowed.
+			if !subject.OnCase(f.products["sonic"], issue) {
+				t.Errorf("a token %s cannot read the case it was minted for", c.what)
+			}
+			if got := subject.OnCaseToAct(f.products["sonic"], issue); got != c.acts {
+				t.Errorf("a token %s writes on the case: %v, want %v", c.what, got, c.acts)
+			}
 		}
 	})
 }

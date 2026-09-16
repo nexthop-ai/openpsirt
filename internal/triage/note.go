@@ -87,7 +87,7 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 	if !told {
 		return nil, ErrNoSuchNote
 	}
-	if !subject.Triages(at, productID) && !subject.OnCase(productID, vulnerabilityID) {
+	if !subject.Triages(at, productID) && !subject.OnCaseToAct(productID, vulnerabilityID) {
 		return nil, access.Denied("write a note about an issue here")
 	}
 
@@ -158,7 +158,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 			return ErrNoSuchNote
 		}
 		if !subject.Triages(at, note.ProductID) &&
-			!subject.OnCase(note.ProductID, note.VulnerabilityID) {
+			!subject.OnCaseToAct(note.ProductID, note.VulnerabilityID) {
 			return access.Denied("change a note about an issue here")
 		}
 		if note.WrittenBy != subject.ID {

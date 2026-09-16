@@ -759,6 +759,15 @@ typed: a lifetime of a year made every browser sign-in last a year. Refused
 rather than quietly shortened, at the settings write and at startup, so that
 somebody who asks for more hears the limit rather than discovering it later.
 
+**A grant a group derived grants through a token only while it is younger than
+this window.** Membership is read at sign-in and a sign-in replaces somebody's
+derived grants whole, so a browser's are never older than its session. A token never signs in: it resolves
+through its owner and reads whatever their last sign-in wrote. So a derived
+grant is in force for a token only while it is younger than this window, and a
+group somebody left stops granting them roles through a token even if they never
+sign in again. What an administrator assigned is untouched — that is a standing
+decision rather than a reading of somebody's membership.
+
 Thirty is a judgment rather than a commitment. Nothing has been decided about
 where the ceiling belongs, and somebody could reasonably say ninety — it is the
 owner's to settle, and `TODO.md` carries it until they do.
@@ -817,6 +826,7 @@ for work it was never scoped for.
 | A live reference to its owner, never a snapshot | What it reaches is read from what they hold at the moment it is used, so a role withdrawn cuts the token at the same instant — including one withdrawn because a group membership went away, which is the case with nothing else to notice it |
 | It may not mint or withdraw another | Minting resolves through the owner, so a token that could mint would ask for a wider one and be given it, making every limit exactly one request deep |
 | Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration is dropped by narrowing entirely, because a token narrowed to one product that still administered everything would not be narrowed |
+| A token narrows by what it may do as well as where | A credential a script reads with should not also be able to triage, and the only way to get one used to be to hold nothing else yourself. The roles it names intersect with its owner's the same way the product does, so naming one they do not hold reaches nothing. Naming none carries all of them. A case is untouched: being brought into one is a grant on a product and an issue rather than a role, so a read-only token still reads the case it was minted for |
 | Expiry is not optional, with a maximum an administrator sets | A credential that never runs out is one nobody ever revokes. Revoking marks rather than deletes, so what used it stays answerable |
 
 Every credential says which kind it is. Pipeline keys and personal tokens carry
@@ -1042,7 +1052,7 @@ private access.
 | The grant is asked wherever a row is read, not only where a list is narrowed | A grant that shows a row in a list and refuses it when opened is a grant with no content. The list narrowing asked it and three reads by identifier did not, so a collaborator saw their case among the decisions and could open none of them |
 | Asked once the row is in hand | It needs the issue, which a bare product-and-visibility rule cannot see. That is the opposite order from a name somebody typed, and safe for the same reason it is necessary: the row is already established as existing |
 | Adding somebody is an access change | It lands in the administration trail, tells them at once in the area inside the application, and the finding shows how many collaborators it has. It stops meaning anything at disclosure |
-| Whoever reads the case manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo |
+| Whoever reads the product the case is in manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo. A collaborator is not that reader: the grant is one issue, so it carries the finding and not the list of who else was brought in |
 | The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator was refused the path to the component their own case sits in and the finding answered as though it were not there |
 | Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faulted on the row the grant exists to open |
 | How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same place, held at a version the decision would not already cover. Asked product-wide they refused the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the two screens that offer to carry a judgment across builds faulted on the one finding the grant exists to open |

@@ -297,7 +297,7 @@ of this table's rules are.
 | Rule | Reason |
 |---|---|
 | Read and cleared rows are included | The question is what was sent, not what is waiting. A line already acknowledged is still a line they were sent |
-| Not narrowed by what that person may read now | Hiding the private half would answer the question with exactly the part that does not matter: a line about an undisclosed finding, sent while they held the role that reached it, is what the investigation is for |
+| Narrowed by what the reader may see, and the administrator flag is not a way to see more | The flag decides who may ask a question about somebody else's list; the rows that come back are the ones the asker could read on their own account, count included. Granting themselves the product reaches the same rows and lands in the administrative record, where this read left nothing — so the two are not equivalent and the cheaper of them was the silent one |
 
 ## Delivery
 

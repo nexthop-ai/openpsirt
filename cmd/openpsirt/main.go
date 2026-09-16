@@ -254,10 +254,19 @@ func run(args []string, stdout, stderr *os.File) error {
 	handler, _ := httpapi.New(logger, db.Validate, httpapi.Ingest{
 		DB: db, Queue: work, Replica: name,
 		Interface: httpapi.Interface{Files: pages},
-		Access: access.NewResolver(rights, access.Trust{
-			Header: cfg.TrustedHeader, From: cfg.TrustedSources,
-			GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
-		}).WithLogger(logger).WithMode(roleMode(settings)).OverPlainHTTP(cfg.PlainHTTP),
+		// The resolver reads through a store that bounds a derived grant to
+		// the session lifetime. A browser re-derives its roles at every
+		// sign-in; a personal token never signs in, so without a bound a
+		// group somebody left keeps granting them roles through that token
+		// for as long as it lasts. The same window, resolved the same way, for
+		// both ways in — including the administrator's setting, which is the
+		// one that decides and is read per request rather than at startup.
+		Access: access.NewResolver(
+			rights.DerivingWithin(httpapi.DerivedWindow(settings, cfg.SessionLifetime)),
+			access.Trust{
+				Header: cfg.TrustedHeader, From: cfg.TrustedSources,
+				GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
+			}).WithLogger(logger).WithMode(roleMode(settings)).OverPlainHTTP(cfg.PlainHTTP),
 		Providers:       providers,
 		BaseURL:         cfg.BaseURL,
 		PlainHTTP:       cfg.PlainHTTP,

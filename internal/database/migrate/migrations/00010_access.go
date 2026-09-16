@@ -72,6 +72,16 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			-- deciding, so somebody promoted inside the application survives a
 			-- change of mode rather than losing access nothing can restore.
 			"admin_derived" ` + t.boolean + ` NOT NULL,
+			-- When a group last said so, refreshed at every sign-in that
+			-- derives it rather than only when the answer changes.
+			--
+			-- It is what bounds the flag for a personal token. A token never
+			-- signs in, so nothing re-derives its owner's administration while
+			-- it is being used, and without this somebody a group made an
+			-- administrator who then left went on administering through a
+			-- year-long token for as long as it lasted. Null where a person
+			-- rather than a group granted it, which never goes stale.
+			"admin_derived_at" ` + t.timestamp + ` NULL,
 			-- Where to reach this person outside the application, and which
 			-- of the two sources it came from. Null is the ordinary state:
 			-- an address is optional, and somebody without one is told
@@ -349,6 +359,16 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			-- what it reaches is the intersection, so pinning it to something
 			-- they cannot read reaches nothing rather than granting it.
 			"product_id"   ` + t.refNull + ` NULL,
+			-- holds narrows a token to some of what its owner may do, the
+			-- same way and for the same reason product_id narrows where.
+			-- The roles it names are intersected with theirs, so naming one
+			-- they do not hold grants nothing.
+			--
+			-- NULL is not the empty string here. NULL is "everything they
+			-- hold", which is what a token minted without saying gets; empty
+			-- would be a token that reaches nothing and is worth refusing at
+			-- the mint rather than storing.
+			"holds"        ` + t.name + ` NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
 			"expires_at"   ` + t.timestamp + ` NOT NULL,
 			"last_used_at" ` + t.timestamp + ` NULL,

@@ -37,7 +37,14 @@ type Token struct {
 	PersonID   int64  `bun:"person_id,notnull"`
 	// ProductID narrows the token below its owner. Absent means it reaches
 	// whatever they do.
-	ProductID  *int64     `bun:"product_id"`
+	ProductID *int64 `bun:"product_id"`
+	// Holds narrows which of its owner's roles the token carries, as the
+	// role words separated by commas. Absent means all of them.
+	//
+	// Intersected rather than granted: a token naming a role its owner does
+	// not hold reaches nothing through it, which is what makes minting one
+	// safe to allow without a second person.
+	Holds      *string    `bun:"holds"`
 	CreatedAt  time.Time  `bun:"created_at,notnull"`
 	ExpiresAt  time.Time  `bun:"expires_at,notnull"`
 	LastUsedAt *time.Time `bun:"last_used_at"`
@@ -55,7 +62,7 @@ const MaxTokenLifetime = 365 * 24 * time.Hour
 // Expiry is not optional. A credential that never runs out is one nobody ever
 // revokes, and the ones that matter are discovered when somebody leaves and
 // nobody knows what breaks if it is turned off.
-func (s *Store) NewToken(ctx context.Context, personID int64, name string, productID *int64, lifetime, ceiling time.Duration) (*Token, string, error) {
+func (s *Store) NewToken(ctx context.Context, personID int64, name string, productID *int64, holds []Role, lifetime, ceiling time.Duration) (*Token, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, "", fmt.Errorf("a token needs a name, so its owner can tell it from the others")
@@ -74,6 +81,15 @@ func (s *Store) NewToken(ctx context.Context, personID int64, name string, produ
 		return nil, "", fmt.Errorf("a token may last at most %s here", ceiling)
 	}
 
+	// Refused rather than stored. A token naming no role it could carry
+	// reaches nothing at all, and a credential that authenticates and then
+	// answers 404 to everything is a support question rather than a
+	// narrowing somebody meant.
+	narrowed, err := rolesFor(holds)
+	if err != nil {
+		return nil, "", err
+	}
+
 	raw, err := secret()
 	if err != nil {
 		return nil, "", err
@@ -83,12 +99,81 @@ func (s *Store) NewToken(ctx context.Context, personID int64, name string, produ
 	now := s.now().Truncate(time.Microsecond)
 	token := &Token{
 		Name: name, SecretHash: hashSecret(presented), PersonID: personID, ProductID: productID,
+		Holds:     narrowed,
 		CreatedAt: now, ExpiresAt: now.Add(lifetime).Truncate(time.Microsecond),
 	}
 	if _, err := s.db.NewInsert().Model(token).Exec(ctx); err != nil {
 		return nil, "", fmt.Errorf("record a token: %w", err)
 	}
 	return token, presented, nil
+}
+
+// rolesFor normalizes what a token was asked to carry into what is stored.
+//
+// Nil for a token that names none, which reaches everything its owner does.
+// The words are de-duplicated and written in the order Roles states them, so
+// two tokens narrowed to the same thing read the same.
+func rolesFor(holds []Role) (*string, error) {
+	if len(holds) == 0 {
+		return nil, nil
+	}
+	named := map[Role]bool{}
+	for _, role := range holds {
+		if !role.Valid() {
+			return nil, fmt.Errorf("%q is not a role", role)
+		}
+		named[role] = true
+	}
+	kept := make([]string, 0, len(named))
+	for _, role := range Roles() {
+		if named[role] {
+			kept = append(kept, string(role))
+		}
+	}
+	joined := strings.Join(kept, ",")
+	return &joined, nil
+}
+
+// narrowedToRoles drops everything the token was not asked to carry.
+//
+// An intersection, like the product: what is left is what its owner holds and
+// the token names, so naming a role they do not hold reaches nothing rather
+// than granting it.
+//
+// **A case keeps its read half and loses its write half.** Being brought into
+// one is a grant on a pair of a product and an issue rather than something in
+// this vocabulary, so dropping it would make a read-only token unable to read
+// the one case it was minted for. Keeping it whole is worse: a case grant is
+// enough to write on its own — a note, an attachment and a decision each accept
+// it in place of triage — so a token narrowed to reading would still have
+// recorded a decision on the embargoed issue it was minted for.
+func (s Subject) narrowedToRoles(holds string) Subject {
+	wanted := map[Role]bool{}
+	for _, word := range strings.Split(holds, ",") {
+		wanted[Role(strings.TrimSpace(word))] = true
+	}
+	narrowed := map[int64][]Role{}
+	for product, held := range s.grants {
+		var kept []Role
+		for _, role := range held {
+			if wanted[role] {
+				kept = append(kept, role)
+			}
+		}
+		if len(kept) > 0 {
+			narrowed[product] = kept
+		}
+	}
+	s.grants = narrowed
+	// Administration is not a role in this vocabulary and cannot be named, so
+	// a token asked to carry some roles carries none of it.
+	s.Admin = false
+	s.unnarrowed = false
+	// And the case's write half goes unless a triage role was named, for the
+	// same reason: what a token carries is what it was asked to carry, and a
+	// case grant writes without any role at all.
+	s.casesReadOnly = !wanted[PublicTriage] && !wanted[PrivateTriage]
+	return s
 }
 
 // ResolveToken turns somebody's own credential into the subject it stands for.
@@ -115,7 +200,11 @@ func (s *Store) ResolveToken(ctx context.Context, presented string) (Subject, er
 		// The account is gone, so the token is too.
 		return Subject{}, ErrDenied
 	}
-	subject, err := s.Resolve(ctx, person.Identity)
+	// Derived grants have to be fresh for a token. A token never signs in, so
+	// nothing re-derives what its owner holds while it is being used, and a
+	// group they left would go on granting them roles through it until they
+	// next signed in — which for somebody who has gone is never.
+	subject, err := s.resolve(ctx, person.Identity, true)
 	if err != nil {
 		return Subject{}, err
 	}
@@ -136,6 +225,9 @@ func (s *Store) ResolveToken(ctx context.Context, presented string) (Subject, er
 	subject = subject.delegate()
 	if token.ProductID != nil {
 		subject = subject.narrowedTo(*token.ProductID)
+	}
+	if token.Holds != nil {
+		subject = subject.narrowedToRoles(*token.Holds)
 	}
 	return subject, nil
 }

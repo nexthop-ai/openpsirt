@@ -160,7 +160,7 @@ func mayAttach(ctx context.Context, db bun.IDB, subject access.Subject,
 	if err := mayReach(ctx, db, subject, productID, vulnerabilityID); err != nil {
 		return err
 	}
-	if subject.OnCase(productID, vulnerabilityID) {
+	if subject.OnCaseToAct(productID, vulnerabilityID) {
 		return nil
 	}
 	visibility, _, err := visibilityOf(ctx, db, productID, vulnerabilityID)
