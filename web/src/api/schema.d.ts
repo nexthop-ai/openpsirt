@@ -1579,6 +1579,8 @@ export interface paths {
          *
          *     **Public findings only unless you ask otherwise**, as the comparison itself is. Where fixes are left out for not having been disclosed, the note says how many and never which.
          *
+         *     A release that fixed nothing answers with a sentence saying so, not with an empty body: zero bytes is also what a truncated response and the wrong pair of builds look like.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-release-notes"];

@@ -159,15 +159,34 @@ func TestTheSameComparisonRendersTheSameDocumentTwice(t *testing.T) {
 	}
 }
 
-func TestANoteWithNothingToSayIsNotWritten(t *testing.T) {
-	// A heading over nothing is a question in the reader's mind about whether
-	// something is missing, and a comparison that fixed nothing has no note.
-	if notes := finding.Notes(about("2.4.0"), &finding.Comparison{
+func TestAReleaseThatFixedNothingSaysSo(t *testing.T) {
+	// It answered nothing at all, and a caller cannot tell that from a
+	// truncated response, from the wrong pair of builds or from a request
+	// that went astray — every one of which is also zero bytes.
+	//
+	// A heading over nothing is still a question in a reader's mind about
+	// whether something is missing, which is why what comes back is a
+	// sentence rather than an empty section.
+	notes := finding.Notes(finding.Note{From: "2.3.0", To: "2.4.0"}, &finding.Comparison{
 		Still: []finding.Changed{
 			{Vulnerability: "CVE-2026-1", Component: "libnl", ArrivedFrom: "3.7.0"},
 		},
-	}); notes != "" {
-		t.Errorf("a note was written for a release that fixed nothing:\n%s", notes)
+	})
+	if notes == "" {
+		t.Fatal("a release that fixed nothing answered with nothing at all")
+	}
+	if strings.Contains(notes, "#") {
+		t.Errorf("a release that fixed nothing was given a heading:\n%s", notes)
+	}
+	for _, want := range []string{"No security fixes", "2.4.0", "2.3.0"} {
+		if !strings.Contains(notes, want) {
+			t.Errorf("the note does not say %q:\n%s", want, notes)
+		}
+	}
+	// And what is still present is not in it, which is the rule the document
+	// is written to whatever it says.
+	if strings.Contains(notes, "CVE-2026-1") {
+		t.Errorf("a finding that was not fixed is in the note:\n%s", notes)
 	}
 }
 

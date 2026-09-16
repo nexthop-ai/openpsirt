@@ -52,13 +52,20 @@ type Note struct {
 // a template choice.
 //
 // The comparison keeps all three sets. This is the one that goes to somebody.
+//
+// **A release that fixed nothing says so.** It answered nothing at all, and a
+// caller cannot tell that from a truncated response, from the wrong pair of
+// builds, or from a request that went astray — every one of which is also
+// zero bytes. The reasoning that produced the empty answer still holds: a
+// heading over nothing is a question in a reader's mind, which is why what is
+// returned here is a sentence and not a heading.
 func Notes(about Note, c *Comparison) string {
 	if c == nil {
 		return ""
 	}
 	fixed := onlyFixes(c.Fixed)
 	if len(fixed) == 0 && about.Omitted == 0 {
-		return ""
+		return nothingFixed(about)
 	}
 
 	var out strings.Builder
@@ -77,6 +84,57 @@ func Notes(about Note, c *Comparison) string {
 //
 // One line rather than a table, because it is prose somebody pastes into a
 // document of their own and a table there is somebody else's formatting.
+// nothingFixed is the whole document where a release fixed nothing.
+//
+// One sentence, naming the builds where they are known, and carrying what
+// measured them as the document with fixes does: a note somebody keeps is
+// re-checkable only if it says what produced it, and "nothing was fixed" is a
+// claim worth being able to re-check.
+func nothingFixed(about Note) string {
+	var out strings.Builder
+	switch to := strings.TrimSpace(about.To); {
+	case to != "" && strings.TrimSpace(about.From) != "":
+		fmt.Fprintf(&out, "No security fixes in %s since %s.\n",
+			to, strings.TrimSpace(about.From))
+	case to != "":
+		fmt.Fprintf(&out, "No security fixes in %s.\n", to)
+	default:
+		out.WriteString("No security fixes.\n")
+	}
+	if measured := measuredWith(about); measured != "" {
+		fmt.Fprintf(&out, "\n%s.\n", measured)
+	}
+	return out.String()
+}
+
+// measuredWith is what the later build was last measured with, as a clause,
+// or nothing where nothing has measured it.
+func measuredWith(about Note) string {
+	var said []string
+	if !about.At.IsZero() {
+		said = append(said, "Last measured "+about.At.UTC().Format("2006-01-02"))
+	}
+	switch {
+	case about.Scanner != "" && about.Database != "":
+		said = append(said, fmt.Sprintf("measured with %s against vulnerability data of %s",
+			about.Scanner, about.Database))
+	case about.Scanner != "":
+		said = append(said, "measured with "+about.Scanner)
+	case about.Database != "":
+		said = append(said, "measured against vulnerability data of "+about.Database)
+	}
+	if len(said) == 0 {
+		return ""
+	}
+	// The first clause opens the sentence where it is there, and the second
+	// opens it where it is not.
+	line := strings.Join(said, ", ")
+	if about.At.IsZero() {
+		line = strings.ToUpper(line[:1]) + line[1:]
+	}
+	return line
+}
+
 func lead(out *strings.Builder, about Note) {
 	var said []string
 	if from := strings.TrimSpace(about.From); from != "" {

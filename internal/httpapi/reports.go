@@ -314,7 +314,10 @@ func registerNotes(api huma.API, in Ingest) {
 			"vulnerability-database versions the later build was last measured with.\n\n" +
 			"**Public findings only unless you ask otherwise**, as the comparison itself is. " +
 			"Where fixes are left out for not having been disclosed, the note says how many " +
-			"and never which.",
+			"and never which.\n\n" +
+			"A release that fixed nothing answers with a sentence saying so, not with an " +
+			"empty body: zero bytes is also what a truncated response and the wrong pair of " +
+			"builds look like.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product        string `path:"product"`

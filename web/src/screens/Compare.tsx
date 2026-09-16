@@ -255,7 +255,7 @@ export function Compare() {
               <Failed error={notes.error} what="The release notes could not be written." />
             )}
             {notes.data !== undefined && (
-              <pre className="notes">{notes.data || "Nothing changed between those two."}</pre>
+              <pre className="notes">{notes.data}</pre>
             )}
           </>
         )}
