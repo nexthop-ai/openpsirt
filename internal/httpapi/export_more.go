@@ -263,6 +263,11 @@ func registerAuditExport(api huma.API, in Ingest) {
 			"it, and whether a second person does. Approvals are joined with `;` in the CSV " +
 			"because a spreadsheet has one cell per column and an auditor reads them as a " +
 			"list; the JSON keeps them as one field of the same shape.\n\n" +
+			"**`agreements` is the whole of the record**, with dates: who agreed, when, " +
+			"whether the agreement was carried from an earlier claim, and when it was taken " +
+			"back. `approved by` stays who agrees *now*, because those are different " +
+			"questions and a column mixing them is the one answer an auditor must not be " +
+			"given.\n\n" +
 			"**Read with your own visibility, as it streams.** Nothing about a report is " +
 			"exempt from the rules the screens follow — a file showing more than the screen " +
 			"that summarizes it would be a way around them.\n\n" +
@@ -287,7 +292,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 				"id", "proposed", "product", "issue", "component", "version", "consumer",
 				"outcome", "justification", "deferred until", "fixed version",
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
-				"reasoning",
+				"agreements", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				judged, _, err := store.Audit(ctx, subject, filter, since, until, limit, offset)
@@ -307,6 +312,22 @@ func registerAuditExport(api huma.API, in Ingest) {
 							agreed = append(agreed, one.By)
 						}
 					}
+					// And the whole of the record beside it, dates and all.
+					// The column above is who agrees now, which is what an
+					// auditor reads first; what somebody agreed to and then
+					// stopped agreeing to is what an audit is looking for,
+					// and the file carried neither it nor any date at all.
+					every := make([]string, 0, len(body.Approvals))
+					for _, one := range body.Approvals {
+						said := one.By + " " + one.At
+						if one.Carried {
+							said += " carried"
+						}
+						if one.WithdrawnAt != "" {
+							said += " withdrawn " + one.WithdrawnAt
+						}
+						every = append(every, said)
+					}
 					rows = append(rows, []string{
 						strconv.FormatInt(body.ID, 10), body.ProposedAt, body.Product,
 						body.Issue, body.Component, body.Version, body.Consumer,
@@ -315,7 +336,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 						strconv.FormatBool(body.Standing),
 						body.ProposedBy, strings.Join(agreed, "; "),
 						strconv.FormatBool(body.TwoPeople), body.EndedAt,
-						body.Reasoning,
+						strings.Join(every, "; "), body.Reasoning,
 					})
 				}
 				return rows, nil

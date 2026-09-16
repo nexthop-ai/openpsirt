@@ -148,6 +148,29 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 				` WHERE cf.vulnerability_id = de.vulnerability_id`+
 				` AND cf.place_identity = de.place_identity AND cc.name = ?)`, f.Component)
 		}
+		// One build. Reached the same way, and with the build's own product
+		// required to be the one that made the judgment: a place identity
+		// carries no product, so the match alone would answer with another
+		// product's judgment about the same code.
+		//
+		// Narrowed by what this reader may see, like the rows themselves: an
+		// undisclosed finding is what puts a place in a build, and a judgment
+		// matching through one is a judgment matched by something not shown.
+		if f.TargetID != 0 {
+			mayRead, readArgs := readableFindingsOn(subject, "bf", "de.product_id")
+			clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
+				JOIN "target" AS "bt" ON bt.id = bf.target_id
+				JOIN "stream" AS "bs" ON bs.id = bt.stream_id
+				WHERE bf.vulnerability_id = de.vulnerability_id
+				  AND bf.place_identity = de.place_identity
+				  AND bf.target_id = ? AND bs.product_id = de.product_id`
+			args := []any{f.TargetID}
+			if mayRead != "" {
+				clause += " AND " + mayRead
+				args = append(args, readArgs...)
+			}
+			q = q.Where(clause+")", args...)
+		}
 		return q
 	}
 

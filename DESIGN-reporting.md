@@ -417,6 +417,9 @@ report that exists to find it.
 | The product, the outcome and the state each take several answers | "Dismissed or deferred" and "waiting or sent back" are the questions somebody reading the record has, and one value cannot ask either; the parameter repeats and any of what is named matches. A product named that the reader may not see refuses the whole request rather than being dropped, because a report answering about two products when three were asked for reads as covering three |
 | It says "this should be empty" only where every outcome asked for is a dismissal | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
 | What was asked for is printed with every value | A sheet headed "dismissed — not applicable" over rows that also hold deferrals is a sheet nobody can check against anything |
+| The record narrows to one build, reached through the findings at each place | A decision names no build, deliberately — it is keyed on the product, the issue and the place, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the judgment, because a place identity carries none |
+| A build is a product, a stream and a variant together, or none of them | Named alone, a stream would narrow to a stream of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
+| The file carries every agreement with its dates, beside who agrees now | What somebody agreed to and then stopped agreeing to is what an audit is looking for, and the file carried neither it nor any date. The two are different questions and a column mixing them is the one answer an auditor must not be given |
 
 ## Dismissals and scan coverage
 

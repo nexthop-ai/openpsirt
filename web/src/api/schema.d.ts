@@ -285,6 +285,8 @@ export interface paths {
          *
          *     **One row per judgment**, with who proposed it, who has a standing agreement on it, and whether a second person does. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
          *
+         *     **`agreements` is the whole of the record**, with dates: who agreed, when, whether the agreement was carried from an earlier claim, and when it was taken back. `approved by` stays who agrees *now*, because those are different questions and a column mixing them is the one answer an auditor must not be given.
+         *
          *     **Read with your own visibility, as it streams.** Nothing about a report is exempt from the rules the screens follow — a file showing more than the screen that summarizes it would be a way around them.
          *
          *     Takes every filter the audit list takes, including the period.
@@ -9386,6 +9388,10 @@ export interface operations {
                 issue?: string;
                 /** @description Only judgments about this component, by name */
                 component?: string;
+                /** @description Only judgments about places this branch or tag holds. Needs exactly one product and a variant */
+                stream?: string;
+                /** @description Which build of that stream. Needs exactly one product and a stream */
+                variant?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -9438,6 +9444,10 @@ export interface operations {
                 issue?: string;
                 /** @description Only judgments about this component, by name */
                 component?: string;
+                /** @description Only judgments about places this branch or tag holds. Needs exactly one product and a variant */
+                stream?: string;
+                /** @description Which build of that stream. Needs exactly one product and a stream */
+                variant?: string;
             };
             header?: never;
             path: {

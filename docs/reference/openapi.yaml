@@ -8925,6 +8925,20 @@ paths:
           schema:
             description: Only judgments about this component, by name
             type: string
+        - description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+            type: string
+        - description: Which build of that stream. Needs exactly one product and a stream
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Which build of that stream. Needs exactly one product and a stream
+            type: string
         - explode: false
           in: query
           name: limit
@@ -8966,6 +8980,8 @@ paths:
         The audit list as a file: every judgment the same filters would show, not one page of them.
 
         **One row per judgment**, with who proposed it, who has a standing agreement on it, and whether a second person does. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
+
+        **`agreements` is the whole of the record**, with dates: who agreed, when, whether the agreement was carried from an earlier claim, and when it was taken back. `approved by` stays who agrees *now*, because those are different questions and a column mixing them is the one answer an auditor must not be given.
 
         **Read with your own visibility, as it streams.** Nothing about a report is exempt from the rules the screens follow — a file showing more than the screen that summarizes it would be a way around them.
 
@@ -9068,6 +9084,20 @@ paths:
           name: component
           schema:
             description: Only judgments about this component, by name
+            type: string
+        - description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+            type: string
+        - description: Which build of that stream. Needs exactly one product and a stream
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Which build of that stream. Needs exactly one product and a stream
             type: string
         - in: path
           name: format
