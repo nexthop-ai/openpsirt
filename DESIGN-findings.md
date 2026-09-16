@@ -262,8 +262,8 @@ producer's own word. **Recorded, and read by nothing that decides anything.**
 | Where it is stated | Words |
 |---|---|
 | A CycloneDX component | `required`, `optional`, `excluded` — stated on the component and carried to the edges arriving at it, because the graph is where a scope can be asked about |
-| An SPDX 3 relationship | `build`, `design`, `development`, `other`, `run` — stated on the relationship, which is the ordinary dependency |
-| An SPDX 2 relationship type | `BUILD_DEPENDENCY_OF` and `DEV_DEPENDENCY_OF`, recorded as `build` and `development`. One fact under two spellings, and a filter cannot be made to ask for the same thing twice |
+| An SPDX 3 relationship | `build`, `design`, `development`, `other`, `runtime` — stated on the relationship, which is the ordinary dependency |
+| An SPDX 2 relationship type | `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF`, recorded as `build`, `development`, `runtime` and `optional`. One fact under two spellings, and a filter cannot be made to ask for the same thing twice — so every relationship that names a phase is here, not a subset of them |
 
 "Not in the runtime path", "build-time only", "test-only" is the largest
 defensible deferral class a vendor has, and it was the one class this could not

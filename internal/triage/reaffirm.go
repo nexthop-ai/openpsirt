@@ -833,6 +833,12 @@ type ReaffirmingClaim struct {
 	// which is what makes it one thing a second person can read.
 	Reasoning string
 	By        int64
+	// Cap bounds a re-affirmed **judgment**, which this mostly is: the outcome
+	// comes from the claim being re-made, so re-affirming a bulk dismissal
+	// comes through here. A promise carries no bound, because the next scan
+	// re-checks it; nothing re-checks a dismissal, which is the reason the cap
+	// exists (REQ-27).
+	Cap int
 }
 
 // Reaffirmed is what one bulk re-affirmation did.
@@ -899,14 +905,6 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		Where("id = ?", r.PreviousClaimID).Scan(ctx); err != nil {
 		return Reaffirmed{}, ErrNotTheirs
 	}
-	// The same rule the single form applies, asked once because a claim has
-	// one proposer. Without it an approver could re-affirm, becoming proposer
-	// of the new claim while their own earlier agreement is carried onto it.
-	if previous.ProposedBy != subject.ID {
-		return Reaffirmed{}, fmt.Errorf(
-			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
-	}
-
 	var lapsed []Decision
 	if err := s.db.NewSelect().Model(&lapsed).
 		Where("de.claim_id = ?", r.PreviousClaimID).
@@ -914,16 +912,30 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		Order("de.id ASC").Scan(ctx); err != nil {
 		return Reaffirmed{}, fmt.Errorf("read what lapsed under that claim: %w", err)
 	}
-	if len(lapsed) == 0 {
-		return Reaffirmed{}, fmt.Errorf("%w: nothing under that claim has lapsed", ErrNothingOpen)
-	}
-	// Authorized against the rows, not against anything the caller said about
-	// them. Asked of every one, because a claim covering a disclosed place and
-	// an undisclosed one is not one a public triager may re-make in part.
+	// Authorized against the rows before anything else is said about the
+	// claim, and asked of every one, because a claim covering a disclosed
+	// place and an undisclosed one is not one a public triager may re-make in
+	// part.
+	//
+	// **Before the proposer check, not after** (REQ-42). Refusing on the
+	// proposer first answered a claim in a product the caller cannot see
+	// differently from one that does not exist — one sentence against a bare
+	// refusal — which turns walking claim identifiers into a directory of
+	// every product in the deployment.
 	for _, row := range lapsed {
 		if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
 			return Reaffirmed{}, ErrNotTheirs
 		}
+	}
+	if len(lapsed) == 0 {
+		return Reaffirmed{}, ErrNotTheirs
+	}
+	// The same rule the single form applies, asked once because a claim has
+	// one proposer. Without it an approver could re-affirm, becoming proposer
+	// of the new claim while their own earlier agreement is carried onto it.
+	if previous.ProposedBy != subject.ID {
+		return Reaffirmed{}, fmt.Errorf(
+			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
 	}
 
 	where, err := s.whereTheyAreNow(ctx, subject, lapsed)
@@ -968,8 +980,20 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 
 	proposals := make([]Proposal, 0, len(lapsed))
 	places := map[string]bool{}
+	// One place, however many rows of the claim lapsed at it. A place identity
+	// is names alone while a decision is keyed on the versions too, so one
+	// component at two versions under one consumer is two lapsed rows sharing
+	// a place — and walking both would resolve the same current place twice,
+	// write the same live key twice, and refuse the whole act with "a decision
+	// already stands here", which is false.
+	done := map[string]bool{}
 	for _, row := range lapsed {
-		for _, at := range where[placeKey(row.ProductID, row.VulnerabilityID, row.PlaceIdentity)] {
+		key := placeKey(row.ProductID, row.VulnerabilityID, row.PlaceIdentity)
+		if done[key] {
+			continue
+		}
+		done[key] = true
+		for _, at := range where[key] {
 			// The visibility it had. A re-affirmation says the same claim
 			// still holds; it is not an occasion to change who may see it.
 			at.Visibility = row.Visibility
@@ -990,7 +1014,17 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		return Reaffirmed{}, fmt.Errorf(
 			"%w: none of what lapsed is open anywhere any more", ErrNothingOpen)
 	}
-	if err := permitted(subject, proposals, s.now()); err != nil {
+	// Bounded unless it is a promise. What decides is the outcome being
+	// re-made rather than the act being a re-affirmation: this path carries
+	// the previous claim's outcome, so a lapsed bulk dismissal re-made here is
+	// a bulk judgment and nothing re-checks it. Unbounded it would write as
+	// many rows as it liked, and with the earlier agreement carried on, nobody
+	// would stand between the request and the rows.
+	if previous.Outcome == UpgradeNeeded {
+		if err := permitted(subject, proposals, s.now()); err != nil {
+			return Reaffirmed{}, err
+		}
+	} else if err := allowed(subject, proposals, r.Cap, s.now()); err != nil {
 		return Reaffirmed{}, err
 	}
 

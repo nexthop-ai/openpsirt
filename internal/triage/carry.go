@@ -26,7 +26,7 @@ import (
 // nothing to happen to. Both are refused rather than quietly skipped, because
 // a caller that got the set wrong should hear so.
 //
-// **Bounded, like every other action that writes many rows**.
+// **Bounded, like every other bulk judgment**.
 func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, toTarget int64,
 	chosen []int64, cap int) (int, error) {
 

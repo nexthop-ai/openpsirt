@@ -159,7 +159,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 			return fmt.Errorf("%w against that component", ErrNothingOpen)
 		}
 		// A bulk judgment is bounded, so an unset cap is the shipped number
-		// rather than none: the sibling that takes this argument fills it in
+		// rather than none: the siblings that take this argument fill it in
 		// the same way, and this one read "zero means unbounded" — which is
 		// the one reading the rule does not have.
 		if cap <= 0 {

@@ -183,6 +183,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// refused by a factor of twenty-two, and the only escape offered was
 		// raising a setting that guards the dismissal path this one has
 		// nothing to do with.
+		//
+		// What one of that size costs to commit is measured rather than
+		// assumed: 8.3 s on SQLite, 8.4 s on MariaDB, 10.9 s on MySQL and
+		// 23.9 s on PostgreSQL, under "make measure".
 		if err := permitted(subject, proposals, s.now()); err != nil {
 			return err
 		}

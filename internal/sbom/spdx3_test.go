@@ -724,7 +724,7 @@ func TestARelationshipsScopeIsRecordedOnTheEdge(t *testing.T) {
 	}{
 		{"build", "build"},
 		{"development", "development"},
-		{"run", "run"},
+		{"runtime", "runtime"},
 		{"design", "design"},
 		{"other", "other"},
 		{"nonsense", ""},

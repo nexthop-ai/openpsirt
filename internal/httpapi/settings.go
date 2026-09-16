@@ -152,7 +152,7 @@ var settable = []struct {
 		aSize, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentQuota) }, false},
 	{setting.QueueBacklog, "How much background work of one kind may be waiting before more of that kind is refused. A whole number, not a length of time. Counted per kind, so a producer that has filled its own queue does not refuse everybody else's work",
 		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultQueueBacklog) }, false},
-	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk write is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog",
+	{setting.RoutingBatch, "How many findings one pass of the routing sweep places, at most. A bulk judgment is bounded and the bound belongs here rather than in the binary: on a large estate a pass can be too big to hold a connection through or too small to drain the backlog",
 		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
 	{setting.SavedPerPerson, "How many saved filters one person may keep for one product. A whole number, not a length of time. The panel that lists them reads every one on every open, so the ceiling is what keeps that a list rather than a table scan",
 		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultSavedPerPerson) }, false},

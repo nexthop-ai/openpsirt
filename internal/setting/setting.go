@@ -165,7 +165,7 @@ const (
 	// that is refused is a build.
 	QueueBacklog = "queue.backlog"
 	// RoutingBatch is how many findings one pass of the routing sweep may
-	// place. A bulk write is bounded, and the bound is a setting: an
+	// place. A bulk judgment is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
 	RoutingBatch = "routing.batch"
@@ -173,7 +173,7 @@ const (
 	// product.
 	//
 	// A ceiling on rows one person writes one at a time, which is the
-	// neighboring case to a bulk write and is bounded for the same reason:
+	// neighboring case to a bulk judgment and is bounded for the same reason:
 	// nothing else stopped a script, or a keyboard shortcut held down, from
 	// filling the table — and the panel that lists them reads every row it
 	// finds on every open. Settable because how many narrowings a person

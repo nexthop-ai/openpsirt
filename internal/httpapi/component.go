@@ -201,10 +201,8 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 			"earliest deadline among what this covers, it stands on its own: nothing is " +
 			"hidden for longer than the policy already allowed. Past it, the promise defers " +
 			"the worst thing it covers and it waits for approval. The response says which.\n\n" +
-			"**Not bounded.** A bulk judgment is, because nothing re-checks one and a " +
-			"sentence answering a thousand findings has to stay a size a reviewer can " +
-			"follow. A promise is re-checked by the next scan, and narrowing it would make " +
-			"the record false: the bump closes what it closes.\n\n" +
+			"**Not bounded**, unlike a bulk judgment: this one writes as many rows as the " +
+			"component has open findings in the releases named.\n\n" +
 			"**Saying who carries it is part of the act**, not a second one: name a `person` " +
 			"or a `team`, and every finding the promise covers is handed to them in the same " +
 			"transaction, so a promise nobody is carrying and a holder with no promise are " +

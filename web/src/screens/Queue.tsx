@@ -470,9 +470,11 @@ export function Queue() {
 type Standing = NonNullable<Body<"DecisionsOutputBody">["items"]>[number];
 
 // A decision the code moved out from under, or a deferral whose date passed.
-// It links to the finding rather than offering the judgment here: reaffirming
-// is a claim about one place in one build, and the row does not carry the
-// build, so the finding is where its places are.
+//
+// A lapsed row points at the claim it belonged to, because re-affirming is an
+// act on the claim: one act re-makes every place it covered. Pointed at the
+// finding, a claim over forty five places drew forty five cards each offering
+// the one-place-at-a-time workflow the whole-claim act exists to replace.
 function Stopped({ row }: { row: Standing }) {
   const it = row.decision;
   const lapsed = it?.state === "lapsed";
@@ -515,12 +517,17 @@ function Stopped({ row }: { row: Standing }) {
       </div>
       <p className="hint" style={{ margin: 0 }}>
         {lapsed
-          ? "The code moved. Reaffirm it from the finding with a fresh reason."
+          ? "The code moved. Re-affirm the whole claim, with a fresh reason."
           : "The deferral has expired."}
       </p>
       <div className="actions">
-        <Link to={`/decisions/${it?.id}`} className="btn ghost">
-          Open the decision →
+        {/* The claim, where the whole-act control is, rather than the row.
+            A lapsed claim is re-made once however many places it covered. */}
+        <Link
+          to={lapsed && it?.claim_id ? `/claims/${it.claim_id}` : `/decisions/${it?.id}`}
+          className="btn ghost"
+        >
+          {lapsed && it?.claim_id ? "Open the claim →" : "Open the decision →"}
         </Link>
       </div>
     </article>

@@ -197,8 +197,8 @@ dismissal, so one sentence answering a thousand findings has to stay a size a
 reviewer can follow. The next scan re-checks every row a promise to upgrade
 names, and narrowing one makes the record false — the upgrade closes what it
 closes — so that path takes no cap at all. The transaction-size half of what a
-cap was doing was measured rather than assumed, and needs nothing: 243,945
-places commit in 5.3 seconds on MariaDB and 17.3 on PostgreSQL.
+cap was doing was measured rather than assumed, and needs nothing: a promise
+over 243,950 places commits in 8.3 seconds on SQLite and 23.9 on PostgreSQL.
 
 **Bound what is written, not what was asked for.** The two differ whenever one
 named thing expands into many rows — an issue sits at many places — so a limit

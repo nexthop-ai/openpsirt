@@ -1066,14 +1066,19 @@ ifneq ($(ENGINES_MISSING),)
 	@echo "four engines and is one. Run 'make engines-up'."
 	@exit 1
 endif
-	@# -run has to match something. A renamed test or a mistyped tag makes
-	@# "no tests to run" a green exit, which is the same green as a
-	@# measurement nobody took.
-	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
+	@# -run has to match something, in every package. A renamed test or a
+	@# mistyped tag makes "no tests to run" a green exit, which is the same
+	@# green as a measurement nobody took — and a package matching nothing
+	@# still exits 0 while its neighbour's output satisfies one grep, so the
+	@# check is per package rather than over the combined run.
+	@for pkg in $(MEASURED); do \
+	  out=$$(mktemp); \
 	  $(GO) test -tags measure -count=1 -v -timeout 60m \
-	    -run 'TestMeasure' $(MEASURED) 2>&1 | tee "$$out"; \
+	    -run 'TestMeasure' "$$pkg" 2>&1 | tee "$$out"; \
 	  grep -q "^=== RUN   TestMeasure" "$$out" \
-	    || { echo "no measurement ran: -run matched nothing"; exit 1; }
+	    || { echo "no measurement ran in $$pkg: -run matched nothing"; rm -f "$$out"; exit 1; }; \
+	  rm -f "$$out"; \
+	done
 
 # Requires docker and helm. Skipped by "check" so that a machine without them
 # can still run everything else.

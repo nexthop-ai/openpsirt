@@ -153,25 +153,6 @@ export const DEADLINES = [
 // itself. What it has no way to do is offer it, and the durable answer to that
 // is the kinds actually present travelling with the read rather than a longer
 // list here — which is a question the server does not answer yet.
-// What a producer may say a dependency's scope is, in the two formats' own
-// words.
-//
-// Two vocabularies rather than one, and they are not folded together: a
-// CycloneDX component scope and an SPDX lifecycle scope say related things in
-// different words, and a label claiming they are the same word would be a
-// reading the tool deliberately does not make. The label says which format the
-// word comes from for the same reason.
-export const DECLARED_AS = [
-  ["required", "required (CycloneDX)"],
-  ["optional", "optional (CycloneDX)"],
-  ["excluded", "excluded (CycloneDX)"],
-  ["run", "run (SPDX)"],
-  ["build", "build (SPDX)"],
-  ["development", "development (SPDX)"],
-  ["design", "design (SPDX)"],
-  ["other", "other (SPDX)"],
-] as const;
-
 export const ECOSYSTEMS = [
   ["", "Any"],
   ["generic", "Generic"],
@@ -186,6 +167,25 @@ export const ECOSYSTEMS = [
   ["oci", "Container image (oci)"],
   ["github", "GitHub"],
   ["maven", "Maven"],
+] as const;
+
+// What a producer may say a dependency's scope is, in the two formats' own
+// words.
+//
+// Two vocabularies rather than one, and they are not folded together: a
+// CycloneDX component scope and an SPDX lifecycle scope say related things in
+// different words, and a label claiming they are the same word would be a
+// reading the tool deliberately does not make. The label says which format the
+// word comes from for the same reason.
+export const DECLARED_AS = [
+  ["required", "required (CycloneDX)"],
+  ["optional", "optional (CycloneDX or SPDX)"],
+  ["excluded", "excluded (CycloneDX)"],
+  ["runtime", "runtime (SPDX)"],
+  ["build", "build (SPDX)"],
+  ["development", "development (SPDX)"],
+  ["design", "design (SPDX)"],
+  ["other", "other (SPDX)"],
 ] as const;
 
 type Pairs = readonly (readonly [string, string])[];

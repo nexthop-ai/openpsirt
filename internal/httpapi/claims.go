@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -233,6 +234,10 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 			"severity has risen since it was agreed to, or nothing was ever agreed to — the " +
 			"whole act does. An approver works at the unit the proposer acted at, and agreeing " +
 			"to part of an argument they were shown whole is not review.\n\n" +
+			"**Bounded like the judgment it re-makes.** The outcome comes from the claim, so " +
+			"re-affirming a bulk dismissal is a bulk judgment and is held to " +
+			"`triage.together-cap`; only a promise to upgrade goes through unbounded, because " +
+			"the next scan re-checks it.\n\n" +
 			"A place that is open nowhere any more is not re-made, which is a finding that " +
 			"closed rather than a fault. `reasoning` is required.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
@@ -246,10 +251,20 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		// The bound a bulk judgment is held to, read the way every other bulk
+		// path reads it. Only a promise goes through unbounded, and which of
+		// the two this is comes from the claim being re-made rather than from
+		// the request.
+		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
+			triage.DefaultTogetherCap)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "the limit on one action could not be read", err)
+		}
 		made, err := store.ReaffirmClaim(ctx, subject, triage.ReaffirmingClaim{
 			PreviousClaimID: input.ID,
 			Reasoning:       input.Body.Reasoning,
 			By:              subject.ID,
+			Cap:             cap,
 		})
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {

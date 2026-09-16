@@ -780,7 +780,7 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 	// screen offered a quarter of what that row stood for and the judgment
 	// covered a quarter of what the person meant — four claims and four
 	// approvals to answer what reads as one thing.
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedSiblings(t)
 
 		// The candidate list, asked about one binary of the fold.
@@ -840,7 +840,7 @@ func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
 	// ticking everything is indistinguishable in the record from an honest
 	// one, and what is asked for is how the set was chosen — which an approver
 	// has to be able to act on.
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedSiblings(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom" +
 			"/components/libcurl4t64/decisions"
@@ -891,6 +891,85 @@ func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
 		// And the prose is kept, because it is what the person meant to say.
 		if claim.SelectedBy != "only the ones in the transfer path" {
 			t.Errorf("the claimant's own words are %q", claim.SelectedBy)
+		}
+	})
+}
+
+func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
+	// The empty-term path proves the record exists; this one proves the term
+	// is re-run. Without it the escaped match that produces the number an
+	// approver checks the claim against could be deleted and every test would
+	// still pass, while the screen sends it on every narrowed claim.
+	eachReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedSiblings(t)
+		// One of the three issues says something the others do not. A percent
+		// sign in the text as well, because the escape is what stops a term
+		// holding one from selecting far more than the box said — and this is
+		// the set a bulk judgment is then recorded against.
+		if _, err := r.db.DB.NewUpdate().Table("vulnerability").
+			Set("description = ?", "A 100% reachable fault in the transfer driver.").
+			Where("identifier = ?", "CVE-2026-CURL1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/components/libcurl4t64/decisions"
+		decided := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"the transfer driver","contains":"driver",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if decided.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
+		}
+		var made struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		var detail struct {
+			Claim struct {
+				Selection *struct {
+					Contains string `json:"contains"`
+					Matched  int    `json:"matched"`
+					Named    int    `json:"named"`
+				} `json:"selection"`
+			} `json:"claim"`
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		if detail.Claim.Selection == nil {
+			t.Fatal("a narrowed claim records no narrowing")
+		}
+		one := detail.Claim.Selection
+		// One of the three matches that word, and one was claimed about: the
+		// sentence describes the set, which is what the two numbers say.
+		if one.Contains != "driver" || one.Matched != 1 || one.Named != 1 {
+			t.Errorf("the narrowing reads %+v, want driver reaching 1 and naming 1", one)
+		}
+
+		// And a term holding a percent matches the text that holds one rather
+		// than everything. Spliced raw it is a wildcard, and the claim would
+		// record three where the person saw one.
+		escaped := asPerson(t, r, "triager", http.MethodPost, at,
+			`{"vulnerabilities":["CVE-2026-CURL2"],"outcome":"not-applicable",`+
+				`"justification":"vulnerable_code_not_in_execute_path",`+
+				`"selected_by":"the ones mentioning a percentage","contains":"100%",`+
+				`"reasoning":"The transfer path is never reached from this image."}`)
+		if escaped.Code != http.StatusCreated {
+			t.Fatalf("deciding together answered %d: %s", escaped.Code, escaped.Body.String())
+		}
+		if err := json.Unmarshal(escaped.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		if detail.Claim.Selection == nil {
+			t.Fatal("a narrowed claim records no narrowing")
+		}
+		if got := detail.Claim.Selection.Matched; got != 1 {
+			t.Errorf("a term holding a percent reached %d issues, want the one whose "+
+				"text holds it", got)
 		}
 	})
 }

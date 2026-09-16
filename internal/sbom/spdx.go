@@ -79,6 +79,12 @@ var spdxEdges = map[string]spdxDirection{
 // the words the third version uses, because they are one fact under two
 // spellings and a filter cannot ask for the same thing twice.
 //
+// **Every relationship above that names a phase is here.** A runtime or
+// optional dependency is an edge either way, and recording the scope for two of
+// them and not the other two would be the same disagreement in a smaller place:
+// one producer emitting the third version and another emitting this one would
+// answer the filter differently about the same dependency.
+//
 // **`TEST_DEPENDENCY_OF` is not here and is not an edge either.** A test
 // dependency is not part of what ships, which is what this relationship says
 // and what the other version's `test` scope says, and the edge is dropped in
@@ -89,8 +95,10 @@ var spdxEdges = map[string]spdxDirection{
 // a compiled language is routinely linked into the shipped artifact, so
 // reading "build" as "does not ship" is wrong for every one of them.
 var spdxScopes = map[string]string{
-	"BUILD_DEPENDENCY_OF": "build",
-	"DEV_DEPENDENCY_OF":   "development",
+	"BUILD_DEPENDENCY_OF":    "build",
+	"DEV_DEPENDENCY_OF":      "development",
+	"RUNTIME_DEPENDENCY_OF":  "runtime",
+	"OPTIONAL_DEPENDENCY_OF": "optional",
 }
 
 // spdxAncestors are the relationship types that say one component was derived

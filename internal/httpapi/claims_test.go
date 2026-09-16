@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -1108,7 +1109,7 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 	// and nothing offered a team the judgment another team had already made
 	// about it. Deciding it again from scratch is the work the grouping exists
 	// to avoid.
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		ctx := t.Context()
 		r.scanned(t)
 		r.alsoScannedInto(t, "theirs", "master", "mellanox")
@@ -1188,6 +1189,160 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 		if len(blind.Elsewhere) != 0 {
 			t.Errorf("somebody with no rights in the other product was shown %d of its "+
 				"judgments: %+v", len(blind.Elsewhere), blind.Elsewhere)
+		}
+	})
+}
+
+func TestReAffirmingADismissalIsBoundedAndAPromiseIsNot(t *testing.T) {
+	// The outcome comes from the claim being re-made, so a lapsed bulk
+	// dismissal comes back through this path — and nothing re-checks a
+	// dismissal, which is the reason the cap exists. Unbounded it would write
+	// as many rows as it liked, and with the earlier agreement carried on,
+	// nobody would stand between the request and the rows.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedSiblings(t)
+		claimed := r.agreedThenLapsed(t)
+
+		// One, so the two places of the fold are already past it.
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+			`{"value":"1"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
+		}
+		refused := asPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			`{"reasoning":"Checked again at 8.6.0; still not reached."}`)
+		if refused.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("re-affirming a dismissal past the cap answered %d: %s",
+				refused.Code, refused.Body.String())
+		}
+		if !strings.Contains(refused.Body.String(), "the limit here is") {
+			t.Errorf("the refusal does not name the bound: %s", refused.Body.String())
+		}
+
+		// And raising it deliberately is the way through, which is what the
+		// refusal offers.
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+			`{"value":"50"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("raising the cap answered %d: %s", got.Code, got.Body.String())
+		}
+		if again := asPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			`{"reasoning":"Checked again at 8.6.0; still not reached."}`,
+		); again.Code != http.StatusCreated {
+			t.Fatalf("re-affirming inside the cap answered %d: %s",
+				again.Code, again.Body.String())
+		}
+	})
+}
+
+func TestTwoLapsedRowsAtOnePlaceAreOneReAffirmation(t *testing.T) {
+	// A place identity is names alone while a decision is keyed on the
+	// versions too, so one component at two versions under one consumer is two
+	// lapsed rows sharing a place. Walked twice, the act resolved the same
+	// current place twice, wrote the same live key twice, and refused the
+	// whole of itself with "a decision already stands here" — which is false
+	// and leaves the caller nowhere to go.
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedSiblings(t)
+		claimed := r.agreedThenLapsed(t)
+
+		// A second lapsed row of the same claim at a place it already covers,
+		// written directly: how one place comes to hold two versions is the
+		// applying side's subject and has its own tests. What is pinned here
+		// is that the act reads one place out of two rows.
+		var rows []triage.Decision
+		if err := r.db.DB.NewSelect().Model(&rows).
+			Where("de.claim_id = ?", claimed).Order("de.id ASC").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 0 {
+			t.Fatal("the claim covers nothing, so this checks nothing")
+		}
+		twin := rows[0]
+		twin.ID = 0
+		twin.LiveKey = nil
+		was := "0.0.1"
+		twin.ComponentUpstreamVersion = &was
+		if _, err := r.db.DB.NewInsert().Model(&twin).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		again := asPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			`{"reasoning":"Checked again at 8.6.0; still not reached."}`)
+		if again.Code != http.StatusCreated {
+			t.Fatalf("re-affirming a claim with two rows at one place answered %d: %s",
+				again.Code, again.Body.String())
+		}
+		var restored struct {
+			Decisions []int64 `json:"decisions"`
+			Places    int     `json:"places"`
+		}
+		if err := json.Unmarshal(again.Body.Bytes(), &restored); err != nil {
+			t.Fatal(err)
+		}
+		// Two places, not three: the twin shares one of them.
+		if restored.Places != 2 || len(restored.Decisions) != 2 {
+			t.Errorf("re-affirming wrote %d decisions over %d places, want two of each",
+				len(restored.Decisions), restored.Places)
+		}
+	})
+}
+
+func TestAClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testing.T) {
+	// Refusing on the proposer before anything checks visibility answered a
+	// claim elsewhere with one sentence and a missing claim with another, so
+	// walking claim identifiers was a directory of every product in the
+	// deployment (REQ-42).
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scanned(t)
+		r.alsoScannedInto(t, "theirs", "master", "mellanox")
+
+		// Somebody who triages the other product makes a claim there. The
+		// reader below holds nothing in it at all.
+		theirs, err := catalog.NewStore(r.db.DB).ProductByName(ctx, "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		person, err := r.rights.Ensure(ctx, "private-triage", "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.GrantRole(ctx, person.ID, theirs.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/theirs/streams/master/variants/mellanox"+
+				"/findings/CVE-2026-9999/components/libnl-3-200/decision",
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
+				`"reasoning":"Not compiled into that build."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("deciding in the other product answered %d: %s",
+				made.Code, made.Body.String())
+		}
+		var theirClaim struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &theirClaim); err != nil {
+			t.Fatal(err)
+		}
+
+		// A claim that exists and one that does not, asked by somebody who may
+		// see neither. The two answers have to be the same answer.
+		invisible := asPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/reaffirmation", theirClaim.ClaimID),
+			`{"reasoning":"Still true."}`)
+		absent := asPerson(t, r, "triager", http.MethodPost,
+			"/v1/claims/999999/reaffirmation", `{"reasoning":"Still true."}`)
+		if invisible.Code != absent.Code {
+			t.Errorf("a claim elsewhere answered %d and a missing one %d",
+				invisible.Code, absent.Code)
+		}
+		if invisible.Body.String() != absent.Body.String() {
+			t.Errorf("a claim elsewhere answered %q and a missing one %q",
+				invisible.Body.String(), absent.Body.String())
 		}
 	})
 }

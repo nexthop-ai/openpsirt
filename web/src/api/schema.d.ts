@@ -493,6 +493,8 @@ export interface paths {
          *
          *     **One act, one approval.** Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
          *
+         *     **Bounded like the judgment it re-makes.** The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
+         *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
          *     **Requires:** public-triage or private-triage
@@ -1671,7 +1673,7 @@ export interface paths {
          *
          *     **Whether a second person agrees depends on the date.** At or before the earliest deadline among what this covers, it stands on its own: nothing is hidden for longer than the policy already allowed. Past it, the promise defers the worst thing it covers and it waits for approval. The response says which.
          *
-         *     **Not bounded.** A bulk judgment is, because nothing re-checks one and a sentence answering a thousand findings has to stay a size a reviewer can follow. A promise is re-checked by the next scan, and narrowing it would make the record false: the bump closes what it closes.
+         *     **Not bounded**, unlike a bulk judgment: this one writes as many rows as the component has open findings in the releases named.
          *
          *     **Saying who carries it is part of the act**, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a judgment one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
          *
@@ -10043,7 +10045,7 @@ export interface operations {
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
                 /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "run")[] | null;
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -10147,7 +10149,7 @@ export interface operations {
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
                 /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "run")[] | null;
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11401,7 +11403,7 @@ export interface operations {
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
                 /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "run")[] | null;
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11548,7 +11550,7 @@ export interface operations {
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
                 /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "run")[] | null;
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11657,7 +11659,7 @@ export interface operations {
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
                 /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "run")[] | null;
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
@@ -11769,7 +11771,7 @@ export interface operations {
                 /** @description Keep only what sits inside the container of this name */
                 under?: string;
                 /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "run")[] | null;
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
                 /** @description Keep only what the build holds directly, which is what has no container above it */
                 under_build?: boolean;
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */

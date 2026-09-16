@@ -42,7 +42,7 @@ var declaredScopes = map[string]bool{
 	"design":      true,
 	"development": true,
 	"other":       true,
-	"run":         true,
+	"runtime":     true,
 }
 
 // scopeWord keeps what a producer declared where the format defines it, and

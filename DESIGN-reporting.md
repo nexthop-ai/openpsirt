@@ -502,6 +502,7 @@ image has, at the same order of open rows.
 |---|--:|--:|
 | SQLite | 1.28 s | 0.19 s |
 | PostgreSQL | 1.29 s | 0.43 s |
+| MariaDB | 1.49 s | 0.52 s |
 | MySQL | 1.56 s | 0.48 s |
 
 The findings list groups those rows into 6,000 groups off an index that covers
@@ -511,7 +512,7 @@ any index it can use: the version that fixes a finding, and the fold key, which
 is on the component rather than on the finding.
 
 **Nothing is built on that yet.** Grouping on the component instead of the fold
-saves six per cent, so the fold is not where the time goes, and the remaining
+saves six percent, so the fold is not where the time goes, and the remaining
 candidates are a stored fold key on the finding and an index that covers the
 fix version. The first is a derived value stored for speed, which has to be
 asked for rather than added while building something else.

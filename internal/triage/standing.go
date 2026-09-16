@@ -471,9 +471,15 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 		return nil, err
 	}
 
+	// Not one that has since been taken back, which both siblings in this file
+	// already ask. Undoing a batch withdraws its agreement and deliberately
+	// leaves the decision approved where another agreement still stands, so
+	// without this the newest row is the withdrawn one and the block names
+	// whoever took it back as the approver.
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
 		Where("claim_id IN (?)", bun.List(order)).
+		Where("withdrawn_at IS NULL").
 		Order("id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who agreed elsewhere: %w", err)
 	}
