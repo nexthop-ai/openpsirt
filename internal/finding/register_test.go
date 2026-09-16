@@ -153,53 +153,6 @@ func asText(row finding.Disposed) string {
 // the register lost who proposed and who approved it, which is what a
 // compliance reader comes here for. The findings list calls the same place
 // lapsed, so the two surfaces disagreed about one build.
-func TestTheRegisterCarriesWhyAPersonClosedSomething(t *testing.T) {
-	// A closure with no reason is refused of whoever writes one, and the
-	// sentence they typed was then readable nowhere: no body carried it, no
-	// query outside a test selected it, no screen drew it. The refusal is a
-	// promise that the words go somewhere.
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
-
-		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
-			Summary: "The management socket accepts a request nobody authenticated.",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		const because = "The patch was backported in 2.4.1-3."
-		if _, err := f.store.Resolve(ctx, who, f.target, rows[0].VulnerabilityID, because); err != nil {
-			t.Fatal(err)
-		}
-
-		register, _, err := f.store.Register(ctx, who, f.target, 50, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var closed *finding.Disposed
-		for i := range register {
-			if register[i].ClosedAt != nil {
-				closed = &register[i]
-			}
-		}
-		if closed == nil {
-			t.Fatalf("the register holds no closed row: %+v", register)
-		}
-		// The category and the sentence. The first says a fix happened and
-		// the second says what the fix was, which is the half somebody has
-		// years later.
-		if closed.ClosedBecause != finding.Fixed {
-			t.Errorf("closed because %q, want the word a person writes", closed.ClosedBecause)
-		}
-		if closed.ClosedNote != because {
-			t.Errorf("the register states the reason as %q", closed.ClosedNote)
-		}
-	})
-}
-
 func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -290,4 +243,51 @@ func (f *fixture) decidedAndLapsed(t *testing.T, at finding.Finding) string {
 		t.Fatal(err)
 	}
 	return at.PlaceIdentity
+}
+
+func TestTheRegisterCarriesWhyAPersonClosedSomething(t *testing.T) {
+	// A closure with no reason is refused of whoever writes one, and the
+	// sentence they typed was then readable nowhere: no body carried it, no
+	// query outside a test selected it, no screen drew it. The refusal is a
+	// promise that the words go somewhere.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		const because = "The patch was backported in 2.4.1-3."
+		if _, err := f.store.Resolve(ctx, who, f.target, rows[0].VulnerabilityID, because); err != nil {
+			t.Fatal(err)
+		}
+
+		register, _, err := f.store.Register(ctx, who, f.target, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var closed *finding.Disposed
+		for i := range register {
+			if register[i].ClosedAt != nil {
+				closed = &register[i]
+			}
+		}
+		if closed == nil {
+			t.Fatalf("the register holds no closed row: %+v", register)
+		}
+		// The category and the sentence. The first says a fix happened and
+		// the second says what the fix was, which is the half somebody has
+		// years later.
+		if closed.ClosedBecause != finding.Fixed {
+			t.Errorf("closed because %q, want the word a person writes", closed.ClosedBecause)
+		}
+		if closed.ClosedNote != because {
+			t.Errorf("the register states the reason as %q", closed.ClosedNote)
+		}
+	})
 }

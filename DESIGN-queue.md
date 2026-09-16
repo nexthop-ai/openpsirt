@@ -181,7 +181,7 @@ queue may get is the sixth and is a stored setting.
 | How deep the queue may get is the exception | That refusal lands on a build server, and the operator meeting it needs a remedy that is not a restart |
 | Zero or negative is refused rather than taken | The rule every setting is held to. So "no ceiling on one hold" cannot be asked for from the environment: it is what a caller whose work has no upper bound of its own states where the queue is built |
 | Two pairs are compared as the process starts | A heartbeat no shorter than the claim timeout hands running work to a second worker; a hold ceiling no larger than the claim timeout cancels work that is running normally. Both read as a fault in the work rather than in the configuration, so the process refuses to start and names the pair |
-| The defaults live where the queue is built | The documents and the chart restate nothing: two spellings of one default disagree the first time either moves |
+| The defaults live where the queue is built | Every reader takes them from there rather than carrying its own, so two spellings cannot disagree. The configuration reference prints them in its Default column as it does for every other setting, which is the one restatement and the one an operator reads; the chart carries none, and a deployment that wants one sets the environment variable |
 
 ## What a failed job records
 

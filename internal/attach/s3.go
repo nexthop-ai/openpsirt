@@ -140,11 +140,11 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	// deployment rather than the attack. Routing it through the guard would
 	// refuse that and protect against nothing.
 	//
-	// What the exemption costs: a deployment where administrative write is
-	// broader than infrastructure trust has a request primitive here, because
-	// whoever may change the attachment configuration may aim these requests
-	// at the internal network. The control for that is who may change that
-	// setting.
+	// What the exemption costs, which is less than it sounds: the endpoint is
+	// read from the environment once, at startup, and no administrator can
+	// change it from inside the application. So aiming these requests
+	// anywhere is something whoever deploys the process can already do by
+	// other means, and the control is who may deploy it.
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		if endpoint != "" {
 			o.BaseEndpoint = aws.String(endpoint)

@@ -1765,7 +1765,7 @@ export interface paths {
          *
          *     It is also how a person finds the one package worth hiding. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58 — a fact no list of issues makes visible, because ordered by urgency it just looks like a long list.
          *
-         *     Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. `sort` takes every key the findings list takes, read of the package rather than of one finding — the worst of what is open against it (`severity`, `urgency`, `epss`), the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how far it reaches (`places`) — and `asc` orders the other way. Four of the six were accepted and discarded, so a caller asking which package has something due this week was answered with which package has the most findings.
+         *     Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. `sort` takes every key the findings list takes, read of the package rather than of one finding — the worst of what is open against it (`severity`, `urgency`, `epss`), the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how far it reaches (`places`) — and `asc` orders the other way.
          *
          *     `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
@@ -5327,7 +5327,7 @@ export interface components {
              * @description Why it closed, in the tool's terms. Only on a closed row
              * @enum {string}
              */
-            closed_because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained" | "fixed" | "invalid";
+            closed_because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained" | "invalid" | "fixed";
             /** @description Why a person closed it, in their words. Only where a person did */
             closed_note?: string;
             component: string;
@@ -7511,7 +7511,7 @@ export interface components {
              * @example https://example.com/schemas/Record-findingRequest.json
              */
             readonly $schema?: string;
-            /** @description Every build that ships it. One issue, one finding per build — which is the shape a scanner's findings already take */
+            /** @description Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take */
             builds: components["schemas"]["Item"][] | null;
             /** @description What carries it. Omit for the build itself */
             component?: string;

@@ -102,6 +102,25 @@ func nothingFixed(about Note) string {
 	return out.String()
 }
 
+// scannedWith is the "measured with" clause both notes carry.
+//
+// One spelling, because the two notes describe the same thing: written twice,
+// a release that fixed nothing and one that fixed something would come to
+// describe their provenance differently, and the half nobody looks at is the
+// half that drifts.
+func scannedWith(about Note) string {
+	switch {
+	case about.Scanner != "" && about.Database != "":
+		return fmt.Sprintf("measured with %s against vulnerability data of %s",
+			about.Scanner, about.Database)
+	case about.Scanner != "":
+		return "measured with " + about.Scanner
+	case about.Database != "":
+		return "measured against vulnerability data of " + about.Database
+	}
+	return ""
+}
+
 // measuredWith is what the later build was last measured with, as a clause,
 // or nothing where nothing has measured it.
 func measuredWith(about Note) string {
@@ -109,14 +128,8 @@ func measuredWith(about Note) string {
 	if !about.At.IsZero() {
 		said = append(said, "Last measured "+about.At.UTC().Format("2006-01-02"))
 	}
-	switch {
-	case about.Scanner != "" && about.Database != "":
-		said = append(said, fmt.Sprintf("measured with %s against vulnerability data of %s",
-			about.Scanner, about.Database))
-	case about.Scanner != "":
-		said = append(said, "measured with "+about.Scanner)
-	case about.Database != "":
-		said = append(said, "measured against vulnerability data of "+about.Database)
+	if with := scannedWith(about); with != "" {
+		said = append(said, with)
 	}
 	if len(said) == 0 {
 		return ""
@@ -147,14 +160,8 @@ func lead(out *strings.Builder, about Note) {
 	if !about.At.IsZero() {
 		said = append(said, "last measured "+about.At.UTC().Format("2006-01-02"))
 	}
-	switch {
-	case about.Scanner != "" && about.Database != "":
-		said = append(said, fmt.Sprintf("measured with %s against vulnerability data of %s",
-			about.Scanner, about.Database))
-	case about.Scanner != "":
-		said = append(said, "measured with "+about.Scanner)
-	case about.Database != "":
-		said = append(said, "measured against vulnerability data of "+about.Database)
+	if with := scannedWith(about); with != "" {
+		said = append(said, with)
 	}
 	if len(said) > 0 {
 		fmt.Fprintf(out, "\n%s.\n", strings.Join(said, ", "))

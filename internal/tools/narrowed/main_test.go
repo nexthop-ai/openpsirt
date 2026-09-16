@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// The shape this exists for, and the shape that is correct, read directly
+// The shape this exists for, and the shapes that are correct, read directly
 // rather than through the program's exit code: a gate reached only by running
 // it over the tree has one bit of evidence for whatever it found.
 
@@ -51,12 +51,29 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			true,
 		},
 		{
+			// The same shape flattened, and the opposite act: its answer
+			// widens what follows rather than turning anybody away, so it
+			// cannot stand for the product question the rest of the function
+			// never asks.
+			"a question whose answer widens what follows",
+			`func f() {
+				named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+				_ = err
+				if subject.Reads(access.Private, named.ProductID) {
+					visible = append(visible, access.Private)
+				}
+				rows := db.NewSelect().Where("product_id = ?", named.ProductID).Scan(ctx)
+				_ = rows
+			}`,
+			true,
+		},
+		{
 			"the same, refused for everybody before anything is read",
 			`func f() {
 				named, err := names.LocateVisible(ctx, subject, product, stream, variant)
 				_ = err
 				if !subject.Reads(access.Public, named.ProductID) {
-					return
+					return nil, access.Denied("read findings here")
 				}
 				rows := db.NewSelect().Where("product_id = ?", named.ProductID).Scan(ctx)
 				_ = rows
@@ -76,14 +93,47 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			false,
 		},
 		{
-			"used to resolve the rest of the address, which answers nothing about findings",
+			// The hop nearly every site takes. The resolved names are used
+			// once, by the resolver, and the read is keyed on what that
+			// returned — so a check that stopped at the first use was
+			// checking the exempt call and nothing else.
+			"read through the build a resolver handed back",
 			`func f() {
 				named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 				_ = err
-				target, err := names.TargetFor(ctx, named.StreamID, named.VariantID)
-				_ = target
+				target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
+				_ = err
+				planned, err := store.PendingUpgrades(ctx, target.ID)
+				_ = planned
+			}`,
+			true,
+		},
+		{
+			"the same, with the subject carried into the read",
+			`func f() {
+				named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
+				_ = err
+				target, err := targetRow(ctx, in, named.StreamID, named.VariantID)
+				_ = err
+				planned, err := store.PendingUpgrades(ctx, subject, target.ID)
+				_ = planned
 			}`,
 			false,
+		},
+		{
+			// A route naming several builds resolves one per turn of a loop,
+			// and a check reading only a function's own statement list sees
+			// none of them.
+			"resolved inside a loop over the builds a request names",
+			`func f() {
+				for _, build := range input.Body.Builds {
+					at, err := names.LocateVisible(ctx, subject, product, build.Stream, build.Variant)
+					_ = err
+					rows := db.NewSelect().Where("target_id = ?", at.StreamID).Scan(ctx)
+					_ = rows
+				}
+			}`,
+			true,
 		},
 		{
 			"resolved and handed back, which is what a resolver does",
@@ -102,11 +152,12 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		if len(resolved) != 1 {
 			t.Fatalf("%s: %d resolutions found, want the one in the source", c.what, len(resolved))
 		}
-		for name := range resolved {
-			loose := refused(body, name) == false && len(unguarded(body, name)) > 0
-			if loose != c.reported {
-				t.Errorf("%s: reported=%v, want %v", c.what, loose, c.reported)
-			}
+		loose, held, _ := looseIn(body, resolved)
+		if held != 1 {
+			t.Errorf("%s: %d resolutions held", c.what, held)
+		}
+		if (len(loose) > 0) != c.reported {
+			t.Errorf("%s: reported=%v, want %v", c.what, len(loose) > 0, c.reported)
 		}
 	}
 }

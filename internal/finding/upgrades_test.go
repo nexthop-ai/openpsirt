@@ -379,7 +379,7 @@ func TestAWordAnAdvisoryWroteWhereAVersionBelongsIsNotTheUpgrade(t *testing.T) {
 // Both group findings, and both answer a question about the group rather than
 // about a finding — the worst thing in this package, the soonest deadline
 // this bump would meet. The by-component view took the six keys the findings
-// list takes and honoured two of them, discarding the direction in silence;
+// list takes and honored two of them, discarding the direction in silence;
 // the bump list took no order at all.
 
 // ranked is a finding of a stated severity, so an ordering test can put one

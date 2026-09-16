@@ -236,6 +236,7 @@ a query string becomes part of the statement.
 | Rule | |
 |---|---|
 | Six keys, each selecting an expression stored beside it | The key a caller sends is a lookup and never the value |
+| The fix-bundle list has six of its own | A bundle is one upstream bump rather than a finding: it has an issue count and a build count a finding has not, and no age of its own. One allowlist covering both would offer each list keys that mean nothing there, so it has a second — read the same way, with the same direction word, and offered by the same generated enum |
 | Nothing else reaches the statement | No derivation from the parameter, no mapping that falls through, no default that is the parameter |
 | The direction is one of two words written here | Not a word that arrived |
 | A key that misses answers in the list's own order | An unknown sort is a mistake about a list, not a reason not to show it |

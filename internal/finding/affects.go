@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // ErrNotOursToSay is what an issue a scanner reported answers.
@@ -138,6 +139,8 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 
 		here := map[int64]bool{}
 		var closing []int64
+		// How many rows this would open, counted as they are resolved.
+		opened := 0
 		// Which builds are being taken out, as against how many rows that
 		// is: a build holding the component in two places is one build.
 		out.Closed = 0
@@ -166,6 +169,16 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			return ErrNoReason
 		}
 
+		// Bounded by what is written, as recording is: a build added to the
+		// set opens one row per place the component sits at there, so a
+		// component two things pull in doubles what a request naming a long
+		// list of builds writes.
+		cap, err := setting.NewStore(tx).Count(ctx,
+			setting.TogetherCap, setting.DefaultTogetherCap)
+		if err != nil {
+			return fmt.Errorf("read how much one action may write: %w", err)
+		}
+
 		// Widening first. A build added and then immediately closed by the
 		// same call is not something to guard against — the two sets are
 		// disjoint by construction — and doing the opening first means a
@@ -188,6 +201,11 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			sittings, err := sittingsOf(ctx, tx, target, componentID)
 			if err != nil {
 				return err
+			}
+			opened += len(sittings)
+			if opened > cap {
+				return fmt.Errorf("%w: those builds hold it at %d places or more, "+
+					"and one action here writes %d", ErrTooManyPlaces, opened, cap)
 			}
 			for _, sitting := range sittings {
 				row := openIn(target, vulnerabilityID, componentID, names[target],

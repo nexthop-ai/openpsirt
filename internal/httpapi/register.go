@@ -37,10 +37,25 @@ type DisposedBody struct {
 	// ClosedBecause is the category it closed under and ClosedNote the
 	// sentence whoever closed it typed. A closure a scan performed carries a
 	// category and no note, because nobody typed one.
-	ClosedBecause string `json:"closed_because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained,fixed,invalid" doc:"Why it closed, in the tool's terms. Only on a closed row"`
-	ClosedNote    string `json:"closed_note,omitempty" doc:"Why a person closed it, in their words. Only where a person did"`
-	Due           string `json:"due,omitempty"`
-	Met           *bool  `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
+	ClosedBecause closure `json:"closed_because,omitempty" doc:"Why it closed, in the tool's terms. Only on a closed row"`
+	ClosedNote    string  `json:"closed_note,omitempty" doc:"Why a person closed it, in their words. Only where a person did"`
+	Due           string  `json:"due,omitempty"`
+	Met           *bool   `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
+}
+
+// closure is the query-side vocabulary of why a finding closed, taken from the
+// store rather than written out again: a closure added there is published here
+// and in the generated client, instead of shipping in a body that no document
+// describes.
+type closure string
+
+// Schema answers with the closures the store knows, in its order.
+func (closure) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(finding.Closures()))
+	for _, each := range finding.Closures() {
+		offered = append(offered, string(each))
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
 }
 
 func registerRegister(api huma.API, in Ingest) {
@@ -153,7 +168,7 @@ func registerRegister(api huma.API, in Ingest) {
 						body.Place, body.Consumer, body.State, string(body.Outcome), string(body.Justification),
 						body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 						strconv.FormatBool(body.AgreementCarried),
-						body.Opened, body.Closed, body.ClosedBecause, body.ClosedNote,
+						body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
 						body.Due, met,
 					})
 				})
@@ -185,7 +200,7 @@ func disposedBody(row finding.Disposed) DisposedBody {
 	}
 	if row.ClosedAt != nil {
 		body.Closed = row.ClosedAt.Format(time.DateOnly)
-		body.ClosedBecause, body.ClosedNote = string(row.ClosedBecause), row.ClosedNote
+		body.ClosedBecause, body.ClosedNote = closure(row.ClosedBecause), row.ClosedNote
 	}
 	if row.DueAt != nil {
 		body.Due = row.DueAt.Format(time.DateOnly)

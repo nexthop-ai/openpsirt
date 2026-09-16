@@ -205,6 +205,14 @@ func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 				return Accept, err
 			}
 			if again {
+				// These exact bytes may already have a row whose attempt
+				// failed, and then it is that row that is taken again: a
+				// second row under the same content hash is what the
+				// uniqueness on the table refuses, and the insert would
+				// collide and answer success pointing at the failed one.
+				if seen != nil {
+					return Retake, nil
+				}
 				return Accept, nil
 			}
 		}

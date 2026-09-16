@@ -186,9 +186,11 @@ export function Register() {
                               reason is refused of whoever writes one, and the
                               words they typed were readable nowhere — so a
                               person was required to say why and nobody could
-                              find out. Plain text, not markdown: it is not
-                              submitted as markdown and nothing here renders
-                              it as any. */}
+                              find out. Drawn as plain text: it goes through
+                              the submission policy on the way in, like every
+                              other field a person types, and what that bounds
+                              is what may be rendered rather than what must
+                              be — a line in a table is not a document. */}
                           {row.closed ? (
                             <>
                               {on(row.closed)}

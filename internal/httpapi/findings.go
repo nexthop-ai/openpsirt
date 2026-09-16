@@ -509,9 +509,7 @@ func registerComponentFindings(api huma.API, in Ingest) {
 			"every key the findings list takes, read of the package rather than of one " +
 			"finding — the worst of what is open against it (`severity`, `urgency`, `epss`), " +
 			"the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how " +
-			"far it reaches (`places`) — and `asc` orders the other way. Four of the six " +
-			"were accepted and discarded, so a caller asking which package has something due " +
-			"this week was answered with which package has the most findings.\n\n" +
+			"far it reaches (`places`) — and `asc` orders the other way.\n\n" +
 			"`stream` and `variant` are optional and independent, as they are on the findings " +
 			"list: with either left out this counts across every build under the product that " +
 			"matches the rest. `beneath` is a walk over one build's edges and is refused " +

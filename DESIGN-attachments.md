@@ -82,7 +82,7 @@ An object store reached through the S3-compatible API. Never the database.
 | A filesystem backend for development | Mirrors what SQLite does for the database |
 | The store is optional | With none configured, attachments are off and everything else works |
 | The official AWS SDK for Go, v2 | Measured against a signer written here. The credential chain is what a cloud deployment needs and is the part that cannot be tested anywhere else |
-| Object-store requests are not restricted to public addresses | The restriction exists for an address that arrived from outside, and this one the operator typed in: a store on their own network is the ordinary deployment. What it costs is that a deployment where administrative write is broader than infrastructure trust has a request primitive here, since whoever may change this configuration may aim these requests at the internal network — so the control is who may change that setting |
+| Object-store requests are not restricted to public addresses | The restriction exists for an address that arrived from outside, and this one the operator typed in: a store on their own network is the ordinary deployment. The endpoint is read from the environment once, at startup, and no administrator can change it from inside the application — so the exemption adds nothing to what whoever deploys the process already holds, and the control is who may deploy it |
 
 The transport lives beside the store. The store decides what may be reached and
 by whom; the object-store and filesystem backends implement one interface behind

@@ -927,7 +927,7 @@ question next year should find the answer rather than the question.
 | `Store.Enter` | Fifty lines of refusals, each with its own reason, and one transaction. Both belong to the act; what it needed was the transaction discipline, which it has |
 | `fix.go` | Two responsibilities with a clean read-and-write seam, and one subject — upgrade commitments. Splitting it now would be splitting to hit a number. The cut is there when the write half grows |
 | The schema migrations | Each is one list of `CREATE TABLE` statements. The length is the schema, the comment beside each column is what makes it legible, and splitting a table group across two functions would break the ordering the chain exists to check |
-| `sortedBy` and `sortedAcross` | Twenty near-identical lines whose tie-breaks genuinely differ. Both already read from the one allowlist, which is the half that matters; a shared function taking the tie-break as an argument saves a line and costs a call site that has to be read to know which list it is |
+| `sortedBy`, `sortedAcross` and the by-component order | The lookup, the direction and the null-last case are one function the three call. Their tie-breaks genuinely differ and stayed with each list, which is what a reader of one of them needs beside it: a shared function taking the tie-break as an argument would put it back at the call site as an argument nobody can read |
 
 ## Limits
 

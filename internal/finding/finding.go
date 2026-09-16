@@ -124,6 +124,18 @@ const (
 	Fixed Closure = "fixed"
 )
 
+// Closures are every reason a finding stops being open, in the order they are
+// offered.
+//
+// One list, as the sort orders are one list: the enum a caller sees is built
+// from this rather than written out again, so a closure added here is
+// published and one removed here is gone from the document too. It was a
+// fourth hand-written copy of these seven words, and `Resolving` below records
+// what the last three copies cost.
+func Closures() []Closure {
+	return []Closure{Removed, Upgraded, Revised, Superseded, Unexplained, Invalid, Fixed}
+}
+
 // Resolving is what counts as an issue actually going away.
 //
 // One list rather than three projections of it. It was a positive list of four

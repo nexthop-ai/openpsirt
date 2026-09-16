@@ -30,11 +30,13 @@ type Entering struct {
 	// than one, because the same code ships on several lines and as several
 	// variants at once.
 	//
-	// **One issue, one finding per build.** That is the shape a scanner's
-	// findings already take, so a flaw somebody recorded lists, ranks, comes
-	// due, carries decisions and appears in a comparison exactly as one that
-	// was reported does — rather than in a scheme of its own that everything
-	// downstream would need to know about.
+	// **One issue, and one finding per place it sits at in each build.** That
+	// is the shape a scanner's findings already take, so a flaw somebody
+	// recorded lists, ranks, comes due, carries decisions and appears in a
+	// comparison exactly as one that was reported does — rather than in a
+	// scheme of its own that everything downstream would need to know about.
+	// A component two things pull in is two places, and a decision is keyed
+	// on one of them.
 	TargetIDs []int64
 	// Component names what in the build carries it, as the build calls it.
 	// Empty is the build itself, which is the honest answer where the flaw is
@@ -109,6 +111,16 @@ var ErrNoSuchComponent = errors.New("this build holds nothing by that name")
 // length and is not a summary, so this is reachable from a request rather than
 // only from a caller inside this process.
 var ErrNothingSaid = errors.New("a recorded finding has to say what the flaw is")
+
+// ErrTooManyPlaces says one recording would open more findings than this
+// deployment allows one action to write.
+//
+// A recording opens one finding per place the component sits at, in every
+// build named — so a widely vendored component across a long list of builds is
+// a large write from a small request, which is the shape REQ-27 bounds: what
+// is written rather than what was asked for. The same cap the bulk triage
+// action is held to, because it is the same question about the same table.
+var ErrTooManyPlaces = errors.New("that would open more findings than one action may")
 
 // ErrNothingScanned says the build holds no contents to record against.
 var ErrNothingScanned = errors.New(
@@ -264,6 +276,21 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 					consumerID: sitting.consumerID, consumer: sitting.consumer,
 				})
 			}
+		}
+
+		// Bounded by what is written rather than by what was asked for. The
+		// request bounds how many builds it may name and one build was one
+		// row, so that was the whole bound; a component that two things pull
+		// in is two rows per build, and a widely vendored one across a long
+		// list of builds is a large write from a small request.
+		cap, err := setting.NewStore(tx).Count(ctx,
+			setting.TogetherCap, setting.DefaultTogetherCap)
+		if err != nil {
+			return fmt.Errorf("read how much one action may write: %w", err)
+		}
+		if len(places) > cap {
+			return fmt.Errorf("%w: it sits at %d places across those builds, "+
+				"and one action here writes %d", ErrTooManyPlaces, len(places), cap)
 		}
 
 		// The product, read again in here. It was resolved before the

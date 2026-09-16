@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // Deciding about everything at one component at once.
@@ -23,12 +24,10 @@ import (
 // DefaultTogetherCap is how many findings one action may claim about when
 // nobody has set a limit.
 //
-// Generous, because the case this exists for is a kernel: a real image put
-// 305,487 findings against one, and a person narrowing that down to the
-// drivers their build does not include is doing the right thing with a long
-// list. The bound is there because an unbounded write is something somebody
-// triggers by accident, not because two thousand is a suspicious number.
-const DefaultTogetherCap = 2000
+// The same number every other bounded write falls back to, read from where the
+// setting itself is declared: recording a flaw bounds what it opens by this
+// too, and a finding cannot import a triage decision.
+const DefaultTogetherCap = setting.DefaultTogetherCap
 
 // allowed is what every proposal has to satisfy before any of them is written.
 //
