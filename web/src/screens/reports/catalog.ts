@@ -28,6 +28,17 @@ export type Report = {
   needs?: (at: Scoped) => string | null;
 };
 
+// withProduct carries the selection into an address that reads its narrowing
+// from the address rather than from the picker.
+//
+// The record is the one screen that does: it is read as a document and sent as
+// a link, so what it answers has to be in the address it was sent as.
+function withProduct(at: string, scope: Scoped): string {
+  if (!scope.product) return at;
+  const joined = at.includes("?") ? "&" : "?";
+  return `${at}${joined}product=${encodeURIComponent(scope.product)}`;
+}
+
 export const CATALOG: Report[] = [
   {
     slug: "program-overview",
@@ -114,13 +125,21 @@ export const CATALOG: Report[] = [
     name: "The exception report",
     answers:
       "Dismissals no second person has a standing agreement on. It should come back empty — every dismissal requires one, so a row here is a control that did not hold.",
-    to: () => "/audit?alone=true&outcome=not-applicable&outcome=wont-fix&outcome=already-fixed",
+    // The product the catalog is being read for, carried into the record. The
+    // record reads its narrowing from the address alone, so an entry that
+    // dropped it opened every product the reader can see from a page scoped
+    // to one — a different population under the same name.
+    to: (at) =>
+      withProduct(
+        "/audit?alone=true&outcome=not-applicable&outcome=wont-fix&outcome=already-fixed",
+        at,
+      ),
   },
   {
     name: "Administrative changes",
     answers:
       "Who moved the ground under the judgments: roles, support dates, thresholds. In the record, for administrators.",
-    to: () => "/audit",
+    to: (at) => withProduct("/audit", at),
   },
   {
     name: "Release comparison",
