@@ -294,11 +294,11 @@ somebody holds and a name nobody holds identically (REQ-43).
 | A name another issue already answers to is refused, checked before the write | A constraint violation cannot distinguish "already recorded" from "that would merge two issues" |
 | It starts undisclosed, and recording one asks for the private triage right (REQ-37) | Defaulting the other way makes the dangerous mistake the quiet one. Somebody who may argue about known issues in shipped components has not been handed the ones nobody has announced. Already-public is a flag on the request, asking the ordinary right |
 
-One identifier, one finding per build. The same code goes out on several lines
-and as several variants at once, so a flaw in it is not a fact about one build.
-This is the shape a scanner's findings already have, so it lists, ranks, comes
-due, carries decisions, groups across variants and appears in a comparison
-exactly as a reported one does.
+One identifier, one finding per place in every build. The same code goes out on
+several lines and as several variants at once, so a flaw in it is not a fact
+about one build. This is the shape a scanner's findings already have, so it
+lists, ranks, comes due, carries decisions, groups across variants and appears
+in a comparison exactly as a reported one does.
 
 | Rule | Reason |
 |---|---|
@@ -306,6 +306,8 @@ exactly as a reported one does.
 | One product | The identifier is minted per product, so a flaw in two products is two records |
 | Every row gets the same embargo, rank and deadline | They are the same flaw. A build added later copies them, or the newest build would get a later deadline for the same flaw |
 | What carries it is a component of the build, or the build itself | Naming nothing puts it on the root, which is honest where the flaw is in how the pieces fit together. Naming something the build does not hold is refused |
+| It is a component at a place, keyed exactly as a scanned one is (REQ-17) | The place is derived from the build's own graph rather than asked for: the entry path has already resolved the component there, and a component can sit in more than one place at once, which a form question could not express and which is why one recording opens one finding per place. Recorded as sitting directly under the product whatever the graph said, a flaw a person recorded and the same flaw a scan found were two places and two decisions — triaging either did nothing for the other |
+| Recorded against the build itself, the place is the build's root, which has no name of its own | The product's name differs per variant, so a place keyed on it is a different place in each of them: one flaw across three variants was three places and three decisions. The scan path collapses a root parent for the same reason |
 | A name the build holds more than once is refused with the choices | A name is not unique within a build and not rarely: a real switch image ships three vendored copies of one library, and thirteen names in it are held at one version by two components. The resolution goes through the same lookup every other component reference takes — it did not, and took the first row a name matched |
 
 ## Reporter details

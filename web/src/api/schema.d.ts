@@ -5450,7 +5450,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many builds it was recorded against. One issue, one finding per build
+             * @description How many builds it was recorded against
              */
             builds: number;
             /** @description What in the build carries it */
@@ -5459,6 +5459,11 @@ export interface components {
             due_at?: string;
             /** @description What this deployment filed it as, such as SONIC-2026-0001 */
             identifier: string;
+            /**
+             * Format: int64
+             * @description How many findings that opened. One per place the component sits in, in each build
+             */
+            places: number;
             /**
              * @description Whether it has been disclosed
              * @enum {string}

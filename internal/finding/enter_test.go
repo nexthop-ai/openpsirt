@@ -536,3 +536,91 @@ func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
 		}
 	})
 }
+
+func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
+	// A decision is keyed on the place. The entry path recorded every finding
+	// as sitting directly under the product, whatever the graph said, so a
+	// flaw recorded by hand against a nested component and the same flaw
+	// found there by a scan were two places and two decisions — one flaw
+	// triaged twice, and triaging either did nothing for the other.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// libnl sits under two consumers, which is what a place is for.
+		f.shipped(t, twoConsumers())
+
+		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage),
+			finding.Entering{
+				TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
+				Summary: "The parser accepts a message it should refuse.",
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// One finding per place, as a scan of the same component opens.
+		if len(rows) != 2 {
+			t.Fatalf("recorded %d findings, want one per place the component sits in", len(rows))
+		}
+		recorded := map[string]bool{}
+		for _, row := range rows {
+			recorded[row.PlaceIdentity] = true
+		}
+
+		// What a scan of the same build writes for the same component.
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		var scanned []string
+		if err := f.db.DB.NewSelect().TableExpr(`finding AS "f"`).
+			ColumnExpr("f.place_identity").
+			Where("f.target_id = ?", f.target).
+			Where("f.kind = ?", finding.Vulnerable).
+			Scan(ctx, &scanned); err != nil {
+			t.Fatal(err)
+		}
+		if len(scanned) != 2 {
+			t.Fatalf("the scan opened %d findings, want one per place", len(scanned))
+		}
+		for _, place := range scanned {
+			if !recorded[place] {
+				t.Errorf("a scan keys a place the hand-recorded flaw does not: %s", place)
+			}
+		}
+	})
+}
+
+func TestAFlawRecordedAgainstTheBuildIsOnePlaceInEveryVariant(t *testing.T) {
+	// The product's name differs per variant, so a place keyed on it is a
+	// different place in each of them: one flaw across three variants was
+	// three places and three decisions. The build's root has no name of its
+	// own, which is what the scan path already does with a root parent.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		f.shippedTo(t, other, graph.Snapshot{
+			// A variant of its own, named as it ships, which is the whole
+			// reason the root is not part of the key.
+			Root:         at("sonic-mellanox", "1.0"),
+			Components:   []graph.Described{swss, libnl},
+			Dependencies: []graph.Dependency{{Parent: at("sonic-mellanox", "1.0"), Child: swss}, {Parent: swss, Child: libnl}},
+		})
+
+		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage),
+			finding.Entering{
+				TargetIDs: []int64{f.target, other}, Severity: "high",
+				Summary: "The pieces are assembled in a way that defeats the sandbox.",
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("recorded %d findings, want one per build", len(rows))
+		}
+		if rows[0].PlaceIdentity != rows[1].PlaceIdentity {
+			t.Errorf("two variants of one flaw sit at two places: %s and %s",
+				rows[0].PlaceIdentity, rows[1].PlaceIdentity)
+		}
+	})
+}

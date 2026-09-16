@@ -215,6 +215,11 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		target    int64
 		component int64
 		name      string
+		// Where the component sits in that build, which is what a decision is
+		// keyed on. One entry per place, because a component can sit in more
+		// than one at once.
+		consumerID int64
+		consumer   string
 	}
 
 	var rows []Finding
@@ -243,8 +248,22 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			if err != nil {
 				return err
 			}
-			places = append(places,
-				at{target: target, component: componentID, name: componentName})
+			// Where it sits, read from the same graph a scan reads. A flaw a
+			// person records and the same flaw a scan finds are one thing, so
+			// they are keyed the same way — and a place recorded as "directly
+			// under the product" when the component is nested is a key no
+			// scanned row will ever share, which is two findings and two
+			// decisions for one flaw.
+			sittings, err := sittingsOf(ctx, tx, target, componentID)
+			if err != nil {
+				return err
+			}
+			for _, sitting := range sittings {
+				places = append(places, at{
+					target: target, component: componentID, name: componentName,
+					consumerID: sitting.consumerID, consumer: sitting.consumer,
+				})
+			}
 		}
 
 		// The product, read again in here. It was resolved before the
@@ -304,17 +323,18 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			return err
 		}
 
-		// One row per build, all pointing at the one issue. Every one of them
-		// gets the same embargo, rank and deadline: they are the same flaw,
-		// and a deadline that differed per build would be the tool deciding
-		// that one release matters more.
+		// One row per place in every build, all pointing at the one issue.
+		// Every one of them gets the same embargo, rank and deadline: they
+		// are the same flaw, and a deadline that differed per build would be
+		// the tool deciding that one release matters more.
 		rows = make([]Finding, 0, len(places))
 		for _, place := range places {
 			row := Finding{
 				TargetID: place.target, Kind: Entered, Visibility: visibility,
 				VulnerabilityID: vulnerabilityID,
 				ComponentID:     place.component,
-				PlaceIdentity:   PlaceIdentity(place.name, ""),
+				ConsumerID:      optional(place.consumerID),
+				PlaceIdentity:   PlaceIdentity(place.name, place.consumer),
 				LastChangedAt:   now,
 				OpenedAt:        now,
 			}
@@ -412,21 +432,35 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 		case err != nil:
 			return 0, "", err
 		}
+		// Named, and it is what the build is. Keyed with no name like the
+		// branch below, because it is the same place: the root's name differs
+		// per variant, and a place keyed on it is a different place in each
+		// of them.
+		root, err := isRootIn(ctx, db, targetID, id)
+		if err != nil {
+			return 0, "", err
+		}
+		if root {
+			return id, "", nil
+		}
 		return id, name, nil
 	}
 
 	// The build itself. A flaw in how the pieces fit together belongs on the
 	// thing that assembles them, and every build has a root — that is what the
 	// inventory describes.
+	//
+	// The root is returned with no name. The product's name differs per
+	// variant, so a place keyed on it is a different place in each of them:
+	// one flaw across three variants became three places and three decisions.
+	// The scan path collapses a root to no name for the same reason.
 	var root struct {
-		ID   int64  `bun:"id"`
-		Name string `bun:"name"`
+		ID int64 `bun:"id"`
 	}
 	err := db.NewSelect().
 		TableExpr(`graph_node AS "n"`).
 		Join(`JOIN component AS "c" ON c.id = n.component_id`).
 		ColumnExpr(`c.id AS "id"`).
-		ColumnExpr(`c.name AS "name"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", true).
@@ -438,7 +472,23 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 	if err != nil {
 		return 0, "", fmt.Errorf("look up what this build is: %w", err)
 	}
-	return root.ID, root.Name, nil
+	return root.ID, "", nil
+}
+
+// isRootIn says whether a component is what a build is, rather than something
+// the build contains.
+func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (bool, error) {
+	found, err := db.NewSelect().
+		TableExpr(`graph_node AS "n"`).
+		Where("n.target_id = ?", targetID).
+		Where("n.component_id = ?", componentID).
+		Where("n.closed_scan_id IS NULL").
+		Where("n.is_root = ?", true).
+		Count(ctx)
+	if err != nil {
+		return false, fmt.Errorf("look up whether that is the build itself: %w", err)
+	}
+	return found > 0, nil
 }
 
 // mint issues an identifier for a flaw recorded against this product.

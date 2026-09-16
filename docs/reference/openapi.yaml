@@ -2195,7 +2195,7 @@ components:
           readOnly: true
           type: string
         builds:
-          description: How many builds it was recorded against. One issue, one finding per build
+          description: How many builds it was recorded against
           format: int64
           type: integer
         component:
@@ -2207,6 +2207,10 @@ components:
         identifier:
           description: What this deployment filed it as, such as SONIC-2026-0001
           type: string
+        places:
+          description: How many findings that opened. One per place the component sits in, in each build
+          format: int64
+          type: integer
         visibility:
           description: Whether it has been disclosed
           enum:
@@ -2218,6 +2222,7 @@ components:
         - component
         - visibility
         - builds
+        - places
       type: object
     ErrorDetail:
       additionalProperties: false
