@@ -218,3 +218,58 @@ func TestEveryClosureThatCountsAsAFixHasWordsForIt(t *testing.T) {
 		}
 	}
 }
+
+func TestOneUpgradeIsStatedOnceHoweverManyIssuesItClosed(t *testing.T) {
+	// A kernel bump closes 917 issues in one move. Written one bullet per
+	// issue, the same version pair is repeated 917 times in a document going
+	// to a customer, and the thing they are looking for — what to move to —
+	// is the part that repeats.
+	var fixed []finding.Changed
+	for _, cve := range []string{"CVE-2026-3", "CVE-2026-1", "CVE-2026-2"} {
+		fixed = append(fixed, finding.Changed{
+			Vulnerability: cve, Component: "linux", Severity: "high",
+			Because: finding.Upgraded, FromVersion: "6.12.41-1", MovedTo: "6.12.85-1",
+		})
+	}
+	notes := finding.Notes(about("2.4.0"), &finding.Comparison{Fixed: fixed})
+
+	if n := strings.Count(notes, "6.12.41-1 → 6.12.85-1"); n != 1 {
+		t.Errorf("the upgrade is stated %d times rather than once:\n%s", n, notes)
+	}
+	for _, want := range []string{"CVE-2026-1", "CVE-2026-2", "CVE-2026-3"} {
+		if !strings.Contains(notes, want) {
+			t.Errorf("the note lost %s while grouping:\n%s", want, notes)
+		}
+	}
+	// Under the upgrade, not beside it: a reader has to be able to tell which
+	// move answers which advisory.
+	if strings.Index(notes, "6.12.85-1") > strings.Index(notes, "CVE-2026-1") {
+		t.Errorf("the issues are listed above the move that closed them:\n%s", notes)
+	}
+}
+
+func TestTwoMovesOfOneComponentStayApart(t *testing.T) {
+	// Two upgrades of the same component in one comparison are two different
+	// answers to "what do I move to". Folded onto the component alone, one of
+	// them would be stated over both.
+	notes := finding.Notes(about("2.4.0"), &finding.Comparison{
+		Fixed: []finding.Changed{
+			{Vulnerability: "CVE-2026-1", Component: "linux", Severity: "high",
+				Because: finding.Upgraded, FromVersion: "6.12.41-1", MovedTo: "6.12.85-1"},
+			{Vulnerability: "CVE-2026-2", Component: "linux", Severity: "high",
+				Because: finding.Upgraded, FromVersion: "5.10.1-1", MovedTo: "5.10.9-1"},
+			{Vulnerability: "CVE-2026-3", Component: "linux", Severity: "high",
+				Because: finding.Revised},
+		},
+	})
+	for _, want := range []string{
+		"6.12.41-1 → 6.12.85-1", "5.10.1-1 → 5.10.9-1", "carried patch",
+	} {
+		if !strings.Contains(notes, want) {
+			t.Errorf("the note does not say %q:\n%s", want, notes)
+		}
+	}
+	if n := strings.Count(notes, "- linux"); n != 3 {
+		t.Errorf("three moves of one component made %d entries:\n%s", n, notes)
+	}
+}
