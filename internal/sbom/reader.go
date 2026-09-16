@@ -3,6 +3,7 @@ package sbom
 import (
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -12,7 +13,47 @@ import (
 // used. Those identifiers never leave this package: nothing guarantees a
 // producer keeps them stable between builds, so they are good for joining a
 // document to itself and for nothing else.
-type refEdge struct{ parent, child string }
+type refEdge struct{ parent, child, kind string }
+
+// declaredScopes are the words the two formats define for what a dependency's
+// scope is, and the whole of what is recorded.
+//
+// **The producer's own word, from whichever vocabulary it wrote in.** One
+// format states a scope on the component and the other on the relationship,
+// and the two do not use the same words for the same idea — "required" and
+// "run" both say the target is there when the product runs. Folding them onto
+// one vocabulary would be a reading, and a reading is the thing this is
+// deliberately not doing.
+//
+// `test` is absent because a test relationship places nothing: its edge is
+// dropped, so there is no edge for a word to sit on. The component is still
+// held, stored and scanned.
+//
+// A word neither format defines is not recorded. A producer inventing one has
+// said something no reader of this can interpret, and a column of arbitrary
+// strings is a filter nobody can offer.
+var declaredScopes = map[string]bool{
+	// A CycloneDX component scope.
+	"required": true,
+	"optional": true,
+	"excluded": true,
+	// An SPDX lifecycle scope, which SPDX 2 spells as a relationship type.
+	"build":       true,
+	"design":      true,
+	"development": true,
+	"other":       true,
+	"run":         true,
+}
+
+// scopeWord keeps what a producer declared where the format defines it, and
+// nothing otherwise.
+func scopeWord(stated string) string {
+	word := strings.ToLower(strings.TrimSpace(stated))
+	if !declaredScopes[word] {
+		return ""
+	}
+	return word
+}
 
 // reader accumulates what a document describes, whatever format described it.
 //
@@ -73,6 +114,10 @@ type reader struct {
 	// inside another. It resolves without the document's identifiers, since a
 	// nested component often carries none.
 	contained []graph.Dependency
+	// scopes is what a producer said a component's scope is, by the component's
+	// identity, for the format that states it on the component rather than on
+	// the relationship. It reaches the edges that arrive at that component.
+	scopes map[string]string
 	// rootRefs are the identifiers the document offered as the thing it is
 	// about, resolved once everything has been read. One format names the root
 	// inline and the other points at it, and a pointer cannot be followed
@@ -116,6 +161,7 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 		headerOnly: headerOnly,
 		fired:      map[int]bool{},
 		byRef:      map[string]graph.Described{},
+		scopes:     map[string]string{},
 		files:      map[string]bool{},
 		seen:       map[string]int{},
 		upstream:   map[string]string{},
@@ -273,12 +319,30 @@ func (c *reader) contain(parent, child graph.Described) error {
 
 // edge records one declared dependency by the identifiers the document used
 // for its ends, charged as it is read.
-func (c *reader) edge(parent, child string) error {
+func (c *reader) edge(parent, child, kind string) error {
 	if err := c.charge(); err != nil {
 		return err
 	}
-	c.edges = append(c.edges, refEdge{parent: parent, child: child})
+	c.edges = append(c.edges, refEdge{parent: parent, child: child, kind: kind})
 	return nil
+}
+
+// scopeFor is what the producer said about one dependency: the word the
+// relationship carried, or where the format states it on the component
+// instead, the word that component carried.
+func (c *reader) scopeFor(stated string, child graph.Described) string {
+	if stated != "" {
+		return stated
+	}
+	return c.scopes[child.Identity()]
+}
+
+// scoped records what a producer said one component's scope is, for the format
+// that states it there.
+func (c *reader) scoped(described graph.Described, stated string) {
+	if word := scopeWord(stated); word != "" {
+		c.scopes[described.Identity()] = word
+	}
 }
 
 // finish resolves the document's own identifiers into components.
@@ -315,12 +379,19 @@ func (c *reader) finish() (*Document, error) {
 			c.drop(e.child)
 			continue
 		}
-		declared = append(declared, graph.Dependency{Parent: parent, Child: child})
+		declared = append(declared, graph.Dependency{
+			Parent: parent, Child: child, Kind: c.scopeFor(e.kind, child),
+		})
 	}
-	declared = append(declared, c.contained...)
+	for _, dep := range c.contained {
+		// Nesting states no scope of its own, so what the child was declared
+		// as is what the edge into it carries.
+		dep.Kind = c.scopeFor("", dep.Child)
+		declared = append(declared, dep)
+	}
 
 	reached := map[string]bool{}
-	pairs := map[[2]string]bool{}
+	pairs := map[[2]string]int{}
 	for _, dep := range declared {
 		parent, child := dep.Parent.Identity(), dep.Child.Identity()
 		if parent == child {
@@ -332,10 +403,19 @@ func (c *reader) finish() (*Document, error) {
 			continue
 		}
 		pair := [2]string{parent, child}
-		if pairs[pair] {
+		if at, already := pairs[pair]; already {
+			// The same pair declared twice. Where one of the two states a
+			// scope and the other does not, what the producer said is the
+			// stated one — a document naming a dependency plainly and then
+			// again with a scope has said the scope. Where both state one and
+			// they differ, the first is kept: the producer said two things and
+			// this records one of them.
+			if c.doc.Dependencies[at].Kind == "" {
+				c.doc.Dependencies[at].Kind = dep.Kind
+			}
 			continue
 		}
-		pairs[pair] = true
+		pairs[pair] = len(c.doc.Dependencies)
 		reached[child] = true
 		c.doc.Dependencies = append(c.doc.Dependencies, dep)
 	}

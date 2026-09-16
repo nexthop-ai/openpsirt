@@ -67,6 +67,30 @@ var spdxEdges = map[string]spdxDirection{
 	"OPTIONAL_DEPENDENCY_OF": held,
 	"PROVIDED_DEPENDENCY_OF": held,
 	"RUNTIME_DEPENDENCY_OF":  held,
+	"BUILD_DEPENDENCY_OF":    held,
+	"DEV_DEPENDENCY_OF":      held,
+}
+
+// spdxScopes are the relationship types that name a lifecycle phase as well as
+// an edge, and the phase each names.
+//
+// The third version states this as a scope on an ordinary dependency; this
+// version has a relationship type per phase, saying the same thing. Recorded in
+// the words the third version uses, because they are one fact under two
+// spellings and a filter cannot ask for the same thing twice.
+//
+// **`TEST_DEPENDENCY_OF` is not here and is not an edge either.** A test
+// dependency is not part of what ships, which is what this relationship says
+// and what the other version's `test` scope says, and the edge is dropped in
+// both readers for that reason. The component is still held, stored and
+// scanned — what is dropped is where it sits, not the component.
+//
+// Nothing is inferred from the two that are here. A build-phase dependency in
+// a compiled language is routinely linked into the shipped artifact, so
+// reading "build" as "does not ship" is wrong for every one of them.
+var spdxScopes = map[string]string{
+	"BUILD_DEPENDENCY_OF": "build",
+	"DEV_DEPENDENCY_OF":   "development",
 }
 
 // spdxAncestors are the relationship types that say one component was derived
@@ -402,7 +426,7 @@ func (c *reader) spdxRelate(from, kind, to string) error {
 		if direction == held {
 			from, to = to, from
 		}
-		return c.edge(from, to)
+		return c.edge(from, to, spdxScopes[kind])
 	}
 	if direction, derivation := spdxAncestors[kind]; derivation {
 		if direction == holder {

@@ -100,8 +100,21 @@ func reconcileNodes(ctx context.Context, tx bun.Tx, targetID, scanID int64, want
 	return nodeIDs, len(missing), len(gone), nil
 }
 
+// edgeAt identifies one declared dependency: the pair and what the producer
+// said the dependency's scope is.
+//
+// **The scope is part of the key.** A producer that starts describing the same
+// pair differently has said something different, and an edge carrying the
+// earlier word while the document says another is a record of what nobody
+// sent. Closing the one and opening the other is what every other change to a
+// graph does here, and it keeps the counts a scan reports true.
+type edgeAt struct {
+	Parent, Child int64
+	Kind          string
+}
+
 // reconcileEdges does the same for dependencies.
-func reconcileEdges(ctx context.Context, tx bun.Tx, targetID, scanID int64, wanted map[[2]int64]bool) (int, int, error) {
+func reconcileEdges(ctx context.Context, tx bun.Tx, targetID, scanID int64, wanted map[edgeAt]bool) (int, int, error) {
 	var open []Edge
 	err := tx.NewSelect().Model(&open).
 		Where("target_id = ?", targetID).
@@ -111,10 +124,10 @@ func reconcileEdges(ctx context.Context, tx bun.Tx, targetID, scanID int64, want
 		return 0, 0, fmt.Errorf("read open edges: %w", err)
 	}
 
-	have := make(map[[2]int64]bool, len(open))
+	have := make(map[edgeAt]bool, len(open))
 	var gone []int64
 	for _, edge := range open {
-		key := [2]int64{edge.ParentID, edge.ChildID}
+		key := edgeAt{Parent: edge.ParentID, Child: edge.ChildID, Kind: edge.Kind}
 		if wanted[key] {
 			have[key] = true
 			continue
@@ -128,7 +141,8 @@ func reconcileEdges(ctx context.Context, tx bun.Tx, targetID, scanID int64, want
 			continue
 		}
 		missing = append(missing, Edge{
-			TargetID: targetID, ParentID: key[0], ChildID: key[1], OpenedScanID: scanID,
+			TargetID: targetID, ParentID: key.Parent, ChildID: key.Child, Kind: key.Kind,
+			OpenedScanID: scanID,
 		})
 	}
 	if len(missing) > 0 {

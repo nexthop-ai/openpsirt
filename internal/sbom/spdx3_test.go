@@ -712,3 +712,45 @@ func TestOnlyTheDocumentSaysWhatABuildIsAbout(t *testing.T) {
 		t.Errorf("an element that is not the document made %q the build's root", doc.Root.Name)
 	}
 }
+
+func TestARelationshipsScopeIsRecordedOnTheEdge(t *testing.T) {
+	// This version states the phase as a scope on an ordinary dependency. The
+	// reader already refused to read it as "does not ship", correctly, and
+	// then threw it away — which is a different thing and is what left the
+	// tool unable to express the deferral class at all.
+	for _, tc := range []struct {
+		stated string
+		want   string
+	}{
+		{"build", "build"},
+		{"development", "development"},
+		{"run", "run"},
+		{"design", "design"},
+		{"other", "other"},
+		{"nonsense", ""},
+	} {
+		t.Run(tc.stated, func(t *testing.T) {
+			doc := read(t, strings.Replace(minimalSPDX3,
+				`"relationshipType": "dependsOn"`,
+				`"relationshipType": "dependsOn", "scope": "`+tc.stated+`"`, 1))
+			if len(doc.Dependencies) != 1 {
+				t.Fatalf("read %d edges, want 1", len(doc.Dependencies))
+			}
+			if got := doc.Dependencies[0].Kind; got != tc.want {
+				t.Errorf("the edge says %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	// The one exception, unchanged: a test dependency places nothing, and
+	// there is no edge for a word to sit on.
+	doc := read(t, strings.Replace(minimalSPDX3,
+		`"relationshipType": "dependsOn"`,
+		`"relationshipType": "dependsOn", "scope": "test"`, 1))
+	if len(doc.Dependencies) != 0 {
+		t.Errorf("a test-scoped dependency became %d edge(s)", len(doc.Dependencies))
+	}
+	if len(doc.Components) != 1 {
+		t.Errorf("read %d components, want 1 — the component is still held", len(doc.Components))
+	}
+}

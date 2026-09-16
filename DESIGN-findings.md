@@ -16,6 +16,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [Derived addresses](#derived-addresses)
 - [What an index says](#what-an-index-says)
 - [How a match was made](#how-a-match-was-made)
+- [Declared dependency scope](#declared-dependency-scope)
 - [Interning a component](#interning-a-component)
 - [Recorded flaws](#recorded-flaws)
 - [Reporter details](#reporter-details)
@@ -252,6 +253,42 @@ against anything, which would need an ordering per ecosystem.
 | Unknown is not unconfirmed | Where a scanner said nothing, nothing is claimed. A working list that quietly holds everything nobody classified is one nobody can work down |
 | Kept on the finding, not the issue | One issue reached through two ecosystems has two answers and the issue can hold only one. An issue first seen in a Debian image and later matched in an Alpine one showed Debian's tracker against the Alpine package |
 | One answer per group | Every place of an issue at a component comes from the same line of a scanner's report |
+
+## Declared dependency scope
+
+What a producer said a dependency's scope is, stored on the graph edge, in the
+producer's own word. **Recorded, and read by nothing that decides anything.**
+
+| Where it is stated | Words |
+|---|---|
+| A CycloneDX component | `required`, `optional`, `excluded` — stated on the component and carried to the edges arriving at it, because the graph is where a scope can be asked about |
+| An SPDX 3 relationship | `build`, `design`, `development`, `other`, `run` — stated on the relationship, which is the ordinary dependency |
+| An SPDX 2 relationship type | `BUILD_DEPENDENCY_OF` and `DEV_DEPENDENCY_OF`, recorded as `build` and `development`. One fact under two spellings, and a filter cannot be made to ask for the same thing twice |
+
+"Not in the runtime path", "build-time only", "test-only" is the largest
+defensible deferral class a vendor has, and it was the one class this could not
+express: a component marked `excluded`, which the specification defines as not
+distributed, produced findings identical to one that ships.
+
+| Rule | Reason |
+|---|---|
+| **Nothing acts on it** | Not a rank input, not a prefilled outcome, not a default narrowing, and nothing is hidden by it. Reading `build` as "does not ship" is the inference that looks obvious and is wrong for every compiled language — a crate or a module linked into a binary is stated as a build-phase dependency and is inside what the product ships |
+| Recording is not inferring | The tree went from *do not infer* to *do not record*, and those are different. What a producer declared is a fact about the document received, in the same class as which scanner found a finding and what it matched on |
+| The producer's own word, from whichever vocabulary | One format states a scope on the component and the other on the relationship, and neither uses the other's words: `required` and `run` both say the target is there when the product runs. Folding them onto one vocabulary is a reading, which is what this is deliberately not doing |
+| A word neither format defines is not recorded | A producer inventing one has said something no reader can interpret, and a column of arbitrary strings is a filter nobody can offer |
+| The scope is part of what identifies the edge | A producer that starts describing the same pair differently has said something different. The earlier edge closes and the new one opens, which is what every other change to a graph does here and what keeps a scan's reported counts true |
+| A pair declared twice takes the stated scope | A document naming a dependency plainly and again with a scope has said the scope. Where two differ, the first is kept: the producer said two things and one is recorded |
+
+**A test dependency places nothing, and carries no word.** Both readers drop
+that edge — SPDX 2's `TEST_DEPENDENCY_OF` and SPDX 3's `test` scope — because a
+test dependency is not part of what ships. The component is still held, stored
+and scanned, which is what a component the producer could not place gets too.
+So there is no edge for a word to sit on, and the one scope with the strongest
+case for deferral is the one not recorded.
+
+**Dropping that edge is not acting on a finding.** What it changes is where the
+component sits, not whether it is tracked, which is why the rule above and this
+exception agree rather than contradict.
 
 ## Interning a component
 

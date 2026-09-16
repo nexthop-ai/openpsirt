@@ -35,10 +35,14 @@ type Node struct {
 type Edge struct {
 	bun.BaseModel `bun:"table:graph_edge,alias:e"`
 
-	ID           int64  `bun:"id,pk,autoincrement"`
-	TargetID     int64  `bun:"target_id,notnull"`
-	ParentID     int64  `bun:"parent_id,notnull"`
-	ChildID      int64  `bun:"child_id,notnull"`
+	ID       int64 `bun:"id,pk,autoincrement"`
+	TargetID int64 `bun:"target_id,notnull"`
+	ParentID int64 `bun:"parent_id,notnull"`
+	ChildID  int64 `bun:"child_id,notnull"`
+	// Kind is the scope the producer declared for this dependency, in the
+	// producer's own word, and empty where it declared none. It is a fact
+	// about the document received and nothing reads it to decide anything.
+	Kind         string `bun:"kind,notnull"`
 	OpenedScanID int64  `bun:"opened_scan_id,notnull"`
 	ClosedScanID *int64 `bun:"closed_scan_id"`
 }
@@ -58,7 +62,12 @@ type Snapshot struct {
 }
 
 // Dependency is one edge, named by component identity rather than by row.
-type Dependency struct{ Parent, Child Described }
+type Dependency struct {
+	Parent, Child Described
+	// Kind is what the producer said this dependency's scope is, in its own
+	// word, and empty where it said nothing. Recorded, never acted on.
+	Kind string
+}
 
 // Applied describes what a snapshot changed.
 type Applied struct {
@@ -167,7 +176,7 @@ func ApplyWithin(ctx context.Context, tx bun.Tx, targetID, scanID int64,
 		}
 		applied.NodesOpened, applied.NodesClosed = opened, closed
 
-		wantedEdges := map[[2]int64]bool{}
+		wantedEdges := map[edgeAt]bool{}
 		for _, dep := range snap.Dependencies {
 			parent, okP := nodeIDs[ids[asStored(dep.Parent).Identity()]]
 			child, okC := nodeIDs[ids[asStored(dep.Child).Identity()]]
@@ -175,7 +184,7 @@ func ApplyWithin(ctx context.Context, tx bun.Tx, targetID, scanID int64,
 				return fmt.Errorf("dependency names a component the snapshot does not list: %s -> %s",
 					dep.Parent.Name, dep.Child.Name)
 			}
-			wantedEdges[[2]int64{parent, child}] = true
+			wantedEdges[edgeAt{Parent: parent, Child: child, Kind: dep.Kind}] = true
 		}
 
 		applied.EdgesOpened, applied.EdgesClosed, err = reconcileEdges(ctx, tx, targetID, scanID, wantedEdges)
