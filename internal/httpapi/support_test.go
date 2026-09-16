@@ -131,7 +131,7 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 // nobody having decided anything. The report was past-only, so the first sight
 // of it was the figures moving.
 func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		soon := time.Now().UTC().AddDate(0, 0, 20).Format(time.DateOnly)
 		ending := asPerson(t, r, "admin", http.MethodPut,

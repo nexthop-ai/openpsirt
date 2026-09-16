@@ -159,7 +159,7 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 // recorded, and the route that hands back the inventory it names already
 // existed and was reachable from nothing.
 func TestTheRegisterNamesWhatItWasMeasuredWith(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		document := r.inventoryOf(t, "the inventory this build shipped")
 
@@ -267,7 +267,7 @@ func (r *reach) inventoryOf(t *testing.T, contents string) int64 {
 // It took no filters at all, so "show me what nobody decided" on a build of a
 // quarter of a million rows was a spreadsheet and a search box.
 func TestTheRegisterNarrows(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
 

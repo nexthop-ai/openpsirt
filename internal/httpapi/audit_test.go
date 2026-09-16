@@ -17,7 +17,7 @@ import (
 // file dropped every approval date and every agreement taken back, which is
 // what an audit is looking for.
 func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
 		if got := asPerson(t, r, "reviewer", http.MethodPost,

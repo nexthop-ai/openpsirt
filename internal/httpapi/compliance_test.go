@@ -238,7 +238,7 @@ func TestTheRateCountsTheSameThingTheListDoes(t *testing.T) {
 // rate took no period control at all — so the one report whose whole subject is
 // dates could only be read as a lifetime total.
 func TestARateCanBeAskedForAPeriod(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		ctx := t.Context()
 

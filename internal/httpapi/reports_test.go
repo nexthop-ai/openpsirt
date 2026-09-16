@@ -111,7 +111,7 @@ func TestHowLongTriageIsTakingIsAddedUpSomewhere(t *testing.T) {
 // not-applicable and a row nobody has looked at read identically — and those
 // are opposite answers to the question a release sign-off asks.
 func TestWhatIsStillThereSaysWhetherAnybodyDecidedIt(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		// One of the two argued away and agreed to; the other untouched.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
@@ -174,7 +174,7 @@ func TestWhatIsStillThereSaysWhetherAnybodyDecidedIt(t *testing.T) {
 // Two tests because a place answered once cannot be answered again: a
 // decision already stands there, which is the refusal working.
 func TestARowDecidedTwoWaysStatesNeither(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		places := r.twoPlacesOf(t, "CVE-2026-9999")
 		r.agreedAt(t, places[0], dismissal)
 		r.agreedAt(t, places[1], `{"outcome":"deferred","deferred_until":"2030-01-01",`+
@@ -193,7 +193,7 @@ func TestTheComparisonFileSaysWhatTheScreenSays(t *testing.T) {
 	// point of the still-present list, and downloaded it was nine columns in
 	// which an approved not-applicable and a row nobody had looked at read
 	// alike.
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
 		if got := asPerson(t, r, "reviewer", http.MethodPost,
@@ -245,7 +245,7 @@ func TestTheComparisonFileSaysWhatTheScreenSays(t *testing.T) {
 }
 
 func TestTwoClaimsAgreeingOnTheOutcomeStateItAndNoReason(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		places := r.twoPlacesOf(t, "CVE-2026-9999")
 		r.agreedAt(t, places[0], dismissal)
 		// The same outcome for a different recognized reason. Counted as

@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -104,15 +105,27 @@ func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 	// asking for, which is why it is a document rather than a refusal — and
 	// exactly why a query that could not be made must not produce it. The
 	// sentinel is what tells a name nobody has filed from a read that failed.
+	//
+	// The read is broken by taking the table the name is resolved against out
+	// from under it, and put back before anything else runs: a server
+	// database is shared by the whole package where SQLite hands out a copy,
+	// so a test that left a hole in the schema would fail every later one and
+	// look like an engine disagreement.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
-		// The table the name is resolved against, gone. A database that is
-		// down is the real shape of this; dropping one table is the smallest
-		// version of it a test can arrange.
-		if _, err := r.db.DB.NewDropTable().
-			Table("vulnerability_alias").Exec(t.Context()); err != nil {
+		ctx := t.Context()
+		if _, err := r.db.ExecContext(ctx,
+			`ALTER TABLE "vulnerability_alias" RENAME TO "vulnerability_alias_away"`); err != nil {
 			t.Fatal(err)
 		}
+		t.Cleanup(func() {
+			if _, err := r.db.ExecContext(context.WithoutCancel(ctx),
+				`ALTER TABLE "vulnerability_alias_away" RENAME TO "vulnerability_alias"`); err != nil {
+				t.Fatalf("the table was not put back, so every later test reads a "+
+					"schema with a hole in it: %v", err)
+			}
+		})
+
 		for _, at := range []string{
 			"/v1/issues/CVE-2026-9999",
 			"/v1/issues/CVE-2026-9999/document",
@@ -136,7 +149,7 @@ func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 // answer was assembled differently every time and the half somebody forgot was
 // the half that mattered.
 func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
 		if got := asPerson(t, r, "reviewer", http.MethodPost,

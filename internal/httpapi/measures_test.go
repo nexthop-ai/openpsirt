@@ -15,7 +15,7 @@ import (
 // people were doing read the deployment's numbers — and in a deployment with
 // more than one team that is somebody else's answer with their name on it.
 func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		ctx := t.Context()
 		r.scannedTwoIssues(t)
 
@@ -91,7 +91,7 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 
 // TestATeamWithNobodyOnItMeasuresNothing is the same rule from the other side.
 func TestATeamWithNobodyOnItMeasuresNothing(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
 		if _, err := access.NewStore(r.db.DB).DeclareTeam(t.Context(),

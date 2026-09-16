@@ -64,25 +64,35 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	// asked for, under a response saying the period ran from the beginning.
 	limit = database.AList.Of(limit)
 
-	// What a judgment was about, reached through a finding at the place — the
-	// same way the record's own component filter reaches it. A judgment about
-	// something since removed still names it, which is what a report about
-	// where the time went has to keep.
-	named := `(SELECT MIN(cc.name) FROM "finding" AS "cf"
-		JOIN "component" AS "cc" ON cc.id = cf.component_id
-		WHERE cf.vulnerability_id = de.vulnerability_id
-		  AND cf.place_identity = de.place_identity)`
-
 	var rows []Spent
 	q := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 		// The argument, which is where an outcome lives.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		// What the judgment was about, reached through the findings at the
+		// place — the same correlation the record's own component filter
+		// makes. A judgment about something since removed matches nothing and
+		// keeps its row, which is what a report about where the time went has
+		// to keep.
+		//
+		// **Joined rather than asked as a subquery in the select list.** The
+		// same expression in the list and in the grouping is refused outright
+		// by MySQL and MariaDB under ONLY_FULL_GROUP_BY, because it reads
+		// columns the grouping does not carry — so the report answered on two
+		// engines and was a 500 on the other two.
+		//
+		// A place sits in as many builds as hold it, so this multiplies the
+		// rows. Every figure below counts distinct identifiers for that
+		// reason: what is being counted is acts, and an act is one row of the
+		// decision table however many builds share the place it names.
+		Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = de.vulnerability_id
+			AND pf.place_identity = de.place_identity`).
+		Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
 		ColumnExpr(`MIN(p.display_name) AS "product"`).
-		ColumnExpr(named+` AS "component"`).
+		ColumnExpr(`COALESCE(pc.name, '') AS "component"`).
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
-		ColumnExpr(`COUNT(*) AS "decisions"`).
+		ColumnExpr(`COUNT(DISTINCT de.id) AS "decisions"`).
 		ColumnExpr(`COUNT(DISTINCT de.proposed_by) AS "people"`).
 		// What came out of them, each counted as claims: the outcome is the
 		// claim's, and counting its rows would weigh a judgment by how far
@@ -94,7 +104,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome = ? THEN de.claim_id END)`+
 			` AS "deferred"`, Deferred).
 		Where("de.proposed_at < ?", until).
-		GroupExpr("de.product_id, " + named).
+		GroupExpr(`de.product_id, COALESCE(pc.name, '')`).
 		OrderExpr("claims DESC, decisions DESC, component").
 		Limit(limit)
 	q = only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))

@@ -112,14 +112,16 @@ in two packages.
 ### Silently wrong query shapes
 
 Not engine-specific code — one query written once — but shapes an engine gets
-wrong. Each is a silent wrong answer rather than an error, which is why they are
-written down.
+wrong. Most are a silent wrong answer rather than an error, which is why they are
+written down; the last is refused outright by two of the four, which is the
+same lesson arriving loudly.
 
 | Shape | What happens |
 |---|---|
 | `COUNT(DISTINCT …)` beside a window function | **MariaDB 11.4 returns no rows at all.** No error, an empty page, and a total from a second statement saying there was something to show. The findings list pages with `COUNT(*) OVER ()` and counts packages and consumers with `COUNT(DISTINCT)`; the two cannot sit in one statement, so the distinct counts moved to the statement that decorates the page |
 | `SUM(CASE … END)` where an integer is wanted | Comes back as a decimal on two of the four, and the cast that fixes it is spelled per engine. Counted as two `COUNT`s instead, which reads the same everywhere |
 | Ordering by a column the grouping does not determine | MySQL refuses it outright, and it is right to: a tie-break on a column that varies within a row is not a tie-break |
+| A correlated subquery in the select list, grouped on the same expression | MySQL and MariaDB refuse it under their default mode: the expression reads columns the grouping does not carry, whatever it is repeated in. Written as a join instead, which groups on a column and answers the same everywhere — at the cost of multiplying rows, so what is counted is distinct identifiers |
 
 ## Engine detection
 

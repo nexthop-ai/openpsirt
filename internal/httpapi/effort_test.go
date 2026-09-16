@@ -11,7 +11,7 @@ import (
 // long things wait. None of them says what the quarter actually went into, and
 // that is the one a manager has to answer without any of the others.
 func TestWhereTheEffortWentIsAReport(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
 		r.claimed(t, "private-triage", "CVE-2026-1000", "linux-image", dismissal)
@@ -88,7 +88,7 @@ func TestWhereTheEffortWentIsAReport(t *testing.T) {
 // an image, and the component every image vendors would be the answer every
 // quarter.
 func TestEffortCountsActsRatherThanRows(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedAtTwoPlaces(t)
 		r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
 
