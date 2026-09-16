@@ -186,10 +186,19 @@ about findings opening and closing as scans change. So it is a judgment rather
 than a commitment, and it is the owner's to revisit: nothing has been promised
 here either way.
 
-**A bulk write is bounded.** One action recording a judgment against many
-issues is deliberate and useful; one action writing an unbounded number of rows
-is a denial of service somebody triggers by accident. The cap is a setting, not
-a constant, and there is always a cap (REQ-27).
+**A bulk judgment is bounded, and a bulk promise is not.** One action recording
+a judgment against many issues is deliberate and useful; one action writing an
+unbounded number of rows is a denial of service somebody triggers by accident.
+The cap is a setting rather than a constant, and every bulk judgment has one
+(REQ-27).
+
+The distinction is reversibility rather than size. Nothing re-checks a
+dismissal, so one sentence answering a thousand findings has to stay a size a
+reviewer can follow. The next scan re-checks every row a promise to upgrade
+names, and narrowing one makes the record false — the upgrade closes what it
+closes — so that path takes no cap at all. The transaction-size half of what a
+cap was doing was measured rather than assumed, and needs nothing: a promise
+over 243,950 places commits in 8.3 seconds on SQLite and 23.9 on PostgreSQL.
 
 **Bound what is written, not what was asked for.** The two differ whenever one
 named thing expands into many rows — an issue sits at many places — so a limit
