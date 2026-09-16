@@ -6981,6 +6981,9 @@ components:
           description: The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument
           format: int64
           type: integer
+        declared_as:
+          description: "What the producer called this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"
+          type: string
         place:
           description: Name this when recording a decision about it
           type: string
@@ -9869,6 +9872,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - run
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -10295,6 +10319,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - run
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -12182,6 +12227,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - run
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -12685,6 +12751,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - run
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -13112,6 +13199,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - run
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -13565,6 +13673,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - run
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query

@@ -153,6 +153,25 @@ export const DEADLINES = [
 // itself. What it has no way to do is offer it, and the durable answer to that
 // is the kinds actually present travelling with the read rather than a longer
 // list here — which is a question the server does not answer yet.
+// What a producer may say a dependency's scope is, in the two formats' own
+// words.
+//
+// Two vocabularies rather than one, and they are not folded together: a
+// CycloneDX component scope and an SPDX lifecycle scope say related things in
+// different words, and a label claiming they are the same word would be a
+// reading the tool deliberately does not make. The label says which format the
+// word comes from for the same reason.
+export const DECLARED_AS = [
+  ["required", "required (CycloneDX)"],
+  ["optional", "optional (CycloneDX)"],
+  ["excluded", "excluded (CycloneDX)"],
+  ["run", "run (SPDX)"],
+  ["build", "build (SPDX)"],
+  ["development", "development (SPDX)"],
+  ["design", "design (SPDX)"],
+  ["other", "other (SPDX)"],
+] as const;
+
 export const ECOSYSTEMS = [
   ["", "Any"],
   ["generic", "Generic"],
@@ -294,6 +313,7 @@ export function activeFilters(params: URLSearchParams): Active[] {
   each("vex_status", "VEX status", VEX_STATUS);
   each("component", "Component", []);
   each("ecosystem", "Package type", ECOSYSTEMS);
+  each("declared_as", "Producer said", DECLARED_AS);
   add("under", "Inside container", at("under"));
   add("beneath", "At or under", at("beneath"));
   if (at("under_build") === "yes") add("under_build", "Held directly by the build", "only");
@@ -621,6 +641,13 @@ export function Filters({
           chosen={all("ecosystem")}
           options={ECOSYSTEMS}
           onChange={(chosen) => setMany("ecosystem", chosen)}
+        />
+        <Choices
+          label="Producer said"
+          hint="What the inventory called the dependency. Nothing here ranks or decides by it"
+          chosen={all("declared_as")}
+          options={DECLARED_AS}
+          onChange={(chosen) => setMany("declared_as", chosen)}
         />
         <Field label="Inside container">
           <input

@@ -290,6 +290,18 @@ case for deferral is the one not recorded.
 component sits, not whether it is tracked, which is why the rule above and this
 exception agree rather than contradict.
 
+### Where it is surfaced
+
+| Surface | What it does |
+|---|---|
+| A filter on the findings list | The only way to ask about the deferral class at all. Asked of the component's incoming edges in the build, so one reached from two consumers scoped differently answers to both words — a place is a pair of columns, and no engine here compares a pair against a set the same way |
+| An evidence line on the finding's dependency path | Beside the place it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it |
+
+**Nowhere else.** Not in the urgency ranking, not as a prefilled outcome on a
+claim, and not as a default narrowing on any list. A person deciding that a
+build-time dependency does not ship is making a judgment, and the judgment stays
+theirs.
+
 ## Interning a component
 
 A component identified by its content is one row whoever writes it, so two

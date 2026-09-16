@@ -187,6 +187,7 @@ export function listQuery(params: URLSearchParams) {
   const assigned = params.getAll("assigned").filter(Boolean);
   const fixStates = params.getAll("fix_state").filter(Boolean);
   const ecosystems = params.getAll("ecosystem").filter(Boolean);
+  const declaredAs = params.getAll("declared_as").filter(Boolean);
   // Which sort of release, and whether it is still in support. Two questions
   // rather than one: a tag can be in support and a branch can be past its
   // date.
@@ -222,6 +223,20 @@ export function listQuery(params: URLSearchParams) {
     ...(ecosystems.length > 0 ? { ecosystem: ecosystems } : {}),
     ...(releases.length > 0 ? { on: releases as ("branch" | "tag")[] } : {}),
     ...(support.length > 0 ? { support: support as ("in-support" | "past-eol")[] } : {}),
+    ...(declaredAs.length > 0
+      ? {
+          declared_as: declaredAs as (
+            | "required"
+            | "optional"
+            | "excluded"
+            | "build"
+            | "design"
+            | "development"
+            | "other"
+            | "run"
+          )[],
+        }
+      : {}),
     ...(params.get("under") ? { under: params.get("under") ?? "" } : {}),
     ...(params.get("beneath") ? { beneath: params.get("beneath") ?? "" } : {}),
     ...(params.get("under_build") === "yes" ? { under_build: true } : {}),

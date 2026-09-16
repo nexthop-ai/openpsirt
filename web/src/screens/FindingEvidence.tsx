@@ -76,6 +76,16 @@ export function Places({
                         true: the consumer under it is what the record names,
                         and what pulls *that* in is what nothing recorded. */}
                     {depth === 0 && rootless && <span className="hint">{UNPLACED}</span>}
+                    {/* What the producer called this dependency, where it
+                        said anything. Shown and read by nothing: it does not
+                        rank, does not prefill an outcome, and hides nothing.
+                        "Build-time only" is the largest deferral class a
+                        vendor has, and it is a person's to make. */}
+                    {last && place.declared_as && (
+                      <span className="state" title="What the producer called this dependency">
+                        producer said {place.declared_as}
+                      </span>
+                    )}
                     {last && place.suppressed && (
                       <span className="state open">suppressed by the build</span>
                     )}

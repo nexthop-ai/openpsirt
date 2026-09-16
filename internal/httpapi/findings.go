@@ -251,6 +251,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		Ecosystems:    n.Ecosystem,
 		Under:         n.Under,
 		UnderTheBuild: n.UnderBuild,
+		DeclaredAs:    n.DeclaredAs,
 		States:        n.State,
 		Outcomes:      plainly(n.Outcome),
 		Assigned:      n.Assigned,
@@ -329,6 +330,7 @@ type Narrowing struct {
 	On           []string    `query:"on,explode" enum:"branch,tag" uniqueItems:"true" doc:"Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything"`
 	Support      []string    `query:"support,explode" enum:"in-support,past-eol" doc:"Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything"`
 	Under        string      `query:"under" maxLength:"191" doc:"Keep only what sits inside the container of this name"`
+	DeclaredAs   []string    `query:"declared_as,explode" enum:"required,optional,excluded,build,design,development,other,run" uniqueItems:"true" doc:"Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"`
 	UnderBuild   bool        `query:"under_build" doc:"Keep only what the build holds directly, which is what has no container above it"`
 	State        []string    `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered"`
 	Outcome      []outcome   `query:"outcome,explode" doc:"Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts"`
@@ -621,8 +623,12 @@ type SittingBody struct {
 	// every binary one source package was built at one version, so a place
 	// named only by its consumer leaves a reader unable to tell one from
 	// another.
-	Component  string `json:"component" doc:"Which package of the source package this place is"`
-	Consumer   string `json:"consumer,omitempty" doc:"What pulls the component in here. Absent under the product itself"`
+	Component string `json:"component" doc:"Which package of the source package this place is"`
+	Consumer  string `json:"consumer,omitempty" doc:"What pulls the component in here. Absent under the product itself"`
+	// DeclaredAs is the producer's own word and nothing here reads it. It is
+	// not a rank input, not a prefilled outcome, and nothing is hidden by it:
+	// reading "build" as "does not ship" is wrong for every compiled language.
+	DeclaredAs string `json:"declared_as,omitempty" doc:"What the producer called this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"`
 	Suppressed bool   `json:"suppressed,omitempty" doc:"The build has already argued this place away"`
 	Decision   int64  `json:"decision,omitempty" doc:"The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument"`
 	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
@@ -947,6 +953,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		sitting := SittingBody{
 			Place: place.PlaceIdentity, Component: place.Component,
 			Consumer: place.Consumer, Suppressed: place.Suppressed,
+			DeclaredAs: place.DeclaredAs,
 		}
 		if place.Decision != nil {
 			sitting.Decision = *place.Decision

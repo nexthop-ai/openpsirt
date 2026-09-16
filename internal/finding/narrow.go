@@ -236,6 +236,19 @@ type Filter struct {
 	// consumer to name.
 	Under         string
 	UnderTheBuild bool
+	// DeclaredAs keeps what a producer scoped one of these ways — "excluded",
+	// "build", "optional". It is the only way to ask about the largest
+	// defensible deferral class a vendor has, and it is a question rather than
+	// an answer: nothing ranks by it, nothing prefills an outcome from it, and
+	// nothing is hidden by it unless somebody asks for it here.
+	//
+	// **Asked of the component's incoming edges in the build, not of the
+	// place.** A component reached from two consumers scoped differently
+	// answers to both words, because the pair of columns a place is cannot be
+	// compared against a set the same way on four engines. What it costs is
+	// stated where the filter is: it is a question about a component in a
+	// build rather than about one route to it.
+	DeclaredAs []string
 	// Beneath keeps what sits at a component or anywhere under it, by the
 	// component's identifier: the same walk over the build's edges the
 	// dependency tree's cumulative count makes, so the number the tree draws
@@ -537,6 +550,19 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			return g
 		})
 		q = q.Where("f.component_id IN (?)", where)
+	}
+	// What the producer called it. Correlated on the build rather than bound
+	// to one, so the cross-product list can ask it too, and the leading column
+	// of the statement is the one the edge index leads with.
+	if words := trimmed(f.DeclaredAs); len(words) > 0 {
+		q = q.Where("f.component_id IN (?)",
+			q.NewSelect().
+				TableExpr(`"graph_edge" AS "ge"`).
+				Join(`JOIN "graph_node" AS "gch" ON gch.id = ge.child_id`).
+				ColumnExpr(`gch.component_id`).
+				Where("ge.target_id = f.target_id").
+				Where("ge.closed_scan_id IS NULL").
+				Where("ge.kind IN (?)", bun.List(words)))
 	}
 	// What holds it. A place records the component that pulls it in, so asking
 	// what is inside a container is asking for places whose consumer is that

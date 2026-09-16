@@ -906,3 +906,58 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	}
 	return rows, nil
 }
+
+// DeclaredScopes is what a producer said about each edge arriving at one
+// component in one build, by the component that pulls it in.
+//
+// Keyed on the puller rather than on the edge row, because that is what a place
+// names: a finding sits at a component under a consumer, and the product itself
+// is a consumer of nothing, which is the zero key here for the same reason a
+// place under the build carries no consumer.
+//
+// A word is present only where the producer stated one, and most inventories
+// state none at all.
+func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
+	componentIDs []int64) (map[[2]int64]string, error) {
+
+	if len(componentIDs) == 0 {
+		return map[[2]int64]string{}, nil
+	}
+	var rows []struct {
+		ChildComponentID  int64  `bun:"child_component_id"`
+		ParentComponentID int64  `bun:"parent_component_id"`
+		ParentIsRoot      bool   `bun:"parent_is_root"`
+		Kind              string `bun:"kind"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"graph_edge" AS "e"`).
+		Join(`JOIN "graph_node" AS "child" ON child.id = e.child_id`).
+		Join(`JOIN "graph_node" AS "parent" ON parent.id = e.parent_id`).
+		ColumnExpr(`child.component_id AS "child_component_id"`).
+		ColumnExpr(`parent.component_id AS "parent_component_id"`).
+		ColumnExpr(`parent.is_root AS "parent_is_root"`).
+		ColumnExpr(`e.kind AS "kind"`).
+		Where("e.target_id = ?", targetID).
+		Where("e.closed_scan_id IS NULL").
+		Where("e.kind <> ?", "").
+		Where("child.component_id IN (?)", bun.List(componentIDs)).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read what the producer called these dependencies: %w", err)
+	}
+	scopes := make(map[[2]int64]string, len(rows))
+	for _, row := range rows {
+		puller := row.ParentComponentID
+		if row.ParentIsRoot {
+			puller = 0
+		}
+		at := [2]int64{row.ChildComponentID, puller}
+		// The first stated word for a pair. A component reached from one
+		// consumer by two edges is one place, and two words for it is the
+		// producer having said two things about the same dependency.
+		if _, already := scopes[at]; !already {
+			scopes[at] = row.Kind
+		}
+	}
+	return scopes, nil
+}
