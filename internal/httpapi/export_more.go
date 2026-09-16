@@ -76,6 +76,8 @@ func registerDueExport(api huma.API, in Ingest) {
 		rights := access.NewStore(in.DB.DB)
 		now := time.Now().UTC()
 		out := Exporting{
+			What:  "what is running out of time",
+			About: []Stated{{"looking ahead days", strconv.Itoa(input.Days)}},
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
 				"product", "stream", "variant", "places", "held by", "due", "days left",
@@ -188,6 +190,16 @@ func registerComparisonExport(api huma.API, in Ingest) {
 			return nil, refusedFinding(in, err)
 		}
 		out := Exporting{
+			What: "comparison of two builds",
+			// Which two builds, because a file headed "comparison" and
+			// naming neither of them is a document nobody can check against
+			// anything, and whether the undisclosed ones are in it: a file
+			// that leaves them out reads as complete about what remains.
+			About: []Stated{
+				{"earlier build", input.From + " (" + input.FromVariant + ")"},
+				{"later build", input.To + " (" + input.ToVariant + ")"},
+				{"includes undisclosed", strconv.FormatBool(input.IncludePrivate)},
+			},
 			Header: []string{
 				"change", "issue", "component", "severity", "because",
 				"from version", "moved to", "arrived from", "closed by run",
@@ -231,6 +243,15 @@ func registerComparisonExport(api huma.API, in Ingest) {
 	})
 }
 
+// asDay is a bound on a period as a file states it, and nothing where the
+// period has no bound on that side.
+func asDay(at time.Time) string {
+	if at.IsZero() {
+		return ""
+	}
+	return at.UTC().Format(time.DateOnly)
+}
+
 // registerAuditExport writes out the record of judgments.
 func registerAuditExport(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
@@ -260,6 +281,8 @@ func registerAuditExport(api huma.API, in Ingest) {
 			return nil, err
 		}
 		out := Exporting{
+			What:  "the record of judgments",
+			About: []Stated{{"from", asDay(since)}, {"to", asDay(until)}},
 			Header: []string{
 				"id", "proposed", "product", "issue", "component", "version", "consumer",
 				"outcome", "justification", "deferred until", "fixed version",
@@ -337,6 +360,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 			return nil, err
 		}
 		out := Exporting{
+			What: "the review queue",
 			Header: []string{
 				"claim", "proposed", "proposed by", "age days", "outcome", "issue",
 				"product", "component", "decisions", "issues", "places", "builds",
@@ -429,7 +453,8 @@ func registerComponentExport(api huma.API, in Ingest) {
 			line = floor.Word
 		}
 		out := Exporting{
-			About:  [2]string{"triaged at or above", line},
+			What:   "findings by component",
+			About:  []Stated{{"triaged at or above", line}},
 			Header: []string{"component", "version", "upstream", "ecosystem", "issues", "places", "exploited"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				groups, _, err := store.ComponentGroups(ctx, subject, scope, limit, offset, narrowed)

@@ -537,7 +537,10 @@ stops is one somebody reads as whole.
 
 | Rule | Reason |
 |---|---|
-| A file states what it is narrowed or computed by, in a header row | A spreadsheet opened six months later has nothing else to say that everything below medium was never in it (REQ-30), or what threshold a true/false column was measured against. One statement, a label and a value, so the record's file — which has no severity line — states nothing rather than an empty one |
+| Every file says what it is and the moment it was taken | Two files in somebody's downloads six months later are two spreadsheets of rows. Written where the file is written rather than asked of each list, because a fact every file must carry is one no file can be written without |
+| A file states what narrowed or computed it, one label and value per fact | A spreadsheet opened six months later has nothing else to say that everything below medium was never in it (REQ-30), what threshold a true/false column was measured against, or which two builds a comparison compares. A fact with nothing to say is left out rather than stated empty |
+| What narrowed it is the request's own query, not a description of the filter | A description assembled field by field is a list somebody keeps in step with the filters, and the one it misses is the one that makes a file read as complete about rows it left out. What was asked for also reproduces the file |
+| The register states no line and says which build it is | It applies no line, and a file claiming to have left things out reads as complete about what remains |
 | Every CSV record is the header's width, statements and markers included | CSV has no comment convention: the `#` opening those two is a data character, and a narrow record makes the document one a conformant reader refuses. Every test here had the field-count check turned off, which is the check that would have said so |
 | One document uses one key convention | The stated fact's key was written with underscores and every column name kept the spaces it is read with on paper, so the same file named its fields two ways |
 | A column of numbers says nothing where there is no number | An unscored finding written as a zero sorted with the genuinely 0.0-rated ones at the bottom of a release meeting's file, and every filter asking for a score below anything took it |

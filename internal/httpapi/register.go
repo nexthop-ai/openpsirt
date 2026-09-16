@@ -145,6 +145,13 @@ func registerRegister(api huma.API, in Ingest) {
 			return nil, refusedFinding(in, err)
 		}
 		out := Exporting{
+			What: "disposition register",
+			// The build it is about, and nothing about a triage line: the
+			// register applies none, and the comment above says why saying so
+			// would be worse than silence.
+			About: []Stated{
+				{"build", input.Product + " " + input.Stream + " (" + input.Variant + ")"},
+			},
 			Header: []string{
 				"issue", "severity", "component", "version", "place", "consumer", "state",
 				"outcome", "justification", "proposed by", "proposed at",

@@ -29,17 +29,26 @@ import (
 // one query shape, so a spreadsheet and a screen cannot disagree about what
 // the filter means.
 type Exporting struct {
-	// About is what the file says about itself above the rows: a label and
-	// the value, stated because a spreadsheet opened six months later has
-	// nowhere else to carry it. The deployment's severity line is the case
-	// this exists for — a file that omits a third of the estate lies by
-	// omission — and the threshold a true/false column was computed against
-	// is the same shape of fact.
+	// What the file is, in the words the report it comes from is known by.
+	// Stated on every export, with the moment it was taken, by writeExport
+	// rather than by each caller: an export that cannot say what it is and
+	// when is not evidence, and a fact every file must carry is one no file
+	// can be written without.
+	What string
+	// About is what else the file says about itself above the rows, each a
+	// label and a value, stated because a spreadsheet opened six months
+	// later has nowhere else to carry it.
 	//
-	// Empty on a file with nothing to state, which writes no statement at
-	// all rather than an empty one: a key reading "triaged at or above"
-	// with nothing after it, on a file about scans, is worse than silence.
-	About  [2]string
+	// **Whatever narrowed it.** The deployment's severity line is the case
+	// this exists for — a file that omits a third of the estate lies by
+	// omission — and which two builds a comparison compares, which window a
+	// report covers and the threshold a true/false column was computed
+	// against are the same shape of fact.
+	//
+	// A fact with nothing to say is left out rather than stated empty: a key
+	// reading "triaged at or above" with nothing after it, on a file about
+	// scans, is worse than silence.
+	About  []Stated
 	Header []string
 	// Rows reads a page at a time, for a list assembled by grouping: the page
 	// is the unit its statement answers in.
@@ -66,6 +75,43 @@ type Exporting struct {
 	// the connection after exportStall, and one that is keeping up holds it
 	// for the seconds the file takes.
 	Stream func(ctx context.Context, each func([]string) error) error
+}
+
+// Stated is one fact a file says about itself.
+type Stated struct {
+	Label string
+	Value string
+}
+
+// preamble is everything the file says about itself: what it is and when it
+// was taken, whatever narrowed it, and the request that produced it.
+//
+// The first two are written here rather than asked of every caller. An export
+// that cannot say what it is and when it was taken is not evidence, and nine
+// files each stating it their own way is nine chances for one of them not to.
+func preamble(out Exporting, now time.Time, asked string) []Stated {
+	said := make([]Stated, 0, len(out.About)+3)
+	if out.What != "" {
+		said = append(said, Stated{"export", out.What})
+	}
+	said = append(said, Stated{"taken on", now.UTC().Format(time.RFC3339)})
+	for _, one := range out.About {
+		if one.Value == "" {
+			continue
+		}
+		said = append(said, one)
+	}
+	// The request's own query, which is what narrowed this file.
+	//
+	// **Taken from the request rather than described from the filter.** A
+	// description assembled field by field is a list somebody has to keep in
+	// step with the filters, and the one it misses is the one that makes the
+	// file read as complete about rows it left out. What was asked for is
+	// also what reproduces the file.
+	if asked != "" {
+		said = append(said, Stated{"narrowed by", asked})
+	}
+	return said
 }
 
 // exportPage is how much is read at a time. The list's own maximum, so the
@@ -211,8 +257,8 @@ var asCSV = exportFormat{
 		// so a two-field record above a fifteen-field header is a document a
 		// conformant reader refuses. Every test here had the field-count
 		// check turned off, which is the check that would have said so.
-		if out.About[0] != "" {
-			_ = w.Write(padded([]string{"# " + out.About[0], out.About[1]}, width))
+		for _, said := range preamble(out, time.Now(), ctx.URL().RawQuery) {
+			_ = w.Write(padded(inert([]string{"# " + said.Label, said.Value}), width))
 		}
 		_ = w.Write(out.Header)
 		return sink{
@@ -236,12 +282,11 @@ var asJSON = exportFormat{
 		// Written by hand rather than marshalled whole, for the reason the
 		// CSV is streamed: the point is that no complete list ever exists in
 		// memory.
-		if out.About[0] != "" {
-			_, _ = fmt.Fprintf(body, `{%s:%s,"items":[`,
-				quoted(asKey(out.About[0])), quoted(out.About[1]))
-		} else {
-			_, _ = fmt.Fprint(body, `{"items":[`)
+		_, _ = fmt.Fprint(body, "{")
+		for _, said := range preamble(out, time.Now(), ctx.URL().RawQuery) {
+			_, _ = fmt.Fprintf(body, "%s:%s,", quoted(asKey(said.Label)), quoted(said.Value))
 		}
+		_, _ = fmt.Fprint(body, `"items":[`)
 		first := true
 		return sink{
 			row: func(row []string) {
@@ -425,7 +470,8 @@ func registerExport(api huma.API, in Ingest) {
 			line = floor.Word
 		}
 		out := Exporting{
-			About: [2]string{"triaged at or above", line},
+			What:  "findings",
+			About: []Stated{{"triaged at or above", line}},
 			Header: []string{
 				"issue", "severity", "score", "exploited", "component", "version",
 				"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
@@ -512,7 +558,8 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 		narrowed.MinSeverity = ""
 		store := finding.NewStore(in.DB.DB)
 		out := Exporting{
-			About: [2]string{"triaged at or above", "each product's own line"},
+			What:  "findings, every product",
+			About: []Stated{{"triaged at or above", "each product's own line"}},
 			Header: []string{
 				"product", "issue", "severity", "score", "exploited", "component", "version",
 				"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",

@@ -98,7 +98,7 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 			return nil, err
 		}
 		out := Exporting{
-			About: [2]string{"taken on", time.Now().UTC().Format(time.DateOnly)},
+			What: "releases out of support",
 			Header: []string{
 				"product", "stream", "kind", "ended_on", "inherited", "ended_days", "open",
 			},

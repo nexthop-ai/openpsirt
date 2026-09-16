@@ -56,20 +56,24 @@ func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
 		// spreadsheet opened six months later has nowhere else to learn that
 		// everything below it was never in there.
 		open := rows(t, "private-triage")
-		if len(open) == 0 || open[0][0] != "# triaged at or above" {
-			t.Fatalf("the export does not state the line: %v", open[0])
+		if states(open)["triaged at or above"] == "" {
+			t.Fatalf("the export does not state the line: %v", states(open))
+		}
+		// And what it is and when it was taken, on every file here.
+		if states(open)["export"] == "" || states(open)["taken on"] == "" {
+			t.Fatalf("the export does not say what it is and when: %v", states(open))
 		}
 		// A header row, then both findings.
-		if len(open) != 4 {
-			t.Fatalf("somebody who may read undisclosed work exported %d lines, want four",
-				len(open))
+		if len(rowsUnder(open)) != 3 {
+			t.Fatalf("somebody who may read undisclosed work exported %d rows, want three",
+				len(rowsUnder(open)))
 		}
 
 		// And somebody who may not read one of them gets a file without it.
 		public := rows(t, "triager")
-		if len(public) != 3 {
-			t.Fatalf("somebody who may not read undisclosed work exported %d lines, want three",
-				len(public))
+		if len(rowsUnder(public)) != 2 {
+			t.Fatalf("somebody who may not read undisclosed work exported %d rows, want two",
+				len(rowsUnder(public)))
 		}
 		for _, row := range public {
 			if strings.Contains(strings.Join(row, " "), "CVE-2026-1000") {
@@ -86,9 +90,14 @@ func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(lines) != 3 {
-			t.Errorf("narrowed to high the export has %d lines, want the line, the header "+
-				"and one row", len(lines))
+		if len(rowsUnder(lines)) != 2 {
+			t.Errorf("narrowed to high the export has %d rows, want the header and one",
+				len(rowsUnder(lines)))
+		}
+		// And the file says what narrowed it, which is what makes it
+		// something somebody can check against anything.
+		if !strings.Contains(states(lines)["narrowed by"], "severity=high") {
+			t.Errorf("the export does not say what narrowed it: %v", states(lines))
 		}
 	})
 }
@@ -170,16 +179,17 @@ func TestAnUnscoredFindingExportsWithNoScoreRatherThanAZero(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the export is not readable as CSV: %v", err)
 		}
+		body := rowsUnder(read)
 		at := -1
-		for i, column := range read[1] {
+		for i, column := range body[0] {
 			if column == "score" {
 				at = i
 			}
 		}
 		if at < 0 {
-			t.Fatalf("the export has no score column: %v", read[1])
+			t.Fatalf("the export has no score column: %v", body[0])
 		}
-		for _, row := range read[2:] {
+		for _, row := range body[1:] {
 			if row[at] != "" {
 				t.Errorf("a finding with no score exported as %q", row[at])
 			}
@@ -232,7 +242,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 		public := lines(t, "triager", "/v1/products/mine/findings/components.csv")
 		issuesIn := func(rows [][]string) string {
 			for _, row := range rows {
-				if len(row) > 4 && row[0] != "component" && row[0] != "# triaged at or above" {
+				if len(row) > 4 && row[0] != "component" && !strings.HasPrefix(row[0], "# ") {
 					return row[4]
 				}
 			}
@@ -244,14 +254,14 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 		if issuesIn(public) != "1" {
 			t.Errorf("somebody who may read one saw %q issues on the component", issuesIn(public))
 		}
-		if open[0][0] != "# triaged at or above" {
-			t.Errorf("the by-component export does not state the line: %v", open[0])
+		if states(open)["triaged at or above"] == "" {
+			t.Errorf("the by-component export does not state the line: %v", states(open))
 		}
 
 		// The record of judgments. Nothing has been judged in this fixture, so
 		// what it must produce is a header and no rows — an empty answer is an
 		// answer, and a file that failed to open is not.
-		record := lines(t, "private-triage", "/v1/audit.csv")
+		record := rowsUnder(lines(t, "private-triage", "/v1/audit.csv"))
 		if len(record) == 0 || record[0][0] != "id" {
 			t.Fatalf("the record's export has no header: %v", record)
 		}
@@ -261,7 +271,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 
 		// The review queue, likewise: nothing waits, and the columns still
 		// come out so a spreadsheet opens.
-		queue := lines(t, "private-triage", "/v1/review-queue.csv")
+		queue := rowsUnder(lines(t, "private-triage", "/v1/review-queue.csv"))
 		if len(queue) == 0 || queue[0][0] != "claim" {
 			t.Fatalf("the review queue's export has no header: %v", queue)
 		}
@@ -273,15 +283,15 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 		// approver sees the claim and its proposer does not, and `mine`
 		// reverses that. A file that answered the same for both would be a
 		// backlog report about somebody else's work.
-		waiting := lines(t, "reviewer", "/v1/review-queue.csv")
+		waiting := rowsUnder(lines(t, "reviewer", "/v1/review-queue.csv"))
 		if len(waiting) != 2 {
 			t.Fatalf("an approver's queue exported %d rows, wanted the claim", len(waiting)-1)
 		}
-		theirs := lines(t, "triager", "/v1/review-queue.csv")
+		theirs := rowsUnder(lines(t, "triager", "/v1/review-queue.csv"))
 		if len(theirs) != 1 {
 			t.Errorf("the proposer's own claim is in their queue export: %v", theirs)
 		}
-		own := lines(t, "triager", "/v1/review-queue.csv?mine=true")
+		own := rowsUnder(lines(t, "triager", "/v1/review-queue.csv?mine=true"))
 		if len(own) != 2 {
 			t.Errorf("asking for their own, the proposer exported %d rows", len(own)-1)
 		}
@@ -291,7 +301,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 			`{"batch":"a-batch"}`); got.Code >= 300 {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
-		agreed := lines(t, "private-triage", "/v1/audit.csv")
+		agreed := rowsUnder(lines(t, "private-triage", "/v1/audit.csv"))
 		if len(agreed) != 2 || agreed[1][14] == "" || agreed[1][15] != "true" {
 			t.Fatalf("with an agreement, the record exported %v", agreed)
 		}
@@ -299,7 +309,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 			"/v1/approval-batches/a-batch", ""); got.Code >= 300 {
 			t.Fatalf("taking the agreement back answered %d: %s", got.Code, got.Body.String())
 		}
-		back := lines(t, "private-triage", "/v1/audit.csv")
+		back := rowsUnder(lines(t, "private-triage", "/v1/audit.csv"))
 		if len(back) != 2 {
 			t.Fatalf("after the agreement was taken back, the record exported %v", back)
 		}
@@ -342,7 +352,7 @@ func TestAnExportAnswersTheSameQuestionAsTheListItCameFrom(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 
-		listed := func(t *testing.T, at, query string) int {
+		counted := func(t *testing.T, at, query string) int {
 			t.Helper()
 			var page struct {
 				Total int `json:"total"`
@@ -389,7 +399,7 @@ func TestAnExportAnswersTheSameQuestionAsTheListItCameFrom(t *testing.T) {
 			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "tag=nothing-is-marked-this"},
 			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "assigned=nobody"},
 		} {
-			want := listed(t, each.list, each.query)
+			want := counted(t, each.list, each.query)
 			if got := exported(t, each.file, each.query); got != want {
 				t.Errorf("%s?%s lists %d and exports %d", each.list, each.query, want, got)
 			}
@@ -522,27 +532,28 @@ func TestTheCrossProductExportCarriesTheProductAndTheVisibility(t *testing.T) {
 		}
 		// Each product applies its own line, so the file says that rather than
 		// naming a number that would be wrong for every product but one.
-		if open[0][0] != "# triaged at or above" || open[0][1] != "each product's own line" {
-			t.Errorf("the file does not say how the line was applied: %v", open[0])
+		if states(open)["triaged at or above"] != "each product's own line" {
+			t.Errorf("the file does not say how the line was applied: %v", states(open))
 		}
+		body := rowsUnder(open)
 		// The product is the column this route exists for.
-		if open[1][0] != "product" {
-			t.Errorf("the first column is %q, want the product", open[1][0])
+		if body[0][0] != "product" {
+			t.Errorf("the first column is %q, want the product", body[0][0])
 		}
-		if len(open) != 4 {
-			t.Fatalf("somebody who may read undisclosed work exported %d lines, want four",
-				len(open))
+		if len(body) != 3 {
+			t.Fatalf("somebody who may read undisclosed work exported %d rows, want three",
+				len(body))
 		}
-		for _, row := range open[2:] {
+		for _, row := range body[1:] {
 			if row[0] == "" {
 				t.Error("a row came out with no product in it")
 			}
 		}
 
 		// The same request, by somebody who may not read one of the two.
-		public := rows(t, "triager", "")
-		if len(public) != 3 {
-			t.Fatalf("somebody who may not read undisclosed work exported %d lines, want three",
+		public := rowsUnder(rows(t, "triager", ""))
+		if len(public) != 2 {
+			t.Fatalf("somebody who may not read undisclosed work exported %d rows, want two",
 				len(public))
 		}
 		for _, row := range public {
@@ -554,9 +565,12 @@ func TestTheCrossProductExportCarriesTheProductAndTheVisibility(t *testing.T) {
 		// And it takes the list's filters, so the file and the screen cannot
 		// disagree about what was asked for.
 		narrowed := rows(t, "private-triage", "?severity=high")
-		if len(narrowed) != 3 {
-			t.Errorf("narrowed to high the export has %d lines, want the line, the header "+
-				"and one row", len(narrowed))
+		if len(rowsUnder(narrowed)) != 2 {
+			t.Errorf("narrowed to high the export has %d rows, want the header and one",
+				len(rowsUnder(narrowed)))
+		}
+		if !strings.Contains(states(narrowed)["narrowed by"], "severity=high") {
+			t.Errorf("the export does not say what narrowed it: %v", states(narrowed))
 		}
 	})
 }
@@ -647,21 +661,22 @@ func TestCoverageStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T
 			t.Fatalf("coverage exported %d lines, want the statement, the header and a build",
 				len(lines))
 		}
-		if lines[0][0] != "# quiet after days" || lines[0][1] == "" {
-			t.Errorf("coverage does not state its threshold: %v", lines[0])
+		if states(lines)["quiet after days"] == "" {
+			t.Errorf("coverage does not state its threshold: %v", states(lines))
 		}
+		columns := rowsUnder(lines)[0]
 		// Named rather than counted from, because an index moves silently when
 		// a column is added and the assertion goes on passing about the wrong
 		// one. The two that matter here are the first and the quiet flag the
 		// statement above was computed for.
-		if lines[1][0] != "product" || indexOf(lines[1], "quiet") < 0 {
-			t.Errorf("coverage's columns moved: %v", lines[1])
+		if columns[0] != "product" || indexOf(columns, "quiet") < 0 {
+			t.Errorf("coverage's columns moved: %v", columns)
 		}
 		// The pair that tells a build nobody uploads to apart from one whose
 		// uploads are refused. Both read as quiet and they are different
 		// faults.
-		if indexOf(lines[1], "last_refused_at") < 0 || indexOf(lines[1], "refused_because") < 0 {
-			t.Errorf("coverage does not say whether anybody is trying: %v", lines[1])
+		if indexOf(columns, "last_refused_at") < 0 || indexOf(columns, "refused_because") < 0 {
+			t.Errorf("coverage does not say whether anybody is trying: %v", columns)
 		}
 
 		// Narrowed the way the screen is. An export that built the list first
@@ -706,4 +721,101 @@ func indexOf(row []string, name string) int {
 		}
 	}
 	return -1
+}
+
+// states is what a file says about itself, by label.
+//
+// Read by name rather than by position. An export states what it is, when it
+// was taken and whatever narrowed it, so counting from the top of the file is
+// a test that fails the day a file says one more true thing about itself.
+func states(rows [][]string) map[string]string {
+	out := map[string]string{}
+	for _, row := range rows {
+		if len(row) < 2 || !strings.HasPrefix(row[0], "# ") {
+			break
+		}
+		out[strings.TrimPrefix(row[0], "# ")] = row[1]
+	}
+	return out
+}
+
+// rowsUnder is the header and the rows, with what the file says about itself
+// taken off.
+func rowsUnder(rows [][]string) [][]string {
+	for i, row := range rows {
+		if len(row) == 0 || !strings.HasPrefix(row[0], "# ") {
+			return rows[i:]
+		}
+	}
+	return nil
+}
+
+// TestEveryExportSaysWhatItIsAndWhenItWasTaken walks the API document rather
+// than a list somebody maintains.
+//
+// A file that cannot say what it is and when it was taken is not evidence, and
+// the way that fails is one export added later that states nothing — which no
+// test of the other nine would notice.
+func TestEveryExportSaysWhatItIsAndWhenItWasTaken(t *testing.T) {
+	// A value for every path and required query parameter an export takes.
+	// Unfilled, the request is refused and the file is never looked at, so an
+	// unknown name fails the test rather than skipping the route.
+	filled := map[string]string{
+		"product": "mine", "stream": "master", "variant": "broadcom", "format": "csv",
+		"from": "master", "from_variant": "broadcom",
+		"to": "master", "to_variant": "broadcom",
+	}
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		examined := 0
+		for path, item := range r.api.OpenAPI().Paths {
+			if item.Get == nil || !strings.HasSuffix(path, ".{format}") {
+				continue
+			}
+			at := path
+			query := ""
+			for _, param := range item.Get.Parameters {
+				value, known := filled[param.Name]
+				switch {
+				case param.In == "path" && !known:
+					t.Errorf("GET %s takes a path parameter %q this does not know how to fill",
+						path, param.Name)
+				case param.In == "path":
+					at = strings.ReplaceAll(at, "{"+param.Name+"}", value)
+				case param.Required && !known:
+					t.Errorf("GET %s requires %q and this does not know what to send",
+						path, param.Name)
+				case param.Required:
+					query += "&" + param.Name + "=" + value
+				}
+			}
+			if strings.Contains(at, "{") {
+				continue
+			}
+			if query != "" {
+				query = "?" + strings.TrimPrefix(query, "&")
+			}
+			got := asPerson(t, r, "private-triage", http.MethodGet, at+query, "")
+			if got.Code != http.StatusOK {
+				t.Errorf("GET %s%s answered %d: %s", at, query, got.Code, got.Body.String())
+				continue
+			}
+			reader := csv.NewReader(strings.NewReader(got.Body.String()))
+			rows, err := reader.ReadAll()
+			if err != nil {
+				t.Errorf("%s is not a spreadsheet: %v", at, err)
+				continue
+			}
+			examined++
+			if states(rows)["export"] == "" {
+				t.Errorf("%s does not say what it is: %v", at, states(rows))
+			}
+			if states(rows)["taken on"] == "" {
+				t.Errorf("%s does not say when it was taken: %v", at, states(rows))
+			}
+		}
+		if examined == 0 {
+			t.Fatal("no exports were read, so this checked nothing")
+		}
+	})
 }

@@ -1082,7 +1082,8 @@ func registerCoverageExport(api huma.API, in Ingest) {
 			return nil, refused(in.Logger, err, "what has been scanned could not be read")
 		}
 		out := Exporting{
-			About: [2]string{"quiet after days", strconv.Itoa(int(quietAfter.Hours() / 24))},
+			What:  "scanning",
+			About: []Stated{{"quiet after days", strconv.Itoa(int(quietAfter.Hours() / 24))}},
 			Header: []string{
 				"product", "stream", "kind", "variant",
 				"last_received_at", "last_refused_at", "refused_because",

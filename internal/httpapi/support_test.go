@@ -107,11 +107,17 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 		if len(lines) < 3 {
 			t.Fatalf("%d lines, want the statement, the header and a release", len(lines))
 		}
-		if lines[0][0] != "# taken on" || lines[0][1] == "" {
-			t.Errorf("the file does not say when it was taken: %v", lines[0])
+		if states(lines)["taken on"] == "" {
+			t.Errorf("the file does not say when it was taken: %v", states(lines))
 		}
-		if lines[2][0] != "mine" || lines[2][1] != "master" {
-			t.Errorf("the release is not in the file: %v", lines[2])
+		// And what it is, which is the half that tells one file from another
+		// once both are in somebody's downloads.
+		if states(lines)["export"] == "" {
+			t.Errorf("the file does not say what it is: %v", states(lines))
+		}
+		release := rowsUnder(lines)[1]
+		if release[0] != "mine" || release[1] != "master" {
+			t.Errorf("the release is not in the file: %v", release)
 		}
 	})
 }
