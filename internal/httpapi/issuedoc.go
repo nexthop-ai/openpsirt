@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -24,11 +25,10 @@ const howManyJudgments = 200
 
 // registerIssueDocument renders everything known about one issue.
 //
-// **The question a customer inquiry arrives as**, and the answer was four
-// screens and a copy-paste: what the issue is, which of our products carry it,
-// what was decided about each, and what is left. Assembled by hand it is
-// assembled differently every time, and the half somebody forgets is the half
-// that mattered.
+// **The question a customer inquiry arrives as**: what the issue is, which of
+// our products carry it, what was decided about each, and the argument behind
+// each judgment — in one document, so that two people answering the same
+// inquiry answer it the same way.
 //
 // **An internal document.** It carries the reasoning behind each judgment,
 // which is this deployment's argument rather than its word to a customer — the
@@ -84,6 +84,15 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		// An identifier nobody here has seen answers as one that sits only in
 		// products this reader cannot see, for the reason the issue's own
 		// route answers both the same way.
+		//
+		// **A read that could not be made is neither.** That is what the
+		// sentinel is for — a name nobody has filed is a 404 and a database
+		// that is down is a fault — and answering a customer inquiry "nothing
+		// of yours is affected" because a query failed is the worst of the
+		// three answers.
+		if !errors.Is(err, finding.ErrNoSuchIssue) {
+			return "", wentWrong(in.Logger, "what issue this is could not be read", err)
+		}
 		return unaffected(name), nil
 	}
 	rows, total, err := finding.NewStore(in.DB.DB).Everywhere(ctx, subject, id, howManyJudgments)
@@ -156,7 +165,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	}
 
 	// And what was decided, with the argument each judgment rests on.
-	judged, _, err := triage.NewStore(in.DB.DB).Audit(ctx, subject,
+	judged, decided, err := triage.NewStore(in.DB.DB).Audit(ctx, subject,
 		triage.Filter{Issue: known.Identifier}, time.Time{}, time.Time{},
 		howManyJudgments, 0)
 	if err != nil {
@@ -166,6 +175,14 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	if len(judged) == 0 {
 		out.WriteString("Nothing. Every place of it is open and undecided.\n")
 		return out.String(), nil
+	}
+	// Said where it is a page of a longer record, the way the places above
+	// say it. An issue at a widely vendored component carries hundreds of
+	// judgments, and a document that stopped at two hundred silently reads as
+	// the whole of it.
+	if len(judged) < decided {
+		fmt.Fprintf(&out, "%d judgments stand. The %d most recent are below.\n\n",
+			decided, len(judged))
 	}
 	// Newest first, which is how the record reads: what stands now is what
 	// somebody is looking for, and the history is under it.
@@ -249,7 +266,7 @@ func pointing(known finding.Named, references []finding.Reference) []string {
 	var out []string
 	for _, at := range append([]string{known.Advisory}, urlsOf(references)...) {
 		at = strings.TrimSpace(at)
-		if at == "" || seen[at] || markdown.Addressable(at) != nil {
+		if at == "" || seen[at] || markdown.Autolinkable(at) != nil {
 			continue
 		}
 		seen[at] = true

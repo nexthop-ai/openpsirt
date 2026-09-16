@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -84,6 +85,12 @@ func registerIssue(api huma.API, in Ingest) {
 		issues := finding.NewVulnerabilities(in.DB.DB)
 		id, err := issues.ByName(ctx, input.Vulnerability)
 		if err != nil {
+			// A read that could not be made is not an answer about what this
+			// reader is affected by. The sentinel is what tells the two
+			// apart, which is what it is for.
+			if !errors.Is(err, finding.ErrNoSuchIssue) {
+				return nil, wentWrong(in.Logger, "what issue this is could not be read", err)
+			}
 			// **Not affected is an answer, and it is the one a customer
 			// inquiry asks for.** This refused with a 404, so the question
 			// "are you affected by this" could be answered "yes, here" and

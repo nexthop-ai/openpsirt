@@ -99,6 +99,35 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 	})
 }
 
+func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
+	// "Nothing of yours is affected" is the answer an inquiry is usually
+	// asking for, which is why it is a document rather than a refusal — and
+	// exactly why a query that could not be made must not produce it. The
+	// sentinel is what tells a name nobody has filed from a read that failed.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		// The table the name is resolved against, gone. A database that is
+		// down is the real shape of this; dropping one table is the smallest
+		// version of it a test can arrange.
+		if _, err := r.db.DB.NewDropTable().
+			Table("vulnerability_alias").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		for _, at := range []string{
+			"/v1/issues/CVE-2026-9999",
+			"/v1/issues/CVE-2026-9999/document",
+		} {
+			got := asPerson(t, r, "triager", http.MethodGet, at, "")
+			if got.Code != http.StatusInternalServerError {
+				t.Errorf("%s answered %d to a read that could not be made", at, got.Code)
+			}
+			if strings.Contains(got.Body.String(), "Nothing you can see carries") {
+				t.Errorf("%s told a customer they are not affected: %s", at, got.Body.String())
+			}
+		}
+	})
+}
+
 // TestEverythingKnownAboutOneIssueIsADocument is the form a customer inquiry
 // is answered in.
 //

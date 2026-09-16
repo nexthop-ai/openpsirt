@@ -267,12 +267,15 @@ func said(row Changed) string {
 // writtenUp is where the issue is written up, as a link, or nothing.
 //
 // The address comes from a scan or a feed and goes into a document somebody
-// publishes, so it passes the same rule an address stored beside a claim
-// does: a scheme a reader's machine would act on is not something to hand
-// them, and one that fails it is left out rather than printed as text.
+// publishes, so it passes the rule for an address written into one: a scheme
+// a reader's machine would act on is not something to hand them, and one
+// carrying a space or an angle bracket is not a link at all — it ends the
+// autolink and the rest of the line becomes content. A feed storing a
+// newline in its own address would otherwise write whole lines into a
+// customer's release note.
 func writtenUp(row Changed) string {
 	url := strings.TrimSpace(row.Advisory)
-	if url == "" || markdown.Addressable(url) != nil {
+	if url == "" || markdown.Autolinkable(url) != nil {
 		return ""
 	}
 	return " — <" + url + ">"

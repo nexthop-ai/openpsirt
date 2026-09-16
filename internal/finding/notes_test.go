@@ -294,6 +294,15 @@ func TestABulletCarriesWhatDecidesWhenTheUpgradeIsTaken(t *testing.T) {
 				// through, and this one leaves the building.
 				Advisory: "ms-msdt:calc",
 			},
+			{
+				Vulnerability: "CVE-2026-3", Component: "linux-image", Severity: "low",
+				Because: finding.Upgraded, FromVersion: "6.12.41-1", MovedTo: "6.12.85-1",
+				// A scheme nothing refuses, carrying a newline. Inside angle
+				// brackets the address ends at the first space, so the rest
+				// of it is not a link — it is markdown, in a document going
+				// to a customer.
+				Advisory: "https://example.test/x\n\n## Fixed upstream\n- nothing",
+			},
 		},
 	})
 	if !strings.Contains(notes, "CVE-2026-1 (critical, 9.8, known exploited)") {
@@ -309,5 +318,10 @@ func TestABulletCarriesWhatDecidesWhenTheUpgradeIsTaken(t *testing.T) {
 	// that reads as harmless.
 	if !strings.Contains(notes, "CVE-2026-2 (low)") {
 		t.Errorf("an unscored issue does not read as unscored:\n%s", notes)
+	}
+	// And an address that would close the autolink is left out rather than
+	// printed: what follows it is whole markdown lines a feed chose.
+	if strings.Contains(notes, "Fixed upstream") {
+		t.Errorf("a feed wrote lines into a published note:\n%s", notes)
 	}
 }
