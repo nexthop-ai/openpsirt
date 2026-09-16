@@ -84,7 +84,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		Issues      int    `bun:"issues"`
 	}
 	held := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`MIN(c.name) AS "name"`).

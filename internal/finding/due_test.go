@@ -304,7 +304,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			// is one argument, and this row says where it lands.
 			claimID := claimSaying(t, f.db, somebody.ID, outcome)
 			if until != nil {
-				if _, err := f.db.DB.NewUpdate().TableExpr("claim").
+				if _, err := f.db.DB.NewUpdate().TableExpr("\"claim\"").
 					Set("deferred_until = ?", until.UTC()).
 					Where("id = ?", claimID).Exec(ctx); err != nil {
 					t.Fatalf("record when it defers to: %v", err)
@@ -320,7 +320,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 				"component_upstream_version": version,
 				"live_key":                   "the-live-key",
 			}
-			if _, err := f.db.DB.NewInsert().Model(&row).TableExpr("decision").Exec(ctx); err != nil {
+			if _, err := f.db.DB.NewInsert().Model(&row).TableExpr("\"decision\"").Exec(ctx); err != nil {
 				t.Fatalf("record a %s claim: %v", state, err)
 			}
 		}
@@ -353,7 +353,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		// standing, and while it is returned nobody is relying on it.
 		sendBack := func() {
 			t.Helper()
-			if _, err := f.db.DB.NewUpdate().TableExpr("decision").
+			if _, err := f.db.DB.NewUpdate().TableExpr("\"decision\"").
 				Set("sent_back_at = ?", time.Now().UTC()).
 				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
 				t.Fatalf("send the claim back: %v", err)
@@ -395,8 +395,8 @@ func (f *fixture) deadline(t *testing.T, identifier string) time.Time {
 	t.Helper()
 	var due time.Time
 	err := f.db.DB.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr("\"finding\" AS \"f\"").
+		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
 		ColumnExpr("f.due_at").
 		Where("v.identifier = ?", identifier).
 		Where("f.closed_at IS NULL").
@@ -524,8 +524,8 @@ func (f *fixture) deadlineOrZero(t *testing.T, identifier string) time.Time {
 	t.Helper()
 	var due *time.Time
 	err := f.db.DB.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr("\"finding\" AS \"f\"").
+		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
 		ColumnExpr("f.due_at").
 		Where("v.identifier = ?", identifier).
 		Where("f.closed_at IS NULL").
@@ -544,8 +544,8 @@ func (f *fixture) urgency(t *testing.T, identifier string) int64 {
 	t.Helper()
 	var rank int64
 	err := f.db.DB.NewSelect().
-		TableExpr("finding AS f").
-		Join("JOIN vulnerability AS v ON v.id = f.vulnerability_id").
+		TableExpr("\"finding\" AS \"f\"").
+		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
 		ColumnExpr("MAX(f.urgency)").
 		Where("v.identifier = ?", identifier).
 		Where("f.closed_at IS NULL").
@@ -571,10 +571,10 @@ func (f *fixture) ratingsIn(t *testing.T, productID int64, identifier string) (s
 		Assessed  string `bun:"assessed"`
 	}
 	err := f.db.DB.NewSelect().
-		TableExpr("vulnerability AS v").
+		TableExpr("\"vulnerability\" AS \"v\"").
 		Join(rating.Here, productID).
 		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
-		ColumnExpr("COALESCE(ir.severity, '') AS assessed").
+		ColumnExpr("COALESCE(ir.severity, '') AS \"assessed\"").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &row)
 	if err != nil {
@@ -600,7 +600,7 @@ func (f *fixture) issue(t *testing.T, identifier string) int64 {
 	t.Helper()
 	var id int64
 	err := f.db.DB.NewSelect().
-		TableExpr("vulnerability AS v").
+		TableExpr("\"vulnerability\" AS \"v\"").
 		ColumnExpr("v.id").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &id)
@@ -643,7 +643,7 @@ func (f *fixture) recorded(t *testing.T, id int64, identity string) {
 			"email_source": "", "digest": false, "digest_unassigned": false,
 			"created_at": time.Now().UTC().Truncate(time.Microsecond),
 		}).
-		TableExpr("person").
+		TableExpr("\"person\"").
 		Exec(t.Context())
 	if err != nil {
 		t.Fatalf("record a person to hang a claim on: %v", err)
@@ -814,7 +814,7 @@ func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
 			seen := time.Now().UTC().Add(-time.Duration(10+i*10) * 24 * time.Hour).
 				Truncate(time.Microsecond)
 			opened[each] = seen
-			if _, err := f.db.DB.NewUpdate().TableExpr("finding AS f").
+			if _, err := f.db.DB.NewUpdate().TableExpr("\"finding\" AS \"f\"").
 				Set("opened_at = ?", seen).
 				Where(`f.vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v"`+
 					` WHERE v.identifier = ?)`, each).

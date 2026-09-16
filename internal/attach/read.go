@@ -320,7 +320,7 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 	}
 	var issue int64
 	err = s.db.NewSelect().
-		TableExpr(`vulnerability AS "v"`).
+		TableExpr(`"vulnerability" AS "v"`).
 		ColumnExpr("v.id").
 		// Against the folded column rather than a function of the
 		// identifier, which is what the column is for: both sides are

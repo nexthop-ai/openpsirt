@@ -218,7 +218,7 @@ func supplierOf(t *testing.T, f *fixture, identity string) string {
 	t.Helper()
 	var said string
 	err := f.db.DB.NewSelect().
-		TableExpr("component AS c").
+		TableExpr("\"component\" AS \"c\"").
 		ColumnExpr("COALESCE(c.supplier, '')").
 		Where("c.identity = ?", identity).
 		Scan(t.Context(), &said)

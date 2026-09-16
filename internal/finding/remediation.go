@@ -117,10 +117,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Issues  int     `bun:"issues"`
 	}
 	closed := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.For(rating.OnStream)).
 		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
@@ -152,9 +152,9 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// What opened in the same window, as distinct issues, so the two figures
 	// are in the same unit and can be read against each other.
 	opened := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.vulnerability_id").
 		Where("f.opened_at >= ?", since).
 		GroupExpr("f.vulnerability_id")
@@ -172,9 +172,9 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	for _, bucket := range agingBuckets {
 		older := now.Add(-time.Duration(bucket.from) * 24 * time.Hour)
 		q := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("f.vulnerability_id").
 			Where("f.closed_at IS NULL").
 			Where("f.opened_at <= ?", older).
@@ -220,9 +220,9 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		// question, not "which build of it".
 		standing, held := InForce()
 		unanswered := q.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("f.vulnerability_id").
 			Where("f.closed_at IS NULL").
 			Where("f.opened_at <= ?", older).
@@ -255,7 +255,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 // is one value by construction: severity belongs to the issue rather than to
 // the place, and MIN over one value is that value.
 func byBandOf(from *bun.SelectQuery) *bun.SelectQuery {
-	return from.Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+	return from.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		// Each row's own product rates it, read through the stream this query
 		// already joins. Without it the plan reported the published rating
 		// while the list it is a summary of reported the product's own.

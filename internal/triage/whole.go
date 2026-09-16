@@ -172,15 +172,15 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		Findings  int `bun:"findings"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
-		Join(`CROSS JOIN finding AS "f"`).
+		Join(`CROSS JOIN "finding" AS "f"`).
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("COUNT(DISTINCT "+finding.FoldedOn+`) AS "folds"`).
 		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
 		ColumnExpr(`COUNT(DISTINCT f.consumer_id) AS "consumers"`).

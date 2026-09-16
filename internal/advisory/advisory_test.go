@@ -239,8 +239,8 @@ func (f *fixture) alsoIn(t *testing.T, identifier string, target int64) {
 	}
 	var componentID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("graph_node AS n").
-		Join("JOIN component AS c ON c.id = n.component_id").
+		TableExpr("\"graph_node\" AS \"n\"").
+		Join("JOIN \"component\" AS \"c\" ON c.id = n.component_id").
 		ColumnExpr("c.id").
 		Where("n.target_id = ?", target).
 		Where("c.name = ?", carrier.Name).

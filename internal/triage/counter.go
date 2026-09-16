@@ -106,7 +106,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Issues    int    `bun:"issues"`
 	}
 	undecided := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).

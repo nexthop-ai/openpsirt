@@ -203,12 +203,12 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		OnTag             int    `bun:"on_tag"`
 	}
 	query := tx.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		// What this product rates the issue, which is the rating in force
 		// here. The read spans products, so each row reads its own stream's.
 		Join(rating.For(rating.OnStream)).

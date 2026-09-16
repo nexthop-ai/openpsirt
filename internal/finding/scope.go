@@ -104,8 +104,8 @@ func (s *Store) buildsIn(ctx context.Context, db bun.IDB, scope Scope,
 
 	var ids []int64
 	q := db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("tg.id").
 		OrderExpr("tg.id")
 	q = scope.Narrow(q)

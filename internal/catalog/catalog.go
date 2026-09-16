@@ -379,7 +379,7 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 		Product *time.Time `bun:"product_eol"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`stream AS "s"`).
+		TableExpr(`"stream" AS "s"`).
 		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
 		ColumnExpr(`s.eol_on AS "stream_eol"`).
 		ColumnExpr(`p.eol_on AS "product_eol"`).
@@ -445,7 +445,7 @@ func (s *Store) StreamsPastEndOfLife(ctx context.Context, at time.Time) ([]int64
 	day := at.UTC().Truncate(24 * time.Hour)
 	var past []int64
 	err := s.db.NewSelect().
-		TableExpr(`stream AS "s"`).
+		TableExpr(`"stream" AS "s"`).
 		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
 		ColumnExpr("s.id").
 		// The release's own date where it has one, the product's otherwise —

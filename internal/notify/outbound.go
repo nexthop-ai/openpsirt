@@ -31,12 +31,12 @@ const signalTimeout = 15 * time.Second
 
 // One signed request out, one shape for every destination.
 //
-// **Nothing left this deployment but mail**, and every comparable tool reaches
-// a chat channel and a tracker. Without one, a fix target is a wish and an
-// approver discovers a claim by opening the queue. One signed HTTP request
-// gives Slack, Teams, a tracker driven by automation and paging without an
-// adapter for any of them — which is what the channel interface was for,
-// reached more cheaply than by writing two of them.
+// Mail alone reaches a person who is already looking. Every comparable tool
+// reaches a chat channel and a tracker, and without one a fix target is a wish
+// and an approver discovers a claim by opening the queue. One signed HTTP
+// request gives Slack, Teams, a tracker driven by automation and paging
+// without an adapter for any of them, which is what the channel interface was
+// for and is reached more cheaply than by writing two of them.
 //
 // **It carries what the channel rules already allow.** The body is composed by
 // the same code that composes a mail, so a notification about a

@@ -191,7 +191,7 @@ inputs.
 | REQ-62 | Every operation declares what it asks of a caller, and a gate refuses one that declares nothing | "Who may call this" should not be a question you read source code to answer |
 | REQ-63 | Documentation is published, versioned, and built from the same specification the application serves. The application itself serves none | It leaves no unauthenticated route at all |
 | REQ-64 | Findings are answerable across every product a caller may see, and one page answers for an issue | "A critical just landed in openssl — which of our products ship an affected version" |
-| REQ-65 | Markdown is what a person writes and what the API returns, with what each reference resolved to traveling beside it | An integrator can lay out markdown; resolving a mention needs data and checks they do not hold |
+| REQ-65 | Markdown is what a person writes and what the API returns, with what each reference resolved to traveling beside it. A reference to a person or to an attached file is resolved; a vulnerability identifier is its own address and is not | An integrator can lay out markdown; resolving a mention needs data and checks they do not hold. An identifier needs neither, so resolving one would be work done on their behalf that they can do without asking |
 
 ### 3.15 Security
 

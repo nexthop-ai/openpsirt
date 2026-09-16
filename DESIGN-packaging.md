@@ -9,11 +9,12 @@ Satisfies REQ-01, REQ-02, REQ-04, and the probe behavior REQ-72 requires.
 - [Image structure](#image-structure)
 - [Base version](#base-version)
 - [Bundled scanner](#bundled-scanner)
-- [Image checks in CI](#image-checks-in-ci)
+- [Image and archive checks](#image-and-archive-checks)
 - [Chart probes](#chart-probes)
 - [Starting and stopping](#starting-and-stopping)
 - [Chart security context](#chart-security-context)
 - [Render-time refusals](#render-time-refusals)
+- [Where a secret comes from](#where-a-secret-comes-from)
 - [Self-inventories](#self-inventories)
 - [Inventory composition](#inventory-composition)
 - [Release assets](#release-assets)
@@ -83,7 +84,7 @@ chart mounts a volume. The default is scratch space living as long as the pod,
 which re-downloads on every start; a deployment that restarts often points it at
 a claim. The image and the chart read the directory from one value in the chart.
 
-## Image checks in CI
+## Image and archive checks
 
 These are the only places these claims are tested rather than asserted.
 
@@ -93,6 +94,17 @@ These are the only places these claims are tested rather than asserted.
 | It is not running as root | A security context regression |
 | The bundled scanner runs | A scanner binary that does not execute in this base |
 | It serves the interface | An image built with no interface, which answers the page's path with a credential refusal rather than a page |
+| The archive's binary serves the interface | The same build with no interface in it, in the form somebody runs by hand |
+
+**They run against a release as well as against a change.** The image a
+release publishes is built from a fresh checkout with its base upgraded as it
+builds, so it is a different set of bytes from the one a merge was gated on,
+and the scanner it bundles can stop working in between. A deployment that
+cannot scan ingests inventories it never reads.
+
+The archive is asked the same question as the image and in the same words, so
+the two cannot drift: it is started on a port nothing else holds, with a
+throwaway database, and asked for the page.
 
 ## Chart probes
 
@@ -152,12 +164,45 @@ cannot work moves the failure to a crash-looping pod and a message nobody reads.
 | A mail server with no address to send as | Mail configured halfway comes up healthy and sends nothing (REQ-02) |
 | An address with no server | |
 | A password with no username | |
+| A sign-in provider with no client secret | The process refuses to start without one, so the install would render cleanly and never come up |
+| An OIDC provider with no username claim | The same, and there is no default: what an authorization is redeemed against is a question only the deployment's operator can answer |
+| A secret given both ways at once | The chart writes no Secret when one is named, so the value in the values file would be ignored without a word — the rule the database URL already follows |
 
 Mail is opt-in, so refusing half of it costs a deployment that wants none of it
 nothing (REQ-49).
 
-Each refusal is tested by asserting that it fires, not by asserting that a good
-install renders.
+Each refusal is tested by asserting that it fires, and the count of refusals
+examined is printed, because a loop that checked nothing reads exactly like one
+that found nothing wrong.
+
+A legal install is tested the other way round, and read out of the render
+rather than compared against a list: every `secretKeyRef` a legal install
+produces is resolved against the Secrets that same install creates. A list
+written beside the check would give a fifth secret source no row, and stay
+green on the defect it exists for.
+
+## Where a secret comes from
+
+| Value | Where it is read from |
+|---|---|
+| Set in the values | A Secret the chart creates, under a key of the chart's own |
+| A Secret the operator names | That Secret, under the key they name beside it |
+| Both | Refused at render. One of them would be ignored, and which one is not something to leave a reader to work out |
+| Neither, for the mail password | Nothing is asked for. Mail is opt-in and a server may want no credentials |
+| Neither, for a sign-in provider | Refused at render, because the process refuses to start without one |
+
+The key an operator names is read only where they also name the Secret. A
+Secret the chart created holds the value under the chart's key, and asking for
+the operator's key name there asks for a key that is not there — which renders
+perfectly and produces a pod that never starts.
+
+**A Secret is written only while the thing that reads it is configured.**
+Turning a provider off by clearing its issuer used to leave the Secret behind,
+holding a live credential nothing reads.
+
+The same pair answers for the database URL, both client secrets and the mail
+password, because what differs between them is the name of the Secret and the
+key inside it rather than anything about how the question is answered.
 
 Bootstrap admins are applied at every startup rather than once, which makes them
 the recovery path: lose administrative access, add yourself, upgrade. The notes
@@ -228,11 +273,11 @@ with its leading `v` removed (REQ-01 and REQ-02).
 |---|---|---|
 | Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. Everything else here supports it. `linux/amd64` today — see below |
 | Helm chart | `openpsirt-<version>.tgz`, pushed to `oci://ghcr.io/nexthop-ai/charts` | The registry that already holds the image, rather than an index somebody has to host and keep |
-| Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
+| Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. The interface is inside the binary, so the archive serves the same pages the image does. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
 | Binary inventory | `openpsirt_<version>.cdx.json` | What the binary was linked from |
 | Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | What the image ships. One per architecture, because it is read off an assembled filesystem |
 | Checksums | `SHA256SUMS` | Every file above, so a download is checkable without holding a signature |
-| Signatures | A cosign bundle beside each file | |
+| Signature | `SHA256SUMS.cosign.bundle` | One signature over the checksum file rather than one per asset: the file already covers every asset, so a verifier checks one signature and then the hashes |
 
 Both inventories are published rather than left as a workflow artifact that
 expires. We ingest these for other people's software; REQ-04 is the same
@@ -307,8 +352,22 @@ the inventories and `openpsirt -version` cannot disagree about one build.
 | | |
 |---|---|
 | Keyless signatures | cosign, against the workflow's own identity. No key to hold, rotate, or lose to whoever holds it next |
+| What is signed | The image, the chart in the registry, and the checksum file that covers every attached asset. The chart is signed where it is installed from, which is the registry copy rather than the archive |
 | Build provenance | An attestation naming the repository, the workflow file and the tag that produced the asset |
 | What it proves | That an asset came out of this repository at that tag. Not that what is inside it is correct — that is what the inventories and the scan are for |
+
+**Every signature is verified in the workflow that makes it**, with the
+command and the identity a third party would use. A signature nobody has
+verified is a signature nobody has tested, and the first person to find out is
+otherwise somebody who downloaded it.
+
+The identity to pin is published in the release notes, with the two commands
+that check a download:
+
+| | |
+|---|---|
+| Issuer | `https://token.actions.githubusercontent.com` |
+| Identity | The release workflow in this repository, at a tag |
 
 ## Cutting a release
 
@@ -325,9 +384,9 @@ git push origin v0.2.0
 | The workflow then | |
 |---|---|
 | Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
-| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log |
+| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything |
 | Pushes the image and the chart to `ghcr.io` | |
-| Signs the image and the checksum file, and attests provenance for both | Keyless, against the workflow's own identity |
+| Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |
 | Creates the release and uploads every asset | |
 | Publishes the documentation under the version | And moves `latest`, unless this is a prerelease |
 

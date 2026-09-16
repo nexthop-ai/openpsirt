@@ -463,7 +463,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Where(rating.EffectiveExpr+" IN (?)", bun.List(words))
 		} else {
 			q = q.Where("f.vulnerability_id IN (?)",
-				q.NewSelect().TableExpr(`vulnerability AS "v"`).
+				q.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 					Join(rating.Here, f.ProductID).
 					Column("v.id").
 					Where(rating.EffectiveExpr+" IN (?)", bun.List(words)))
@@ -513,10 +513,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 				WhereOr("f.component_id IN (?)",
 					componentsWhere(q, "c.name_folded LIKE ?"+database.LikeClause, like)).
 				WhereOr("f.vulnerability_id IN (?)",
-					q.NewSelect().TableExpr(`vulnerability AS "v"`).Column("v.id").
+					q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
 						Where("LOWER(v.identifier) LIKE ?"+database.LikeClause, like)).
 				WhereOr("f.vulnerability_id IN (?)",
-					q.NewSelect().TableExpr(`vulnerability_alias AS "va"`).
+					q.NewSelect().TableExpr(`"vulnerability_alias" AS "va"`).
 						Column("va.vulnerability_id").
 						Where("LOWER(va.identifier) LIKE ?"+database.LikeClause, like))
 		})
@@ -529,7 +529,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		// One subquery holding an OR rather than one per kind, because a
 		// component has one identifier and is of one kind: asking for two
 		// kinds as two IN clauses is asking a component to be both.
-		where := q.NewSelect().TableExpr(`component AS "c"`).Column("c.id")
+		where := q.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id")
 		where = where.WhereGroup(" AND ", func(g *bun.SelectQuery) *bun.SelectQuery {
 			for _, kind := range kinds {
 				g = g.WhereOr("LOWER(c.purl) LIKE ?"+database.LikeClause, "pkg:"+containsTerm(kind)+"/%")
@@ -606,7 +606,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	if f.LikelihoodAtLeast > 0 {
 		q = q.Where("f.vulnerability_id IN (?)",
-			q.NewSelect().TableExpr(`vulnerability AS "v"`).Column("v.id").
+			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
 				Where("COALESCE(v.likelihood_ppm, 0) >= ?", f.LikelihoodAtLeast))
 	}
 	if f.OpenedBefore != nil {
@@ -864,7 +864,7 @@ func (f Filter) at() time.Time {
 // componentsWhere is the identifiers of the components a condition selects,
 // as a subquery for a membership test on a finding's component or consumer.
 func componentsWhere(q *bun.SelectQuery, condition string, args ...any) *bun.SelectQuery {
-	return q.NewSelect().TableExpr(`component AS "c"`).Column("c.id").Where(condition, args...)
+	return q.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").Where(condition, args...)
 }
 
 // Hidden counts what the line keeps out of a list, so that the list can say so
@@ -890,8 +890,8 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		return 0, nil
 	}
 	counted := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr("f.vulnerability_id").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -902,7 +902,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		// beneath the line. Both read the way Floor.narrow reads them.
 		counted = counted.Where("f.urgency < ?", int64(exploitedBand)).
 			Where("f.vulnerability_id IN (?)",
-				counted.NewSelect().TableExpr(`vulnerability AS "v"`).
+				counted.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 					Join(rating.Here, productID).
 					Column("v.id").
 					Where(rating.BandExpr+" NOT IN (?)", bun.List(words)))
@@ -1040,13 +1040,13 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	standingHere, inForce := InForce()
 	decided := q.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN finding AS "f2" ON f2.vulnerability_id = de.vulnerability_id`+
+		Join(`JOIN "finding" AS "f2" ON f2.vulnerability_id = de.vulnerability_id`+
 			" AND f2.place_identity = de.place_identity").
-		Join(`JOIN component AS "c" ON c.id = f2.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f2.consumer_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f2.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id`).
 		// The argument, which is where the outcome lives: one act is one
 		// argument, and the rows underneath say where it lands.
-		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`f2.id AS "finding_id"`).
 		// Waiting, and standing: the row's own count requires the live key
 		// and this did not, so a claim proposed and then withdrawn put its
@@ -1084,8 +1084,8 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// the product the finding it answers for sits in, which is the same
 		// rule the bound number states inside one product.
 		decided = decided.
-			Join(`JOIN target AS "tg2" ON tg2.id = f2.target_id`).
-			Join(`JOIN stream AS "st2" ON st2.id = tg2.stream_id`).
+			Join(`JOIN "target" AS "tg2" ON tg2.id = f2.target_id`).
+			Join(`JOIN "stream" AS "st2" ON st2.id = tg2.stream_id`).
 			Where("de.product_id = st2.product_id")
 	} else {
 		decided = decided.Where("de.product_id = ?", f.ProductID)

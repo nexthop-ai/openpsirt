@@ -105,10 +105,10 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		ClosedBecause   string     `bun:"closed_because"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		// This product's rating where it has stated one, folded to the four
 		// words that rank. The other chart on this screen reads it the same
 		// way, so a product that re-rated an issue does not see one severity

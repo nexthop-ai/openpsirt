@@ -45,16 +45,31 @@ jobs:
       # something nothing gated. Everything on main arrived through the merge
       # queue with CI green; a tag on a side branch did not, and the assets
       # would be indistinguishable afterwards.
+      # Nothing derived from the tag is substituted into a script in this file.
+      # A ${{ }} value is expanded when the script is written, so a tag name
+      # carrying shell syntax — which the ref format permits — would run here,
+      # in a job holding the write, package and signing permissions, and the
+      # failure path of the check meant to refuse it is one of the places it
+      # would run. Every such value is passed through `env:` and read as a
+      # variable, which the shell treats as data.
       - name: Confirm the tag is on main
         run: |
           git fetch origin main --quiet
           git merge-base --is-ancestor "${{ github.sha }}" origin/main \
-            || { echo "::error::${{ github.ref_name }} points at a commit that is not on main"; exit 1; }
+            || { echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"; exit 1; }
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
+      # "make dist" builds the interface before it builds the binaries, because
+      # the binary embeds it. The version is the one the image builds with, and
+      # "make pins-check" is what holds every copy of that number together.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
       # builder the default, and that driver does not load what it builds
@@ -90,28 +105,52 @@ jobs:
       # the others do, and neither is applied to a prerelease.
       - name: Push the image
         id: image
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          MINOR: ${{ steps.release.outputs.minor }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
-          image=ghcr.io/${{ github.repository }}
-          version=${{ steps.release.outputs.version }}
+          image=ghcr.io/$GITHUB_REPOSITORY
+          version=$VERSION
           docker push "$image:$version"
-          if [ "${{ steps.release.outputs.prerelease }}" = "false" ]; then
-            docker tag "$image:$version" "$image:${{ steps.release.outputs.minor }}"
+          if [ "$PRERELEASE" = "false" ]; then
+            docker tag "$image:$version" "$image:$MINOR"
             docker tag "$image:$version" "$image:latest"
-            docker push "$image:${{ steps.release.outputs.minor }}"
+            docker push "$image:$MINOR"
             docker push "$image:latest"
           fi
           digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image:$version" | cut -d@ -f2)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
+      # The digest is kept because the copy operators are told to install is
+      # this one, and a registry copy is signed by digest. The identical
+      # archive attached to the release is covered by SHA256SUMS; this one was
+      # covered by nothing.
       - name: Push the chart
+        id: chart
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
-          helm push "bin/dist/openpsirt-${{ steps.release.outputs.version }}.tgz" \
-            "oci://ghcr.io/${{ github.repository_owner }}/charts"
+          out=$(helm push "bin/dist/openpsirt-$VERSION.tgz" \
+            "oci://ghcr.io/$GITHUB_REPOSITORY_OWNER/charts" 2>&1)
+          echo "$out"
+          digest=$(printf '%s\n' "$out" | awk '/^Digest: /{print $2}')
+          [ -n "$digest" ] || { echo "::error::helm push named no digest, so the chart cannot be signed"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - name: Sign the image
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
         run: |
           cosign sign --yes \
-            "ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}"
+            "ghcr.io/$GITHUB_REPOSITORY@$DIGEST"
+
+      - name: Sign the chart
+        env:
+          DIGEST: ${{ steps.chart.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            "ghcr.io/$GITHUB_REPOSITORY_OWNER/charts/openpsirt@$DIGEST"
 
       # One signature over the checksum file rather than one per asset: the
       # file already covers every asset, so a verifier checks one signature
@@ -126,12 +165,33 @@ jobs:
       # is the command a third party runs, with the identity they would pin,
       # so a release that cannot be verified fails here rather than for them.
       - name: Verify the signature the way somebody else would
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          CHART_DIGEST: ${{ steps.chart.outputs.digest }}
         run: |
+          identity="^https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/"
           cosign verify \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/" \
-            "ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}" > /dev/null
-          echo "the image verifies against this workflow's identity at ${{ github.ref_name }}"
+            --certificate-identity-regexp "$identity" \
+            "ghcr.io/$GITHUB_REPOSITORY@$IMAGE_DIGEST" > /dev/null
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "$identity" \
+            "ghcr.io/$GITHUB_REPOSITORY_OWNER/charts/openpsirt@$CHART_DIGEST" > /dev/null
+          echo "the image and the chart verify against this workflow's identity at $GITHUB_REF_NAME"
+
+      # The same principle as the step above, for the signature that covers
+      # everything a person downloads rather than the image. It was produced
+      # and never read back, so a bundle signed over the wrong file, or one an
+      # option change left empty, would have been found by a downloader.
+      - name: Verify the checksums the way somebody else would
+        run: |
+          cosign verify-blob \
+            --bundle bin/dist/SHA256SUMS.cosign.bundle \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp "^https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/" \
+            bin/dist/SHA256SUMS
+          echo "SHA256SUMS verifies against this workflow's identity at $GITHUB_REF_NAME"
 
       - name: Attest the image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
@@ -148,32 +208,49 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
-          version=${{ steps.release.outputs.version }}
+          version=$VERSION
           {
             echo "## Container image"
             echo
             echo '```'
-            echo "docker pull ghcr.io/${{ github.repository }}:$version"
+            echo "docker pull ghcr.io/$GITHUB_REPOSITORY:$version"
             echo '```'
             echo
-            echo "Digest \`${{ steps.image.outputs.digest }}\`, signed with cosign against this workflow's identity."
+            echo "Digest \`$IMAGE_DIGEST\`, signed with cosign against this workflow's identity."
             echo
             echo "## Helm chart"
             echo
             echo '```'
-            echo "helm install openpsirt oci://ghcr.io/${{ github.repository_owner }}/charts/openpsirt --version $version"
+            echo "helm install openpsirt oci://ghcr.io/$GITHUB_REPOSITORY_OWNER/charts/openpsirt --version $version"
             echo '```'
             echo
             echo "## Everything else"
             echo
             echo "The binaries, both CycloneDX inventories, \`SHA256SUMS\` and its cosign bundle are attached."
             echo "Inventories are published because this tool ingests them for other people's software."
+            echo
+            echo "### Checking what you downloaded"
+            echo
+            echo '```'
+            echo "cosign verify-blob \\"
+            echo "  --bundle SHA256SUMS.cosign.bundle \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+            echo "  --certificate-identity-regexp '^https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/' \\"
+            echo "  SHA256SUMS"
+            echo "sha256sum -c SHA256SUMS"
+            echo '```'
+            echo
+            echo "The signature covers \`SHA256SUMS\`, which covers every file above."
           } > /tmp/notes.md
+          if [ "$PRERELEASE" = "true" ]; then set -- --prerelease; else set --; fi
           gh release create "$GITHUB_REF_NAME" \
             --title "$version" \
             --notes-file /tmp/notes.md \
-            ${{ steps.release.outputs.prerelease == 'true' && '--prerelease' || '' }} \
+            "$@" \
             bin/dist/*
 
   # A job of its own, in the group docs.yml uses, because both push to the
@@ -196,7 +273,10 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -r docs/requirements.txt
+      # --require-hashes refuses any distribution the lock does not name by
+      # hash, transitive ones included — the guarantee go.sum and the npm
+      # lockfile already give the other two ecosystems here.
+      - run: pip install --require-hashes -r docs/requirements.txt
       - name: Configure committer
         run: |
           git config user.name  "github-actions[bot]"

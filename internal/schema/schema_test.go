@@ -79,14 +79,14 @@ func TestMigrationsApplyOnEveryEngine(t *testing.T) {
 		name := uniqueName(t)
 		want := time.Now().UTC().Truncate(time.Second)
 		if _, err := db.ExecContext(ctx,
-			"INSERT INTO application_setting (name, value, updated_at) VALUES (?, ?, ?)",
+			"INSERT INTO \"application_setting\" (name, value, updated_at) VALUES (?, ?, ?)",
 			name, "value", want); err != nil {
 			t.Fatalf("insert into the migrated table: %v", err)
 		}
 		var value string
 		var updated time.Time
 		if err := db.QueryRowContext(ctx,
-			"SELECT value, updated_at FROM application_setting WHERE name = ?", name).
+			"SELECT value, updated_at FROM \"application_setting\" WHERE name = ?", name).
 			Scan(&value, &updated); err != nil {
 			t.Fatalf("read back: %v", err)
 		}

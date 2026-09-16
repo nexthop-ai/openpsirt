@@ -42,6 +42,10 @@ is a thing to raise rather than to configure here.
 | `OPENPSIRT_LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` |
 | `OPENPSIRT_LOG_FORMAT` | `text` or `json` | `text` |
 
+The defaults above are the binary's. **The chart sets a log format of `json`**,
+because a cluster's collector parses the logs; run the binary yourself and it
+writes `text`.
+
 ## Database
 
 | Variable | Meaning | Default |

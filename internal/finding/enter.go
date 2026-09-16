@@ -458,8 +458,8 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 		ID int64 `bun:"id"`
 	}
 	err := db.NewSelect().
-		TableExpr(`graph_node AS "n"`).
-		Join(`JOIN component AS "c" ON c.id = n.component_id`).
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
 		ColumnExpr(`c.id AS "id"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
@@ -524,7 +524,7 @@ func mint(ctx context.Context, tx bun.Tx, product string, year int) (string, err
 		}
 		candidate := fmt.Sprintf("%s-%d-%d", prefix, year, drawn.Int64()+lowest)
 		taken, err := tx.NewSelect().
-			TableExpr(`vulnerability AS "v"`).
+			TableExpr(`"vulnerability" AS "v"`).
 			Where("v.identifier = ?", candidate).
 			Count(ctx)
 		if err != nil {
@@ -545,7 +545,7 @@ func mint(ctx context.Context, tx bun.Tx, product string, year int) (string, err
 func productNameOf(ctx context.Context, db bun.IDB, productID int64) (string, error) {
 	var name string
 	err := db.NewSelect().
-		TableExpr(`product AS "p"`).
+		TableExpr(`"product" AS "p"`).
 		ColumnExpr("p.name").
 		Where("p.id = ?", productID).
 		Scan(ctx, &name)
@@ -560,7 +560,7 @@ func productNameOf(ctx context.Context, db bun.IDB, productID int64) (string, er
 func (s *Store) ComponentName(ctx context.Context, componentID int64) (string, error) {
 	var name string
 	err := s.db.NewSelect().
-		TableExpr(`component AS "c"`).
+		TableExpr(`"component" AS "c"`).
 		ColumnExpr("c.name").
 		Where("c.id = ?", componentID).
 		Scan(ctx, &name)

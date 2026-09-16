@@ -510,7 +510,7 @@ func (f *fixture) anIssue(t *testing.T, identifier string) int64 {
 func (f *fixture) componentNamed(t *testing.T, name string) int64 {
 	t.Helper()
 	var id int64
-	if err := f.db.DB.NewSelect().TableExpr(`component AS "c"`).
+	if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).
 		ColumnExpr("c.id").Where("c.name = ?", name).
 		Limit(1).Scan(t.Context(), &id); err != nil {
 		t.Fatal(err)

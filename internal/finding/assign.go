@@ -457,9 +457,9 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 
 	mine := func() *bun.SelectQuery {
 		query := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Where("f.closed_at IS NULL").
 			Where("f.assigned_to IS NOT NULL")
 		// One product where the caller named one, for a screen that is about
@@ -549,8 +549,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	// calling it a fortieth of one is a number nobody acts on.
 	standing, args := OffTheClock("st.product_id", s.now())
 	late := mine().
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`f.assigned_to AS "person_id"`).
 		Where("f.due_at IS NOT NULL").
 		Where("f.due_at < ?", s.now().UTC()).
@@ -702,9 +702,9 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	limit = database.AList.Of(limit)
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		q = q.TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Where("f.closed_at IS NULL")
 		if since != nil {
 			q = q.Where("f.opened_at > ?", *since)
@@ -893,10 +893,10 @@ func targetsNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]build
 	}
 	var builds []buildName
 	err := db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN product AS "p" ON p.id = st.product_id`).
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		ColumnExpr(`tg.id AS "target_id"`).
 		ColumnExpr(`p.display_name AS "product"`).
 		ColumnExpr(`st.display_name AS "stream"`).

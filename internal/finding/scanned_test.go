@@ -473,7 +473,7 @@ func (f *fixture) issueScore(t *testing.T, name string) int {
 	t.Helper()
 	var score int
 	if err := f.db.DB.NewSelect().
-		TableExpr("vulnerability AS v").
+		TableExpr("\"vulnerability\" AS \"v\"").
 		ColumnExpr("COALESCE(v.score_centi, 0)").
 		Where("v.identifier = ?", name).
 		Scan(t.Context(), &score); err != nil {

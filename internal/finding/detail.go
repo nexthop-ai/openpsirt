@@ -439,9 +439,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 	var rows []evidenceRow
 	err = s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
 		ColumnExpr(`f.consumer_id AS "consumer_id"`).
@@ -665,7 +665,7 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 		Identity *string `bun:"identity"`
 	}
 	err := InTheFoldOf(s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		// Joined on the party a person is assignable as, which is what
 		// the assignment column holds. A team's queue names no person
 		// and answers empty here, which is what a queue is.
@@ -701,7 +701,7 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 		Name *string `bun:"name"`
 	}
 	err := InTheFoldOf(s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		Join(`LEFT JOIN "routing_rule" AS "rr" ON rr.id = f.routed_by`).
 		ColumnExpr(`rr.name AS "name"`).
 		Where("f.target_id = ?", targetID).

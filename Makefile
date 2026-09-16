@@ -151,7 +151,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check tools govulncheck licenses sbom web web-deps web-api web-check clean-web
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -289,6 +289,13 @@ sbom-shape:
 
 # We ingest SBOMs, so we publish one for ourselves. CycloneDX because that is
 # the format this project treats as authoritative on the way in.
+#
+# It describes the source tree and is not what a release publishes: that
+# document is read out of the image by "dist-inventories". This generator is
+# asked about a module directory rather than about a compiled binary, so the
+# version comes from the checkout's own history and is a commit where there is
+# no tag to name — never the empty version a binary's build information
+# carries, which is why the image's invocation has to be told one.
 sbom:
 	@mkdir -p bin
 	$(GO) run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CDXGOMOD_VERSION) \
@@ -306,12 +313,24 @@ sbom:
 #
 # The order matters: the directory is emptied first, so an asset left by an
 # earlier version cannot be checksummed and published alongside this one.
+#
+# The interface is built before the binaries, because the binary embeds a
+# git-ignored directory and a fresh checkout's is empty — archives built
+# without this step carry every API route and no page at all.
+#
+# The image is gated after it is built rather than only in CI. A release
+# builds it from a fresh checkout, and the base image is upgraded as it
+# builds, so it is a different set of bytes from the one CI checked: the
+# scanner it bundles can stop working between the merge queue and the tag,
+# and a deployment that cannot scan ingests inventories it never reads.
 dist:
 	@$(MAKE) --no-print-directory dist-version
 	@$(MAKE) --no-print-directory dist-clean
+	@$(MAKE) --no-print-directory web
 	@$(MAKE) --no-print-directory dist-binaries
 	@$(MAKE) --no-print-directory dist-chart
 	@$(MAKE) --no-print-directory dist-inventories
+	@$(MAKE) --no-print-directory check-packaging CHECK_IMAGE=$(DIST_IMAGE):$(DIST_VERSION)
 	@$(MAKE) --no-print-directory dist-sums
 	@$(MAKE) --no-print-directory dist-verify
 	@echo "$(DIST_DIR) holds $$(ls -1 $(DIST_DIR) | wc -l) files for $(DIST_VERSION)"
@@ -322,13 +341,24 @@ dist:
 # "-dirty" — both name a version nobody can get back to, and neither is
 # something a chart will accept. Overridable, because building the assets to
 # look at them is a reasonable thing to want: DIST_VERSION=0.0.0-dev.
+# The version arrives from "git describe", so it is a tag name, and a tag name
+# may carry shell syntax: the ref format refuses a space and a handful of
+# characters and permits "$", "(" and ")". A value substituted into a recipe
+# becomes script text, so this one is read from the environment instead, where
+# the shell treats it as data.
+#
+# Everything downstream interpolates it freely, and may: past this target the
+# value has matched the pattern below, which admits digits, dots and a
+# restricted suffix and nothing a shell acts on. Which is why every target that
+# builds a name from it asks for this one first.
+dist-version: export CHECKED_VERSION = $(DIST_VERSION)
 dist-version:
-	@case "$(DIST_VERSION)" in \
-	  *-dirty) echo "the tree is dirty, so $(DIST_VERSION) names no commit anybody else can get"; exit 1 ;; \
+	@case "$$CHECKED_VERSION" in \
+	  *-dirty) echo "the tree is dirty, so $$CHECKED_VERSION names no commit anybody else can get"; exit 1 ;; \
 	esac
-	@printf '%s' "$(DIST_VERSION)" \
+	@printf '%s' "$$CHECKED_VERSION" \
 	  | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)*$$' \
-	  || { echo "$(DIST_VERSION) is not a version a chart can carry: tag the commit, or pass DIST_VERSION=0.0.0-dev"; exit 1; }
+	  || { echo "that is not a version a chart can carry: tag the commit, or pass DIST_VERSION=0.0.0-dev"; exit 1; }
 
 dist-clean:
 	@rm -rf $(DIST_DIR)
@@ -339,7 +369,7 @@ dist-clean:
 # pure Go and cgo is off, so every supported architecture builds here in
 # seconds and none of them needs emulation.
 dist-binaries: STAMP_VERSION := $(DIST_VERSION)
-dist-binaries:
+dist-binaries: dist-version
 	@mkdir -p $(DIST_DIR)
 	@set -e; for arch in $(DIST_ARCHES); do \
 	  name=openpsirt_$(DIST_VERSION)_linux_$$arch; \
@@ -359,7 +389,7 @@ dist-binaries:
 # version committed to a file is the one somebody forgets to move — the same
 # reason pins-check exists. Stamping at package time means the tag is the only
 # thing that has to be right.
-dist-chart:
+dist-chart: dist-version
 	@mkdir -p $(DIST_DIR)
 	@command -v helm >/dev/null 2>&1 \
 	  || { echo "helm is needed to package the chart"; exit 1; }
@@ -373,7 +403,7 @@ dist-chart:
 # for other people's software, and REQ-04 is the same promise kept about our
 # own. They are read out of the image rather than rebuilt here, because the
 # image is what the inventories are about.
-dist-inventories:
+dist-inventories: dist-version
 	@mkdir -p $(DIST_DIR)
 	@command -v $(DOCKER) >/dev/null 2>&1 \
 	  || { echo "$(DOCKER) is needed to read the inventories out of the image"; exit 1; }
@@ -395,7 +425,7 @@ dist-inventories:
 
 # One file covering every other, so a download can be checked without holding
 # a signature or trusting the page it came from.
-dist-sums:
+dist-sums: dist-version
 	@cd $(DIST_DIR) && rm -f SHA256SUMS \
 	  && sha256sum $$(ls -1 | sort) > SHA256SUMS
 	@echo "  SHA256SUMS"
@@ -415,7 +445,7 @@ dist-sums:
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
 # named for what it signs, not for the release.
-dist-verify:
+dist-verify: dist-version
 	@command -v jq >/dev/null 2>&1 \
 	  || { echo "jq is needed to read the version out of an inventory"; exit 1; }
 	@set -e; fail=0; skipped=; \
@@ -431,9 +461,12 @@ dist-verify:
 	  if [ -f "$$archive" ]; then \
 	    work=$$(mktemp -d); trap 'rm -rf "$$work"' EXIT; \
 	    tar -C "$$work" -xzf "$$archive"; \
-	    said=$$("$$work"/openpsirt_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH)/openpsirt -version | awk '{print $$2}'); \
+	    binary="$$work"/openpsirt_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH)/openpsirt; \
+	    said=$$("$$binary" -version | awk '{print $$2}'); \
 	    [ "$$said" = "$(DIST_VERSION)" ] \
 	      || { echo "the binary reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
+	    $(MAKE) --no-print-directory dist-serves BINARY="$$binary" \
+	      || fail=1; \
 	  else skipped="$$skipped the binary (no archive for $(DIST_IMAGE_ARCH))"; fi; \
 	  chart=$(DIST_DIR)/openpsirt-$(DIST_VERSION).tgz; \
 	  if [ ! -f "$$chart" ]; then skipped="$$skipped the chart (not packaged)"; \
@@ -456,6 +489,50 @@ dist-verify:
 	  [ "$$fail" = 0 ] || exit 1; \
 	  echo "  every asset names $(DIST_VERSION), and every one that carries it inside agrees"; \
 	  [ -z "$$skipped" ] || echo "  not checked:$$skipped"
+
+# That a released binary serves the interface, asked of the binary rather than
+# of the tree it was built from.
+#
+# The same question "check-packaging" asks of the image, for the same reason
+# and in the same words: the Go build embeds a git-ignored directory, so a
+# binary built from a clean checkout answers every API route and no page. The
+# image grew this check when that happened; the archives a person downloads
+# did not have it, and are the half somebody runs by hand.
+#
+# The port is chosen here and moved when it is taken. A fixed one collides
+# with whatever else is on this machine, and the release path is not the place
+# to discover that.
+dist-serves:
+	@test -n "$(BINARY)" || { echo "dist-serves needs BINARY=<path>"; exit 1; }
+	@set -e; \
+	  dir=$$(mktemp -d); pid=; answered=; port=$$((20000 + $$$$ % 20000)); \
+	  trap '[ -z "$$pid" ] || kill $$pid 2>/dev/null || true; rm -rf "$$dir"' EXIT; \
+	  attempt=0; \
+	  while [ $$attempt -lt 5 ]; do \
+	    OPENPSIRT_DATABASE_URL="sqlite://$$dir/serves.db" \
+	    OPENPSIRT_ADDR="127.0.0.1:$$port" \
+	    OPENPSIRT_PLAIN_HTTP=1 \
+	    OPENPSIRT_BOOTSTRAP_ADMINS=check \
+	      "$(BINARY)" >"$$dir/log" 2>&1 & \
+	    pid=$$!; \
+	    waited=0; \
+	    while kill -0 $$pid 2>/dev/null; do \
+	      if curl -fsS --noproxy '*' "http://127.0.0.1:$$port/readyz" >/dev/null 2>&1; then \
+	        answered=yes; break; \
+	      fi; \
+	      waited=$$((waited + 1)); \
+	      [ $$waited -gt 60 ] && break; \
+	      sleep 1; \
+	    done; \
+	    [ -n "$$answered" ] && break; \
+	    kill $$pid 2>/dev/null || true; wait $$pid 2>/dev/null || true; pid=; \
+	    attempt=$$((attempt + 1)); port=$$((port + 1)); \
+	  done; \
+	  [ -n "$$answered" ] \
+	    || { echo "the archive's binary never answered on five ports:"; \
+	         sed 's/^/    /' "$$dir/log"; exit 1; }; \
+	  curl -fsS --noproxy '*' "http://127.0.0.1:$$port/" | grep -qi '<!doctype html' \
+	    || { echo "the archive's binary serves no interface: it was built without one"; exit 1; }
 
 # The document is generated from the running registrations, never hand-written.
 openapi:
@@ -489,6 +566,8 @@ web: web-deps
 # Reproducible, like every other dependency here: npm ci installs exactly what
 # the lockfile pins rather than re-resolving ranges at build time.
 web-deps:
+	@command -v $(NPM) >/dev/null 2>&1 \
+	  || { echo "$(NPM) is needed to build the interface"; exit 1; }
 	$(NPM) --prefix web ci
 
 # The client is generated from the committed document, so a drifted
@@ -864,6 +943,10 @@ docs-site:
 #
 # Named rather than folded into engines-check, because that one is about what
 # the tests run against and this is about what the release is built from.
+# The tidy run rewrites the tree, so what it found there is put back on every
+# exit path — including an interrupt, which used to leave the tree as tidy had
+# made it and the copies behind under a name every checkout on the machine
+# shared.
 .PHONY: pins-check
 pins-check:
 	@fail=0; \
@@ -881,24 +964,76 @@ pins-check:
 	[ "$$here" = "$$there" ] || { \
 	  echo "the SBOM generator is $$here here and $$there in the image."; fail=1; }; \
 	node=$$(awk -F'[:-]' '/^FROM node:/{print $$2}' Dockerfile); \
-	ci=$$(awk -F': ' '/node-version:/{print $$2}' .github/workflows/ci.yml | tr -d ' '); \
-	[ "$$node" = "$$ci" ] || { \
-	  echo "the image builds the interface with Node $$node and CI uses $$ci."; fail=1; }; \
+	for flow in .github/workflows/*.yml; do \
+	  for said in $$(awk -F': ' '/node-version:/{print $$2}' "$$flow" | tr -d ' '); do \
+	    [ "$$said" = "$$node" ] || { \
+	      echo "the image builds the interface with Node $$node and $$flow uses $$said."; \
+	      fail=1; }; \
+	  done; \
+	done; \
 	defaults=$$(grep -c '^ARG VERSION=' Dockerfile); \
 	distinct=$$(grep '^ARG VERSION=' Dockerfile | sort -u | wc -l); \
 	[ "$$distinct" -le 1 ] || { \
 	  echo "the image has $$defaults version defaults and they differ, so an"; \
 	  echo "unpassed build says one thing in the binary and another in its SBOM."; \
 	  fail=1; }; \
-	cp go.mod $${TMPDIR:-/tmp}/openpsirt-go.mod.was && cp go.sum $${TMPDIR:-/tmp}/openpsirt-go.sum.was; \
+	# Every count is taken with "|| true": grep exits 1 on a count of zero, \
+	# recipes run under -e, and a check that dies on the empty case is one \
+	# that says nothing where it has the most to say. \
+	pinned=$$(grep -cE '^[A-Za-z0-9][^ ]*==' docs/requirements.txt || true); \
+	hashed=$$(grep -cE '^[A-Za-z0-9][^ ]*==.*\\$$' docs/requirements.txt || true); \
+	[ "$$pinned" -gt 0 ] || { \
+	  echo "docs/requirements.txt names no packages, so nothing about it is pinned."; fail=1; }; \
+	[ "$$pinned" = "$$hashed" ] || { \
+	  echo "$$pinned packages are named in docs/requirements.txt and $$hashed carry a hash."; \
+	  echo "Regenerate it from docs/requirements.in rather than editing it:"; \
+	  echo "  pip-compile --generate-hashes --no-index --output-file=docs/requirements.txt docs/requirements.in"; \
+	  fail=1; }; \
+	asked=0; \
+	for wanted in $$(grep -E '^[A-Za-z0-9]' docs/requirements.in); do \
+	  asked=$$((asked + 1)); \
+	  grep -q "^$$wanted " docs/requirements.txt || { \
+	    echo "docs/requirements.in asks for $$wanted and the lock beside it does not."; fail=1; }; \
+	done; \
+	[ "$$asked" -gt 0 ] || { \
+	  echo "docs/requirements.in asks for nothing, so the lock was compared against nothing."; fail=1; }; \
+	installs=0; \
+	for flow in .github/workflows/*.yml; do \
+	  bare=$$(grep -c 'pip install' "$$flow" || true); \
+	  [ "$$bare" -gt 0 ] || continue; \
+	  installs=$$((installs + bare)); \
+	  hashes=$$(grep -c 'pip install --require-hashes' "$$flow" || true); \
+	  [ "$$bare" = "$$hashes" ] || { \
+	    echo "$$flow installs the documentation closure $$bare times and $$hashes of those"; \
+	    echo "require hashes, so the hashes beside every package buy that job nothing."; fail=1; }; \
+	done; \
+	[ "$$installs" -gt 0 ] || { \
+	  echo "no workflow installs the documentation closure, so --require-hashes was checked nowhere."; \
+	  fail=1; }; \
+	python=$$(awk -F': ' '/python-version:/{gsub(/['"'"'" ]/, "", $$2); print $$2}' \
+	  .github/workflows/*.yml | sort -u | tr '\n' ' '); \
+	lock=$$(awk '/autogenerated by pip-compile with Python /{print $$NF; exit}' docs/requirements.txt); \
+	[ -n "$$python" ] || { \
+	  echo "no workflow names a Python version, so the lock was compared against nothing."; fail=1; }; \
+	[ -n "$$lock" ] || { \
+	  echo "docs/requirements.txt does not say which Python resolved it."; fail=1; }; \
+	case "$$python" in \
+	  *" "*" "*) echo "the workflows build the documentation on more than one Python: $$python."; \
+	    echo "The lock was resolved on one of them."; fail=1 ;; \
+	  "$$lock "*) ;; \
+	  *) echo "the workflows use Python $${python% } and the lock was resolved on $$lock."; fail=1 ;; \
+	esac; \
+	kept=$$(mktemp -d) || { echo "no temporary directory, so go.mod could not be kept"; exit 1; }; \
+	trap 'cp "$$kept"/go.mod go.mod; cp "$$kept"/go.sum go.sum; rm -rf "$$kept"' EXIT; \
+	trap 'exit 130' INT TERM; \
+	cp go.mod go.sum "$$kept"/; \
 	$(GO) mod tidy; \
-	cmp -s go.mod $${TMPDIR:-/tmp}/openpsirt-go.mod.was && cmp -s go.sum $${TMPDIR:-/tmp}/openpsirt-go.sum.was || { \
+	cmp -s go.mod "$$kept"/go.mod && cmp -s go.sum "$$kept"/go.sum || { \
 	  echo "go.mod or go.sum is not what go mod tidy produces: a dependency is"; \
 	  echo "declared that nothing imports, or one is imported and not declared."; \
-	  echo "A requirement nothing uses stays in the vulnerability and licence"; \
+	  echo "A requirement nothing uses stays in the vulnerability and license"; \
 	  echo "surface for code that never runs. Run go mod tidy and commit it."; \
-	  cp $${TMPDIR:-/tmp}/openpsirt-go.mod.was go.mod; cp $${TMPDIR:-/tmp}/openpsirt-go.sum.was go.sum; fail=1; }; \
-	rm -f $${TMPDIR:-/tmp}/openpsirt-go.mod.was $${TMPDIR:-/tmp}/openpsirt-go.sum.was; \
+	  fail=1; }; \
 	[ "$$fail" = 0 ] || exit 1
 
 # Measurements, not gates.
@@ -984,7 +1119,7 @@ else
 	helm template t deploy/helm/openpsirt --set database.existingSecret=s \
 	  --set auth.bootstrapAdmins='{admin}' --set auth.baseURL=https://psirt.example.com \
 	  --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc \
-	  --set auth.oidc.clientSecret=shh >/dev/null
+	  --set auth.oidc.clientSecret=shh --set auth.oidc.usernameClaim=sub >/dev/null
 	# An install that cannot reach a login is not an install, and mail that is
 	# half configured is mail nobody gets. Each of these refuses at template
 	# time rather than producing a deployment that starts, fails its own
@@ -995,14 +1130,20 @@ else
 	@# read as the refusal — so an unrelated fault reachable under one value
 	@# combination looked exactly like the guard working, and the success line
 	@# below printed anyway.
-	@for missing in \
+	@refusals=0; \
+	for missing in \
 	  "no database|needs a database|" \
 	  "nobody can administer|set auth.bootstrapAdmins|--set database.existingSecret=s" \
 	  "no way to sign in|configure a way to sign in|--set database.existingSecret=s --set auth.bootstrapAdmins={admin}" \
 	  "no address to return to|set auth.baseURL|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.oidc.issuer=https://id.example.com" \
 	  "a header anybody can set|set auth.trustedHeader.sources|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User" \
 	  "half a mail configuration|set mail.server and mail.from together|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587" \
-	  "a password that is never sent|set mail.username|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.password=shh"; do \
+	  "a password that is never sent|set mail.username|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.password=shh" \
+	  "a provider and no client secret|set auth.oidc.clientSecret|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc" \
+	  "a provider and no username claim|set auth.oidc.usernameClaim|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.clientSecret=shh" \
+	  "a GitHub app and no client secret|set auth.github.clientSecret|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh" \
+	  "a secret given twice|not both|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh --set auth.oidc.existingSecret=mine"; do \
+	  refusals=$$((refusals + 1)); \
 	  what="$${missing%%|*}"; rest="$${missing#*|}"; \
 	  expect="$${rest%%|*}"; args="$${rest#*|}"; \
 	  out=$$(helm template t deploy/helm/openpsirt $$args 2>&1) && { \
@@ -1012,8 +1153,76 @@ else
 	    *) echo "the chart refused an install with $$what for the wrong reason:"; \
 	       echo "$$out"; exit 1;; \
 	  esac; \
-	done
-	@echo "the chart refuses every install that could not be signed into, and every mail configuration that would send nothing, each for the reason it names"
+	done; \
+	  [ "$$refusals" -gt 0 ] || { echo "no refusal was examined, so this checked nothing"; exit 1; }; \
+	  echo "  $$refusals installs the chart has to refuse, each for the reason it names"
+	@echo "the chart refuses every install that could not be signed into or could not start, and every mail configuration that would send nothing"
+	@# The refusals above assert that an install the chart cannot serve fails
+	@# at render. These assert the other half: that a legal one renders a
+	@# reference something answers. A secretKeyRef naming a Secret nothing
+	@# creates, or a key nothing writes, renders perfectly and leaves a pod
+	@# that can never start — the same failure the refusals exist to prevent,
+	@# one step later and with no message anybody reads.
+	@#
+	@# Read out of the render rather than compared against a list written
+	@# here: a fifth secret source added later gets no row in a list and the
+	@# check stays green on exactly the defect it is for. Every reference a
+	@# legal install renders is resolved against the Secrets that same install
+	@# creates, and the count of what was examined is printed, because a walk
+	@# that found nothing looks like a walk that found nothing wrong.
+	@#
+	@# Every value is held by the chart in these, because a Secret the
+	@# operator manages is not in the render and a reference to one cannot be
+	@# resolved here. That arm is asserted below, against what they named.
+	@set -e; base="--set auth.bootstrapAdmins={admin} --set auth.baseURL=https://psirt.example.com"; \
+	refs=0; \
+	for install in \
+	  "a database URL the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}" \
+	  "an OIDC secret the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh" \
+	  "a GitHub secret the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.github.clientID=gh --set auth.github.clientSecret=shh" \
+	  "a mail password the chart holds|--set database.url=postgres://u:p@h:5432/d --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh" \
+	  "every secret the chart holds at once|--set database.url=postgres://u:p@h:5432/d --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh --set mail.server=smtp:587 --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh"; do \
+	  what="$${install%%|*}"; args="$${install#*|}"; \
+	  out=$$(helm template t deploy/helm/openpsirt $$base $$args) \
+	    || { echo "the chart refused $$what:"; echo "$$out"; exit 1; }; \
+	  written=$$(printf '%s\n' "$$out" | awk '\
+	    /^kind: Secret$$/ {secret=1; next} \
+	    /^---/ {secret=0; holds=0; next} \
+	    secret && /^  name:/ {name=$$2; next} \
+	    secret && /^stringData:$$/ {holds=1; next} \
+	    holds && /^  [A-Za-z0-9_-]+:/ {key=$$1; sub(":", "", key); print name "/" key}' | tr '\n' ' '); \
+	  found=$$(printf '%s\n' "$$out" | awk '\
+	    /secretKeyRef:/ {ref=1; next} \
+	    ref && /name:/ {name=$$2; next} \
+	    ref && /key:/ {print name "/" $$2; ref=0}'); \
+	  [ -n "$$found" ] || { echo "$$what renders no secret reference at all"; exit 1; }; \
+	  for one in $$found; do \
+	    refs=$$((refs + 1)); \
+	    case " $$written " in \
+	      *" $$one "*) ;; \
+	      *) echo "with $$what the chart asks for $$one and creates [$$written]"; exit 1 ;; \
+	    esac; \
+	  done; \
+	done; \
+	[ "$$refs" -gt 0 ] || { echo "no secret reference was examined, so this checked nothing"; exit 1; }; \
+	echo "  $$refs secret references, every one of them answered by a Secret the same install writes"
+	@# The operator's own Secret is the other arm, and cannot be resolved
+	@# inside the render because it is theirs. What is asserted there is that
+	@# the reference names what they named, rather than the chart's own key.
+	@set -e; out=$$(helm template t deploy/helm/openpsirt \
+	  --set database.existingSecret=s --set auth.bootstrapAdmins={admin} \
+	  --set auth.baseURL=https://psirt.example.com \
+	  --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc \
+	  --set auth.oidc.usernameClaim=sub \
+	  --set auth.oidc.existingSecret=mine --set auth.oidc.existingSecretKey=theirs); \
+	  got=$$(printf '%s\n' "$$out" | awk '\
+	    $$0 ~ "name: OPENPSIRT_OIDC_CLIENT_SECRET$$" {f=1; next} \
+	    f && /secretKeyRef:/ {g=1; next} \
+	    g && /name:/ {n=$$2; next} \
+	    g && /key:/ {print n, $$2; exit}'); \
+	  [ "$$got" = "mine theirs" ] \
+	    || { echo "with a Secret the operator holds, the chart asks for [$$got]"; exit 1; }
+	@echo "every secret the chart renders a reference to is one it creates, under the key it wrote"
 endif
 
 run:

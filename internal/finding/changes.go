@@ -73,7 +73,7 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 		// two columns, which not every engine takes.
 		inner := s.db.NewSelect().
 			Distinct().
-			TableExpr(`finding AS "f"`).
+			TableExpr(`"finding" AS "f"`).
 			ColumnExpr("f."+column+` AS "run_id"`).
 			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 			ColumnExpr(`f.component_id AS "component_id"`).

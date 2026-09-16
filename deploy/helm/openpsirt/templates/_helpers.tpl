@@ -35,19 +35,28 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
-{{/* Where the database URL comes from. Exactly one source must be given. */}}
-{{- define "openpsirt.databaseSecretName" -}}
-{{- if .Values.database.existingSecret }}
-{{- .Values.database.existingSecret }}
+{{/*
+Where a secret value comes from: a Secret the operator manages, or one the
+chart creates from a value. One pair for all four, because the answer differs
+by which of those it is rather than by which value it holds — and a Secret the
+chart created carries a key of the chart's own, so consulting the operator's
+key name for it asks for a key that is not there.
+
+Called with the values block holding existingSecret and existingSecretKey, the
+suffix the chart names its own Secret with, and the key it writes there.
+*/}}
+{{- define "openpsirt.secretName" -}}
+{{- if .source.existingSecret }}
+{{- .source.existingSecret }}
 {{- else }}
-{{- printf "%s-database" (include "openpsirt.fullname" .) }}
+{{- printf "%s-%s" (include "openpsirt.fullname" .top) .suffix }}
 {{- end }}
 {{- end }}
 
-{{- define "openpsirt.databaseSecretKey" -}}
-{{- if .Values.database.existingSecret }}
-{{- .Values.database.existingSecretKey }}
+{{- define "openpsirt.secretKey" -}}
+{{- if .source.existingSecret }}
+{{- .source.existingSecretKey }}
 {{- else }}
-{{- "database-url" }}
+{{- .key }}
 {{- end }}
 {{- end }}

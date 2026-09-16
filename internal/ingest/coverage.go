@@ -97,10 +97,10 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 	// case this exists to report, and joining the scan table would drop
 	// exactly those rows.
 	query := s.db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN product AS "p" ON p.id = st.product_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`st.id AS "stream_id"`).
 		ColumnExpr(`p.name AS "product"`).
@@ -113,7 +113,7 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		// the failure this report exists for, and counting the arrival drew
 		// it as perfectly quiet on the one report whose subject is that
 		// silence must not look like health.
-		ColumnExpr(`(SELECT MAX(sc.received_at) FROM scan AS "sc" `+
+		ColumnExpr(`(SELECT MAX(sc.received_at) FROM "scan" AS "sc" `+
 			`WHERE sc.target_id = tg.id AND sc.status = ?) AS "last_seen"`, Accepted)
 	if !all {
 		query = query.Where("st.product_id IN (?)", bun.List(products))

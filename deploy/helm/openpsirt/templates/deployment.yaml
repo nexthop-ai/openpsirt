@@ -4,6 +4,15 @@
 {{- if and .Values.database.url .Values.database.existingSecret }}
 {{- fail "set database.url or database.existingSecret, not both" }}
 {{- end }}
+{{- if and .Values.auth.oidc.clientSecret .Values.auth.oidc.existingSecret }}
+{{- fail "set auth.oidc.clientSecret or auth.oidc.existingSecret, not both: the Secret the chart would write is not created when you name one of your own, so the value here would be silently ignored" }}
+{{- end }}
+{{- if and .Values.auth.github.clientSecret .Values.auth.github.existingSecret }}
+{{- fail "set auth.github.clientSecret or auth.github.existingSecret, not both: the value here would be silently ignored" }}
+{{- end }}
+{{- if and .Values.mail.password .Values.mail.existingSecret }}
+{{- fail "set mail.password or mail.existingSecret, not both: the value here would be silently ignored" }}
+{{- end }}
 {{- if and .Values.database.url (regexMatch "^(sqlite|sqlite3|file):" (lower .Values.database.url)) (gt (int .Values.replicaCount) 1) }}
 {{- fail (printf "database.url is SQLite and replicaCount is %d: SQLite is one file on one pod, so a second replica would start with an empty database of its own rather than share this one. Use PostgreSQL, MySQL or MariaDB, or set replicaCount to 1 for a single-pod trial" (int .Values.replicaCount)) }}
 {{- end }}
@@ -19,6 +28,15 @@
 {{- end }}
 {{- if and .Values.auth.oidc.issuer (not .Values.auth.baseURL) }}
 {{- fail "set auth.baseURL: a provider sends people back to an address and compares it against what it was registered with" }}
+{{- end }}
+{{- if and .Values.auth.oidc.issuer (not (or .Values.auth.oidc.clientSecret .Values.auth.oidc.existingSecret)) }}
+{{- fail "set auth.oidc.clientSecret or auth.oidc.existingSecret: the process refuses to start with an issuer and no client secret, so an install without one comes up as a pod that never starts" }}
+{{- end }}
+{{- if and .Values.auth.oidc.issuer (not .Values.auth.oidc.usernameClaim) }}
+{{- fail "set auth.oidc.usernameClaim: the process refuses to start without one, because it is what redeems an authorization written for somebody who has not signed in yet. There is no default; the configuration reference names the usual answer for each provider" }}
+{{- end }}
+{{- if and .Values.auth.github.clientID (not (or .Values.auth.github.clientSecret .Values.auth.github.existingSecret)) }}
+{{- fail "set auth.github.clientSecret or auth.github.existingSecret: the process refuses to start with a client identifier and no secret" }}
 {{- end }}
 {{- if and .Values.auth.github.clientID (not .Values.auth.baseURL) }}
 {{- fail "set auth.baseURL: a provider sends people back to an address and compares it against what it was registered with" }}
@@ -87,8 +105,8 @@ spec:
             - name: OPENPSIRT_DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "openpsirt.databaseSecretName" . }}
-                  key: {{ include "openpsirt.databaseSecretKey" . }}
+                  name: {{ include "openpsirt.secretName" (dict "top" $ "source" .Values.database "suffix" "database") }}
+                  key: {{ include "openpsirt.secretKey" (dict "source" .Values.database "key" "database-url") }}
             - name: OPENPSIRT_BOOTSTRAP_ADMINS
               value: {{ join "," .Values.auth.bootstrapAdmins | quote }}
             {{- with .Values.auth.baseURL }}
@@ -102,11 +120,13 @@ spec:
               value: {{ .Values.auth.oidc.issuer | quote }}
             - name: OPENPSIRT_OIDC_CLIENT_ID
               value: {{ .Values.auth.oidc.clientID | quote }}
+            {{- if or .Values.auth.oidc.clientSecret .Values.auth.oidc.existingSecret }}
             - name: OPENPSIRT_OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.auth.oidc.existingSecret | default (printf "%s-oidc" (include "openpsirt.fullname" .)) }}
-                  key: {{ .Values.auth.oidc.existingSecretKey }}
+                  name: {{ include "openpsirt.secretName" (dict "top" $ "source" .Values.auth.oidc "suffix" "oidc") }}
+                  key: {{ include "openpsirt.secretKey" (dict "source" .Values.auth.oidc "key" "oidc-client-secret") }}
+            {{- end }}
             {{- with .Values.auth.oidc.usernameClaim }}
             - name: OPENPSIRT_OIDC_USERNAME_CLAIM
               value: {{ . | quote }}
@@ -119,11 +139,13 @@ spec:
             {{- if .Values.auth.github.clientID }}
             - name: OPENPSIRT_GITHUB_CLIENT_ID
               value: {{ .Values.auth.github.clientID | quote }}
+            {{- if or .Values.auth.github.clientSecret .Values.auth.github.existingSecret }}
             - name: OPENPSIRT_GITHUB_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.auth.github.existingSecret | default (printf "%s-github" (include "openpsirt.fullname" .)) }}
-                  key: {{ .Values.auth.github.existingSecretKey }}
+                  name: {{ include "openpsirt.secretName" (dict "top" $ "source" .Values.auth.github "suffix" "github") }}
+                  key: {{ include "openpsirt.secretKey" (dict "source" .Values.auth.github "key" "github-client-secret") }}
+            {{- end }}
             {{- with .Values.auth.github.org }}
             - name: OPENPSIRT_GITHUB_ORG
               value: {{ . | quote }}
@@ -154,8 +176,8 @@ spec:
             - name: OPENPSIRT_MAIL_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.mail.existingSecret | default (printf "%s-mail" (include "openpsirt.fullname" .)) }}
-                  key: {{ .Values.mail.existingSecretKey }}
+                  name: {{ include "openpsirt.secretName" (dict "top" $ "source" .Values.mail "suffix" "mail") }}
+                  key: {{ include "openpsirt.secretKey" (dict "source" .Values.mail "key" "mail-password") }}
             {{- end }}
             {{- end }}
             - name: OPENPSIRT_AUTO_MIGRATE

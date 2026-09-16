@@ -356,7 +356,7 @@ func TestALineNothingCanEnforceReadsAsNoLine(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		for _, word := range []string{"negligible", "Critical", "none", "  "} {
-			if _, err := f.db.DB.NewUpdate().TableExpr("product").
+			if _, err := f.db.DB.NewUpdate().TableExpr("\"product\"").
 				Set("triage_floor = ?", word).
 				Where("id = ?", f.productID).Exec(ctx); err != nil {
 				t.Fatal(err)

@@ -72,7 +72,7 @@ func PerFold(expression string) string { return "MIN(" + expression + ")" }
 // rule that placed a third of a fold reported as no rule at all under one
 // name and as the whole thing under another.
 func InTheFoldOf(q *bun.SelectQuery, componentID int64) *bun.SelectQuery {
-	return q.Join(`JOIN component AS "c" ON c.id = f.component_id`).
+	return q.Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Where(FoldedOn+` = (SELECT "c2".fold_key FROM "component" AS "c2" WHERE "c2".id = ?)`,
 			componentID)
 }

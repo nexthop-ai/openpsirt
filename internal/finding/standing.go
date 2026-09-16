@@ -90,7 +90,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// thing, which is what the findings list answers for a whole product.
 	grouped := func(byBuild bool) *bun.SelectQuery {
 		q := s.db.NewSelect().
-			TableExpr(`finding AS "f"`).
+			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			ColumnExpr(`COUNT(*) AS "places"`).

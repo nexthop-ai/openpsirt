@@ -529,9 +529,9 @@ func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build,
 	}
 	var rows []build
 	if err := db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`tg.id AS "id"`).
 		ColumnExpr(`st.display_name AS "stream"`).
 		ColumnExpr(`va.display_name AS "variant"`).
@@ -655,13 +655,13 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 
 	var heads []groupHead
 	page := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		// The fold, which is the unit a person acts in: two binaries of one
 		// source package are one row, because upgrading them is one act,
 		// deciding about them is one judgment and routing them is one rule.
 		// A reader with no way to see that was reading a list a third of
 		// which was the same work said again.
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
@@ -680,7 +680,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	// a page rather than a scan, and a join added for everybody would pay for
 	// a sort almost nobody asks for.
 	if by, known := order[filter.SortBy]; known && by.issue {
-		page = page.Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`)
+		page = page.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`)
 	}
 	page = page.
 		// Ordered by urgency unless somebody asked otherwise. Urgency
@@ -709,8 +709,8 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	// page was being looked at — and this is the one somebody quotes, because
 	// it is what a deep link or the last page shows.
 	counted := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr("f.vulnerability_id").
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
@@ -753,17 +753,17 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	// author.
 	var rows []decorated
 	q := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		// Joined for the likelihood and the score. Likelihood ranks above
 		// severity, so a list that orders by it and does not show it looks
 		// unsorted.
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		// And for the versions a decision is keyed on. Two primary-key
 		// lookups per place on the page, so the correlated counts can ask
 		// whether a claim is about the versions shipping here rather than
 		// about the place at whatever versions it once held.
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).

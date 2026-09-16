@@ -104,13 +104,13 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 	}
 
 	query := s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN variant AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN product AS "p" ON p.id = st.product_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`v.description AS "summary"`).
@@ -244,9 +244,9 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject,
 		// moved.
 		var was time.Time
 		err := tx.NewSelect().
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			ColumnExpr("MAX(f.disclose_at)").
 			Where("st.product_id = ?", productID).
 			Where("f.vulnerability_id = ?", vulnerabilityID).

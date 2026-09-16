@@ -422,7 +422,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	}
 
 	var found Catches
-	names, err := narrow(s.db.NewSelect().TableExpr(`finding AS "f"`).
+	names, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "cn" ON cn.id = f.component_id`).
 		ColumnExpr(`DISTINCT cn.name AS "name"`).
 		OrderExpr("cn.name").
@@ -443,7 +443,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		found.Components = shown
 	}
 
-	counted, err := narrow(s.db.NewSelect().TableExpr(`finding AS "f"`).
+	counted, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr("DISTINCT f.vulnerability_id, f.component_id"))
 	if err != nil {
@@ -455,7 +455,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	}
 	found.Work = work
 
-	unheld, err := narrow(s.db.NewSelect().TableExpr(`finding AS "f"`).
+	unheld, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		ColumnExpr("DISTINCT f.vulnerability_id, f.component_id").
 		Where("f.assigned_to IS NULL"))
@@ -480,7 +480,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]int64, error) {
 	var builds []int64
 	err := s.db.NewSelect().
-		TableExpr(`target AS "tg"`).
+		TableExpr(`"target" AS "tg"`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("tg.id").
 		Where("st.product_id = ?", productID).
@@ -494,7 +494,7 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 	for _, build := range builds {
 		var roots []int64
 		if err := s.db.NewSelect().
-			TableExpr(`graph_node AS "n"`).
+			TableExpr(`"graph_node" AS "n"`).
 			Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
 			ColumnExpr("DISTINCT n.component_id").
 			Where("n.target_id = ?", build).
@@ -552,7 +552,7 @@ func (s *Store) partiesOf(ctx context.Context, rules []Routing) (map[int64]int64
 		PartyID int64 `bun:"party_id"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`team AS "tm"`).
+		TableExpr(`"team" AS "tm"`).
 		ColumnExpr(`tm.id AS "id"`).
 		ColumnExpr(`tm.party_id AS "party_id"`).
 		Where("tm.id IN (?)", bun.List(ids)).
