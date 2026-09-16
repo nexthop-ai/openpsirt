@@ -54,6 +54,94 @@ export function coveringWords(days: number): string {
   return `the last ${days} days`;
 }
 
+// A period is two dates rather than a rolling window, because a window ending
+// today cannot say "last financial year" — which is the question an auditor
+// asks and the one a quarterly review is written from.
+
+// The shape a date has in the address. Checked rather than trusted, for the
+// reason the window is: it reaches date arithmetic on the render path and the
+// server, and an edited address is the ordinary way a wrong one arrives.
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+// Asked is a period somebody asked for. Either side may be missing: a start
+// with no end runs to now, and an end with no start runs from the beginning.
+export type Asked = { from: string; to: string };
+
+// periodAsked is the period the address asks for, or neither date.
+export function periodAsked(params: URLSearchParams): Asked {
+  const kept = (name: string) => {
+    const value = params.get(name) ?? "";
+    if (!DAY.test(value) || Number.isNaN(new Date(value).getTime())) return "";
+    return value;
+  };
+  const from = kept("from");
+  const to = kept("to");
+  // A period that ends before it starts holds nothing, and the server refuses
+  // it. Dropped here so the sheet asks a question that can be answered rather
+  // than drawing an error somebody has to read to understand.
+  if (from !== "" && to !== "" && from >= to) return { from: "", to: "" };
+  return { from, to };
+}
+
+// stated says whether a period was asked for at all.
+export function stated(period: Asked): boolean {
+  return period.from !== "" || period.to !== "";
+}
+
+// asked is what a report is sent: the period where there is one, and the
+// rolling window otherwise. The two are ways of saying the same thing and the
+// server refuses both together.
+export function asked(period: Asked, days: number): { from?: string; to?: string; days?: number } {
+  if (!stated(period)) return { days };
+  return { ...(period.from ? { from: period.from } : {}), ...(period.to ? { to: period.to } : {}) };
+}
+
+// coveringPeriod is what a sheet's heading calls the stretch it covers.
+export function coveringPeriod(period: Asked, days: number): string {
+  if (!stated(period)) return coveringWords(days);
+  if (period.from === "") return `everything up to ${period.to}`;
+  if (period.to === "") return `${period.from} onwards`;
+  return `${period.from} to ${period.to}`;
+}
+
+// PeriodPicker writes two dates into the address beside the window picker, so
+// a sheet somebody sends carries the stretch they were reading.
+export function PeriodPicker({ period }: { period: Asked }) {
+  const [params, setParams] = useSearchParams();
+  const set = (name: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value === "") next.delete(name);
+    else next.set(name, value);
+    // The two ways of saying when cannot travel together, so naming dates
+    // drops the window rather than sending a request the server refuses.
+    if (value !== "") next.delete("days");
+    setParams(next);
+  };
+  return (
+    <div className="controls">
+      <label>
+        From <input type="date" value={period.from} onChange={(e) => set("from", e.target.value)} />
+      </label>
+      <label>
+        To <input type="date" value={period.to} onChange={(e) => set("to", e.target.value)} />
+      </label>
+      {stated(period) && (
+        <button
+          type="button"
+          onClick={() => {
+            const next = new URLSearchParams(params);
+            next.delete("from");
+            next.delete("to");
+            setParams(next);
+          }}
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
 // WindowPicker is the picker itself. It writes the choice into the address, so a
 // sheet somebody sends carries the window they were looking at.
 export function WindowPicker({ offered, days }: { offered: readonly number[]; days: number }) {

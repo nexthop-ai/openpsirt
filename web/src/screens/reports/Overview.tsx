@@ -11,7 +11,16 @@ import { Empty } from "../../ui/Empty";
 import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords, daysAsked, windowStart } from "./Window";
+import {
+  PeriodPicker,
+  WindowPicker,
+  asked,
+  coveringPeriod,
+  daysAsked,
+  periodAsked,
+  stated,
+  windowStart,
+} from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // How long the figures cover. Thirty days is the window the remediation
@@ -68,11 +77,17 @@ export function Overview() {
   const scope = scopeQuery(at);
   const [params] = useSearchParams();
   const days = daysAsked(params, 30);
+  const period = periodAsked(params);
+  // What every figure on this sheet covers, and what the lists it links to
+  // have to be narrowed by. One value, because a heading saying one stretch
+  // over a list showing another is the failure this sheet is easiest to ship.
+  const when = asked(period, days);
+  const began = stated(period) ? period.from : windowStart(days);
 
   const pace = useQuery({
-    queryKey: ["remediation", scope, days],
+    queryKey: ["remediation", scope, when],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/remediation", { params: { query: { days, ...scope } } })),
+      unwrap(await api.GET("/v1/remediation", { params: { query: { ...when, ...scope } } })),
   });
   // What has been argued away, which is what an auditor asks for first.
   //
@@ -87,7 +102,7 @@ export function Overview() {
   // record is the one that takes an outcome repeated and names the place each
   // judgment sits at.
   const argued = useQuery({
-    queryKey: ["dismissals", at.product ?? "", days],
+    queryKey: ["dismissals", at.product ?? "", when],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/audit", {
@@ -99,7 +114,8 @@ export function Overview() {
               // header saying ninety days over a list that ignores it. Dated
               // by when the judgment was argued, which is what the record
               // dates by.
-              from: windowStart(days),
+              ...(began ? { from: began } : {}),
+              ...(period.to ? { to: period.to } : {}),
               limit: NEWEST,
               ...(at.product ? { product: [at.product] } : {}),
             },
@@ -108,8 +124,13 @@ export function Overview() {
       ),
   });
   const measures = useQuery({
-    queryKey: ["measures", days],
-    queryFn: async () => unwrap(await api.GET("/v1/measures", { params: { query: { days } } })),
+    queryKey: ["measures", when, at.product ?? ""],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/measures", {
+          params: { query: { ...when, ...(at.product ? { product: at.product } : {}) } },
+        }),
+      ),
   });
   const repeated = useQuery({
     queryKey: ["repeated", at.product ?? ""],
@@ -126,9 +147,10 @@ export function Overview() {
       settled={pace.isSuccess && measures.isSuccess && repeated.isSuccess && argued.isSuccess}
       name="Program overview"
       answers="how the work is going, rather than what it is."
-      asked={coveringWords(days)}
+      asked={coveringPeriod(period, days)}
     >
       <WindowPicker offered={WINDOWS} days={days} />
+      <PeriodPicker period={period} />
 
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Keeping pace</h3>
