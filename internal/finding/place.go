@@ -101,7 +101,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 	}
 
 	var rows []placeRow
-	err = placeColumns(s.db.NewSelect().TableExpr(`finding AS "f"`), productID).
+	err = placeColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.place_identity = ?", placeIdentity).
@@ -209,7 +209,7 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 		DueAt           *time.Time `bun:"due_at"`
 	}
 	if err := db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
@@ -331,7 +331,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		Consumer        string `bun:"consumer"`
 		FixedIn         string `bun:"fixed_in"`
 	}
-	query := placeColumns(db.NewSelect().TableExpr(`finding AS "f"`), productID).
+	query := placeColumns(db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
@@ -439,7 +439,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		Consumer      string `bun:"consumer"`
 		FixedIn       string `bun:"fixed_in"`
 	}
-	err = placeColumns(s.db.NewSelect().TableExpr(`finding AS "f"`), productID).
+	err = placeColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
 		ColumnExpr(`COALESCE(f.fixed_in, '') AS "fixed_in"`).
@@ -508,12 +508,12 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 // a decision is keyed on must not depend on what the database returned first.
 func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 	return q.
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.Here, productID).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`f.visibility AS "visibility"`).
 		// The upstream version where one is stated, and the component's own
 		// where none is. Most packages are not forks and state no upstream at

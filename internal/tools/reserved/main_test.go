@@ -1,6 +1,7 @@
 package main
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"strings"
@@ -76,6 +77,135 @@ func TestAConcatenatedClauseIsOneString(t *testing.T) {
 		}
 		if ok && got != c.want {
 			t.Errorf("%s: read %q, want %q", c.what, got, c.want)
+		}
+	}
+}
+
+func TestATableIsReportedOnlyWhereItIsWrittenBare(t *testing.T) {
+	// Aliases were quoted everywhere and tables were not, in the same clause
+	// and often on the same line. The alias pattern cannot see a table at all
+	// — a table is declared rather than invented — so nothing outside the
+	// migrations looked at one.
+	schema := map[string]bool{"finding": true, "component": true}
+	for _, c := range []struct {
+		what string
+		text string
+		want []string
+	}{
+		{"a bare table after FROM", `SELECT 1 FROM finding`, []string{"finding"}},
+		{"a bare table after JOIN", `JOIN component AS "c" ON c.id = f.component_id`, []string{"component"}},
+		{"a bare table after INTO", `INSERT INTO finding ("id") VALUES (?)`, []string{"finding"}},
+		{"a bare table after UPDATE", `UPDATE component SET "name" = ?`, []string{"component"}},
+		{"a bare table opening a table expression", `finding AS "f"`, []string{"finding"}},
+		{"a quoted table", `SELECT 1 FROM "finding"`, nil},
+		{"a quoted table after INTO", `INSERT INTO "finding" ("id") VALUES (?)`, nil},
+		{"a quoted table after UPDATE", `UPDATE "component" SET "name" = ?`, nil},
+		{"a quoted table opening one", `"finding" AS "f"`, nil},
+		{"a column of the same name as a table", `component = ?`, nil},
+		{"a qualified column", `finding.id = ?`, nil},
+		{"a word this schema has no table of", `SELECT 1 FROM ledger`, nil},
+	} {
+		var got []string
+		for _, one := range unquotedTables(c.text, schema, "x.go", 1) {
+			got = append(got, one.word)
+		}
+		if len(got) != len(c.want) {
+			t.Errorf("%s: reported %v, want %v", c.what, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%s: reported %v, want %v", c.what, got, c.want)
+				break
+			}
+		}
+	}
+}
+
+func TestAClauseBuiltInAVariableIsRead(t *testing.T) {
+	// The three clauses this could not see were assembled a line before they
+	// were handed over: literal() reads what is written at the call and
+	// returns nothing for a variable, so the fragment nobody had read was
+	// exactly the one nothing checked.
+	const source = `package x
+
+func q() {
+	where := "SELECT 1 FROM finding AS f"
+	where += " AND EXISTS (SELECT 1 FROM component)"
+	parts := []string{}
+	parts = append(parts, "JOIN target AS tg")
+	db.Where(where)
+	db.Having(strings.Join(parts, " OR "))
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "x.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := file.Decls[0].(*ast.FuncDecl)
+	if !ok {
+		t.Fatal("the fixture's first declaration is not a function")
+	}
+	pieces := assembled(fset, fn, map[int]bool{})
+	if got := pieces["where"]; !strings.Contains(got, "FROM finding") ||
+		!strings.Contains(got, "FROM component") {
+		t.Errorf("a variable built in two statements read as %q", got)
+	}
+	if got := pieces["parts"]; !strings.Contains(got, "JOIN target") {
+		t.Errorf("a slice appended to read as %q", got)
+	}
+
+	// A piece already read where it was written is not read again, so one
+	// defect is reported once rather than at both lines.
+	written := fset.Position(fn.Body.List[0].Pos()).Line
+	if got := assembled(fset, fn, map[int]bool{written: true})["where"]; strings.Contains(got, "FROM finding") {
+		t.Errorf("a statement already read was read again: %q", got)
+	}
+
+	// And the variable a call is handed is the one to look up.
+	for _, c := range []struct{ what, expr, want string }{
+		{"a variable", "db.Where(where)", "where"},
+		{"a joined slice", `db.Having(strings.Join(parts, " OR "))`, "parts"},
+		{"something else entirely", `db.Where("x = ?", 1)`, ""},
+	} {
+		node, err := parser.ParseExpr(c.expr)
+		if err != nil {
+			t.Fatalf("%s: %v", c.what, err)
+		}
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			t.Fatalf("%s: not a call", c.what)
+		}
+		if got := assembledFrom(call.Args[0]); got != c.want {
+			t.Errorf("%s: read %q, want %q", c.what, got, c.want)
+		}
+	}
+}
+
+func TestWhatIsReadAsAStatementAtAll(t *testing.T) {
+	// The alias half is applied only to a literal this recognizes as SQL,
+	// because "as" is a word in nearly every English sentence in this
+	// repository — a version that read them reported eighteen names, every
+	// one of them prose. The marker is a quoted table, which appears in a
+	// query and not in a sentence.
+	//
+	// The table half deliberately does not wait for it: a query whose tables
+	// are all bare carries no marker, and that is the query nothing was
+	// looking at.
+	for _, c := range []struct {
+		what string
+		text string
+		want bool
+	}{
+		{"a query naming a quoted table", `SELECT 1 FROM "finding" AS f`, true},
+		{"a join onto a quoted table", `JOIN "component" AS c ON c.id = f.id`, true},
+		{"a query whose tables are bare", `SELECT id FROM job WHERE kind = ?`, false},
+		{"a sentence using the word from", `read from the document as it arrived`, false},
+		{"a sentence about a table", `the index's table reads as %q`, false},
+	} {
+		if got := statement.MatchString(c.text); got != c.want {
+			t.Errorf("%s: read as a statement=%v, want %v", c.what, got, c.want)
 		}
 	}
 }

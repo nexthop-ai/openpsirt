@@ -725,7 +725,7 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 	// every product is a role held here, so withdrawing their last per-product
 	// grant does not leave their work unreachable.
 	held, err := holdingAny(s.db.NewSelect().
-		TableExpr(`person AS "p"`).ColumnExpr("p.id").
+		TableExpr(`"person" AS "p"`).ColumnExpr("p.id").
 		Where("p.id = ?", personID), "p.id", Roles(), productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
@@ -977,7 +977,7 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 		return nil
 	}
 	return holdingAny(s.db.NewSelect().
-		TableExpr(`person AS "p"`).
+		TableExpr(`"person" AS "p"`).
 		ColumnExpr(`p.id AS "id"`).
 		ColumnExpr(`p.identity AS "identity"`).
 		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.identity) AS "name"`).

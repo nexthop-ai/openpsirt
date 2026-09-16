@@ -76,10 +76,10 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Visibility      string `bun:"visibility"`
 	}
 	err := w.db.NewSelect().
-		TableExpr(`decision AS "de"`).
-		Join(`JOIN vex_statement AS "ss" ON ss.id = de.from_statement_id`).
-		Join(`JOIN product AS "p" ON p.id = de.product_id`).
-		Join(`JOIN vulnerability AS "v" ON v.id = de.vulnerability_id`).
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "vex_statement" AS "ss" ON ss.id = de.from_statement_id`).
+		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
 		ColumnExpr(`MIN(de.id) AS "decision_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).

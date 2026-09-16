@@ -31,7 +31,6 @@ Mandatory, and wrong to do earlier.
 | Adapters that deliver an advisory | The document is generated and handed over; where it goes next differs completely by product (REQ-39) |
 | The VEX profile of the CSAF document | Needs the mapping from a decision to the releases it covers. The dismissal vocabulary was aligned to VEX from the start, so no new words are needed |
 | Server-side PDF rendering for reports | Printing is the browser's and the stylesheet is the record's, which covers what a report is taken away as today |
-| Whether the server resolves an issue reference | REQ-65 says what each reference resolved to travels beside the text. Attachments and mentions do; issues do not, and `markdown.Issues` has no caller. `DESIGN-text.md` records why one may not be needed — an identifier **is** the address, reachable with no lookup, unlike a mention needing the person table. Either that reading stands and `Issues` goes, or the server grows an `issues` array on every body carrying markdown, resolved against what the subject may see. A `REQUIREMENTS.md` row either way, which is the owner's |
 | A release note with nothing in it | `get-release-notes` answers 200 with a zero-byte body where nothing was fixed, and a caller cannot tell that from a truncated response or a wrong pair of builds. `finding.Notes` returns the empty string deliberately — a heading over nothing is a question in the reader's mind — and a test pins it, so changing what a published operation returns is a decision rather than a fix |
 | Nothing watches how deep the queue is | The undertaker sets aside work whose worker died, which was the case that motivated watching it. What is left is depth: a backlog nobody sees. `Depth` and `MaxBacklog` are there to read; what is missing is the threshold it is measured against and the alert kind it raises, both of which are decisions |
 | Where the ceiling on a sign-in belongs | Thirty days is in force and is a judgment rather than a commitment: it bounds how long a role a group withdrew can still be held, and ninety would be defensible. `DESIGN-access.md` records what is built; the number itself is the owner's to settle, and a decision row is theirs to add |
@@ -46,6 +45,7 @@ gap somebody rediscovers by auditing.
 | Decision | Waits for |
 |---|---|
 | REQ-14 | Ingesting static analysis and fuzzing findings. The finding model already carries a kind, so a second kind needs no rewrite |
+| REQ-46 | A channel per chat service, behind the interface mail uses, and a screen to configure one. The signed outbound request is not that: it is a general destination somebody points at whatever accepts it, and a channel translates a notification into what one service renders well. Sending a chat service a payload shaped for everything is the shape this is meant to replace |
 
 ## Known gaps
 

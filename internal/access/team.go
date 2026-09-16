@@ -406,7 +406,7 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 		return false, err
 	}
 	reads, err := holdingAny(s.db.NewSelect().
-		TableExpr(`person AS "p"`).ColumnExpr("p.id").
+		TableExpr(`"person" AS "p"`).ColumnExpr("p.id").
 		Where("p.id = ?", personID), "p.id", enough, productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether they may see this: %w", err)
@@ -504,7 +504,7 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	// working the product can see — the argument the administrator case above
 	// already makes, for a case nobody made it for.
 	reads, err := holdingAny(s.db.NewSelect().
-		TableExpr(`team_member AS "tmm"`).
+		TableExpr(`"team_member" AS "tmm"`).
 		Join(`JOIN "person" AS "pe" ON pe.id = tmm.person_id`).
 		ColumnExpr("tmm.person_id").
 		Where("tmm.team_id = ?", teamID).

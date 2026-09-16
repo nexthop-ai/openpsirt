@@ -106,7 +106,7 @@ func TestOnlyAnAllowedColumnReachesTheOrder(t *testing.T) {
 
 		for _, hostile := range []finding.SortKey{
 			"id",
-			"urgency DESC, (SELECT identity FROM person LIMIT 1)",
+			"urgency DESC, (SELECT identity FROM \"person\" LIMIT 1)",
 			"places); DROP TABLE finding; --",
 			"1",
 			"f.assigned_to",

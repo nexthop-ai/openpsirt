@@ -179,8 +179,8 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 		var revision struct {
 			ID int64 `bun:"id"`
 		}
-		if err := f.db.DB.NewSelect().TableExpr(`"claim_revision" AS dr`).
-			ColumnExpr("dr.id AS id").Where("dr.claim_id = ?", claimed.ClaimID).
+		if err := f.db.DB.NewSelect().TableExpr(`"claim_revision" AS "dr"`).
+			ColumnExpr("dr.id AS \"id\"").Where("dr.claim_id = ?", claimed.ClaimID).
 			Order("dr.id DESC").Limit(1).Scan(ctx, &revision); err != nil {
 			t.Fatal(err)
 		}

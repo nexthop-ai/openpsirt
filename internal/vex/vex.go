@@ -209,7 +209,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	// whose versions match it, so what belongs in this document is what this
 	// build ships rather than everything the product has ever decided.
 	err = s.db.NewSelect().
-		TableExpr(`finding AS "f"`).
+		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
@@ -461,7 +461,7 @@ func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words
 	}
 	where, args := database.InAnyOf("de.id", decisions)
 	if err := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
 		ColumnExpr(`de.id AS "id"`).

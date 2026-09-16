@@ -70,7 +70,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	}
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.TableExpr(`finding AS "f"`).
+		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).

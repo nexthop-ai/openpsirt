@@ -76,15 +76,15 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 			ID   int64  `bun:"id"`
 			Name string `bun:"name"`
 		}
-		if err := f.db.NewSelect().TableExpr("vulnerability").
-			ColumnExpr("id, identifier AS name").Scan(t.Context(), &named); err != nil {
+		if err := f.db.NewSelect().TableExpr("\"vulnerability\"").
+			ColumnExpr("id, identifier AS \"name\"").Scan(t.Context(), &named); err != nil {
 			t.Fatal(err)
 		}
 		for _, n := range named {
 			names[n.ID] = n.Name
 		}
 		named = nil
-		if err := f.db.NewSelect().TableExpr("component").
+		if err := f.db.NewSelect().TableExpr("\"component\"").
 			ColumnExpr("id, name").Scan(t.Context(), &named); err != nil {
 			t.Fatal(err)
 		}

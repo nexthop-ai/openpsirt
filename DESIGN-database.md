@@ -88,6 +88,7 @@ Engine-specific code is confined to these places:
 | Inserting a row another writer may already have written | Two of them want `ON CONFLICT` and the other two want `INSERT IGNORE`. For a table whose rows are facts rather than somebody's state, where two writers describing the same thing are agreeing |
 | The job queue's locking | The only query outside this package, because the queue owns the statement |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
+| Listing the harness's own databases | The one query in the harness that does branch. PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
@@ -375,20 +376,45 @@ that looks like a statement is read now, and `FROM "` or `JOIN "` is what
 marks one: every table here is quoted, so that appears in SQL and not in
 prose, where matching the bare keywords reported sixty-odd English sentences.
 
-**A name that is not in a literal is still invisible**, because there is no
-parser here for four dialects — an alias assembled from two pieces is the
-shape, and the one that existed is now quoted at its joint. That is the safe
-direction for a check that fails a build, and it is why the gate says every
-name *in a literal* rather than claiming the rule outright.
+**A table a query names is quoted too, and is checked outside the migrations.**
+A table is declared rather than invented, so the alias pattern cannot see one
+at all, and nothing looked: they were bare in four hundred and eighty-eight
+places and quoted in a handful, in the same clauses whose aliases were quoted.
+What the migrations made is read first, and a word this schema has no table of
+is not a table — which is how a clause keyword is told from a name without a
+list of keywords that would go stale the same way the reserved list does.
+
+**The two halves are admitted differently, and for a reason.** The alias half
+reads only a literal recognizable as a query, because "as" is a word in nearly
+every English sentence here. The table half reads every literal, because what
+admits one is this schema's own table names — and a query whose tables are all
+bare carries no quoted table to be recognized by, which is precisely the query
+nothing was looking at. A table expression that is a table name and nothing
+else is admitted where a method that names a table is being called, since no
+pattern over the text alone tells `"person"` the table from `"person"` the kind
+of subject.
+
+**Test queries are held to it too.** They run against the same four engines,
+and twenty-two of them named a table bare. The checker's own package is the one
+exemption: a bare table in its fixtures is the input, not a defect.
+
+**A clause assembled in a variable is read where it is handed over.** Three of
+them reached the builder through a local built from literals a line earlier,
+and a check that reads only what is written at the call read none of it — which
+is the fragment nobody else has read either. Every literal a function puts in a
+variable is gathered, which is more than any one run assembles, because reading
+too much can only report a name somebody wrote bare somewhere in that function.
+What was already read where it was written is left out, so one defect is
+reported once.
+
+A name that reaches SQL from outside the file is still invisible, because the
+check reads source as text and there is no parser here for four dialects. That
+is the safe direction for a check that fails a build. It looks only inside the
+builder's own methods: a version that read doc comments reported eighteen
+names, every one the English word "as".
 
 The schema is also read back from the database and checked there, on the same
 principle as the index test: what matters is what an operator ends up with.
-
-The check reads source as text, because SQL is inside the strings and there is no
-parser here for four dialects. That makes it blind to an alias built by
-concatenation, which is the safe direction for a check that fails a build. It
-looks only inside the builder's own methods: a version that read doc comments
-reported eighteen names, every one the English word "as".
 
 Two tests hold silent truncation, which is the worst shape a portability
 difference can take — nothing fails and the data is wrong. Both were checked by

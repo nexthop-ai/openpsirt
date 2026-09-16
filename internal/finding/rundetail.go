@@ -117,7 +117,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 		}
 		inner := s.db.NewSelect().
 			Distinct().
-			TableExpr(`finding AS "f"`).
+			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 			Join(rating.Here, productID).
 			ColumnExpr(rating.BandExpr+` AS "band"`).

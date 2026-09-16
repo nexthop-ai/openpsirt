@@ -53,7 +53,7 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 		// caller sends never becomes the expression.
 		for _, hostile := range []string{
 			"id",
-			"urgency DESC, (SELECT secret FROM person)",
+			"urgency DESC, (SELECT secret FROM \"person\")",
 			"places; DROP TABLE finding",
 			"1",
 			"f.assigned_to",

@@ -207,7 +207,7 @@ func issueID(t *testing.T, f *fixture, identifier string) int64 {
 	t.Helper()
 	var id int64
 	if err := f.store.DB().NewSelect().
-		TableExpr("vulnerability AS v").Column("v.id").
+		TableExpr("\"vulnerability\" AS \"v\"").Column("v.id").
 		Where("v.identifier = ?", identifier).
 		Scan(t.Context(), &id); err != nil {
 		t.Fatalf("%s: %v", identifier, err)

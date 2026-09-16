@@ -116,7 +116,7 @@ func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
 		return 0, nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	return productID, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.TableExpr(`finding AS "f"`).
+		return q.TableExpr(`"finding" AS "f"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.visibility IN (?)", bun.List(visible))
 	}, nil
@@ -244,23 +244,23 @@ func (s *Store) registerQuery(productID int64,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery) *bun.SelectQuery {
 
 	return narrow(s.db.NewSelect()).
-		Join(`JOIN vulnerability AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.Here, productID).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		// What pulls the component in. Left, because a build holds some
 		// components directly and those have no consumer at all.
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		// Liveness is asked of the columns rather than of the join. In the
 		// join it hid a lapsed decision entirely, so a place whose judgment
 		// stopped applying reported as never decided and the register lost who
 		// proposed and who approved it — which is what a compliance reader
 		// comes here for. The findings list says "lapsed" about the same
 		// place, so the two surfaces disagreed.
-		Join(`LEFT JOIN decision AS "de" ON de.product_id = ?
+		Join(`LEFT JOIN "decision" AS "de" ON de.product_id = ?
 			AND de.vulnerability_id = f.vulnerability_id
 			AND de.place_identity = f.place_identity`, productID).
-		Join(`LEFT JOIN claim AS "cl" ON cl.id = de.claim_id`).
-		Join(`LEFT JOIN person AS "pp" ON pp.id = de.proposed_by`).
+		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`LEFT JOIN "person" AS "pp" ON pp.id = de.proposed_by`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).

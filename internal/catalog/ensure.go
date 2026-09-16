@@ -247,7 +247,7 @@ func (s *Store) BuiltAs(ctx context.Context, subject access.Subject, streamID in
 	}
 	var rows []Variant
 	err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN target AS "tg" ON tg.variant_id = v.id`).
+		Join(`JOIN "target" AS "tg" ON tg.variant_id = v.id`).
 		Where("tg.stream_id = ?", streamID).Order("v.name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list what a release is built as: %w", err)
@@ -330,7 +330,7 @@ func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 		Count     int    `bun:"count"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`stream AS "st"`).
+		TableExpr(`"stream" AS "st"`).
 		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`st.kind AS "kind"`).
 		ColumnExpr(`COUNT(*) AS "count"`).
@@ -354,7 +354,7 @@ func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 		Count     int   `bun:"count"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`variant AS "va"`).
+		TableExpr(`"variant" AS "va"`).
 		ColumnExpr(`va.product_id AS "product_id"`).
 		ColumnExpr(`COUNT(*) AS "count"`).
 		Where("va.product_id IN (?)", bun.List(productIDs)).

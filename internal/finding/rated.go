@@ -79,9 +79,9 @@ func RatingIn(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64)
 func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]int64, error) {
 	var products []int64
 	err := db.NewSelect().
-		TableExpr(`finding AS "f"`).
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("st.product_id").
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").

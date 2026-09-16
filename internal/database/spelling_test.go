@@ -27,7 +27,7 @@ func TestAColumnReferenceIsQuotedForWhicheverEngineIsAsked(t *testing.T) {
 		// And the statement it reaches runs, which is what makes the quoting
 		// the engine's own rather than a guess about it.
 		var n int
-		if err := db.DB.NewSelect().TableExpr(`finding AS "f"`).
+		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 			ColumnExpr("COUNT(*)").
 			Where(quoted+" IS NULL").Scan(t.Context(), &n); err != nil {
 			t.Errorf("a quoted column reference did not run: %v", err)

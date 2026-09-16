@@ -147,7 +147,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows    int    `bun:"written"`
 	}
 	err := narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`cl.outcome AS "outcome"`).
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
@@ -180,7 +180,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
 		ColumnExpr(`ap.batch AS "batch"`).
@@ -215,7 +215,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows     int    `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pr" ON pr.id = de.proposed_by`).
 		Join(`JOIN "person" AS "ape" ON ape.id = ap.approved_by`).
@@ -253,7 +253,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
@@ -311,7 +311,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Covered    int       `bun:"covered"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
@@ -374,7 +374,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	}
 	var ids []int64
 	if err := readableBy(s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
+		TableExpr(`"decision" AS "de"`).
 		ColumnExpr("de.id").
 		Where("de.claim_id IN (?)", bun.List(claims)), subject, "de").
 		Scan(ctx, &ids); err != nil {
@@ -390,13 +390,13 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Covers  int   `bun:"covers"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
-		Join(`JOIN finding AS "f" ON f.vulnerability_id = de.vulnerability_id`+
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = de.vulnerability_id`+
 			" AND f.place_identity = de.place_identity").
-		Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
-		Join(`JOIN component AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`COUNT(*) AS "covers"`).
 		Where("de.id IN (?)", bun.List(ids)).

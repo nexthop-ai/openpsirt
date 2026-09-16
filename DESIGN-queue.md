@@ -211,5 +211,9 @@ own.
 - **No queue library is used.** The mature Go queues either tie to one database
   engine or require a separate service — one would cut engine support from four
   to one, the other adds a component to every deployment.
-- **Row locking is verified as non-load-bearing** by removing it entirely and
-  observing that the exclusivity test still passes.
+- **Row locking is verified as non-load-bearing.** The exclusivity test runs
+  twice on every engine, once with the locking clause and once without it, and
+  the second arm is the one that fails when the conditional update stops
+  repeating the state it expects: with locking in place the same defect passes,
+  because locking hides it. The switch is reachable only from the package's
+  test surface, never from an option a deployment can set.

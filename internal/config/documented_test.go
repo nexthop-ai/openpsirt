@@ -112,6 +112,37 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 		t.Errorf("documented and read by nothing, so setting %s changes nothing and says nothing:\n  %s",
 			plural(len(invented)), strings.Join(invented, "\n  "))
 	}
+
+	// The chart is a third writer of the same contract, and the one on the
+	// deployment the design calls the deployment. A name it sets that the
+	// process no longer reads is a setting an operator changes to no effect,
+	// with nothing anywhere to say so.
+	//
+	// One direction only: the chart offers the settings a cluster install
+	// needs rather than all of them, so asking that it set every name the
+	// process reads would fail on every optional one.
+	chart, err := os.ReadFile("../../deploy/helm/openpsirt/templates/deployment.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := map[string]bool{}
+	for _, found := range named.FindAllStringSubmatch(string(chart), -1) {
+		set[found[1]] = true
+	}
+	if len(set) == 0 {
+		t.Fatal("the chart sets no settings, so this checked nothing")
+	}
+	var ignored []string
+	for name := range set {
+		if !reads[name] {
+			ignored = append(ignored, envPrefix+name)
+		}
+	}
+	sort.Strings(ignored)
+	if len(ignored) > 0 {
+		t.Errorf("set by the chart and read by nothing, so a cluster install carries %s and the process ignores it:\n  %s",
+			plural(len(ignored)), strings.Join(ignored, "\n  "))
+	}
 }
 
 func plural(n int) string {

@@ -103,7 +103,7 @@ func read(t *testing.T, db *database.DB) map[string]stored {
 	t.Helper()
 	var rows []stored
 	err := db.DB.NewSelect().
-		TableExpr("component AS c").
+		TableExpr("\"component\" AS \"c\"").
 		ColumnExpr("c.purl, c.latest_version, c.latest_released_at, c.latest_checked_at").
 		ColumnExpr("c.summary, c.project_url").
 		Scan(t.Context(), &rows)

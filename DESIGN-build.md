@@ -15,6 +15,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Database engines](#database-engines)
 - [Test databases](#test-databases)
 - [Pinned pairs](#pinned-pairs)
+- [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
 - [Static analysis](#static-analysis)
 - [What a gate reads](#what-a-gate-reads)
 - [Licenses](#licenses)
@@ -45,12 +46,20 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/queue/` | Durable background work. See `DESIGN-queue.md` |
 | `internal/sbom/`, `internal/scanner/` | Reading an inventory and scanning it. See `DESIGN-ingest.md` |
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `DESIGN-data-model.md`, `DESIGN-findings.md` |
+| `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |
 | `internal/triage/`, `internal/advisory/` | Judgments, approvals, and the CSAF document. See `DESIGN-triage.md` |
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
+| `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
+| `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |
+| `internal/saved/` | A narrowing of a list somebody kept, and the claim it prepares. See `DESIGN-remediation.md` |
+| `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
+| `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `DESIGN-remediation.md` |
+| `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
+| `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |
 | `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
-| `internal/docs/`, `internal/tools/` | Document checks and the gates that are not linters |
+| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gates that are not linters |
 | `web/` | The interface source. See `DESIGN-interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
 | `docs/` | The published documentation site |
@@ -59,6 +68,14 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `Makefile.demo` | The image and what is built from it: the seeded demo deployment, the hot-reload loop, and the offline scanner bundle. Included by the makefile beside it, so every target is reached the same way. A file of its own because it shares nothing with the gate half but the names of the docker and npm commands, so the half that decides whether a change may be pushed reads without the half that stands an instance up. The scanner bundle is here because it is built from the demo image rather than because it is a demo target, and every variable these read is here with them |
 
 Everything is under `internal/`, so nothing is importable by another module.
+
+Two import constraints are worth stating, because a fix proposed without them
+cannot be written:
+
+| Constraint | Why |
+|---|---|
+| `internal/database` cannot read a setting | `internal/setting` imports `internal/database`, so a bound read from the settings store cannot live below it. Bounds that low come from the environment |
+| The schema's tests cannot reach the harness's table list | They are an external test package, and the list is the harness's own |
 
 ## Make targets
 
@@ -97,6 +114,9 @@ of ours needs no edit.
 | `make unreachable` | Exported code nothing reaches |
 | `make negatives` | A 404 built from an error's own text: it asserts a name reaches nothing, and publishes whatever the error carried |
 | `make granted` | Every query outside the access package asks both grant tables |
+| `make attached` | A doc comment describing something other than the declaration it sits on |
+| `make confined` | Engine-specific code outside the two places allowed to hold it |
+| `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
 | `make unclaimed` | Every requirement is named by a design document |
 | `make pins-check` | Every version pinned in two files still agrees |
 | `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
@@ -104,7 +124,7 @@ of ours needs no edit.
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
 | `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
 | `make check-packaging` | The container image and the Helm chart. Needs docker and helm |
-| `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker and helm. See `DESIGN-packaging.md` |
+| `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `DESIGN-packaging.md` |
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
 | `make measure` | Measurements rather than gates. Behind a build tag |
@@ -126,7 +146,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `test` |
+| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `attached`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
@@ -350,8 +370,9 @@ servers, and two minutes forty-five against cold ones.
 
 A version written in two files is a version somebody moves in one of them: the Go
 toolchain the container builds with against the one the module declares, the Node
-the image uses against the one CI runs, the SBOM generator in the image against
-the one the SBOM target invokes.
+the image uses against the one every workflow runs, the SBOM generator in the
+image against the one the SBOM target invokes, and the Python the documentation
+closure was resolved on against the one the workflows build it with.
 
 A check of its own rather than part of the engine check: that answers what the
 tests run against, this answers what the release is built from. It found drift on
@@ -369,6 +390,37 @@ version.
 |---|---|
 | The image no longer picks up a Go release by itself | Dependabot watches the images and a bump arrives as a pull request |
 | A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities, and now reports them about the toolchain both artifacts are built with rather than about one of the two |
+
+## Hash pinning per ecosystem
+
+| Ecosystem | What names the bytes |
+|---|---|
+| Go | `go.sum`, through the checksum database |
+| Node | `package-lock.json`, by integrity |
+| Python, for the documentation | `docs/requirements.txt`, a lock with a hash for every package in the closure, installed with `--require-hashes` |
+| The scanner and the cataloger | A version and a per-architecture hash in the image |
+| Actions | A commit, never a tag |
+
+The Python closure was the exception, and it is the one that runs beside a
+token that can write to the repository. Three packages were pinned and the
+thirty or so they pull in were not, so a republished transitive release
+executed on the next push.
+
+Direct versions are written in `docs/requirements.in` and the lock beside it is
+generated, never edited:
+
+```
+pip-compile --generate-hashes --output-file docs/requirements.txt docs/requirements.in
+```
+
+`pins-check` asks that every package in the lock carries a hash, that each
+direct version is the one the lock resolved, that every workflow installing it
+passes `--require-hashes`, and that they agree on one Python — the lock was
+resolved on one, and a second would resolve a different closure.
+
+A hash-pinned install fails closed when an upstream republishes, which is a
+refusal to install rather than something executing unnoticed, and it is
+answered by regenerating the lock in a commit somebody reviews.
 
 ## Static analysis
 

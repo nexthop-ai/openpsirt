@@ -229,7 +229,7 @@ func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64
 		ScoreCenti int    `bun:"score_centi"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`vulnerability AS "v"`).
+		TableExpr(`"vulnerability" AS "v"`).
 		Join(rating.Here, productID).
 		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
 		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed"`).
@@ -408,9 +408,9 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	openHere := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().
 			ColumnExpr("1").
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN component AS "c" ON c.id = f.component_id`).
-			Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			Where("f.target_id = ?", targetID).
 			Where("f.closed_at IS NULL").
 			Where("f.vulnerability_id = de.vulnerability_id").
@@ -424,11 +424,11 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	stillCovered := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().
 			ColumnExpr("1").
-			TableExpr(`finding AS "f"`).
-			Join(`JOIN component AS "c" ON c.id = f.component_id`).
-			Join(`LEFT JOIN component AS "uc" ON uc.id = f.consumer_id`).
-			Join(`JOIN target AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Where("st.product_id = de.product_id").
 			Where("f.closed_at IS NULL").
 			Where("f.vulnerability_id = de.vulnerability_id").
@@ -446,8 +446,8 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where("de.state IN (?, ?)", Proposed, Approved).
 			Where("de.product_id = (?)", db.NewSelect().
 				ColumnExpr("st.product_id").
-				TableExpr(`target AS "tg"`).
-				Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+				TableExpr(`"target" AS "tg"`).
+				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 				Where("tg.id = ?", targetID)).
 			Where("EXISTS (?)", openHere(db).Where("NOT ("+matching+")")).
 			Where("NOT EXISTS (?)", stillCovered(db)).
@@ -607,8 +607,8 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	// one product.
 	var productID int64
 	if err := s.db.NewSelect().
-		TableExpr(`target AS "tg"`).
-		Join(`JOIN stream AS "st" ON st.id = tg.stream_id`).
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("st.product_id").
 		Where("tg.id = ?", toTarget).
 		Scan(ctx, &productID); err != nil {
@@ -639,11 +639,11 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		PlaceIdentity   string `bun:"place_identity"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`decision AS "de"`).
-		Join(`JOIN vulnerability AS "v" ON v.id = de.vulnerability_id`).
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = de.vulnerability_id`).
 		// The argument, which is where the outcome lives.
-		Join(`JOIN claim AS "cl" ON cl.id = de.claim_id`).
-		Join(`LEFT JOIN claim_revision AS "dr" ON dr.id = cl.revision_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
 		ColumnExpr(`de.id AS "decision_id"`).
 		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).

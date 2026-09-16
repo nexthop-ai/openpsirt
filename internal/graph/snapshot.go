@@ -207,7 +207,7 @@ func (s *Store) CurrentNodes(ctx context.Context, targetID int64) ([]Node, error
 func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Described, error) {
 	var rows []Component
 	err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN graph_node AS "n" ON n.component_id = c.id`).
+		Join(`JOIN "graph_node" AS "n" ON n.component_id = c.id`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
@@ -331,8 +331,8 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 	name, version, ecosystem string) (int64, error) {
 
 	query := db.NewSelect().
-		TableExpr(`graph_node AS "n"`).
-		Join(`JOIN component AS "c" ON c.id = n.component_id`).
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
@@ -523,7 +523,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 
 	var rootID int64
 	err := s.db.NewSelect().
-		TableExpr(`graph_node AS "n"`).
+		TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr("n.component_id").
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
@@ -583,7 +583,7 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 
 	row := &Neighbor{Children: children, ComponentID: componentID}
 	err := s.db.NewSelect().
-		TableExpr(`component AS "c"`).
+		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
@@ -620,10 +620,10 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 
 	var rows []Neighbor
 	err := s.db.NewSelect().
-		TableExpr(`graph_edge AS "e"`).
-		Join(`JOIN graph_node AS "nn" ON nn.id = e.`+near).
-		Join(`JOIN graph_node AS "fn" ON fn.id = e.`+far).
-		Join(`JOIN component AS "c" ON c.id = fn.component_id`).
+		TableExpr(`"graph_edge" AS "e"`).
+		Join(`JOIN "graph_node" AS "nn" ON nn.id = e.`+near).
+		Join(`JOIN "graph_node" AS "fn" ON fn.id = e.`+far).
+		Join(`JOIN "component" AS "c" ON c.id = fn.component_id`).
 		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
@@ -809,7 +809,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		return 0, 0, err
 	}
 	components, err := s.db.NewSelect().
-		TableExpr(`graph_node AS "n"`).
+		TableExpr(`"graph_node" AS "n"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		// The build's own root is not one of its components, which is what the
@@ -821,7 +821,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 		return 0, 0, fmt.Errorf("count what this build holds: %w", err)
 	}
 	edges, err := s.db.NewSelect().
-		TableExpr(`graph_edge AS "e"`).
+		TableExpr(`"graph_edge" AS "e"`).
 		Where("e.target_id = ?", targetID).
 		Where("e.closed_scan_id IS NULL").
 		Count(ctx)
@@ -858,8 +858,8 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 
 	var rows []Neighbor
 	err = s.db.NewSelect().
-		TableExpr(`graph_node AS "n"`).
-		Join(`JOIN component AS "c" ON c.id = n.component_id`).
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
 		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
