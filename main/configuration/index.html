@@ -582,6 +582,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-work-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The work queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-a-scan-file" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -875,6 +886,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-work-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The work queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-a-scan-file" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1031,6 +1053,11 @@ writes <code>text</code>.</p>
 <td>How long a connection is used before it is replaced</td>
 <td><code>30m</code></td>
 </tr>
+<tr>
+<td><code>OPENPSIRT_DB_REQUIRE_ENCRYPTION</code></td>
+<td>Refuse to start where the connection to the database is not encrypted. See below</td>
+<td><code>false</code></td>
+</tr>
 </tbody>
 </table>
 <h3 id="encrypting-the-database-connection">Encrypting the database connection<a class="headerlink" href="#encrypting-the-database-connection" title="Permanent link">&para;</a></h3>
@@ -1066,6 +1093,39 @@ nobody checked. Ask for certainty in the URL.</p>
 </table>
 <p>Anything the URL says about the transport is left alone, so <code>tls=skip-verify</code>
 or a <code>sslmode</code> of your own reaches the driver as written.</p>
+<p><strong>Say so where it is required.</strong> With <code>OPENPSIRT_DB_REQUIRE_ENCRYPTION</code> set,
+the process asks the connection what it negotiated and refuses to start where
+that is cleartext — naming the URL, without its password, and what to put in
+it. Asking for encryption in the URL and being given none is a deployment that
+believes it is encrypted and is not, and nothing else says otherwise: the
+process logs the transport at every start, which is a line somebody has to
+read.</p>
+<table>
+<thead>
+<tr>
+<th>Where it is set</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The connection is encrypted</td>
+<td>Nothing happens. The transport is logged as it always is</td>
+</tr>
+<tr>
+<td>The connection is in cleartext</td>
+<td>Refused at startup, naming the setting</td>
+</tr>
+<tr>
+<td>The server will not say which</td>
+<td>Refused. What this asks for is certainty, and "we could not find out" is not it</td>
+</tr>
+<tr>
+<td>The database is SQLite</td>
+<td>Refused. A file opened directly has no connection to encrypt, and quietly doing nothing is what a setting that changes nothing looks like</td>
+</tr>
+</tbody>
+</table>
 <h2 id="scanning">Scanning<a class="headerlink" href="#scanning" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1083,7 +1143,7 @@ or a <code>sslmode</code> of your own reaches the driver as written.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_SCANNER_TIMEOUT</code></td>
-<td>How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below the two hours a worker may hold one job for, and the process refuses to start where it does not</td>
+<td>How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below <code>OPENPSIRT_QUEUE_MAX_HOLD</code>, the span a worker may hold one job for, and the process refuses to start where it does not</td>
 <td><code>30m</code></td>
 </tr>
 <tr>
@@ -1505,6 +1565,49 @@ told so at every start rather than only where it was configured:</p>
 <p>This is not <code>OPENPSIRT_PLAIN_HTTP</code>, which is about serving this application
 without TLS and loosens cookies. One is a file on the way out and the other a
 session on the way in; a deployment can want either without the other.</p>
+<h2 id="the-work-queue">The work queue<a class="headerlink" href="#the-work-queue" title="Permanent link">&para;</a></h2>
+<p>Reading a scan and running a scanner are jobs in a queue held in the database.
+Each bound below is what a deployment sizes; left unset, the built-in value
+applies, and each takes effect at the next start rather than at once.</p>
+<p>How deep the queue may get before uploads are refused is not here: it is a
+setting an administrator changes on screen, because the refusal lands on a
+build server and waiting for a restart is not a remedy.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_QUEUE_MAX_ATTEMPTS</code></td>
+<td>How many times a job is tried before it is set aside with its last error</td>
+<td><code>5</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_CLAIM_TIMEOUT</code></td>
+<td>How long a claim is honored with nothing heard from the worker holding it, after which another worker may take the job. It bounds a worker going silent, not how long a job may take</td>
+<td><code>30m</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_HEARTBEAT</code></td>
+<td>How often a running job renews its claim. Well under the claim timeout, so several renewals may fail before the claim is at risk — a value that is not below it is refused at startup</td>
+<td><code>5m</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_MAX_HOLD</code></td>
+<td>How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and <code>OPENPSIRT_SCANNER_TIMEOUT</code>, which the process checks at startup</td>
+<td><code>2h</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_BACKOFF</code></td>
+<td>How long a failed job waits before it is tried again, multiplied by the attempt</td>
+<td><code>30s</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="reading-a-scan-file">Reading a scan file<a class="headerlink" href="#reading-a-scan-file" title="Permanent link">&para;</a></h2>
 <p>A scan file is somebody else's output arriving over a link this deployment does
 not control, so it is read within bounds. These are the ceilings; each is
