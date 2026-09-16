@@ -180,6 +180,8 @@ builds, and this is a document going to a customer.
 | Builds are named the way a customer knows them | From the catalog's display names. A heading reading "main container" puts internals on the first line of somebody else's document |
 | Fixes are grouped by what was done, not by the issue | One kernel upgrade closes 917 issues at once, and a bullet per issue states the same version pair 917 times in a document going to a customer — while the part a reader is looking for, which version to move to, is the part that repeats. The move is stated once and the issues it closed are listed under it |
 | A group is the component with its closure reason and its version pair | Two upgrades of one component in one comparison are two different answers to "what do I move to", and folding on the component alone states one of them over both |
+| A bullet carries the score, whether it is known exploited, and where it is written up | The name and the word do not say whether the upgrade is taken tonight or next month, and all three are already held. The address goes through the rule an address stored beside a claim does, because this document leaves the building and a scheme a reader's machine acts on is not something to hand them |
+| The description is not in the bullet | One upgrade closes hundreds of issues and they are listed under it, so a sentence apiece is a document nobody reads to the end. The description is behind the link, which is what the link is for |
 | An empty section is not written | A heading with nothing under it is a question about whether something is missing |
 | A release that fixed nothing says so, in a sentence | The operation answered nothing at all, and zero bytes is also what a truncated response, the wrong pair of builds and a request that went astray look like. A sentence is not a heading over nothing, so the rule above still holds: what comes back names the two builds and what measured them, and carries no section |
 | What was left out is counted | A reader cannot otherwise tell a release that fixed nothing undisclosed from one whose undisclosed fixes were taken off the page. A number and never the entries, and zero for a reader who could not have seen them anyway |
@@ -548,10 +550,11 @@ The measurement is `make measure`, and it runs on every engine.
 
 ## Exports
 
-Any list that can be read can be exported, as CSV or JSON. Ten lists export:
-the findings list, the cross-product findings list, the record of judgments, the
+Any list that can be read can be exported, as CSV or JSON. What exports: the
+findings list, the cross-product findings list, the record of judgments, the
 review queue, the by-component view, what is running out of time, scan coverage,
-what is out of support, a comparison of two builds, and the disposition
+what is out of support, a comparison of two builds, the fix bundles, the
+upgrades one build is waiting on, what keeps being put off, and the disposition
 register — which is the one an auditor asks for first, and which the count left
 out.
 
@@ -574,6 +577,7 @@ stops is one somebody reads as whole.
 | A refusal is answered before the first byte | A stream's status is gone by the time the store can refuse, so a refusal arriving there could only be said in the file — which said the export stopped early, with a 200 in front of it |
 | The cross-product list states no single line | Each product applies its own |
 | The findings list offers its file whether or not a product is picked | The two lists are two endpoints and the filters mean the same on both, so offering the control on one and not the other left one narrowing reachable as a file and the other not, for no reason a reader could see. The spanning file drops the filters a single build resolves, the same narrowing the screen's own read applies |
+| A list and its file are built from one function, not two | Three exports rendered their rows again beside the handler, which is the same drift a second parameter list is: the screen gains a column and the file quietly does not |
 | Each takes the same filters as its screen, from the same struct | Two declared their parameters by hand and drifted: the findings export accepted fourteen of the list's filters and the by-component export ten, so nineteen arrived and were dropped before the handler ran. Nothing rejects an undeclared parameter, so there was no error and no clue |
 | Paging is a struct of its own, kept out of the filters | An export answers the whole of a narrowing and pages internally; embedding the filters wholesale would make it offer a page size it does not honor |
 | The deadline report needed an offset before it could be a file | What somebody exports a deadline report for is precisely the part they have not read. Paging it also needed the build in the ordering, since an arbitrary order between pages repeats one row and skips another |

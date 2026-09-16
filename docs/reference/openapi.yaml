@@ -9964,6 +9964,57 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/deferrals/repeated.{format}:
+    get:
+      description: |-
+        The same list as a file: places deferred more than once, most-deferred first, with how long they have been put off for in total.
+
+        What the screen shows is a shape rather than a page — one item deferred three times is a judgment and forty of them is a policy nobody wrote down — and the file is what that goes into a review as.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-repeated-deferrals
+      parameters:
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Limit to one product, by name. Empty means every product you can see
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see
+            type: string
+        - description: How many deferrals make something worth listing. One is an ordinary judgment
+          explode: false
+          in: query
+          name: at_least
+          schema:
+            default: 2
+            description: How many deferrals make something worth listing. One is an ordinary judgment
+            format: int64
+            maximum: 50
+            minimum: 2
+            type: integer
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export repeated deferrals
+      tags:
+        - Reports
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/disclosing:
     get:
       description: |-
@@ -14528,6 +14579,132 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/fix-bundles.{format}:
+    get:
+      description: |-
+        The same list as a file: one row per upstream bump, with what it closes and the builds that hold it.
+
+        Takes the same selection and the same filters as the screen, from the same struct. The builds a bump is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-fix-bundles
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Limit to one branch or tag
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Limit to one branch or tag
+            type: string
+        - description: Limit to one variant
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant
+            type: string
+        - description: Keep only issues rated this badly or worse
+          explode: false
+          in: query
+          name: severity
+          schema:
+            description: Keep only issues rated this badly or worse
+            enum:
+              - low
+              - medium
+              - high
+              - critical
+            type: string
+        - description: Keep only bumps closing something known to be exploited
+          explode: false
+          in: query
+          name: exploited
+          schema:
+            description: Keep only bumps closing something known to be exploited
+            type: boolean
+        - description: Keep only bumps moving a component of this name
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep only bumps moving a component of this name
+            type: string
+        - description: Keep only rows whose component or issue name contains this
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Keep only rows whose component or issue name contains this
+            maxLength: 200
+            type: string
+        - description: Keep only components of one package kind
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: Keep only components of one package kind
+            type: string
+        - description: Keep only groups this far decided
+          explode: false
+          in: query
+          name: state
+          schema:
+            description: Keep only groups this far decided
+            enum:
+              - undecided
+              - waiting
+              - agreed
+              - lapsed
+            type: string
+        - description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+          explode: false
+          in: query
+          name: sort
+          schema:
+            description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+            enum:
+              - urgency
+              - severity
+              - issues
+              - places
+              - builds
+              - deadline
+            type: string
+        - description: Order the other way — fewest, least urgent, nearest deadline first
+          explode: false
+          in: query
+          name: asc
+          schema:
+            description: Order the other way — fewest, least urgent, nearest deadline first
+            type: boolean
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export findings by upgrade
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/products/{product}/holders:
     get:
       description: |-
@@ -17347,6 +17524,54 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades.{format}:
+    get:
+      description: |-
+        The same list as a file: one row per bump this build is waiting on, where it stands, and what it would still close here.
+
+        The packages one bump moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-pending-upgrades
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the upgrades one build is waiting on
+      tags:
+        - Remediation
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/products/{product}/streams/{stream}/variants/{variant}/readiness:
     get:
       description: |-

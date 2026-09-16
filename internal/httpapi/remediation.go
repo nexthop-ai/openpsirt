@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -164,19 +165,85 @@ func registerRemediation(api huma.API, in Ingest) {
 		// How many there are in all, so a caller holding a full page can tell
 		// a clipped page from the whole list.
 		out.Body.Total = total
-		out.Body.Items = make([]RepeatBody, 0, len(rows))
-		for _, row := range rows {
-			item := RepeatBody{
-				Product: row.Product, Vulnerability: row.Vulnerability, Severity: row.Severity,
-				Place: row.PlaceIdentity, Times: row.Times,
-				TotalDays: int(math.Round(row.TotalDays)),
-				Standing:  row.Standing,
-			}
-			if !row.LastUntil.IsZero() {
-				item.LastUntil = row.LastUntil.Format(time.RFC3339)
-			}
-			out.Body.Items = append(out.Body.Items, item)
-		}
+		out.Body.Items = repeatBodies(rows)
 		return out, nil
 	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "export-repeated-deferrals", Method: http.MethodGet,
+		Path:    "/v1/deferrals/repeated.{format}",
+		Summary: "Export repeated deferrals",
+		Description: "The same list as a file: places deferred more than once, most-deferred " +
+			"first, with how long they have been put off for in total.\n\n" +
+			"What the screen shows is a shape rather than a page — one item deferred three " +
+			"times is a judgment and forty of them is a policy nobody wrote down — and the " +
+			"file is what that goes into a review as.",
+		Tags: []string{"Reports"},
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Format  string `path:"format" enum:"csv,json"`
+		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
+		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"How many deferrals make something worth listing. One is an ordinary judgment"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
+		var productID int64
+		if input.Product != "" {
+			named, err := productNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			productID = named.ID
+		}
+		store := triage.NewStore(in.DB.DB)
+		out := Exporting{
+			What:  "repeated deferrals",
+			About: []Stated{{"deferred at least", strconv.Itoa(input.AtLeast) + " times"}},
+			Header: []string{
+				"product", "issue", "severity", "place", "times",
+				"total_days", "standing", "last_until",
+			},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				rows, _, err := store.RepeatsPage(ctx, subject, productID,
+					input.AtLeast, limit, offset)
+				if err != nil {
+					return nil, err
+				}
+				written := make([][]string, 0, len(rows))
+				for _, row := range repeatBodies(rows) {
+					written = append(written, []string{
+						row.Product, row.Vulnerability, row.Severity, row.Place,
+						strconv.Itoa(row.Times), strconv.Itoa(row.TotalDays),
+						strconv.FormatBool(row.Standing), row.LastUntil,
+					})
+				}
+				return written, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			writeExport(writer, input.Format, "repeated-deferrals", out)
+		}}, nil
+	})
+}
+
+// repeatBodies is the list as it is written, for the screen and for the file.
+func repeatBodies(rows []triage.Repeated) []RepeatBody {
+	out := make([]RepeatBody, 0, len(rows))
+	for _, row := range rows {
+		item := RepeatBody{
+			Product: row.Product, Vulnerability: row.Vulnerability, Severity: row.Severity,
+			Place: row.PlaceIdentity, Times: row.Times,
+			TotalDays: int(math.Round(row.TotalDays)),
+			Standing:  row.Standing,
+		}
+		if !row.LastUntil.IsZero() {
+			item.LastUntil = row.LastUntil.Format(time.RFC3339)
+		}
+		out = append(out, item)
+	}
+	return out
 }

@@ -410,6 +410,13 @@ export function ByBump({
   return (
     <>
       <p className="hint" style={{ margin: "0 0 8px" }}>
+        {/* The same answer as a file, narrowed the same way. A bump list is
+            what a release meeting works from, and taking it away meant
+            copying the table out by hand. */}
+        The whole of it as a file — <a href={bundlesFile(at, narrowed, "csv")}>CSV</a> ·{" "}
+        <a href={bundlesFile(at, narrowed, "json")}>JSON</a>.
+      </p>
+      <p className="hint" style={{ margin: "0 0 8px" }}>
         Ordered by what each bump would close. <b>Listed rather than ordered</b> — comparing two
         versions needs a per-ecosystem ordering this does not have, so one package appears once per
         version upstream released and there is no nearest and no latest.
@@ -592,6 +599,28 @@ export function Pager({
     </span>
   );
 }
+// Where the fix-bundle view comes from as a file.
+//
+// The same filters the table was read with, so the file and the table cannot
+// disagree about what was asked for — and a link somebody follows rather than
+// a request this page makes.
+function bundlesFile(
+  at: { product: string },
+  query: Record<string, unknown>,
+  format: string,
+): string {
+  const asked = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (key === "limit" || key === "offset" || value === undefined || value === "") continue;
+    asked.set(key, String(value));
+  }
+  const text = asked.toString();
+  return (
+    `/v1/products/${encodeURIComponent(at.product)}/fix-bundles.${format}` +
+    (text ? `?${text}` : "")
+  );
+}
+
 // Where the by-component view comes from as a file.
 //
 // Built here rather than by the generated client because it is a link

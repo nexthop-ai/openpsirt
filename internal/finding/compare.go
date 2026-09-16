@@ -40,6 +40,17 @@ type Changed struct {
 	// given nowhere to look. Zero where a person closed it, which is the other
 	// way a finding closes.
 	ClosedRun int64 `bun:"closed_run"`
+	// What a reader of a release note acts on, beyond the identifier and the
+	// word: the number, whether somebody is known to be exploiting it, and
+	// where it is written up.
+	//
+	// **Not the description.** One upgrade closes hundreds of issues and the
+	// note lists them under it, so a sentence apiece is a document nobody
+	// reads to the end — and the description is behind the link, which is
+	// what the link is for.
+	ScoreCenti int    `bun:"score_centi"`
+	Exploited  bool   `bun:"exploited"`
+	Advisory   string `bun:"advisory"`
 }
 
 // Comparison is what changed between two builds.
@@ -112,9 +123,16 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).
 			ColumnExpr(`MIN(COALESCE(f.arrived_from, '')) AS "arrived_from"`).
+			// Properties of the issue rather than of the place, so they are
+			// grouped on rather than aggregated: every row of a group carries
+			// the same three.
+			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+			ColumnExpr(`v.exploited AS "exploited"`).
+			ColumnExpr(`COALESCE(v.advisory, '') AS "advisory"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.visibility IN (?)", bun.List(visible)).
-			GroupExpr("v.identifier, c.name, " + rating.EffectiveExpr + ", f.closed_because")
+			GroupExpr("v.identifier, c.name, " + rating.EffectiveExpr +
+				", f.closed_because, v.score_centi, v.exploited, v.advisory")
 		return q.Where("f.closed_at IS NULL")
 	}
 

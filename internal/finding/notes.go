@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
 // Note is what a release note says about itself: which two builds it compares,
@@ -233,13 +235,47 @@ func section(out *strings.Builder, rows []Changed) {
 	for _, g := range grouped(rows) {
 		fmt.Fprintf(out, "- %s%s\n", g.component, how(g.rows[0]))
 		for _, row := range g.rows {
-			fmt.Fprintf(out, "  - %s", row.Vulnerability)
-			if row.Severity != "" {
-				fmt.Fprintf(out, " (%s)", row.Severity)
-			}
-			out.WriteString("\n")
+			fmt.Fprintf(out, "  - %s%s%s\n", row.Vulnerability, said(row), writtenUp(row))
 		}
 	}
+}
+
+// said is what is known about one issue, in the parenthesis after its name.
+//
+// **What a reader acts on, and not the description.** One upgrade closes
+// hundreds of issues and they are listed under it, so a sentence apiece is a
+// document nobody reads to the end — while the number, the word and whether
+// somebody is known to be exploiting it are what decides whether this upgrade
+// is taken tonight or next month.
+func said(row Changed) string {
+	var parts []string
+	if row.Severity != "" {
+		parts = append(parts, row.Severity)
+	}
+	if row.ScoreCenti > 0 {
+		parts = append(parts, fmt.Sprintf("%.1f", float64(row.ScoreCenti)/100))
+	}
+	if row.Exploited {
+		parts = append(parts, "known exploited")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(parts, ", ") + ")"
+}
+
+// writtenUp is where the issue is written up, as a link, or nothing.
+//
+// The address comes from a scan or a feed and goes into a document somebody
+// publishes, so it passes the same rule an address stored beside a claim
+// does: a scheme a reader's machine would act on is not something to hand
+// them, and one that fails it is left out rather than printed as text.
+func writtenUp(row Changed) string {
+	url := strings.TrimSpace(row.Advisory)
+	if url == "" || markdown.Addressable(url) != nil {
+		return ""
+	}
+	return " — <" + url + ">"
 }
 
 // remediation is one thing that was done and every issue it closed.

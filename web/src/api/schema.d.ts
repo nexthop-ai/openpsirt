@@ -770,6 +770,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/deferrals/repeated.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export repeated deferrals
+         * @description The same list as a file: places deferred more than once, most-deferred first, with how long they have been put off for in total.
+         *
+         *     What the screen shows is a shape rather than a page — one item deferred three times is a judgment and forty of them is a policy nobody wrote down — and the file is what that goes into a review as.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-repeated-deferrals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/disclosing": {
         parameters: {
             query?: never;
@@ -1868,6 +1892,30 @@ export interface paths {
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-fix-bundles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/fix-bundles.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export findings by upgrade
+         * @description The same list as a file: one row per upstream bump, with what it closes and the builds that hold it.
+         *
+         *     Takes the same selection and the same filters as the screen, from the same struct. The builds a bump is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-fix-bundles"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3130,6 +3178,30 @@ export interface paths {
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-pending-upgrades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the upgrades one build is waiting on
+         * @description The same list as a file: one row per bump this build is waiting on, where it stands, and what it would still close here.
+         *
+         *     The packages one bump moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-pending-upgrades"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10019,6 +10091,40 @@ export interface operations {
             };
         };
     };
+    "export-repeated-deferrals": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description How many deferrals make something worth listing. One is an ordinary judgment */
+                at_least?: number;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-approaching-disclosure": {
         parameters: {
             query?: {
@@ -12011,6 +12117,57 @@ export interface operations {
             };
         };
     };
+    "export-fix-bundles": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag */
+                stream?: string;
+                /** @description Limit to one variant */
+                variant?: string;
+                /** @description Keep only issues rated this badly or worse */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only bumps closing something known to be exploited */
+                exploited?: boolean;
+                /** @description Keep only bumps moving a component of this name */
+                component?: string;
+                /** @description Keep only rows whose component or issue name contains this */
+                q?: string;
+                /** @description Keep only components of one package kind */
+                ecosystem?: string;
+                /** @description Keep only groups this far decided */
+                state?: "undecided" | "waiting" | "agreed" | "lapsed";
+                /** @description Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                sort?: "urgency" | "severity" | "issues" | "places" | "builds" | "deadline";
+                /** @description Order the other way — fewest, least urgent, nearest deadline first */
+                asc?: boolean;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-holders": {
         parameters: {
             query?: {
@@ -13865,6 +14022,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ListBodyPlannedBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-pending-upgrades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

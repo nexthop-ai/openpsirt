@@ -400,7 +400,11 @@ export function Overview() {
         <h3>Repeated deferrals</h3>
         <p className="hint">
           One item deferred three times is a judgment; forty is an undocumented policy. This
-          product, not this build — and over the whole record, not the window above.
+          product, not this build — and over the whole record, not the window above.{" "}
+          {/* The one list on this sheet rather than a figure, so it is the one
+              thing here that exports. A review argues over the rows. */}
+          <a href={repeatsFile(at.product ?? "", "csv")}>CSV</a> ·{" "}
+          <a href={repeatsFile(at.product ?? "", "json")}>JSON</a>
         </p>
         {repeated.isPending ? (
           <Loading />
@@ -535,4 +539,12 @@ export function Overview() {
       </section>
     </Sheet>
   );
+}
+
+// Where what keeps being put off comes from as a file. A link somebody
+// follows rather than a request this page makes, narrowed the way the panel
+// above it is.
+function repeatsFile(product: string, format: string): string {
+  const asked = product ? `?product=${encodeURIComponent(product)}` : "";
+  return `/v1/deferrals/repeated.${format}${asked}`;
 }
