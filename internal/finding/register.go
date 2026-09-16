@@ -58,6 +58,15 @@ type Disposed struct {
 	ClosedAt *time.Time
 	DueAt    *time.Time
 	Met      *bool
+	// ClosedBecause is the category the closure was recorded under and
+	// ClosedNote the sentence the person who closed it typed. Both, because
+	// the category says a fix happened and the note says what the fix was:
+	// "fixed" and "because the patch was backported in 2.4.1-3" answer
+	// different questions, and the second is the one somebody has years
+	// later. A closure a scan performed carries a category and no note —
+	// nobody typed one — which is why the note is not required to be there.
+	ClosedBecause Closure
+	ClosedNote    string
 }
 
 // Register is every known vulnerability in one build with its disposition .
@@ -232,6 +241,8 @@ type registerRow struct {
 	OpenedAt      time.Time  `bun:"opened_at"`
 	ClosedAt      *time.Time `bun:"closed_at"`
 	DueAt         *time.Time `bun:"due_at"`
+	ClosedBecause string     `bun:"closed_because"`
+	ClosedNote    string     `bun:"closed_note"`
 }
 
 // registerQuery is the register, unbounded. What a caller adds is how much of
@@ -299,6 +310,12 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`f.due_at AS "due_at"`).
+		// Why it closed, in both the words the tool chose and the words a
+		// person typed. A closure with no reason was refused of whoever
+		// wrote it and then readable by nobody, so the refusal was a promise
+		// the tool did not keep.
+		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
+		ColumnExpr(`COALESCE(f.closed_note, '') AS "closed_note"`).
 		OrderExpr("v.identifier, c.name, f.place_identity")
 }
 
@@ -318,6 +335,7 @@ func disposedFrom(row registerRow) Disposed {
 		ApprovedBy: row.ApprovedBy, ApprovedAt: row.ApprovedAt,
 		AgreementCarried: row.Carried,
 		OpenedAt:         row.OpenedAt, ClosedAt: row.ClosedAt, DueAt: row.DueAt,
+		ClosedBecause: Closure(row.ClosedBecause), ClosedNote: row.ClosedNote,
 	}
 	// The same four words the state filter uses, at the grain of one
 	// place: a place has one standing decision or none, so there is no

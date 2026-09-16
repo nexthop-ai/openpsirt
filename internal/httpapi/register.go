@@ -34,8 +34,13 @@ type DisposedBody struct {
 	AgreementCarried bool   `json:"agreement_carried,omitempty" doc:"Whether the agreement was carried forward from an earlier claim rather than given for this one"`
 	Opened           string `json:"opened"`
 	Closed           string `json:"closed,omitempty"`
-	Due              string `json:"due,omitempty"`
-	Met              *bool  `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
+	// ClosedBecause is the category it closed under and ClosedNote the
+	// sentence whoever closed it typed. A closure a scan performed carries a
+	// category and no note, because nobody typed one.
+	ClosedBecause string `json:"closed_because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained,fixed,invalid" doc:"Why it closed, in the tool's terms. Only on a closed row"`
+	ClosedNote    string `json:"closed_note,omitempty" doc:"Why a person closed it, in their words. Only where a person did"`
+	Due           string `json:"due,omitempty"`
+	Met           *bool  `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
 }
 
 func registerRegister(api huma.API, in Ingest) {
@@ -129,7 +134,7 @@ func registerRegister(api huma.API, in Ingest) {
 				"issue", "severity", "component", "version", "place", "consumer", "state",
 				"outcome", "justification", "proposed by", "proposed at",
 				"approved by", "approved at", "agreement carried",
-				"opened", "closed", "due", "met",
+				"opened", "closed", "closed because", "closed note", "due", "met",
 			},
 			// Streamed rather than paged, and neither counted. A file has no
 			// column for how many rows there are altogether, and every page
@@ -148,7 +153,8 @@ func registerRegister(api huma.API, in Ingest) {
 						body.Place, body.Consumer, body.State, string(body.Outcome), string(body.Justification),
 						body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 						strconv.FormatBool(body.AgreementCarried),
-						body.Opened, body.Closed, body.Due, met,
+						body.Opened, body.Closed, body.ClosedBecause, body.ClosedNote,
+						body.Due, met,
 					})
 				})
 			},
@@ -179,6 +185,7 @@ func disposedBody(row finding.Disposed) DisposedBody {
 	}
 	if row.ClosedAt != nil {
 		body.Closed = row.ClosedAt.Format(time.DateOnly)
+		body.ClosedBecause, body.ClosedNote = string(row.ClosedBecause), row.ClosedNote
 	}
 	if row.DueAt != nil {
 		body.Due = row.DueAt.Format(time.DateOnly)

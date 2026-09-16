@@ -370,6 +370,7 @@ still reading as present, invisibly.
 | A scanner's finding is refused | The evidence exists, and overruling it is what computing resolution was chosen to prevent |
 | Closed per build, across every place the issue sits at there | A fix ships in a release |
 | It carries who, when and why | A closure with no reason is refused |
+| The reason is published, on the register | What is required of a person is readable: the category says a fix happened, the sentence says what the fix was, and the second is what somebody has years later. The refusal is a promise to whoever typed it that the sentence goes somewhere. A closure a scan performed carries a category and no sentence, because nobody typed one. It is not in a release note: a person's internal words are not a customer document, and a comparison of two builds already says what was fixed in the terms a release note needs |
 | It asks the same right recording it asked, checked against each row | Somebody who may argue about disclosed findings has not been handed the undisclosed ones |
 | Nothing reopens one | Undoing a closure needs somewhere to keep the closure that was undone, which is a table rather than a column |
 

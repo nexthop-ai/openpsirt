@@ -1928,6 +1928,20 @@ components:
           type: string
         closed:
           type: string
+        closed_because:
+          description: Why it closed, in the tool's terms. Only on a closed row
+          enum:
+            - removed
+            - upgraded
+            - revised
+            - superseded
+            - unexplained
+            - fixed
+            - invalid
+          type: string
+        closed_note:
+          description: Why a person closed it, in their words. Only where a person did
+          type: string
         component:
           type: string
         consumer:

@@ -313,7 +313,9 @@ type Finding struct {
 	ClosedBy    *int64 `bun:"closed_by"`
 	// ClosedNote is why, where a person closed it. Required of them: a
 	// closure with no reason is a record saying somebody closed it and
-	// nothing else.
+	// nothing else — and what is required is published, on the register
+	// beside the category and the date, because the refusal is a promise to
+	// whoever typed it that the sentence goes somewhere.
 	ClosedNote    string  `bun:"closed_note"`
 	ClosedBecause Closure `bun:"closed_because"`
 }

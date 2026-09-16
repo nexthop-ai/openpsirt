@@ -5319,6 +5319,13 @@ export interface components {
             /** @description Who agreed. Two different people is the whole of the control, so both names are carried rather than a count */
             approved_by?: string;
             closed?: string;
+            /**
+             * @description Why it closed, in the tool's terms. Only on a closed row
+             * @enum {string}
+             */
+            closed_because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained" | "fixed" | "invalid";
+            /** @description Why a person closed it, in their words. Only where a person did */
+            closed_note?: string;
             component: string;
             /** @description What pulls the component in. Absent where the build holds it directly */
             consumer?: string;
