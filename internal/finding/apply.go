@@ -831,7 +831,7 @@ func componentNames(ctx context.Context, db bun.IDB, ids []int64) (map[int64]str
 		Name string `bun:"name"`
 	}
 	if err := db.NewSelect().
-		TableExpr(`component AS "c"`).
+		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.name AS "name"`).
 		Where("c.id IN (?)", bun.List(wanted)).

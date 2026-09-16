@@ -479,7 +479,7 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 // the build contains.
 func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (bool, error) {
 	found, err := db.NewSelect().
-		TableExpr(`graph_node AS "n"`).
+		TableExpr(`"graph_node" AS "n"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.component_id = ?", componentID).
 		Where("n.closed_scan_id IS NULL").
