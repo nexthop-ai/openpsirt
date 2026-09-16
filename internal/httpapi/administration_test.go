@@ -190,7 +190,7 @@ func TestATokenCannotMintACredentialThatOutlivesIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, secret, err := r.rights.NewToken(t.Context(), person.ID, "theirs", nil, time.Hour, 0)
+		_, secret, err := r.rights.NewToken(t.Context(), person.ID, "theirs", nil, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

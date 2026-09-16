@@ -193,6 +193,10 @@ function Tokens() {
   // minted a token lasting an hour rather than refusing to mint one at all.
   const [count, setCount] = useState("30");
   const [product, setProduct] = useState("");
+  // Whether the token carries only the roles that read. The narrowing the
+  // server takes is a list of roles; this offers the one shape somebody
+  // actually asks for, which is a credential for a script that only looks.
+  const [readOnly, setReadOnly] = useState(false);
   const [unit, setUnit] = useState<Unit>("days");
   const [minted, setMinted] = useState<{ name: string; secret: string } | null>(null);
   // How long it lasts, or nothing where the box says something that is not a
@@ -222,6 +226,10 @@ function Tokens() {
             // intersects rather than adds, so naming a product its owner
             // cannot read reaches nothing.
             ...(product ? { product } : {}),
+            // Both reading roles, because which one it lands on is whichever
+            // its owner holds — the server intersects, so naming the pair
+            // narrows to reading without asking the browser who holds what.
+            ...(readOnly ? { holds: ["public-read", "private-read"] as const } : {}),
           },
         }),
       ),
@@ -229,6 +237,7 @@ function Tokens() {
       setMinted({ name: made.name ?? "", secret: made.secret ?? "" });
       setName("");
       setProduct("");
+      setReadOnly(false);
       void queries.invalidateQueries({ queryKey: ["tokens"] });
     },
   });
@@ -374,6 +383,19 @@ function Tokens() {
                 {each.display_name || each.name} only
               </option>
             ))}
+          </select>
+        </label>
+        <label className="field" style={{ margin: 0 }}>
+          <span>Carries</span>
+          <select
+            aria-label="What the token may do"
+            {...notACredential}
+            style={{ width: "auto" }}
+            value={readOnly ? "read" : "all"}
+            onChange={(event) => setReadOnly(event.target.value === "read")}
+          >
+            <option value="all">Whatever you can do</option>
+            <option value="read">Reading only</option>
           </select>
         </label>
         <button

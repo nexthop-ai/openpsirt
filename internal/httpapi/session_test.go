@@ -253,7 +253,7 @@ func TestAnAdministratorCanWithdrawATokenWhoseOwnerHasGone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, secret, err := r.rights.NewToken(ctx, person.ID, "scripting", nil, time.Hour, 0)
+		_, secret, err := r.rights.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -282,7 +282,7 @@ func TestATokenIsACredentialLikeAnyOther(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, secret, err := r.rights.NewToken(t.Context(), person.ID, "scripting", nil, time.Hour, 0)
+		_, secret, err := r.rights.NewToken(t.Context(), person.ID, "scripting", nil, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -319,7 +319,7 @@ func TestATokenCannotMintItselfAWiderOne(t *testing.T) {
 		}
 		_ = mine
 
-		_, narrow, err := r.rights.NewToken(ctx, person.ID, "narrow", nil, time.Hour, 0)
+		_, narrow, err := r.rights.NewToken(ctx, person.ID, "narrow", nil, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

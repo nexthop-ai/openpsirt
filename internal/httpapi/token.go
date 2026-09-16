@@ -22,6 +22,9 @@ type TokenBody struct {
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: minting a token resolves the field above.
 	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
+	// Holds narrows which of its owner's roles it carries, the same way and
+	// for the same reason Product narrows where. Absent means all of them.
+	Holds []string `json:"holds,omitempty" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them"`
 	// Lifetime is how long it lasts, as a duration. There is a maximum, and
 	// there is no way to ask for one that never expires.
 	Lifetime string `json:"lifetime,omitempty" doc:"How long it lasts, such as \"720h\". There is a configured maximum"`
@@ -108,7 +111,12 @@ func registerTokens(api huma.API, in Ingest) {
 			}
 		}
 
-		token, secret, err := rights.NewToken(ctx, subject.ID, input.Body.Name, productID, lifetime, ceiling)
+		holds := make([]access.Role, 0, len(input.Body.Holds))
+		for _, word := range input.Body.Holds {
+			holds = append(holds, access.Role(word))
+		}
+
+		token, secret, err := rights.NewToken(ctx, subject.ID, input.Body.Name, productID, holds, lifetime, ceiling)
 		if err != nil {
 			// The refusals here are about what was asked for — a name that is
 			// missing, a lifetime past the ceiling — so they are reported.

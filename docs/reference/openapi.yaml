@@ -7379,6 +7379,20 @@ components:
         expires_at:
           description: When it stops working
           type: string
+        holds:
+          description: Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them
+          items:
+            enum:
+              - approver
+              - assigner
+              - public-read
+              - private-read
+              - public-triage
+              - private-triage
+            type: string
+          type:
+            - array
+            - "null"
         last_used_at:
           description: When it was last used
           type: string

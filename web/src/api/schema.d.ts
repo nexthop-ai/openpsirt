@@ -8368,6 +8368,8 @@ export interface components {
             readonly $schema?: string;
             /** @description When it stops working */
             expires_at?: string;
+            /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them */
+            holds?: ("approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage")[] | null;
             /** @description When it was last used */
             last_used_at?: string;
             /** @description How long it lasts, such as "720h". There is a configured maximum */
