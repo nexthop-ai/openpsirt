@@ -4269,6 +4269,10 @@ export interface components {
              */
             acknowledged: number;
         };
+        Acknowledgment: {
+            names?: string[] | null;
+            summary?: string;
+        };
         "Add-outboundRequest": {
             /**
              * Format: uri
@@ -4661,6 +4665,13 @@ export interface components {
             to: string;
             /** @description What the bump is of: the source package where one is recorded, and the component's own name otherwise */
             upstream: string;
+        };
+        CVSSv3: {
+            /** Format: double */
+            baseScore: number;
+            baseSeverity: string;
+            vectorString: string;
+            version: string;
         };
         CanBody: {
             /** @description Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
@@ -5402,6 +5413,9 @@ export interface components {
             state: "undecided" | "waiting" | "agreed" | "lapsed";
             version?: string;
             vulnerability: string;
+        };
+        Distribution: {
+            tlp?: components["schemas"]["TLP"];
         };
         Document: {
             /**
@@ -6841,9 +6855,11 @@ export interface components {
         Meta: {
             category: string;
             csaf_version: string;
+            distribution?: components["schemas"]["Distribution"];
             lang?: string;
             notes?: components["schemas"]["Note"][] | null;
             publisher: components["schemas"]["Issuer"];
+            references?: components["schemas"]["Reference"][] | null;
             title: string;
             tracking: components["schemas"]["Tracking"];
         };
@@ -7668,6 +7684,11 @@ export interface components {
             /** @description Why the file is being removed. Recorded and shown wherever the text referred to it */
             reason: string;
         };
+        Reference: {
+            category?: string;
+            summary: string;
+            url: string;
+        };
         ReferenceBody: {
             /**
              * @description What it appears to be. A patch is the change itself
@@ -7704,6 +7725,11 @@ export interface components {
              */
             open: number;
             stream: string;
+        };
+        Remediation: {
+            category: string;
+            details: string;
+            product_ids?: string[] | null;
         };
         RemediationOutputBody: {
             /**
@@ -8019,6 +8045,10 @@ export interface components {
             prepares?: components["schemas"]["PreparedBody"];
             /** @description The findings list's query string, without a leading ? */
             query: string;
+        };
+        Score: {
+            cvss_v3?: components["schemas"]["CVSSv3"];
+            products: string[] | null;
         };
         "Score-vectorResponse": {
             /**
@@ -8452,6 +8482,10 @@ export interface components {
             /** @description For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in */
             released_on?: string;
         };
+        TLP: {
+            label: string;
+            url?: string;
+        };
         TeamBody: {
             display_name?: string;
             members: string[] | null;
@@ -8682,11 +8716,14 @@ export interface components {
             status: string;
         };
         Vulnerability: {
+            acknowledgments?: components["schemas"]["Acknowledgment"][] | null;
             cve?: string;
             discovery_date?: string;
             ids?: components["schemas"]["Issued"][] | null;
             notes?: components["schemas"]["Note"][] | null;
             product_status: components["schemas"]["Status"];
+            remediations?: components["schemas"]["Remediation"][] | null;
+            scores?: components["schemas"]["Score"][] | null;
             title?: string;
         };
         WaitingBody: {

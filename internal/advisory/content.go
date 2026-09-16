@@ -1,0 +1,288 @@
+package advisory
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
+)
+
+// The parts of the document that carry what is held about the flaw rather than
+// what identifies the document: where a reader can go, what the flaw scored,
+// what an affected release can do about it, and who is credited.
+//
+// **Only what is held.** Nothing here derives a fact the record does not carry.
+// A field the standard defines and this deployment has no data for is left out,
+// because an advisory is read by somebody deciding whether to act.
+
+// Reference is somewhere a reader can go about the flaw.
+//
+// Category is the standard's: "external" for somebody else's page, "self" for
+// this document at its published address. Nothing here publishes, so nothing
+// states a self reference — a self reference to an address that answers
+// nothing is worse than none, because a reader's tooling follows it.
+type Reference struct {
+	Category string `json:"category,omitempty"`
+	Summary  string `json:"summary"`
+	URL      string `json:"url"`
+}
+
+// Distribution says how the document may be passed on.
+type Distribution struct {
+	TLP *TLP `json:"tlp,omitempty"`
+}
+
+// TLP is the label a reader shares the document by.
+type TLP struct {
+	Label string `json:"label"`
+	URL   string `json:"url,omitempty"`
+}
+
+// tlpURL is where the labels are defined. The standard asks for the URL of the
+// definition the label is taken from rather than assuming one.
+const tlpURL = "https://www.first.org/tlp/"
+
+// Score is one rating of the flaw and which releases it was rated for.
+type Score struct {
+	CVSSv3 *CVSSv3 `json:"cvss_v3,omitempty"`
+	// Products is which releases the rating is stated for. The standard
+	// requires it: a score with nothing to attach to is a number in a
+	// document.
+	Products []string `json:"products"`
+}
+
+// CVSSv3 is a base score as the standard carries it.
+//
+// The field names are the CVSS schema's, which is why they are spelled in its
+// casing rather than this codebase's — the same exemption the CSAF field names
+// have.
+type CVSSv3 struct {
+	Version      string  `json:"version"`
+	VectorString string  `json:"vectorString"`
+	BaseScore    float64 `json:"baseScore"`
+	BaseSeverity string  `json:"baseSeverity"`
+}
+
+// Remediation is what somebody holding a release can do about the flaw.
+type Remediation struct {
+	Category   string   `json:"category"`
+	Details    string   `json:"details"`
+	ProductIDs []string `json:"product_ids,omitempty"`
+}
+
+// Acknowledgment is whoever told us, named the way they asked to be named.
+type Acknowledgment struct {
+	Names   []string `json:"names,omitempty"`
+	Summary string   `json:"summary,omitempty"`
+}
+
+// referencesTo is every address this deployment holds about the flaw.
+//
+// **On the document rather than on the vulnerability.** The document is about
+// one flaw, so the two lists would hold the same addresses, and the standard's
+// security-advisory profile requires the document's. One list, in the place
+// that is asked for.
+func (s *Store) referencesTo(ctx context.Context,
+	issue *finding.Vulnerability) ([]Reference, error) {
+
+	var rows []finding.Reference
+	err := s.db.NewSelect().Model(&rows).
+		Where("vr.vulnerability_id = ?", issue.ID).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read where this issue is written up: %w", err)
+	}
+
+	held := make([]Reference, 0, len(rows)+1)
+	if url := strings.TrimSpace(issue.Advisory); url != "" {
+		held = append(held, Reference{Summary: "Advisory", URL: url})
+	}
+	for _, row := range rows {
+		held = append(held, Reference{Summary: summaryOfKind(row.Kind), URL: strings.TrimSpace(row.URL)})
+	}
+
+	seen := map[string]bool{}
+	out := make([]Reference, 0, len(held))
+	for _, one := range held {
+		// An address a scanner or a feed supplied, going into a document
+		// somebody else's tooling will follow. The same rule an address
+		// stored beside a claim goes through, for the stronger case: this one
+		// leaves the deployment.
+		if one.URL == "" || seen[one.URL] || markdown.Addressable(one.URL) != nil {
+			continue
+		}
+		seen[one.URL] = true
+		one.Category = "external"
+		out = append(out, one)
+	}
+	// Ordered here rather than by the engine, for the reason the releases are:
+	// two documents generated from the same facts are the same bytes, and the
+	// engines do not agree on how text compares.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Summary != out[j].Summary {
+			return out[i].Summary < out[j].Summary
+		}
+		return out[i].URL < out[j].URL
+	})
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
+}
+
+// summaryOfKind says what a reference appears to be, in the words a reader of
+// the document gets rather than the stored value.
+func summaryOfKind(kind finding.ReferenceKind) string {
+	switch kind {
+	case finding.Patch:
+		return "Patch"
+	case finding.AdvisoryRef:
+		return "Advisory"
+	default:
+		return "Report"
+	}
+}
+
+// creditedFor is whoever reported the flaw, where they said how to name them.
+//
+// **The credit and nothing else.** Somebody reporting a flaw under a name gave
+// it so we could reply, not so it could be published; the credit field is the
+// one they answered the publication question with, and "anonymous" is a real
+// answer to it. So a report with a reporter and no credit is acknowledged as
+// nobody.
+//
+// Narrowed to the product the document is about, which is how the report is
+// keyed: an issue's identity spans its aliases, so a report read on the issue
+// alone is readable from every product that ever recorded a shared name.
+func (s *Store) creditedFor(ctx context.Context, productID,
+	issueID int64) ([]Acknowledgment, error) {
+
+	var credits []string
+	err := s.db.NewSelect().Model((*finding.WhoTold)(nil)).
+		ColumnExpr("fr.credit").
+		Where("fr.vulnerability_id = ?", issueID).
+		Where("fr.product_id = ?", productID).
+		Scan(ctx, &credits)
+	if err != nil {
+		return nil, fmt.Errorf("read who is credited for this: %w", err)
+	}
+
+	names := make([]string, 0, len(credits))
+	for _, credit := range credits {
+		if credit = strings.TrimSpace(credit); credit != "" {
+			names = append(names, credit)
+		}
+	}
+	if len(names) == 0 {
+		return nil, nil
+	}
+	sort.Strings(names)
+	return []Acknowledgment{{Names: names, Summary: "Reported this flaw"}}, nil
+}
+
+// scoresFor is what the flaw scored, stated for every release the document
+// names.
+//
+// Worked out from the vector rather than read alongside it, which is the rule
+// the record is written under: a stored number and a stored vector that
+// disagree have nothing to say which was meant, and the standard's own
+// consumers recompute.
+//
+// A vector under a scheme this deployment does not score — version 2, version
+// 4 — yields nothing rather than a number under the wrong formula.
+func scoresFor(issue *finding.Vulnerability, products []string) []Score {
+	if len(products) == 0 || strings.TrimSpace(issue.Vector) == "" {
+		return nil
+	}
+	scored, err := finding.Score(issue.Vector)
+	if err != nil || scored == nil {
+		return nil
+	}
+	scheme, _, found := strings.Cut(scored.Vector, "/")
+	if !found {
+		return nil
+	}
+	return []Score{{
+		CVSSv3: &CVSSv3{
+			Version:      strings.TrimPrefix(scheme, "CVSS:"),
+			VectorString: scored.Vector,
+			BaseScore:    float64(scored.ScoreCenti) / 100,
+			BaseSeverity: strings.ToUpper(scored.Severity),
+		},
+		Products: products,
+	}}
+}
+
+// remediationsFor is what a reader can do, from what is true now.
+//
+// **Nothing about planned work.** A commitment is one build's plan, agreed to
+// inside this deployment; the same sentence in a published advisory is a
+// promise to a customer about a date. Whether to make one is the publisher's,
+// so a remediation states a release that no longer carries the flaw and says
+// nothing where every release still does — which is what the format reads
+// silence as anyway.
+func remediationsFor(fixed, affected []string) []Remediation {
+	if len(fixed) > 0 {
+		return []Remediation{{
+			Category:   "vendor_fix",
+			Details:    "Update to a release in which this flaw is fixed.",
+			ProductIDs: fixed,
+		}}
+	}
+	if len(affected) > 0 {
+		return []Remediation{{
+			Category:   "none_available",
+			Details:    "No release fixing this is available.",
+			ProductIDs: affected,
+		}}
+	}
+	return nil
+}
+
+// distributionFor is how far the document may travel.
+//
+// It follows the same fact the tracking status does: a document about a flaw
+// nobody outside has been told about is a draft, and handing a draft to
+// somebody who may pass it on is the disclosure the embargo exists to hold.
+// The labels are the standard's four, which is why a final document is WHITE
+// rather than the word the protocol renamed it to.
+func distributionFor(status string) *Distribution {
+	label := "WHITE"
+	if status == "draft" {
+		label = "RED"
+	}
+	return &Distribution{TLP: &TLP{Label: label, URL: tlpURL}}
+}
+
+// profileOf is the category the document may honestly declare.
+//
+// The security-advisory profile requires more than the generic one: notes on
+// the document and on the vulnerability, somewhere to go, a product tree and a
+// statement about each release. A document declaring a profile it fails is
+// dropped by the tooling that reads it, which is the one use a generated
+// advisory has — so where the deployment holds nothing to point at, the
+// document says it is a base document rather than claiming a profile and
+// failing its tests.
+//
+// The VEX profile is a separate question and is not assembled here: its point
+// is the not-affected justification.
+func profileOf(doc *Document) string {
+	if len(doc.Document.Notes) == 0 || len(doc.Document.References) == 0 {
+		return "csaf_base"
+	}
+	if len(doc.ProductTree.Branches) == 0 || len(doc.Vulnerabilities) == 0 {
+		return "csaf_base"
+	}
+	for _, one := range doc.Vulnerabilities {
+		if len(one.Notes) == 0 {
+			return "csaf_base"
+		}
+		if len(one.Status.KnownAffected) == 0 && len(one.Status.Fixed) == 0 {
+			return "csaf_base"
+		}
+	}
+	return "csaf_security_advisory"
+}

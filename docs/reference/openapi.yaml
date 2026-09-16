@@ -74,6 +74,18 @@ components:
       required:
         - acknowledged
       type: object
+    Acknowledgment:
+      additionalProperties: false
+      properties:
+        names:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        summary:
+          type: string
+      type: object
     Add-outboundRequest:
       additionalProperties: false
       properties:
@@ -749,6 +761,24 @@ components:
         - issues
         - places
         - in
+      type: object
+    CVSSv3:
+      additionalProperties: false
+      properties:
+        baseScore:
+          format: double
+          type: number
+        baseSeverity:
+          type: string
+        vectorString:
+          type: string
+        version:
+          type: string
+      required:
+        - version
+        - vectorString
+        - baseScore
+        - baseSeverity
       type: object
     CanBody:
       additionalProperties: false
@@ -2024,6 +2054,12 @@ components:
         - place
         - state
         - opened
+      type: object
+    Distribution:
+      additionalProperties: false
+      properties:
+        tlp:
+          $ref: "#/components/schemas/TLP"
       type: object
     Document:
       additionalProperties: false
@@ -4764,6 +4800,8 @@ components:
           type: string
         csaf_version:
           type: string
+        distribution:
+          $ref: "#/components/schemas/Distribution"
         lang:
           type: string
         notes:
@@ -4774,6 +4812,12 @@ components:
             - "null"
         publisher:
           $ref: "#/components/schemas/Issuer"
+        references:
+          items:
+            $ref: "#/components/schemas/Reference"
+          type:
+            - array
+            - "null"
         title:
           type: string
         tracking:
@@ -6122,6 +6166,19 @@ components:
       required:
         - reason
       type: object
+    Reference:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        summary:
+          type: string
+        url:
+          type: string
+      required:
+        - summary
+        - url
+      type: object
     ReferenceBody:
       additionalProperties: false
       properties:
@@ -6187,6 +6244,23 @@ components:
         - stream
         - cut
         - open
+      type: object
+    Remediation:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        details:
+          type: string
+        product_ids:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - category
+        - details
       type: object
     RemediationOutputBody:
       additionalProperties: false
@@ -6679,6 +6753,20 @@ components:
       required:
         - name
         - query
+      type: object
+    Score:
+      additionalProperties: false
+      properties:
+        cvss_v3:
+          $ref: "#/components/schemas/CVSSv3"
+        products:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - products
       type: object
     Score-vectorResponse:
       additionalProperties: false
@@ -7469,6 +7557,16 @@ components:
         - name
         - kind
       type: object
+    TLP:
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+      required:
+        - label
+      type: object
     TeamBody:
       additionalProperties: false
       properties:
@@ -7878,6 +7976,12 @@ components:
     Vulnerability:
       additionalProperties: false
       properties:
+        acknowledgments:
+          items:
+            $ref: "#/components/schemas/Acknowledgment"
+          type:
+            - array
+            - "null"
         cve:
           type: string
         discovery_date:
@@ -7896,6 +8000,18 @@ components:
             - "null"
         product_status:
           $ref: "#/components/schemas/Status"
+        remediations:
+          items:
+            $ref: "#/components/schemas/Remediation"
+          type:
+            - array
+            - "null"
+        scores:
+          items:
+            $ref: "#/components/schemas/Score"
+          type:
+            - array
+            - "null"
         title:
           type: string
       required:

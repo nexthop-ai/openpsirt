@@ -93,11 +93,13 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		if doc.Document.CSAFVersion != "2.0" {
 			t.Errorf("the document claims CSAF %q", doc.Document.CSAFVersion)
 		}
-		// The category follows what the document can support. The VEX profile
-		// is the one carrying "not affected, and here is why", and claiming it
-		// while carrying none of those would describe this as something it is
-		// not.
-		if doc.Document.Category != "csaf_security_advisory" {
+		// The category follows what the document can support. Nothing has
+		// been written up anywhere for a flaw recorded a moment ago, so it
+		// carries no references and cannot meet the security-advisory
+		// profile's own tests — and a document declaring a profile it fails
+		// is one a reader's tooling drops. The other arm, where there is
+		// somewhere to point, is covered where the document is assembled.
+		if doc.Document.Category != "csaf_base" {
 			t.Errorf("the document is categorized %q", doc.Document.Category)
 		}
 		if doc.Document.Tracking.ID != recorded.Identifier {
