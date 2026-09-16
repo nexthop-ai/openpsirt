@@ -990,6 +990,10 @@ components:
             - superseded
             - unexplained
           type: string
+        closed_by_run:
+          description: The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
+          format: int64
+          type: integer
         component:
           type: string
         from_version:
@@ -1083,6 +1087,9 @@ components:
         selected_by:
           description: How a bulk set was narrowed. Never part of the claim itself
           type: string
+        selection:
+          $ref: "#/components/schemas/SelectionBody"
+          description: The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one
       required:
         - id
         - kind
@@ -1268,16 +1275,23 @@ components:
         - written_by
         - written_at
       type: object
-    Compare-releasesResponse:
+    ComparisonBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/Compare-releasesResponse.json
+            - https://example.com/schemas/ComparisonBody.json
           format: uri
           readOnly: true
           type: string
+        closed_not_fixed:
+          description: Left the affected list without being fixed
+          items:
+            $ref: "#/components/schemas/ChangedBody"
+          type:
+            - array
+            - "null"
         fixed:
           items:
             $ref: "#/components/schemas/ChangedBody"
@@ -1298,6 +1312,7 @@ components:
             - "null"
       required:
         - fixed
+        - closed_not_fixed
         - newly_present
         - still_present
       type: object
@@ -1535,6 +1550,10 @@ components:
           format: uri
           readOnly: true
           type: string
+        contains:
+          description: "The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two"
+          maxLength: 200
+          type: string
         deferred_until:
           description: Required when it is deferred. A date, as 2026-03-31
           type: string
@@ -1563,7 +1582,7 @@ components:
           minLength: 1
           type: string
         selected_by:
-          description: How you narrowed this set. Recorded, and never part of the claim
+          description: How you narrowed this set, in your own words. Recorded, and never part of the claim
           maxLength: 500
           minLength: 1
           type: string
@@ -2126,6 +2145,49 @@ components:
       required:
         - body
       type: object
+    ElsewhereBody:
+      additionalProperties: false
+      properties:
+        approved_at:
+          type: string
+        approved_by:
+          type: string
+        claim_id:
+          format: int64
+          type: integer
+        decision_id:
+          format: int64
+          type: integer
+        justification:
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
+          type: string
+        outcome:
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
+          type: string
+        product:
+          description: The product it was decided in
+          type: string
+        reasoning:
+          type: string
+      required:
+        - product
+        - claim_id
+        - decision_id
+        - outcome
+        - reasoning
+      type: object
     EmbargoedBody:
       additionalProperties: false
       properties:
@@ -2332,6 +2394,13 @@ components:
         due:
           description: When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late
           type: string
+        elsewhere:
+          description: Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five
+          items:
+            $ref: "#/components/schemas/ElsewhereBody"
+          type:
+            - array
+            - "null"
         exploited:
           description: Somebody is known to be exploiting this
           type: boolean
@@ -2482,6 +2551,7 @@ components:
         - standing
         - previous
         - similar
+        - elsewhere
         - vex
       type: object
     Extend-disclosureRequest:
@@ -5747,6 +5817,23 @@ components:
       required:
         - now
       type: object
+    Reaffirm-claimRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Reaffirm-claimRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        reasoning:
+          description: Why every one of them still holds, in markdown
+          minLength: 1
+          type: string
+      required:
+        - reasoning
+      type: object
     Reaffirm-decisionRequest:
       additionalProperties: false
       properties:
@@ -5768,6 +5855,40 @@ components:
       required:
         - previous
         - reasoning
+      type: object
+    ReaffirmedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ReaffirmedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        claim_id:
+          description: The claim this action made, which is what a second person agrees to where one is needed
+          format: int64
+          type: integer
+        decisions:
+          items:
+            format: int64
+            type: integer
+          type:
+            - array
+            - "null"
+        places:
+          description: How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
+          format: int64
+          type: integer
+        waiting:
+          description: Whether a second person has to agree
+          type: boolean
+      required:
+        - claim_id
+        - decisions
+        - places
+        - waiting
       type: object
     ReceiptBody:
       additionalProperties: false
@@ -6649,6 +6770,24 @@ components:
         - agreed
         - days
       type: object
+    SelectionBody:
+      additionalProperties: false
+      properties:
+        contains:
+          description: The text the candidate list was narrowed by. Absent where it was not narrowed, which means every issue at the component was on the page
+          type: string
+        matched:
+          description: How many issues that narrowing reached when the claim was written, read here rather than taken from the caller
+          format: int64
+          type: integer
+        named:
+          description: How many the claim was then made about
+          format: int64
+          type: integer
+      required:
+        - matched
+        - named
+      type: object
     Send-claim-backRequest:
       additionalProperties: false
       properties:
@@ -6969,6 +7108,9 @@ components:
           description: The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument
           format: int64
           type: integer
+        declared_as:
+          description: "What the producer called this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"
+          type: string
         place:
           description: Name this when recording a decision about it
           type: string
@@ -9046,6 +9188,57 @@ paths:
         any_of:
           - public-triage
           - private-triage
+  /v1/claims/{id}/reaffirmation:
+    post:
+      description: |-
+        Re-makes every row of this claim that stopped applying because an upstream version moved, at the versions each place has now, as one act with one reasoning.
+
+        **Deciding is bulk-capable and re-deciding was not.** A team answering one kernel issue writes a decision at each of its places in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
+
+        Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version bump is a prompt to re-check rather than a new claim.
+
+        **One act, one approval.** Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+
+        **Bounded like the judgment it re-makes.** The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
+
+        A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
+
+        **Requires:** public-triage or private-triage
+      operationId: reaffirm-claim
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reaffirm-claimRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReaffirmedBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Re-affirm everything one action claimed
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
   /v1/claims/{id}/reasoning:
     put:
       description: |-
@@ -9857,6 +10050,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - runtime
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -10283,6 +10497,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - runtime
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -11676,7 +11911,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Compare-releasesResponse"
+                $ref: "#/components/schemas/ComparisonBody"
           description: OK
         default:
           content:
@@ -11923,7 +12158,7 @@ paths:
 
         **Whether a second person agrees depends on the date.** At or before the earliest deadline among what this covers, it stands on its own: nothing is hidden for longer than the policy already allowed. Past it, the promise defers the worst thing it covers and it waits for approval. The response says which.
 
-        Bounded like every other action that writes many rows, against the places it resolves to rather than against what was named.
+        **Not bounded**, unlike a bulk judgment: this one writes as many rows as the component has open findings in the releases named.
 
         **Saying who carries it is part of the act**, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a judgment one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
 
@@ -12170,6 +12405,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - runtime
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -12673,6 +12929,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - runtime
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -13100,6 +13377,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - runtime
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -13553,6 +13851,27 @@ paths:
             description: Keep only what sits inside the container of this name
             maxLength: 191
             type: string
+        - description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+          explode: true
+          in: query
+          name: declared_as
+          schema:
+            description: "Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language"
+            items:
+              enum:
+                - required
+                - optional
+                - excluded
+                - build
+                - design
+                - development
+                - other
+                - runtime
+              type: string
+            type:
+              - array
+              - "null"
+            uniqueItems: true
         - description: Keep only what the build holds directly, which is what has no container above it
           explode: false
           in: query
@@ -15872,6 +16191,8 @@ paths:
         Records the same claim against every issue you name: one outcome, one justification, one reasoning, and a separate decision for every place each issue sits at, each keyed and expiring on its own.
 
         You name the issues; the places are resolved here. `selected_by` says how you narrowed the list and is recorded with every claim, so "how were these chosen" has an answer later — but it is never the claim. The reasoning has to hold for every issue in the list, since "these matched a word" is not a defense anybody would accept.
+
+        **`contains` is the same question an approver can re-run.** Send the text you narrowed the candidate list by; the claim records how many issues that narrowing reaches, read here, against how many you named. Equal, the claim is exactly what that narrowing returns; far apart, the sentence does not describe the set.
 
         Always needs a second person to agree, whatever the outcome.
 
