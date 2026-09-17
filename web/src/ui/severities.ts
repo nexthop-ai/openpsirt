@@ -61,12 +61,35 @@ export function isBand(word: string): word is Band {
   return (BANDS as readonly string[]).includes(word);
 }
 
-// bandOf is the word a rating is drawn with: one of the four, or "unrated".
+// BELOW_LOW is the two words a scanner reports that rank beneath every band
+// and are still a rating: somebody looked and said it is not worth much. The
+// server puts both in the low band — `rating.BandExpr` and `SeverityScore`
+// both say so — so this says the same rather than a second thing.
+export const BELOW_LOW = ["negligible", "none"] as const;
+
+// bandOf is the band a rating is drawn in: one of the four, or "unrated".
 //
 // One answer, because there were four for the same row. A finding whose
 // vulnerability carries no severity was counted as a medium by the chart, drawn
 // as a low by the badge, given a low's stripe by the card, and given its own
 // band by the tree strip — four answers about one nothing, on one screen.
+//
+// **Rated negligible is not unrated.** The two were folded together here and
+// nowhere else: the server ranks both of the words below low inside the low
+// band, and a reader was told nobody had looked at a finding somebody had
+// looked at and dismissed.
 export function bandOf(word: string | null | undefined): string {
-  return isBand(word ?? "") ? (word as string) : "unrated";
+  if (isBand(word ?? "")) return word as string;
+  if ((BELOW_LOW as readonly string[]).includes(word ?? "")) return "low";
+  return "unrated";
+}
+
+// ratedAs is the word a row says, which is what was rated rather than the band
+// it falls in. They differ for exactly the two words below low: those draw in
+// the low band, because that is where everything that sorts and filters puts
+// them, and they say what somebody actually said.
+export function ratedAs(word: string | null | undefined): string {
+  const said = word ?? "";
+  if (isBand(said) || (BELOW_LOW as readonly string[]).includes(said)) return said;
+  return "unrated";
 }

@@ -22,6 +22,13 @@ type AtComponentBody struct {
 	Severity      string `json:"severity,omitempty" doc:"How bad the report rates it"`
 	Places        int    `json:"places" doc:"How many places in this build it sits at"`
 	FixedIn       string `json:"fixed_in,omitempty" doc:"The version the report says fixes it, where it names one"`
+	// What one judgment is being made on. Deciding in bulk on less than
+	// deciding singly is the wrong way round, and this list narrows by the
+	// description while showing none of it.
+	Summary    string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
+	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
+	Due        string  `json:"due,omitempty" doc:"When it runs out, as a date. The earliest among its places here, which is the one that makes it late"`
 }
 
 func registerBulk(api huma.API, in Ingest) {
@@ -31,8 +38,11 @@ func registerBulk(api huma.API, in Ingest) {
 			"/components/{component}/issues",
 		Summary: "List the issues open against one component",
 		Description: "Returns the distinct issues open against this component in this build, " +
-			"most urgent first, with how many places each sits at and the version that fixes " +
-			"it where the report names one.\n\n" +
+			"most urgent first, with how many places each sits at, the version that fixes " +
+			"it where the report names one, and what one judgment about it would be made " +
+			"on: what the issue says about itself, whether anybody is known to be " +
+			"exploiting it, the published estimate, and the earliest deadline among its " +
+			"places here.\n\n" +
 			"`contains` matches the text of a report. It narrows a list; it is not part of any " +
 			"claim made afterwards.",
 		Tags: []string{"Triage"},
@@ -106,17 +116,36 @@ func registerBulk(api huma.API, in Ingest) {
 		// what a decision is written against; this list is what somebody picks
 		// from, and the place count is the useful part of it.
 		out.Body.Items = make([]AtComponentBody, 0, len(at))
+		// The deadline is the earliest among the places, which is the one
+		// that makes the issue late — so the rows are walked for it rather
+		// than the first place being taken as the answer.
+		soonest := map[int64]*time.Time{}
+		for _, each := range at {
+			if each.DueAt == nil {
+				continue
+			}
+			if was := soonest[each.VulnerabilityID]; was == nil || each.DueAt.Before(*was) {
+				soonest[each.VulnerabilityID] = each.DueAt
+			}
+		}
 		seen := map[int64]bool{}
 		for _, each := range at {
 			if seen[each.VulnerabilityID] {
 				continue
 			}
 			seen[each.VulnerabilityID] = true
-			out.Body.Items = append(out.Body.Items, AtComponentBody{
+			row := AtComponentBody{
 				Vulnerability: named[each.VulnerabilityID],
 				Severity:      finding.SeverityWord(each.SeverityCenti),
 				Places:        each.Places, FixedIn: each.FixedIn,
-			})
+				Summary:    each.Summary,
+				Exploited:  each.Exploited,
+				Likelihood: float64(each.LikelihoodPPM) / 1_000_000,
+			}
+			if due := soonest[each.VulnerabilityID]; due != nil {
+				row.Due = due.Format(time.DateOnly)
+			}
+			out.Body.Items = append(out.Body.Items, row)
 		}
 		out.Body.Total = total
 		return out, nil

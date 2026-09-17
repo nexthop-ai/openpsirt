@@ -324,6 +324,11 @@ export function activeFilters(params: URLSearchParams): Active[] {
   pick("running", "Deadline", DEADLINES);
   add("open_for", "Open for", at("open_for") && `${at("open_for")} days or more`);
   add("opened_after", "First seen after", at("opened_after"));
+  // A chip rather than a control in the panel: nobody types a run identifier,
+  // and what puts it in the address is a link from the run that reports it.
+  // It removes itself like every other chip, which is how somebody arriving
+  // from that link widens back out to the whole build.
+  add("opened_by_run", "Opened by run", at("opened_by_run"));
   add("proposed_after", "Claimed after", at("proposed_after"));
   add("closed_after", "Closed after", at("closed_after"));
   each("weakness", "Weakness", []);

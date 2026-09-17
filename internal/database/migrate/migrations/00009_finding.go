@@ -77,12 +77,33 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- spells an exact decimal differently and a float compares
 			-- differently again, and this has to sort in an index.
 			"likelihood_ppm"  ` + t.ref + ` NULL,
+			-- Where that estimate stands among all of them, and the day it was
+			-- computed for. The estimate is a thirty-day forecast recomputed
+			-- daily and it legitimately falls, so the day it is about is what
+			-- decides whether a report is newer than what is stored — without
+			-- it, keeping the highest anybody ever published made the order
+			-- answer "was ever risky" instead of "is risky".
+			"likelihood_percentile_ppm" ` + t.ref + ` NULL,
+			"likelihood_on"   ` + t.date + ` NULL,
 			-- The severity as a number, and the statement of what it assumes.
 			-- Network-reachable and unauthenticated is a different judgment
 			-- from local-and-privileged at the same number, and the vector is
 			-- where that shows.
 			"score_centi"     ` + t.ref + ` NULL,
 			"vector"          ` + t.free + ` NULL,
+			-- Who published that score, which scoring system it is, and
+			-- whether it is the primary rating or a secondary one. Provenance
+			-- is recorded for everything else a report says — what found it,
+			-- what it was matched from, what it was matched in — and the
+			-- number a deadline is set from had none, so a reader asking who
+			-- says 5.9 had nowhere to go.
+			-- Unbounded, like everything else copied out of a report: a
+			-- bounded column here means a legitimate but long value fails
+			-- the whole scan that carried it, and nothing bounds what a
+			-- producer writes in any of the three.
+			"score_version"   ` + t.free + ` NULL,
+			"score_source"    ` + t.free + ` NULL,
+			"score_kind"      ` + t.free + ` NULL,
 			"first_seen_at" ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "vulnerability_folded_unique" UNIQUE ("identifier_folded")
 		)` + t.suffix,

@@ -10,6 +10,8 @@ import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
 import { Findings } from "../screens/Findings";
+import { UNOWNED_LIST } from "../screens/list";
+import { NotFound } from "../screens/NotFound";
 import { Products } from "../screens/Products";
 import { Product } from "../screens/Product";
 import { Run } from "../screens/Run";
@@ -29,9 +31,6 @@ const Work = lazy(() => import("../screens/Work").then((m) => ({ default: m.Work
 const Queue = lazy(() => import("../screens/Queue").then((m) => ({ default: m.Queue })));
 const Decision = lazy(() => import("../screens/Decision").then((m) => ({ default: m.Decision })));
 const Claim = lazy(() => import("../screens/Claim").then((m) => ({ default: m.Claim })));
-const Unassigned = lazy(() =>
-  import("../screens/Unassigned").then((m) => ({ default: m.Unassigned })),
-);
 const Together = lazy(() => import("../screens/Together").then((m) => ({ default: m.Together })));
 const Me = lazy(() => import("../screens/Me").then((m) => ({ default: m.Me })));
 const Issue = lazy(() => import("../screens/Issue").then((m) => ({ default: m.Issue })));
@@ -170,7 +169,12 @@ export function App() {
             <Routes>
               <Route path={ROUTES.home} element={<Home who={who.data} />} />
               <Route path={ROUTES.reviewQueue} element={<Queue />} />
-              <Route path={ROUTES.unassigned} element={<Unassigned />} />
+              {/* Work nobody holds is the findings list under two filters, so
+                the address stays and the screen does not. It is a route rather
+                than nothing so that a bookmark, a link in an old digest and
+                the sidebar entry as it was all land on the list instead of
+                being swallowed by the catch-all below. */}
+              <Route path={ROUTES.unassigned} element={<Navigate to={UNOWNED_LIST} replace />} />
               <Route path={ROUTES.findings} element={<Findings />} />
               {/* One claim, whole, and every act at that grain. A decision's
                 address resolves to it: what a judgment says belongs to the
@@ -217,17 +221,11 @@ export function App() {
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
               <Route path={ROUTES.settings} element={<Settings who={who.data} />} />
               <Route path={ROUTES.system} element={<System />} />
-              {/* A path the page does not know either. Sending somebody home is
-            better than a dead end — and the replace is what stops the back
-            button returning to an address that only redirects again.
-            
-            **What it costs is that nothing says why.** The address they tried
-            is gone from the bar with it, so a link built wrong lands on the
-            home screen looking like a click that did nothing. That is how
-            `/products//components/NAME` — a component link built with no
-            product selected — was reported as "it brings you back to the
-            homepage". */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* An address this application does not answer. It says so, and
+                keeps the address in the bar: redirecting home threw away the
+                one piece of evidence a link built wrong leaves behind, which
+                is the link. */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </Boundary>

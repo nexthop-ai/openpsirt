@@ -121,6 +121,10 @@
   letter-spacing: 0.08em;
   color: var(--faint);
   font-weight: 600;
+  /* A tile may say more than one thing under its number — what a score is on
+     and who published it, what an estimate means and the day it is about —
+     and side by side they ran into each other as one word. */
+  display: block;
 }
 .refs {
   list-style: none;

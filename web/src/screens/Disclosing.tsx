@@ -28,7 +28,11 @@ const PAGE = 100;
 
 export function Disclosing() {
   const queries = useQueryClient();
-  const [days, setDays] = useState(30);
+  // How far ahead to look. Empty is this deployment's own embargo length,
+  // which the server supplies: a fixed thirty days against the ninety-day
+  // policy that ships drew an empty screen while embargoes were running, and
+  // an empty screen reads as "nothing is coming".
+  const [days, setDays] = useState("");
   const [asking, setAsking] = useState<string | null>(null);
   const [until, setUntil] = useState("");
   const [because, setBecause] = useState("");
@@ -40,7 +44,7 @@ export function Disclosing() {
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/disclosing", {
-          params: { query: { within: days, limit: PAGE, offset } },
+          params: { query: { ...(days ? { within: Number(days) } : {}), limit: PAGE, offset } },
         }),
       ),
   });
@@ -89,7 +93,8 @@ export function Disclosing() {
         <p>Embargoes running out, soonest first. Reaching a date discloses nothing on its own.</p>
         <label className="field" style={{ marginLeft: "auto" }}>
           <span>Within</span>
-          <select value={String(days)} onChange={(event) => setDays(Number(event.target.value))}>
+          <select value={days} onChange={(event) => setDays(event.target.value)}>
+            <option value="">The whole embargo window</option>
             <option value="7">Within 7 days</option>
             <option value="30">Within 30 days</option>
             <option value="90">Within 90 days</option>

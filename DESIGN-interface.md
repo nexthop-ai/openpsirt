@@ -25,7 +25,7 @@ end rather than left to be found by clicking.
 - [Sorting, paging and selection](#sorting-paging-and-selection)
 - [Saved filters](#saved-filters)
 - [The by-component view](#the-by-component-view)
-- [The by-bump view](#the-by-bump-view)
+- [The by-upgrade view](#the-by-upgrade-view)
 - [The component screen](#the-component-screen)
 - [The finding screen](#the-finding-screen)
 - [The decision form](#the-decision-form)
@@ -96,6 +96,7 @@ reload while working when navigated to.
 | The rule is "the router has no route for this", asked of the router | Not "the path is outside `/v1`". The framework registers routes of its own — the API document and the schemas it references — and a prefix rule hands those to anybody who asks |
 | Names the server owns are reserved even when nothing is routed there | The framework's documentation route is disabled by configuration, and unrouted is exactly what marks a path as the page's. Without a reserved list the interface would have claimed `/docs`. A test asserts that mounting the interface opens nothing |
 | The page loads without a credential and nothing else changes | The sign-in screen *is* the page. What is served is a compiled application and its assets, carrying no data |
+| An address the page does not know says so, and keeps the address | It used to redirect to the home screen, which threw away the one piece of evidence a link built wrong leaves behind. A component link composed with no product selected was reported as "it brings you back to the homepage" — the reporter could not say what address they had been on, because it was gone from the bar |
 
 ## The generated client
 
@@ -159,9 +160,9 @@ to upload, what is waiting on you, and who you are.
 
 | Rail group | Holds |
 |---|---|
-| **Across products** | Home, the review queue, what is unassigned, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
+| **Across products** | Home, the review queue, what nobody holds, the assignments, the catalog and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build. The catalog is here because it is what this deployment carries, and because Manage ships folded |
 | **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many |
-| **Manage** | The catalog, the users and the settings. Branches, tags and variants have entries of their own, scoped to the picked product |
+| **Manage** | The users, the teams, the standing assignment rules, the settings and the deployment itself. Branches, tags and variants have entries of their own, scoped to the picked product |
 
 A build-only entry declines rather than opening on a scope that means nothing.
 With a product, branch or variant unpicked, the tree and inventories entries are
@@ -188,9 +189,12 @@ the screen; scrolling with the page leaves the menu a thousand pixels above
 somebody reading the foot of a findings list, which is where they are when they
 want it.
 
-A group heading folds what is under it, and "Manage" starts folded. Declaring a
-product or granting a role is occasional rather than something done while
-working, and with it away the rail asks for under seven hundred. The heading
+A group heading folds what is under it, and "Manage" starts folded. Granting a
+role or changing a setting is occasional rather than something done while
+working, and with it away the rail asks for under seven hundred. **Nothing a
+first visit needs is under it** — the catalog was, which made the one screen
+saying what this deployment carries invisible to somebody who had just
+arrived. The heading
 stays a heading to look at — a caret is the only thing marking it as a control,
 because three headings drawn as buttons read as three more places to go. What is
 folded is kept in the browser, per person.
@@ -447,7 +451,10 @@ first is what has not been answered yet.
 
 Sorting is by a column the server names, never by one a caller does (REQ-66).
 Four headers order the list — severity, EPSS, locations and the deadline — and
-clicking the one already sorted turns it around. What reaches the statement is
+clicking the one already sorted turns it around. **An order control above the
+list carries all six**, including the two with no column: the ranking the list
+is in when nothing is asked, and how long something has been open. What reaches
+the statement is
 an expression the server stores against each of its own keys: a placeholder
 cannot bind a column name, so this is the one query parameter that has to become
 SQL text. A word that is not one of the keys is not a sort, and the list comes
@@ -456,6 +463,15 @@ back in its own order rather than refusing.
 | Rule | |
 |---|---|
 | A finding with no deadline sorts last whichever direction is asked for | "No deadline" is neither early nor late |
+| **What came in overnight is a control, not a typed date** | The first question of a working day was a date box behind the filter panel. A chip writes the date a day back into the address — the date rather than the word, so a list somebody sends means the same thing when it is opened |
+| **An empty list says what emptied it and offers the way back** | A narrowed list matching nothing is a dead end: the controls that produced it are scrolled off above, and what is left on screen says so and offers nothing. It names how many filters are in force and carries a control that takes all of them off — and says "nothing is open here at all" where none was in force, which is a different answer |
+| **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the order control above the list |
+| **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a claim requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
+| **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. The whole screen used to unmount — the search box, the chips, the count and the controls with it — so changing one filter blanked the thing being narrowed and took the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
+| **Each view's button carries what that view would show** | The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-upgrade figure is a fix-bundle aggregate, measured at 2.2 s against a backlog of 8,376, so it is held for five minutes rather than asked again as somebody pages |
+| **The list opens by issue, whatever the size** | No threshold, and the other two are a click away in the toggle and in the address as a chip that removes itself. A list that jumps to a different grain past a number nobody set is a list that answers a different question on two products |
+| The order in force is named on screen, and every order can be asked for | Four of the six sit under a column header, so the other two could be reached by typing an address and by nothing else — one of them being urgency, which is the order the list opens in and what REQ-32 is for. Sorting by a column and then wanting the ranking back was a dead end |
+| An order opens the way round that order means | The worst severity, the highest likelihood and the widest reach are all "most first"; a deadline and an age are not. Due opened at the furthest-away date, which is the answer to a question nobody asks |
 | The tie-break is always the same pair of identifiers | Two rows equal on the sorted column do not swap between pages and drop one while repeating another |
 | A page size of fifty, a hundred or two hundred, kept in the address | Fifty is 153 pages of one product's findings |
 | A row is selected by what it is, not by where it sits | The list is read again after every decision and on every page, so an index would select a different row each time. That also makes a selection survive paging, which is what "a filtered set" means when the filter matches more than a page |
@@ -539,18 +555,19 @@ done to — and read as a stray list of version numbers with an unexplained link
 The grouping it existed for did not go with it: the act follows the source
 package, so upgrading curl still reaches both of its binaries in one go.
 
-## The by-bump view
+## The by-upgrade view
 
-One row per upstream bump, with what moving it would close: the pending-upgrades
-question read from the triager's end rather than the coordinator's. Keyed on the
-fold, so packages built from one source are one row.
+One row per upstream upgrade, with what moving it would close: the
+pending-upgrades question read from the triager's end rather than the
+coordinator's. Keyed on the fold, so packages built from one source are one row.
 
 | Rule | |
 |---|---|
-| **No action column** | That is what the By fix view was deleted for. The package name opens the component, where the upgrade is planned; a source package that builds three binaries is one bump and three links |
+| **No action column** | That is what the By fix view was deleted for. The package name opens the component, where the upgrade is planned; a source package that builds three binaries is one upgrade and three links |
 | Versions are listed, not ordered | Comparing two needs a per-ecosystem ordering this does not have, so one package appears once per version upstream released, and there is no nearest and no latest |
-| The filters it cannot apply are named on the screen | It takes six of the list's thirty-odd; the rest ask about a place, a deadline or an assignee, and a bump has none of those. Dropping them quietly widens the list back out while the chips go on saying they are on |
-| Nothing here counts places | A bump is a fold. What it says is the packages it moves, the issues it would close, and the builds that hold it |
+| The filters it cannot apply are named on the screen | It takes six of the list's thirty-odd; the rest ask about a place, a deadline or an assignee, and an upgrade has none of those. Dropping them quietly widens the list back out while the chips go on saying they are on |
+| Nothing here counts places | An upgrade is a fold. What it says is the packages it moves, the issues it would close, and the builds that hold it |
+| **The word on screen is "upgrade"** | It read "bump", which is not the word the decisions use. A vocabulary a screen and a document share reads as two things when it is spelled two ways, which is the rule the product name is already held to |
 
 ## The component screen
 
@@ -571,6 +588,7 @@ and the act hangs off it.
 | Releases are picked inside the promise, ticked to the ones shipping this version | One bump moves every release at that version. Picked in a column of the table instead, the form appeared only once something was ticked, so the control was invisible until somebody guessed at it |
 | The version to move to is offered and never required | The list is what the scanner named; the server is what refuses one it has not heard of. So a version newer than anything reported can still be named, which is the case where an upgrade is ahead of the advisories |
 | Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a judgment. A form that cannot be filled in is one somebody fills in anyway |
+| The way to make that judgment is on this page | One judgment about many issues at one component is its own screen, and nothing in the application linked to it — it could be reached by typing the address. This page is where the question is asked: beside the count of what no version fixes, and as the action where nothing fixes anything at all |
 | More than one version is a choice, not a refusal | A name meaning two components is two pieces of code. The versions are offered with what is open at each, rather than the request being refused with an instruction to add a parameter |
 | A build is listed because it ships the component, not because something is open | The presence is a fact about the graph and the counts are joined onto it. Read off the findings instead, a package whose whole risk sits in what it pulls in — nothing on the package, everything underneath — answered with no builds, which reads as a name the product does not ship. That is the ordinary state of anything vendored in pre-built |
 | One row per version rather than per build | A build shipping a name at two versions holds two components, and they are two pieces of code to decide about separately. Collapsing them to the lowest version reported one and hid the other |
@@ -609,6 +627,11 @@ The notes thread is the one somebody can write in before anybody has decided
 anything, which is why it is not gated on a claim. Nothing about writing one
 changes what ranks, a deadline, or what the product triages, and it says so
 beside the button.
+
+**The identifier in the heading opens the issue screen.** That screen answers
+"everywhere this issue sits", and the doors into it were an exact-match search,
+one report and one queue link — so the reader most likely to want it, somebody
+already looking at one place the issue sits, had none.
 
 **The issue screen carries the same thread, a product at a time.** That screen
 shows an issue wherever it sits, and a note belongs to one product — so one
@@ -747,6 +770,7 @@ written, and only then is anything sent.
 
 | Rule | |
 |---|---|
+| **A build is one entry, however many places reach it** | A judgment is about a group of places, and a build the claim already reaches is one thing to be told about. Answered per place, a kernel flaw at sixty places listed the same other build sixty times, once per consumer that pulls the package in — so what the sheet led with was a count of this build's own graph rather than of builds the judgment travels to. A build at *another* version is one entry per version, because each version is a separate judgment |
 | The decision here is recorded first, then each build applied, one at a time | With the places narrowed where any were excluded. A refusal on one is reported for that one and does not decide the rest |
 | The reach is answered whole rather than sampled | Where a judgment lands beyond this build is a question per place, and asking per place is a request each — so it asked about the first eight. That was a cost control that had become a rule about what a decision covers: what is offered is what gets written, so a build reachable only from the ninth place was never offered and nothing said so |
 | The review step is skipped where there is nothing to review | It ran even when the reach it exists to confirm is zero, and at around 150 decisions a day that is some 300 keystrokes spent confirming nothing |
@@ -878,17 +902,30 @@ claim, its reasoning and its history with no way to answer it.
 ## Assignments and routing rules
 
 Assignments is two tabs: what is due soon and undecided, and who holds what.
-Unassigned work is its own screen with its own rail entry, and a row nobody
-holds says "unassigned" in muted text rather than drawing nobody as a person
-with an avatar.
+A row nobody holds says "unassigned" in muted text rather than drawing nobody
+as a person with an avatar.
+
+**Work nobody holds is the findings list under two filters**, not a screen of
+its own: nobody assigned, and nothing decided. The rail entry keeps its label,
+its icon and its place, and its address carries those two filters. The badge
+beside it is counted from that same address, through the list's own query, so
+the number and the list it opens cannot disagree — the list writes three
+narrowings of its own into any address it is given, and a total counted without
+them is a different question.
+
+| Why it is not its own screen | |
+|---|---|
+| The list already does the whole of it | Deadline, age, EPSS, every filter and every order, over thousands of rows. The screen had none of those and no way to narrow |
+| The screen and its own heading disagreed | It said "undecided" and asked a question with no decision predicate in it |
+| `/unassigned` still resolves | A bookmark and a link in an old digest land on the list rather than being swallowed by the catch-all |
 
 | Rule | |
 |---|---|
 | Every figure counts pieces of work, and says so | A person's row and the list behind their name are one measurement, so clicking through never turns one number into a different one. The findings those cover are a second, quieter column, and the screen states in words what each counts |
-| Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. On a finding it is the picker's first option, because taking work is the common case and should need no typing; the unassigned list carries a Take of its own on its batch bar |
+| Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. On a finding it is the picker's first option, because taking work is the common case and should need no typing; the findings list carries a Take of its own on its batch bar |
 | Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
-| Offering work to somebody is a question about one product | The unassigned list spans every product somebody can see, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
+| Offering work to somebody is a question about one product | The findings list spans every product somebody can see when none is picked, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
 | **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
 | A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 
@@ -943,6 +980,12 @@ closed, broken down by the rating in force, with how much of what it opened is
 known to be exploited — which is what decides whether an overnight jump is an
 evening's work or a night's. A band with none in it is left out rather than
 drawn as a zero, because a row of zeros reads as a chart that failed to load.
+
+| Rule | |
+|---|---|
+| **What it opened is a list, reached from the count** | A run saying it opened four thousand findings and offering no way to read them is the problem the page exists to fix. The findings list narrows to one run by its identifier — "opened after a date" is the wrong question when two runs landed the same day — and the narrowing is a chip that removes itself, so arriving from that link widens back to the whole build |
+| **What it closed is not** | Those findings are closed, and the list is of what is open |
+| **How long it took is said** | The page carried both moments it is the difference of and drew only the second. "Did the nightly scan take four minutes or four hours" is what somebody asks when a build is late, and a run still going says when it started instead |
 
 Release comparison carries a chart across every build, not only the two being
 compared: the comparison answers what changed between two, and the chart answers
@@ -1003,6 +1046,7 @@ is still reachable over HTTP and referenced nowhere in the interface.
 | A group is undisclosed when *any* of its places is | One embargoed place among fifty makes the whole of it embargoed for anybody deciding what may be said about it, and the earliest date is the one that matters. Both read as aggregates rather than off whichever row sorted first — counted, because a maximum of the visibility word answers "public" for exactly the mixed group the question is about, and the list then drew no marker on a row holding an undisclosed place |
 | The standing notice is unmissable on the finding page (REQ-40) | A notice somebody has to look for is one that has not been given. It sits above everything, on the screen where a person is about to write something down, and it names the places a disclosure actually happens: a ticket, a commit message, a chat. The row's chip is the secondary signal |
 | A screen lists what is approaching disclosure (REQ-38) | Soonest first with what is past due at the top, and an extension asked for on it. That list is itself a disclosure and is narrowed the way `DESIGN-access.md` describes — a product somebody may not read undisclosed work in contributes nothing to it, not even a count |
+| **The window it opens on is this deployment's own embargo length** | It opened on thirty days against the ninety-day policy that ships, so a deployment with five embargoes running drew an empty screen — which reads as "nothing is coming". The server answers over its own window where the caller names none, and the picker's first option says that is what it is doing |
 | The screen says what a date arriving means | The answer is counter-intuitive: nothing has been published, and the row is waiting for somebody to say what happens. It also says what an extension will do before it is asked for |
 | Agreeing to an extension sits on the review queue | Beside the ratings that wait there for the same reason: both are a second person's turn, and a queue holding one kind and not the other is one somebody has to remember to look past |
 | A waiting rating names its product, on the card and in every sentence about what agreeing does | A rating belongs to one product and two products may rate one issue differently (REQ-29), so a card reading only "CVE-… low" is a word an approver cannot act on. What they are agreeing to is a deadline and a triage line in one named place |
@@ -1085,6 +1129,8 @@ A control somebody can see and cannot reach is a control that is not there.
 
 | Rule | |
 |---|---|
+| **The findings list is worked from the keyboard** | `j` and `k` move a cursor through the rows, `Enter` opens one where it sits, `Escape` closes it and `o` opens the finding. It is the screen a triager spends the day on and it answered one key, which was the search box's. Every key means nothing while what has focus takes typing — `j` inside a justification is the letter — and a modified key is the browser's |
+| **The cursor is drawn, and goes when the question changes** | A cursor nobody can see is a key that appears to do nothing, and a cursor pointing at row nine of a list that has been re-read points at a different finding |
 | The focus ring is added to, never replaced | An accent border and a wash around it are an addition to the global ring. A checkbox and a radio are painted by the browser, so a border declaration reaches nothing on them and a wash at a tenth of full strength is 1.16:1 against the surface — where 3:1 is the floor. Tabbing into the permission grid, where one press writes a grant per product, nothing on screen said which box had focus |
 | Where a control has no border of its own, the ring goes on the box around it | The two search boxes draw their own frame and the input inside has none, so the ring taken off the input had nowhere to go |
 | Nothing a person operates is hidden with `display: none` | It leaves the tab order. The upload drop zone's file input was hidden that way and nothing else reached it — no focusable label, no drag handler, and the Upload button disabled until a file is chosen — so filing an inventory by hand was pointer-only |
@@ -1190,7 +1236,8 @@ chosen (REQ-64).
 | It matches issue names as well as component names | Labeled "Find a component or an issue", it searched component names only, so the question a PSIRT is asked first when an advisory lands — where is this in what we ship — returned an empty list, which reads as "we do not ship it" |
 | Aliases are matched | An issue is one thing under several names, so the name a reporter used has to reach the row filed under the name a scanner used, or the answer depends on which feed arrived first |
 | Both halves are one box rather than two fields | Somebody typing a name does not classify it first, and an identifier is not mistakable for a package name in practice |
-| It stops at a product where the address it is on does | Asking "wherever we have it" across every product is a view of its own with a query behind it, which is better than a box that quietly answers about one product while looking like it answered about all of them |
+| It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. It used to return without navigating anywhere when no product was picked, so the box looked live and swallowed what was typed |
+| A term that resolves to an issue goes to the issue instead | Decided by asking rather than by the shape of the text: a second copy of the server's name resolution is wrong about every identifier a deployment mints for itself |
 
 ## A person's own page
 
@@ -1335,6 +1382,8 @@ said so.
 
 | Rule | |
 |---|---|
+| **What kind of flaw it is, all of it and named** | One identifier was shown and the rest dropped, as a bare number — "CWE-401" is not something a reader knows, and the four commonest in a kernel backlog are a memory leak, a race, improper locking and a double free, none of which was named. The common ones are named inline and every one links to where it is written up, built from the identifier rather than stored. The two words a feed uses to say it has no classification are said rather than drawn as one |
+| **The band a row is drawn in and the word it says are two answers** | They differ for exactly the two words a scanner reports below low. Both rank inside the low band everywhere that sorts and filters, so that is the color; what the row says is what was rated. Folded together, "rated negligible" read as "Unrated" — which tells a reader nobody has looked at a finding somebody looked at and dismissed |
 | Known-exploited is its own badge, not a replacement for the severity word | Replacing it answers one question by destroying another: an exploited medium is still a medium, and the reader needs both facts to see why it sits above an unexploited high |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |
 | Where this product has rated something itself, that is what orders its list, and both ratings are shown | Being able to say a published rating is wrong is pointless if everything that sorts and filters then ignores us. The world's stays beside it, because a rating of ours standing where the world's goes reads as the world's. The list that spans products reads each row against its own product's rating, because a rating belongs to one (REQ-29) |

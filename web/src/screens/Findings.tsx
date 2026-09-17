@@ -2,14 +2,14 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useSelection } from "./useSelection";
 import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
-import { ByBump, ByComponent, Pager } from "./FindingsViews";
+import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
 import { FLOORS } from "../ui/severities";
 import { Filters, Narrowed, STATES, activeFilters, without, withoutAny } from "./FindingsFilters";
 import { Choices } from "../ui/Choices";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Navigate, useParams, useSearchParams } from "react-router-dom";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
@@ -19,12 +19,18 @@ import { Holder } from "../ui/Holder";
 import { Saved, here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
+import { activates, meansFor, moved, typingIn } from "./keys";
+import { useWho } from "../app/session";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
 // question of the server to offer the row before and the row after. Fifty rows
 // is 153 pages of one product's findings, which is not a list anybody
 // assembles a day's work out of.
 import {
+  BY_DEFAULT,
+  LEAST_FIRST,
+  daysBack,
+  ORDERS,
   PAGE,
   PAGES,
   SORTS,
@@ -36,7 +42,10 @@ import {
   withParam,
   withParams,
   hidden,
+  identityOf,
+  pathTo,
   type Row,
+  type SortWord,
   usePaging,
 } from "./list";
 
@@ -67,6 +76,7 @@ export function Findings() {
   // the product as a column of its own.
   const COLUMNS = spanning ? 11 : 10;
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   // The branch and the variant come from the path on a build's own list and
   // from the picker's selection otherwise. Either may be "all": the list is
   // not one of the screens that needs a whole build.
@@ -117,6 +127,11 @@ export function Findings() {
   // somebody followed a link to read, to say what the chips say already.
   const [more, setMore] = useState(false);
   const [peeking, setPeeking] = useState<string | null>(null);
+  // Which row the keys are about. An index rather than a key, because "the
+  // next one" is a question about the page's order; it is put back to nothing
+  // whenever the question changes, since a cursor pointing at row nine of a
+  // list that has been re-read is pointing at a different finding.
+  const [cursor, setCursor] = useState(-1);
   // What is selected, by what a row *is* rather than by where it sits: the
   // list is read again after every decision and after every page, and an index
   // would select a different row each time. Selection is a prerequisite rather
@@ -140,6 +155,7 @@ export function Findings() {
   // Beside the hooks it belongs with: this reads the session, so it cannot sit
   // after an early return.
   const { cap: bulkCap, over: overCap } = useBulkCap(picked.size);
+  const me = useWho();
   const [handing, setHanding] = useState("");
   // The list somebody has turned down a prepared claim for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
@@ -147,9 +163,16 @@ export function Findings() {
   // is offered again.
   const [declined, setDeclined] = useState<string | null>(null);
   const [typed, setTyped] = useState(searching);
+  // The direction an order opens at, which is not the same for all of them:
+  // "sort by severity" means the worst first and "sort by due" means the
+  // soonest, and both were opening most-first.
+  function firstAsk(key: SortWord): Record<string, string> {
+    return { sort: key === BY_DEFAULT ? "" : key, asc: LEAST_FIRST.includes(key) ? "yes" : "" };
+  }
+
   // A column header that orders by itself. Clicking the one already sorted
-  // turns it around; clicking another sorts by that, most-first, because that
-  // is what somebody means by "sort by severity".
+  // turns it around; clicking another opens it the way round that column
+  // means.
   function sortable(label: keyof typeof SORTS) {
     const key = SORTS[label];
     const on = sort === key;
@@ -159,13 +182,11 @@ export function Findings() {
         className="linkish"
         title={`Order by ${label.toLowerCase()}`}
         onClick={() => {
-          const next = new URLSearchParams(params);
-          if (on && !ascending) next.set("asc", "yes");
-          else {
-            next.set("sort", key);
-            next.delete("asc");
+          if (on) {
+            ask(withParam(asked, "asc", ascending ? "" : "yes"));
+            return;
           }
-          ask(next);
+          setEach(firstAsk(key));
         }}
       >
         {label}
@@ -274,6 +295,75 @@ export function Findings() {
             }),
       ),
     enabled: view === "issues",
+    // The rows that were on screen stay there while the next answer is read.
+    // Without this the whole screen unmounted on every filter change — the
+    // search box, the chips, the count and the controls with it — so changing
+    // one filter blanked the thing being narrowed and put the cursor nowhere.
+    placeholderData: keepPreviousData,
+  });
+
+  // What each view would show, on the button that switches to it.
+  //
+  // The three answer the same narrowing at three grains, and the difference
+  // between them is the whole reason to switch: a product whose by-issue list
+  // is 7,455 rows is 341 by component and 284 by upgrade, and nothing said so
+  // — so the list opened on its longest view and read as the only one.
+  //
+  // Asked with a page of one, because the total is what is wanted. The
+  // by-issue count is the one the screen already holds where the by-issue view
+  // is what is drawn, so it is asked only from the other two. The by-upgrade
+  // count is a fix-bundle aggregate, measured at 2.2 s against a backlog of
+  // 8,376 — held for five minutes rather than asked again as somebody pages.
+  const byIssue = useQuery({
+    queryKey: ["findings", "count", product, stream, variant, query],
+    enabled: view !== "issues",
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      unwrap(
+        spanning
+          ? await api.GET("/v1/findings", {
+              params: { query: { ...acrossProducts(query), limit: 1, offset: 0 } },
+            })
+          : await api.GET("/v1/products/{product}/findings", {
+              params: {
+                path: { product },
+                query: { ...query, ...selection, limit: 1, offset: 0 },
+              },
+            }),
+      ),
+  });
+  const byComponent = useQuery({
+    queryKey: ["findings-by-component", "count", product, selection, query],
+    enabled: !spanning,
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/findings/components", {
+          params: {
+            path: { product },
+            query: {
+              ...(query as unknown as Record<string, never>),
+              ...selection,
+              limit: 1,
+              offset: 0,
+            },
+          },
+        }),
+      ),
+  });
+  const byUpgrade = useQuery({
+    queryKey: ["fix-bundles", "count", product, selection, query],
+    enabled: !spanning,
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/fix-bundles", {
+          params: {
+            path: { product },
+            query: bumpQuery({ product, ...selection }, query, 1, 0) as Record<string, never>,
+          },
+        }),
+      ),
   });
 
   // Where somebody was, restored when they come back. This is the screen the
@@ -303,10 +393,29 @@ export function Findings() {
     };
   }
 
+  // What a write here makes stale.
+  //
+  // Three keys rather than one: the view counts are held for five minutes, and
+  // two of the three are not under the `findings` prefix — so a triager who
+  // decided a page of rows in place saw two numbers, drawn side by side with a
+  // third that had moved, still quoting the figures from before their own
+  // writes. That is the half of the rule the hold is justified under: a number
+  // that is wrong in a way nothing reports.
+  function reread() {
+    for (const key of [["findings"], ["findings-by-component"], ["fix-bundles"], ["holdings"]]) {
+      void queries.invalidateQueries({ queryKey: key });
+    }
+  }
+
   // Every change to the question the list is asking goes through the hook that
   // holds the selection, which is where the rule that a changed question
   // clears it now lives.
   function ask(next: URLSearchParams) {
+    // The cursor and the open row go with it. Both point at a position in a
+    // page, and a changed question is a different page — row nine of the
+    // answer is a different finding from row nine of the last one.
+    setCursor(-1);
+    setPeeking(null);
     setParams(asking(next));
   }
 
@@ -353,6 +462,71 @@ export function Findings() {
   }, [rows]);
   const total = findings.data?.total ?? 0;
 
+  // Working the list from the keyboard.
+  //
+  // The list is where a triager spends the day, and it answered one global
+  // key. Move with j and k, open the row where it sits with Enter, close it
+  // with Escape, and go to the finding itself with o. What each key means, and
+  // when it means nothing, is in `keys.ts` so that the rule can be pinned
+  // without rendering a page.
+  //
+  // The rows are held in a ref so that the listener is bound once rather than
+  // re-bound on every page of results, which would also have made the cursor
+  // a dependency of itself.
+  const live = useRef({ rows, cursor, peeking, at: (row: Row) => pathTo(buildOf(row), row) });
+  useEffect(() => {
+    live.current = {
+      rows,
+      cursor,
+      peeking,
+      at: (row: Row) => pathTo(buildOf(row), row, carrying, prepared?.name),
+    };
+  });
+  useEffect(() => {
+    function key(event: KeyboardEvent) {
+      const { rows, cursor, peeking, at: addressOf } = live.current;
+      const means = meansFor(event, typingIn(document.activeElement));
+      if (means === null) return;
+      if (means === "close") {
+        if (peeking === null && cursor < 0) return;
+        event.preventDefault();
+        setPeeking(null);
+        setCursor(-1);
+        return;
+      }
+      if (means === "next" || means === "previous") {
+        event.preventDefault();
+        const to = moved(cursor, means === "next" ? 1 : -1, rows.length);
+        setCursor(to);
+        // The row brought into view, because a cursor below the fold is a
+        // cursor nobody can see moving.
+        requestAnimationFrame(() =>
+          document
+            .querySelector(`#findingRows tr[data-i="${to}"]`)
+            ?.scrollIntoView({ block: "nearest" }),
+        );
+        return;
+      }
+      // Enter belongs to whatever has focus where that thing answers it
+      // itself. Taken here it would suppress a button's own activation, which
+      // is what the decision form a row opens is submitted with.
+      if (means === "open" && activates(document.activeElement)) return;
+      const row = rows[cursor];
+      if (!row) return;
+      event.preventDefault();
+      if (means === "openFull") {
+        navigate(addressOf(row));
+        return;
+      }
+      const at = identityOf(row);
+      setPeeking(peeking === at ? null : at);
+    }
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+    // Bound once. Everything it reads that changes is read off the ref above,
+    // which the effect before this one keeps in step.
+  }, [navigate]);
+
   const controls = (
     <>
       <div className="filters">
@@ -393,10 +567,10 @@ export function Findings() {
               produce an error — and switching to one and back is how somebody
               loses the question they had built. */}
           {[
-            ["issues", "By issue"],
-            ...(spanning ? [] : [["components", "By component"] as const]),
-            ...(spanning ? [] : [["bumps", "By bump"] as const]),
-          ].map(([value, label]) => (
+            ["issues", "By issue", view === "issues" ? total : byIssue.data?.total],
+            ...(spanning ? [] : [["components", "By component", byComponent.data?.total] as const]),
+            ...(spanning ? [] : [["bumps", "By upgrade", byUpgrade.data?.total] as const]),
+          ].map(([value, label, count]) => (
             <button
               key={value}
               type="button"
@@ -404,6 +578,7 @@ export function Findings() {
               onClick={() => set("view", value === "issues" ? "" : (value as string))}
             >
               {label}
+              {typeof count === "number" && <span className="n">{count.toLocaleString()}</span>}
             </button>
           ))}
         </span>
@@ -424,6 +599,19 @@ export function Findings() {
             onChange={(chosen) => setMany("state", chosen)}
           />
         </span>
+        {/* What came in overnight, which is the first question of a working
+            day and was a hand-typed date behind a disclosure. The date rather
+            than the word, so a list somebody sends means the same thing when
+            it is opened. */}
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={!!asked.get("opened_after")}
+          title="Findings first seen in the last day"
+          onClick={() => set("opened_after", asked.get("opened_after") ? "" : daysBack(1))}
+        >
+          New today
+        </button>
         {/* Behind a control rather than always on screen: the chips above are
             what somebody uses constantly. What is on is said on the control,
             so a narrowed list never looks like an unnarrowed one. */}
@@ -450,6 +638,25 @@ export function Findings() {
             }}
           />
         )}
+        {/* Which order the list is in, said rather than inferred. Four of the
+            six sit under a column header, so the two that do not — the tool's
+            own ranking and how long something has been open — could not be
+            asked for at all, and the ranking could not be got back to once a
+            header had been clicked. */}
+        <span className="floor">
+          <span style={{ color: "var(--faint)" }}>Order</span>
+          <select
+            aria-label="Order the list"
+            value={sort || BY_DEFAULT}
+            onChange={(event) => setEach(firstAsk(event.target.value as SortWord))}
+          >
+            {Object.entries(ORDERS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </span>
         <span className="floor">
           <span style={{ color: "var(--faint)" }}>Min severity</span>
           <span className="seg">
@@ -627,7 +834,6 @@ export function Findings() {
     );
   }
 
-  if (findings.isPending) return <Loading />;
   if (findings.isError) {
     return <Failed error={findings.error} what="The findings could not be read." />;
   }
@@ -640,14 +846,13 @@ export function Findings() {
   // Handing a selection to somebody, which is the one thing a selection can do
   // until the bulk workflows that start from one are built. What a refusal
   // partway through leaves behind is the hook's rule rather than this one's.
-  async function handOver() {
-    const who = handing.slice(handing.indexOf(":") + 1);
-    const team = handing.startsWith("team:");
+  async function handOver(to?: string) {
+    const who = to ?? handing.slice(handing.indexOf(":") + 1);
+    const team = to === undefined && handing.startsWith("team:");
     await through((row: Row) => hand.mutateAsync({ row, who, team }));
     // Once, after the loop. On every write it put a list refetch between each
     // of them, so a long selection spent its time refetching.
-    void queries.invalidateQueries({ queryKey: ["findings"] });
-    void queries.invalidateQueries({ queryKey: ["holdings"] });
+    reread();
     setHanding("");
   }
 
@@ -700,15 +905,31 @@ export function Findings() {
             </span>
           )}
           <span className="spacer" />
+          {/* Taking unowned work needs no more right than reaching this list
+              does and no product chosen, so it is a button rather than a step
+              through a picker that may have nobody in it. */}
+          <button
+            type="button"
+            className="btn"
+            disabled={me.data?.identity == null || hand.isPending || overCap}
+            onClick={() => void handOver(me.data!.identity)}
+          >
+            {`Take ${picked.size}`}
+          </button>
           {/* One lookup rather than a list of people beside a list of teams:
               both are parties, and at a hundred people a select is a list
-              nobody can type toward. */}
+              nobody can type toward.
+
+              Who may hold work is a question about one product, and this list
+              answers for every product a reader can see when none is picked —
+              so the control says that instead of opening on nobody. */}
           <div style={{ minWidth: 230 }}>
             <Holder
               product={product}
               value={null}
-              placeholder="Assign to…"
+              placeholder={product ? "Assign to…" : "Pick a product to assign"}
               none="Nobody"
+              disabled={!product}
               onPick={(held) => setHanding(held ? `${held.kind}:${held.identity}` : "")}
             />
           </div>
@@ -726,31 +947,63 @@ export function Findings() {
         </div>
       )}
 
-      {rows.length === 0 ? (
-        <Empty title="Nothing matches these filters." />
-      ) : (
-        <FindingsTable
-          rows={rows}
-          shownKeys={shownKeys}
-          picked={picked}
-          pick={pick}
-          pickAll={pickAll}
-          spanning={spanning}
-          columns={COLUMNS}
-          oneBuild={oneBuild}
-          sortable={sortable}
-          buildOf={buildOf}
-          siblings={siblings}
-          carrying={carrying}
-          prepared={prepared}
-          set={set}
-          hide={hide}
-          peeking={peeking}
-          setPeeking={setPeeking}
-        />
-      )}
+      {/* The rows, or what stands in for them. Marked busy rather than
+          replaced while the next answer is read: the list somebody is
+          narrowing is the thing they are looking at. */}
+      <div className="listing" aria-busy={findings.isPlaceholderData || undefined}>
+        {findings.isPending ? (
+          <Loading />
+        ) : rows.length === 0 ? (
+          // A narrowed list that matches nothing is a dead end: the controls
+          // that produced it are scrolled off above, and the reader is looking
+          // at a panel that says so and offers nothing. What is on, and the
+          // way to take it all off.
+          <Empty
+            title="Nothing matches these filters."
+            detail={
+              advanced > 0
+                ? `${advanced.toLocaleString()} ${advanced === 1 ? "filter is" : "filters are"} narrowing this list.`
+                : "Nothing is open here at all."
+            }
+          >
+            {advanced > 0 && (
+              <button type="button" className="btn quiet" onClick={() => ask(withoutAny(asked))}>
+                Clear every filter
+              </button>
+            )}
+          </Empty>
+        ) : (
+          <FindingsTable
+            rows={rows}
+            cursor={cursor}
+            onDecided={reread}
+            shownKeys={shownKeys}
+            picked={picked}
+            pick={pick}
+            pickAll={pickAll}
+            spanning={spanning}
+            columns={COLUMNS}
+            oneBuild={oneBuild}
+            sortable={sortable}
+            buildOf={buildOf}
+            siblings={siblings}
+            carrying={carrying}
+            prepared={prepared}
+            set={set}
+            hide={hide}
+            peeking={peeking}
+            setPeeking={setPeeking}
+          />
+        )}
+      </div>
 
       <div className="filters" style={{ margin: "10px 0 0" }}>
+        {/* Said where somebody is already looking at the foot of a page,
+            rather than behind a key that opens a list of keys. */}
+        <span className="hint" style={{ marginRight: "auto" }}>
+          <kbd>j</kbd> <kbd>k</kbd> to move · <kbd>Enter</kbd> to open in place · <kbd>o</kbd> to
+          open the finding
+        </span>
         <span className="hint">
           Showing {rows.length.toLocaleString()} of {total.toLocaleString()}
           {(line.hidden ?? 0) > 0 && !below && (

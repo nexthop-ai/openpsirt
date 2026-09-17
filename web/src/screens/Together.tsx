@@ -1,8 +1,9 @@
 import { notACredential } from "../ui/noautofill";
+import { Icon } from "../ui/Icons";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { paths } from "../api/schema";
 import { usePaging } from "./list";
@@ -10,7 +11,9 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Crumbs } from "../ui/Crumbs";
-import { Severity } from "../ui/Severity";
+import { Severity, Exploited } from "../ui/Severity";
+import { Wide } from "../ui/Wide";
+import { on } from "../ui/when";
 import { JUSTIFICATIONS, type Justification } from "../ui/Outcome";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
@@ -153,7 +156,7 @@ export function Together() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <>
       <Crumbs product={product} stream={stream} variant={variant} />
       <div className="screen-head">
         <h2>Bulk decision</h2>
@@ -163,32 +166,31 @@ export function Together() {
         </p>
       </div>
 
-      <form
-        className="mb-4 flex flex-wrap gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          // A selection is made out of a population, so replacing the
-          // population replaces what was selected. Kept across a narrowing,
-          // issues ticked under the old question were submitted under the new
-          // one, with none of them on screen.
-          setPicked(new Set());
-          setParams(typed ? { contains: typed } : {});
-        }}
-      >
-        <input
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-          placeholder="Narrow by what the report says — driver, ioctl…"
-          aria-label="Narrow the list"
-          className="min-w-56 flex-1 rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-sm"
-        />
-        <button type="submit" className="rounded border border-[var(--line)] px-3 py-1.5 text-sm">
-          Narrow
-        </button>
-        <span className="hint" style={{ alignSelf: "center" }}>
-          Text match on the description
-        </span>
-      </form>
+      <div className="filters">
+        <form
+          className="searchbox"
+          onSubmit={(event) => {
+            event.preventDefault();
+            // A selection is made out of a population, so replacing the
+            // population replaces what was selected. Kept across a narrowing,
+            // issues ticked under the old question were submitted under the
+            // new one, with none of them on screen.
+            setPicked(new Set());
+            setParams(typed ? { contains: typed } : {});
+          }}
+        >
+          <Icon name="search" />
+          <input
+            {...notACredential}
+            type="text"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder="Narrow by what the report says — driver, ioctl…"
+            aria-label="Narrow the list"
+          />
+        </form>
+        <span className="hint">Text match on the description</span>
+      </div>
 
       {issues.isPending && <Loading />}
       {issues.isError && <Failed error={issues.error} what="The issues could not be read." />}
@@ -202,13 +204,18 @@ export function Together() {
 
       {items.length > 0 && (
         <>
-          <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
+          <div className="batchbar" style={{ marginBottom: 8 }}>
+            <span>
+              <b>
+                {picked.size.toLocaleString()} of {everything.toLocaleString()} selected
+              </b>
+            </span>
             <button
               type="button"
+              className="linkish"
               onClick={() => setPicked(new Set(items.map((i) => i.vulnerability ?? "")))}
-              className="text-[var(--accent)] hover:underline"
             >
-              Select all {items.length} shown
+              Select all {items.length.toLocaleString()} shown
             </button>
             {/* The whole narrowed set, not the page. A page is fifty of eight
                 hundred, and a claim assembled a page at a time is eighteen
@@ -216,23 +223,19 @@ export function Together() {
             {everything > items.length && (
               <button
                 type="button"
+                className="linkish"
                 disabled={all.isFetching}
                 onClick={() => void selectEverything()}
-                className="text-[var(--accent)] hover:underline"
               >
-                {all.isFetching ? "Selecting…" : `Select all ${everything} matching`}
+                {all.isFetching
+                  ? "Selecting…"
+                  : `Select all ${everything.toLocaleString()} matching`}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setPicked(new Set())}
-              className="text-[var(--muted)] hover:text-[var(--ink)]"
-            >
+            <span className="spacer" />
+            <button type="button" className="linkish" onClick={() => setPicked(new Set())}>
               Clear
             </button>
-            <span className="ml-auto text-[var(--muted)]">
-              {picked.size} of {everything} selected
-            </span>
           </div>
 
           {/* What it would write, said before anybody types a reasoning. The
@@ -254,38 +257,91 @@ export function Together() {
             </p>
           )}
 
-          <ul className="mb-5 max-h-96 divide-y divide-[var(--line)] overflow-y-auto rounded-lg border border-[var(--line)]">
-            {items.map((issue) => {
-              const name = issue.vulnerability ?? "";
-              return (
-                <li
-                  key={name}
-                  className="flex flex-wrap items-center gap-2 bg-[var(--surface)] px-3 py-2 text-sm"
-                >
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={picked.has(name)}
-                      onChange={(event) => {
-                        const next = new Set(picked);
-                        if (event.target.checked) next.add(name);
-                        else next.delete(name);
-                        setPicked(next);
-                      }}
-                    />
-                    <span className="font-medium">{name}</span>
-                  </label>
-                  <Severity word={issue.severity} />
-                  <span className="ml-auto flex gap-3 text-[var(--muted)]">
-                    <span>
-                      {issue.places} {issue.places === 1 ? "place" : "places"}
-                    </span>
-                    {issue.fixed_in && <span>fixed in {issue.fixed_in}</span>}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          {/* The evidence one judgment is being made on. It showed the
+              identifier, the severity and a place count and nothing else —
+              while narrowing by the description, which it did not show. One
+              click here writes a claim across hundreds of places, so it says
+              at least as much as the screen for deciding one. */}
+          <div className="picklist">
+            <Wide>
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 34 }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Select every row shown"
+                        checked={
+                          items.length > 0 && items.every((i) => picked.has(i.vulnerability ?? ""))
+                        }
+                        onChange={(event) => {
+                          const next = new Set(picked);
+                          for (const issue of items) {
+                            if (event.target.checked) next.add(issue.vulnerability ?? "");
+                            else next.delete(issue.vulnerability ?? "");
+                          }
+                          setPicked(next);
+                        }}
+                      />
+                    </th>
+                    <th>Severity</th>
+                    <th>Issue</th>
+                    <th className="num" title="EPSS: published probability of exploitation">
+                      EPSS
+                    </th>
+                    <th>Fixed in</th>
+                    <th className="num">Places</th>
+                    <th>Due</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((issue) => {
+                    const name = issue.vulnerability ?? "";
+                    return (
+                      <tr key={name} className="row">
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${name}`}
+                            checked={picked.has(name)}
+                            onChange={(event) => {
+                              const next = new Set(picked);
+                              if (event.target.checked) next.add(name);
+                              else next.delete(name);
+                              setPicked(next);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <Severity word={issue.severity} />
+                        </td>
+                        <td>
+                          <Link to={`/issues/${encodeURIComponent(name)}`} className="id">
+                            {name}
+                          </Link>{" "}
+                          <Exploited when={issue.exploited} />
+                          {/* What the issue says about itself. The screen
+                              narrows on this text and showed none of it, so a
+                              term matched rows nobody could check. */}
+                          {issue.summary && <div className="hint">{issue.summary}</div>}
+                        </td>
+                        <td className="num">
+                          {typeof issue.likelihood === "number" && issue.likelihood > 0
+                            ? issue.likelihood.toFixed(2)
+                            : ""}
+                        </td>
+                        <td>
+                          {issue.fixed_in ? <span className="id">{issue.fixed_in}</span> : ""}
+                        </td>
+                        <td className="num">{issue.places}</td>
+                        <td>{issue.due ? on(issue.due) : <span className="hint">none</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Wide>
+          </div>
           <Paged
             shown={items.length}
             total={issues.data?.total}
@@ -306,7 +362,7 @@ export function Together() {
           />
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -355,18 +411,17 @@ function Claim({
     (!needsVersion || fixedVersion.trim() !== "");
 
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-      <h2 className="mb-3 text-sm font-semibold">
-        Decision for {count} {count === 1 ? "issue" : "issues"}
-      </h2>
+    <section className="card act">
+      <h3>
+        Decision for {count.toLocaleString()} {count === 1 ? "issue" : "issues"}
+      </h3>
 
-      <div className="flex flex-col gap-3">
-        <label className="text-sm">
-          <span className="mb-1 block text-[var(--muted)]">Outcome</span>
+      <div className="fields">
+        <label className="field">
+          <span className="l">Outcome</span>
           <select
             value={outcome}
             onChange={(event) => setOutcome(event.target.value as Claimed["outcome"])}
-            className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
           >
             <option value="not-applicable">Not applicable</option>
             <option value="wont-fix">Will not fix</option>
@@ -379,44 +434,37 @@ function Claim({
         </label>
 
         {needsDate && (
-          <label className="text-sm">
-            <span className="mb-1 block text-[var(--muted)]">Returns on</span>
-            <input
-              type="date"
-              value={until}
-              onChange={(event) => setUntil(event.target.value)}
-              className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
-            />
+          <label className="field">
+            <span className="l">Returns on</span>
+            <input type="date" value={until} onChange={(event) => setUntil(event.target.value)} />
           </label>
         )}
 
         {needsVersion && (
-          <label className="text-sm">
-            <span className="mb-1 block text-[var(--muted)]">Fixed in</span>
+          <label className="field">
+            <span className="l">Fixed in</span>
             <input
               {...notACredential}
               type="text"
               value={fixedVersion}
               onChange={(event) => setFixedVersion(event.target.value)}
               placeholder="the package version the fix arrived in, as the packager writes it"
-              className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
             />
-            <span className="mt-1 block text-[var(--muted)]">
+            <span className="hint">
               One version for every issue here. If they differ, this is not one claim.
             </span>
           </label>
         )}
 
         {needsJustification && (
-          <label className="text-sm">
-            <span className="mb-1 block text-[var(--muted)]">Justification</span>
+          <label className="field">
+            <span className="l">Justification</span>
             <select
               value={justification}
               // The options are the vocabulary, so what comes back is one of
               // it. The type is read out of that list now rather than written
               // beside it.
               onChange={(event) => setJustification(event.target.value as Justification)}
-              className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
             >
               {JUSTIFICATIONS.map((each) => (
                 <option key={each.value} value={each.value} title={each.value}>
@@ -431,21 +479,22 @@ function Claim({
             candidate was found is not why the claim is true — "these matched a
             word" is not a defense anybody would accept — but "how were these
             chosen" is the question asked of a bulk judgment months later. */}
-        <label className="text-sm">
-          <span className="mb-1 block text-[var(--muted)]">Narrowed by</span>
+        <label className="field">
+          <span className="l">Narrowed by</span>
           <input
+            {...notACredential}
+            type="text"
             value={selectedBy}
             onChange={(event) => setSelectedBy(event.target.value)}
             placeholder="e.g. searched the reports for the drivers this image does not build"
-            className="w-full rounded border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5"
           />
         </label>
 
         {/* No attach control here, deliberately. One judgment covers many
             issues, and a file hangs off one — so there is nothing this could
             attach to that would be true of the rest. */}
-        <div>
-          <span className="mb-1 block text-sm text-[var(--muted)]">Reasoning</span>
+        <div className="field">
+          <span className="l">Reasoning</span>
           <Editor
             value={reasoning}
             onChange={setReasoning}
@@ -458,9 +507,9 @@ function Claim({
 
         {error != null && <Failed error={error} what="That could not be recorded." />}
         {typeof recorded === "number" && recorded > 0 && (
-          <p className="rounded border border-[var(--ok)] bg-[var(--ok-bg)] px-3 py-2 text-sm">
-            {recorded} records written — one per issue, per place. One claim, pending a second
-            person; each record expires on its own.
+          <p className="alert info" role="status">
+            <strong>{recorded.toLocaleString()} records written — one per issue, per place.</strong>
+            <span>One claim, pending a second person; each record expires on its own.</span>
           </p>
         )}
 
@@ -483,13 +532,11 @@ function Claim({
                 reasoning,
               });
             }}
-            className="rounded bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] disabled:opacity-50"
+            className="btn"
           >
-            Submit for {count}
-          </button>
-          <span className="ml-3 text-sm text-[var(--muted)]">
-            Always needs a second person, whatever the outcome.
-          </span>
+            Submit for {count.toLocaleString()}
+          </button>{" "}
+          <span className="hint">Always needs a second person, whatever the outcome.</span>
         </div>
       </div>
     </section>

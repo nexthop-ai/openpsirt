@@ -35,15 +35,66 @@ export type SortWord = NonNullable<
 
 // The orders this list offers as column headers, by the column they sit under.
 //
-// Four of the six. `urgency` is the order the list is in when nothing else is
-// asked for and needs no header of its own, and `age` has no column to sit
-// under — which the typing makes visible rather than answers.
+// Four of the six. The other two are in the order control above the list:
+// `urgency` has no column because it is composed from four signals, and `age`
+// has none because the table is already wider than a laptop.
 export const SORTS = {
   Severity: "severity",
   EPSS: "epss",
   Covers: "places",
   Due: "deadline",
 } satisfies Record<string, SortWord>;
+
+// Every order, by the word a reader picks it by.
+//
+// All six, checked against the server's own enum: an order the server gains
+// and this list does not offer is a compile error here rather than a word
+// nobody can reach. The list is ordered by urgency when nothing is asked —
+// the tool's own ranking, and what REQ-32 exists for — and that was the one
+// order with no name on screen and no way back to it once a column header had
+// been clicked.
+export const ORDERS = {
+  urgency: "Urgency",
+  severity: "Severity",
+  epss: "EPSS",
+  places: "Covers",
+  deadline: "Due",
+  age: "Age",
+} satisfies Record<SortWord, string>;
+
+// A date this many days back, as the address carries one.
+//
+// Written as the date rather than as "yesterday": every filter lives in the
+// address so that a list is a link somebody can send, and a relative word
+// would mean something different whenever it was opened.
+export function daysBack(days: number, from = new Date()): string {
+  const then = new Date(from);
+  then.setUTCDate(then.getUTCDate() - days);
+  return then.toISOString().slice(0, 10);
+}
+
+// The order the list is in when the address asks for none.
+export const BY_DEFAULT: SortWord = "urgency";
+
+// Which orders mean "least first" on the first ask.
+//
+// Most of them are "most first": the worst severity, the highest likelihood,
+// the widest reach. Two are not, and both were opening at the end nobody
+// wanted — Due sorted the furthest-away deadline first, which is the answer to
+// a question nobody asks, and Age is a question about what has sat here
+// longest.
+export const LEAST_FIRST: readonly SortWord[] = ["deadline", "age"];
+
+// Work nobody holds and nobody has decided, as filters on this list.
+//
+// One spelling, because three places open it: the sidebar entry, the badge
+// beside that entry, and the route the old `/unassigned` address resolves
+// through. The screen that used to answer this went — it asked the server a
+// question with no decision predicate in it, so it counted differently from
+// its own heading, and it carried no deadline, no age, no filters and no sort
+// over a list that runs to thousands of rows.
+export const UNOWNED = "assigned=nobody&state=undecided";
+export const UNOWNED_LIST = `/findings?${UNOWNED}`;
 
 // What the by-issue list asks when the address has not said: the work a
 // promised upgrade already answers is out of view, because deciding it again
@@ -206,6 +257,10 @@ export function listQuery(params: URLSearchParams) {
   // Both are a count of days the server takes from one upward, so a word, an
   // empty box and a zero are all "do not ask about this" rather than values.
   const openFor = num(params.get("open_for"), 1, Number.MAX_SAFE_INTEGER);
+  // Which run opened it, as the run screen links to. An identifier the address
+  // carries is somebody else's text like any other, so a value that is not a
+  // run number is a parameter to leave off rather than one to send wrong.
+  const openedBy = num(params.get("opened_by_run"), 1, Number.MAX_SAFE_INTEGER);
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   return {
     limit: pageSize(params),
@@ -217,6 +272,7 @@ export function listQuery(params: URLSearchParams) {
     ...(fixable ? { fixable: true } : {}),
     ...(likelihood > 0 && likelihood <= 1 ? { epss_at_least: likelihood } : {}),
     ...(params.get("opened_after") ? { opened_after: params.get("opened_after") ?? "" } : {}),
+    ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
     ...(params.get("proposed_after") ? { proposed_after: params.get("proposed_after") ?? "" } : {}),
     ...(params.get("closed_after") ? { closed_after: params.get("closed_after") ?? "" } : {}),
     ...(params.get("q") ? { q: params.get("q") ?? "" } : {}),

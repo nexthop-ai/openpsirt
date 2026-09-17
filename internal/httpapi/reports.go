@@ -49,7 +49,7 @@ type ChangedBody struct {
 	Component     string `json:"component"`
 	Severity      string `json:"severity,omitempty"`
 	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained" doc:"Why it went. Only on fixed entries"`
-	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was bumped from since the earlier build. Only on still-present entries, where it means the bump did not reach the fix"`
+	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
 	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
 	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
 	ClosedRun     int64  `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
@@ -190,7 +190,7 @@ func registerReports(api huma.API, in Ingest) {
 			"not fixed at all.\n\n" +
 			"A still-present entry carrying `arrived_from` is the same failure seen from the " +
 			"other side: somebody moved that version since the earlier build and the issue came " +
-			"with it, so the bump did not reach the fix.\n\n" +
+			"with it, so the upgrade did not reach the fix.\n\n" +
 			"**Public findings only unless you ask otherwise.** Its destination is usually a " +
 			"public document, so including something undisclosed should be deliberate rather " +
 			"than something pasted in without noticing.",
@@ -326,7 +326,7 @@ func registerNotes(api huma.API, in Ingest) {
 			"release note. Returned as `text/markdown` rather than as a string in a JSON " +
 			"field, because the point of it is that it goes straight in.\n\n" +
 			"**It carries what was fixed and nothing else.** Not what is still present, not " +
-			"what newly appeared, and not a bump that carried the issue with it — those are " +
+			"what newly appeared, and not an upgrade that carried the issue with it — those are " +
 			"statements about what a build contains, and the document for them is a VEX, " +
 			"which a customer's own scanner reads. The comparison itself still answers all " +
 			"three.\n\n" +

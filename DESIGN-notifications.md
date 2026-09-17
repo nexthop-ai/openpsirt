@@ -218,6 +218,7 @@ what somebody may do, not what they want to read.
 | It pages past what it has already said | Filtering one page rather than paging until enough survive gave a holder with a page's worth of already-told items an empty digest. Routed work arrives deliberately without a message, so the digest is the only place it is named |
 | A digest with nothing in it is not sent, and the clock still moves | A daily "nothing" is how somebody stops opening the daily message. Leaving the mark unmoved would make a quiet week report itself as new the following Monday |
 | A first digest reports nothing under "nobody owns" | There is no "since" to measure against |
+| **"Nobody owns" is about the assignee alone** | It counts what is open and unassigned, including what somebody has claimed and what is waiting for approval — 8,400 rows against 7,471 for the equivalent findings narrowing on one real build, with a pending approval at the top. Narrowing it would change what people are sent, so the screen asking the same question narrows its own list instead and counts from that |
 | One message is bounded, **and says so** | What is over the bound stays in the application, and the message says how many of how many it listed. Without that a holder of four hundred things read "fifty pieces of work assigned to you" as a statement of fact, with nothing to tell it apart from a message about fifty |
 
 It names what has been disclosed and gives numbers for what has not. A public

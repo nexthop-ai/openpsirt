@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { on, since } from "./when";
+import { lasted, on, since } from "./when";
 
 // Two forms and no others. There were four in use at once, two of them
 // showing the stored string with its time and offset — the tool displaying its
@@ -61,5 +61,29 @@ describe("how a moment is written", () => {
     // other side of now.
     expect(since("2026-09-10T12:00:00Z", now)).toBe("in 3 days");
     expect(since("2026-09-07T12:00:30Z", now)).toBe("in a moment");
+  });
+});
+
+describe("how long something took", () => {
+  it("says seconds outright below a minute", () => {
+    // A scan that took nine seconds and one that took fifty are different
+    // things, and "0 minutes" says neither.
+    expect(lasted("2026-03-01T00:00:00Z", "2026-03-01T00:00:09Z")).toBe("9 seconds");
+    expect(lasted("2026-03-01T00:00:00Z", "2026-03-01T00:00:01Z")).toBe("1 second");
+    expect(lasted("2026-03-01T00:00:00Z", "2026-03-01T00:00:50Z")).toBe("50 seconds");
+  });
+
+  it("uses the coarsest unit that still says something", () => {
+    expect(lasted("2026-03-01T00:00:00Z", "2026-03-01T00:04:00Z")).toBe("4 minutes");
+    expect(lasted("2026-03-01T00:00:00Z", "2026-03-01T03:30:00Z")).toBe("3 hours");
+  });
+
+  it("answers nothing where there is no pair, or the pair is impossible", () => {
+    expect(lasted(null, "2026-03-01T00:00:00Z")).toBe("");
+    expect(lasted("2026-03-01T00:00:00Z", undefined)).toBe("");
+    expect(lasted("not a moment", "2026-03-01T00:00:00Z")).toBe("");
+    // A run that finished before it started is a clock nobody should be told
+    // a duration from.
+    expect(lasted("2026-03-01T01:00:00Z", "2026-03-01T00:00:00Z")).toBe("");
   });
 });

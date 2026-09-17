@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANDS, ROLLED, bandOf, isBand } from "./severities";
+import { BANDS, BELOW_LOW, ROLLED, bandOf, isBand, ratedAs } from "./severities";
 
 // One nothing, drawn one way. A finding whose vulnerability carries no
 // severity was counted as a medium by the chart, drawn as a low by the badge,
@@ -18,9 +18,23 @@ describe("what an unrated finding is drawn as", () => {
     expect(bandOf(null)).toBe("unrated");
     expect(bandOf("")).toBe("unrated");
     expect(bandOf("unknown")).toBe("unrated");
-    expect(bandOf("negligible")).toBe("unrated");
-    expect(bandOf("none")).toBe("unrated");
     expect(bandOf("whatever a producer invented")).toBe("unrated");
+  });
+
+  it("puts a rating below low in the low band, because the server does", () => {
+    // Somebody looked and said it is not worth much, which is not the same
+    // statement as nobody having looked. `rating.BandExpr` puts both of these
+    // words in the low band and `SeverityScore` gives them a low's score, so
+    // a row drawn as unrated here disagreed with everything that sorted it.
+    for (const word of BELOW_LOW) expect(bandOf(word)).toBe("low");
+  });
+
+  it("says what was rated, which is not always the band", () => {
+    for (const band of BANDS) expect(ratedAs(band)).toBe(band);
+    for (const word of BELOW_LOW) expect(ratedAs(word)).toBe(word);
+    for (const nothing of ["", "unknown", undefined, null]) {
+      expect(ratedAs(nothing)).toBe("unrated");
+    }
   });
 
   it("answers with a word the roll-up has a place for", () => {

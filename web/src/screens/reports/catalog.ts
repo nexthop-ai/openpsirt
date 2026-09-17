@@ -106,7 +106,7 @@ export const CATALOG: Report[] = [
   {
     name: "Upgrade plan status",
     answers:
-      "What each build is waiting on: the bumps promised, what they would close, and which have landed.",
+      "What each build is waiting on: the upgrades promised, what they would close, and which have landed.",
     to: (at) => `${buildAt(at)}/pending-upgrades`,
     needs: whole,
   },

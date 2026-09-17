@@ -10,6 +10,7 @@ import { ROLLED } from "../ui/severities";
 
 import { Loading } from "../ui/Loading";
 import { useQuery } from "@tanstack/react-query";
+import { Decide } from "../ui/Decide";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -326,10 +327,46 @@ export function ByComponent({
   );
 }
 
+// What this view asks of the server, apart from the view that draws it.
+//
+// A bump takes six of the list's filters. The rest ask about a place, a
+// deadline or an assignee, none of which a bump has. Written once because the
+// toggle above the list counts what switching to this view would show, and a
+// count built from a second narrowing would be a number that disagrees with
+// the list it opens.
+export function bumpQuery(
+  at: { product: string; stream?: string; variant?: string },
+  query: Record<string, unknown>,
+  limit: number,
+  offset: number,
+): Record<string, unknown> {
+  const first = (value: unknown): string =>
+    Array.isArray(value) ? String(value[0] ?? "") : value == null ? "" : String(value);
+  return {
+    limit,
+    offset,
+    ...(at.stream ? { stream: at.stream } : {}),
+    ...(at.variant ? { variant: at.variant } : {}),
+    ...(query.severity ? { severity: query.severity } : {}),
+    ...(query.exploited ? { exploited: true } : {}),
+    ...(first(query.component) ? { component: first(query.component) } : {}),
+    ...(query.q ? { q: query.q } : {}),
+    ...(first(query.ecosystem) ? { ecosystem: first(query.ecosystem) } : {}),
+    ...(first(query.state) ? { state: first(query.state) } : {}),
+    // What each upgrade would close, which is what the line above this table
+    // says the order is and what somebody reads this view to decide. The
+    // list's own default is worst-first, which is the findings list's
+    // question asked again; the sort is not taken from the findings
+    // controls, whose keys are about a finding and half of which an upgrade
+    // has no answer for.
+    sort: "issues",
+  };
+}
+
 // One row per upstream bump, with what moving it would close.
 //
 // The other end of the same query the pending-upgrades screen reads: a
-// coordinator reads a build and the bumps it is waiting on, and a triager
+// coordinator reads a build and the upgrades it is waiting on, and a triager
 // reads a bump and the issues it closes. Keyed on the fold, so packages built
 // from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
 //
@@ -355,29 +392,7 @@ export function ByBump({
   // went on saying they were on.
   cannot: string[];
 }) {
-  // A bump takes six of the list's filters. The rest ask about a place, a
-  // deadline or an assignee, none of which a bump has.
-  const first = (value: unknown): string =>
-    Array.isArray(value) ? String(value[0] ?? "") : value == null ? "" : String(value);
-  const narrowed: Record<string, unknown> = {
-    limit: size,
-    offset,
-    ...(at.stream ? { stream: at.stream } : {}),
-    ...(at.variant ? { variant: at.variant } : {}),
-    ...(query.severity ? { severity: query.severity } : {}),
-    ...(query.exploited ? { exploited: true } : {}),
-    ...(first(query.component) ? { component: first(query.component) } : {}),
-    ...(query.q ? { q: query.q } : {}),
-    ...(first(query.ecosystem) ? { ecosystem: first(query.ecosystem) } : {}),
-    ...(first(query.state) ? { state: first(query.state) } : {}),
-    // What each bump would close, which is what the line above this table
-    // says the order is and what somebody reads this view to decide. The
-    // list's own default is worst-first, which is the findings list's
-    // question asked again; the sort is not taken from the findings
-    // controls, whose keys are about a finding and half of which a bump has
-    // no answer for.
-    sort: "issues",
-  };
+  const narrowed = bumpQuery(at, query, size, offset);
 
   const bundles = useQuery({
     queryKey: ["fix-bundles", at, narrowed],
@@ -394,7 +409,7 @@ export function ByBump({
 
   if (bundles.isPending) return <Loading />;
   if (bundles.isError) {
-    return <Failed error={bundles.error} what="What is open could not be read by bump." />;
+    return <Failed error={bundles.error} what="What is open could not be read by upgrade." />;
   }
   const rows = bundles.data?.items ?? [];
   const total = bundles.data?.total ?? 0;
@@ -417,14 +432,14 @@ export function ByBump({
         <a href={bundlesFile(at, narrowed, "json")}>JSON</a>.
       </p>
       <p className="hint" style={{ margin: "0 0 8px" }}>
-        Ordered by what each bump would close. <b>Listed rather than ordered</b> — comparing two
+        Ordered by what each upgrade would close. <b>Listed rather than ordered</b> — comparing two
         versions needs a per-ecosystem ordering this does not have, so one package appears once per
         version upstream released and there is no nearest and no latest.
         {cannot.length > 0 && (
           <>
             {" "}
             <span style={{ color: "var(--sev-medium)" }}>
-              A bump has no place, no deadline and no assignee, so {cannot.join(", ")}{" "}
+              An upgrade has no place, no deadline and no assignee, so {cannot.join(", ")}{" "}
               {cannot.length === 1 ? "is" : "are"} not applied here.
             </span>
           </>
@@ -435,7 +450,7 @@ export function ByBump({
         <table>
           <thead>
             <tr>
-              <th>Bump</th>
+              <th>Upgrade</th>
               <th>Moving to</th>
               <th>Packages</th>
               <th>Worst</th>
@@ -492,8 +507,8 @@ export function ByBump({
 
       <div className="filters" style={{ margin: "10px 0 0" }}>
         <span className="hint">
-          Showing {rows.length.toLocaleString()} of {total.toLocaleString()} bumps that would close
-          something
+          Showing {rows.length.toLocaleString()} of {total.toLocaleString()} upgrades that would
+          close something
         </span>
         <Pager offset={offset} total={total} onGo={onPage} size={size} />
       </div>
@@ -501,20 +516,29 @@ export function ByBump({
   );
 }
 
-// Opening a row is a look, not a commitment: what the issue actually says and
-// where it sits, without leaving a list of a thousand rows.
+// Opening a row is where the judgment is made, not only where it is read.
+//
+// What the issue says, where it sits, and the decision form — the same form
+// the finding screen carries, in the same place a reader already is. Nothing
+// about what a claim requires changes: only where it is typed. A triager
+// answering a page of findings used to make two journeys per row, and the
+// list was read again on each return.
 export function Peek({
   at,
   vulnerability,
   component,
   version,
   to: link,
+  onDecided,
 }: {
   at: { product: string; stream: string; variant: string };
   vulnerability: string;
   component: string;
   version: string;
   to: string;
+  // What the list does once something has been recorded here: read itself
+  // again, because the row's state has moved.
+  onDecided: () => void;
 }) {
   const detail = useQuery({
     queryKey: ["finding", at, vulnerability, component, version],
@@ -556,6 +580,19 @@ export function Peek({
           </li>
         ))}
       </ul>
+      {/* The same form the finding screen carries. What it requires and what
+          it writes are unchanged — a second person still agrees to it — and
+          the only difference is that the list is still on screen underneath.
+          Everything the form cannot show here is one link away. */}
+      <Decide
+        at={{ ...at, vulnerability, component, version }}
+        places={it?.places ?? []}
+        undisclosed={!!it?.undisclosed}
+        onDone={() => {
+          void detail.refetch();
+          onDecided();
+        }}
+      />
       <Link to={link} className="linkish">
         Open finding →
       </Link>

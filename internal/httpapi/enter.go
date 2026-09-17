@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // EmbargoedBody is one finding nobody has announced, and when that ends.
@@ -278,12 +279,15 @@ func registerDisclosure(api huma.API, in Ingest) {
 			"a decision a person makes.\n\n" +
 			"Every row is undisclosed by definition, so this list is a disclosure in its own " +
 			"right: a product you may not read undisclosed work in contributes nothing to it, " +
-			"not even a count.",
+			"not even a count.\n\n" +
+			"`within` is how many days ahead to look. Left off, it is this deployment's own " +
+			"embargo length — the screen opened on thirty days against a ninety-day policy " +
+			"and drew nothing while five embargoes were running.",
 		Tags: []string{"Findings"},
 	}, perProduct, "A product you may not read undisclosed work in contributes "+
 		"nothing, not even a count.", privateRights()...), func(ctx context.Context, input *struct {
 		ScopeQuery
-		Within int `query:"within" default:"30" minimum:"1" maximum:"365" doc:"How many days ahead to look"`
+		Within int `query:"within" minimum:"1" maximum:"365" doc:"How many days ahead to look. Left off, this deployment's own embargo length"`
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset int `query:"offset" minimum:"0" doc:"Where in the list to start"`
 	}) (*listOutput[EmbargoedBody], error) {
@@ -299,9 +303,22 @@ func registerDisclosure(api huma.API, in Ingest) {
 			return nil, err
 		}
 
+		// How far ahead to look, where the caller has not said: the length
+		// this deployment gives an embargo. A fixed thirty days against the
+		// ninety-day policy that ships drew an empty screen while embargoes
+		// were running, which reads as "nothing is coming".
+		within := time.Duration(input.Within) * 24 * time.Hour
+		if input.Within == 0 {
+			within, err = setting.NewStore(in.DB.DB).Duration(ctx, setting.DiscloseAfter,
+				setting.DefaultDiscloseAfter)
+			if err != nil {
+				return nil, wentWrong(in.Logger, "the embargo length could not be read", err)
+			}
+		}
+
 		store := finding.NewStore(in.DB.DB)
 		rows, total, err := store.DisclosingPage(ctx, subject, scope,
-			time.Duration(input.Within)*24*time.Hour, input.Limit, input.Offset)
+			within, input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is approaching disclosure could not be read", err)
 		}

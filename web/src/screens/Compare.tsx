@@ -376,7 +376,7 @@ function Columns({
         title="Unchanged"
         rows={still}
         signOff
-        note="A version it arrived from means the bump did not reach the fix. What stands about each is beside it: shipping with a known issue is a decision somebody made."
+        note="A version it arrived from means the upgrade did not reach the fix. What stands about each is beside it: shipping with a known issue is a decision somebody made."
       />
     </div>
   );
@@ -442,7 +442,7 @@ function Column({
                 <span className="id">{row.component}</span>
                 {row.arrived_from && (
                   <>
-                    {" — bumped from "}
+                    {" — upgraded from "}
                     <span className="id">{row.arrived_from}</span>
                     {", and the issue came with it"}
                   </>

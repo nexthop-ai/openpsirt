@@ -163,6 +163,12 @@ type grypeMatch struct {
 		// What the published estimates say about it being used.
 		EPSS []struct {
 			EPSS float64 `json:"epss"`
+			// Where that estimate stands among all of them, and the day it
+			// was computed for. A reader cannot act on 0.00042 and can act on
+			// "higher than 91% of everything published", and the day is what
+			// says whether this estimate is newer than the stored one.
+			Percentile float64 `json:"percentile"`
+			Date       string  `json:"date"`
 		} `json:"epss"`
 		Risk float64 `json:"risk"`
 		KEV  []struct {
@@ -171,6 +177,14 @@ type grypeMatch struct {
 		CVSS []struct {
 			Version string `json:"version"`
 			Vector  string `json:"vector"`
+			// Who published this rating and whether it is the primary one.
+			// Provenance is recorded for everything else a scan says — what
+			// found it, what it was matched from, what it was matched in —
+			// and the number a deadline is set from had none, so a reader
+			// asking "who says 5.9" had nowhere to go. Absent in some
+			// reports, which is itself an answer.
+			Source  string `json:"source"`
+			Type    string `json:"type"`
 			Metrics struct {
 				BaseScore float64 `json:"baseScore"`
 			} `json:"metrics"`
@@ -340,7 +354,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	if match.Artifact.Name == "" {
 		return nil, nil
 	}
-	score, vector := rating(match.Vulnerability.CVSS)
+	published := rating(match.Vulnerability.CVSS)
 	aliases := make([]string, 0, len(match.RelatedVulnerabilities))
 	// Where else this issue is written up, from every identifier it
 	// answers to. Deduplicated by `references`, which the matched
@@ -360,19 +374,25 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	if err != nil {
 		return nil, err
 	}
+	epss := firstEPSS(match.Vulnerability.EPSS)
 	return &finding.Reported{
 		Issue: finding.Named{
-			Identifier:  match.Vulnerability.ID,
-			Aliases:     aliases,
-			Severity:    strings.ToLower(match.Vulnerability.Severity),
-			Description: strings.TrimSpace(match.Vulnerability.Description),
-			Advisory:    strings.TrimSpace(match.Vulnerability.DataSource),
-			References:  pointing,
-			Exploited:   len(match.Vulnerability.KEV) > 0,
-			Likelihood:  firstEPSS(match.Vulnerability.EPSS),
-			Score:       score,
-			Vector:      vector,
-			Weaknesses:  weaknesses(match.Vulnerability.CWEs),
+			Identifier:           match.Vulnerability.ID,
+			Aliases:              aliases,
+			Severity:             strings.ToLower(match.Vulnerability.Severity),
+			Description:          strings.TrimSpace(match.Vulnerability.Description),
+			Advisory:             strings.TrimSpace(match.Vulnerability.DataSource),
+			References:           pointing,
+			Exploited:            len(match.Vulnerability.KEV) > 0,
+			Likelihood:           epss.value,
+			LikelihoodPercentile: epss.percentile,
+			LikelihoodOn:         epss.on,
+			Score:                published.score,
+			Vector:               published.vector,
+			ScoreVersion:         published.version,
+			ScoreSource:          published.source,
+			ScoreKind:            published.kind,
+			Weaknesses:           weaknesses(match.Vulnerability.CWEs),
 		},
 		Component: graph.Described{
 			Name: match.Artifact.Name, Version: match.Artifact.Version,
@@ -613,37 +633,80 @@ func advisoryLinks(advisories []struct {
 	return links
 }
 
+// rated is a published severity with what it assumes and who published it.
+type rated struct {
+	score   float64
+	vector  string
+	version string
+	source  string
+	kind    string
+}
+
 // rating picks the severity score to record, and the vector it assumes.
 //
 // The first that states both. A report carries several ratings from different
 // sources and they disagree; taking the first stated is at least a stable
 // answer, and the vector travels with the number so that what the number
-// assumed is readable rather than lost.
+// assumed is readable rather than lost. Who published it travels with them for
+// the same reason: everything else a scan says carries its provenance.
 func rating(ratings []struct {
 	Version string `json:"version"`
 	Vector  string `json:"vector"`
+	Source  string `json:"source"`
+	Type    string `json:"type"`
 	Metrics struct {
 		BaseScore float64 `json:"baseScore"`
 	} `json:"metrics"`
-}) (float64, string) {
-	for _, rated := range ratings {
-		if rated.Metrics.BaseScore > 0 && rated.Vector != "" {
-			return rated.Metrics.BaseScore, rated.Vector
+}) rated {
+	for _, published := range ratings {
+		if published.Metrics.BaseScore > 0 && published.Vector != "" {
+			return rated{
+				score: published.Metrics.BaseScore, vector: published.Vector,
+				version: strings.TrimSpace(published.Version),
+				source:  strings.TrimSpace(published.Source),
+				kind:    strings.TrimSpace(published.Type),
+			}
 		}
 	}
-	return 0, ""
+	return rated{}
+}
+
+// estimate is the published likelihood, where it stands, and the day it is
+// about.
+type estimate struct {
+	value      float64
+	percentile float64
+	on         *time.Time
 }
 
 // firstEPSS reads the published estimate that an issue will be exploited.
+//
+// The day it was computed for travels with it, because the estimate is a
+// thirty-day forecast recomputed daily and legitimately falls: which of two
+// reports carries the newer estimate is a question about that day rather than
+// about which scan ran last.
 func firstEPSS(estimates []struct {
-	EPSS float64 `json:"epss"`
-}) float64 {
-	for _, estimate := range estimates {
-		if estimate.EPSS > 0 {
-			return estimate.EPSS
+	EPSS       float64 `json:"epss"`
+	Percentile float64 `json:"percentile"`
+	Date       string  `json:"date"`
+}) estimate {
+	for _, published := range estimates {
+		if published.EPSS <= 0 {
+			continue
 		}
+		answer := estimate{value: published.EPSS, percentile: published.Percentile}
+		// Not a day that has not happened. A scan file is hostile input and
+		// this day decides which of two reports is newer, so one stating a
+		// date ahead of now would pin the issue at whatever that report said
+		// with no later report able to replace it — and nothing would say the
+		// number had stopped moving.
+		if on, err := time.Parse(time.DateOnly, strings.TrimSpace(published.Date)); err == nil &&
+			!on.After(time.Now().UTC()) {
+			answer.on = &on
+		}
+		return answer
 	}
-	return 0
+	return estimate{}
 }
 
 // firstFixDate reads when a fix became available.

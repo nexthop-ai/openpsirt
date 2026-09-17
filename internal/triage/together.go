@@ -2,7 +2,6 @@ package triage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -135,11 +134,17 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
+	// What the write was about, kept so a refusal can be read back after the
+	// transaction has unwound. Inside it the row that collided is the row this
+	// attempt cannot see, so the sentence naming it is built afterwards.
+	var attempted []Proposal
+
 	err = s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		// Cleared on every attempt. A retry re-runs this against a database
 		// that has moved, and carrying identifiers over from the attempt that
 		// failed would report claims that no longer exist.
 		recorded = recorded[:0]
+		attempted = nil
 		claimID = 0
 
 		// The fold, resolved inside the transaction that writes like
@@ -197,15 +202,16 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 			}
 			each = append(each, one)
 		}
+		attempted = each
+		// One live claim per combination of code holds here too. A selection
+		// covering something already decided is a selection somebody should
+		// look at again rather than one to write around, and the sentinel is
+		// carried out whole so the refusal outside can name which decision
+		// stands — it used to be replaced here with "something in this
+		// selection is already decided", which tells a reader holding five
+		// hundred rows nothing they can act on.
 		made, err := within.proposeAll(ctx, claim, each)
 		if err != nil {
-			// One live claim per combination of code holds here too. A
-			// selection covering something already decided is a selection
-			// somebody should look at again rather than one to write around.
-			if errors.Is(err, ErrAlreadyDecided) {
-				return fmt.Errorf("%w: something in this selection is already decided",
-					ErrAlreadyDecided)
-			}
 			return err
 		}
 		for _, one := range made {
@@ -214,7 +220,7 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return nil
 	})
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, s.alreadyDecided(ctx, err, placesOf(attempted))
 	}
 	return claimID, recorded, nil
 }

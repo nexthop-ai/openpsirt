@@ -208,7 +208,6 @@ export function Assignee({
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: ["finding"] });
       void queries.invalidateQueries({ queryKey: ["findings"] });
-      void queries.invalidateQueries({ queryKey: ["unassigned"] });
       void queries.invalidateQueries({ queryKey: ["holdings"] });
     },
   });

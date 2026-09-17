@@ -3,6 +3,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -135,9 +136,13 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	}
 
 	type shown struct {
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Severity        int    `bun:"severity_centi"`
-		FixedIn         string `bun:"fixed_in"`
+		VulnerabilityID int64      `bun:"vulnerability_id"`
+		Severity        int        `bun:"severity_centi"`
+		FixedIn         string     `bun:"fixed_in"`
+		Description     string     `bun:"description"`
+		Exploited       int        `bun:"exploited"`
+		LikelihoodPPM   int        `bun:"likelihood_ppm"`
+		DueAt           *time.Time `bun:"due_at"`
 	}
 	about := map[int64]shown{}
 	if len(issues) > 0 {
@@ -148,6 +153,21 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 			ColumnExpr(`MIN(COALESCE(v.score_centi, 0)) AS "severity_centi"`).
 			ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`).
+			// What the issue says about itself, whether anybody is known to
+			// be using it, and the published estimate. One row per issue
+			// already, so the aggregate is over one value.
+			ColumnExpr(`MIN(COALESCE(v.description, '')) AS "description"`).
+			ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
+			// Counted rather than compared. A boolean expression in a
+			// select list comes back as a boolean on two engines and as a
+			// number on the other two; a number comes back as a number on
+			// all four.
+			ColumnExpr(`MAX(CASE WHEN v.exploited THEN 1 ELSE 0 END) AS "exploited"`).
+			// The earliest deadline among this issue's places here, which is
+			// the one that makes it late. Read with the rest of what a row
+			// shows rather than off the places: the places are read for what
+			// a decision is keyed on, and that read carries no clock.
+			ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.component_id IN (?)", bun.List(fold)).
 			Where("f.closed_at IS NULL").
@@ -180,6 +200,10 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			place.VulnerabilityID = head.VulnerabilityID
 			place.SeverityCenti = row.Severity
 			place.FixedIn = row.FixedIn
+			place.Summary = firstLineOf(row.Description)
+			place.Exploited = row.Exploited == 1
+			place.LikelihoodPPM = row.LikelihoodPPM
+			place.DueAt = row.DueAt
 			place.Places = head.Places
 			at = append(at, place)
 		}

@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { asAsked, fromAt, listQuery, pageSize, pathTo, where, windowFor } from "./list";
+import {
+  LEAST_FIRST,
+  daysBack,
+  ORDERS,
+  SORTS,
+  asAsked,
+  fromAt,
+  listQuery,
+  pageSize,
+  pathTo,
+  where,
+  windowFor,
+} from "./list";
 
 // The list's address is the list. What is tested here is the part a second
 // screen depends on: the finding walks the list it came from by asking the
@@ -244,5 +256,45 @@ describe("a number the address carries", () => {
   it("reads an offset that is not a number as the first page", () => {
     expect(listQuery(new URLSearchParams("offset=nowhere")).offset).toBe(0);
     expect(listQuery(new URLSearchParams("offset=100")).offset).toBe(100);
+  });
+});
+
+describe("every order the list offers", () => {
+  it("names each of the server's own orders", () => {
+    // The typing is what enforces this; the assertion is here so that the
+    // reason is written down beside the words. An order the server gains and
+    // the control does not offer is reachable by typing an address and by
+    // nothing else, which is what happened to urgency and age.
+    expect(Object.keys(ORDERS).sort()).toEqual(
+      ["age", "deadline", "epss", "places", "severity", "urgency"].sort(),
+    );
+  });
+
+  it("puts the four column headers among them", () => {
+    for (const word of Object.values(SORTS)) expect(ORDERS).toHaveProperty(word);
+  });
+
+  it("opens a deadline at the soonest and everything else at the worst", () => {
+    // Due opened at the furthest-away date, which answers a question nobody
+    // asks. Age is the same shape: what has sat here longest is the question.
+    expect(LEAST_FIRST).toContain("deadline");
+    expect(LEAST_FIRST).toContain("age");
+    for (const word of ["severity", "epss", "places", "urgency"] as const) {
+      expect(LEAST_FIRST).not.toContain(word);
+    }
+  });
+});
+
+describe("a date the address carries", () => {
+  it("is the date rather than the word", () => {
+    // A relative word in an address means something different whenever the
+    // link is opened, and every filter here lives in the address so that a
+    // list can be sent to somebody.
+    expect(daysBack(1, new Date("2026-03-01T09:30:00Z"))).toBe("2026-02-28");
+    expect(daysBack(7, new Date("2026-01-03T00:00:00Z"))).toBe("2025-12-27");
+  });
+
+  it("crosses a leap day like any other", () => {
+    expect(daysBack(1, new Date("2028-03-01T12:00:00Z"))).toBe("2028-02-29");
   });
 });

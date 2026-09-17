@@ -87,8 +87,16 @@ func onDay(at *time.Time) *string {
 	if at == nil {
 		return nil
 	}
-	said := at.UTC().Format(time.DateOnly)
+	said := dayOf(at)
 	return &said
+}
+
+// dayOf is a moment as the day it falls on, or nothing where there is none.
+func dayOf(at *time.Time) string {
+	if at == nil || at.IsZero() {
+		return ""
+	}
+	return at.UTC().Format(time.DateOnly)
 }
 
 // ChangeBody is one administrative act, as an administrator reads it.

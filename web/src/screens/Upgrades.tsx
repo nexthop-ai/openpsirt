@@ -27,7 +27,7 @@ function rank(state?: string): number {
 // move, and how much of each has landed.
 //
 // The fix-bundle query read from the other end: a triager reads a bump and the
-// issues it closes, a coordinator reads a build and the bumps it is waiting
+// issues it closes, a coordinator reads a build and the upgrades it is waiting
 // on. One query, so the two cannot come to disagree.
 export function Upgrades() {
   const { product = "", stream = "", variant = "" } = useParams();
@@ -61,7 +61,7 @@ export function Upgrades() {
           <span className="n">{rows.filter((row) => row.state !== "landed").length}</span>
         </h2>
         <p>
-          What {stream} · {variant} is waiting on, by the upstream bump that would deliver it.
+          What {stream} · {variant} is waiting on, by the upstream upgrade that would deliver it.
           Nothing here is declared done by hand: a piece of work has landed when the build stops
           holding it, which the scans already say — and where it stands is read the same way, from
           the scans and the date somebody promised.
@@ -99,7 +99,7 @@ export function Upgrades() {
           <table>
             <thead>
               <tr>
-                <th>Bump</th>
+                <th>Upgrade</th>
                 <th>Moving to</th>
                 <th>Packages</th>
                 <th className="num">Would close</th>

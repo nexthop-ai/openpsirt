@@ -870,6 +870,43 @@ button.vchip {
   color: var(--accent);
   font-weight: 600;
 }
+/* What switching to that view would show. Quieter than the label, because the
+   label is what is being chosen and the number is why. */
+.seg button .n {
+  margin-left: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+.seg button[aria-pressed="true"] .n {
+  color: var(--accent);
+}
+/* A list being re-read is still the list. It dims rather than being replaced,
+   so the rows somebody was narrowing stay where they are while the next answer
+   lands — and `aria-busy` says the same thing to a reader who cannot see the
+   dimming. */
+.listing[aria-busy="true"] {
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .listing {
+    transition: opacity 120ms linear;
+  }
+}
+
+/* The list a bulk judgment is picked out of. Bounded, because a page here is
+   five hundred rows — a kernel carries thousands and assembling one claim a
+   page at a time is eighteen claims where the person meant one — and the form
+   that judgment is typed into has to stay reachable without scrolling past all
+   of them. */
+.picklist {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  margin-bottom: 14px;
+}
+
 .floor {
   display: flex;
   align-items: center;
@@ -994,6 +1031,15 @@ tbody tr.row {
 }
 tbody tr.row:hover td {
   background: var(--raised);
+}
+/* The row the keys are about. Drawn on the left edge rather than as a fill, so
+   that it is still legible on the row a pointer is also over and on one that
+   is open below. */
+tbody tr.row.at > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+tbody tr.row.at > td {
+  background: var(--accent-soft);
 }
 td.num,
 th.num {

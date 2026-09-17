@@ -279,6 +279,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		SentBack:          n.SentBack,
 		Publishers:        n.Publisher,
 		VexStatus:         plainly(n.Said),
+		OpenedByRun:       n.OpenedByRun,
 	}
 	for _, each := range []struct {
 		text string
@@ -339,11 +340,12 @@ type Narrowing struct {
 	OpenFor      int         `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
 	DueWithin    int         `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
 	Overdue      bool        `query:"overdue" doc:"Keep only what is already past its deadline"`
-	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in"`
+	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in"`
 	Weakness     []string    `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
 	SentBack     bool        `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
 	Publisher    []string    `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
 	OpenedAfter  string      `query:"opened_after" doc:"Keep only what was first seen here after this date, as 2026-03-31"`
+	OpenedByRun  int64       `query:"opened_by_run" minimum:"1" doc:"Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it"`
 	ClosedAfter  string      `query:"closed_after" doc:"Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it"`
 	DecidedAfter string      `query:"proposed_after" doc:"Keep only what somebody claimed something about after this date"`
 	Said         []vexStatus `query:"vex_status,explode" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
@@ -647,14 +649,24 @@ type EvidenceBody struct {
 	// Both are carried and both are shown: a rating of ours put where the
 	// world's goes reads as the world's, and the first person to check
 	// against the public record finds a discrepancy nobody declared.
-	Assessed    string   `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
-	Score       float64  `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
-	Vector      string   `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
-	Exploited   bool     `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	Likelihood  float64  `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
-	Weaknesses  []string `json:"weaknesses,omitempty" doc:"What kind of flaw this is, as CWE identifiers"`
-	Description string   `json:"description,omitempty"`
-	Advisory    string   `json:"advisory,omitempty" doc:"Where the issue is written up"`
+	Assessed string  `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
+	Score    float64 `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
+	Vector   string  `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
+	// Where the number came from. Everything else a scan says carries its
+	// provenance; the one number a deadline is set from carried none.
+	ScoreVersion string  `json:"score_version,omitempty" doc:"Which scoring system the number is on, as the report states it"`
+	ScoreSource  string  `json:"score_source,omitempty" doc:"Who published it, where the report names them"`
+	ScoreKind    string  `json:"score_kind,omitempty" doc:"Whether it is the primary rating or a secondary one"`
+	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
+	// What the estimate means and whether it is current. The probability
+	// alone is unreadable — nobody acts on 0.00042 — and it is a thirty-day
+	// forecast recomputed daily, so the day it is about is part of it.
+	LikelihoodPercentile float64  `json:"likelihood_percentile,omitempty" doc:"Where that estimate stands among all published ones, 0 to 1"`
+	LikelihoodOn         string   `json:"likelihood_on,omitempty" doc:"The day the estimate was computed for, as a date"`
+	Weaknesses           []string `json:"weaknesses,omitempty" doc:"What kind of flaw this is, as CWE identifiers"`
+	Description          string   `json:"description,omitempty"`
+	Advisory             string   `json:"advisory,omitempty" doc:"Where the issue is written up"`
 	// References carries patches first, because for somebody deciding whether
 	// to backport rather than upgrade, the change itself is the answer.
 	References []ReferenceBody `json:"references,omitempty"`
@@ -686,7 +698,7 @@ type EvidenceBody struct {
 	// ArrivedFrom says somebody moved this version and the issue came with it.
 	// A different sentence aimed at a different person: whoever did the bump,
 	// rather than whoever triages.
-	ArrivedFrom string `json:"arrived_from,omitempty" doc:"The version this was bumped from, where the bump did not resolve it"`
+	ArrivedFrom string `json:"arrived_from,omitempty" doc:"The version this was upgraded from, where the upgrade did not resolve it"`
 
 	// Tags are the words people put on this, as they were typed.
 	Tags []string `json:"tags,omitempty" doc:"Words somebody put on this. Free text, no fixed vocabulary"`
@@ -902,8 +914,13 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Vulnerability: e.Vulnerability, Aliases: e.Aliases, Severity: e.Severity,
 		Assessed: e.Assessed,
 		Score:    float64(e.ScoreCenti) / 100, Vector: e.Vector,
+		ScoreVersion: e.ScoreVersion, ScoreSource: e.ScoreSource, ScoreKind: e.ScoreKind,
 		Exploited: e.Exploited, Likelihood: float64(e.LikelihoodPPM) / 1_000_000,
-		Weaknesses: e.Weaknesses, Description: e.Description, Advisory: e.Advisory,
+		LikelihoodPercentile: float64(e.LikelihoodPercentilePPM) / 1_000_000,
+		// The day rather than an instant: the estimate is computed per day,
+		// and a timestamp would state a precision the feed does not have.
+		LikelihoodOn: dayOf(e.LikelihoodOn),
+		Weaknesses:   e.Weaknesses, Description: e.Description, Advisory: e.Advisory,
 		Component: e.Component, Version: e.Version, Upstream: e.Upstream,
 		FixState: string(e.FixState), FixedIn: e.FixedIn, ArrivedFrom: e.ArrivedFrom,
 		Matched: string(e.Matched), MatchedFrom: e.MatchedFrom,

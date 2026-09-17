@@ -59,6 +59,14 @@ type Deciding struct {
 	// go, and somebody claiming a whole component is unreachable should see
 	// which of it is already fixable.
 	FixedIn string
+	// Summary, Exploited and LikelihoodPPM are what the issue is and how
+	// likely it is to be used, for somebody judging many issues at once.
+	// Deciding in bulk on less evidence than deciding singly is the wrong way
+	// round: the bulk screen narrows *by* the description and showed neither
+	// it, nor the exploited flag, nor the estimate.
+	Summary       string
+	Exploited     bool
+	LikelihoodPPM int
 	// Consumer is what pulls the component in here, for naming the place to
 	// somebody choosing which of them a judgment covers. Empty where that is
 	// the product itself.

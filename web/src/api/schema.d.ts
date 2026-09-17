@@ -523,7 +523,7 @@ export interface paths {
          *
          *     **Deciding is bulk-capable and re-deciding was not.** A team answering one kernel issue writes a decision at each of its places in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
          *
-         *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version bump is a prompt to re-check rather than a new claim.
+         *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
          *
          *     **One act, one approval.** Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
          *
@@ -844,6 +844,8 @@ export interface paths {
          *     **Nothing here discloses anything.** Reaching the date escalates: the row appears and the people who can act on it are told. Publishing embargoed detail because a timer expired is the wrong default — if the fix is not ready, disclosing anyway is a decision a person makes.
          *
          *     Every row is undisclosed by definition, so this list is a disclosure in its own right: a product you may not read undisclosed work in contributes nothing to it, not even a count.
+         *
+         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length — the screen opened on thirty days against a ninety-day policy and drew nothing while five embargoes were running.
          *
          *     **Requires:** private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read undisclosed work in contributes nothing, not even a count.
          */
@@ -1677,7 +1679,7 @@ export interface paths {
          *
          *     Each fixed entry says why it went, because "fixed by upgrading" and "fixed by a carried patch" are different sentences to a reader. `superseded` is the one to read carefully — it means the version moved and the issue came with it, so it was not fixed at all.
          *
-         *     A still-present entry carrying `arrived_from` is the same failure seen from the other side: somebody moved that version since the earlier build and the issue came with it, so the bump did not reach the fix.
+         *     A still-present entry carrying `arrived_from` is the same failure seen from the other side: somebody moved that version since the earlier build and the issue came with it, so the upgrade did not reach the fix.
          *
          *     **Public findings only unless you ask otherwise.** Its destination is usually a public document, so including something undisclosed should be deliberate rather than something pasted in without noticing.
          *
@@ -1731,7 +1733,7 @@ export interface paths {
          * Render a comparison as release notes
          * @description The same comparison as markdown, in the form somebody pastes into a release note. Returned as `text/markdown` rather than as a string in a JSON field, because the point of it is that it goes straight in.
          *
-         *     **It carries what was fixed and nothing else.** Not what is still present, not what newly appeared, and not a bump that carried the issue with it — those are statements about what a build contains, and the document for them is a VEX, which a customer's own scanner reads. The comparison itself still answers all three.
+         *     **It carries what was fixed and nothing else.** Not what is still present, not what newly appeared, and not an upgrade that carried the issue with it — those are statements about what a build contains, and the document for them is a VEX, which a customer's own scanner reads. The comparison itself still answers all three.
          *
          *     Worst first and stably ordered, so two runs over the same pair of builds produce the same document. A lead line names both builds, the day, and the scanner and vulnerability-database versions the later build was last measured with.
          *
@@ -1973,9 +1975,9 @@ export interface paths {
         };
         /**
          * List findings by upgrade
-         * @description One row per upstream bump, with the issues it closes.
+         * @description One row per upstream upgrade, with the issues it closes.
          *
-         *     Keyed on the **source package** where one is recorded and on the component's own name otherwise, so packages built from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
+         *     Keyed on the **source package** where one is recorded and on the component's own name otherwise, so packages built from one source are one row — curl, libcurl4t64 and libcurl3t64 are upgraded once.
          *
          *     Only what has a fix: a bundle is a version to move to, so a finding upstream has released nothing for is not in one.
          *
@@ -1983,7 +1985,7 @@ export interface paths {
          *
          *     Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about a place or a deadline has no row here to narrow.
          *
-         *     Ordered worst first, and `sort` takes any of: what the bump would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
+         *     Ordered worst first, and `sort` takes any of: what the upgrade would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -2005,9 +2007,9 @@ export interface paths {
         };
         /**
          * Export findings by upgrade
-         * @description The same list as a file: one row per upstream bump, with what it closes and the builds that hold it.
+         * @description The same list as a file: one row per upstream upgrade, with what it closes and the builds that hold it.
          *
-         *     Takes the same selection and the same filters as the screen, from the same struct. The builds a bump is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+         *     Takes the same selection and the same filters as the screen, from the same struct. The builds an upgrade is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -2955,7 +2957,7 @@ export interface paths {
         };
         /**
          * List the issues open against one component
-         * @description Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at and the version that fixes it where the report names one.
+         * @description Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at, the version that fixes it where the report names one, and what one judgment about it would be made on: what the issue says about itself, whether anybody is known to be exploiting it, the published estimate, and the earliest deadline among its places here.
          *
          *     `contains` matches the text of a report. It narrows a list; it is not part of any claim made afterwards.
          *
@@ -3049,7 +3051,7 @@ export interface paths {
          *
          *     Pass `extends` to carry an approved claim to this issue: the source must be approved, sit at the same component under the same consumer, and the outcome and justification must match it. The new claim is recorded as an extension of it and still waits for a second person. `similar` on `GET .../findings/{vulnerability}/components/{component}` lists the claims that qualify.
          *
-         *     **`patch-needed` is the backport case**: a fix is being carried into this build and the version does not move, so it requires `committed_to`, the date the work lands. `upgrade-needed` is not recorded here — a bump answers a component and everything open on it, so it is recorded from the component.
+         *     **`patch-needed` is the backport case**: a fix is being carried into this build and the version does not move, so it requires `committed_to`, the date the work lands. `upgrade-needed` is not recorded here — an upgrade answers a component and everything open on it, so it is recorded from the component.
          *
          *     **Requires:** public-triage or private-triage on the product
          */
@@ -3135,7 +3137,7 @@ export interface paths {
          *
          *     `standing` is absent when nothing has been decided, or when a claim is still waiting for approval: a claim nobody has agreed to suppresses nothing.
          *
-         *     Read `previously` before deciding again. A claim that lapsed on a version bump is usually still the right answer, and re-affirming it is a different request from making a new one.
+         *     Read `previously` before deciding again. A claim that lapsed on a version upgrade is usually still the right answer, and re-affirming it is a different request from making a new one.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3149,7 +3151,7 @@ export interface paths {
          *
          *     **`patch-needed` is the backport case**: a fix is being carried into this build and the version does not move. It requires `committed_to`, the date the work lands, and it closes the only way a backport can — the next inventory declares the patch it carries and says what that patch resolves, so the finding goes while the version stays where it was.
          *
-         *     `upgrade-needed` is not recorded here. A bump answers a component rather than one finding, so it is recorded from the component and covers everything open on it.
+         *     `upgrade-needed` is not recorded here. An upgrade answers a component rather than one finding, so it is recorded from the component and covers everything open on it.
          *
          *     The decision applies to every build running the same component and consumer upstream versions, including future releases — it is matched by code, not copied between releases. It stops applying automatically when either upstream version changes.
          *
@@ -3179,7 +3181,7 @@ export interface paths {
          * Re-affirm a decision after an upstream version changed
          * @description Re-makes a decision that stopped applying because an upstream version moved, at the versions this finding has now. `previous` is the decision being re-made, from `previously` in `GET .../decision`.
          *
-         *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version bump is a prompt to re-check rather than a new claim.
+         *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
          *
          *     It does need approval again if the vulnerability's severity has risen since the original was agreed to, or if nothing was ever agreed to. What was agreed was that this did not matter much, which is not an agreement about what it has become. The response says whether a second person is needed.
          *
@@ -3259,11 +3261,11 @@ export interface paths {
         };
         /**
          * List the upgrades one build is waiting on
-         * @description Everything committed for this build, one row per bump — a source package at the version it was built at, moving to another version — with what it would still close here.
+         * @description Everything committed for this build, one row per upgrade — a source package at the version it was built at, moving to another version — with what it would still close here.
          *
          *     **What it covers is a match, not a list.** A finding is covered when its component folds to the same key in this build, so changing the version a release is moving to is one row, and an issue published tonight against the same package is covered by this morning's commitment with nobody acting.
          *
-         *     **The fix-bundle query read from the other end.** A triager reads a bump and the issues it closes; a coordinator reads a build and the bumps it is waiting on. One query rather than two reports that will eventually disagree.
+         *     **The fix-bundle query read from the other end.** A triager reads an upgrade and the issues it closes; a coordinator reads a build and the upgrades it is waiting on. One query rather than two reports that will eventually disagree.
          *
          *     **Nothing here is declared done.** A piece of work has landed when the build stops holding it, which the scans already say — a declared fix that is still open after a scan has run is a missed target, and the scan is independent evidence against the claim.
          *
@@ -3291,9 +3293,9 @@ export interface paths {
         };
         /**
          * Export the upgrades one build is waiting on
-         * @description The same list as a file: one row per bump this build is waiting on, where it stands, and what it would still close here.
+         * @description The same list as a file: one row per upgrade this build is waiting on, where it stands, and what it would still close here.
          *
-         *     The packages one bump moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
+         *     The packages one upgrade moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -3687,7 +3689,7 @@ export interface paths {
          *
          *     **A period or a rolling window.** `from` and `to` name a stretch — a quarter, a financial year — and `days` is the rolling window ending now. They are two ways of saying when, so only one may be sent. What is **aging** is a statement about now whatever period was asked for: how long something has been open is answered by the clock.
          *
-         *     **A closure only counts as a fix if the issue actually went away.** A bump that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
+         *     **A closure only counts as a fix if the issue actually went away.** An upgrade that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
          *
          *     **Counted in issues, not in places.** One kernel flaw across sixty modules is one thing that was fixed; an average weighted by how far a component fans out measures the dependency graph rather than anybody's work.
          *
@@ -4679,8 +4681,17 @@ export interface components {
             team?: string;
         };
         AtComponentBody: {
+            /** @description When it runs out, as a date. The earliest among its places here, which is the one that makes it late */
+            due?: string;
+            /** @description Somebody is known to be exploiting this */
+            exploited?: boolean;
             /** @description The version the report says fixes it, where it names one */
             fixed_in?: string;
+            /**
+             * Format: double
+             * @description Published estimate that this will be exploited, 0 to 1
+             */
+            likelihood?: number;
             /**
              * Format: int64
              * @description How many places in this build it sits at
@@ -4688,6 +4699,8 @@ export interface components {
             places: number;
             /** @description How bad the report rates it */
             severity?: string;
+            /** @description The first line of what the issue says about itself, cut to fit a row */
+            summary?: string;
             vulnerability: string;
         };
         AttachmentBody: {
@@ -4898,17 +4911,17 @@ export interface components {
              * @description How many builds of the selection hold any of it. Absent where the selection is one build
              */
             builds?: number;
-            /** @description The packages this one bump moves. More than one where a source package builds several */
+            /** @description The packages this one upgrade moves. More than one where a source package builds several */
             components: string[] | null;
             /** @description Some of what it closes is being exploited */
             exploited?: boolean;
             /** @description The version in hand */
             from: string;
-            /** @description The builds that hold this bump */
+            /** @description The builds that hold this upgrade */
             in: components["schemas"]["BuildName"][] | null;
             /**
              * Format: int64
-             * @description Distinct vulnerabilities the bump closes
+             * @description Distinct vulnerabilities the upgrade closes
              */
             issues: number;
             /**
@@ -4920,7 +4933,7 @@ export interface components {
             severity?: string;
             /** @description The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped */
             to: string;
-            /** @description What the bump is of: the source package where one is recorded, and the component's own name otherwise */
+            /** @description What the upgrade is of: the source package where one is recorded, and the component's own name otherwise */
             upstream: string;
         };
         CVSSv3: {
@@ -5054,7 +5067,7 @@ export interface components {
             was?: string;
         };
         ChangedBody: {
-            /** @description The version this was bumped from since the earlier build. Only on still-present entries, where it means the bump did not reach the fix */
+            /** @description The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix */
             arrived_from?: string;
             /**
              * @description Why it went. Only on fixed entries
@@ -5882,7 +5895,7 @@ export interface components {
             advisory?: string;
             /** @description Other names the same issue is known by */
             aliases?: string[] | null;
-            /** @description The version this was bumped from, where the bump did not resolve it */
+            /** @description The version this was upgraded from, where the upgrade did not resolve it */
             arrived_from?: string;
             /** @description What we rate it, where we have said something. This is what ranks; severity is what was published */
             assessed?: string;
@@ -5920,6 +5933,13 @@ export interface components {
              * @description Published probability of exploitation, 0 to 1
              */
             likelihood?: number;
+            /** @description The day the estimate was computed for, as a date */
+            likelihood_on?: string;
+            /**
+             * Format: double
+             * @description Where that estimate stands among all published ones, 0 to 1
+             */
+            likelihood_percentile?: number;
             links?: components["schemas"]["LinkBody"][] | null;
             /** @enum {string} */
             matched?: "advisory" | "identifier";
@@ -5951,6 +5971,12 @@ export interface components {
              * @description The same judgment as a number, where one is published
              */
             score?: number;
+            /** @description Whether it is the primary rating or a secondary one */
+            score_kind?: string;
+            /** @description Who published it, where the report names them */
+            score_source?: string;
+            /** @description Which scoring system the number is on, as the report states it */
+            score_version?: string;
             /** @description As the data rates it. A word */
             severity?: string;
             /** @description Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five */
@@ -7608,14 +7634,14 @@ export interface components {
             components: string[] | null;
             /** @description When the commitment was made, which is what this release has been waiting since */
             declared_at: string;
-            /** @description The bump's own key: the source package at the version it was built at, in the ecosystem and distribution it came from */
+            /** @description The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
             from: string;
-            /** @description The party carrying it, where one party holds all of what is still open under it. A bump split between two is nobody's */
+            /** @description The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's */
             held_by?: string;
             /**
              * Format: int64
-             * @description Distinct issues still open under this bump here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them
+             * @description Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them
              */
             issues: number;
             /**
@@ -10493,7 +10519,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How many days ahead to look */
+                /** @description How many days ahead to look. Left off, this deployment's own embargo length */
                 within?: number;
                 limit?: number;
                 /** @description Where in the list to start */
@@ -10671,7 +10697,7 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in */
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
                 fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
@@ -10681,6 +10707,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -10775,7 +10803,7 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in */
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
                 fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
@@ -10785,6 +10813,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12072,7 +12102,7 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in */
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
                 fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
@@ -12082,6 +12112,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12219,7 +12251,7 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in */
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
                 fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
@@ -12229,6 +12261,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12328,7 +12362,7 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in */
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
                 fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
@@ -12338,6 +12372,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12440,7 +12476,7 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in */
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
                 fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
@@ -12450,6 +12486,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12507,9 +12545,9 @@ export interface operations {
                 variant?: string;
                 /** @description Keep only issues rated this badly or worse */
                 severity?: "low" | "medium" | "high" | "critical";
-                /** @description Keep only bumps closing something known to be exploited */
+                /** @description Keep only upgrades closing something known to be exploited */
                 exploited?: boolean;
-                /** @description Keep only bumps moving a component of this name */
+                /** @description Keep only upgrades moving a component of this name */
                 component?: string;
                 /** @description Keep only rows whose component or issue name contains this */
                 q?: string;
@@ -12561,9 +12599,9 @@ export interface operations {
                 variant?: string;
                 /** @description Keep only issues rated this badly or worse */
                 severity?: "low" | "medium" | "high" | "critical";
-                /** @description Keep only bumps closing something known to be exploited */
+                /** @description Keep only upgrades closing something known to be exploited */
                 exploited?: boolean;
-                /** @description Keep only bumps moving a component of this name */
+                /** @description Keep only upgrades moving a component of this name */
                 component?: string;
                 /** @description Keep only rows whose component or issue name contains this */
                 q?: string;

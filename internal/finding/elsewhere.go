@@ -110,9 +110,24 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// this finding and differing for another, and the two are different things
 	// to say about it.
 	seen := map[bool]map[string]int{true: {}, false: {}}
+	// What makes two rows the same entry, which is not the same question for
+	// the two lists.
+	//
+	// A build the judgment already reaches is one thing to be told about,
+	// however many places of this finding reach it: keyed on anything finer,
+	// a kernel flaw at sixty places listed the same other build sixty times,
+	// once per consumer that pulls the package in — which is a screen saying
+	// "and sixty other builds" about one.
+	//
+	// A build holding it at *another* version is a separate judgment, because
+	// the code differs — so the version keys it, and nothing below the version
+	// does: two consumers pulling in the same version there is still one
+	// version to decide about.
 	add := func(into *[]Match, differing bool, match Match) {
-		key := fmt.Sprintf("%d\x00%s\x00%s\x00%s", match.TargetID, match.Version,
-			match.ComponentUpstream, match.ConsumerUpstream)
+		key := fmt.Sprintf("%d", match.TargetID)
+		if differing {
+			key += "\x00" + match.Version
+		}
 		if at, held := seen[differing][key]; held {
 			// The same build reached from two places of this finding is one
 			// thing somebody ticks, carrying the places of both.

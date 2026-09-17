@@ -654,7 +654,7 @@ func registerProposing(api huma.API, in Ingest) {
 			"lands, and it closes the only way a backport can — the next inventory declares " +
 			"the patch it carries and says what that patch resolves, so the finding goes " +
 			"while the version stays where it was.\n\n" +
-			"`upgrade-needed` is not recorded here. A bump answers a component rather than one " +
+			"`upgrade-needed` is not recorded here. An upgrade answers a component rather than one " +
 			"finding, so it is recorded from the component and covers everything open on it.\n\n" +
 			"The decision applies to every build running the same component and consumer upstream " +
 			"versions, including future releases — it is matched by code, not copied between " +

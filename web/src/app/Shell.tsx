@@ -4,6 +4,7 @@ import { initials } from "../ui/initials";
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { findingsPath, useScope, type Scoped } from "./scope";
+import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
 import { signOut } from "./session";
 import { Scope } from "./Scope";
@@ -23,6 +24,15 @@ import {
   type Look,
 } from "./look";
 import type { Who } from "./session";
+
+// The badge beside the Unassigned entry, asked as the list itself asks it.
+//
+// The list writes three narrowings of its own into whatever address it is
+// given — nothing lands in a tag, nothing in a release past end-of-life, and
+// the by-issue view sets aside what a promised upgrade already answers — so a
+// total counted without them is a number that disagrees with the list it
+// opens. Built from the entry's own address for that reason.
+const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"));
 
 // The frame the restyled mockup settled on: a rail down the side carrying the
 // brand and the entries grouped by what they span, a bar across the top
@@ -85,14 +95,13 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
       unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
     refetchInterval: 60_000,
   });
+  // Across every product a reader can see, like the entry it sits under and
+  // unlike the scoped count below: the badge is what the address opens, and
+  // that address names no product.
   const unassigned = useQuery({
-    queryKey: ["unassigned", "count", product ?? ""],
+    queryKey: ["findings", "unowned"],
     queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/unassigned", {
-          params: { query: { limit: 1, ...(product ? { product } : {}) } },
-        }),
-      ),
+      unwrap(await api.GET("/v1/findings", { params: { query: { ...UNOWNED_QUERY, limit: 1 } } })),
     refetchInterval: 60_000,
   });
   // Counted for whatever is selected rather than only for a whole build : the
@@ -183,15 +192,23 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               unit="claims waiting"
             />
             <Rail
-              to="/unassigned"
+              to={UNOWNED_LIST}
+              mark={UNOWNED}
               icon="nobody"
               label="Unassigned"
               count={unassigned.data?.total}
               unread={unassigned.isError}
-              unit="findings nobody holds"
+              unit="findings nobody holds and nobody has decided"
               quiet
             />
             <Rail to="/work" icon="people" label="Assignments" />
+            {/* The catalog of what this deployment carries. Across products
+              because that is what it is, and here rather than under Manage
+              because Manage ships folded — which left the one screen that
+              says what exists invisible on a first visit, when there is
+              nothing else to go on. Declaring a product happens there too;
+              reading what is there is the commoner reason to open it. */}
+            <Rail to="/products" end icon="box" label="Products" />
             {/* The record of what was judged. Across products because that is how
               it is asked for — an auditor asks about a period, not a build. */}
             <Rail to="/audit" icon="ledger" label="The record" />
@@ -253,7 +270,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         <Group name="manage" label="Manage" shut={shut} onToggle={toggleGroup} />
         {!shut.has("manage") && (
           <>
-            <Rail to="/products" end icon="box" label="Products" />
             <Rail
               to={`/products/${encodeURIComponent(product ?? "")}/streams`}
               end
@@ -354,6 +370,7 @@ function Version() {
 
 function Rail({
   to,
+  mark,
   icon,
   label,
   count,
@@ -365,6 +382,11 @@ function Rail({
   why = "Pick a product, a branch and a variant",
 }: {
   to: string;
+  // The filters this entry's address carries, where it carries any. The router
+  // matches a path and never a query, so an entry that opens one narrowing of
+  // a shared screen reads as the screen somebody is on for every other
+  // narrowing of it too.
+  mark?: string;
   icon: string;
   label: string;
   count?: number;
@@ -382,6 +404,7 @@ function Rail({
   needs?: boolean;
   why?: string;
 }) {
+  const { pathname, search } = useLocation();
   if (!needs) {
     return (
       <button type="button" className="nav" disabled title={why}>
@@ -393,8 +416,13 @@ function Rail({
   // NavLink marks the active entry with aria-current itself, which is what the
   // rail styles key off — the state is announced to a screen reader and drawn
   // from the same fact, rather than a class that only one of them can see.
-  return (
-    <NavLink to={to} end={end} className="nav">
+  //
+  // An entry carrying filters says so for itself, because the router's answer
+  // is about the path alone: `aria-current` there is the same fact, decided by
+  // asking whether the address in the bar still carries what this entry asks
+  // for.
+  const body = (
+    <>
       <Icon name={icon} />
       {label}
       {unread ? (
@@ -417,6 +445,22 @@ function Rail({
           </span>
         )
       )}
+    </>
+  );
+  if (mark !== undefined) {
+    const asked = new URLSearchParams(search);
+    const here =
+      pathname === to.split("?")[0] &&
+      [...new URLSearchParams(mark)].every(([key, value]) => asked.getAll(key).includes(value));
+    return (
+      <Link to={to} className="nav" aria-current={here ? "page" : undefined}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <NavLink to={to} end={end} className="nav">
+      {body}
     </NavLink>
   );
 }
@@ -434,8 +478,10 @@ function Rail({
 // **An issue name goes to the issue, wherever it sits**, and needs no
 // product picked: "a critical just landed in openssl — which of our products
 // ship an affected version" is the question, and it spans products by
-// construction. Anything else searches what a product ships, which still needs
-// one picked.
+// construction. Anything else searches what is shipped, at whatever the
+// picker has selected — and across every product a reader can see where it has
+// selected nothing, which is the same list at its widest address. Typing at
+// that scope used to do nothing at all, silently.
 //
 // Which of the two it is, is decided by asking: a term that resolves to an
 // issue goes to the issue page, and everything else falls through to the list.
@@ -468,9 +514,6 @@ function Search({ at }: { at: Scoped }) {
   return (
     <form
       className="topsearch"
-      title={
-        at.product ? undefined : "Search an issue by name, or pick a product to search components"
-      }
       onSubmit={(event) => {
         event.preventDefault();
         const term = typed.trim();
@@ -494,9 +537,10 @@ function Search({ at }: { at: Scoped }) {
               setUnread(true);
               return;
             }
-            // Not an issue anybody here carries, so it is a component search,
-            // and that is a question about one product's contents.
-            if (!at.product) return;
+            // Not an issue anybody here carries, so it is a component
+            // search. The list answers that across every product a reader can
+            // see as readily as within one, so with no product picked the
+            // term used to be dropped where the answer was a screen away.
             const path = findingsPath(at);
             navigate(`${path}${path.includes("?") ? "&" : "?"}q=${encodeURIComponent(term)}`);
           })

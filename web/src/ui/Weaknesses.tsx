@@ -1,46 +1,10 @@
 import { notACredential } from "./noautofill";
 import { useState } from "react";
+import { COMMON, nameOf } from "./cwe";
 
-// What kind of flaw it is, by the classification the world uses.
-//
-// **Suggested, never restricted.** The list below is the ones that come up
-// most; anything may be typed. A picker that refused an identifier it had not
-// heard of would refuse next year's, and the point of recording these is to
-// make a set of findings comparable to things outside this deployment — which
-// is served by recording what somebody meant, not by having an opinion.
-//
-// The names are here rather than fetched: they are a fixed vocabulary somebody
-// else maintains, and a screen that could not offer them because a network
-// call failed would be worse than one that offers a short list.
-const COMMON: { id: string; name: string }[] = [
-  { id: "CWE-79", name: "Cross-site scripting" },
-  { id: "CWE-787", name: "Out-of-bounds write" },
-  { id: "CWE-89", name: "SQL injection" },
-  { id: "CWE-352", name: "Cross-site request forgery" },
-  { id: "CWE-22", name: "Path traversal" },
-  { id: "CWE-125", name: "Out-of-bounds read" },
-  { id: "CWE-78", name: "OS command injection" },
-  { id: "CWE-416", name: "Use after free" },
-  { id: "CWE-862", name: "Missing authorization" },
-  { id: "CWE-434", name: "Unrestricted upload of a dangerous file" },
-  { id: "CWE-94", name: "Code injection" },
-  { id: "CWE-20", name: "Improper input validation" },
-  { id: "CWE-77", name: "Command injection" },
-  { id: "CWE-287", name: "Improper authentication" },
-  { id: "CWE-269", name: "Improper privilege management" },
-  { id: "CWE-502", name: "Deserialization of untrusted data" },
-  { id: "CWE-200", name: "Exposure of sensitive information" },
-  { id: "CWE-863", name: "Incorrect authorization" },
-  { id: "CWE-918", name: "Server-side request forgery" },
-  { id: "CWE-119", name: "Buffer overflow" },
-  { id: "CWE-476", name: "Null pointer dereference" },
-  { id: "CWE-798", name: "Hard-coded credentials" },
-  { id: "CWE-190", name: "Integer overflow" },
-  { id: "CWE-400", name: "Uncontrolled resource consumption" },
-  { id: "CWE-306", name: "Missing authentication for a critical function" },
-];
-
-const NAMES = new Map(COMMON.map((c) => [c.id, c.name]));
+// The picker for what kind of flaw something is. The vocabulary, the names and
+// where to read about one live beside it in `cwe.ts`, because the finding
+// screen names them too and two lists of names is two lists that disagree.
 
 export function Weaknesses({
   chosen,
@@ -77,7 +41,7 @@ export function Weaknesses({
               >
                 {id} ×
               </button>
-              {NAMES.has(id) && <span className="hint">{NAMES.get(id)}</span>}
+              {nameOf(id) && <span className="hint">{nameOf(id)}</span>}
             </li>
           ))}
         </ul>
