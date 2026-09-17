@@ -1030,7 +1030,7 @@ writes <code>text</code>.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_AUTO_MIGRATE</code></td>
-<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and <code>openpsirt migrate status</code> says where both stand. That compares version numbers, not schema content: before the first release a schema change edits the migration that made the thing, so a database can be at the expected version and still hold what an earlier build created</td>
+<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and <code>openpsirt migrate status</code> says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits the migration that made the thing, so a database can be at the expected version and still hold what an earlier build created</td>
 <td><code>true</code></td>
 </tr>
 <tr>
