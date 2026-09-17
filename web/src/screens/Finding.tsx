@@ -21,6 +21,7 @@ import { at as choicesAt, unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited } from "../ui/Severity";
+import { Weaknesses } from "../ui/Weakness";
 import { AffectedBuilds } from "./FindingBuilds";
 import { Markdown } from "../ui/Markdown";
 import { Decide, said, type Recorded } from "../ui/Decide";
@@ -622,14 +623,16 @@ export function Finding() {
               {it.likelihood_on && <span className="l">as of {it.likelihood_on}</span>}
             </div>
             <div className="score">
-              <span className="n">{(it.weaknesses ?? [])[0] ?? "—"}</span>
-              <span className="l">Weakness</span>
-            </div>
-            <div className="score">
               <span className="n">{it.exploited ? "Yes" : "No"}</span>
               <span className="l">Exploited</span>
             </div>
           </div>
+          {/* What kind of flaw this is, all of it. One identifier was shown
+              and the rest were dropped, and a bare number is not something a
+              reader knows: the common ones are named here, every one of them
+              links to where it is written up, and the two words a feed uses to
+              say it has no classification are said rather than drawn as one. */}
+          <Weaknesses of={it.weaknesses ?? []} />
           {it.vector && (
             <p className="mono" style={{ fontSize: "var(--step--1)", color: "var(--muted)" }}>
               {it.vector}
