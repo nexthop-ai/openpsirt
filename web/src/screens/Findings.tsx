@@ -19,7 +19,7 @@ import { Holder } from "../ui/Holder";
 import { Saved, here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
-import { meansFor, moved, typingIn } from "./keys";
+import { activates, meansFor, moved, typingIn } from "./keys";
 import { useWho } from "../app/session";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
@@ -393,6 +393,20 @@ export function Findings() {
     };
   }
 
+  // What a write here makes stale.
+  //
+  // Three keys rather than one: the view counts are held for five minutes, and
+  // two of the three are not under the `findings` prefix — so a triager who
+  // decided a page of rows in place saw two numbers, drawn side by side with a
+  // third that had moved, still quoting the figures from before their own
+  // writes. That is the half of the rule the hold is justified under: a number
+  // that is wrong in a way nothing reports.
+  function reread() {
+    for (const key of [["findings"], ["findings-by-component"], ["fix-bundles"], ["holdings"]]) {
+      void queries.invalidateQueries({ queryKey: key });
+    }
+  }
+
   // Every change to the question the list is asking goes through the hook that
   // holds the selection, which is where the rule that a changed question
   // clears it now lives.
@@ -493,6 +507,10 @@ export function Findings() {
         );
         return;
       }
+      // Enter belongs to whatever has focus where that thing answers it
+      // itself. Taken here it would suppress a button's own activation, which
+      // is what the decision form a row opens is submitted with.
+      if (means === "open" && activates(document.activeElement)) return;
       const row = rows[cursor];
       if (!row) return;
       event.preventDefault();
@@ -834,8 +852,7 @@ export function Findings() {
     await through((row: Row) => hand.mutateAsync({ row, who, team }));
     // Once, after the loop. On every write it put a list refetch between each
     // of them, so a long selection spent its time refetching.
-    void queries.invalidateQueries({ queryKey: ["findings"] });
-    void queries.invalidateQueries({ queryKey: ["holdings"] });
+    reread();
     setHanding("");
   }
 
@@ -959,9 +976,7 @@ export function Findings() {
           <FindingsTable
             rows={rows}
             cursor={cursor}
-            onDecided={() => {
-              void queries.invalidateQueries({ queryKey: ["findings"] });
-            }}
+            onDecided={reread}
             shownKeys={shownKeys}
             picked={picked}
             pick={pick}

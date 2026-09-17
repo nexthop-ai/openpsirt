@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
@@ -488,5 +489,79 @@ func TestWhatLabelsAReferenceIsItsHostAndItsPath(t *testing.T) {
 		if got != c.want {
 			t.Errorf("%s is labelled %q, want %q", c.address, got, c.want)
 		}
+	}
+}
+
+func TestTheEstimateAndWhoScoredItAreReadOutOfTheReport(t *testing.T) {
+	// Five fields are read out of a report here and nothing read any of them
+	// back: a wrong JSON tag, or a feed that changes its date format, drops
+	// one silently. The tests downstream cannot catch it either — they build
+	// what a report knows by hand, while production reaches it through this
+	// parser.
+	//
+	// The day matters most: it is what decides which of two reports carries
+	// the newer estimate, and without it the rule falls back to whichever scan
+	// ran last.
+	var seen int
+	for _, r := range parse(t).Reported {
+		if r.Issue.Identifier != "CVE-2024-6119" {
+			continue
+		}
+		seen++
+		if r.Issue.Likelihood != 0.66582 {
+			t.Errorf("the estimate reads %v, want what the report states", r.Issue.Likelihood)
+		}
+		if r.Issue.LikelihoodPercentile != 0.99227 {
+			t.Errorf("the percentile reads %v, want what the report states",
+				r.Issue.LikelihoodPercentile)
+		}
+		if r.Issue.LikelihoodOn == nil {
+			t.Error("the day the estimate is about was dropped, so which of two reports " +
+				"is newer falls back to which scan ran last")
+		} else if got := r.Issue.LikelihoodOn.Format(time.DateOnly); got != "2026-08-27" {
+			t.Errorf("the day reads %s, want what the report states", got)
+		}
+		if r.Issue.ScoreSource != "nvd@nist.gov" {
+			t.Errorf("who published the score reads %q, want what the report states",
+				r.Issue.ScoreSource)
+		}
+		if r.Issue.ScoreKind != "Primary" {
+			t.Errorf("whether the rating is primary reads %q, want what the report states",
+				r.Issue.ScoreKind)
+		}
+		if r.Issue.ScoreVersion != "3.1" {
+			t.Errorf("the scoring system reads %q, want what the report states",
+				r.Issue.ScoreVersion)
+		}
+	}
+	if seen == 0 {
+		t.Fatal("the match this reads is not in the recorded output, so this checked nothing")
+	}
+}
+
+func TestAnEstimateDatedAheadOfNowIsNotTakenAsItsDay(t *testing.T) {
+	// A scan file is hostile input and this day decides which of two reports
+	// is newer, so one stating a date that has not happened would pin the
+	// issue at whatever that report said with no later report able to replace
+	// it. The estimate itself is still recorded; what is refused is the claim
+	// about when it was computed.
+	ahead := time.Now().UTC().AddDate(0, 0, 7).Format(time.DateOnly)
+	report := fmt.Sprintf(`{"matches":[{"vulnerability":{"id":"CVE-2026-1","severity":"High",
+	  "epss":[{"epss":0.5,"percentile":0.9,"date":%q}]},
+	  "artifact":{"name":"libnl","version":"3.7.0","purl":"pkg:deb/debian/libnl@3.7.0"}}],
+	  "descriptor":{"name":"grype","version":"0.100.0"}}`, ahead)
+	result, err := scanner.ParseGrype(strings.NewReader(report), scanner.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Reported) != 1 {
+		t.Fatalf("%d matches were read, want the one written", len(result.Reported))
+	}
+	if on := result.Reported[0].Issue.LikelihoodOn; on != nil {
+		t.Errorf("a day ahead of now was taken as the day the estimate is about: %v", on)
+	}
+	if result.Reported[0].Issue.Likelihood != 0.5 {
+		t.Errorf("the estimate itself was dropped with the date: %v",
+			result.Reported[0].Issue.Likelihood)
 	}
 }

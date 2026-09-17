@@ -221,7 +221,10 @@ function ByPerson({
       ),
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: ["holdings"] });
-      void queries.invalidateQueries({ queryKey: ["unassigned"] });
+      // The badge for what nobody holds is counted from the findings list
+      // now, so the key this used to name registers nothing. Returning a whole
+      // queue is the single act that moves that number most.
+      void queries.invalidateQueries({ queryKey: ["findings"] });
     },
   });
 

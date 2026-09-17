@@ -1,6 +1,7 @@
 package finding_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -536,4 +537,131 @@ func TestAFallingLikelihoodIsTakenRatherThanItsPeak(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestAScoreRisingDoesNotCarryAStaleEstimateWithIt(t *testing.T) {
+	// The three signals are raised in one statement under one condition, and
+	// that condition is an OR across them: the row matches when *any* of them
+	// would move. So a write for one of them writes all three, and a report
+	// carrying a rising score alongside a stale estimate put the estimate back
+	// — which is the ratchet this branch removed, arriving by the side door.
+	//
+	// The estimate needs a guard the row-level condition cannot give it,
+	// because the condition is shared. A `CASE` inside the same `SET` list is
+	// not it either: two engines evaluate assignments left to right and read
+	// the already-written value, so a guard on one column would see another's
+	// new value. Its own statement is the portable shape.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		spiked := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		settled := time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC)
+
+		peak := finding.Reported{
+			Issue: finding.Named{
+				Identifier: "CVE-2026-5", Severity: "high",
+				Likelihood: 0.9, LikelihoodOn: &spiked, Score: 5.0,
+			},
+			Component: libnl, FixState: finding.NoFix,
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{peak}); err != nil {
+			t.Fatal(err)
+		}
+
+		// A week on the forecast has come down, which is what should stand.
+		today := peak
+		today.Issue.Likelihood = 0.05
+		today.Issue.LikelihoodOn = &settled
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{today}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Now a report from another source rating it worse, carrying the old
+		// estimate. The score is news and must land; the estimate is about an
+		// earlier day and must not.
+		worse := peak
+		worse.Issue.Score = 9.0
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{worse}); err != nil {
+			t.Fatal(err)
+		}
+
+		var issue finding.Vulnerability
+		if err := f.db.DB.NewSelect().Model(&issue).
+			Where("identifier = ?", "CVE-2026-5").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if issue.LikelihoodPPM == nil || *issue.LikelihoodPPM != 50_000 {
+			t.Errorf("the estimate reads %s after a rising score carried an older one in, "+
+				"want the 0.05 of the later day", ppm(issue.LikelihoodPPM))
+		}
+		if issue.LikelihoodOn == nil || !issue.LikelihoodOn.UTC().Equal(settled) {
+			t.Errorf("the day reads %v, want the later one", issue.LikelihoodOn)
+		}
+		if issue.ScoreCenti == nil || *issue.ScoreCenti != 900 {
+			t.Errorf("the score reads %s, want the 9.0 that rose", ppm(issue.ScoreCenti))
+		}
+	})
+}
+
+func TestAnUndatedEstimateDoesNotWipeTheDayAStoredOneHas(t *testing.T) {
+	// Writing the day unconditionally clears it where a report carries none,
+	// and after that every later report wins on `likelihood_on IS NULL` — so
+	// newest-wins is off for that issue for good, and one feed that omits the
+	// date undoes the rule for everybody.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		dated := time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC)
+
+		known := finding.Reported{
+			Issue: finding.Named{
+				Identifier: "CVE-2026-6", Severity: "high",
+				Likelihood: 0.05, LikelihoodOn: &dated,
+			},
+			Component: libnl, FixState: finding.NoFix,
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{known}); err != nil {
+			t.Fatal(err)
+		}
+
+		// A feed that states an estimate and no day, alongside a score that
+		// rose. The score is what matches the row; the estimate cannot be
+		// shown to be newer than a dated one, so it must change nothing —
+		// including the day.
+		undated := known
+		undated.Issue.Likelihood = 0.9
+		undated.Issue.LikelihoodOn = nil
+		undated.Issue.Score = 9.0
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{undated}); err != nil {
+			t.Fatal(err)
+		}
+
+		var issue finding.Vulnerability
+		if err := f.db.DB.NewSelect().Model(&issue).
+			Where("identifier = ?", "CVE-2026-6").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if issue.LikelihoodOn == nil {
+			t.Fatal("an undated report cleared the day a dated one had, so nothing later " +
+				"can be compared against it")
+		}
+		if issue.LikelihoodPPM == nil || *issue.LikelihoodPPM != 50_000 {
+			t.Errorf("the estimate reads %s, want the dated 0.05 it could not be shown to "+
+				"be newer than", ppm(issue.LikelihoodPPM))
+		}
+	})
+}
+
+// ppm reads a stored number back for a message, where absent says so rather
+// than printing an address.
+func ppm(value *int) string {
+	if value == nil {
+		return "nothing"
+	}
+	return fmt.Sprint(*value)
 }

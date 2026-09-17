@@ -695,7 +695,13 @@ func firstEPSS(estimates []struct {
 			continue
 		}
 		answer := estimate{value: published.EPSS, percentile: published.Percentile}
-		if on, err := time.Parse(time.DateOnly, strings.TrimSpace(published.Date)); err == nil {
+		// Not a day that has not happened. A scan file is hostile input and
+		// this day decides which of two reports is newer, so one stating a
+		// date ahead of now would pin the issue at whatever that report said
+		// with no later report able to replace it — and nothing would say the
+		// number had stopped moving.
+		if on, err := time.Parse(time.DateOnly, strings.TrimSpace(published.Date)); err == nil &&
+			!on.After(time.Now().UTC()) {
 			answer.on = &on
 		}
 		return answer

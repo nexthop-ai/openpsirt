@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { meansFor, moved, typingIn } from "./keys";
+import { activates, meansFor, moved, typingIn } from "./keys";
 
 // What a key means over a list of findings, and — the part worth pinning —
 // when it means nothing. A triager typing "j" into a justification does not
@@ -61,6 +61,33 @@ describe("whether what has focus takes typing", () => {
     expect(typingIn(element("tr"))).toBe(false);
     expect(typingIn(element("button"))).toBe(false);
     expect(typingIn(null)).toBe(false);
+  });
+});
+
+describe("whether Enter already belongs to what has focus", () => {
+  const element = (tag: string, href?: string) => {
+    const made = document.createElement(tag);
+    if (href !== undefined) made.setAttribute("href", href);
+    return made;
+  };
+
+  it("says so for a button and for a link", () => {
+    // A button's activation is the default action of the keydown, so taking
+    // Enter here takes the button with it — and the decision form a row opens
+    // is submitted with one.
+    expect(activates(element("button"))).toBe(true);
+    expect(activates(element("a", "/findings"))).toBe(true);
+  });
+
+  it("says no for an anchor that goes nowhere", () => {
+    expect(activates(element("a"))).toBe(false);
+  });
+
+  it("says no for a row, an input and nothing at all", () => {
+    // An input is somebody typing, which the other rule already answers.
+    expect(activates(element("tr"))).toBe(false);
+    expect(activates(element("input"))).toBe(false);
+    expect(activates(null)).toBe(false);
   });
 });
 
