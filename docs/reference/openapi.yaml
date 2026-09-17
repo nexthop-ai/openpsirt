@@ -586,6 +586,9 @@ components:
             - waiting
             - lapsed
           type: string
+        version:
+          description: The version this sits at, which is what tells two rows of one component apart
+          type: string
         vulnerability:
           type: string
       required:

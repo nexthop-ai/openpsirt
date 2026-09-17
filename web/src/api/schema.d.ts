@@ -4810,6 +4810,8 @@ export interface components {
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "lapsed";
+            /** @description The version this sits at, which is what tells two rows of one component apart */
+            version?: string;
             vulnerability: string;
         };
         Branch: {

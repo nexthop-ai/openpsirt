@@ -202,13 +202,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               quiet
             />
             <Rail to="/work" icon="people" label="Assignments" />
-            {/* The catalog of what this deployment carries. Across products
-              because that is what it is, and here rather than under Manage
-              because Manage ships folded — which left the one screen that
-              says what exists invisible on a first visit, when there is
-              nothing else to go on. Declaring a product happens there too;
-              reading what is there is the commoner reason to open it. */}
-            <Rail to="/products" end icon="box" label="Products" />
             {/* The record of what was judged. Across products because that is how
               it is asked for — an auditor asks about a period, not a build. */}
             <Rail to="/audit" icon="ledger" label="The record" />
@@ -270,6 +263,13 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         <Group name="manage" label="Manage" shut={shut} onToggle={toggleGroup} />
         {!shut.has("manage") && (
           <>
+            {/* The catalog, whole and in order: a product, then the branches and
+              tags under it, then what those are built as. The two below need a
+              product picked, and the screen that picks one sat in another group
+              — so managing a product meant two groups, one of them folded.
+              Somebody arriving with nothing chosen picks a product in the bar
+              above, which is what that control is for. */}
+            <Rail to="/products" end icon="box" label="Products" />
             <Rail
               to={`/products/${encodeURIComponent(product ?? "")}/streams`}
               end
@@ -293,7 +293,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* Who holds what, which the audit permission is largely for.
               The screen already degrades for a reader who cannot grant. */}
             {(who.admin || who.audits) && (
-              <Rail to="/people" icon="roles" label="Users and roles" />
+              <Rail to="/people" icon="roles" label="Access" />
             )}
             {/* Assignment without a person doing it, by standing rule.
               Under Manage because it is something set up once rather than worked
@@ -305,7 +305,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               and an operator's rather than an auditor's: what a worker
               reported can quote what the job was about, and a destination's
               address is a credential for two of the services it names. */}
-            {who.admin && <Rail to="/system" icon="gear" label="System" />}
+            {who.admin && <Rail to="/system" icon="pulse" label="System" />}
           </>
         )}
       </nav>

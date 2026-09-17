@@ -1,4 +1,4 @@
-import { ROLLED } from "../ui/severities";
+import { Shape } from "../ui/Shape";
 import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -16,21 +16,24 @@ import { Icon } from "../ui/Icons";
 import { useWho } from "../app/session";
 import { useReseed } from "../ui/reseed";
 
-// What is beneath a node, worst first, as a short strip. Only the bands that
-// are there: a row of zeros is noise on a screen whose whole job is saying
-// which branch is worth opening.
+// What is beneath a node, worst first, as one bar whose widths are the counts.
+//
+// The same control the component screen draws, for the same reason: a bar that
+// is mostly one colour says where the weight is before a number is read. This
+// was a chip per band at a fixed width, which said only which bands were
+// present — and down a page of rows at six different depths that is five
+// numbers a reader cannot compare, which is the one thing they are for.
+//
+// The column stays a fixed width and keeps its left edge, so the bars line up
+// under each other whatever the name above them was. Drawn empty rather than
+// left out, because the strip is a column and a row that omits it is a row
+// whose count sits where every other row's bands are. The key is dropped and
+// the title carries the numbers: five legends down a tree say the same thing
+// five times.
 function Strip({ by }: { by?: Record<string, number> }) {
-  const there = ROLLED.filter((band) => (by ?? {})[band]);
-  // Drawn empty rather than left out: the strip is a column, and a row that
-  // omits it is a row whose count sits where every other row's bands are.
-  if (there.length === 0) return <span className="strip" />;
   return (
-    <span className="strip" aria-hidden={false}>
-      {there.map((band) => (
-        <span key={band} className={`band ${band}`} title={`${(by ?? {})[band]} ${band}`}>
-          {(by ?? {})[band]}
-        </span>
-      ))}
+    <span className="strip">
+      <Shape by={by} key_={false} />
     </span>
   );
 }

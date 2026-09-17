@@ -56,6 +56,12 @@ type ReadinessBody struct {
 type BlockingBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Component     string `json:"component"`
+	// Version is what tells one of these from another. A group is keyed on the
+	// issue and the fold — the source package at the version it was built at —
+	// so one issue at three versions of one component is three rows here.
+	// Without it they arrived identical: four rows reading "CVE-2026-46595
+	// golang.org/x/crypto", differing only in a count the panel does not draw.
+	Version string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
 	Severity      string `json:"severity,omitempty"`
 	Exploited     bool   `json:"exploited,omitempty"`
 	Places        int    `json:"places" doc:"How many places of the build it sits at"`
@@ -63,10 +69,16 @@ type BlockingBody struct {
 	Due           string `json:"due,omitempty"`
 }
 
-// blocking is how many of the worst are listed. A release conversation reads
-// the top of this and the number beside it; the findings list is where the
-// whole of it is worked.
-const blocking = 20
+// blocking is how many of the worst are listed.
+//
+// A release conversation reads the top of this and the number beside it; the
+// findings list is where the whole of it is worked, and the panel links to it.
+// Five rather than twenty: against a blocker count in the thousands, twenty is
+// an arbitrary page of the list rather than what the count is made of, and it
+// made the panel three times the height of everything beside it on the screen
+// the comparison is named after. What the rule asks for — a number somebody can
+// act on without going and assembling it — is satisfied by the worst few.
+const blocking = 5
 
 func registerReadiness(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
@@ -149,6 +161,7 @@ func registerReadiness(api huma.API, in Ingest) {
 		for _, group := range groups {
 			one := BlockingBody{
 				Vulnerability: group.Vulnerability, Component: group.Component,
+				Version:  group.Version,
 				Severity: group.Severity, Exploited: group.Exploited,
 				Places: group.Places, State: group.State,
 			}

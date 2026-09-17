@@ -136,8 +136,21 @@ a.kpi:hover {
 .panel li .id {
   flex: none;
 }
+/* The part of a row that varies, and so the part that gives. It shrinks and
+   ellipsizes rather than pushing the row past the panel — a component name is
+   forty-four characters where a Debian kernel package is one.
+
+   The three declarations are what makes that work and all three are needed:
+   `flex` because a row is a flex line and `auto` alone will not shrink below
+   the content, `min-width` because a flex item's floor is its content width
+   until it is told otherwise, and the two overflow rules to end it in an
+   ellipsis rather than a clip. Stated here rather than left to the cascade
+   because this sits beside `.id` on the rows that are both, and that one
+   pins `flex: none`. */
 .panel li .what {
   color: var(--muted);
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

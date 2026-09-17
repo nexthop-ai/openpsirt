@@ -275,9 +275,20 @@ function Readiness({ at }: { at: Scoped }) {
           </p>
           <ul className="plain">
             {blocking.map((row) => (
-              <li key={`${row.vulnerability} ${row.component}`}>
+              /* Keyed on the version too, because that is what the group is
+                 keyed on. Without it one issue at three versions of one
+                 component was three rows under one key. */
+              <li key={`${row.vulnerability} ${row.component} ${row.version ?? ""}`}>
                 <Severity word={row.severity} /> <span className="id">{row.vulnerability}</span>{" "}
-                <span className="id hint">{row.component}</span>
+                {/* The component is the part that varies, and a Debian kernel
+                    package is forty-four characters of it. It shrinks and
+                    ellipsizes like the varying part of every other panel list;
+                    given `.id` alone it could do neither and ran out of the
+                    panel. The whole of it is on the title. */}
+                <span className="what id" title={`${row.component} ${row.version ?? ""}`.trim()}>
+                  {row.component}
+                  {row.version && <span className="hint"> {row.version}</span>}
+                </span>
                 {row.state && <span className="hint"> · {row.state}</span>}
                 {row.due && <span className="hint"> · due {row.due}</span>}
               </li>

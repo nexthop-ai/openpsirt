@@ -405,41 +405,17 @@
 .strip {
   margin-left: auto;
   display: inline-flex;
-  justify-content: flex-end;
-  gap: 3px;
+  align-items: center;
   width: 202px;
   flex: none;
 }
-/* Every band the same width, whichever of the five it is and whether it holds
-   one digit or four. Sized to the digits rather than to the content: down a
-   page of rows at six different depths, numbers that start wherever the name
-   ended are five numbers nobody can compare, which is the one thing they are
-   for. */
-.strip .band {
-  box-sizing: border-box;
-  width: 38px;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.6;
-  padding: 0 4px;
-  text-align: center;
-  border-radius: var(--pill);
-  color: var(--accent-ink);
-}
-.strip .band.critical {
-  background: var(--sev-critical);
-}
-.strip .band.high {
-  background: var(--sev-high);
-}
-.strip .band.medium {
-  background: var(--sev-medium);
-}
-.strip .band.low {
-  background: var(--sev-low);
-}
-.strip .band.unrated {
-  background: var(--sev-unrated);
+/* One bar across a fixed column rather than a chip per band. Widths are the
+   counts, so the shape says where the weight is before a number is read; the
+   column's own width is what makes the bars comparable down a page of rows at
+   six different depths, which is the one thing they are for. The numbers are
+   on the title, because a legend per row says the same thing every row. */
+.strip > .sevbar {
+  width: 100%;
 }
 /* The count sits after the strip and is the same width whatever it holds, so
    the strip's own left edge does not move with it. A row with no bands still
