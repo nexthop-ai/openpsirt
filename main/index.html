@@ -957,9 +957,12 @@ behind every line of it.</p>
 <li><strong>Change over time is a primary query</strong>, not an audit log read backwards</li>
 <li><strong>Findings open and close themselves as scans change</strong>, every closure records
  why, and a disappearance nobody can explain is flagged at any volume</li>
-<li><strong>Triage history is append-only</strong>, administrative changes record who changed
- what from what, and what a scan observed is never merged with what a person
- declared</li>
+<li><strong>Triage history is append-only</strong>: records are written and never edited or
+ removed, and each is written in the same transaction as the act it describes.
+ The database is trusted, and nothing defends against somebody editing rows
+ directly</li>
+<li><strong>Administrative changes record who changed what from what</strong>, and what a scan
+ observed is never merged with what a person declared</li>
 </ul>
 <h3 id="triage">Triage<a class="headerlink" href="#triage" title="Permanent link">&para;</a></h3>
 <ul>
