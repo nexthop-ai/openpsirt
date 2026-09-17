@@ -881,6 +881,19 @@ button.vchip {
 .seg button[aria-pressed="true"] .n {
   color: var(--accent);
 }
+/* A list being re-read is still the list. It dims rather than being replaced,
+   so the rows somebody was narrowing stay where they are while the next answer
+   lands — and `aria-busy` says the same thing to a reader who cannot see the
+   dimming. */
+.listing[aria-busy="true"] {
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .listing {
+    transition: opacity 120ms linear;
+  }
+}
+
 .floor {
   display: flex;
   align-items: center;

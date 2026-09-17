@@ -8,7 +8,7 @@ import { Filters, Narrowed, STATES, activeFilters, without, withoutAny } from ".
 import { Choices } from "../ui/Choices";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -285,6 +285,11 @@ export function Findings() {
             }),
       ),
     enabled: view === "issues",
+    // The rows that were on screen stay there while the next answer is read.
+    // Without this the whole screen unmounted on every filter change — the
+    // search box, the chips, the count and the controls with it — so changing
+    // one filter blanked the thing being narrowed and put the cursor nowhere.
+    placeholderData: keepPreviousData,
   });
 
   // What each view would show, on the button that switches to it.
@@ -722,7 +727,6 @@ export function Findings() {
     );
   }
 
-  if (findings.isPending) return <Loading />;
   if (findings.isError) {
     return <Failed error={findings.error} what="The findings could not be read." />;
   }
@@ -837,29 +841,36 @@ export function Findings() {
         </div>
       )}
 
-      {rows.length === 0 ? (
-        <Empty title="Nothing matches these filters." />
-      ) : (
-        <FindingsTable
-          rows={rows}
-          shownKeys={shownKeys}
-          picked={picked}
-          pick={pick}
-          pickAll={pickAll}
-          spanning={spanning}
-          columns={COLUMNS}
-          oneBuild={oneBuild}
-          sortable={sortable}
-          buildOf={buildOf}
-          siblings={siblings}
-          carrying={carrying}
-          prepared={prepared}
-          set={set}
-          hide={hide}
-          peeking={peeking}
-          setPeeking={setPeeking}
-        />
-      )}
+      {/* The rows, or what stands in for them. Marked busy rather than
+          replaced while the next answer is read: the list somebody is
+          narrowing is the thing they are looking at. */}
+      <div className="listing" aria-busy={findings.isPlaceholderData || undefined}>
+        {findings.isPending ? (
+          <Loading />
+        ) : rows.length === 0 ? (
+          <Empty title="Nothing matches these filters." />
+        ) : (
+          <FindingsTable
+            rows={rows}
+            shownKeys={shownKeys}
+            picked={picked}
+            pick={pick}
+            pickAll={pickAll}
+            spanning={spanning}
+            columns={COLUMNS}
+            oneBuild={oneBuild}
+            sortable={sortable}
+            buildOf={buildOf}
+            siblings={siblings}
+            carrying={carrying}
+            prepared={prepared}
+            set={set}
+            hide={hide}
+            peeking={peeking}
+            setPeeking={setPeeking}
+          />
+        )}
+      </div>
 
       <div className="filters" style={{ margin: "10px 0 0" }}>
         <span className="hint">
