@@ -51,6 +51,17 @@ export function Scope() {
   // what `declared` holds — the per-release list would be an arbitrary one of
   // them.
   const variants = useReleaseVariants(open, product, stream);
+  // What the variant column draws, which is not simply whichever of the two
+  // the branch selects.
+  //
+  // The two are different questions and different cache entries, so choosing a
+  // branch switched the column to a query holding nothing and it emptied and
+  // refilled — on a selection that usually does not change the names at all.
+  // The product's own list stands in until the narrower answer is here: it is
+  // a superset of it, so nothing is offered that the release does not have for
+  // longer than the read takes, and the column stops going blank in front of
+  // somebody halfway through choosing.
+  const offered = stream ? (variants.data?.items ?? declared.data?.items) : declared.data?.items;
 
   // Applied as soon as it is chosen, at whatever level. A partial selection is
   // a real answer now — every level offers "all" — so there is nothing to wait
@@ -213,7 +224,7 @@ export function Scope() {
               Every variant
             </button>
           )}
-          {((stream ? variants.data?.items : declared.data?.items) ?? []).map((each) => (
+          {(offered ?? []).map((each) => (
             <button
               key={each.name}
               type="button"

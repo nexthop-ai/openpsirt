@@ -612,6 +612,14 @@ export function Filters({
           end-of-life either — so both default to the working population and
           both say so in a chip above the list. Two controls rather than one,
           because a tag can be in support and a branch can be past its date. */}
+      {/* Cleared means the key goes, not both values written in.
+          Both of these default to the working population when the address is
+          silent, and the default is applied only where the key is absent — so
+          writing "branch and tag" to mean "I have not narrowed this" made the
+          address say something, suppressed the default, and quietly widened the
+          list. There was then no way to express from this panel what the rail's
+          own address says, which is how one screen came to disagree with the
+          number that opened it. */}
       <Group legend="Release">
         <Choices
           label="Release kind"
@@ -619,7 +627,7 @@ export function Filters({
           anything="Branches and tags"
           chosen={all("on")}
           options={RELEASES}
-          onChange={(chosen) => setMany("on", chosen.length > 0 ? chosen : ["branch", "tag"])}
+          onChange={(chosen) => setMany("on", chosen)}
         />
         <Choices
           label="Support"
@@ -627,9 +635,7 @@ export function Filters({
           anything="Whatever its support"
           chosen={all("support")}
           options={SUPPORT}
-          onChange={(chosen) =>
-            setMany("support", chosen.length > 0 ? chosen : ["in-support", "past-eol"])
-          }
+          onChange={(chosen) => setMany("support", chosen)}
         />
       </Group>
 
@@ -756,18 +762,69 @@ export function Filters({
 // it — so what is on can be read and undone without opening anything.
 export function Narrowed({
   params,
+  scope,
+  widen,
   clear,
   clearAll,
 }: {
   params: URLSearchParams;
+  // What the selection narrows this list to, which is a narrowing like any
+  // other and was the one that did not say so. It rides on the path rather
+  // than in the parameters, so it drew no chip — and a list scoped to one
+  // product sat under filters identical to the list across every product,
+  // counting fewer rows, with nothing on the screen to explain the
+  // difference. The rule the three implicit filters are written into the
+  // address for is the same rule: a list that narrows itself and does not say
+  // so is how two people read one screen and disagree about what it holds.
+  scope: { product: string; stream: string; variant: string };
+  // Widening by a level. Removing a scope chip only ever widens, like every
+  // other chip here.
+  widen: (to: { product: string; stream: string; variant: string }) => void;
   clear: (chip: Active) => void;
   clearAll: () => void;
 }) {
   const active = activeFilters(params);
-  if (active.length === 0) return null;
+  const where: { label: string; value: string; to: typeof scope }[] = [];
+  if (scope.product) {
+    where.push({
+      label: "Product",
+      value: scope.product,
+      to: { product: "", stream: "", variant: "" },
+    });
+    if (scope.stream) {
+      where.push({
+        label: "Branch or tag",
+        value: scope.stream,
+        to: { product: scope.product, stream: "", variant: "" },
+      });
+    }
+    if (scope.variant) {
+      where.push({
+        label: "Variant",
+        value: scope.variant,
+        to: { product: scope.product, stream: scope.stream, variant: "" },
+      });
+    }
+  }
+  if (active.length === 0 && where.length === 0) return null;
   return (
     <div className="narrowed">
       <span className="hint">Narrowed by</span>
+      {/* First, because it is the widest of them: everything after it is
+          narrowing what this one already chose. */}
+      {where.map((each) => (
+        <button
+          key={`scope ${each.label}`}
+          type="button"
+          className="chip"
+          aria-pressed
+          title="Widen to everything under this"
+          onClick={() => widen(each.to)}
+        >
+          <span className="l">{each.label}:</span> {each.value}
+          <span aria-hidden>&times;</span>
+        </button>
+      ))}
       {active.map((each) => (
         <button
           // The key and the value, because a multi-valued filter puts one
@@ -788,7 +845,7 @@ export function Narrowed({
       ))}
       {active.length > 1 && (
         <button type="button" className="linkish" onClick={clearAll}>
-          Clear all {active.length}
+          Clear all {active.length} filters
         </button>
       )}
     </div>

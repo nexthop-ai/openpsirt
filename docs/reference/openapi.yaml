@@ -5930,7 +5930,7 @@ components:
           minLength: 1
           type: string
         open:
-          description: Issues open against it, counted at components rather than at every place they sit
+          description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
         tags:
@@ -7879,7 +7879,7 @@ components:
           minLength: 1
           type: string
         open:
-          description: Issues open against it, counted at components rather than at every place they sit
+          description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
         parent:
@@ -8267,7 +8267,7 @@ components:
           minLength: 1
           type: string
         open:
-          description: Issues open against it here, counted at components rather than at every place they sit
+          description: Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
       required:
@@ -12687,6 +12687,14 @@ paths:
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-products
+      parameters:
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:
@@ -16655,6 +16663,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:
@@ -16816,6 +16831,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:
@@ -18888,6 +18910,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:

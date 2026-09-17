@@ -773,7 +773,9 @@ function Credentials({ me }: { me: Who }) {
                         type="button"
                         className="linkish"
                         disabled={!me.admin}
-                        title={me.admin ? undefined : "Only an administrator withdraws a credential"}
+                        title={
+                          me.admin ? undefined : "Only an administrator withdraws a credential"
+                        }
                         onClick={() => withdrawKey.mutate(key.name ?? "")}
                       >
                         Withdraw
@@ -812,7 +814,9 @@ function Credentials({ me }: { me: Who }) {
                         type="button"
                         className="linkish"
                         disabled={!me.admin}
-                        title={me.admin ? undefined : "Only an administrator withdraws a credential"}
+                        title={
+                          me.admin ? undefined : "Only an administrator withdraws a credential"
+                        }
                         onClick={() =>
                           withdrawToken.mutate({
                             identity: token.owner ?? "",

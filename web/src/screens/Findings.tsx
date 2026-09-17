@@ -6,6 +6,7 @@ import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
 import { FLOORS } from "../ui/severities";
 import { Filters, Narrowed, STATES, activeFilters, without, withoutAny } from "./FindingsFilters";
 import { Choices } from "../ui/Choices";
+import { findingsPath } from "../app/scope";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ import {
   hidden,
   identityOf,
   pathTo,
+  widened,
   type Row,
   type SortWord,
   usePaging,
@@ -681,6 +683,13 @@ export function Findings() {
           meant opening a panel and looking at nine controls. */}
       <Narrowed
         params={asked}
+        scope={{ product, stream, variant }}
+        // Widening a level is a move rather than a parameter change, because
+        // the selection rides on the path. The filters travel with it: what
+        // was asked of one product is the same question asked of all of them,
+        // and dropping the narrowing somebody did not touch would be a second
+        // surprise on top of the one this chip exists to end.
+        widen={(to) => navigate(widened(findingsPath(to), asked))}
         // Through the same function every other change goes through, so the
         // invariant above holds by construction rather than by a property of
         // the chips: today every chip either drops its key or puts the wider

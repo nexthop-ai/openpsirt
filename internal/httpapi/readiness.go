@@ -61,12 +61,12 @@ type BlockingBody struct {
 	// so one issue at three versions of one component is three rows here.
 	// Without it they arrived identical: four rows reading "CVE-2026-46595
 	// golang.org/x/crypto", differing only in a count the panel does not draw.
-	Version string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
-	Severity      string `json:"severity,omitempty"`
-	Exploited     bool   `json:"exploited,omitempty"`
-	Places        int    `json:"places" doc:"How many places of the build it sits at"`
-	State         string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"How far it has been decided. Anything agreed is not in this list"`
-	Due           string `json:"due,omitempty"`
+	Version   string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
+	Severity  string `json:"severity,omitempty"`
+	Exploited bool   `json:"exploited,omitempty"`
+	Places    int    `json:"places" doc:"How many places of the build it sits at"`
+	State     string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"How far it has been decided. Anything agreed is not in this list"`
+	Due       string `json:"due,omitempty"`
 }
 
 // blocking is how many of the worst are listed.

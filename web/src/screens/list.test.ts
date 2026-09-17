@@ -10,6 +10,7 @@ import {
   pageSize,
   pathTo,
   where,
+  widened,
   windowFor,
 } from "./list";
 
@@ -296,5 +297,41 @@ describe("a date the address carries", () => {
 
   it("crosses a leap day like any other", () => {
     expect(daysBack(1, new Date("2028-03-01T12:00:00Z"))).toBe("2028-02-29");
+  });
+});
+
+describe("widening out of a scope", () => {
+  // The query half of what widened() built, since the rest of it is a path.
+  const query = (address: string) => new URLSearchParams(address.split("?")[1] ?? "");
+
+  // The selection rides on the path, so widening is a move. What it must not
+  // do is drop the narrowing somebody actually chose on the way: that is the
+  // second surprise on top of the one the scope chip exists to end.
+  it("carries the filters across", () => {
+    const asked = new URLSearchParams("assigned=nobody&state=undecided&on=branch");
+    const out = query(widened("/findings", asked));
+    expect(out.get("assigned")).toBe("nobody");
+    expect(out.get("state")).toBe("undecided");
+    expect(out.get("on")).toBe("branch");
+  });
+
+  it("lets the address being built own the branch and the variant", () => {
+    // findingsPath puts back whichever of these the new scope still has, so
+    // carrying the old ones would name a build the new path is not about.
+    const asked = new URLSearchParams("state=undecided&stream=master&variant=broadcom");
+    const out = query(widened("/products/sonic/findings?stream=master", asked));
+    expect(out.getAll("stream")).toEqual(["master"]);
+    expect(out.getAll("variant")).toEqual([]);
+    expect(out.get("state")).toBe("undecided");
+  });
+
+  it("keeps every value of a filter that has several", () => {
+    const asked = new URLSearchParams("state=undecided&state=waiting&state=lapsed");
+    const out = query(widened("/findings", asked));
+    expect(out.getAll("state")).toEqual(["undecided", "waiting", "lapsed"]);
+  });
+
+  it("asks for nothing where nothing was asked", () => {
+    expect(widened("/findings", new URLSearchParams())).toBe("/findings");
   });
 });

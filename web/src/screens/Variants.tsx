@@ -26,20 +26,24 @@ export function Variants() {
   const [facing, setFacing] = useState(true);
 
   const ofRelease = useQuery({
-    queryKey: ["variants", product, stream],
+    queryKey: ["variants", product, stream, "counts"],
     enabled: !!stream,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/streams/{stream}/variants", {
-          params: { path: { product, stream } },
+          params: { path: { product, stream }, query: { counts: true } },
         }),
       ),
   });
   const ofProduct = useQuery({
-    queryKey: ["variants", product],
+    queryKey: ["variants", product, "counts"],
     enabled: !stream,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
+      unwrap(
+        await api.GET("/v1/products/{product}/variants", {
+          params: { path: { product }, query: { counts: true } },
+        }),
+      ),
   });
   const variants = stream ? ofRelease : ofProduct;
 

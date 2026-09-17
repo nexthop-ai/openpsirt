@@ -71,7 +71,8 @@ type ProductBody struct {
 	Branches int `json:"branches,omitempty" doc:"How many branches are declared"`
 	Tags     int `json:"tags,omitempty" doc:"How many tags are declared"`
 	Variants int `json:"variants,omitempty" doc:"How many variants are declared"`
-	Open     int `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit"`
+	// Counting what is open is the expensive half of a catalog read: a list of two products took 0.39s against 1ms for a liveness probe, and it scaled with the findings rather than with the rows. So it is asked for rather than always done, and a pointer so that "nobody asked" and "none open" are different answers — a screen drawing an unasked-for count as zero reports a clean product.
+	Open *int `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
 	// LastScanAt is absent where nothing has ever been filed against any of
 	// this product's builds.
 	LastScanAt string `json:"last_scan_at,omitempty" doc:"When a scan last arrived for any of its builds"`
@@ -114,7 +115,7 @@ type StreamBody struct {
 	// Open and LastScanAt, for the same reason the product list carries them:
 	// a line that has stopped being built looks identical to a healthy one
 	// until somebody opens it.
-	Open       int    `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit"`
+	Open       *int   `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
 	LastScanAt string `json:"last_scan_at,omitempty" doc:"When a scan last arrived for any build of it"`
 	// EndOfLife is the date support ends and whether this release stated it.
 	// Absent with Inherited set means it follows its product; absent with
@@ -133,7 +134,7 @@ type VariantBody struct {
 	// saying no. An unclassified artifact should rank as though it ships,
 	// which means the default is yes and silence must not read as a denial.
 	CustomerFacing *bool `json:"customer_facing,omitempty" doc:"Whether this reaches customers. Defaults to yes"`
-	Open           int   `json:"open,omitempty" doc:"Issues open against it here, counted at components rather than at every place they sit"`
+	Open           *int  `json:"open,omitempty" doc:"Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for"`
 }
 
 // declaredOutput reports what a declaration did.

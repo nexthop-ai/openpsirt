@@ -7779,7 +7779,7 @@ export interface components {
             name: string;
             /**
              * Format: int64
-             * @description Issues open against it, counted at components rather than at every place they sit
+             * @description Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
             /**
@@ -8929,7 +8929,7 @@ export interface components {
             name: string;
             /**
              * Format: int64
-             * @description Issues open against it, counted at components rather than at every place they sit
+             * @description Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
             /** @description For a tag, the branch it was cut from */
@@ -9145,7 +9145,7 @@ export interface components {
             name: string;
             /**
              * Format: int64
-             * @description Issues open against it here, counted at components rather than at every place they sit
+             * @description Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
         };
@@ -11762,7 +11762,10 @@ export interface operations {
     };
     "list-products": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -13583,7 +13586,10 @@ export interface operations {
     };
     "list-streams": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path: {
                 product: string;
@@ -13717,7 +13723,10 @@ export interface operations {
     };
     "list-release-variants": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path: {
                 product: string;
@@ -14917,7 +14926,10 @@ export interface operations {
     };
     "list-variants": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path: {
                 product: string;

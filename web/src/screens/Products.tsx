@@ -21,9 +21,14 @@ export function Products({ who }: { who: Who }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
+  // Counted, and keyed as counted. What is open against each row is asked for
+  // rather than always done, and a read that asked shares nothing with one
+  // that did not — keyed the same, the picker's uncounted answer and this
+  // screen's would be one cache entry and whichever arrived first would win.
   const products = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
+    queryKey: ["products", "counts"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/products", { params: { query: { counts: true } } })),
   });
   const declare = useMutation({
     mutationFn: async () =>
