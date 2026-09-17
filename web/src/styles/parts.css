@@ -894,6 +894,19 @@ button.vchip {
   }
 }
 
+/* The list a bulk judgment is picked out of. Bounded, because a page here is
+   five hundred rows — a kernel carries thousands and assembling one claim a
+   page at a time is eighteen claims where the person meant one — and the form
+   that judgment is typed into has to stay reachable without scrolling past all
+   of them. */
+.picklist {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  margin-bottom: 14px;
+}
+
 .floor {
   display: flex;
   align-items: center;

@@ -136,7 +136,6 @@
 :root,
 :root[data-look="dark"] {
   --sev-exploited-bg: color-mix(in oklab, var(--sev-exploited) 12%, transparent);
-  --ok-bg: color-mix(in oklab, var(--ok) 12%, transparent);
 }
 
 * {

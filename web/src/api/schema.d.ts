@@ -2955,7 +2955,7 @@ export interface paths {
         };
         /**
          * List the issues open against one component
-         * @description Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at and the version that fixes it where the report names one.
+         * @description Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at, the version that fixes it where the report names one, and what one judgment about it would be made on: what the issue says about itself, whether anybody is known to be exploiting it, the published estimate, and the earliest deadline among its places here.
          *
          *     `contains` matches the text of a report. It narrows a list; it is not part of any claim made afterwards.
          *
@@ -4679,8 +4679,17 @@ export interface components {
             team?: string;
         };
         AtComponentBody: {
+            /** @description When it runs out, as a date. The earliest among its places here, which is the one that makes it late */
+            due?: string;
+            /** @description Somebody is known to be exploiting this */
+            exploited?: boolean;
             /** @description The version the report says fixes it, where it names one */
             fixed_in?: string;
+            /**
+             * Format: double
+             * @description Published estimate that this will be exploited, 0 to 1
+             */
+            likelihood?: number;
             /**
              * Format: int64
              * @description How many places in this build it sits at
@@ -4688,6 +4697,8 @@ export interface components {
             places: number;
             /** @description How bad the report rates it */
             severity?: string;
+            /** @description The first line of what the issue says about itself, cut to fit a row */
+            summary?: string;
             vulnerability: string;
         };
         AttachmentBody: {

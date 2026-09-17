@@ -374,15 +374,28 @@ components:
     AtComponentBody:
       additionalProperties: false
       properties:
+        due:
+          description: When it runs out, as a date. The earliest among its places here, which is the one that makes it late
+          type: string
+        exploited:
+          description: Somebody is known to be exploiting this
+          type: boolean
         fixed_in:
           description: The version the report says fixes it, where it names one
           type: string
+        likelihood:
+          description: Published estimate that this will be exploited, 0 to 1
+          format: double
+          type: number
         places:
           description: How many places in this build it sits at
           format: int64
           type: integer
         severity:
           description: How bad the report rates it
+          type: string
+        summary:
+          description: The first line of what the issue says about itself, cut to fit a row
           type: string
         vulnerability:
           type: string
@@ -17216,7 +17229,7 @@ paths:
   /v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/issues:
     get:
       description: |-
-        Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at and the version that fixes it where the report names one.
+        Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at, the version that fixes it where the report names one, and what one judgment about it would be made on: what the issue says about itself, whether anybody is known to be exploiting it, the published estimate, and the earliest deadline among its places here.
 
         `contains` matches the text of a report. It narrows a list; it is not part of any claim made afterwards.
 
