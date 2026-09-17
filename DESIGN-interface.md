@@ -244,17 +244,29 @@ waiting for review, what is being worked on, what stopped applying, then the
 trends, and the operational state at the foot. The trends answer a question
 asked occasionally, and they are also the slowest part of the page.
 
-Four figures lead, and they follow the scope: open at or above the floor, known
-exploited, pending the reader's approval, and overdue. Open is the trend's
-latest point at every scope, which counts distinct issues — the findings list
-counts one row per issue and component, and a tile switching between the two as
-the picker moved would quote two figures for one word.
+**The reader's own work leads, then the shape of the estate.** Assigned to
+them, and claims of theirs an approver sent back; then open at or above the
+floor, known exploited, pending their approval, and overdue. Home answered "how
+much is there" and never "what do I do next" — the largest number on the screen
+was the whole estate's open count, which is the least actionable thing on it,
+and the one panel that could have carried somebody's own work is deliberately
+everybody else's.
+
+Open is the trend's latest point at every scope, which counts distinct issues —
+the findings list counts one row per issue and component, and a tile switching
+between the two as the picker moved would quote two figures for one word.
+
+**What became of a claim is derived rather than stored**, so there is no count
+to ask the server for: a page is read and what is on it is counted, and the
+tile says so where the page was cut. That is the treatment the deadline tiles
+beside it already get.
 
 | Panel | |
 |---|---|
 | **Release readiness** | The picked branch against the last release cut from it, band by band, with the move shown as a direction rather than a signed number: fewer is better here, so the color follows the meaning and not the arithmetic. Drawn only where the question has an answer — it needs a whole build, because a count across products is not a release, and a branch, because a tag is one frozen point |
 | **Quiet builds** | A build that stops being scanned reports no new findings and fails nothing, so it looks healthier than one still being scanned. Named one at a time rather than counted, because a number is read past and a name is acted on. On the front page and on the scans screen |
 | **Overdue and due soon** | Overdue is a report about something that has already happened; due-soon is the week somebody can still finish. Both come from one read of the deadline list. The overdue tile pointed at the assignments screen, which answers what is *mine*, so the number and the screen it opened disagreed for everybody but the person holding all of it |
+| **In progress** | How much each person and team holds, with the reader's own row first. The panel is about the shape of the work rather than about one person, and it stays that way — but reading your own row off a list of colleagues, where it may fall below the three this shows, is why somebody who works here went elsewhere to find out |
 
 Every figure opens the list it counts, narrowed the way the figure was counted —
 the aging buckets, the fixed and appeared counts, both deadline tiles. A number
@@ -877,6 +889,8 @@ with an avatar.
 | Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The unassigned list spans every product somebody can see, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
+| **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
+| A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 
 A screen for the standing rules (REQ-34), per product, shown as a numbered list
 because the order *is* the precedence: the first rule that matches places the

@@ -19,6 +19,12 @@ import { Wide } from "../ui/Wide";
 // rather than leaving a page to pass for the answer.
 const OVERDUE_LIMIT = 200;
 
+// The most of a person's own claims the "sent back" tile reads. What became of
+// a claim is derived from its rows rather than stored on them, so there is no
+// count to ask for — a page is read and what is on it counted, and the tile
+// says so where the page was cut.
+const BACK_LIMIT = 200;
+
 // How far ahead "soon" looks. A fortnight is the window the deadline list
 // itself defaults to, and it is about as far out as somebody can act on: a
 // quarter ahead is a plan rather than a week's work.
@@ -85,7 +91,7 @@ export function Home({ who }: { who: Who }) {
 
       <div className="panels">
         <Pending />
-        <InProgress />
+        <InProgress me={who.identity} />
         <Lapsed />
 
         <div className="panel wide">
@@ -362,6 +368,29 @@ function Figures({
         }),
       ),
   });
+  // What this person is holding, and what has come back to them. **Home
+  // answered "how much is there" and never "what do I do next":** the largest
+  // number on the screen was the whole estate's open count, and the one panel
+  // that could have carried her own work is deliberately everybody else's.
+  // Both of these existed as endpoints and as screens one click away.
+  const assigned = useQuery({
+    queryKey: ["home", "assigned", "me", scope],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/people/{identity}/assignments", {
+          params: { path: { identity: "me" }, query: { limit: 1, ...scope } },
+        }),
+      ),
+  });
+  // Sent back is derived from a claim's rows rather than stored on them, so
+  // there is no count to ask the server for: a page is read and what is on it
+  // is counted, and the tile says "+" where the page was cut. The same
+  // treatment the deadline tiles beside it get, for the same reason.
+  const became = useQuery({
+    queryKey: ["home", "became", "me"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/my-claims", { params: { query: { limit: BACK_LIMIT } } })),
+  });
   const queue = useQuery({
     queryKey: ["queue", "count", scope],
     queryFn: async () =>
@@ -412,6 +441,9 @@ function Figures({
 
   const latest = points[points.length - 1];
   const openCount = latest?.open;
+  const backRows = became.data?.items ?? [];
+  const sentBack = backRows.filter((row) => row.happened === "sent-back").length;
+  const backCut = (became.data?.total ?? backRows.length) > backRows.length;
   const running = late.data?.items ?? [];
   const overdue = running.filter((row) => (row.days_left ?? 0) < 0);
   const overdueExploited = overdue.filter((row) => row.exploited).length;
@@ -451,6 +483,28 @@ function Figures({
 
   return (
     <div className="kpis">
+      {/* Hers first. What somebody opening this most days has to decide is
+          what to pick up, and a count of the estate does not answer it. */}
+      <button type="button" className="kpi" onClick={() => navigate("/work")}>
+        <span className="l">Assigned to you · {counting}</span>
+        <span className="n">
+          {assigned.isError ? "—" : (assigned.data?.total ?? 0).toLocaleString()}
+        </span>
+        <span className="d">yours and your teams&rsquo;</span>
+      </button>
+      <button
+        type="button"
+        className={`kpi${sentBack > 0 ? " urgent" : ""}`}
+        onClick={() => navigate("/queue?mine=true")}
+      >
+        <span className="l">Sent back to you</span>
+        <span className="n">
+          {became.isError
+            ? "—"
+            : `${sentBack.toLocaleString()}${backCut && sentBack > 0 ? "+" : ""}`}
+        </span>
+        <span className="d">claims an approver returned</span>
+      </button>
       {/* Unnarrowed, because the figure is. The list writes three narrowings
           into its own address when the address says nothing, and none of them
           was applied to the count — so every figure here opened a list with
@@ -648,7 +702,7 @@ function Pending() {
 
 // What each person holds. Nothing lists what one person holds — only how much
 // each person holds — so this is everybody rather than you.
-function InProgress() {
+function InProgress({ me }: { me: string }) {
   const at = useScope();
   const product = at.product ? { product: at.product } : {};
   const held = useQuery({
@@ -661,7 +715,16 @@ function InProgress() {
     enabled: !!at.product,
     queryFn: async () => unwrap(await api.GET("/v1/assignments", { params: { query: {} } })),
   });
-  const mine = held.data?.items ?? [];
+  // The viewer's own row first, then everybody else's in the order the server
+  // gave them. The panel is deliberately about how much each person holds
+  // rather than about what one person holds — but reading your own row off a
+  // list of colleagues, where it may be below the three this shows, is why
+  // somebody who works here had to go somewhere else to find out.
+  const rows = held.data?.items ?? [];
+  const mine = [
+    ...rows.filter((each) => each.person === me),
+    ...rows.filter((each) => each.person !== me),
+  ];
   const total = mine.reduce((sum, each) => sum + (each.open ?? 0), 0);
   const overdue = mine.reduce((sum, each) => sum + (each.overdue ?? 0), 0);
 
@@ -691,7 +754,7 @@ function InProgress() {
       <ul>
         {mine.slice(0, 3).map((each) => (
           <li key={each.person}>
-            <span className="id">{each.person}</span>
+            <span className="id">{each.person === me ? "you" : each.person}</span>
             <span className="what">{each.open} open</span>
             {(each.overdue ?? 0) > 0 && <span className="when">{each.overdue} overdue</span>}
           </li>

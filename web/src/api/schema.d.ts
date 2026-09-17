@@ -4166,6 +4166,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/teams/{team}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what one team is dealing with
+         * @description The open findings routed to a team, most urgent first, in the same units as everywhere else: **one item per issue in a component in a product**.
+         *
+         *     Work goes to a team by standing rule and by an assignment naming one, so a team holds work the way a person does — and the totals list says so. This is the list behind that number.
+         *
+         *     A team nobody declared answers with an empty list rather than a 404, which is also what a team whose work is not yours to see answers. The two are deliberately the same, for the reason a person's is: refusing would answer "does this team exist" for any credential at all.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see. A team nobody declared answers as one whose work you cannot see.
+         */
+        get: operations["list-team-assigned"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/teams/{team}/members/{identity}": {
         parameters: {
             query?: never;
@@ -6631,6 +6657,17 @@ export interface components {
             /** Format: int64 */
             total: number;
             waiting: components["schemas"]["QueuedBody"][] | null;
+        };
+        "List-team-assignedResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-team-assignedResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["UnassignedBody"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         "List-unassignedResponse": {
             /**
@@ -15733,6 +15770,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-team-assigned": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                stream?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The team's name */
+                team: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-team-assignedResponse"];
+                };
             };
             /** @description Error */
             default: {
