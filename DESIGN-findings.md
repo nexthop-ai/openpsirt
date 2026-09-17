@@ -151,9 +151,16 @@ would depend on which scan ran last.
 | Field | Rule | Reason |
 |---|---|---|
 | Known-exploited | Moves forward only | It is a claim about the world rather than a description of an issue: a later report not mentioning it is a gap in that report |
-| Score, likelihood | Keeps the worst anybody claimed | A maximum is the only answer that comes out the same whatever the order. A report saying something is worse is news; one saying it is milder is a gap |
+| Score | Keeps the worst anybody claimed | A maximum is the only answer that comes out the same whatever the order. A report saying something is worse is news; one saying it is milder is a gap |
+| Likelihood | Keeps the newest, by the day the estimate is about | It is a thirty-day forecast recomputed every day and it legitimately falls, so a maximum makes the order answer "was ever risky" rather than "is risky" — a spike read as the issue's value for ever. What makes it order-independent is the day rather than which scan wrote last: a dated estimate beats an undated one and an older dated one, and two undated reports are last-seen |
+| Likelihood, where a report carries none | Left alone | Silence is a gap in that report. A feed omitting the estimate is not a feed saying it is zero |
 
 A test puts the same two reports through in both orders and asserts they agree.
+
+**The estimate carries what it means and when.** Where it stands among all
+published ones, and the day it was computed for. The probability alone is
+unreadable — nobody acts on 0.00042 — and the percentile is the same fact a
+reader can use.
 
 The maximum is written out rather than using the engines' greatest-of function,
 which is not agreed on when one side is absent: two of the four answer "unknown"
@@ -643,7 +650,9 @@ at the top, which on a real image is the kernel.
 It is worked out from what is on record about the issue, not from the report
 being applied. A report is one source's account of one moment: it may omit that
 something is being exploited, or carry a score lower than last week's. What the
-issue holds is the worst anybody has claimed, moving only toward worse.
+issue holds is the worst anybody has claimed for the two that are claims, and
+for the likelihood the newest anybody has published — see the table above for
+why those differ.
 
 **The fourth signal, the rating, belongs to a product** (REQ-29). Three of the
 four are properties of the issue and reach every product holding it; the rating

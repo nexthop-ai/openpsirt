@@ -77,6 +77,14 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- spells an exact decimal differently and a float compares
 			-- differently again, and this has to sort in an index.
 			"likelihood_ppm"  ` + t.ref + ` NULL,
+			-- Where that estimate stands among all of them, and the day it was
+			-- computed for. The estimate is a thirty-day forecast recomputed
+			-- daily and it legitimately falls, so the day it is about is what
+			-- decides whether a report is newer than what is stored — without
+			-- it, keeping the highest anybody ever published made the order
+			-- answer "was ever risky" instead of "is risky".
+			"likelihood_percentile_ppm" ` + t.ref + ` NULL,
+			"likelihood_on"   ` + t.timestamp + ` NULL,
 			-- The severity as a number, and the statement of what it assumes.
 			-- Network-reachable and unauthenticated is a different judgment
 			-- from local-and-privileged at the same number, and the vector is

@@ -5933,6 +5933,13 @@ export interface components {
              * @description Published probability of exploitation, 0 to 1
              */
             likelihood?: number;
+            /** @description The day the estimate was computed for, as a date */
+            likelihood_on?: string;
+            /**
+             * Format: double
+             * @description Where that estimate stands among all published ones, 0 to 1
+             */
+            likelihood_percentile?: number;
             links?: components["schemas"]["LinkBody"][] | null;
             /** @enum {string} */
             matched?: "advisory" | "identifier";

@@ -477,3 +477,63 @@ func (f *fixture) urgencyIn(t *testing.T, target int64, identifier string) int64
 	}
 	return rank
 }
+
+func TestAFallingLikelihoodIsTakenRatherThanItsPeak(t *testing.T) {
+	// The estimate is a thirty-day forecast recomputed every day, and it
+	// legitimately falls. Kept as the worst anybody ever published — which is
+	// right for a score and for being exploited, both of which are claims
+	// about the world — a CVE that spiked once read its peak for ever, and
+	// ordering by it answered "was ever risky" rather than "is risky".
+	//
+	// Which of two reports is newer is a question about the day the estimate
+	// was computed for, not about which scan ran last: reports arrive in an
+	// order nobody controls.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		spiked := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		settled := time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC)
+
+		peak := finding.Reported{
+			Issue: finding.Named{
+				Identifier: "CVE-2026-3", Severity: "high",
+				Likelihood: 0.9, LikelihoodPercentile: 0.99, LikelihoodOn: &spiked,
+			},
+			Component: libnl, FixState: finding.NoFix,
+		}
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{peak}); err != nil {
+			t.Fatal(err)
+		}
+		was := f.open(t)[0].Urgency
+
+		// A week later the forecast has come down.
+		today := peak
+		today.Issue.Likelihood = 0.05
+		today.Issue.LikelihoodPercentile = 0.6
+		today.Issue.LikelihoodOn = &settled
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{today}); err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range f.open(t) {
+			if row.Urgency >= was {
+				t.Errorf("urgency is %d after the estimate fell from 0.9 to 0.05, was %d — "+
+					"the peak is still what the order reads", row.Urgency, was)
+			}
+		}
+
+		// And the stale report arriving late does not put the peak back:
+		// which of two estimates is newer is about the day, not about which
+		// scan ran last.
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{peak}); err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range f.open(t) {
+			if row.Urgency >= was {
+				t.Errorf("a report about an earlier day put the peak back: urgency is %d, "+
+					"and the spike read %d", row.Urgency, was)
+			}
+		}
+	})
+}

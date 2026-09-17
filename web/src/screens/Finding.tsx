@@ -604,11 +604,22 @@ export function Finding() {
               <span className="n">{it.score ? it.score.toFixed(1) : "—"}</span>
               <span className="l">CVSS</span>
             </div>
+            {/* The estimate, what it means, and whether it is current.
+                Nobody acts on 0.00042; "higher than 91% of everything
+                published" is the same number a reader can use. It is a
+                thirty-day forecast recomputed daily, so the day it is about
+                is part of it rather than a detail. */}
             <div className="score">
               <span className="n">
                 {typeof it.likelihood === "number" ? it.likelihood.toFixed(3) : "—"}
               </span>
-              <span className="l">EPSS</span>
+              <span className="l">
+                EPSS
+                {typeof it.likelihood_percentile === "number" && it.likelihood_percentile > 0 && (
+                  <> · {(it.likelihood_percentile * 100).toFixed(0)}th pct</>
+                )}
+              </span>
+              {it.likelihood_on && <span className="l">as of {it.likelihood_on}</span>}
             </div>
             <div className="score">
               <span className="n">{(it.weaknesses ?? [])[0] ?? "—"}</span>

@@ -163,6 +163,12 @@ type grypeMatch struct {
 		// What the published estimates say about it being used.
 		EPSS []struct {
 			EPSS float64 `json:"epss"`
+			// Where that estimate stands among all of them, and the day it
+			// was computed for. A reader cannot act on 0.00042 and can act on
+			// "higher than 91% of everything published", and the day is what
+			// says whether this estimate is newer than the stored one.
+			Percentile float64 `json:"percentile"`
+			Date       string  `json:"date"`
 		} `json:"epss"`
 		Risk float64 `json:"risk"`
 		KEV  []struct {
@@ -360,19 +366,22 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	if err != nil {
 		return nil, err
 	}
+	epss := firstEPSS(match.Vulnerability.EPSS)
 	return &finding.Reported{
 		Issue: finding.Named{
-			Identifier:  match.Vulnerability.ID,
-			Aliases:     aliases,
-			Severity:    strings.ToLower(match.Vulnerability.Severity),
-			Description: strings.TrimSpace(match.Vulnerability.Description),
-			Advisory:    strings.TrimSpace(match.Vulnerability.DataSource),
-			References:  pointing,
-			Exploited:   len(match.Vulnerability.KEV) > 0,
-			Likelihood:  firstEPSS(match.Vulnerability.EPSS),
-			Score:       score,
-			Vector:      vector,
-			Weaknesses:  weaknesses(match.Vulnerability.CWEs),
+			Identifier:           match.Vulnerability.ID,
+			Aliases:              aliases,
+			Severity:             strings.ToLower(match.Vulnerability.Severity),
+			Description:          strings.TrimSpace(match.Vulnerability.Description),
+			Advisory:             strings.TrimSpace(match.Vulnerability.DataSource),
+			References:           pointing,
+			Exploited:            len(match.Vulnerability.KEV) > 0,
+			Likelihood:           epss.value,
+			LikelihoodPercentile: epss.percentile,
+			LikelihoodOn:         epss.on,
+			Score:                score,
+			Vector:               vector,
+			Weaknesses:           weaknesses(match.Vulnerability.CWEs),
 		},
 		Component: graph.Described{
 			Name: match.Artifact.Name, Version: match.Artifact.Version,
@@ -634,16 +643,36 @@ func rating(ratings []struct {
 	return 0, ""
 }
 
+// estimate is the published likelihood, where it stands, and the day it is
+// about.
+type estimate struct {
+	value      float64
+	percentile float64
+	on         *time.Time
+}
+
 // firstEPSS reads the published estimate that an issue will be exploited.
+//
+// The day it was computed for travels with it, because the estimate is a
+// thirty-day forecast recomputed daily and legitimately falls: which of two
+// reports carries the newer estimate is a question about that day rather than
+// about which scan ran last.
 func firstEPSS(estimates []struct {
-	EPSS float64 `json:"epss"`
-}) float64 {
-	for _, estimate := range estimates {
-		if estimate.EPSS > 0 {
-			return estimate.EPSS
+	EPSS       float64 `json:"epss"`
+	Percentile float64 `json:"percentile"`
+	Date       string  `json:"date"`
+}) estimate {
+	for _, published := range estimates {
+		if published.EPSS <= 0 {
+			continue
 		}
+		answer := estimate{value: published.EPSS, percentile: published.Percentile}
+		if on, err := time.Parse(time.DateOnly, strings.TrimSpace(published.Date)); err == nil {
+			answer.on = &on
+		}
+		return answer
 	}
-	return 0
+	return estimate{}
 }
 
 // firstFixDate reads when a fix became available.

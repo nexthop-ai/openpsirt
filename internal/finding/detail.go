@@ -58,9 +58,14 @@ type Evidence struct {
 	// from the thousands that can wait.
 	Exploited     bool
 	LikelihoodPPM int
-	Weaknesses    []string
-	Description   string
-	Advisory      string
+	// Where that estimate stands among all of them, and the day it is about.
+	// The number alone is unreadable — 0.00042 is not something anybody acts
+	// on — and the day is what says whether it is current.
+	LikelihoodPercentilePPM int
+	LikelihoodOn            *time.Time
+	Weaknesses              []string
+	Description             string
+	Advisory                string
 	// References are everything the data points at, with patches told apart —
 	// somebody deciding whether to backport rather than upgrade needs the
 	// change itself, and hunting for it by hand is the step that does not
@@ -305,6 +310,10 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	if issue.ScoreCenti != nil {
 		evidence.ScoreCenti = *issue.ScoreCenti
 	}
+	if issue.LikelihoodPercentilePPM != nil {
+		evidence.LikelihoodPercentilePPM = *issue.LikelihoodPercentilePPM
+	}
+	evidence.LikelihoodOn = issue.LikelihoodOn
 	if issue.LikelihoodPPM != nil {
 		evidence.LikelihoodPPM = *issue.LikelihoodPPM
 	}

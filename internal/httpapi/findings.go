@@ -647,14 +647,19 @@ type EvidenceBody struct {
 	// Both are carried and both are shown: a rating of ours put where the
 	// world's goes reads as the world's, and the first person to check
 	// against the public record finds a discrepancy nobody declared.
-	Assessed    string   `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
-	Score       float64  `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
-	Vector      string   `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
-	Exploited   bool     `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	Likelihood  float64  `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
-	Weaknesses  []string `json:"weaknesses,omitempty" doc:"What kind of flaw this is, as CWE identifiers"`
-	Description string   `json:"description,omitempty"`
-	Advisory    string   `json:"advisory,omitempty" doc:"Where the issue is written up"`
+	Assessed   string  `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
+	Score      float64 `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
+	Vector     string  `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
+	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	Likelihood float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
+	// What the estimate means and whether it is current. The probability
+	// alone is unreadable — nobody acts on 0.00042 — and it is a thirty-day
+	// forecast recomputed daily, so the day it is about is part of it.
+	LikelihoodPercentile float64  `json:"likelihood_percentile,omitempty" doc:"Where that estimate stands among all published ones, 0 to 1"`
+	LikelihoodOn         string   `json:"likelihood_on,omitempty" doc:"The day the estimate was computed for, as a date"`
+	Weaknesses           []string `json:"weaknesses,omitempty" doc:"What kind of flaw this is, as CWE identifiers"`
+	Description          string   `json:"description,omitempty"`
+	Advisory             string   `json:"advisory,omitempty" doc:"Where the issue is written up"`
 	// References carries patches first, because for somebody deciding whether
 	// to backport rather than upgrade, the change itself is the answer.
 	References []ReferenceBody `json:"references,omitempty"`
@@ -903,7 +908,11 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Assessed: e.Assessed,
 		Score:    float64(e.ScoreCenti) / 100, Vector: e.Vector,
 		Exploited: e.Exploited, Likelihood: float64(e.LikelihoodPPM) / 1_000_000,
-		Weaknesses: e.Weaknesses, Description: e.Description, Advisory: e.Advisory,
+		LikelihoodPercentile: float64(e.LikelihoodPercentilePPM) / 1_000_000,
+		// The day rather than an instant: the estimate is computed per day,
+		// and a timestamp would state a precision the feed does not have.
+		LikelihoodOn: dayOf(e.LikelihoodOn),
+		Weaknesses:   e.Weaknesses, Description: e.Description, Advisory: e.Advisory,
 		Component: e.Component, Version: e.Version, Upstream: e.Upstream,
 		FixState: string(e.FixState), FixedIn: e.FixedIn, ArrivedFrom: e.ArrivedFrom,
 		Matched: string(e.Matched), MatchedFrom: e.MatchedFrom,

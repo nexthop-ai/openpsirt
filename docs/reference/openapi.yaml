@@ -2544,6 +2544,13 @@ components:
           description: Published probability of exploitation, 0 to 1
           format: double
           type: number
+        likelihood_on:
+          description: The day the estimate was computed for, as a date
+          type: string
+        likelihood_percentile:
+          description: Where that estimate stands among all published ones, 0 to 1
+          format: double
+          type: number
         links:
           items:
             $ref: "#/components/schemas/LinkBody"
