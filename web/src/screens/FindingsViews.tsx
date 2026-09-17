@@ -326,6 +326,42 @@ export function ByComponent({
   );
 }
 
+// What this view asks of the server, apart from the view that draws it.
+//
+// A bump takes six of the list's filters. The rest ask about a place, a
+// deadline or an assignee, none of which a bump has. Written once because the
+// toggle above the list counts what switching to this view would show, and a
+// count built from a second narrowing would be a number that disagrees with
+// the list it opens.
+export function bumpQuery(
+  at: { product: string; stream?: string; variant?: string },
+  query: Record<string, unknown>,
+  limit: number,
+  offset: number,
+): Record<string, unknown> {
+  const first = (value: unknown): string =>
+    Array.isArray(value) ? String(value[0] ?? "") : value == null ? "" : String(value);
+  return {
+    limit,
+    offset,
+    ...(at.stream ? { stream: at.stream } : {}),
+    ...(at.variant ? { variant: at.variant } : {}),
+    ...(query.severity ? { severity: query.severity } : {}),
+    ...(query.exploited ? { exploited: true } : {}),
+    ...(first(query.component) ? { component: first(query.component) } : {}),
+    ...(query.q ? { q: query.q } : {}),
+    ...(first(query.ecosystem) ? { ecosystem: first(query.ecosystem) } : {}),
+    ...(first(query.state) ? { state: first(query.state) } : {}),
+    // What each upgrade would close, which is what the line above this table
+    // says the order is and what somebody reads this view to decide. The
+    // list's own default is worst-first, which is the findings list's
+    // question asked again; the sort is not taken from the findings
+    // controls, whose keys are about a finding and half of which an upgrade
+    // has no answer for.
+    sort: "issues",
+  };
+}
+
 // One row per upstream bump, with what moving it would close.
 //
 // The other end of the same query the pending-upgrades screen reads: a
@@ -355,29 +391,7 @@ export function ByBump({
   // went on saying they were on.
   cannot: string[];
 }) {
-  // A bump takes six of the list's filters. The rest ask about a place, a
-  // deadline or an assignee, none of which a bump has.
-  const first = (value: unknown): string =>
-    Array.isArray(value) ? String(value[0] ?? "") : value == null ? "" : String(value);
-  const narrowed: Record<string, unknown> = {
-    limit: size,
-    offset,
-    ...(at.stream ? { stream: at.stream } : {}),
-    ...(at.variant ? { variant: at.variant } : {}),
-    ...(query.severity ? { severity: query.severity } : {}),
-    ...(query.exploited ? { exploited: true } : {}),
-    ...(first(query.component) ? { component: first(query.component) } : {}),
-    ...(query.q ? { q: query.q } : {}),
-    ...(first(query.ecosystem) ? { ecosystem: first(query.ecosystem) } : {}),
-    ...(first(query.state) ? { state: first(query.state) } : {}),
-    // What each bump would close, which is what the line above this table
-    // says the order is and what somebody reads this view to decide. The
-    // list's own default is worst-first, which is the findings list's
-    // question asked again; the sort is not taken from the findings
-    // controls, whose keys are about a finding and half of which a bump has
-    // no answer for.
-    sort: "issues",
-  };
+  const narrowed = bumpQuery(at, query, size, offset);
 
   const bundles = useQuery({
     queryKey: ["fix-bundles", at, narrowed],

@@ -2,7 +2,7 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useSelection } from "./useSelection";
 import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
-import { ByBump, ByComponent, Pager } from "./FindingsViews";
+import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
 import { FLOORS } from "../ui/severities";
 import { Filters, Narrowed, STATES, activeFilters, without, withoutAny } from "./FindingsFilters";
 import { Choices } from "../ui/Choices";
@@ -287,6 +287,70 @@ export function Findings() {
     enabled: view === "issues",
   });
 
+  // What each view would show, on the button that switches to it.
+  //
+  // The three answer the same narrowing at three grains, and the difference
+  // between them is the whole reason to switch: a product whose by-issue list
+  // is 7,455 rows is 341 by component and 284 by upgrade, and nothing said so
+  // — so the list opened on its longest view and read as the only one.
+  //
+  // Asked with a page of one, because the total is what is wanted. The
+  // by-issue count is the one the screen already holds where the by-issue view
+  // is what is drawn, so it is asked only from the other two. The by-upgrade
+  // count is a fix-bundle aggregate, measured at 2.2 s against a backlog of
+  // 8,376 — held for five minutes rather than asked again as somebody pages.
+  const byIssue = useQuery({
+    queryKey: ["findings", "count", product, stream, variant, query],
+    enabled: view !== "issues",
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      unwrap(
+        spanning
+          ? await api.GET("/v1/findings", {
+              params: { query: { ...acrossProducts(query), limit: 1, offset: 0 } },
+            })
+          : await api.GET("/v1/products/{product}/findings", {
+              params: {
+                path: { product },
+                query: { ...query, ...selection, limit: 1, offset: 0 },
+              },
+            }),
+      ),
+  });
+  const byComponent = useQuery({
+    queryKey: ["findings-by-component", "count", product, selection, query],
+    enabled: !spanning,
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/findings/components", {
+          params: {
+            path: { product },
+            query: {
+              ...(query as unknown as Record<string, never>),
+              ...selection,
+              limit: 1,
+              offset: 0,
+            },
+          },
+        }),
+      ),
+  });
+  const byUpgrade = useQuery({
+    queryKey: ["fix-bundles", "count", product, selection, query],
+    enabled: !spanning,
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/fix-bundles", {
+          params: {
+            path: { product },
+            query: bumpQuery({ product, ...selection }, query, 1, 0) as Record<string, never>,
+          },
+        }),
+      ),
+  });
+
   // Where somebody was, restored when they come back. This is the screen the
   // complaint is about: opening a finding and pressing back rebuilt the list
   // at the top of it, eighteen rows above where they had been reading.
@@ -404,10 +468,10 @@ export function Findings() {
               produce an error — and switching to one and back is how somebody
               loses the question they had built. */}
           {[
-            ["issues", "By issue"],
-            ...(spanning ? [] : [["components", "By component"] as const]),
-            ...(spanning ? [] : [["bumps", "By upgrade"] as const]),
-          ].map(([value, label]) => (
+            ["issues", "By issue", view === "issues" ? total : byIssue.data?.total],
+            ...(spanning ? [] : [["components", "By component", byComponent.data?.total] as const]),
+            ...(spanning ? [] : [["bumps", "By upgrade", byUpgrade.data?.total] as const]),
+          ].map(([value, label, count]) => (
             <button
               key={value}
               type="button"
@@ -415,6 +479,7 @@ export function Findings() {
               onClick={() => set("view", value === "issues" ? "" : (value as string))}
             >
               {label}
+              {typeof count === "number" && <span className="n">{count.toLocaleString()}</span>}
             </button>
           ))}
         </span>

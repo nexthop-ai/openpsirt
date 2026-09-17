@@ -460,6 +460,8 @@ back in its own order rather than refusing.
 | Rule | |
 |---|---|
 | A finding with no deadline sorts last whichever direction is asked for | "No deadline" is neither early nor late |
+| **Each view's button carries what that view would show** | The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-upgrade figure is a fix-bundle aggregate, measured at 2.2 s against a backlog of 8,376, so it is held for five minutes rather than asked again as somebody pages |
+| **The list opens by issue, whatever the size** | No threshold, and the other two are a click away in the toggle and in the address as a chip that removes itself. A list that jumps to a different grain past a number nobody set is a list that answers a different question on two products |
 | The order in force is named on screen, and every order can be asked for | Four of the six sit under a column header, so the other two could be reached by typing an address and by nothing else — one of them being urgency, which is the order the list opens in and what REQ-32 is for. Sorting by a column and then wanting the ranking back was a dead end |
 | An order opens the way round that order means | The worst severity, the highest likelihood and the widest reach are all "most first"; a deadline and an age are not. Due opened at the furthest-away date, which is the answer to a question nobody asks |
 | The tie-break is always the same pair of identifiers | Two rows equal on the sorted column do not swap between pages and drop one while repeating another |

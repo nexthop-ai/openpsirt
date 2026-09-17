@@ -870,6 +870,17 @@ button.vchip {
   color: var(--accent);
   font-weight: 600;
 }
+/* What switching to that view would show. Quieter than the label, because the
+   label is what is being chosen and the number is why. */
+.seg button .n {
+  margin-left: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+.seg button[aria-pressed="true"] .n {
+  color: var(--accent);
+}
 .floor {
   display: flex;
   align-items: center;
