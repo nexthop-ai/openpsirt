@@ -5971,6 +5971,12 @@ export interface components {
              * @description The same judgment as a number, where one is published
              */
             score?: number;
+            /** @description Whether it is the primary rating or a secondary one */
+            score_kind?: string;
+            /** @description Who published it, where the report names them */
+            score_source?: string;
+            /** @description Which scoring system the number is on, as the report states it */
+            score_version?: string;
             /** @description As the data rates it. A word */
             severity?: string;
             /** @description Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five */

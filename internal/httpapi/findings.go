@@ -649,11 +649,16 @@ type EvidenceBody struct {
 	// Both are carried and both are shown: a rating of ours put where the
 	// world's goes reads as the world's, and the first person to check
 	// against the public record finds a discrepancy nobody declared.
-	Assessed   string  `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
-	Score      float64 `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
-	Vector     string  `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
-	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	Likelihood float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
+	Assessed string  `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
+	Score    float64 `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
+	Vector   string  `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
+	// Where the number came from. Everything else a scan says carries its
+	// provenance; the one number a deadline is set from carried none.
+	ScoreVersion string  `json:"score_version,omitempty" doc:"Which scoring system the number is on, as the report states it"`
+	ScoreSource  string  `json:"score_source,omitempty" doc:"Who published it, where the report names them"`
+	ScoreKind    string  `json:"score_kind,omitempty" doc:"Whether it is the primary rating or a secondary one"`
+	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
 	// What the estimate means and whether it is current. The probability
 	// alone is unreadable — nobody acts on 0.00042 — and it is a thirty-day
 	// forecast recomputed daily, so the day it is about is part of it.
@@ -909,6 +914,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Vulnerability: e.Vulnerability, Aliases: e.Aliases, Severity: e.Severity,
 		Assessed: e.Assessed,
 		Score:    float64(e.ScoreCenti) / 100, Vector: e.Vector,
+		ScoreVersion: e.ScoreVersion, ScoreSource: e.ScoreSource, ScoreKind: e.ScoreKind,
 		Exploited: e.Exploited, Likelihood: float64(e.LikelihoodPPM) / 1_000_000,
 		LikelihoodPercentile: float64(e.LikelihoodPercentilePPM) / 1_000_000,
 		// The day rather than an instant: the estimate is computed per day,

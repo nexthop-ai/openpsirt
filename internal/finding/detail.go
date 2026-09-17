@@ -54,6 +54,12 @@ type Evidence struct {
 	// different judgment from local-and-privileged at the same score.
 	ScoreCenti int
 	Vector     string
+	// Who published that score, which scoring system it is, and whether it is
+	// the primary rating or a secondary one. A reader asking "who says 5.9"
+	// had nowhere to go, on the one number a deadline is set from.
+	ScoreVersion string
+	ScoreSource  string
+	ScoreKind    string
 	// Exploited and LikelihoodPPM are what separate the handful that matter
 	// from the thousands that can wait.
 	Exploited     bool
@@ -310,6 +316,8 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	if issue.ScoreCenti != nil {
 		evidence.ScoreCenti = *issue.ScoreCenti
 	}
+	evidence.ScoreVersion, evidence.ScoreSource, evidence.ScoreKind =
+		issue.ScoreVersion, issue.ScoreSource, issue.ScoreKind
 	if issue.LikelihoodPercentilePPM != nil {
 		evidence.LikelihoodPercentilePPM = *issue.LikelihoodPercentilePPM
 	}

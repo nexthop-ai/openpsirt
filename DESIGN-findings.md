@@ -157,6 +157,12 @@ would depend on which scan ran last.
 
 A test puts the same two reports through in both orders and asserts they agree.
 
+**The score carries where it came from.** Which scoring system it is on, who
+published it and whether it is the primary rating or a secondary one, filled
+where a report knows and never overwritten. Everything else a scan says is
+recorded with its provenance — what found it, what it was matched from, what it
+was matched in — and the one number a deadline is set from had none.
+
 **The estimate carries what it means and when.** Where it stands among all
 published ones, and the day it was computed for. The probability alone is
 unreadable — nobody acts on 0.00042 — and the percentile is the same fact a

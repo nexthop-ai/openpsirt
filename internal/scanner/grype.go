@@ -177,6 +177,14 @@ type grypeMatch struct {
 		CVSS []struct {
 			Version string `json:"version"`
 			Vector  string `json:"vector"`
+			// Who published this rating and whether it is the primary one.
+			// Provenance is recorded for everything else a scan says — what
+			// found it, what it was matched from, what it was matched in —
+			// and the number a deadline is set from had none, so a reader
+			// asking "who says 5.9" had nowhere to go. Absent in some
+			// reports, which is itself an answer.
+			Source  string `json:"source"`
+			Type    string `json:"type"`
 			Metrics struct {
 				BaseScore float64 `json:"baseScore"`
 			} `json:"metrics"`
@@ -346,7 +354,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	if match.Artifact.Name == "" {
 		return nil, nil
 	}
-	score, vector := rating(match.Vulnerability.CVSS)
+	published := rating(match.Vulnerability.CVSS)
 	aliases := make([]string, 0, len(match.RelatedVulnerabilities))
 	// Where else this issue is written up, from every identifier it
 	// answers to. Deduplicated by `references`, which the matched
@@ -379,8 +387,11 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 			Likelihood:           epss.value,
 			LikelihoodPercentile: epss.percentile,
 			LikelihoodOn:         epss.on,
-			Score:                score,
-			Vector:               vector,
+			Score:                published.score,
+			Vector:               published.vector,
+			ScoreVersion:         published.version,
+			ScoreSource:          published.source,
+			ScoreKind:            published.kind,
 			Weaknesses:           weaknesses(match.Vulnerability.CWEs),
 		},
 		Component: graph.Described{
@@ -628,19 +639,35 @@ func advisoryLinks(advisories []struct {
 // sources and they disagree; taking the first stated is at least a stable
 // answer, and the vector travels with the number so that what the number
 // assumed is readable rather than lost.
+// rated is a published severity with what it assumes and who published it.
+type rated struct {
+	score   float64
+	vector  string
+	version string
+	source  string
+	kind    string
+}
+
 func rating(ratings []struct {
 	Version string `json:"version"`
 	Vector  string `json:"vector"`
+	Source  string `json:"source"`
+	Type    string `json:"type"`
 	Metrics struct {
 		BaseScore float64 `json:"baseScore"`
 	} `json:"metrics"`
-}) (float64, string) {
-	for _, rated := range ratings {
-		if rated.Metrics.BaseScore > 0 && rated.Vector != "" {
-			return rated.Metrics.BaseScore, rated.Vector
+}) rated {
+	for _, published := range ratings {
+		if published.Metrics.BaseScore > 0 && published.Vector != "" {
+			return rated{
+				score: published.Metrics.BaseScore, vector: published.Vector,
+				version: strings.TrimSpace(published.Version),
+				source:  strings.TrimSpace(published.Source),
+				kind:    strings.TrimSpace(published.Type),
+			}
 		}
 	}
-	return 0, ""
+	return rated{}
 }
 
 // estimate is the published likelihood, where it stands, and the day it is

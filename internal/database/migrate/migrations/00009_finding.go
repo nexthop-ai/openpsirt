@@ -91,6 +91,15 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- where that shows.
 			"score_centi"     ` + t.ref + ` NULL,
 			"vector"          ` + t.free + ` NULL,
+			-- Who published that score, which scoring system it is, and
+			-- whether it is the primary rating or a secondary one. Provenance
+			-- is recorded for everything else a report says — what found it,
+			-- what it was matched from, what it was matched in — and the
+			-- number a deadline is set from had none, so a reader asking who
+			-- says 5.9 had nowhere to go.
+			"score_version"   ` + t.kind + ` NULL,
+			"score_source"    ` + t.free + ` NULL,
+			"score_kind"      ` + t.kind + ` NULL,
 			"first_seen_at" ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "vulnerability_folded_unique" UNIQUE ("identifier_folded")
 		)` + t.suffix,

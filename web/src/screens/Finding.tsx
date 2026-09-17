@@ -601,9 +601,19 @@ export function Finding() {
         <div className="evblock">
           <h4>Severity</h4>
           <div className="scores">
+            {/* Where the number came from. Everything else this screen shows
+                carries its provenance — what found it, what it was matched
+                from, what it was matched in — and the one number a deadline is
+                set from carried none, so a reader asking who says 5.9 had
+                nowhere to go. */}
             <div className="score">
               <span className="n">{it.score ? it.score.toFixed(1) : "—"}</span>
-              <span className="l">CVSS</span>
+              <span className="l">CVSS{it.score_version ? ` ${it.score_version}` : ""}</span>
+              {(it.score_source || it.score_kind) && (
+                <span className="l">
+                  {[it.score_source, it.score_kind?.toLowerCase()].filter(Boolean).join(" · ")}
+                </span>
+              )}
             </div>
             {/* The estimate, what it means, and whether it is current.
                 Nobody acts on 0.00042; "higher than 91% of everything

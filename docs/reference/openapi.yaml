@@ -2612,6 +2612,15 @@ components:
           description: The same judgment as a number, where one is published
           format: double
           type: number
+        score_kind:
+          description: Whether it is the primary rating or a secondary one
+          type: string
+        score_source:
+          description: Who published it, where the report names them
+          type: string
+        score_version:
+          description: Which scoring system the number is on, as the report states it
+          type: string
         severity:
           description: As the data rates it. A word
           type: string
