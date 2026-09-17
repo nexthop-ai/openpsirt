@@ -325,7 +325,7 @@ consumer where it had none**, so its place identity moves and decisions written
 against the old one stop covering it. An instance that already ingested SPDX 2
 inventories has to be recreated for that reason and one other: the graph edge
 gained a column with no default, which an existing database never re-applies.
-Before the first release there is no schema compatibility, so recreation is the
+Below 1.0 there is no schema compatibility (REQ-76), so recreation is the
 answer to both.
 
 **The root is resolved at the end rather than where it is named.** One format

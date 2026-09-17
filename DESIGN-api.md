@@ -279,8 +279,8 @@ nobody owns.
 
 ## Path version
 
-`/v1` is the shape the API will have. Before the first release it is not a
-compatibility promise, and a change to a shape is an edit rather than a second
+`/v1` is the shape the API will have. Below 1.0 it is not a compatibility
+promise (REQ-76), and a change to a shape is an edit rather than a second
 version standing beside the first.
 
 ## Declared privileges

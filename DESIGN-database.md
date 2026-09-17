@@ -216,12 +216,11 @@ engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
 implicit default and an on-update clause depending on server configuration.
 
-Before the first release a migration is edited rather than added to (REQ-72). A
+Below 1.0 a migration is edited rather than added to (REQ-72 and REQ-76). A
 change to a table edits the migration that created it, and anybody holding a
 development database recreates it. The migrations that exist are kept only
 because walking the chain up and down catches an ordering mistake between two of
-them, and they collapse into a single initial migration before the first
-release.
+them, and they collapse into a single initial migration before 1.0.
 
 Ten of them did the opposite and have been folded back into the migrations
 that created their tables. What that cost while they stood: a four-statement

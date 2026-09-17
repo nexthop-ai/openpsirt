@@ -104,8 +104,8 @@ heading that is a sentence. Rewrite it rather than appending to it.
 ## What is left lives in one place
 
 `TODO.md` holds everything still in scope and not built: the work that has to
-happen before the first release, what the owner deferred, decisions taken but
-not implemented, questions waiting on an answer, and what was measured and left
+happen before 1.0, what the owner deferred, decisions taken but not
+implemented, questions waiting on an answer, and what was measured and left
 alone deliberately.
 
 **Nothing may reference it** — not code, not comments, not commit messages, not
@@ -287,14 +287,13 @@ document that cites one.
 
 ## Nothing is compatible with anything yet
 
-Before the first release there is no schema compatibility and no API
-compatibility. A schema change **edits the migration that created the thing**
-rather than adding one beside it, and anybody holding a development database
-recreates it. The version in the API path is the shape it will have, not a
+Below 1.0 there is no schema compatibility and no API compatibility (REQ-76).
+A schema change **edits the migration that created the thing** rather than
+adding one beside it, and anybody holding a development database recreates it. The version in the API path is the shape it will have, not a
 promise anybody may hold us to.
 
 The migrations that exist are kept only because walking the chain up and down
-catches an ordering mistake between them. They collapse into one before release
+catches an ordering mistake between them. They collapse into one before 1.0
 (REQ-72), which `TODO.md` records so it happens rather than being remembered.
 
 ## Decisions carry the evidence that forced them

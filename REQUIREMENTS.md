@@ -66,6 +66,7 @@ inputs.
 | REQ-02 | Ships as a container image and a Helm chart. A configuration that cannot work is refused at install time, naming what is missing | A pod that crash-loops is found in minutes; mail configured halfway is found when somebody asks why they were never told |
 | REQ-03 | Runs as any number of replicas — no leader, no shared filesystem, no state in one process that decides anything | Scaling should be adding a node. The alternative is discovered the first time two replicas run, under load |
 | REQ-04 | Publishes an inventory of itself, of the binary and of the image, and scans itself with them | A tool whose subject is knowing what is inside what you ship has to know what is inside what it ships |
+| REQ-76 | A major version of 0 is alpha. Nothing about the API or the schema is promised, an upgrade may require recreating the database, and compatibility begins at 1.0 | The version is what an operator reads before upgrading, so that is where "nothing is promised yet" belongs. A suffix on every tag says it somewhere nobody looks twice, and costs the publication path a distinction it then cannot make: with `0.1.0-rc.4` the newest thing anybody is meant to run is reachable under no moving name at all |
 
 ### 3.2 Ingest
 
