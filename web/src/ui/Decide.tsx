@@ -10,7 +10,7 @@ import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
-import { DECIDE_KEPT } from "../app/drafts";
+import { DECIDE_KEPT, keepAnswer, restoreAnswer } from "../app/drafts";
 
 // One judgment about this finding: the decision form the finding screen
 // carries. Outcome, the justification where it does not apply, a date where it
@@ -201,30 +201,39 @@ export function Decide({
   // the form again, and the fields below seed themselves from it.
   const queries = useQueryClient();
   const draftKey = draftKeyFor(at);
+  // What was chosen here and not sent, read once as the form is built.
+  //
+  // **A prefill wins over it**, because a prefill is somebody pressing "start
+  // from this" and a draft is what they left behind — an explicit choice beats
+  // an interrupted one. Read once, like the prefill beside it: a value that
+  // changed under somebody mid-decision is not the one they were answering.
+  const [kept] = useState(() => (prefill ? {} : restoreAnswer(draftKey)));
   // Nothing chosen until somebody chooses. The form used to open on
   // "not applicable" with a justification already selected, which put every
   // finding one click from a dismissal — the outcome that hides risk and
   // needs a second person, offered as the default for the ordinary case.
-  const [outcome, setOutcome] = useState(prefill?.outcome ?? "");
-  const [fixedVersion, setFixedVersion] = useState("");
+  const [outcome, setOutcome] = useState(prefill?.outcome ?? kept.outcome ?? "");
+  const [fixedVersion, setFixedVersion] = useState(kept.fixedVersion ?? "");
   // Likewise unchosen. A justification is a claim about our build that a
   // reader is entitled to take literally, so the first one in the list is not
   // an answer — it is whichever happened to be written first.
   const [justification, setJustification] = useState<Justification | "">(
-    (prefill?.justification as Justification | undefined) ?? "",
+    (prefill?.justification as Justification | undefined) ??
+      (kept.justification as Justification | undefined) ??
+      "",
   );
-  const [mitigation, setMitigation] = useState("");
+  const [mitigation, setMitigation] = useState(kept.mitigation ?? "");
   // Counted from now rather than from when the rule was saved, which is the
   // whole reason a prepared deferral is kept as a number of days. Without this
   // one opened the form with the outcome chosen and no date, which cannot be
   // submitted — a prefill that half-fires.
   const [until, setUntil] = useState(() => {
-    if (!prefill?.deferDays) return "";
+    if (!prefill?.deferDays) return kept.until ?? "";
     const day = new Date();
     day.setUTCDate(day.getUTCDate() + prefill.deferDays);
     return day.toISOString().slice(0, 10);
   });
-  const [lands, setLands] = useState("");
+  const [lands, setLands] = useState(kept.lands ?? "");
   // The deployment's deferral threshold, so the form can say which side of it
   // a date falls on while it is being chosen.
   const days = useWho().data?.deferral_days ?? null;
@@ -235,6 +244,13 @@ export function Decide({
   const [reasoning, setReasoning] = useState(prefill?.reasoning ?? "");
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set());
   const [reviewing, setReviewing] = useState(false);
+
+  // Written as it is chosen, beside the prose the editor is already keeping.
+  // A draft that keeps three paragraphs and loses what they argued for is one
+  // somebody has to read to find out what they meant.
+  useEffect(() => {
+    keepAnswer(draftKey, { outcome, justification, until, fixedVersion, mitigation, lands });
+  }, [draftKey, outcome, justification, until, fixedVersion, mitigation, lands]);
 
   const open = useMemo(() => places.filter((p) => p.decision == null), [places]);
   const answered = places.length - open.length;

@@ -630,11 +630,12 @@ func registerTrendExport(api huma.API, in Ingest) {
 		}
 		const week = 7 * 24 * time.Hour
 		since := time.Now().UTC().Add(-time.Duration(input.Weeks) * week)
-		// The bands the file carries, in the order the severity ladder ranks
-		// them. Named rather than taken from whatever the first row happens to
-		// hold: a file whose columns depend on the data is one a spreadsheet
-		// cannot be built against.
-		bands := []string{"critical", "high", "medium", "low", "unrated"}
+		// The bands the file carries, worst first, from the one place the
+		// ladder is written down — and what nothing rated, which ranks below
+		// all of them. Fixed rather than taken from whatever the first row
+		// happens to hold: a file whose columns depend on the data is one a
+		// spreadsheet cannot be built against.
+		bands := append(finding.Bands(), finding.Unrated)
 		header := []string{"week ending", "opened", "resolved", "open"}
 		for _, band := range bands {
 			header = append(header, "opened "+band)

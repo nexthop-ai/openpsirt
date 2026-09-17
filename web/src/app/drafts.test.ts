@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { belongTo, forget, forgetAll, forgetSession, keep, restore } from "./drafts";
+import {
+  belongTo,
+  forget,
+  forgetAll,
+  forgetSession,
+  keep,
+  keepAnswer,
+  restore,
+  restoreAnswer,
+} from "./drafts";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -242,5 +251,61 @@ describe("whose draft is whose", () => {
     keep("decide:P:S:V:CVE-2026-1:pkg", "mine");
     belongTo("alice:b");
     expect(restore("decide:P:S:V:CVE-2026-1:pkg")).toBe("mine");
+  });
+});
+
+describe("what was chosen, beside what was typed", () => {
+  it("gives back the answer as well as the prose", () => {
+    belongTo("oidc:ana");
+    keep("decide:mine:master:broadcom:CVE-1:curl:8.0", "the argument");
+    keepAnswer("decide:mine:master:broadcom:CVE-1:curl:8.0", {
+      outcome: "not-applicable",
+      justification: "vulnerable_code_not_present",
+    });
+    expect(restore("decide:mine:master:broadcom:CVE-1:curl:8.0")).toBe("the argument");
+    expect(restoreAnswer("decide:mine:master:broadcom:CVE-1:curl:8.0")).toEqual({
+      outcome: "not-applicable",
+      justification: "vulnerable_code_not_present",
+    });
+  });
+
+  it("keeps the answer per finding, like the prose", () => {
+    belongTo("oidc:ana");
+    keepAnswer("decide:a", { outcome: "deferred", until: "2026-12-01" });
+    expect(restoreAnswer("decide:b")).toEqual({});
+  });
+
+  it("is nobody else's", () => {
+    belongTo("oidc:ana");
+    keepAnswer("decide:a", { outcome: "wont-fix" });
+    // Somebody else arriving on this browser clears what is not theirs, which
+    // is the whole reason a draft is safe to keep at all — and the answer is
+    // the same draft.
+    belongTo("oidc:ben");
+    expect(restoreAnswer("decide:a")).toEqual({});
+  });
+
+  it("goes when the decision it belonged to is accepted", () => {
+    belongTo("oidc:ana");
+    keep("decide:a", "the argument");
+    keepAnswer("decide:a", { outcome: "wont-fix" });
+    forget("decide:a");
+    expect(restore("decide:a")).toBe("");
+    // Both halves. Cleared apart, an accepted decision left its outcome behind
+    // to be offered against the next thing decided at the same place.
+    expect(restoreAnswer("decide:a")).toEqual({});
+  });
+
+  it("keeps nothing where nothing was chosen", () => {
+    belongTo("oidc:ana");
+    keepAnswer("decide:a", { outcome: "wont-fix" });
+    keepAnswer("decide:a", {});
+    expect(restoreAnswer("decide:a")).toEqual({});
+  });
+
+  it("reads an unreadable answer as none", () => {
+    belongTo("oidc:ana");
+    keep("decide:a:answer", "not an object");
+    expect(restoreAnswer("decide:a")).toEqual({});
   });
 });

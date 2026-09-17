@@ -1052,6 +1052,32 @@ the part of a decision that matters most.
 | **A draft key names everything the text is about** | The build and the version included. A build ships one name at more than one version often enough that leaving the version out shares a draft between two of them, and they are different code at a different number of places |
 | **Signing out also clears what the tab remembers** | The scope somebody picked and the last judgment they recorded. Sign-out is a same-tab navigation, so the session store survives it by construction: the next person was handed the previous person's product in the scope bar — a name they may hold no grant on — and their last outcome in the decision form. The look and the rail stay, because a preference surviving a sign-out is what a preference is |
 | Where a draft lives, and under whose name, is decided in one place | A control spelled at each of six call sites is a control that is missing at the seventh |
+| **A draft keeps the answer as well as the prose** | The outcome, the justification, the date, the fixed version. A draft that kept three paragraphs and lost what they argued for came back as text somebody had to read to find out what they had meant — and the prose is about the answer |
+| It is restored into the form it was typed in, and is not a default | The rule that the decision form opens on nothing chosen is about what somebody has *not* answered. This is their own answer to this exact finding, keyed on every part of it, and an explicit "start from this" beats it |
+
+### Where somebody was
+
+A browser restores the scroll position on a real navigation and this
+application never makes one.
+
+| Rule | |
+|---|---|
+| **A list opened by pressing back opens where it was being read** | Going into a finding and coming back rebuilt the list at the top: eighteen rows above where somebody had been, on the screen whose whole use is working down a list one row at a time. The address and the filters survived because they are in the address; the place in the list is the one thing that cannot be re-derived from it |
+| A list opened fresh opens at the top | Which is what a fresh list is. The two are told apart by how the arrival happened, and restoring on both would drop somebody into the middle of a list they have not read |
+| Restored after the rows are drawn | Scrolling a page that is a few hundred pixels tall clamps to the bottom, so the restore lands somewhere arbitrary and reads as a fault in the list |
+| Written as somebody scrolls, not as they leave | A route change unmounts the screen, and an unmount is too late to read a position the browser has already moved |
+| A handful of pages, and anything that is not a position is the top | The store is the browser's and a person may edit it, and the value goes straight into a scroll call. An unbounded map in storage grows for as long as the tab is open |
+| Cleared with everything else the session holds | The next person on this browser does not land in the middle of somebody else's page |
+
+### Where an answer appears
+
+**A confirmation belongs where the button that produced it was pressed.** The
+decision form's submit sits at the foot of a long form and the confirmation is
+drawn at the head of the screen, so somebody pressing it was left looking at
+the form they had just sent, with the answer a page and a half above them and
+nothing saying anything had happened. The page is brought to it, smoothly, so
+that the movement is something they watch rather than a jump they have to
+re-find themselves after.
 
 ## Reachable from a keyboard
 

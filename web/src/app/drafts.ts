@@ -25,6 +25,10 @@
 // before it lapses. The window is what bounds that, and clearing on sign-out
 // is what ends it for somebody who leaves deliberately.
 
+// Where somebody was in each list, cleared with everything else the session
+// holds.
+import { forgetPlaces } from "./place";
+
 // The namespace every draft lives under. Named the way the other things this
 // application keeps in the browser are — the chosen theme and the scope
 // somebody picked — and distinct enough from both that clearing drafts cannot
@@ -156,6 +160,65 @@ export function restore(about: string | undefined): string {
   return held.text;
 }
 
+// Answered is what was chosen beside the reasoning, kept under the same key
+// and the same window.
+//
+// **A draft that keeps the prose and loses the answer is half a draft.** The
+// reasoning is the expensive part to retype and the outcome is the part that
+// decides what the prose is about — so an interrupted decision came back with
+// three paragraphs and no statement of what they argued for, and the person
+// had to read their own text to work out what they had meant.
+//
+// Every field the form holds, because the ones it does not keep are the ones
+// that come back empty beside a filled form and read as answered.
+export type Answered = {
+  outcome?: string;
+  justification?: string;
+  until?: string;
+  fixedVersion?: string;
+  mitigation?: string;
+  lands?: string;
+};
+
+// The suffix that separates the answer from the prose. Two keys rather than
+// one object, because the editor writes its text on every keystroke and the
+// answer changes on a click: merged, each would rewrite the other's half.
+const ANSWER = ":answer";
+
+// keepAnswer records what was chosen, or takes it away where nothing is.
+//
+// **Restored only into the form it was typed in.** This is not a default and
+// not a shortcut carried between findings: the rule that the decision form
+// opens on nothing chosen is about what somebody has not answered, and this is
+// their own answer to this exact finding, keyed on every part of it.
+//
+// Through the same two functions the prose goes through, so it lands under the
+// same prefix, the same identity and the same window — and the sweep that
+// clears somebody else's text clears this with it rather than walking past a
+// shape it does not recognize.
+export function keepAnswer(about: string | undefined, said: Answered) {
+  const anything = Object.values(said).some((value) => value);
+  keep(answerAbout(about), anything ? JSON.stringify(said) : "");
+}
+
+// restoreAnswer reads back what was chosen, or nothing.
+export function restoreAnswer(about: string | undefined): Answered {
+  const kept = restore(answerAbout(about));
+  if (!kept) return {};
+  try {
+    const said: unknown = JSON.parse(kept);
+    if (typeof said === "object" && said !== null) return said as Answered;
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+// answerAbout is the answer's own name for the thing the prose is about.
+function answerAbout(about: string | undefined): string | undefined {
+  return about === undefined ? undefined : about + ANSWER;
+}
+
 // forget clears one draft once its text has actually been accepted. Called on
 // success only: a failed submission keeps what somebody wrote.
 export function forget(about: string | undefined) {
@@ -163,6 +226,11 @@ export function forget(about: string | undefined) {
   if (!key) return;
   try {
     window.localStorage.removeItem(key);
+    // Both halves, because the answer is the same draft. Cleared apart, an
+    // accepted decision left its outcome behind to be offered against the
+    // next thing decided at the same place.
+    const answer = keyFor(answerAbout(about));
+    if (answer) window.localStorage.removeItem(answer);
   } catch {
     // Nothing to clear if storage was refused in the first place.
   }
@@ -199,6 +267,11 @@ export function forgetSession() {
   } catch {
     // A browser that refuses storage has nothing to clear.
   }
+  // Where somebody was in each list they were reading. Its own module because
+  // it is written on every scroll and this one is loaded with the frame, and
+  // cleared from here because sign-out is the one place that knows every
+  // session-scoped thing has to go.
+  forgetPlaces();
 }
 
 export function forgetAll() {

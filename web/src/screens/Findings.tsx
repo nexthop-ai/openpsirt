@@ -18,6 +18,7 @@ import { Icon } from "../ui/Icons";
 import { Holder } from "../ui/Holder";
 import { Saved, here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
+import { useKeepPlace } from "../app/keepPlace";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
 // question of the server to offer the row before and the row after. Fifty rows
@@ -274,6 +275,11 @@ export function Findings() {
       ),
     enabled: view === "issues",
   });
+
+  // Where somebody was, restored when they come back. This is the screen the
+  // complaint is about: opening a finding and pressing back rebuilt the list
+  // at the top of it, eighteen rows above where they had been reading.
+  useKeepPlace(findings.isSuccess);
 
   // How many rows sit below what this product triages, and where that line is.
   // A product's own answer: across products each has its own line, so there is

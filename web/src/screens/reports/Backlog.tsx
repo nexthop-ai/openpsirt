@@ -9,6 +9,10 @@ import { Mix, Pace, folded } from "../../ui/Charts";
 import { Empty } from "../../ui/Empty";
 import { Sheet } from "./Sheet";
 import { Wide } from "../../ui/Wide";
+// The ladder, written down once. The columns are fixed rather than read off
+// the data: ones that appear and vanish with the rows are columns nobody can
+// build a spreadsheet against.
+import { BANDS } from "../../ui/severities";
 
 // Whether the backlog is growing, and what kind of thing is making it grow.
 //
@@ -36,11 +40,6 @@ export function weeksAsked(params: URLSearchParams, fallback = 13): number {
   if (!Number.isFinite(weeks) || weeks < 1 || weeks > 104) return fallback;
   return Math.floor(weeks);
 }
-
-// The bands a row is split into, worst first, which is the order the ladder
-// ranks them. Named here rather than read off the data: columns that appear
-// and vanish with the rows are columns nobody can build a spreadsheet against.
-const BANDS = ["critical", "high", "medium", "low"] as const;
 
 export function Backlog() {
   const at = useScope();
