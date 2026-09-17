@@ -301,7 +301,7 @@ demo-down:
 # themselves roles like anybody else, which is also the honest demonstration —
 # the grant is visible in the same record everyone else's is, rather than
 # implied by a flag. Idempotent, so re-seeding is not a special case.
-demo-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant dev on $(1) %{http_code}\n" \
+demo-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1) %{http_code}\n" \
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
 	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
 	  "$(DEMO_URL)/v1/people"
@@ -539,8 +539,14 @@ demo-flaw:
 	@# Nothing here refuses a second one: an identifier is minted per record,
 	@# so recording the same flaw twice files two of them. Asked first rather
 	@# than left to the reader to notice they have three.
+	@# `origin=manual` is the parameter the list declares for this. It asked
+	@# `recorded=true`, which the list does not take — and nothing rejects a
+	@# parameter it has not heard of, so it was dropped, the count came back
+	@# as every finding in the product, and the target reported "already
+	@# recorded" on any deployment that had ever been scanned. It had never
+	@# filed one, so the advisory it exists to give a subject had none.
 	@held=$$(curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/openpsirt/findings?recorded=true&limit=1" \
+	    "$(DEMO_URL)/v1/products/openpsirt/findings?origin=manual&limit=1" \
 	  | sed -e 's/.*"total":\([0-9]*\).*/\1/' -e 's/^{.*/0/'); \
 	if [ "$${held:-0}" != "0" ]; then \
 	  echo "  a flaw is already recorded here — nothing to do"; exit 0; \
