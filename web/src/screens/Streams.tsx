@@ -27,9 +27,15 @@ export function Streams() {
   const [kind, setKind] = useState<"branch" | "tag">("branch");
   const [parent, setParent] = useState("");
   const streams = useQuery({
-    queryKey: ["streams", product],
+    // Keyed as counted, so this and the picker's uncounted read of the same
+    // list are two cache entries rather than a race between them.
+    queryKey: ["streams", product, "counts"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
+      unwrap(
+        await api.GET("/v1/products/{product}/streams", {
+          params: { path: { product }, query: { counts: true } },
+        }),
+      ),
   });
 
   const declare = useMutation({

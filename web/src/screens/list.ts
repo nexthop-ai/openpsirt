@@ -125,6 +125,27 @@ export function asAsked(params: URLSearchParams, view: string): URLSearchParams 
 // drops the offset: a filter change lands somebody on page nine of a list with
 // two pages, which draws as an empty list under a filter that matches plenty.
 
+// Where a scope chip goes when it is removed: the same list, one level wider,
+// carrying every filter that was already on.
+//
+// The selection rides on the path rather than in the parameters, so widening is
+// a move rather than a parameter change — and the filters have to be carried
+// across by hand or removing the product chip would silently drop the narrowing
+// somebody actually chose. `stream` and `variant` are dropped from what is
+// carried because the address being built owns those: it puts back whichever of
+// them the new scope still has.
+export function widened(path: string, params: URLSearchParams): string {
+  const rest = new URLSearchParams(params);
+  rest.delete("stream");
+  rest.delete("variant");
+  const cut = path.indexOf("?");
+  const base = cut < 0 ? path : path.slice(0, cut);
+  const own = cut < 0 ? "" : path.slice(cut + 1);
+  for (const [key, value] of new URLSearchParams(own)) rest.append(key, value);
+  const query = rest.toString();
+  return query ? `${base}?${query}` : base;
+}
+
 // withParam sets one value, or takes the key out where there is none.
 export function withParam(params: URLSearchParams, key: string, value: string): URLSearchParams {
   return withEach(params, { [key]: value });

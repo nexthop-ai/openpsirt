@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
+import { Suggest } from "../ui/Suggest";
+import { useCatalog } from "../api/catalog";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { called, ROLES, type Role } from "../ui/roles";
@@ -13,7 +15,8 @@ import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import type { Who } from "../app/session";
 
-// Users and roles: who can see what, and who can decide about it.
+// Access: who can see what, who can decide about it, and the credentials
+// that carry either.
 //
 // Nobody appears here by having authenticated. Access is granted in advance,
 // so this is what an administrator decided rather than who has turned up — and
@@ -189,7 +192,7 @@ export function People({ who: me }: { who: Who }) {
   return (
     <>
       <div className="screen-head">
-        <h2>Users and roles</h2>
+        <h2>Access</h2>
         <p>Who can read and decide what</p>
         {/* Offered only to somebody the server will take it from. A control
             that changes nothing is worse than a control that is not there,
@@ -588,7 +591,13 @@ export function People({ who: me }: { who: Who }) {
         )}
       </div>
 
-      <Credentials />
+      {/* Administrators only, and the panel as a whole. Both of its reads are
+          administrator-only, so an auditor — whom the rail admits here — got a
+          403 for each and the only empty branch below drew "Nothing is issued."
+          against a deployment holding twelve keys. A silent wrong answer, to
+          the one reader whose job is reviewing them. The same shape the
+          webhooks panel is gated for. */}
+      {me.admin && <Credentials me={me} />}
 
       <Declare
         title="Add user"
@@ -635,7 +644,7 @@ export function People({ who: me }: { who: Who }) {
 // Credentials that are not people. A pipeline uploads with a key scoped to
 // what it may send to; a person holds tokens for their own scripts, which
 // never carry more than the person does.
-function Credentials() {
+function Credentials({ me }: { me: Who }) {
   const queries = useQueryClient();
   const [issuing, setIssuing] = useState(false);
   const [keyName, setKeyName] = useState("");
@@ -648,10 +657,10 @@ function Credentials() {
     queryKey: ["keys"],
     queryFn: async () => unwrap(await api.GET("/v1/keys", {})),
   });
-  const products = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
+  // The three catalog reads as one, so this form shares the picker's cache
+  // rather than keeping a fourth copy of the same query keys. Asked only while
+  // the form is open: nothing below is drawn until then.
+  const { products, streams, variants } = useCatalog(issuing, keyProduct);
   const tokens = useQuery({
     queryKey: ["tokens"],
     queryFn: async () => unwrap(await api.GET("/v1/people/tokens", {})),
@@ -769,6 +778,10 @@ function Credentials() {
                       <button
                         type="button"
                         className="linkish"
+                        disabled={!me.admin}
+                        title={
+                          me.admin ? undefined : "Only an administrator withdraws a credential"
+                        }
                         onClick={() => withdrawKey.mutate(key.name ?? "")}
                       >
                         Withdraw
@@ -806,6 +819,10 @@ function Credentials() {
                       <button
                         type="button"
                         className="linkish"
+                        disabled={!me.admin}
+                        title={
+                          me.admin ? undefined : "Only an administrator withdraws a credential"
+                        }
                         onClick={() =>
                           withdrawToken.mutate({
                             identity: token.owner ?? "",
@@ -845,7 +862,18 @@ function Credentials() {
         Shown once. Only a hash is stored.
       </p>
 
-      <button type="button" className="btn" onClick={() => setIssuing(true)}>
+      {/* Only a signed-in administrator may mint one — a credential cannot
+          create another — so the refusal belongs here rather than after the
+          form has been filled in. The belt rather than the braces while the
+          panel itself is gated: it is what keeps this honest if the reads
+          behind it are ever widened to the auditor whose job this is. */}
+      <button
+        type="button"
+        className="btn"
+        disabled={!me.admin}
+        title={me.admin ? undefined : "Only an administrator creates an API key"}
+        onClick={() => setIssuing(true)}
+      >
         Create an API key
       </button>
 
@@ -868,7 +896,18 @@ function Credentials() {
         />
         <label className="field">
           <span>Product</span>
-          <select value={keyProduct} onChange={(event) => setKeyProduct(event.target.value)}>
+          {/* Choosing a product clears the two below it, the way the scope
+              panel does: a branch belongs to one product, so a branch picked
+              against the last one survives into a key naming a build the new
+              product never declared. */}
+          <select
+            value={keyProduct}
+            onChange={(event) => {
+              setKeyProduct(event.target.value);
+              setKeyStream("");
+              setKeyVariant("");
+            }}
+          >
             <option value="">Choose a product</option>
             {(products.data?.items ?? []).map((each) => (
               <option key={each.name} value={each.name ?? ""}>
@@ -878,20 +917,43 @@ function Credentials() {
           </select>
           <span className="hint">Required. A key covers one product.</span>
         </label>
-        <Field
-          label="Branch or tag"
-          value={keyStream}
-          onChange={setKeyStream}
-          placeholder="master"
-          hint="Optional. Empty means any branch or tag."
-        />
-        <Field
-          label="Variant"
-          value={keyVariant}
-          onChange={setKeyVariant}
-          placeholder="broadcom"
-          hint="Optional. Empty means any variant."
-        />
+        {/* Offered rather than typed from memory. Both are refused unless the
+            product already holds them — a key names a branch that exists, not
+            one a build will declare later — so the list is what the server
+            will accept. It still does not restrict: the server is what
+            refuses, and a name declared between the two requests is not one
+            this control should decline. Opens on focus, because a product has
+            a handful of these and all of them are worth seeing. */}
+        <div className="field">
+          <label htmlFor="key-stream">Branch or tag</label>
+          <Suggest
+            id="key-stream"
+            label="Branch or tag"
+            value={keyStream}
+            onChange={setKeyStream}
+            options={(streams.data?.items ?? []).map((each) => each.name ?? "")}
+            loading={streams.isFetching}
+            disabled={keyProduct === ""}
+            placeholder={keyProduct === "" ? "pick a product first" : "master"}
+            from={0}
+          />
+          <span className="hint">Optional. Empty means any branch or tag.</span>
+        </div>
+        <div className="field">
+          <label htmlFor="key-variant">Variant</label>
+          <Suggest
+            id="key-variant"
+            label="Variant"
+            value={keyVariant}
+            onChange={setKeyVariant}
+            options={(variants.data?.items ?? []).map((each) => each.name ?? "")}
+            loading={variants.isFetching}
+            disabled={keyProduct === ""}
+            placeholder={keyProduct === "" ? "pick a product first" : "broadcom"}
+            from={0}
+          />
+          <span className="hint">Optional. Empty means any variant.</span>
+        </div>
       </Declare>
     </div>
   );

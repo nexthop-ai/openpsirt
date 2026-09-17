@@ -97,17 +97,22 @@ func registerKeys(api huma.API, a Administering) {
 			}
 			scope := access.Scope{ProductID: product.ID}
 
+			// Each lookup names the field whose read failed, so a fault
+			// reading the branch is not reported as a fault reading the
+			// product. A name that is simply not declared never reaches this
+			// string: undeclared answers those from the error, which already
+			// carries the name and what it was.
 			if in.Body.Stream != "" {
 				stream, err := names.StreamByName(ctx, product.ID, in.Body.Stream)
 				if err != nil {
-					return undeclared(a.Logger, err, "that product could not be looked up")
+					return undeclared(a.Logger, err, "that branch or tag could not be looked up")
 				}
 				scope.StreamID = &stream.ID
 			}
 			if in.Body.Variant != "" {
 				variant, err := names.VariantByName(ctx, product.ID, in.Body.Variant)
 				if err != nil {
-					return undeclared(a.Logger, err, "that product could not be looked up")
+					return undeclared(a.Logger, err, "that variant could not be looked up")
 				}
 				scope.VariantID = &variant.ID
 			}

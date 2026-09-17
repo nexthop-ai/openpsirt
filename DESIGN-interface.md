@@ -160,9 +160,9 @@ to upload, what is waiting on you, and who you are.
 
 | Rail group | Holds |
 |---|---|
-| **Across products** | Home, the review queue, what nobody holds, the assignments, the catalog and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build. The catalog is here because it is what this deployment carries, and because Manage ships folded |
+| **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
 | **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many |
-| **Manage** | The users, the teams, the standing assignment rules, the settings and the deployment itself. Branches, tags and variants have entries of their own, scoped to the picked product |
+| **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.
 With a product, branch or variant unpicked, the tree and inventories entries are
@@ -191,10 +191,9 @@ want it.
 
 A group heading folds what is under it, and "Manage" starts folded. Granting a
 role or changing a setting is occasional rather than something done while
-working, and with it away the rail asks for under seven hundred. **Nothing a
-first visit needs is under it** — the catalog was, which made the one screen
-saying what this deployment carries invisible to somebody who had just
-arrived. The heading
+working, and with it away the rail asks for under seven hundred. **A first visit
+needs nothing out of it**: somebody who has just arrived picks a product in the
+bar above, which is what that control is for, rather than in the rail. The heading
 stays a heading to look at — a caret is the only thing marking it as a control,
 because three headings drawn as buttons read as three more places to go. What is
 folded is kept in the browser, per person.
@@ -240,6 +239,8 @@ screen answering the question just asked of it.
 | What the tab remembers goes with the session | Signing out takes it away, which the drafts section states in full: the next person in that tab was shown the previous person's product |
 | A narrowed screen says what it is counting | A page answering for one product that looks exactly like a page answering for all of them is how two people quote different figures. That applies to the panels within it: a chart the picker has narrowed and a label reading "all products" state opposite things, and the label is the half a reader believes |
 | A selection the server would refuse is never sent | A branch or variant with no product above it is dropped on the way out |
+| **The variant column does not empty while it narrows** | Picking a branch swaps what the column offers from the product's variants to that release's, which is a different question and a different read. The first stands in until the second arrives: it is a superset, and a column that goes blank in front of somebody halfway through choosing reads as the picker losing what it had |
+| **The picker asks for no counts** | What is open against a row is the expensive half of a catalog read — a list of two products answered in 0.39s against 1ms for a liveness probe, and the time went with the findings rather than the rows. This panel draws names. So the counts are a parameter the two screens whose subject they are pass, and everybody else gets the cheap answer |
 
 ## Home
 
@@ -380,6 +381,9 @@ three date bounds having no control at all.
 |---|---|
 | Every filter is labeled with the question it asks, grouped by what they are about | Severity and risk, what upstream did, where triage has got to, where the row came from, the component, and time. A value says what it is rather than completing a sentence begun by a label nobody can see |
 | What is narrowing the list is above the list | One chip per filter naming both the filter and its value, removable by clicking, whether or not the panel is open. The control used to carry a count and nothing else, and the count was a hand-maintained list of variables that had already fallen behind |
+| **The selection is a chip too, and the first of them** | It rides on the path rather than in the parameters, so it drew nothing — and a list scoped to one product sat under filters identical to the list across every product, counting fewer rows, with nothing on screen to explain the difference. The rail's own unassigned count is across every product a reader may see, so the two disagreed by exactly what the other products held. A chip per level, product first, because each is narrowing what the one before it chose |
+| Removing a selection chip widens by a level and carries the filters | Widening is a move rather than a parameter change, and dropping what somebody actually narrowed by on the way would be a second surprise on top of the one the chip ends. The branch and the variant are the new address's to put back, so they are not carried |
+| **A filter cleared drops its key; it does not write out its own default** | The three narrowings the list applies when the address is silent are applied only where the key is absent. Two controls wrote both of their values to mean "not narrowed", which made the address say something, suppressed the default and widened the list — and left no way to express from the panel what the rail's address says |
 | The count is read from the address | The one place that knows what every filter is called |
 | Filtering is the server's, not the browser's | A list narrowed after it arrives is narrowed within one page of it, so "hide the kernel" would hide it from the twenty rows already fetched and from nothing else |
 | The common ones stay one click away | Severity, exploited and fix-available. Package kind, what holds a thing, and how far it has been decided sit in a panel that opens, with how many are on written on the control while it is shut |
@@ -813,7 +817,7 @@ expects two. **One recursive statement for the row's whole set of children**:
 | A level is drawn whole | An honest inventory has tens of components at a level. The remaining cap is high and exists for the inventory that is not honest — a real image has been seen with 5,270 components directly under its root |
 | Arriving from a finding opens the tree on the component, with every parent expanded | The chain travels in the link rather than being walked upward here. Where a level is past its cap, the step on the path is kept whatever its position: a link that opens a tree without the component it was opened for shows the one thing it exists to show |
 | A version every component at a level shares is drawn once | Shared by components of different names, it is the producer describing the build — a switch image whose thirty containers carry one build stamp. The level says it above the rows |
-| A node says what its number is made of, as a short strip of the bands | Five thousand beneath a node says nothing about whether any of it matters. Rolled up in the statement that already counts the subtree, so the bands sum back to the total. Banded by **the rating in force in this product**, which is the same word the list the number opens groups by — drawn from the published rating alone, a product that had re-rated an issue read its own decision in the list and the world's in the strip over it |
+| A node says what its number is made of, as one bar whose widths are the counts | Five thousand beneath a node says nothing about whether any of it matters. The same control the component screen draws: a bar mostly one color says where the weight is before a number is read, where a chip per band at a fixed width said only which bands were present. Held in a column of a fixed width, so the bars compare down a page of rows at six different depths; the numbers are on the title, because a legend per row says the same thing every row. Rolled up in the statement that already counts the subtree, so the bands sum back to the total. Banded by **the rating in force in this product**, which is the same word the list the number opens groups by — drawn from the published rating alone, a product that had re-rated an issue read its own decision in the list and the world's in the strip over it |
 | The node counts open their lists | A node saying "5,650 beneath · 0 here" and going nowhere is a figure nobody can act on from where they read it |
 | The count is every open issue, answered or not | A dismissal does not subtract from it. Written down because "what is open here" and "what is still to answer here" are both reasonable readings and the screen gives the first |
 | The marker that opens a row is a button | A span with a click handler leaves every node past the first level unreachable without a pointer, on the screen whose whole purpose is walking down |
@@ -952,6 +956,7 @@ is what the screen is about.
 | Rule | |
 |---|---|
 | The catalog says what each entry holds | Products carry their branch, tag and variant counts, what is open against them and when they were last scanned; branches and tags carry what they came from; variants carry whether they ship to customers. A list of names alone makes somebody open every row. Every count is issues at components, the way the findings list counts |
+| **What is open is counted when it is asked for** | It is counted over the findings and is the whole cost of a catalog read: 0.39s for a list of two products against 1ms for a liveness probe, and 0.39s against 0.24s for a product holding 8,839 findings against one holding 28. The three screens that draw the column ask for it; the pickers that read the same lists for their names do not, and were paying it on every open. **Absent rather than zero where nobody asked** — these screens render a missing number as "0", and a variant holding twenty-five reported as clean is the failure the count was added to fix |
 | A product row says what it triages from | An administrator changes it there. Everybody sees it because it explains a number, and "deployment's" is shown rather than the deployment's current word, because following it and stating it are different things |
 | An inventory can be uploaded from the interface (REQ-05) | From the bar and from the inventories screen. The drawer takes the target — prefilled from the scope, refused by the server if undeclared — one inventory — CycloneDX or SPDX, as the file itself says — and any number of OpenVEX suppression documents, which is what the endpoint takes. It posts the same multipart request a pipeline sends, then opens the inventories screen, where the receipt shows "queued" until the run says what it changed |
 | The screen that lists receipts is called Inventories | A scan is what the deployment does to an inventory after it arrives; what a person uploads is inventories |
@@ -1339,6 +1344,8 @@ since a person only ever sees products they hold a role on.
 | What a new line inherits is on the inventories screen | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already and how many cover nothing here, and offers the rest as a list to tick. Only two of the four groups are questions, and the screen says which |
 | What was recorded here is a filter | A flaw somebody entered is the only kind a person may close by hand (REQ-19), and the screen that records one is where "is this already filed" gets asked. Offered on the list and linked from the recording screen, with the line off, because the question is what exists rather than what is worth an afternoon |
 | **A setting says what it does in words, under its name** | It said so on the label's hover, which is where clarification goes — and what a setting does is not clarification, it is the whole of what the control is. Three of them rewrite what the tool reports without anything being scanned. Not on the control itself: a password manager classifies a field by the words it can reach through it |
+| **A setting's control is identified by a generated id, never by its key** | The prose moved off the control and the key stayed on it as `id`, and `signin.claim-window` is a sign-in field to a manager reading attributes however many ignore flags sit beside it. `name` was already pinned to a constant for this; `id` was the half that was missed. Generated rather than sanitized, because sanitizing moves the problem to the next key somebody adds |
+| **Webhooks are configured here** | Adding one is administration and this is where a deployment is set to things. Administrators only, and the panel as a whole rather than its controls: the address authenticates to two of the services it names, and the endpoint refuses anybody else — so drawn for an auditor it is a table that can only fail to load. Whether they arrive is the system screen's |
 
 ## The System screen
 
@@ -1346,19 +1353,25 @@ What this deployment is doing, rather than what it has found.
 
 | Rule | |
 |---|---|
-| Three things on one screen: what is queued, what the queue gave up on, and where things are sent | They are one question — is this deployment working — and each of them fails the same way. A queue that has given up looks exactly like a quiet one, and a destination refusing every request for a week looks exactly like one nothing has been sent to |
-| What is waiting is said per kind, against the bound | The bound is per kind, so one producer's own backlog hides behind everybody else's empty queues. What an operator does about a full queue needs both numbers |
+| Three things on one screen: the queue, the jobs it gave up on, and whether the webhooks are arriving | They are one question — is this deployment working — and each of them fails the same way. A queue that has given up looks exactly like a quiet one, and a webhook refusing every request for a week looks exactly like one nothing has been sent to |
+| **Configuring a webhook is not here; whether it is arriving is** | Adding one is administration and sits under Settings with the rest of what a deployment is set to. The delivery half stays because it fails silently, which is what this screen is for — and it carries no address, so the credential stays on the screen that holds it |
+| The delivery panel is named for delivery, not for what is wrong | An empty panel has to read correctly. "Webhooks failing" drawn empty is good news; "webhook delivery" drawn empty means none is configured, which is what it means here |
+| What is waiting is said per kind, against the limit | The limit is per kind, so one producer's own backlog hides behind everybody else's empty queues. What an operator does about a full queue needs both numbers |
 | Work held by a worker that stopped reporting counts as waiting | It is work waiting for whoever takes it next. Counted as running, a queue in the middle of a reclaim cycle reads as empty |
 | A set-aside job is shown in the queue's own words | What it points at may have been deleted since, and a list that fails to render because one row points at nothing is worse than one that says what the row says |
-| An operator's screen, not an auditor's | What a worker reported quotes what its job was about, so a failed parse can carry a component name out of an SBOM the reader holds nothing on — and a destination's address is a credential. Neither is one of the deployment's own records, which is what that grant reads |
-| A destination's address is not a link | It is somewhere this deployment posts to rather than somewhere a person goes, and for two of the services it names the path is the credential |
-| What a full queue needs is both numbers | An operator adds workers or raises the bound, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the bound is a state rather than a proportion |
+| An operator's screen, not an auditor's | What a worker reported quotes what its job was about, so a failed parse can carry a component name out of an SBOM the reader holds nothing on. That is not one of the deployment's own records, which is what that grant reads |
+| A webhook's address is not a link | It is somewhere this deployment posts to rather than somewhere a person goes, and for two of the services it names the path is the credential. Shown only on the configuration panel, which is administrators only for that reason; a failure is recorded with the address replaced by its host, so the delivery panel can say which one without saying what authenticates to it |
+| What a full queue needs is both numbers | An operator adds workers or raises the limit, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the limit is a state rather than a proportion |
 | A resolved issue is counted at the severity it held while it was open | The step it left in no longer has one, and counting it as unrated would make every answered critical disappear from the answered column |
 | The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
 
 ## The administration screens
 
-Who may sign in, what they hold, and the credentials that carry it.
+Who may sign in, what they hold, and the credentials that carry it. Called
+**Access**, because all three are one subject and two of the three are not users
+or roles: a pipeline key belongs to no person, and a personal token is listed
+against the person whose reach it carries. Naming the screen after the first of
+the three left the credentials on a screen that did not mention them.
 
 | Rule | |
 |---|---|
@@ -1368,6 +1381,9 @@ Who may sign in, what they hold, and the credentials that carry it.
 | The list narrows to who holds what | "Who approves on this product" is what an access review asks. A grant out of force does not match, because what somebody holds is a statement about now |
 | A person's name and their address are recorded here | Both are on the record and neither could be typed: the whole mail path could never reach anybody created through the interface, and what the person was told when they went looking was that an administrator has to record one |
 | An address stated empty clears it; an address left out is left alone | Coming off mail is not coming off the tool, and a screen that cannot tell the two apart makes one of them unreachable |
+| A control an auditor may not use is disabled and says why | Hidden, it teaches nobody that it exists; live, it is a button that can only reach a refusal. Only a signed-in administrator mints or withdraws a credential — a credential cannot create another |
+| The credentials panel is drawn for an administrator only | Both of its reads are administrator-only, and its one empty state says nothing is issued — so an auditor, whom the rail admits here, was told a deployment holding keys had none. The same shape the webhooks panel is gated for |
+| The branch and the variant on a key are offered from what the product holds | A key names a build that exists: both are resolved through the catalog and refused unless declared. Offered rather than restricting, because the server is what refuses and a name declared between the two requests is not one this should decline. Choosing a product clears them, since a branch belongs to one |
 | The two things held over the deployment are checkboxes beside the grid, not roles in it | A role is held against a product and neither of these is. What each grants is written beside it, because one of them is a reader who changes nothing and that is not what "administrator" reads as |
 
 ## Showing the ordering signals
@@ -1486,7 +1502,7 @@ scroll sideways. That is why the tables here are written rather than installed.
 | A small screen is shaped around review and respond, not bulk work | Read a finding, agree to one or send it back, see what is assigned to you. Nobody triages three hundred findings on a phone, so the wide-only screens stay wide and say so rather than being folded into something unusable |
 | Every table that is wider than the screen says so | Nearly every table scrolled sideways inside its own frame and none mentioned it, which reads as a page cut off rather than as a table with more in it. Said above the table and pinned so it stays visible while the table moves. **Only the ones that are wider**: a stylesheet cannot ask, so the table measures itself and says which it is — a note about scrolling over a two-column table that fits teaches people to stop reading the notes |
 | Headings and field labels are noun phrases (REQ-60) | The name of the thing, the way a settings screen anywhere else names one. Written as descriptions — "When somebody counts as absent" — they make somebody scanning for the one they came to change read thirty sentences instead of thirty names. The explanation stays underneath. Three had no name at all, falling through to the last segment of a configuration key: a card headed "After" |
-| Labels use the conventional word (REQ-60) | Reject, Trend, Assignments, Unassigned, Justification, Path, EPSS, Locations, Users and roles, Lapsed decisions, Submit. A caption on a screen is a sentence at most |
+| Labels use the conventional word (REQ-60) | Reject, Trend, Assignments, Unassigned, Justification, Path, EPSS, Locations, Access, Lapsed decisions, Submit. A caption on a screen is a sentence at most |
 | A form field is not a credential | Every text and number box says so in the four attributes the password managers actually read. They guess from shape and proximity, so a short box beside another short box is offered a saved login. `autocomplete` alone does not do it: browsers ignore it for saved logins by design. Nothing here is exempt, because nothing here is a credential — this deployment never holds a password |
 | A control carries no prose, and names itself | Saying a field is not a credential is not enough where the field's own words read as one. A manager reads whatever text it can reach through a control, and three settings were offered a saved login with all four attributes set: their explanation sat on the control as a tooltip, and it said sign-in, account and date. So the explanation sits on the label, where a person hovering still finds it, and each control is named for what it holds rather than left for a manager to name from its surroundings |
 | Two rows are only ambiguous when both ends match (REQ-57) | The same subproject reaching the same component twice by different routes. Rare, and visible when it happens: expanding the row, or the tree, resolves it. Nothing is invented to disambiguate a case the reader can see |

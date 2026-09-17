@@ -16,6 +16,23 @@ import (
 // each row holds beside it: a catalog that answers only names makes somebody
 // open every row to find out whether there is anything behind it, which is
 // the question the list exists to answer.
+
+// CountsQuery is the query parameter every catalog list takes, and the reason
+// it is a parameter.
+//
+// What is open against a row is counted over the findings, and that is the
+// whole cost of these reads: a list of two products answered in 0.39s against
+// 1ms for a liveness probe, and the time went with the findings rather than
+// with the rows — 0.39s for a product holding 8,839 and 0.24s for one holding
+// 28. The scope picker and the upload panel read all three of these lists and
+// draw none of the counts, so they were paying it for nothing on every open.
+//
+// Off by default, because the callers that want it are the two screens whose
+// subject it is and a new caller should get the cheap answer until it asks.
+type CountsQuery struct {
+	Counts bool `query:"counts" doc:"Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"`
+}
+
 func registerCatalogReading(api huma.API, d Declaring) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-products", Method: http.MethodGet, Path: "/v1/products",
@@ -24,7 +41,9 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			"A scan may only be filed against something declared, so this is the first question " +
 			"to ask after an upload is refused for naming something unknown.",
 		Tags: []string{"Catalog"},
-	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, _ *struct{}) (*listOutput[ProductBody], error) {
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
+		CountsQuery
+	}) (*listOutput[ProductBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -46,9 +65,12 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, wentWrong(d.Logger, "cannot count what the products hold", err)
 		}
-		open, err := d.Findings().OpenBy(ctx, subject, finding.Scope{}, finding.ByProduct)
-		if err != nil {
-			return nil, wentWrong(d.Logger, "cannot count what is open", err)
+		var open map[int64]int
+		if in.Counts {
+			open, err = d.Findings().OpenBy(ctx, subject, finding.Scope{}, finding.ByProduct)
+			if err != nil {
+				return nil, wentWrong(d.Logger, "cannot count what is open", err)
+			}
 		}
 		// When each product was last scanned comes from the same answer the
 		// home page reads, rather than a second query that could disagree
@@ -65,7 +87,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			out.Body.Items = append(out.Body.Items, ProductBody{
 				Name: row.Name, DisplayName: row.DisplayName,
 				Branches: shape.Branches, Tags: shape.Tags, Variants: shape.Variants,
-				Open:        open[row.ID],
+				Open:        counted(in.Counts, open, row.ID),
 				LastScanAt:  seen[row.Name],
 				TriageFloor: stated(row.TriageFloor),
 				EndOfLife:   onDate(row.EOLOn),
@@ -88,6 +110,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		Tags: []string{"Catalog"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
+		CountsQuery
 	}) (*listOutput[StreamBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -105,9 +128,12 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, refused(d.Logger, err, "cannot list streams")
 		}
-		open, err := d.Findings().OpenBy(ctx, subject, finding.Scope{ProductID: &product.ID}, finding.ByStream)
-		if err != nil {
-			return nil, wentWrong(d.Logger, "cannot count what is open", err)
+		var open map[int64]int
+		if in.Counts {
+			open, err = d.Findings().OpenBy(ctx, subject, finding.Scope{ProductID: &product.ID}, finding.ByStream)
+			if err != nil {
+				return nil, wentWrong(d.Logger, "cannot count what is open", err)
+			}
 		}
 		seen, err := lastScansIn(ctx, d.Scans(), subject, product.ID, func(c ingest.Coverage) string {
 			return c.Stream
@@ -133,7 +159,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		for _, row := range rows {
 			body := StreamBody{
 				Name: row.Name, Kind: string(row.Kind),
-				Open: open[row.ID], LastScanAt: seen[row.Name],
+				Open: counted(in.Counts, open, row.ID), LastScanAt: seen[row.Name],
 			}
 			if row.ParentID != nil {
 				body.Parent = named[*row.ParentID]
@@ -165,6 +191,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		Tags: []string{"Catalog"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
+		CountsQuery
 	}) (*listOutput[VariantBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -182,13 +209,16 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, refused(d.Logger, err, "cannot list variants")
 		}
-		open, err := d.Findings().OpenBy(ctx, subject, finding.Scope{ProductID: &product.ID}, finding.ByVariant)
-		if err != nil {
-			return nil, wentWrong(d.Logger, "cannot count what is open", err)
+		var open map[int64]int
+		if in.Counts {
+			open, err = d.Findings().OpenBy(ctx, subject, finding.Scope{ProductID: &product.ID}, finding.ByVariant)
+			if err != nil {
+				return nil, wentWrong(d.Logger, "cannot count what is open", err)
+			}
 		}
 		list := variantList(rows)
 		for i := range list.Body.Items {
-			list.Body.Items[i].Open = open[rows[i].ID]
+			list.Body.Items[i].Open = counted(in.Counts, open, rows[i].ID)
 		}
 		return list, nil
 	})
@@ -206,6 +236,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
+		CountsQuery
 	}) (*listOutput[VariantBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -229,15 +260,32 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		// holding twenty-five, which reads as a clean build rather than as a
 		// number nobody filled in.
 		productID := stream.ProductID
-		open, err := d.Findings().OpenBy(ctx, subject,
-			finding.Scope{ProductID: &productID, StreamID: &stream.ID}, finding.ByVariant)
-		if err != nil {
-			return nil, wentWrong(d.Logger, "cannot count what is open", err)
+		var open map[int64]int
+		if in.Counts {
+			open, err = d.Findings().OpenBy(ctx, subject,
+				finding.Scope{ProductID: &productID, StreamID: &stream.ID}, finding.ByVariant)
+			if err != nil {
+				return nil, wentWrong(d.Logger, "cannot count what is open", err)
+			}
 		}
 		list := variantList(rows)
 		for i := range list.Body.Items {
-			list.Body.Items[i].Open = open[rows[i].ID]
+			list.Body.Items[i].Open = counted(in.Counts, open, rows[i].ID)
 		}
 		return list, nil
 	})
+}
+
+// counted is what a row says about how much is open: the count where it was asked
+// for, and nothing where it was not.
+//
+// A zero and an absence are different answers here. Reported as a plain zero,
+// a list nobody asked to count says every product is clean, which is the one
+// wrong answer this must not give.
+func counted(asked bool, by map[int64]int, id int64) *int {
+	if !asked {
+		return nil
+	}
+	count := by[id]
+	return &count
 }

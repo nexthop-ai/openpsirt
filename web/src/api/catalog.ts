@@ -20,6 +20,12 @@ export type Variant = Body<"VariantBody">;
 // built as, rather than what one release was — and are read whenever a product
 // is chosen, because a picker offers them the moment the branch goes back to
 // "all" and a read that waits for that is a wait in front of a choice.
+//
+// **None of these asks for the counts.** What is open against a row is the
+// expensive half of a catalog read and every caller of this hook draws names:
+// the scope picker and the upload panel between them were paying 0.39s a list
+// for three numbers neither of them renders. The screens whose subject those
+// numbers are ask for them, under keys of their own.
 export function useCatalog(
   open: boolean,
   product = "",
@@ -51,6 +57,14 @@ export function useCatalog(
 // What one release was built as, which is a different question from what the
 // product is built as — and a different route. Only the scope picker asks it,
 // once a branch or tag is chosen.
+//
+// **Nothing here holds a previous key's rows on screen.** Three of these four
+// are keyed on something the picker changes, so keeping the last answer would
+// draw one product's branches under another product's name — and a variant
+// picked from it reaches the server as a build that product has no such branch
+// for, which is the selection this panel is not allowed to send. The variant
+// column has a stand-in for the gap it leaves, and it is the product's own
+// list, which is a superset of any one release's.
 export function useReleaseVariants(
   open: boolean,
   product: string,

@@ -49,19 +49,82 @@ func TestWhatAReleaseWasBuiltAsSaysHowMuchIsOpenInEach(t *testing.T) {
 		var built struct {
 			Items []struct {
 				Name string `json:"name"`
-				Open int    `json:"open"`
+				Open *int   `json:"open"`
 			} `json:"items"`
 		}
-		read(t, r, "triager", "/v1/products/mine/streams/master/variants", &built)
+		read(t, r, "triager", "/v1/products/mine/streams/master/variants?counts=true", &built)
 		if len(built.Items) == 0 {
 			t.Fatal("the fixture's branch was built as nothing, so this proves nothing")
 		}
 		total := 0
 		for _, one := range built.Items {
-			total += one.Open
+			if one.Open == nil {
+				t.Fatalf("%q reports no count at all where one was asked for", one.Name)
+			}
+			total += *one.Open
 		}
 		if total == 0 {
 			t.Error("every variant of a release with findings in it reports nothing open")
+		}
+	})
+}
+
+// Counting what is open is the expensive half of a catalog read, so it is
+// asked for rather than always done. Both directions are pinned on every path
+// that takes the parameter.
+//
+// Unasked, it must never come back as a zero: the screens that draw this
+// column render a missing number as "0", and a variant holding twenty-five
+// reported as clean is the failure the count above exists to catch, arriving
+// by a different route. Asked, it must still be the number.
+func TestACatalogListCountsWhatWasAskedForAndNothingOtherwise(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+
+		for _, path := range []string{
+			"/v1/products",
+			"/v1/products/mine/streams",
+			"/v1/products/mine/variants",
+			"/v1/products/mine/streams/master/variants",
+		} {
+			var list struct {
+				Items []struct {
+					Name string `json:"name"`
+					Open *int   `json:"open"`
+				} `json:"items"`
+			}
+			read(t, r, "triager", path, &list)
+			if len(list.Items) == 0 {
+				t.Fatalf("%s came back empty, so this proves nothing", path)
+			}
+			for _, one := range list.Items {
+				if one.Open != nil {
+					t.Errorf("%s: %q reports open=%d where nobody asked for a count",
+						path, one.Name, *one.Open)
+				}
+			}
+
+			// And the other direction on the same path. Pinned per path
+			// rather than once: each of these counts through a scope of its
+			// own, so a handler that stopped counting would leave the screen
+			// drawing this column at zero with the suite still green.
+			var counted struct {
+				Items []struct {
+					Name string `json:"name"`
+					Open *int   `json:"open"`
+				} `json:"items"`
+			}
+			read(t, r, "triager", path+"?counts=true", &counted)
+			total := 0
+			for _, one := range counted.Items {
+				if one.Open == nil {
+					t.Fatalf("%s: %q reports no count where one was asked for", path, one.Name)
+				}
+				total += *one.Open
+			}
+			if total == 0 {
+				t.Errorf("%s: a fixture with findings in it counts nothing open", path)
+			}
 		}
 	})
 }

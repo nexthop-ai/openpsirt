@@ -45,6 +45,8 @@ const PATHS: Record<string, string> = {
   minus: '<path d="M5 12h14"/>',
   quote: '<path d="M5 5v14"/><path d="M10 8h9M10 12h9M10 16h5"/>',
   triage: '<path d="M4 7h16M4 12h10M4 17h7"/><path d="m16 15 2 2 4-4"/>',
+  pulse:
+    '<rect x="3.5" y="4" width="17" height="6" rx="1.5"/><path d="M3.5 14.5h4l1.5-3 2.5 6 2-3h7"/><path d="M3.5 20h17"/>',
   shield:
     '<path fill="currentColor" stroke="none" d="M12 2.2 4.6 5.9v5.4c0 4.6 3.1 8.4 7.4 10.5 4.3-2.1 7.4-5.9 7.4-10.5V5.9Z" opacity=".35"/><path fill="currentColor" stroke="none" d="M12 4.2 6.4 7v4.3c0 3.5 2.3 6.5 5.6 8.2Z"/>',
 };

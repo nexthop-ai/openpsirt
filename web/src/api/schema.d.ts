@@ -3325,7 +3325,7 @@ export interface paths {
          *
          *     Counted as issues at components at or above the deployment's line, which `floor` names.
          *
-         *     **`blocking` is what the count is made of**: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
+         *     **`blocking` is the worst few of what the count is made of**: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -4810,6 +4810,8 @@ export interface components {
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "lapsed";
+            /** @description The version this sits at, which is what tells two rows of one component apart */
+            version?: string;
             vulnerability: string;
         };
         Branch: {
@@ -7777,7 +7779,7 @@ export interface components {
             name: string;
             /**
              * Format: int64
-             * @description Issues open against it, counted at components rather than at every place they sit
+             * @description Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
             /**
@@ -8927,7 +8929,7 @@ export interface components {
             name: string;
             /**
              * Format: int64
-             * @description Issues open against it, counted at components rather than at every place they sit
+             * @description Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
             /** @description For a tag, the branch it was cut from */
@@ -9143,7 +9145,7 @@ export interface components {
             name: string;
             /**
              * Format: int64
-             * @description Issues open against it here, counted at components rather than at every place they sit
+             * @description Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
         };
@@ -11760,7 +11762,10 @@ export interface operations {
     };
     "list-products": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -13581,7 +13586,10 @@ export interface operations {
     };
     "list-streams": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path: {
                 product: string;
@@ -13715,7 +13723,10 @@ export interface operations {
     };
     "list-release-variants": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path: {
                 product: string;
@@ -14915,7 +14926,10 @@ export interface operations {
     };
     "list-variants": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
             header?: never;
             path: {
                 product: string;

@@ -51,6 +51,23 @@ export function Scope() {
   // what `declared` holds — the per-release list would be an arbitrary one of
   // them.
   const variants = useReleaseVariants(open, product, stream);
+  // What the variant column draws, which is not simply whichever of the two
+  // the branch selects.
+  //
+  // The two are different questions and different cache entries, so choosing a
+  // branch switched the column to a query holding nothing and it emptied and
+  // refilled — on a selection that usually does not change the names at all.
+  // The product's own list stands in for that gap: it is a superset of any one
+  // release's, so the column offers nothing the release does not have for
+  // longer than the read takes, and it stops going blank in front of somebody
+  // halfway through choosing.
+  //
+  // **The stand-in has to be this list and no other.** Holding the previous
+  // branch's answer would fill the same gap with a set that is not a superset
+  // of anything — a variant picked from it is a build this release was never
+  // built as, which is the selection this panel is not allowed to send. Both
+  // reads are left to arrive empty for that reason.
+  const offered = stream ? (variants.data?.items ?? declared.data?.items) : declared.data?.items;
 
   // Applied as soon as it is chosen, at whatever level. A partial selection is
   // a real answer now — every level offers "all" — so there is nothing to wait
@@ -213,7 +230,7 @@ export function Scope() {
               Every variant
             </button>
           )}
-          {((stream ? variants.data?.items : declared.data?.items) ?? []).map((each) => (
+          {(offered ?? []).map((each) => (
             <button
               key={each.name}
               type="button"

@@ -1,5 +1,6 @@
 import { notACredential } from "../ui/noautofill";
-import { useState } from "react";
+import { Webhooks } from "./Webhooks";
+import { useId, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -139,6 +140,16 @@ export function Settings({ who }: { who: Who }) {
       ))}
 
       <p className="hint">Defaults, not recommendations. Zero or negative is refused.</p>
+
+      {/* Where this deployment posts what it has to say. Configuration rather
+          than health, so it is here with the rest of what the deployment is
+          set to; whether they are arriving is on the system screen.
+
+          Administrators only, and the whole panel rather than its controls:
+          the address is the credential for two of the services it names, and
+          the endpoint behind it refuses anybody else — so drawn for an auditor
+          this would be a table that could only fail to load. */}
+      {who.admin && <Webhooks />}
     </>
   );
 }
@@ -287,6 +298,16 @@ function Field({
   // What would be stored, from whatever the controls are showing. A box left
   // empty is not a value: saving is refused rather than a number invented for
   // somebody.
+  // The control's id is opaque and generated, never the setting's key.
+  //
+  // A password manager classifies a field by every word it can reach through
+  // it, and the key is one of those: "signin.claim-window" rendered into `id`
+  // is a sign-in field to LastPass however many ignore attributes sit beside
+  // it, which is how one duration box came to be offered a saved login. `name`
+  // was already pinned to a constant for this reason and `id` was missed.
+  // Generated rather than sanitized, so no key can ever reach a classifier
+  // again — sanitizing only moves the problem to the next key somebody adds.
+  const field = useId();
   const typed = Number(count);
   const usable = count.trim() !== "" && Number.isFinite(typed) && typed >= 1;
   const asked = takes
@@ -305,7 +326,7 @@ function Field({
 
   return (
     <div className="field" style={{ margin: 0, maxWidth: takes || sizes ? 320 : 240 }}>
-      <label htmlFor={setting.name}>
+      <label htmlFor={field}>
         {label(setting.name)}
         {setting.default && <span className="hint"> · default</span>}
       </label>
@@ -327,7 +348,7 @@ function Field({
       <div style={{ display: "flex", gap: 6 }}>
         {words ? (
           <select
-            id={setting.name}
+            id={field}
             name="setting"
             {...notACredential}
             value={value}
@@ -342,7 +363,7 @@ function Field({
         ) : takes ? (
           <>
             <input
-              id={setting.name}
+              id={field}
               name="setting"
               {...notACredential}
               type="number"
@@ -369,7 +390,7 @@ function Field({
         ) : sizes ? (
           <>
             <input
-              id={setting.name}
+              id={field}
               name="setting"
               {...notACredential}
               type="number"
@@ -395,7 +416,7 @@ function Field({
           </>
         ) : (
           <input
-            id={setting.name}
+            id={field}
             name="setting"
             {...notACredential}
             type="text"

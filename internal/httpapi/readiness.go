@@ -56,17 +56,29 @@ type ReadinessBody struct {
 type BlockingBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Component     string `json:"component"`
-	Severity      string `json:"severity,omitempty"`
-	Exploited     bool   `json:"exploited,omitempty"`
-	Places        int    `json:"places" doc:"How many places of the build it sits at"`
-	State         string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"How far it has been decided. Anything agreed is not in this list"`
-	Due           string `json:"due,omitempty"`
+	// Version is what tells one of these from another. A group is keyed on the
+	// issue and the fold — the source package at the version it was built at —
+	// so one issue at three versions of one component is three rows here.
+	// Without it they arrived identical: four rows reading "CVE-2026-46595
+	// golang.org/x/crypto", differing only in a count the panel does not draw.
+	Version   string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
+	Severity  string `json:"severity,omitempty"`
+	Exploited bool   `json:"exploited,omitempty"`
+	Places    int    `json:"places" doc:"How many places of the build it sits at"`
+	State     string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"How far it has been decided. Anything agreed is not in this list"`
+	Due       string `json:"due,omitempty"`
 }
 
-// blocking is how many of the worst are listed. A release conversation reads
-// the top of this and the number beside it; the findings list is where the
-// whole of it is worked.
-const blocking = 20
+// blocking is how many of the worst are listed.
+//
+// A release conversation reads the top of this and the number beside it; the
+// findings list is where the whole of it is worked, and the panel links to it.
+// The worst few: against a blocker count in the thousands, a longer list is an
+// arbitrary page of the findings list rather than what the count is made of,
+// and it costs the panel the comparison it is named after — which is what the
+// rest of the panel draws. What is asked for here is a number somebody can act
+// on without going and assembling it, and the worst few are that.
+const blocking = 5
 
 func registerReadiness(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
@@ -86,7 +98,7 @@ func registerReadiness(api huma.API, in Ingest) {
 			"that shipped clean and a release nobody scanned are not the same answer.\n\n" +
 			"Counted as issues at components at or above the deployment's line, which `floor` " +
 			"names.\n\n" +
-			"**`blocking` is what the count is made of**: the work nobody has agreed to ship " +
+			"**`blocking` is the worst few of what the count is made of**: the work nobody has agreed to ship " +
 			"with, worst first, read through the findings list's own reader with the same " +
 			"line — so the list it opens is the list it counts. Anything agreed is absent, " +
 			"because agreeing is the decision to ship with it. `blockers` says how many " +
@@ -149,6 +161,7 @@ func registerReadiness(api huma.API, in Ingest) {
 		for _, group := range groups {
 			one := BlockingBody{
 				Vulnerability: group.Vulnerability, Component: group.Component,
+				Version:  group.Version,
 				Severity: group.Severity, Exploited: group.Exploited,
 				Places: group.Places, State: group.State,
 			}

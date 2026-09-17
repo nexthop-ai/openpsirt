@@ -15,6 +15,7 @@ import { notACredential } from "../ui/noautofill";
 import { Pace } from "../ui/Charts";
 import { ROLLED } from "../ui/severities";
 import { Severity } from "../ui/Severity";
+import { Shape } from "../ui/Shape";
 import { Wide } from "../ui/Wide";
 
 // One component, and the one piece of work it is.
@@ -495,41 +496,6 @@ function Sits({
         </ol>
       )}
     </div>
-  );
-}
-
-// What a count is made of, as one bar whose widths are the counts.
-//
-// The shape is the answer: a bar that is mostly one colour says where the weight
-// is before a number is read, which a chip per band at a fixed width does not.
-//
-// **The key carries the identity, not the colour.** Two of the severity colours
-// are close enough that a colourblind reader cannot separate them, so the labels
-// are what says which band is which and the colour reinforces it. Where a row is
-// one line the key is dropped and the title carries it, because five legends
-// down a table say the same thing five times.
-function Shape({ by, key_ = true }: { by?: Record<string, number>; key_?: boolean }) {
-  const there = ROLLED.filter((band) => (by ?? {})[band]);
-  if (there.length === 0) return null;
-  const said = there.map((band) => `${(by ?? {})[band]} ${band}`).join(" · ");
-  return (
-    <>
-      <span className="sevbar" role="img" aria-label={said} title={key_ ? undefined : said}>
-        {there.map((band) => (
-          <i key={band} className={band} style={{ flex: (by ?? {})[band] }} />
-        ))}
-      </span>
-      {key_ && (
-        <span className="sevkey">
-          {there.map((band) => (
-            <span key={band}>
-              <i className={band} />
-              {(by ?? {})[band]} {band}
-            </span>
-          ))}
-        </span>
-      )}
-    </>
   );
 }
 
