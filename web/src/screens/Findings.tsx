@@ -848,7 +848,24 @@ export function Findings() {
         {findings.isPending ? (
           <Loading />
         ) : rows.length === 0 ? (
-          <Empty title="Nothing matches these filters." />
+          // A narrowed list that matches nothing is a dead end: the controls
+          // that produced it are scrolled off above, and the reader is looking
+          // at a panel that says so and offers nothing. What is on, and the
+          // way to take it all off.
+          <Empty
+            title="Nothing matches these filters."
+            detail={
+              advanced > 0
+                ? `${advanced.toLocaleString()} ${advanced === 1 ? "filter is" : "filters are"} narrowing this list.`
+                : "Nothing is open here at all."
+            }
+          >
+            {advanced > 0 && (
+              <button type="button" className="btn quiet" onClick={() => ask(withoutAny(asked))}>
+                Clear every filter
+              </button>
+            )}
+          </Empty>
         ) : (
           <FindingsTable
             rows={rows}
