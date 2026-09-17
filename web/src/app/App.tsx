@@ -11,6 +11,7 @@ import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
 import { Findings } from "../screens/Findings";
 import { UNOWNED_LIST } from "../screens/list";
+import { NotFound } from "../screens/NotFound";
 import { Products } from "../screens/Products";
 import { Product } from "../screens/Product";
 import { Run } from "../screens/Run";
@@ -220,17 +221,11 @@ export function App() {
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
               <Route path={ROUTES.settings} element={<Settings who={who.data} />} />
               <Route path={ROUTES.system} element={<System />} />
-              {/* A path the page does not know either. Sending somebody home is
-            better than a dead end — and the replace is what stops the back
-            button returning to an address that only redirects again.
-            
-            **What it costs is that nothing says why.** The address they tried
-            is gone from the bar with it, so a link built wrong lands on the
-            home screen looking like a click that did nothing. That is how
-            `/products//components/NAME` — a component link built with no
-            product selected — was reported as "it brings you back to the
-            homepage". */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* An address this application does not answer. It says so, and
+                keeps the address in the bar: redirecting home threw away the
+                one piece of evidence a link built wrong leaves behind, which
+                is the link. */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </Boundary>

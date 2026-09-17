@@ -96,6 +96,7 @@ reload while working when navigated to.
 | The rule is "the router has no route for this", asked of the router | Not "the path is outside `/v1`". The framework registers routes of its own — the API document and the schemas it references — and a prefix rule hands those to anybody who asks |
 | Names the server owns are reserved even when nothing is routed there | The framework's documentation route is disabled by configuration, and unrouted is exactly what marks a path as the page's. Without a reserved list the interface would have claimed `/docs`. A test asserts that mounting the interface opens nothing |
 | The page loads without a credential and nothing else changes | The sign-in screen *is* the page. What is served is a compiled application and its assets, carrying no data |
+| An address the page does not know says so, and keeps the address | It used to redirect to the home screen, which threw away the one piece of evidence a link built wrong leaves behind. A component link composed with no product selected was reported as "it brings you back to the homepage" — the reporter could not say what address they had been on, because it was gone from the bar |
 
 ## The generated client
 
@@ -609,6 +610,11 @@ The notes thread is the one somebody can write in before anybody has decided
 anything, which is why it is not gated on a claim. Nothing about writing one
 changes what ranks, a deadline, or what the product triages, and it says so
 beside the button.
+
+**The identifier in the heading opens the issue screen.** That screen answers
+"everywhere this issue sits", and the doors into it were an exact-match search,
+one report and one queue link — so the reader most likely to want it, somebody
+already looking at one place the issue sits, had none.
 
 **The issue screen carries the same thread, a product at a time.** That screen
 shows an issue wherever it sits, and a note belongs to one product — so one

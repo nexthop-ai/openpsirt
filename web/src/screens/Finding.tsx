@@ -396,9 +396,19 @@ export function Finding() {
           </div>
         )}
         <h2>
-          <span className="id">{it.vulnerability}</span> in{" "}
-          <span className="id">{it.component}</span> <Severity word={it.assessed || it.severity} />{" "}
-          {it.exploited && <Exploited when />}{" "}
+          {/* The one screen that answers "everywhere this issue sits" had
+              almost no doors into it: an exact-match search, one report and
+              one queue link. The identifier a reader is already looking at is
+              the natural one. */}
+          <Link
+            to={`/issues/${encodeURIComponent(it.vulnerability ?? "")}`}
+            className="id"
+            title={`${it.vulnerability} everywhere it sits`}
+          >
+            {it.vulnerability}
+          </Link>{" "}
+          in <span className="id">{it.component}</span>{" "}
+          <Severity word={it.assessed || it.severity} /> {it.exploited && <Exploited when />}{" "}
           <span className={`state ${state.cls}`}>{state.label}</span>
         </h2>
         <p>
