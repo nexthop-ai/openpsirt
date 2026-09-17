@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { BANDS } from "../ui/severities";
+import { lasted, on } from "../ui/when";
 
 type Changed = {
   total?: number;
@@ -57,9 +58,21 @@ export function Run() {
         <p>
           {product} · {stream} · {variant} ·{" "}
           {it.finished_at ? (
-            <>finished {it.finished_at.replace("T", " ").slice(0, 16)}</>
+            <>
+              finished {on(it.finished_at)}
+              {/* How long it took, which the page about a run did not say
+                  while carrying both moments it is the difference of. "Did
+                  the nightly scan take four minutes or four hours" is the
+                  question somebody asks when a build is late. */}
+              {lasted(it.started_at, it.finished_at) && (
+                <> · took {lasted(it.started_at, it.finished_at)}</>
+              )}
+            </>
           ) : (
-            <b>still running</b>
+            <>
+              <b>still running</b>
+              {it.started_at && <> · started {on(it.started_at)}</>}
+            </>
           )}
         </p>
       </div>
@@ -106,7 +119,16 @@ export function Run() {
       </div>
 
       <div className="detail" style={{ marginTop: 14 }}>
-        <Shape title="What it opened" changed={it.opened} exploited={it.opened_exploited} />
+        {/* The list this card is a count of. A run saying it opened four
+            thousand findings and offering no way to read them is the exact
+            problem this screen exists to fix, and "opened after a date" is the
+            wrong question when two runs landed the same day. */}
+        <Shape
+          title="What it opened"
+          changed={it.opened}
+          exploited={it.opened_exploited}
+          to={`${build}/findings?opened_by_run=${encodeURIComponent(run)}`}
+        />
         <Shape title="What it closed" changed={it.closed} />
       </div>
 
@@ -122,10 +144,15 @@ function Shape({
   title,
   changed,
   exploited,
+  to,
 }: {
   title: string;
   changed: Changed | undefined;
   exploited?: number;
+  // Where the rows behind the count are, where they can be listed. What a run
+  // closed has no such list: those findings are closed, and the list is of
+  // what is open.
+  to?: string;
 }) {
   // Read off the ladder rather than listed here. Written out, a rung added
   // to it was a row this strip never drew.
@@ -143,6 +170,13 @@ function Shape({
         </p>
       ) : (
         <>
+          {to && (
+            <p style={{ margin: "0 0 8px" }}>
+              <Link to={to} className="linkish">
+                Read them →
+              </Link>
+            </p>
+          )}
           {/* A band with none of them is left out rather than drawn as a
               zero: a row of zeros reads as a chart that failed to load. */}
           <div className="variants">

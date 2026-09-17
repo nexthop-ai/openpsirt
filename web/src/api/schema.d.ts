@@ -10701,6 +10701,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -10805,6 +10807,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12102,6 +12106,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12249,6 +12255,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12358,6 +12366,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */
@@ -12470,6 +12480,8 @@ export interface operations {
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here after this date, as 2026-03-31 */
                 opened_after?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
                 /** @description Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it */
                 closed_after?: string;
                 /** @description Keep only what somebody claimed something about after this date */

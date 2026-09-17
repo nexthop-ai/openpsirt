@@ -979,6 +979,12 @@ known to be exploited — which is what decides whether an overnight jump is an
 evening's work or a night's. A band with none in it is left out rather than
 drawn as a zero, because a row of zeros reads as a chart that failed to load.
 
+| Rule | |
+|---|---|
+| **What it opened is a list, reached from the count** | A run saying it opened four thousand findings and offering no way to read them is the problem the page exists to fix. The findings list narrows to one run by its identifier — "opened after a date" is the wrong question when two runs landed the same day — and the narrowing is a chip that removes itself, so arriving from that link widens back to the whole build |
+| **What it closed is not** | Those findings are closed, and the list is of what is open |
+| **How long it took is said** | The page carried both moments it is the difference of and drew only the second. "Did the nightly scan take four minutes or four hours" is what somebody asks when a build is late, and a run still going says when it started instead |
+
 Release comparison carries a chart across every build, not only the two being
 compared: the comparison answers what changed between two, and the chart answers
 whether it is getting better or worse. Bars rather than a line, because these

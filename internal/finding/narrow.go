@@ -411,6 +411,12 @@ type Filter struct {
 	OpenedAfter   *time.Time
 	ClosedAfter   *time.Time
 	ProposedAfter *time.Time
+	// OpenedByRun keeps only what one scan run opened. A run says how much it
+	// opened and at what severities, and the list it says that about could not
+	// be reached: somebody looking at a build that jumped by four thousand
+	// overnight is asking which of them matter, and "opened after a date" is
+	// the wrong question when two runs landed the same day.
+	OpenedByRun int64
 }
 
 // product is how a clause names the product a row belongs to: a bound number
@@ -617,6 +623,13 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	q = f.sayingIt(q)
 	if f.OpenedAfter != nil {
 		q = q.Having("MIN(f.opened_at) > ?", *f.OpenedAfter)
+	}
+	if f.OpenedByRun > 0 {
+		// A row-level condition rather than one over the group: a group is in
+		// the list when any of its places was opened by that run, which is
+		// what "what this run opened" means — one issue at a component can
+		// appear at a place this run found and at forty it did not.
+		q = q.Where("f.opened_run_id = ?", f.OpenedByRun)
 	}
 	if f.ClosedAfter != nil {
 		// Closed rows are outside the list's own population, so this is the

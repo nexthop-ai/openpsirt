@@ -257,6 +257,10 @@ export function listQuery(params: URLSearchParams) {
   // Both are a count of days the server takes from one upward, so a word, an
   // empty box and a zero are all "do not ask about this" rather than values.
   const openFor = num(params.get("open_for"), 1, Number.MAX_SAFE_INTEGER);
+  // Which run opened it, as the run screen links to. An identifier the address
+  // carries is somebody else's text like any other, so a value that is not a
+  // run number is a parameter to leave off rather than one to send wrong.
+  const openedBy = num(params.get("opened_by_run"), 1, Number.MAX_SAFE_INTEGER);
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   return {
     limit: pageSize(params),
@@ -268,6 +272,7 @@ export function listQuery(params: URLSearchParams) {
     ...(fixable ? { fixable: true } : {}),
     ...(likelihood > 0 && likelihood <= 1 ? { epss_at_least: likelihood } : {}),
     ...(params.get("opened_after") ? { opened_after: params.get("opened_after") ?? "" } : {}),
+    ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
     ...(params.get("proposed_after") ? { proposed_after: params.get("proposed_after") ?? "" } : {}),
     ...(params.get("closed_after") ? { closed_after: params.get("closed_after") ?? "" } : {}),
     ...(params.get("q") ? { q: params.get("q") ?? "" } : {}),

@@ -10987,6 +10987,15 @@ paths:
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
             type: string
+        - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+          explode: false
+          in: query
+          name: opened_by_run
+          schema:
+            description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
           explode: false
           in: query
@@ -11434,6 +11443,15 @@ paths:
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
             type: string
+        - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+          explode: false
+          in: query
+          name: opened_by_run
+          schema:
+            description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
           explode: false
           in: query
@@ -13435,6 +13453,15 @@ paths:
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
             type: string
+        - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+          explode: false
+          in: query
+          name: opened_by_run
+          schema:
+            description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
           explode: false
           in: query
@@ -13959,6 +13986,15 @@ paths:
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
             type: string
+        - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+          explode: false
+          in: query
+          name: opened_by_run
+          schema:
+            description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
           explode: false
           in: query
@@ -14407,6 +14443,15 @@ paths:
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
             type: string
+        - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+          explode: false
+          in: query
+          name: opened_by_run
+          schema:
+            description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
           explode: false
           in: query
@@ -14881,6 +14926,15 @@ paths:
           schema:
             description: Keep only what was first seen here after this date, as 2026-03-31
             type: string
+        - description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+          explode: false
+          in: query
+          name: opened_by_run
+          schema:
+            description: Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it
+            format: int64
+            minimum: 1
+            type: integer
         - description: Keep only what stopped being present after this date. Closed rows are outside this list's own population, so asking changes what it is about rather than narrowing it
           explode: false
           in: query
