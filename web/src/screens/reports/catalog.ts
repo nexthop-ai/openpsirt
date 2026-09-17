@@ -59,6 +59,12 @@ export const CATALOG: Report[] = [
       "What is still shipped and no longer maintained. Past end-of-life the deadline comes off every open finding, so this pile is absent from every overdue count by design.",
   },
   {
+    slug: "backlog-over-time",
+    name: "Backlog over time",
+    answers:
+      "Whether the backlog is growing, and what kind of thing is making it grow: what arrived, what was answered, and what stood open, each split by severity.",
+  },
+  {
     slug: "rubber-stamp",
     name: "Rubber-stamp",
     answers:

@@ -49,6 +49,18 @@ type Point struct {
 	// BySeverity is the open count split up. A total that barely moves while
 	// its critical share rises is getting worse, and one line hides that.
 	BySeverity map[string]int
+	// OpenedBySeverity and ResolvedBySeverity are the same split over the two
+	// flows. **The question a backlog is read for is what kind of thing is
+	// arriving and what kind is being answered**: ten arriving and ten
+	// resolved is a team keeping pace where both are low, and a team losing
+	// ground where the ten arriving are critical and the ten resolved are
+	// not. Split only on the open count, that reads as a flat line.
+	//
+	// A resolved issue is counted at the severity it held while it was open,
+	// which is the last step that held it: the row it was resolved in no
+	// longer has one.
+	OpenedBySeverity   map[string]int
+	ResolvedBySeverity map[string]int
 }
 
 // Trend reports new, resolved and open over time, split by severity.
@@ -244,7 +256,10 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 
 	points := make([]Point, 0, steps)
 	for i := 0; i < steps; i++ {
-		point := Point{At: since.Add(time.Duration(i+1) * step), BySeverity: map[string]int{}}
+		point := Point{
+			At: since.Add(time.Duration(i+1) * step), BySeverity: map[string]int{},
+			OpenedBySeverity: map[string]int{}, ResolvedBySeverity: map[string]int{},
+		}
 		point.Open = len(open[i])
 		for _, severity := range open[i] {
 			point.BySeverity[severity]++
@@ -258,14 +273,16 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 			continue
 		}
 		before := open[i-1]
-		for id := range open[i] {
+		for id, severity := range open[i] {
 			if _, was := before[id]; !was {
 				point.Opened++
+				point.OpenedBySeverity[severity]++
 			}
 		}
-		for id := range before {
+		for id, severity := range before {
 			if _, still := open[i][id]; !still && !quiet[i][id] {
 				point.Resolved++
+				point.ResolvedBySeverity[severity]++
 			}
 		}
 		points = append(points, point)

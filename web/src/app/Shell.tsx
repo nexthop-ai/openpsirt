@@ -280,6 +280,11 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               at, and called what it does: the act it automates is assignment. */}
             <Rail to="/auto-assignment" icon="route" label="Auto-assignment" />
             {who.admin && <Rail to="/settings" icon="gear" label="Settings" />}
+            {/* What the deployment itself is doing. Beside settings because
+              both are about the deployment rather than about what it found,
+              and open to an auditor as well: reading what is queued and where
+              things are sent changes none of it. */}
+            {(who.admin || who.audits) && <Rail to="/system" icon="gear" label="System" />}
           </>
         )}
       </nav>

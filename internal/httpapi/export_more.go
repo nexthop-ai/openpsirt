@@ -36,6 +36,7 @@ import (
 func registerMoreExports(api huma.API, in Ingest) {
 	registerAuditExport(api, in)
 	registerChangeExport(api, in)
+	registerTrendExport(api, in)
 	registerQueueExport(api, in)
 	registerComponentExport(api, in)
 	registerDueExport(api, in)
@@ -588,6 +589,102 @@ func registerChangeExport(api huma.API, in Ingest) {
 		}
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
 			writeExport(writer, input.Format, "administrative-changes", out)
+		}}, nil
+	})
+}
+
+// registerTrendExport writes out the backlog over time.
+//
+// The trend was a panel on one screen at a fixed twelve weeks: no catalog
+// entry, no window, and no file. It is the first question a manager asks —
+// whether the backlog is growing — and the answer could be looked at and not
+// taken to the meeting it was asked in.
+func registerTrendExport(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "export-trend", Method: http.MethodGet, Path: "/v1/trend.{format}",
+		Summary: "Export new, resolved and open over time",
+		Description: "One row per step, with what arrived, what was answered and what stood " +
+			"open at the end of it — each split by severity.\n\n" +
+			"**The two flows are what the backlog is read for.** Ten arriving and ten " +
+			"answered is a team keeping pace where both are low, and a team losing ground " +
+			"where what arrives is critical and what leaves is not.\n\n" +
+			"Takes the window and the narrowings the trend takes. Read with your own " +
+			"visibility, like the chart it comes from.",
+		Tags: []string{"Reports"},
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Format string `path:"format" enum:"csv,json"`
+		ScopeQuery
+		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
+		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
+		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build"`
+		Version   string `query:"beneath_version" doc:"Which one, where the build holds that name at several versions"`
+		Ecosystem string `query:"beneath_ecosystem" doc:"Which one, for the few names a build holds at one version as two components"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		scope, err := scoped(ctx, in, subject, input.ScopeQuery)
+		if err != nil {
+			return nil, err
+		}
+		const week = 7 * 24 * time.Hour
+		since := time.Now().UTC().Add(-time.Duration(input.Weeks) * week)
+		// The bands the file carries, in the order the severity ladder ranks
+		// them. Named rather than taken from whatever the first row happens to
+		// hold: a file whose columns depend on the data is one a spreadsheet
+		// cannot be built against.
+		bands := []string{"critical", "high", "medium", "low", "unrated"}
+		header := []string{"week ending", "opened", "resolved", "open"}
+		for _, band := range bands {
+			header = append(header, "opened "+band)
+		}
+		for _, band := range bands {
+			header = append(header, "resolved "+band)
+		}
+		for _, band := range bands {
+			header = append(header, "open "+band)
+		}
+		out := Exporting{
+			What:   "the backlog over time",
+			About:  []Stated{{"weeks", strconv.Itoa(input.Weeks)}},
+			Header: header,
+			// Every step in one answer, because a trend is worked out over the
+			// whole window rather than a page at a time: there is no offset
+			// that means anything here, so the second page is empty and the
+			// walk stops.
+			Rows: func(ctx context.Context, _, offset int) ([][]string, error) {
+				if offset > 0 {
+					return nil, nil
+				}
+				points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope,
+					since, week, input.Weeks, finding.Within{
+						Component: input.Component, Beneath: input.Beneath,
+						BeneathVersion: input.Version, BeneathEcosystem: input.Ecosystem,
+					})
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(points))
+				for _, point := range points {
+					row := []string{
+						point.At.Format(time.DateOnly), strconv.Itoa(point.Opened),
+						strconv.Itoa(point.Resolved), strconv.Itoa(point.Open),
+					}
+					for _, split := range []map[string]int{
+						point.OpenedBySeverity, point.ResolvedBySeverity, point.BySeverity,
+					} {
+						for _, band := range bands {
+							row = append(row, strconv.Itoa(split[band]))
+						}
+					}
+					rows = append(rows, row)
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			writeExport(writer, input.Format, "trend", out)
 		}}, nil
 	})
 }

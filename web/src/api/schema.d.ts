@@ -4282,6 +4282,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trend.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export new, resolved and open over time
+         * @description One row per step, with what arrived, what was answered and what stood open at the end of it — each split by severity.
+         *
+         *     **The two flows are what the backlog is read for.** Ten arriving and ten answered is a team keeping pace where both are low, and a team losing ground where what arrives is critical and what leaves is not.
+         *
+         *     Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-trend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trend/releases": {
         parameters: {
             query?: never;
@@ -4371,7 +4397,9 @@ export interface paths {
          *
          *     At most 200 are returned. `total` is how many are set aside in all, so a clipped page can be told from a complete one.
          *
-         *     **Requires:** administrator
+         *     `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
+         *
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-set-aside-work"];
         put?: never;
@@ -6592,6 +6620,18 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        "List-set-aside-workResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-set-aside-workResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SetAsideBody"][] | null;
+            /** Format: int64 */
+            total: number;
+            waiting: components["schemas"]["QueuedBody"][] | null;
+        };
         "List-unassignedResponse": {
             /**
              * Format: uri
@@ -6897,17 +6937,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["SavedBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodySetAsideBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodySetAsideBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["SetAsideBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -7630,11 +7659,19 @@ export interface components {
              * @description Findings that appeared during this step
              */
             opened: number;
+            /** @description What appeared, split by severity */
+            opened_by_severity: {
+                [key: string]: number;
+            };
             /**
              * Format: int64
              * @description Findings that went away during this step
              */
             resolved: number;
+            /** @description What went away, split by the severity it held while it was open */
+            resolved_by_severity: {
+                [key: string]: number;
+            };
         };
         PreparedBody: {
             /**
@@ -7715,6 +7752,20 @@ export interface components {
             items: components["schemas"]["WaitingBody"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        QueuedBody: {
+            /** @description Which worker the work is for */
+            kind: string;
+            /**
+             * Format: int64
+             * @description How much of this kind may wait before more is refused
+             */
+            limit: number;
+            /**
+             * Format: int64
+             * @description How much is waiting, including work held by a worker that has stopped reporting
+             */
+            waiting: number;
         };
         RateBody: {
             /**
@@ -15890,6 +15941,51 @@ export interface operations {
             };
         };
     };
+    "export-trend": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                stream?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                weeks?: number;
+                /** @description Keep only what is open against components of this name, whatever version */
+                component?: string;
+                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build */
+                beneath?: string;
+                /** @description Which one, where the build holds that name at several versions */
+                beneath_version?: string;
+                /** @description Which one, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-release-trend": {
         parameters: {
             query?: {
@@ -16010,7 +16106,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodySetAsideBody"];
+                    "application/json": components["schemas"]["List-set-aside-workResponse"];
                 };
             };
             /** @description Error */

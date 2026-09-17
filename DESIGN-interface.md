@@ -51,6 +51,7 @@ end rather than left to be found by clicking.
 - [A person, whole](#a-person-whole)
 - [A release, gathered](#a-release-gathered)
 - [Reports, settings, inheritance](#reports-settings-inheritance)
+- [The System screen](#the-system-screen)
 - [The administration screens](#the-administration-screens)
 - [Showing the ordering signals](#showing-the-ordering-signals)
 - [Units, dates and copy](#units-dates-and-copy)
@@ -1251,6 +1252,20 @@ since a person only ever sees products they hold a role on.
 | What a new line inherits is on the inventories screen | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already and how many cover nothing here, and offers the rest as a list to tick. Only two of the four groups are questions, and the screen says which |
 | What was recorded here is a filter | A flaw somebody entered is the only kind a person may close by hand (REQ-19), and the screen that records one is where "is this already filed" gets asked. Offered on the list and linked from the recording screen, with the line off, because the question is what exists rather than what is worth an afternoon |
 | **A setting says what it does in words, under its name** | It said so on the label's hover, which is where clarification goes — and what a setting does is not clarification, it is the whole of what the control is. Three of them rewrite what the tool reports without anything being scanned. Not on the control itself: a password manager classifies a field by the words it can reach through it |
+
+## The System screen
+
+What this deployment is doing, rather than what it has found.
+
+| Rule | |
+|---|---|
+| Three things on one screen: what is queued, what the queue gave up on, and where things are sent | They are one question — is this deployment working — and each of them fails the same way. A queue that has given up looks exactly like a quiet one, and a destination refusing every request for a week looks exactly like one nothing has been sent to |
+| What is waiting is said per kind, against the bound | The bound is per kind, so one producer's own backlog hides behind everybody else's empty queues. What an operator does about a full queue needs both numbers |
+| Work held by a worker that stopped reporting counts as waiting | It is work waiting for whoever takes it next. Counted as running, a queue in the middle of a reclaim cycle reads as empty |
+| A set-aside job is shown in the queue's own words | What it points at may have been deleted since, and a list that fails to render because one row points at nothing is worse than one that says what the row says |
+| The audit permission reaches it; changing anything on it does not | Reading what is queued and where things are sent changes none of it |
+| A destination's address is not a link | It is somewhere this deployment posts to rather than somewhere a person goes, and for two of the services it names the path is the credential |
+| The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
 
 ## The administration screens
 

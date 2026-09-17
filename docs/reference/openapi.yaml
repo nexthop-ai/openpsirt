@@ -3902,6 +3902,36 @@ components:
         - findings
         - cap
       type: object
+    List-set-aside-workResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/List-set-aside-workResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SetAsideBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+        waiting:
+          items:
+            $ref: "#/components/schemas/QueuedBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+        - total
+        - waiting
+      type: object
     List-unassignedResponse:
       additionalProperties: false
       properties:
@@ -4510,28 +4540,6 @@ components:
         items:
           items:
             $ref: "#/components/schemas/SavedBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
-    ListBodySetAsideBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodySetAsideBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/SetAsideBody"
           type:
             - array
             - "null"
@@ -5776,16 +5784,30 @@ components:
           description: Findings that appeared during this step
           format: int64
           type: integer
+        opened_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: What appeared, split by severity
+          type: object
         resolved:
           description: Findings that went away during this step
           format: int64
           type: integer
+        resolved_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: What went away, split by the severity it held while it was open
+          type: object
       required:
         - at
         - open
         - opened
         - resolved
         - by_severity
+        - opened_by_severity
+        - resolved_by_severity
       type: object
     PreparedBody:
       additionalProperties: false
@@ -5921,6 +5943,25 @@ components:
       required:
         - items
         - total
+      type: object
+    QueuedBody:
+      additionalProperties: false
+      properties:
+        kind:
+          description: Which worker the work is for
+          type: string
+        limit:
+          description: How much of this kind may wait before more is refused
+          format: int64
+          type: integer
+        waiting:
+          description: How much is waiting, including work held by a worker that has stopped reporting
+          format: int64
+          type: integer
+      required:
+        - kind
+        - waiting
+        - limit
       type: object
     RateBody:
       additionalProperties: false
@@ -20171,6 +20212,99 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/trend.{format}:
+    get:
+      description: |-
+        One row per step, with what arrived, what was answered and what stood open at the end of it — each split by severity.
+
+        **The two flows are what the backlog is read for.** Ten arriving and ten answered is a team keeping pace where both are low, and a team losing ground where what arrives is critical and what leaves is not.
+
+        Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-trend
+      parameters:
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Limit to one product, by name. Empty means every product you can see
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see
+            type: string
+        - description: Limit to one branch or tag. Only meaningful with a product
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Limit to one branch or tag. Only meaningful with a product
+            type: string
+        - description: Limit to one variant. Only meaningful with a product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Only meaningful with a product, and independent of the branch
+            type: string
+        - explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 12
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - description: Keep only what is open against components of this name, whatever version
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep only what is open against components of this name, whatever version
+            type: string
+        - description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build
+            type: string
+        - description: Which one, where the build holds that name at several versions
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: Which one, where the build holds that name at several versions
+            type: string
+        - description: Which one, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: Which one, for the few names a build holds at one version as two components
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export new, resolved and open over time
+      tags:
+        - Reports
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/trend/releases:
     get:
       description: |-
@@ -20337,14 +20471,16 @@ paths:
 
         At most 200 are returned. `total` is how many are set aside in all, so a clipped page can be told from a complete one.
 
-        **Requires:** administrator
+        `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
+
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-set-aside-work
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodySetAsideBody"
+                $ref: "#/components/schemas/List-set-aside-workResponse"
           description: OK
         default:
           content:
@@ -20356,7 +20492,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
   /v1/work/set-aside/{id}/retry:
     post:
       description: |-
