@@ -45,8 +45,8 @@ func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 // over every build of the product — so a rule naming a pattern that matches
 // broadly issued tens of thousands of them inside one request. The engine
 // walks from every anchor at once instead.
-func WithinAny(db *bun.DB, targetID int64, componentIDs []int64) *bun.RawQuery {
-	return bun.NewRawQuery(db, `WITH RECURSIVE "down" AS (
+func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
+	return db.NewRaw(`WITH RECURSIVE "down" AS (
 		SELECT n.id AS "node", 0 AS "depth"
 		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)

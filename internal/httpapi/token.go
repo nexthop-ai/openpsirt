@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -68,7 +69,7 @@ func registerTokens(api huma.API, in Ingest) {
 			"found when somebody leaves and nobody knows what breaks if it is turned off.",
 		Tags: []string{"Access"}, DefaultStatus: http.StatusCreated,
 	}, ownSubject, "Signed in, not through a token: a token cannot mint another."), func(ctx context.Context, input *struct{ Body TokenBody }) (*struct{ Body TokenBody }, error) {
-		subject, rights, _, err := mine(ctx, in)
+		subject, _, _, err := mine(ctx, in)
 		if err != nil {
 			return nil, err
 		}
@@ -136,18 +137,31 @@ func registerTokens(api huma.API, in Ingest) {
 			}
 		}
 
-		token, secret, err := rights.NewToken(ctx, subject.ID, input.Body.Name, productID, holds, lifetime, ceiling)
-		if err != nil {
-			// The refusals here are about what was asked for — a name that is
-			// missing, a lifetime past the ceiling — so they are reported.
-			return nil, asked(in.Logger, err)
+		var token *access.Token
+		var secret string
+		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+			var err error
+			token, secret, err = access.NewStore(tx).NewToken(ctx, subject.ID,
+				input.Body.Name, productID, holds, lifetime, ceiling)
+			if err != nil {
+				// The refusals here are about what was asked for — a name that
+				// is missing, a lifetime past the ceiling — so they are
+				// reported.
+				return asked(in.Logger, err)
+			}
+			// A personal token is a way into the deployment, so who minted one
+			// is the same question as who minted a pipeline key — and the
+			// answer is asked for after somebody leaves, when they are not
+			// there to ask. Named by owner and token, because a name is unique
+			// to its owner.
+			if err := noted(ctx, tx, trail.Credential, subject.Identity+" · "+token.Name,
+				nil, trail.Said(narrowedTokenSays(input.Body.Product, holds), true)); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		// A personal token is a way into the deployment, so who minted one is
-		// the same question as who minted a pipeline key — and the answer is
-		// asked for after somebody leaves, when they are not there to ask.
-		// Named by owner and token, because a name is unique to its owner.
-		noteChange(ctx, in, trail.Credential, subject.Identity+" · "+token.Name,
-			nil, trail.Said(narrowedTokenSays(input.Body.Product, holds), true))
 		return &struct{ Body TokenBody }{Body: TokenBody{
 			Name: token.Name, Product: input.Body.Product, Secret: secret,
 			Holds: input.Body.Holds, ExpiresAt: stamp(token.ExpiresAt),
@@ -165,7 +179,7 @@ func registerTokens(api huma.API, in Ingest) {
 	}, ownSubject, "Signed in, not through a token: a token cannot withdraw another."), func(ctx context.Context, input *struct {
 		Name string `path:"name"`
 	}) (*struct{}, error) {
-		subject, rights, _, err := mine(ctx, in)
+		subject, _, _, err := mine(ctx, in)
 		if err != nil {
 			return nil, err
 		}
@@ -176,18 +190,23 @@ func registerTokens(api huma.API, in Ingest) {
 			return nil, huma.Error403Forbidden(
 				"a token cannot withdraw another; sign in to withdraw one")
 		}
-		token, err := rights.TokenByName(ctx, subject.ID, input.Name)
-		if err != nil {
-			return nil, absent(in.Logger, err, "that token could not be looked up",
-				func() error {
-					return huma.Error404NotFound("no token of yours is called that")
-				})
+		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+			rights := access.NewStore(tx)
+			token, err := rights.TokenByName(ctx, subject.ID, input.Name)
+			if err != nil {
+				return absent(in.Logger, err, "that token could not be looked up",
+					func() error {
+						return huma.Error404NotFound("no token of yours is called that")
+					})
+			}
+			if err := rights.RevokeToken(ctx, token.ID); err != nil {
+				return wentWrong(in.Logger, "cannot revoke a token", err)
+			}
+			return noted(ctx, tx, trail.Credential, subject.Identity+" · "+token.Name,
+				trail.Said("in force", true), nil)
+		}); err != nil {
+			return nil, err
 		}
-		if err := rights.RevokeToken(ctx, token.ID); err != nil {
-			return nil, wentWrong(in.Logger, "cannot revoke a token", err)
-		}
-		noteChange(ctx, in, trail.Credential, subject.Identity+" · "+token.Name,
-			trail.Said("in force", true), nil)
 		return &struct{}{}, nil
 	})
 }

@@ -31,7 +31,7 @@ type BindingBody struct {
 	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin" doc:"What membership of this group grants"`
 }
 
-func registerBindings(api huma.API, a Administering, settings func() *setting.Store) {
+func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *setting.Store) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-role-mode", Method: http.MethodGet, Path: "/v1/roles/mode",
 		Summary: "Get the role assignment mode",
@@ -42,10 +42,10 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 			"stale assignment outlives somebody's removal from the team it was shadowing.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ModeBody }, error) {
-		if _, _, err := administerable(ctx, a); err != nil {
+		if _, _, err := administerable(ctx, a, a.handle()); err != nil {
 			return nil, err
 		}
-		store := settings()
+		store := settings(a.handle())
 		if store == nil {
 			return nil, noDatabase(a.Logger)
 		}
@@ -64,58 +64,67 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 			"would leave nobody able to administer this deployment.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, in *struct{ Body ModeBody }) (*struct{ Body ModeBody }, error) {
-		rights, _, err := administerable(ctx, a)
-		if err != nil {
-			return nil, err
-		}
-		store := settings()
-		if store == nil {
-			return nil, noDatabase(a.Logger)
-		}
-
 		wanted := access.AsMode(in.Body.Mode)
 		if string(wanted) != in.Body.Mode {
 			return nil, huma.Error422UnprocessableEntity("that is not a way for roles to be assigned")
 		}
 
-		// Asked before the switch rather than after. A deployment that has
-		// locked itself out of its own administration has one route back —
-		// editing the database by hand — and refusing the change is cheaper
-		// than discovering that afterwards.
-		can, err := rights.CanAdminister(ctx, wanted)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot tell who would administer", err)
-		}
-		if !can {
-			return nil, huma.Error409Conflict(
-				"nothing would administer this deployment in that mode: bind a group to admin, " +
-					"or name somebody in configuration, before switching")
-		}
-		// And something has to be able to say what groups somebody is in. A
-		// provider configured without a source of groups reports every arrival
-		// as belonging to nothing, so in this mode nobody derives any role —
-		// which is the same lockout the check above prevents, arriving by the
-		// other door and looking like a working deployment that admits nobody.
-		if wanted == access.GroupBound && a.Groups != nil && !a.Groups() {
-			return nil, huma.Error409Conflict(
-				"nothing here can say which groups somebody is in, so in that mode " +
-					"nobody would hold any role: configure a groups claim on the provider, " +
-					"an organization for GitHub sign-in, or a trusted proxy that reports " +
-					"groups, before switching")
-		}
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			rights, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			store := settings(tx)
+			if store == nil {
+				return noDatabase(a.Logger)
+			}
 
-		if err := rights.SwitchTo(ctx, wanted); err != nil {
-			return nil, wentWrong(a.Logger, "cannot change where roles come from", err)
+			// Asked before the switch rather than after. A deployment that has
+			// locked itself out of its own administration has one route back —
+			// editing the database by hand — and refusing the change is
+			// cheaper than discovering that afterwards.
+			can, err := rights.CanAdminister(ctx, wanted)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot tell who would administer", err)
+			}
+			if !can {
+				return huma.Error409Conflict(
+					"nothing would administer this deployment in that mode: bind a group to admin, " +
+						"or name somebody in configuration, before switching")
+			}
+			// And something has to be able to say what groups somebody is in.
+			// A provider configured without a source of groups reports every
+			// arrival as belonging to nothing, so in this mode nobody derives
+			// any role — which is the same lockout the check above prevents,
+			// arriving by the other door and looking like a working deployment
+			// that admits nobody.
+			if wanted == access.GroupBound && a.Groups != nil && !a.Groups() {
+				return huma.Error409Conflict(
+					"nothing here can say which groups somebody is in, so in that mode " +
+						"nobody would hold any role: configure a groups claim on the provider, " +
+						"an organization for GitHub sign-in, or a trusted proxy that reports " +
+						"groups, before switching")
+			}
+
+			if err := rights.SwitchTo(ctx, wanted); err != nil {
+				return wentWrong(a.Logger, "cannot change where roles come from", err)
+			}
+			// Changed rather than set, because what it held is not derivable
+			// afterwards and is half of what the trail is asked: read in a
+			// statement of its own it would be the value at some earlier
+			// moment.
+			before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
+			if err != nil {
+				return wentWrong(a.Logger, "cannot record where roles come from", err)
+			}
+			if err := noted(ctx, tx, trail.Setting, setting.RoleMode,
+				trail.Said(before, had), trail.Said(string(wanted), true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		// Changed rather than set, because what it held is not derivable
-		// afterwards and is half of what the trail is asked: read in a
-		// statement of its own it would be the value at some earlier moment.
-		before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot record where roles come from", err)
-		}
-		noteAdminChange(ctx, a, trail.Setting, setting.RoleMode,
-			trail.Said(before, had), trail.Said(string(wanted), true))
 		return &struct{ Body ModeBody }{Body: ModeBody{Mode: string(wanted)}}, nil
 	})
 
@@ -127,7 +136,7 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 			"the first time in a mapped group is admitted, and somebody in none is refused.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[BindingBody], error) {
-		rights, _, err := administerable(ctx, a)
+		rights, _, err := administerable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -176,39 +185,49 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 			"spelling against the provider rather than against what looks right.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct{ Body BindingBody }) (*struct{ Body BindingBody }, error) {
-		rights, names, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			rights, names, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+
+			if in.Body.Role == adminRole {
+				if in.Body.Product != "" {
+					return huma.Error422UnprocessableEntity(
+						"administration is not held against a product, so a group bound to it names none")
+				}
+				if err := rights.BindAdmin(ctx, in.Body.Group); err != nil {
+					return wentWrong(a.Logger, "cannot bind a group to administration", err)
+				}
+				if err := noted(ctx, tx, trail.Role, in.Body.Group+" on every product",
+					nil, trail.Said(adminRole, true)); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+				return nil
+			}
+
+			role := access.Role(in.Body.Role)
+			if !role.Valid() {
+				return huma.Error422UnprocessableEntity("that is not a role")
+			}
+			product, err := names.ProductByName(ctx, in.Body.Product)
+			if err != nil {
+				return absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
+			}
+			if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
+				return wentWrong(a.Logger, "cannot bind a group", err)
+			}
+			// Named by the product's address rather than its display name,
+			// because that is what a binding states and what the withdrawal
+			// resolves.
+			if err := noted(ctx, tx, trail.Role, in.Body.Group+" on "+product.Name,
+				nil, trail.Said(in.Body.Role, true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-
-		if in.Body.Role == adminRole {
-			if in.Body.Product != "" {
-				return nil, huma.Error422UnprocessableEntity(
-					"administration is not held against a product, so a group bound to it names none")
-			}
-			if err := rights.BindAdmin(ctx, in.Body.Group); err != nil {
-				return nil, wentWrong(a.Logger, "cannot bind a group to administration", err)
-			}
-			noteAdminChange(ctx, a, trail.Role, in.Body.Group+" on every product",
-				nil, trail.Said(adminRole, true))
-			return &struct{ Body BindingBody }{Body: in.Body}, nil
-		}
-
-		role := access.Role(in.Body.Role)
-		if !role.Valid() {
-			return nil, huma.Error422UnprocessableEntity("that is not a role")
-		}
-		product, err := names.ProductByName(ctx, in.Body.Product)
-		if err != nil {
-			return nil, absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
-		}
-		if err := rights.Bind(ctx, in.Body.Group, product.ID, role); err != nil {
-			return nil, wentWrong(a.Logger, "cannot bind a group", err)
-		}
-		// Named by the product's address rather than its display name, because
-		// that is what a binding states and what the withdrawal resolves.
-		noteAdminChange(ctx, a, trail.Role, in.Body.Group+" on "+product.Name,
-			nil, trail.Said(in.Body.Role, true))
 		return &struct{ Body BindingBody }{Body: in.Body}, nil
 	})
 
@@ -224,51 +243,60 @@ func registerBindings(api huma.API, a Administering, settings func() *setting.St
 		Product string `query:"product"`
 		Role    string `query:"role" required:"true"`
 	}) (*struct{}, error) {
-		rights, names, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			rights, names, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+
+			if in.Role == adminRole {
+				// Refused where it would leave nobody able to administer, for
+				// the same reason the mode change is — and decided inside the
+				// write, so a refusal rolls the delete back rather than being
+				// undone by a second statement that could itself fail.
+				switch err := rights.UnbindAdminIfOthersRemain(ctx, in.Group,
+					roleModeIn(settings)); {
+				case errors.Is(err, access.ErrLastAdministrator):
+					return huma.Error409Conflict(
+						"that was the last thing granting administration: bind another group " +
+							"to admin, or name somebody in configuration, first")
+				case errors.Is(err, access.ErrNothingMatched):
+					// Nothing was bound, so nothing was withdrawn — and the
+					// check that would have refused this passed *because* the
+					// delete did nothing.
+					return noSuchGrant()
+				case err != nil:
+					return wentWrong(a.Logger, "cannot unbind a group from administration", err)
+				}
+				if err := noted(ctx, tx, trail.Role, in.Group+" on every product",
+					trail.Said(adminRole, true), nil); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+				return nil
+			}
+
+			product, err := names.ProductByName(ctx, in.Product)
+			if err != nil {
+				return absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
+			}
+			role := access.Role(in.Role)
+			if !role.Valid() {
+				return huma.Error422UnprocessableEntity("that is not a role")
+			}
+			switch err := rights.Unbind(ctx, in.Group, product.ID, role); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return noSuchGrant()
+			case err != nil:
+				return wentWrong(a.Logger, "cannot unbind a group", err)
+			}
+			if err := noted(ctx, tx, trail.Role, in.Group+" on "+product.Name,
+				trail.Said(in.Role, true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-
-		if in.Role == adminRole {
-			// Refused where it would leave nobody able to administer, for the
-			// same reason the mode change is — and decided inside the write,
-			// so a refusal rolls the delete back rather than being undone by
-			// a second statement that could itself fail.
-			switch err := rights.UnbindAdminIfOthersRemain(ctx, in.Group,
-				roleModeIn(settings)); {
-			case errors.Is(err, access.ErrLastAdministrator):
-				return nil, huma.Error409Conflict(
-					"that was the last thing granting administration: bind another group " +
-						"to admin, or name somebody in configuration, first")
-			case errors.Is(err, access.ErrNothingMatched):
-				// Nothing was bound, so nothing was withdrawn — and the check
-				// that would have refused this passed *because* the delete
-				// did nothing.
-				return nil, noSuchGrant()
-			case err != nil:
-				return nil, wentWrong(a.Logger, "cannot unbind a group from administration", err)
-			}
-			noteAdminChange(ctx, a, trail.Role, in.Group+" on every product",
-				trail.Said(adminRole, true), nil)
-			return &struct{}{}, nil
-		}
-
-		product, err := names.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, absent(a.Logger, err, "that product could not be looked up", noSuchProduct)
-		}
-		role := access.Role(in.Role)
-		if !role.Valid() {
-			return nil, huma.Error422UnprocessableEntity("that is not a role")
-		}
-		switch err := rights.Unbind(ctx, in.Group, product.ID, role); {
-		case errors.Is(err, access.ErrNothingMatched):
-			return nil, noSuchGrant()
-		case err != nil:
-			return nil, wentWrong(a.Logger, "cannot unbind a group", err)
-		}
-		noteAdminChange(ctx, a, trail.Role, in.Group+" on "+product.Name,
-			trail.Said(in.Role, true), nil)
 		return &struct{}{}, nil
 	})
 }
@@ -284,9 +312,9 @@ const adminRole = "admin"
 // are derived from groups and does not while they are assigned: refusing in
 // both would leave a deployment that has never turned group binding on unable
 // to tidy up a mapping it is not using.
-func roleModeIn(settings func() *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
+func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
 	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
-		if settings() == nil {
+		if settings(db) == nil {
 			return access.Direct, nil
 		}
 		stored, _, err := setting.NewStore(db).Get(ctx, setting.RoleMode)
@@ -319,7 +347,7 @@ type named struct {
 // send back a word that matched no row, so a role on a product whose display
 // name is not merely a recapitalization could be granted and not withdrawn.
 func productNames(ctx context.Context, a Administering) (map[int64]named, error) {
-	names := a.Catalog()
+	names := a.Catalog(a.handle())
 	// Every product, because this is naming the ones bindings already refer
 	// to rather than answering anybody about them. The caller is administering
 	// group bindings and was authorized for that before reaching here.
@@ -355,7 +383,7 @@ func registerRevocation(api huma.API, a Administering) {
 			"breaks if it is turned off.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[TokenBody], error) {
-		rights, names, err := administerable(ctx, a)
+		rights, names, err := administerable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -387,27 +415,34 @@ func registerRevocation(api huma.API, a Administering) {
 		Identity string `path:"identity"`
 		Name     string `path:"name"`
 	}) (*struct{}, error) {
-		rights, _, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			rights, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			person, err := rights.ByIdentity(ctx, in.Identity)
+			if err != nil {
+				return absent(a.Logger, err, "that person could not be looked up",
+					noSuchPerson)
+			}
+			token, err := rights.TokenByName(ctx, person.ID, in.Name)
+			if err != nil {
+				return absent(a.Logger, err, "that token could not be looked up",
+					func() error {
+						return huma.Error404NotFound("they hold no token called that")
+					})
+			}
+			if err := rights.RevokeToken(ctx, token.ID); err != nil {
+				return wentWrong(a.Logger, "cannot revoke a token", err)
+			}
+			if err := noted(ctx, tx, trail.Credential, in.Identity+" · "+in.Name,
+				trail.Said("in force", true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		person, err := rights.ByIdentity(ctx, in.Identity)
-		if err != nil {
-			return nil, absent(a.Logger, err, "that person could not be looked up",
-				noSuchPerson)
-		}
-		token, err := rights.TokenByName(ctx, person.ID, in.Name)
-		if err != nil {
-			return nil, absent(a.Logger, err, "that token could not be looked up",
-				func() error {
-					return huma.Error404NotFound("they hold no token called that")
-				})
-		}
-		if err := rights.RevokeToken(ctx, token.ID); err != nil {
-			return nil, wentWrong(a.Logger, "cannot revoke a token", err)
-		}
-		noteAdminChange(ctx, a, trail.Credential, in.Identity+" · "+in.Name,
-			trail.Said("in force", true), nil)
 		return &struct{}{}, nil
 	})
 
@@ -421,19 +456,26 @@ func registerRevocation(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
-		rights, _, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			rights, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			person, err := rights.ByIdentity(ctx, in.Identity)
+			if err != nil {
+				return noSuchPerson()
+			}
+			if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
+				return wentWrong(a.Logger, "cannot end the sessions", err)
+			}
+			if err := noted(ctx, tx, trail.Account, in.Identity,
+				nil, trail.Said("sessions ended", true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		person, err := rights.ByIdentity(ctx, in.Identity)
-		if err != nil {
-			return nil, noSuchPerson()
-		}
-		if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
-			return nil, wentWrong(a.Logger, "cannot end the sessions", err)
-		}
-		noteAdminChange(ctx, a, trail.Account, in.Identity,
-			nil, trail.Said("sessions ended", true))
 		return &struct{}{}, nil
 	})
 }

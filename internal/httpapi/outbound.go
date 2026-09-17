@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -45,7 +46,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 			"it would put a shared secret on a page.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[OutboundBody], error) {
-		if _, _, err := administerable(ctx, a); err != nil {
+		if _, _, err := administerable(ctx, a, a.handle()); err != nil {
 			return nil, err
 		}
 		by, err := reading(ctx)
@@ -98,10 +99,6 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Status int
 		Body   OutboundBody
 	}, error) {
-		_, _, err := administerable(ctx, a)
-		if err != nil {
-			return nil, err
-		}
 		by, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -114,20 +111,32 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		if err == nil {
 			address = parsed.String()
 		}
-		row, err := notify.NewStore(in.DB.DB).AddDestination(ctx, by,
-			input.Body.Name, input.Body.Kind, address, input.Body.Secret)
-		if err != nil {
-			return nil, asked(in.Logger, err)
+		var row *notify.Outbound
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			if _, _, err := administerable(ctx, a, tx); err != nil {
+				return err
+			}
+			var err error
+			row, err = notify.NewStore(tx).AddDestination(ctx, by,
+				input.Body.Name, input.Body.Kind, address, input.Body.Secret)
+			if err != nil {
+				return asked(in.Logger, err)
+			}
+			// The address is recorded as its host and nothing more. For Slack
+			// and for Teams the address *is* the credential — the path carries
+			// the token and there is no other authentication — so writing it
+			// whole into a record that is deliberately permanent puts a bearer
+			// secret somewhere retiring the destination cannot take it out of.
+			// The host is what an administrator reading the trail needs: which
+			// service this deployment started talking to.
+			if err := noted(ctx, tx, trail.Setting, "outbound · "+row.Name+" · "+row.Kind,
+				nil, trail.Said(parsed.Hostname(), true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		// The address is recorded as its host and nothing more. For Slack and
-		// for Teams the address *is* the credential — the path carries the
-		// token and there is no other authentication — so writing it whole
-		// into a record that is deliberately permanent puts a bearer secret
-		// somewhere retiring the destination cannot take it out of. The host
-		// is what an administrator reading the trail needs: which service this
-		// deployment started talking to.
-		noteAdminChange(ctx, a, trail.Setting, "outbound · "+row.Name+" · "+row.Kind,
-			nil, trail.Said(parsed.Hostname(), true))
 		return &struct {
 			Status int
 			Body   OutboundBody
@@ -147,25 +156,32 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Name string `path:"name"`
 		Kind string `path:"kind"`
 	}) (*struct{}, error) {
-		if _, _, err := administerable(ctx, a); err != nil {
-			return nil, err
-		}
 		by, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		// Mapped before the trail row, which would otherwise record a
-		// retirement that did not happen — and the destination goes on
-		// receiving everything it takes.
-		switch err := notify.NewStore(in.DB.DB).
-			RetireDestination(ctx, by, input.Name, input.Kind); {
-		case errors.Is(err, access.ErrNothingMatched):
-			return nil, huma.Error404NotFound("no destination is recorded under that name and kind")
-		case err != nil:
-			return nil, wentWrong(a.Logger, "that could not be retired", err)
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			if _, _, err := administerable(ctx, a, tx); err != nil {
+				return err
+			}
+			// Mapped before the trail row, which would otherwise record a
+			// retirement that did not happen — and the destination goes on
+			// receiving everything it takes.
+			switch err := notify.NewStore(tx).
+				RetireDestination(ctx, by, input.Name, input.Kind); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return huma.Error404NotFound("no destination is recorded under that name and kind")
+			case err != nil:
+				return wentWrong(a.Logger, "that could not be retired", err)
+			}
+			if err := noted(ctx, tx, trail.Setting, "outbound · "+input.Name+" · "+input.Kind,
+				trail.Said("in use", true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		noteAdminChange(ctx, a, trail.Setting, "outbound · "+input.Name+" · "+input.Kind,
-			trail.Said("in use", true), nil)
 		return &struct{}{}, nil
 	})
 }

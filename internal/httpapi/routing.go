@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -187,21 +188,29 @@ func registerRouting(api huma.API, in Ingest) {
 			Beneath  string `json:"beneath,omitempty" doc:"A component name, matching it and everything under it"`
 		}
 	}) (*struct{ Body RuleBody }, error) {
-		subject, product, rights, err := routable(ctx, in, input.Product)
+		subject, product, _, err := routable(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
 		}
-		team, err := rights.TeamByName(ctx, input.Body.Team)
-		if err != nil {
-			return nil, noSuchTeamNamed(input.Body.Team)
+		var rule *finding.Routing
+		var team *access.Team
+		if err := changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+			var err error
+			if team, err = access.NewStore(tx).TeamByName(ctx, input.Body.Team); err != nil {
+				return noSuchTeamNamed(input.Body.Team)
+			}
+			if rule, err = finding.NewStore(tx).AddRule(ctx, subject, product, team.ID,
+				input.Body.Name, input.Body.Upstream, input.Body.Beneath); err != nil {
+				return asked(in.Logger, err)
+			}
+			if err := noted(ctx, tx, trail.Routing, input.Product+" · "+rule.Name,
+				nil, trail.Said("to "+team.Called(), true)); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		rule, err := finding.NewStore(in.DB.DB).AddRule(ctx, subject, product, team.ID,
-			input.Body.Name, input.Body.Upstream, input.Body.Beneath)
-		if err != nil {
-			return nil, asked(in.Logger, err)
-		}
-		noteChange(ctx, in, trail.Routing, input.Product+" · "+rule.Name,
-			nil, trail.Said("to "+team.Called(), true))
 		queueSweep(ctx, in, product)
 
 		shown := ""
@@ -232,12 +241,16 @@ func registerRouting(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, err
 			}
-			if err := finding.NewStore(in.DB.DB).RetireRule(ctx, subject, product, input.ID); err != nil {
-				return nil, absent(in.Logger, err, "that rule could not be retired", noSuchRule)
+			if err := changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+				if err := finding.NewStore(tx).RetireRule(ctx, subject, product, input.ID); err != nil {
+					return absent(in.Logger, err, "that rule could not be retired", noSuchRule)
+				}
+				return noted(ctx, tx, trail.Routing,
+					input.Product+" · "+strconv.FormatInt(input.ID, 10),
+					trail.Said("in use", true), nil)
+			}); err != nil {
+				return nil, err
 			}
-			noteChange(ctx, in, trail.Routing,
-				input.Product+" · "+strconv.FormatInt(input.ID, 10),
-				trail.Said("in use", true), nil)
 			return &struct{}{}, nil
 		})
 }

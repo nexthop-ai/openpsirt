@@ -324,16 +324,12 @@ func (s *Store) record(ctx context.Context, person *Account) error {
 		_, err := db.NewInsert().Model(person).Exec(ctx)
 		return err
 	}
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return write(ctx, s.db)
-	}
 	// Through the one helper, so the whole of it is retried: a cluster
 	// certifies at COMMIT, and a write whose statements all succeeded can
-	// still be rolled back under it.
-	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		return write(ctx, tx)
-	})
+	// still be rolled back under it. A caller already inside a transaction —
+	// an administrator recording somebody, which is trailed in the same
+	// transaction — joins that one instead.
+	return database.Within(ctx, s.db, write)
 }
 
 // EmailSource says who last decided somebody's address.

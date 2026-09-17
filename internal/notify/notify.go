@@ -232,12 +232,13 @@ type Notification struct {
 
 // Store records and reads notifications.
 type Store struct {
-	db  *bun.DB
+	db  bun.IDB
 	now func() time.Time
 }
 
-// NewStore returns a store over db.
-func NewStore(db *bun.DB) *Store {
+// NewStore returns a store over db, which is the transaction an
+// administrative act is being made in or this deployment's pooled handle.
+func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
@@ -345,7 +346,7 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 		wanted[h.About] = h
 	}
 
-	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		opened, cleared = 0, 0
 
 		var open []Notification

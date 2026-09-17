@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -53,26 +54,35 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 					"or nothing at all to follow the deployment",
 					in.Body.Floor, strings.Join(theFloor, ", ")))
 		}
-		store, err := storeFor(d)
-		if err != nil {
+		var product *catalog.Product
+		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			if product, err = store.ProductByName(ctx, in.Product); err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
+			}
+			// Absent means the product follows the deployment, which is a
+			// different act from stating the deployment's current line: a
+			// blank and an unset value have to stay distinguishable in the
+			// record.
+			before := product.TriageFloor
+			if err := store.SetTriageFloor(ctx, product.ID, word); err != nil {
+				return wentWrong(d.Logger, "that line could not be recorded", err)
+			}
+			// The line one product triages at, recorded like the deployment's
+			// own: it is one of the three levers that rewrite what this tool
+			// reports without anything being scanned.
+			if err := noted(ctx, tx, trail.Setting, "triage floor of "+product.Name,
+				trail.Said(stated(before), before != nil),
+				trail.Said(word, word != "")); err != nil {
+				return notRecorded(d.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		product, err := store.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-		// Absent means the product follows the deployment, which is a
-		// different act from stating the deployment's current line: a blank
-		// and an unset value have to stay distinguishable in the record.
-		before := product.TriageFloor
-		if err := store.SetTriageFloor(ctx, product.ID, word); err != nil {
-			return nil, wentWrong(d.Logger, "that line could not be recorded", err)
-		}
-		// The line one product triages at, recorded like the deployment's own:
-		// it is one of the three levers that rewrite what this tool reports
-		// without anything being scanned.
-		noteDeclared(ctx, d, trail.Setting, "triage floor of "+product.Name,
-			trail.Said(stated(before), before != nil), trail.Said(word, word != ""))
 		if d.RewriteDeadlines != nil {
 			d.RewriteDeadlines(ctx, "triage floor of product "+product.Name, word)
 		}
@@ -102,19 +112,27 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
-		if err != nil {
+		var product *catalog.Product
+		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			if product, err = store.ProductByName(ctx, in.Product); err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
+			}
+			before := product.EOLOn
+			if err := store.SetProductEndOfLife(ctx, product.ID, on); err != nil {
+				return wentWrong(d.Logger, "that date could not be recorded", err)
+			}
+			if err := noted(ctx, tx, trail.Support, product.Name,
+				onDay(before), onDay(on)); err != nil {
+				return notRecorded(d.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		product, err := store.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-		before := product.EOLOn
-		if err := store.SetProductEndOfLife(ctx, product.ID, on); err != nil {
-			return nil, wentWrong(d.Logger, "that date could not be recorded", err)
-		}
-		noteDeclared(ctx, d, trail.Support, product.Name, onDay(before), onDay(on))
 		if d.RewriteDeadlines != nil {
 			d.RewriteDeadlines(ctx, "end of life of product "+product.Name, in.Body.On)
 		}
@@ -159,23 +177,22 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
-		if err != nil {
-			return nil, err
-		}
 		// Both writes or neither, and every name they turn on resolved inside
 		// the transaction that acts on it. Written apart, a date that could
 		// not be recorded left the parent filled in permanently — and the
 		// parent is what a comparison walks, so the caller's refusal described
 		// a state the database no longer had.
-		var product *catalog.Product
-		var stream *catalog.Stream
-		if err := store.Within(ctx, func(ctx context.Context, store *catalog.Store) error {
-			var err error
-			if product, err = store.ProductByName(ctx, in.Product); err != nil {
+		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			product, err := store.ProductByName(ctx, in.Product)
+			if err != nil {
 				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
-			if stream, err = store.StreamByName(ctx, product.ID, in.Stream); err != nil {
+			stream, err := store.StreamByName(ctx, product.ID, in.Stream)
+			if err != nil {
 				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
 			if named := strings.TrimSpace(in.Body.CutFrom); named != "" {
@@ -190,12 +207,14 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 			if err := store.SetReleasedOn(ctx, stream.ID, on); err != nil {
 				return wentWrong(d.Logger, "that date could not be recorded", err)
 			}
+			if err := noted(ctx, tx, trail.Release, product.Name+" "+stream.Name,
+				onDay(stream.ReleasedOn), onDay(on)); err != nil {
+				return notRecorded(d.Logger, err)
+			}
 			return nil
 		}); err != nil {
 			return nil, err
 		}
-		noteDeclared(ctx, d, trail.Release, product.Name+" "+stream.Name,
-			onDay(stream.ReleasedOn), onDay(on))
 		return &struct{}{}, nil
 	})
 
@@ -222,24 +241,31 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
-		if err != nil {
+		var product *catalog.Product
+		var stream *catalog.Stream
+		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			if product, err = store.ProductByName(ctx, in.Product); err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
+			}
+			if stream, err = store.StreamByName(ctx, product.ID, in.Stream); err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
+			}
+			before := stream.EOLOn
+			if err := store.SetStreamEndOfLife(ctx, stream.ID, on); err != nil {
+				return wentWrong(d.Logger, "that date could not be recorded", err)
+			}
+			if err := noted(ctx, tx, trail.Support, product.Name+" "+stream.Name,
+				onDay(before), onDay(on)); err != nil {
+				return notRecorded(d.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		product, err := store.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-		stream, err := store.StreamByName(ctx, product.ID, in.Stream)
-		if err != nil {
-			return nil, undeclared(d.Logger, err, "that product could not be looked up")
-		}
-		before := stream.EOLOn
-		if err := store.SetStreamEndOfLife(ctx, stream.ID, on); err != nil {
-			return nil, wentWrong(d.Logger, "that date could not be recorded", err)
-		}
-		noteDeclared(ctx, d, trail.Support, product.Name+" "+stream.Name,
-			onDay(before), onDay(on))
 		if d.RewriteDeadlines != nil {
 			d.RewriteDeadlines(ctx, "end of life of "+product.Name+" "+stream.Name, in.Body.On)
 		}

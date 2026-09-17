@@ -7,17 +7,35 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// noteChange records an administrative act against whoever made it.
+// changing runs one administrative act and the record of it in one
+// transaction.
 //
-// **A failure to record is not a failure of the change.** The change has
-// already happened, and answering with an error would invite a retry that
-// makes it twice. It is logged instead, which is the same choice the
-// assignment notification makes for the same reason.
+// **A failure to record fails the act.** Both are one change: a setting moved
+// with nobody recorded as having moved it is exactly the state REQ-22 says the
+// record exists to prevent, and it used to be reachable by a write that
+// succeeded beside a record that did not. Answering with an error invites a
+// retry, which is what the retry is for — nothing was committed.
+//
+// The act is written against the transaction rather than against the handle,
+// so everything it decides from is read inside it (REQ-71).
+func changing(ctx context.Context, db *database.DB, logger *slog.Logger,
+	do func(ctx context.Context, tx bun.Tx) error) error {
+
+	if db == nil {
+		return noDatabase(logger)
+	}
+	return database.InTransaction(ctx, db.DB, do)
+}
+
+// noted records an administrative act against whoever made it, in the
+// transaction that made it.
 //
 // Called from the request rather than from the store underneath. The stores
 // take no subject — a setting write knows the name and the value and nothing
@@ -25,48 +43,20 @@ import (
 // this would make those signatures about auditing rather than about the thing
 // being written. The cost is that a new administrative route can forget, so a
 // test walks the routes and asserts each leaves a row.
-func noteChange(ctx context.Context, in Ingest, kind trail.Kind, name string, was, became *string) {
-	if in.DB == nil {
-		return
-	}
-	noted(ctx, trail.NewStore(in.DB.DB), in.Logger, kind, name, was, became)
-}
-
-// noteAdminChange is the same for the administrative routes, which carry their
-// dependencies as functions rather than a database.
-func noteAdminChange(ctx context.Context, a Administering, kind trail.Kind, name string,
-	was, became *string) {
-
-	if a.Trail == nil {
-		return
-	}
-	noted(ctx, a.Trail(), a.Logger, kind, name, was, became)
-}
-
-func noted(ctx context.Context, store *trail.Store, logger *slog.Logger, kind trail.Kind,
-	name string, was, became *string) {
-
-	if store == nil {
-		return
-	}
+func noted(ctx context.Context, tx bun.IDB, kind trail.Kind, name string, was, became *string) error {
 	by, err := reading(ctx)
 	if err != nil {
-		return
+		return err
 	}
-	if err := store.Record(ctx, by, kind, name, was, became); err != nil && logger != nil {
-		logger.Error("could not record an administrative change",
-			"error", err, "kind", kind, "about", name)
-	}
+	return trail.NewStore(tx).Record(ctx, by, kind, name, was, became)
 }
 
-// noteDeclared is the same for the catalog routes.
-func noteDeclared(ctx context.Context, d Declaring, kind trail.Kind, name string,
-	was, became *string) {
-
-	if d.Trail == nil {
-		return
-	}
-	noted(ctx, d.Trail(), d.Logger, kind, name, was, became)
+// notRecorded refuses an act whose record could not be written.
+//
+// The act is rolled back with it, so the sentence says that: a caller told
+// only that recording failed would be left wondering which of the two stood.
+func notRecorded(logger *slog.Logger, err error) error {
+	return wentWrong(logger, "that change could not be recorded, so it was not made", err)
 }
 
 // onDay spells a date for the trail, where absent means there is none.

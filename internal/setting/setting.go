@@ -471,6 +471,19 @@ var errMoved = errors.New("the setting moved between the read and the write")
 // is the difference between a deployment that never tuned this and one that
 // cleared it.
 func (s *Store) Change(ctx context.Context, name, value string) (string, bool, error) {
+	// Inside somebody else's transaction — an administrator moving a setting,
+	// recorded in the same transaction as the act — the race is theirs to take
+	// again. Going again here would re-run against a transaction the failed
+	// statement has already poisoned, and would leave the other half of the
+	// act standing on a read that has moved.
+	if _, own := database.Handle(s.db); !own {
+		before, had, err := s.change(ctx, name, value)
+		if database.IsDuplicate(err) || errors.Is(err, errMoved) {
+			return "", false, fmt.Errorf("record the %q setting: %w", name, database.ErrGoAgain)
+		}
+		return before, had, err
+	}
+
 	// Bounded, rather than the "once more and no further" a collision on the
 	// primary key uses: the loser of that one lands in the update arm and is
 	// done, while a writer whose condition matched nothing can lose the row
@@ -492,17 +505,12 @@ func (s *Store) Change(ctx context.Context, name, value string) (string, bool, e
 
 // change is one attempt, letting a duplicate out for the caller to take again.
 func (s *Store) change(ctx context.Context, name, value string) (before string, had bool, err error) {
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return "", false, fmt.Errorf("this store is already inside a transaction")
-	}
-
 	// Inside one transaction, and retried whole. Written as two statements it
 	// could report success having stored nothing: the update matches no row,
 	// another writer inserts one, and a separate existence check then sees a
 	// row that the caller's value never reached. Whether the row exists and
 	// what it says have to be decided in the same view.
-	err = database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		// Every attempt starts from nothing: a rolled-back attempt read a row
 		// that no longer describes anything.
 		before, had = "", false

@@ -11,12 +11,13 @@ import (
 	"log/slog"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
 // Declaring is what the catalog endpoints need.
@@ -25,7 +26,13 @@ import (
 // this has to be reachable from whatever cuts a branch — a step that can only
 // be done by hand is the step every pipeline works around.
 type Declaring struct {
-	Store  func() *catalog.Store
+	// DB is what a declaration and the record of it are written in one
+	// transaction on. Nil where this process has no database.
+	DB *database.DB
+	// Store is built over whatever handle the caller is writing on: the
+	// transaction, where a declaration is being made, and the pooled handle
+	// where it is only being read.
+	Store  func(bun.IDB) *catalog.Store
 	Logger *slog.Logger
 	// Findings and Scans answer what is open against a catalog entry and
 	// when it was last scanned. A list of names alone makes somebody open
@@ -40,10 +47,17 @@ type Declaring struct {
 	// one-replica-at-a- time path, because two rewrites racing is the same
 	// problem whichever setting started them.
 	RewriteDeadlines func(ctx context.Context, what, value string)
-	// Trail records an administrative change. A support date takes the
-	// deadline off everything past it, which is one of the three levers
-	// that silently rewrite what the tool reports.
-	Trail func() *trail.Store
+}
+
+// handle is what a route that only reads builds its store over.
+//
+// Named rather than written as d.DB at each site: a nil *database.DB handed to
+// an interface parameter is an interface that is not nil.
+func (d Declaring) handle() bun.IDB {
+	if d.DB == nil {
+		return nil
+	}
+	return d.DB.DB
 }
 
 // ProductBody is a product as the API states it.
@@ -199,11 +213,13 @@ func refused(logger *slog.Logger, err error, what string) error {
 
 // storeFor gives the handlers a catalog, or says plainly that this process
 // has none.
-func storeFor(d Declaring) (*catalog.Store, error) {
-	if d.Store == nil {
+// db is the handle it builds it over: the transaction a declaration is being
+// made in, or handle() where the route only reads.
+func storeFor(d Declaring, db bun.IDB) (*catalog.Store, error) {
+	if d.Store == nil || db == nil {
 		return nil, noDatabase(d.Logger)
 	}
-	store := d.Store()
+	store := d.Store(db)
 	if store == nil {
 		return nil, noDatabase(d.Logger)
 	}

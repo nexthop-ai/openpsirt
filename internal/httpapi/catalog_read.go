@@ -29,7 +29,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
+		store, err := storeFor(d, d.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +93,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
+		store, err := storeFor(d, d.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +170,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
+		store, err := storeFor(d, d.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +211,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
+		store, err := storeFor(d, d.handle())
 		if err != nil {
 			return nil, err
 		}

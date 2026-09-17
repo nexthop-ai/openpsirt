@@ -29,7 +29,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
-	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -91,32 +90,25 @@ func (in Ingest) attachments() *attach.Store {
 	return attach.NewStore(in.DB.DB, in.Files)
 }
 
-// catalog returns a store over this deployment's database, or nothing when
-// there is no database — which is the process that only renders the API
-// document.
-func (in Ingest) catalog() *catalog.Store {
-	if in.DB == nil {
+// catalog returns a store over the handle it is given, or nothing when there
+// is none — which is the process that only renders the API document.
+//
+// The handle is the transaction an administrative act is being made in, or
+// this deployment's pooled one where the route only reads.
+func (in Ingest) catalog(db bun.IDB) *catalog.Store {
+	if in.DB == nil || db == nil {
 		return nil
 	}
-	return catalog.NewStore(in.DB.DB)
-}
-
-// trail returns a store over what has been changed administratively, or
-// nothing where there is no database.
-func (in Ingest) trail() *trail.Store {
-	if in.DB == nil {
-		return nil
-	}
-	return trail.NewStore(in.DB.DB)
+	return catalog.NewStore(db)
 }
 
 // settings returns a store over what an operator has set, or nothing where
 // there is no database.
-func (in Ingest) settings() *setting.Store {
-	if in.DB == nil {
+func (in Ingest) settings(db bun.IDB) *setting.Store {
+	if in.DB == nil || db == nil {
 		return nil
 	}
-	return setting.NewStore(in.DB.DB)
+	return setting.NewStore(db)
 }
 
 // logger is where this process writes, and never nil.
@@ -149,13 +141,25 @@ func (in Ingest) groupsReachable() bool {
 	return in.Access != nil && in.Access.ReportsGroups()
 }
 
-// rights returns a store over who may do what, or nothing where there is no
-// database.
-func (in Ingest) rights() *access.Store {
+// rights returns a store over who may do what, built over the handle it is
+// given, or nothing where there is none.
+func (in Ingest) rights(db bun.IDB) *access.Store {
+	if in.DB == nil || db == nil {
+		return nil
+	}
+	return access.NewStore(db)
+}
+
+// handle is what a route that only reads builds its stores over.
+//
+// Named rather than written as in.DB at each site: a nil *database.DB handed
+// to an interface parameter is an interface that is not nil, so every check
+// below it reads as a database that is there.
+func (in Ingest) handle() bun.IDB {
 	if in.DB == nil {
 		return nil
 	}
-	return access.NewStore(in.DB.DB)
+	return in.DB.DB
 }
 
 // uploadParts are the documents a build sends.

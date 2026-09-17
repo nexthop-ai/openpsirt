@@ -29,7 +29,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
+		store, err := storeFor(d, d.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +53,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
+		store, err := storeFor(d, d.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +97,7 @@ func registerDeclaring(api huma.API, d Declaring) {
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
-		store, err := storeFor(d)
+		store, err := storeFor(d, d.handle())
 		if err != nil {
 			return nil, err
 		}

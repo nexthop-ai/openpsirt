@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -402,8 +403,16 @@ func PlaceIdentity(component, consumer string) string {
 
 // Store records what runs find.
 type Store struct {
-	db  *bun.DB
-	now func() time.Time
+	db bun.IDB
+	// pool is the same handle where this store was built over one, and
+	// nothing where it was built over a transaction.
+	//
+	// Kept for the one read that streams its rows rather than filling a
+	// slice: bun hangs the row mapper off the pooled handle rather than off
+	// the interface every other query here goes through. It is a read on the
+	// export path, which is never inside somebody else's transaction.
+	pool *bun.DB
+	now  func() time.Time
 	// reach is how many places in one build a routing rule's pattern may
 	// name, or zero for the shipped number. Carried on the store so a test can
 	// bring it down to a fixture rather than building a fixture up to it.
@@ -411,8 +420,9 @@ type Store struct {
 }
 
 // NewStore returns a store over db.
-func NewStore(db *bun.DB) *Store {
-	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
+func NewStore(db bun.IDB) *Store {
+	pool, _ := database.Handle(db)
+	return &Store{db: db, pool: pool, now: func() time.Time { return time.Now().UTC() }}
 }
 
 // Begin records that a scanner is about to run.

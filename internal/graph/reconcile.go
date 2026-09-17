@@ -14,7 +14,7 @@ import (
 //
 // Nodes that are still present are left completely alone: not touched, not
 // re-stamped, not rewritten. That is what makes an unchanged rebuild free.
-func reconcileNodes(ctx context.Context, tx bun.Tx, targetID, scanID int64, wanted map[int64]bool) (map[int64]int64, int, int, error) {
+func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64, wanted map[int64]bool) (map[int64]int64, int, int, error) {
 	var open []Node
 	err := tx.NewSelect().Model(&open).
 		Where("target_id = ?", targetID).
@@ -114,7 +114,7 @@ type edgeAt struct {
 }
 
 // reconcileEdges does the same for dependencies.
-func reconcileEdges(ctx context.Context, tx bun.Tx, targetID, scanID int64, wanted map[edgeAt]bool) (int, int, error) {
+func reconcileEdges(ctx context.Context, tx bun.IDB, targetID, scanID int64, wanted map[edgeAt]bool) (int, int, error) {
 	var open []Edge
 	err := tx.NewSelect().Model(&open).
 		Where("target_id = ?", targetID).

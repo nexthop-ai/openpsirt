@@ -572,3 +572,57 @@ func TestTheTrailIsAnAdministratorsToRead(t *testing.T) {
 		}
 	})
 }
+
+// TestAChangeThatCannotBeRecordedIsNotMade pins the act and its record as one
+// transaction.
+//
+// The record used to be written after the change and its failure logged, so a
+// setting could move with nothing saying who moved it — the state REQ-22 says
+// the record exists to prevent, reachable without anybody attacking anything.
+//
+// The trail table is taken away for the length of the act, which is the one
+// way to make the record fail without making the change fail first.
+func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+			`{"value":"medium"}`); got.Code >= 300 {
+			t.Fatalf("setting the floor answered %d: %s", got.Code, got.Body.String())
+		}
+
+		hide := func(from, to string) {
+			t.Helper()
+			if _, err := r.db.ExecContext(ctx,
+				`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
+				t.Fatalf("cannot rename %q to %q: %v", from, to, err)
+			}
+		}
+		hide("admin_change", "admin_change_hidden")
+		got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+			`{"value":"critical"}`)
+		hide("admin_change_hidden", "admin_change")
+
+		if got.Code < 500 {
+			t.Errorf("a change nothing could record answered %d, want a refusal", got.Code)
+		}
+		// The whole of the point: the setting is what it was.
+		var offered struct {
+			Items []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/settings", &offered)
+		for _, item := range offered.Items {
+			if item.Name != "triage.floor" {
+				continue
+			}
+			if item.Value != "medium" {
+				t.Errorf("the floor is %q after a change nothing recorded, want medium",
+					item.Value)
+			}
+			return
+		}
+		t.Error("the triage floor is not among the settings offered")
+	})
+}

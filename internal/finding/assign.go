@@ -360,7 +360,7 @@ func (s *Store) ReleaseIn(ctx context.Context, subject access.Subject, party, pr
 		return 0, access.Denied("move work assigned to somebody else")
 	}
 	var moved int64
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		result, err := tx.NewUpdate().Model((*Finding)(nil)).
 			Set("assigned_to = ?", nil).Set("assigned_at = ?", nil).
 			Where("assigned_to = ?", party).
@@ -388,7 +388,7 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 
 	now := s.now().UTC().Truncate(time.Microsecond)
 	var moved int64
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		update := tx.NewUpdate().Model((*Finding)(nil)).
 			Where("assigned_to = ?", from).
 			Where("closed_at IS NULL")
@@ -886,7 +886,7 @@ type buildName struct {
 }
 
 // targetsNamed reads the names of the builds these targets are, by target.
-func targetsNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]buildName, error) {
+func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]buildName, error) {
 	held := map[int64]buildName{}
 	if len(ids) == 0 {
 		return held, nil

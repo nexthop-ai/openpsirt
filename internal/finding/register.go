@@ -200,6 +200,9 @@ func (s *Store) RegisterEach(ctx context.Context, subject access.Subject, target
 	if err != nil {
 		return err
 	}
+	if s.pool == nil {
+		return fmt.Errorf("the register is read over a database handle rather than inside a transaction")
+	}
 	rows, err := only.narrow(s.registerQuery(productID, narrow)).Rows(ctx)
 	if err != nil {
 		return fmt.Errorf("read what was decided about this build: %w", err)
@@ -207,7 +210,7 @@ func (s *Store) RegisterEach(ctx context.Context, subject access.Subject, target
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var row registerRow
-		if err := s.db.ScanRow(ctx, rows, &row); err != nil {
+		if err := s.pool.ScanRow(ctx, rows, &row); err != nil {
 			return fmt.Errorf("read what was decided about this build: %w", err)
 		}
 		if err := each(disposedFrom(row)); err != nil {

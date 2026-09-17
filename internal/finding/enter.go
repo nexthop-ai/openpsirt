@@ -236,7 +236,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 
 	var rows []Finding
 	var identifier string
-	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		// The moment, taken on every attempt. It decides the year the
 		// identifier is minted in and every timestamp written, and a retry
 		// crossing midnight would otherwise file a flaw under last year.
@@ -533,7 +533,7 @@ func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (boo
 // inside the same transaction, so two people recording at the same moment
 // cannot be handed the same identifier: the second waits, sees the first's
 // row, and draws once more.
-func mint(ctx context.Context, tx bun.Tx, product string, year int) (string, error) {
+func mint(ctx context.Context, tx bun.IDB, product string, year int) (string, error) {
 	prefix := strings.ToUpper(strings.TrimSpace(product))
 	if prefix == "" {
 		return "", fmt.Errorf("a product with no name cannot issue an identifier")

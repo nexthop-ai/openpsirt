@@ -27,7 +27,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -373,16 +372,11 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerElsewhere(api, in)
 	registerReachAcross(api, in)
 	registerBindings(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Groups: in.groupsReachable, Trail: in.trail,
-	}, func() *setting.Store {
-		if in.DB == nil {
-			return nil
-		}
-		return setting.NewStore(in.DB.DB)
-	})
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
+		Groups: in.groupsReachable,
+	}, in.settings)
 	registerCatalog(api, Declaring{
-		Store: in.catalog, Logger: logger,
+		DB: in.DB, Store: in.catalog, Logger: logger,
 		Findings: func() *finding.Store {
 			if in.DB == nil {
 				return nil
@@ -396,27 +390,19 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 			return ingest.NewStore(in.DB.DB)
 		},
 		RewriteDeadlines: deadlinesRewritten(in),
-		Trail:            in.trail,
 	})
 	registerAdministration(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
 		Findings: func() *finding.Store {
 			if in.DB == nil {
 				return nil
 			}
 			return finding.NewStore(in.DB.DB)
 		},
-		Trail: in.trail,
-		Settings: func() *setting.Store {
-			if in.DB == nil {
-				return nil
-			}
-			return setting.NewStore(in.DB.DB)
-		},
+		Settings: in.settings,
 	})
 	registerTeams(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
 	})
 	// Who is on one undisclosed case. It takes both: the grant is managed
 	// by whoever reads the case rather than by an administrator, and it
@@ -435,23 +421,19 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	// Where a claim's work is happening, stored and never sent to.
 	registerClaimLink(api, in)
 	registerCollaborators(api, in, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
 	})
 	// One person, whole: what they hold, what they used to hold, their part
 	// in the record, and what they were told.
 	registerPerson(api, in, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
 	})
 	// Where this deployment sends what it has to say.
 	registerOutbound(api, in, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
 	})
 	registerRevocation(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
 	})
 
 	// Last, so it claims only what nothing above it did.

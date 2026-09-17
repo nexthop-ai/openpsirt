@@ -124,7 +124,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			"who published it is longer than the %d characters this records", MostPublisher)
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
-	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0
 		res, err := tx.NewUpdate().Model((*Statement)(nil)).
 			Set("superseded_at = ?", now).

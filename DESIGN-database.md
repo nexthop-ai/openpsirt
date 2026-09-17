@@ -565,19 +565,33 @@ written as a statement per part a refusal partway through answers "nothing
 happened" over a database where half of it did. The caller then corrects the
 request and sends it again, and the half that landed lands twice.
 
-Two things stay outside it, deliberately:
+**The record of an administrative act is inside it.** The act and the row saying
+who made it are one change: a setting moved with nobody recorded as having moved
+it is the state the record exists to prevent, and a write that succeeded beside
+a record that failed produced exactly that. A failure to record fails the act,
+and the caller retries a request that changed nothing.
+
+What follows the commit is what is not part of the act:
 
 | Outside | Why |
 |---|---|
 | A job queued for what was written | A job pointing at an uncommitted graph is worse than one queued a moment late, so it is asked for after the commit — and a full backlog is not the write's failure |
-| The row the append-only trail gets | Written inside, it would describe a grant a later refusal rolled back, and the trail cannot take a line out again |
+| Work handed back when somebody loses their last role | A consequence of the withdrawal rather than part of it, and bounded by how much that person was holding rather than by the request |
+| The deadline rewrite a policy change forces | Bounded by how much is open, measured at nineteen seconds against 441,108 findings, which is longer than a request |
 
-A store handed a transaction joins it rather than refusing. Both spellings exist:
+A store handed a transaction joins it rather than refusing. Three spellings
+exist:
 
 | Spelling | Correct where |
 |---|---|
 | Refuse | The method owns the retry boundary. It decides what a retry re-reads, and cannot decide that from inside a transaction it does not control |
 | Join | The requirement is only "both statements or neither", which the caller's transaction meets. Refusing makes the method uncallable from inside one |
+| Join, and hand the race back | The method resolves a lost race by going again, and cannot from inside a caller's transaction: the failed statement has already aborted it on one engine, and the other half of the act is the caller's to re-run. It says it lost, and the caller's helper takes the whole act again |
+
+The third is a named error the retry helper recognizes, beside the engine codes
+it reads. The condition is one a query expresses rather than one an engine
+reports — a conditional update that matched nothing because another writer moved
+the row — so nothing in a driver's vocabulary says it.
 
 The joining spelling is a named helper rather than an `if` on the handle's type,
 because written by hand it reads as a fallback to writing outside a transaction.

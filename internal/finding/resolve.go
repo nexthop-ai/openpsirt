@@ -73,7 +73,7 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 
 	now := s.now().UTC().Truncate(time.Microsecond)
 	out := &Resolved{At: now}
-	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		out.Closed = 0
 
 		// Read inside the transaction, because a retry re-runs this against a

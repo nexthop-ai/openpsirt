@@ -71,6 +71,19 @@ func InTransaction(ctx context.Context, db *bun.DB, fn func(context.Context, bun
 	return fmt.Errorf("gave up after %d attempts: %w", Attempts, err)
 }
 
+// ErrGoAgain is a store saying it lost a race that a fresh transaction can win.
+//
+// The engines say this for themselves, in the codes below. This is for the
+// condition a query expresses rather than one an engine reports: a conditional
+// update that matched nothing because another writer moved the row between the
+// read and the write.
+//
+// A store that owns its transaction takes that again itself. One handed
+// somebody else's cannot — the statement that failed has already poisoned the
+// transaction on one engine, and half the act belongs to the caller — so it
+// says so and the caller's helper re-runs the whole of it.
+var ErrGoAgain = errors.New("lost a race with another writer")
+
 // WorthRetrying reports whether a failure is one that going again can fix.
 //
 // This is the one place besides the migrations and the queue's locking that
@@ -86,6 +99,9 @@ func InTransaction(ctx context.Context, db *bun.DB, fn func(context.Context, bun
 func WorthRetrying(err error) bool {
 	if err == nil {
 		return false
+	}
+	if errors.Is(err, ErrGoAgain) {
+		return true
 	}
 
 	// MySQL and MariaDB. A cluster reports a certification failure at commit

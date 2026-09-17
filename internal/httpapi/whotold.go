@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -130,20 +131,24 @@ func registerWhoTold(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		switch err := finding.NewVulnerabilities(in.DB.DB).
-			AlsoKnownAs(ctx, subject, issue, input.Alias); {
-		case errors.Is(err, finding.ErrNameTaken):
-			return nil, huma.Error409Conflict(
-				"another issue already goes by that name, so this would merge two records")
-		case err != nil:
-			return nil, asked(in.Logger, err)
+		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+			switch err := finding.NewVulnerabilities(tx).
+				AlsoKnownAs(ctx, subject, issue, input.Alias); {
+			case errors.Is(err, finding.ErrNameTaken):
+				return huma.Error409Conflict(
+					"another issue already goes by that name, so this would merge two records")
+			case err != nil:
+				return asked(in.Logger, err)
+			}
+			// Recorded deployment-wide, because that is what it is: from here
+			// on a scan of any product reporting that name resolves to this
+			// issue. The issue it was recorded against is named too, since
+			// that is where the right to record it was held.
+			return noted(ctx, tx, trail.Alias, input.Vulnerability,
+				nil, trail.Said(input.Alias, true))
+		}); err != nil {
+			return nil, err
 		}
-		// Recorded deployment-wide, because that is what it is: from here on a
-		// scan of any product reporting that name resolves to this issue. The
-		// issue it was recorded against is named too, since that is where the
-		// right to record it was held.
-		noteChange(ctx, in, trail.Alias, input.Vulnerability,
-			nil, trail.Said(input.Alias, true))
 		return &struct{}{}, nil
 	})
 }

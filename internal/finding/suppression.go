@@ -97,7 +97,7 @@ func (a ClaimsApplied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 
 // at once and reopen every finding they suppressed, with nothing saying why.
 func (s *Store) RecordClaims(ctx context.Context, targetID, scanID int64, claims []sbom.Suppression, stated map[sbom.Origin]bool) (ClaimsApplied, error) {
 	var applied ClaimsApplied
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		var err error
 		applied, err = RecordClaimsWithin(ctx, tx, targetID, scanID, claims, stated)
 		return err
@@ -110,7 +110,7 @@ func (s *Store) RecordClaims(ctx context.Context, targetID, scanID int64, claims
 // Ingest applies a graph and records what the build argued about its own
 // patches as one act: claims recorded without the graph, or a graph without
 // them, is a build reading as having withdrawn every patch it carries.
-func RecordClaimsWithin(ctx context.Context, tx bun.Tx, targetID, scanID int64,
+func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 	claims []sbom.Suppression, stated map[sbom.Origin]bool) (ClaimsApplied, error) {
 
 	var applied ClaimsApplied

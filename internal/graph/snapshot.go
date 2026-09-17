@@ -84,12 +84,12 @@ func (a Applied) Unchanged() bool {
 
 // Store writes graphs.
 type Store struct {
-	db         *bun.DB
+	db         bun.IDB
 	components *Components
 }
 
 // NewStore returns a graph store over db.
-func NewStore(db *bun.DB) *Store {
+func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, components: NewComponents(db)}
 }
 
@@ -105,7 +105,7 @@ func NewStore(db *bun.DB) *Store {
 // findings that are still present.
 func (s *Store) Apply(ctx context.Context, targetID, scanID int64, snap Snapshot) (Applied, error) {
 	var applied Applied
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		var err error
 		applied, err = ApplyWithin(ctx, tx, targetID, scanID, snap)
 		return err
@@ -119,7 +119,7 @@ func (s *Store) Apply(ctx context.Context, targetID, scanID int64, snap Snapshot
 // the inventory was made of, and those three are one act: a graph applied
 // beside claims that were not recorded reads as a build that withdrew every
 // patch it carries, and reopens every finding they suppressed.
-func ApplyWithin(ctx context.Context, tx bun.Tx, targetID, scanID int64,
+func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 	snap Snapshot) (Applied, error) {
 
 	var applied Applied
@@ -194,7 +194,7 @@ func ApplyWithin(ctx context.Context, tx bun.Tx, targetID, scanID int64,
 }
 
 // DB exposes the underlying handle for queries this package does not wrap.
-func (s *Store) DB() *bun.DB { return s.db }
+func (s *Store) DB() bun.IDB { return s.db }
 
 // CurrentNodes returns the components present in a variant now.
 func (s *Store) CurrentNodes(ctx context.Context, targetID int64) ([]Node, error) {

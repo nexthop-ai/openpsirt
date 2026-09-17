@@ -180,12 +180,8 @@ type modeIn func(context.Context, bun.IDB) (Mode, error)
 // original row back: BindAdmin stamps a fresh CreatedAt, so a "restored"
 // binding was not the row that had been there.
 func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mode modeIn) error {
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return fmt.Errorf("this store is already inside a transaction")
-	}
 	group = strings.TrimSpace(group)
-	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		// Read here, not by the caller. A retry re-runs this closure against a
 		// database somebody else has moved, so a mode fetched before it began
 		// describes a world that is gone (REQ-71) — and judging by the old one
@@ -482,11 +478,7 @@ func (s *Store) SwitchTo(ctx context.Context, mode Mode) error {
 	// derived grants back after they were cleared — leaving roles in a
 	// deployment where nothing derives them any more, which is exactly what
 	// clearing them was for.
-	db, err := s.handle()
-	if err != nil {
-		return err
-	}
-	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		return s.over(tx).switchTo(ctx, mode)
 	})
 }

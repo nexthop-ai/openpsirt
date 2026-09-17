@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -196,13 +197,20 @@ func registerVexImport(api huma.API, in Ingest) {
 				})
 			}
 		}
-		recorded, superseded, err := finding.NewStore(in.DB.DB).RecordStatements(ctx, by,
-			product.ID, publisher, file.Filename, hex.EncodeToString(digest.Sum(nil)), statements)
-		if err != nil {
-			return nil, asked(in.Logger, err)
+		var recorded, superseded int
+		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+			var err error
+			recorded, superseded, err = finding.NewStore(tx).RecordStatements(ctx, by,
+				product.ID, publisher, file.Filename,
+				hex.EncodeToString(digest.Sum(nil)), statements)
+			if err != nil {
+				return asked(in.Logger, err)
+			}
+			return noted(ctx, tx, trail.Setting, "VEX statements from "+publisher,
+				nil, trail.Said(file.Filename, true))
+		}); err != nil {
+			return nil, err
 		}
-		noteChange(ctx, in, trail.Setting, "VEX statements from "+publisher,
-			nil, trail.Said(file.Filename, true))
 
 		return &struct{ Body StatementsTakenBody }{Body: StatementsTakenBody{
 			Publisher: strings.ToLower(publisher), Recorded: recorded, Superseded: superseded,

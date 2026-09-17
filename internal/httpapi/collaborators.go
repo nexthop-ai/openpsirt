@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -94,17 +95,22 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			if !subject.Reads(access.Private, product) {
 				return nil, noSuchFinding()
 			}
-			rights := access.NewStore(in.DB.DB)
-			person, err := rights.ByIdentity(ctx, input.Identity)
-			if err != nil {
-				return nil, noSuchPerson()
+			var person *access.Account
+			if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+				rights := access.NewStore(tx)
+				var err error
+				if person, err = rights.ByIdentity(ctx, input.Identity); err != nil {
+					return noSuchPerson()
+				}
+				if err := rights.AddToCase(ctx, product, issue, person.ID, subject.ID); err != nil {
+					return wentWrong(in.Logger, "they could not be brought in", err)
+				}
+				return noted(ctx, tx, trail.Case,
+					input.Product+" · "+input.Vulnerability+" · "+person.Identity,
+					nil, trail.Said("a collaborator", true))
+			}); err != nil {
+				return nil, err
 			}
-			if err := rights.AddToCase(ctx, product, issue, person.ID, subject.ID); err != nil {
-				return nil, wentWrong(in.Logger, "they could not be brought in", err)
-			}
-			noteAdminChange(ctx, a, trail.Case,
-				input.Product+" · "+input.Vulnerability+" · "+person.Identity,
-				nil, trail.Said("a collaborator", true))
 			// Told at once, and told what it is about. no detail
 			// about an undisclosed finding keeps an issue out of
 			// what leaves this deployment; the area inside it is
@@ -149,17 +155,21 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			if !subject.Reads(access.Private, product) {
 				return nil, noSuchFinding()
 			}
-			rights := access.NewStore(in.DB.DB)
-			person, err := rights.ByIdentity(ctx, input.Identity)
-			if err != nil {
-				return nil, noSuchPerson()
+			if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+				rights := access.NewStore(tx)
+				person, err := rights.ByIdentity(ctx, input.Identity)
+				if err != nil {
+					return noSuchPerson()
+				}
+				if err := rights.RemoveFromCase(ctx, product, issue, person.ID, subject.ID); err != nil {
+					return wentWrong(in.Logger, "they could not be taken off", err)
+				}
+				return noted(ctx, tx, trail.Case,
+					input.Product+" · "+input.Vulnerability+" · "+person.Identity,
+					trail.Said("a collaborator", true), nil)
+			}); err != nil {
+				return nil, err
 			}
-			if err := rights.RemoveFromCase(ctx, product, issue, person.ID, subject.ID); err != nil {
-				return nil, wentWrong(in.Logger, "they could not be taken off", err)
-			}
-			noteAdminChange(ctx, a, trail.Case,
-				input.Product+" · "+input.Vulnerability+" · "+person.Identity,
-				trail.Said("a collaborator", true), nil)
 			return &struct{}{}, nil
 		})
 }

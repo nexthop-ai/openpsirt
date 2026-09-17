@@ -45,8 +45,15 @@ func upTrail(ctx context.Context, tx *sql.Tx) error {
 			"by"       ` + t.ref + ` NOT NULL,
 			-- What kind of thing moved, and which one of them. The kind is
 			-- what a reader filters by; the name is what they search for.
+			--
+			-- Wider than a name, because what is written here is composed of
+			-- them: a collaborator is a product, an issue and a person, each
+			-- of them a name's width, with separators between. At a name's
+			-- own width the longest of those overflowed the column, which
+			-- takes the act down with it on the three engines that refuse a
+			-- value too long for what it is going into.
 			"kind"     ` + t.kind + ` NOT NULL,
-			"about"    ` + t.name + ` NOT NULL,
+			"about"    VARCHAR(600) NOT NULL,
 			-- What it held and what it holds. Null before means nobody had
 			-- set it; null after means it was cleared.
 			"was"      ` + t.text + ` NULL,
