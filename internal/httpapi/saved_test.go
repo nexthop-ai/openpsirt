@@ -174,7 +174,7 @@ func TestASavedFilterBelongsToTheProductItNarrows(t *testing.T) {
 	eachReach(t, func(t *testing.T, r *reach) {
 		// The same person can see a second product, so what is being measured
 		// is the filter's scope rather than what they may reach.
-		person, err := r.rights.Ensure(t.Context(), "triager", "", nil)
+		person, err := r.rights.Ensure(t.Context(), "triager", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

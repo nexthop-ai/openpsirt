@@ -66,6 +66,28 @@ func administrating(ctx context.Context) error {
 	return nil
 }
 
+// readingTheDeployment refuses anybody who may read neither the deployment's
+// own records nor administer it.
+//
+// The two are different capabilities and either satisfies this: an
+// administrator can grant themselves anything, so asking them to hold the
+// audit permission as well would be a checkbox rather than a control.
+//
+// **It is not a way into any product.** What it opens is the settings, who
+// holds what, and what has been changed — records about the deployment rather
+// than about anything scanned. An auditor who reads one product goes on
+// reading one product.
+func readingTheDeployment(ctx context.Context) error {
+	subject, err := requester(ctx)
+	if err != nil {
+		return err
+	}
+	if !subject.ReadsTheDeployment() {
+		return huma.Error403Forbidden("not authorized")
+	}
+	return nil
+}
+
 // mintingCredentials is administrating, for the two acts that create a
 // credential outliving whoever asked.
 //

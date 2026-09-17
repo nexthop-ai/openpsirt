@@ -613,7 +613,11 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int64,
 	limit, offset int) ([]Notification, int, error) {
 
-	if !subject.Admin || subject.Kind != access.Person {
+	// Either thing held over the deployment, and neither is a way to see
+	// more: the rows are narrowed below by what the asker could read on their
+	// own account. Somebody who reaches no product is answered with nothing,
+	// which is the same answer an administrator holding no product gets.
+	if !subject.ReadsTheDeployment() {
 		return nil, 0, access.Denied("read what somebody else was told")
 	}
 	limit = database.AList.Of(limit)

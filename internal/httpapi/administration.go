@@ -41,7 +41,8 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	}
 	body := &PersonBody{
 		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
-		Email: person.Email, EmailSource: string(person.EmailSource),
+		Audits: person.Audits,
+		Email:  person.Email, EmailSource: string(person.EmailSource),
 	}
 	for _, door := range doors {
 		body.SignsInBy = append(body.SignsInBy, SignInBody{
@@ -125,6 +126,9 @@ type PersonBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"What to call them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"What to show instead of the identity"`
 	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
+	// Audits is the read-only half: this deployment's own records, and no
+	// product's findings or decisions.
+	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
 	// How somebody signs in is SignsInBy below, which carries the username
 	// and whether the provider's own identifier has been pinned to it. Two
 	// fields here said the same thing, were documented as though a request
@@ -189,6 +193,9 @@ type RecordBody struct {
 	// A plain bool decodes an absent field as false, so granting a role — a
 	// request that says nothing about administration — withdrew it.
 	Admin *bool `json:"admin,omitempty" doc:"Whether they administer this deployment. Omit it to leave it as it is"`
+	// Audits is the same shape for the other thing held over the deployment:
+	// reading its own records and writing none of them.
+	Audits *bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"`
 	// Email is where to reach them outside the application. Optional:
 	// without one somebody is told nothing outside it and keeps the area
 	// inside it. A provider that verifies an address fills in one nobody
@@ -286,8 +293,8 @@ func registerAdministration(api huma.API, a Administering) {
 			"Nobody appears here by having authenticated. Access is granted in advance, so this " +
 			"list is what an administrator has decided rather than who has turned up.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[PersonBody], error) {
-		store, _, err := administerable(ctx, a, a.handle())
+	}, deploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*listOutput[PersonBody], error) {
+		store, _, err := readable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -312,6 +319,7 @@ func registerAdministration(api huma.API, a Administering) {
 		for _, person := range people {
 			body := PersonBody{
 				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+				Audits: person.Audits,
 			}
 			doors, err := store.Identities(ctx, person.ID)
 			if err != nil {
@@ -424,7 +432,7 @@ func registerAdministration(api huma.API, a Administering) {
 
 			var err error
 			if person, err = store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName,
-				in.Body.Admin); err != nil {
+				in.Body.Admin, in.Body.Audits); err != nil {
 				return huma.Error400BadRequest(err.Error())
 			}
 			if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {
@@ -789,6 +797,23 @@ func administerable(ctx context.Context, a Administering, db bun.IDB) (*access.S
 	if err := administrating(ctx); err != nil {
 		return nil, nil, err
 	}
+	return stores(a, db)
+}
+
+// readable is administerable for the routes that only read the deployment's
+// own records: who holds what, what it is set to, and what has been changed.
+//
+// The audit permission reaches those and nothing else. Every write below stays
+// with administerable above, which is the whole difference between the two.
+func readable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
+	if err := readingTheDeployment(ctx); err != nil {
+		return nil, nil, err
+	}
+	return stores(a, db)
+}
+
+// stores builds the pair over db, or says this process has no database.
+func stores(a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
 	if a.Access == nil || a.Catalog == nil || db == nil {
 		return nil, nil, noDatabase(a.Logger)
 	}

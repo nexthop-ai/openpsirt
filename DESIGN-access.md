@@ -15,7 +15,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [Assignment](#assignment)
 - [What a sign-in leaves behind](#what-a-sign-in-leaves-behind)
 - [Departure](#departure)
-- [No statistics role](#no-statistics-role)
+- [Statistics and the audit permission](#statistics-and-the-audit-permission)
 - [Somebody who has left](#somebody-who-has-left)
 - [Teams](#teams)
 - [Routing rules](#routing-rules)
@@ -238,10 +238,12 @@ Two triggers happen on their own: withdrawing somebody's last role on a product
 hands back what they were dealing with *there*, and only there; and deactivating
 an account hands back everything it held, everywhere.
 
-## No statistics role
+## Statistics and the audit permission
 
-Not built, and not planned. Asked for as "counts and trends without reading the
-findings behind them".
+A numbers-only role over products is not built and not planned. Reading the
+deployment's own records **is** built, as a permission beside administration.
+
+### Numbers-only is not a role
 
 `public-read` on the products somebody should see already is that role. Every
 report endpoint runs as the subject asking and answers only what that subject
@@ -254,8 +256,50 @@ numbers for two products and nothing else.
 | What it would protect | A product's name, which REQ-42 already treats as a secret — a product somebody holds nothing on is invisible rather than merely unreadable |
 | Why that is not enough | The protection is already there, and the mode would be a second way of expressing it that can disagree with the first |
 
-The `reporting` role was retired for the same reason (REQ-42), and a read-only
-auditor is granted with what already exists.
+The `reporting` role was retired for the same reason (REQ-42).
+
+### The administrative half
+
+That held for findings, decisions and reports, and never for the administrative
+half. An auditor could read every decision and not the deadline policy those
+decisions were measured against, who held which role when they were made, or
+whether any of it changed — three of the four things an audit checks. The only
+grant that opened those was the administrator flag, which is not read-only: the
+record proving nobody moved the goalposts was readable by exactly the population
+able to move them.
+
+### What the audit permission grants
+
+| | |
+|---|---|
+| The settings, who holds what, the role bindings, and the administrative change log | These are records about the deployment rather than about anything scanned |
+| No product's findings or decisions | It is orthogonal to product visibility. An auditor holding disclosed reading on one product sees that product and the whole deployment's governance, and does not gain a second product's contents |
+| Read, never write | Every write over the same records asks for administration. An administrator is not asked to hold this as well: they can grant themselves anything, so requiring it would be a checkbox rather than a control |
+| The records are shown whole | Not narrowed by which products the holder reaches |
+
+**Holding it means knowing which products exist.** The change log names them —
+a role granted on one, a release whose support date moved — and the list of
+people names each person's products. That is a property of the grant rather
+than a leak, because granting it is a deliberate administrative act, and it is
+written down here so that granting it is an informed one. The alternative is an
+audit record with holes in it that nothing marks, which is worse than no record.
+
+**What somebody was told is narrowed, and this is not a way to see more.** The
+rows come back as the asker could have read them on their own account, which is
+the rule the administrator flag already follows — so an auditor who reaches no
+product is answered with nothing.
+
+### Where it lives
+
+Its own column beside administration, not a role.
+
+| Rule | Reason |
+|---|---|
+| Not a role | A role is held against a product and this is held against none. Spread over every product it would grant nothing in a deployment with no products declared, and would appear in every product's grant list while reaching none of them |
+| Bound to a group the way administration is | Roles come from one place at a time, so in group-bound mode a capability with no binding path is one nobody can ever hold. The binding table says which of the two things over the deployment it grants |
+| Derived and stamped like administration | Only what a group gave is taken back by a group, and the stamp is what bounds the flag for a credential that never signs in. Without it somebody a group made an auditor, who minted a year-long token and then left, would go on auditing through it |
+| No bootstrap arm | Configuration names an administrator, which is the documented way back into a deployment nobody can administer. Nobody is locked out by holding no audit permission |
+| Unbinding it counts nothing | Administration is refused where it would leave nobody able to administer. Nothing else held over the deployment can lock anybody out |
 
 ## Somebody who has left
 

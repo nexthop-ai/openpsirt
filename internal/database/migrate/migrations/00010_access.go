@@ -82,6 +82,20 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			-- year-long token for as long as it lasted. Null where a person
 			-- rather than a group granted it, which never goes stale.
 			"admin_derived_at" ` + t.timestamp + ` NULL,
+			-- audits is the second thing held over the deployment rather than
+			-- over a product: reading what the deployment is set to, who holds
+			-- what, and what has been changed administratively. It grants no
+			-- product's findings or decisions, so an auditor narrowed to one
+			-- product stays narrowed to it.
+			--
+			-- Its own column rather than a role, because a role is held
+			-- against a product and this is not — and beside is_admin rather
+			-- than inside it, because the whole point is a reader who cannot
+			-- write. The two derived columns are the same shape as
+			-- administration's and carry the same bound for the same reason.
+			"audits"       ` + t.boolean + ` NOT NULL,
+			"audits_derived" ` + t.boolean + ` NOT NULL,
+			"audits_derived_at" ` + t.timestamp + ` NULL,
 			-- Where to reach this person outside the application, and which
 			-- of the two sources it came from. Null is the ordinary state:
 			-- an address is optional, and somebody without one is told
@@ -391,11 +405,18 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 		// At least one row here is required while group-bound mode is
 		// on, checked at startup, or a deployment can lock itself out
 		// of its own administration.
+		// Two things are held over the deployment rather than over a
+		// product, so the row says which: administering it, and
+		// auditing what it is set to. One table because they are the
+		// same kind of grant made the same way, and because the
+		// alternative is a second one-column table per capability
+		// anybody adds.
 		`CREATE TABLE "group_admin" (
 			"id"         ` + t.id + `,
 			"group_name" ` + t.name + ` NOT NULL,
+			"grants"     ` + t.kind + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "group_admin_unique" UNIQUE ("group_name")
+			CONSTRAINT "group_admin_unique" UNIQUE ("group_name", "grants")
 		)` + t.suffix,
 	}
 

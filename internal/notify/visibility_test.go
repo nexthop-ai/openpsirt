@@ -26,7 +26,7 @@ func TestWithdrawingTheRoleTakesAwayWhatItLetSomebodyBeTold(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", nil)
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,11 +109,11 @@ func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		guest, err := rights.Ensure(ctx, "guest@example.com", "Guest", nil)
+		guest, err := rights.Ensure(ctx, "guest@example.com", "Guest", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		granter, err := rights.Ensure(ctx, "granter@example.com", "Granter", access.Stated(true))
+		granter, err := rights.Ensure(ctx, "granter@example.com", "Granter", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +167,7 @@ func TestSomethingUndisclosedThatNamesNoProductIsRefused(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)
 
-		person, err := access.NewStore(db.DB).Ensure(ctx, "someone@example.com", "Someone", nil)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,15 +196,15 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil)
+		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		nosy, err := rights.Ensure(ctx, "nosy@example.com", "Nosy", nil)
+		nosy, err := rights.Ensure(ctx, "nosy@example.com", "Nosy", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		boss, err := rights.Ensure(ctx, "boss@example.com", "Boss", access.Stated(true))
+		boss, err := rights.Ensure(ctx, "boss@example.com", "Boss", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -259,18 +259,18 @@ func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil)
+		subjectOf, err := rights.Ensure(ctx, "told@example.com", "Told", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// One administrator holding nothing, and one holding private read on
 		// the product. The pair is the whole of the test: the same flag, the
 		// same question, two different answers.
-		bare, err := rights.Ensure(ctx, "bare@example.com", "Bare", access.Stated(true))
+		bare, err := rights.Ensure(ctx, "bare@example.com", "Bare", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", access.Stated(true))
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -47,7 +47,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 			}
 		}
 
-		all, total, err := s.Changes(ctx, by, "", 100, 0)
+		all, total, err := s.Changes(ctx, by, "", trail.Over{}, 100, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 		}
 
 		// Filtered by kind, and paged.
-		settings, count, err := s.Changes(ctx, by, trail.Setting, 1, 0)
+		settings, count, err := s.Changes(ctx, by, trail.Setting, trail.Over{}, 1, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,7 +85,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 			t.Errorf("one page of the settings changes is %d of %d, want one of two",
 				len(settings), count)
 		}
-		second, _, err := s.Changes(ctx, by, trail.Setting, 1, 1)
+		second, _, err := s.Changes(ctx, by, trail.Setting, trail.Over{}, 1, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,7 +180,7 @@ func TestTheTrailRefusesAReaderWhoDoesNotAdminister(t *testing.T) {
 
 		// Somebody real, holding everything except administration.
 		reader := access.NewPerson(by.ID+1, "reader@example.com", false, nil, 0)
-		if _, _, err := s.Changes(ctx, reader, "", 100, 0); !errors.Is(err, access.ErrDenied) {
+		if _, _, err := s.Changes(ctx, reader, "", trail.Over{}, 100, 0); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("listing the trail as a non-administrator answered %v, want a refusal", err)
 		}
 		if _, _, err := s.About(ctx, reader, trail.Case, "sonic", 100, 0); !errors.Is(err, access.ErrDenied) {
@@ -190,7 +190,7 @@ func TestTheTrailRefusesAReaderWhoDoesNotAdminister(t *testing.T) {
 		// The deployment itself still reads it: a background pass answers
 		// nobody, and refusing it would be a refusal that reads as a bug.
 		if _, _, err := s.Changes(ctx, access.Everything("reporting on the tool"),
-			"", 100, 0); err != nil {
+			"", trail.Over{}, 100, 0); err != nil {
 			t.Errorf("the deployment could not read its own trail: %v", err)
 		}
 	})

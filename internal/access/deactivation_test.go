@@ -22,7 +22,7 @@ func TestSomebodyWhoHasLeftIsRefusedAtEveryWayIn(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		person, err := rights.Ensure(ctx, "leaver@example.com", "Leaver", nil)
+		person, err := rights.Ensure(ctx, "leaver@example.com", "Leaver", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +96,7 @@ func TestSomebodyWhoHasLeftIsClearedForNothing(t *testing.T) {
 		ctx := t.Context()
 		product := f.products["sonic"]
 
-		person, err := f.store.Ensure(ctx, "ana", "", nil)
+		person, err := f.store.Ensure(ctx, "ana", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

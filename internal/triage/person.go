@@ -39,7 +39,10 @@ type Record struct {
 // is not the signal. Enforced here, where the rest of this store's rules are
 // (REQ-42).
 func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID int64) (Record, error) {
-	if !subject.Admin || subject.Kind != access.Person {
+	// Either thing held over the deployment. What comes back is how much
+	// somebody proposed and agreed to rather than what any of it said, which
+	// is one of the things an audit of who decided what is for.
+	if !subject.ReadsTheDeployment() {
 		return Record{}, access.Denied("read somebody else's part in the record")
 	}
 	var out Record

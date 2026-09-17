@@ -28,7 +28,7 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		holder, err := rights.Ensure(ctx, "holder@example.com", "Hana Holder", nil)
+		holder, err := rights.Ensure(ctx, "holder@example.com", "Hana Holder", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

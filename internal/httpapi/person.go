@@ -27,6 +27,9 @@ type AboutPersonBody struct {
 	Identity    string `json:"identity"`
 	DisplayName string `json:"display_name,omitempty"`
 	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
+	// Audits is the read-only half of what is held over the deployment: its
+	// own records, and no product's findings or decisions.
+	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
 	// DeactivatedAt is when they stopped being somebody who may sign in.
 	// Absent is the ordinary state. Never a deletion: they are still named
 	// by every judgment they proposed and every one they agreed to.
@@ -96,11 +99,11 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 			"`held` and `told` are the first page of each; `held_total` and `told_total` " +
 			"say how many there are.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, input *struct {
+	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
 		Identity string `path:"identity" maxLength:"191"`
 		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many of each list to return"`
 	}) (*struct{ Body AboutPersonBody }, error) {
-		store, _, err := administerable(ctx, a, a.handle())
+		store, _, err := readable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -116,6 +119,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 
 		body := AboutPersonBody{
 			Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+			Audits:        person.Audits,
 			DeactivatedAt: orAbsent(person.DeactivatedAt),
 		}
 

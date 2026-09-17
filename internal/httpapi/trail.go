@@ -99,16 +99,25 @@ func registerTrail(api huma.API, in Ingest) {
 			"things listed here silently rewrite what the tool reports: the deadline windows " +
 			"recompute every open finding's deadline, the triage floor takes the deadline off " +
 			"everything below it, and an end-of-life date takes it off everything past it.\n\n" +
-			"Newest first, and paged: it only grows.",
+			"Newest first, and paged: it only grows.\n\n" +
+			"Takes a period, because the question an audit asks is what changed in the " +
+			"stretch the certificate covers. Asked for none, it answers about everything " +
+			"it holds.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, input *struct {
-		Kind   string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"Keep only changes of one kind"`
-		Limit  int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int    `query:"offset" minimum:"0"`
+	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
+		Kind string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"Keep only changes of one kind"`
+		Period
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0"`
 	}) (*struct {
 		Body struct {
 			Items []ChangeBody `json:"items"`
 			Total int          `json:"total"`
+			// From and To say the period back, so a page of rows is never
+			// read without the stretch it covers. Empty where that side is
+			// unbounded.
+			From string `json:"from,omitempty"`
+			To   string `json:"to,omitempty"`
 		}
 	}, error) {
 		subject, err := requester(ctx)
@@ -118,12 +127,20 @@ func registerTrail(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
+		// No default window. A trail read with one would answer about the
+		// last stretch while looking like it answered about everything, which
+		// is the reading an audit must not be given.
+		since, until, err := input.window(0, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
 		store := access.NewStore(in.DB.DB)
 		// Refused by the store rather than here. A row names who was brought
 		// into which case, undisclosed ones among them, so who may read it is
 		// a question about the query (REQ-42 and REQ-43).
 		changes, total, err := trail.NewStore(in.DB.DB).Changes(ctx, subject,
-			trail.Kind(input.Kind), input.Limit, input.Offset)
+			trail.Kind(input.Kind), trail.Over{Since: since, Until: until},
+			input.Limit, input.Offset)
 		if err != nil {
 			return nil, refused(in.Logger, err, "what has been changed could not be read")
 		}
@@ -141,9 +158,12 @@ func registerTrail(api huma.API, in Ingest) {
 			Body struct {
 				Items []ChangeBody `json:"items"`
 				Total int          `json:"total"`
+				From  string       `json:"from,omitempty"`
+				To    string       `json:"to,omitempty"`
 			}
 		}{}
 		out.Body.Total = total
+		out.Body.From, out.Body.To = stating(since, until)
 		out.Body.Items = make([]ChangeBody, 0, len(changes))
 		for _, change := range changes {
 			body := ChangeBody{

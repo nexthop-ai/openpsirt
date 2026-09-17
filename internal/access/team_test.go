@@ -13,11 +13,11 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 	// arrangement rather than a misconfiguration.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true))
+		admin, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		cleared, err := f.store.Ensure(ctx, "cleared", "Cleared", nil)
+		cleared, err := f.store.Ensure(ctx, "cleared", "Cleared", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -25,7 +25,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 			access.PrivateRead); err != nil {
 			t.Fatal(err)
 		}
-		plain, err := f.store.Ensure(ctx, "plain", "Plain", nil)
+		plain, err := f.store.Ensure(ctx, "plain", "Plain", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +99,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 func TestARetiredTeamStopsTakingWorkAndKeepsItsName(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true))
+		admin, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

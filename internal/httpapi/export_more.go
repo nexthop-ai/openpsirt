@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -34,6 +35,7 @@ import (
 
 func registerMoreExports(api huma.API, in Ingest) {
 	registerAuditExport(api, in)
+	registerChangeExport(api, in)
 	registerQueueExport(api, in)
 	registerComponentExport(api, in)
 	registerDueExport(api, in)
@@ -508,6 +510,84 @@ func registerComponentExport(api huma.API, in Ingest) {
 		name := "components-" + strings.ToLower(input.Product)
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
 			writeExport(writer, input.Format, name, out)
+		}}, nil
+	})
+}
+
+// registerChangeExport writes out what has been changed administratively.
+//
+// The change log was capped at fifty rows, undated and unexportable, and
+// reached by scrolling past a hundred audit cards. What an audit asks of it —
+// "show me every grant made in the year the certificate covers" — could be
+// read a page at a time on a screen and could not leave it.
+func registerChangeExport(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "export-administrative-changes", Method: http.MethodGet,
+		Path:    "/v1/administration/changes.{format}",
+		Summary: "Export administrative changes",
+		Description: "Every administrative change the same filters would show, as a file, " +
+			"rather than one page of them.\n\n" +
+			"**One row per change**, with who made it, what it was about, and what it held " +
+			"before and after. An absent value is not an empty one: `unset` says nobody had " +
+			"set it, and `cleared` that the change removed it.\n\n" +
+			"Takes the kind and the period the list takes. Asked for no period it writes " +
+			"everything this deployment holds.",
+		Tags: []string{"Administration"},
+	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
+		Format string `path:"format" enum:"csv,json"`
+		Kind   string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"Keep only changes of one kind"`
+		Period
+	}) (*huma.StreamResponse, error) {
+		subject, err := requester(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
+		since, until, err := input.window(0, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+		store := trail.NewStore(in.DB.DB)
+		rights := access.NewStore(in.DB.DB)
+		out := Exporting{
+			What: "what has been changed administratively",
+			About: []Stated{
+				{"from", asDay(since)}, {"to", asDay(until)}, {"kind", input.Kind},
+			},
+			Header: []string{"at", "by", "kind", "about", "was", "became", "unset", "cleared"},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				changes, _, err := store.Changes(ctx, subject, trail.Kind(input.Kind),
+					trail.Over{Since: since, Until: until}, limit, offset)
+				if err != nil {
+					return nil, err
+				}
+				// Who, by the identity they sign in under, read a page at a
+				// time like every other name this file carries.
+				who := make([]int64, 0, len(changes))
+				for _, change := range changes {
+					who = append(who, change.By)
+				}
+				names, err := rights.Names(ctx, who)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(changes))
+				for _, change := range changes {
+					rows = append(rows, []string{
+						change.At.UTC().Format(time.RFC3339), names[change.By],
+						string(change.Kind), change.Name,
+						orBlank(change.Was), orBlank(change.Became),
+						strconv.FormatBool(change.Was == nil),
+						strconv.FormatBool(change.Became == nil),
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			writeExport(writer, input.Format, "administrative-changes", out)
 		}}, nil
 	})
 }

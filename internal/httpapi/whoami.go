@@ -40,6 +40,7 @@ type WhoBody struct {
 	Identity string    `json:"identity" doc:"What this deployment calls them"`
 	Name     string    `json:"name" doc:"What to show instead of the identity, where one is recorded"`
 	Admin    bool      `json:"admin" doc:"Administers this deployment"`
+	Audits   bool      `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
 	Kind     string    `json:"kind" enum:"person,key" doc:"A person who signed in, or a credential"`
 	Reach    []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
 	// What they asked to be sent. Answered here because a screen offering the
@@ -86,7 +87,7 @@ func registerWhoAmI(api huma.API, in Ingest) {
 		}
 
 		body := WhoBody{
-			Identity: subject.Identity, Admin: subject.Admin,
+			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{},
 		}
 		if threshold, err := deferralThreshold(ctx, in); err == nil {

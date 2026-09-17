@@ -134,12 +134,25 @@ var administrativeActs = []trailedAct{
 	{
 		id: "bind-group", what: "a group bound to administration", method: http.MethodPost,
 		path: "/v1/roles/bindings", body: `{"group":"Owners","role":"admin"}`,
-		kind: "role", about: "Owners on every product",
+		kind: "role", about: "Owners over this deployment",
 	},
 	{
 		id: "unbind-group", what: "a group unbound from administration",
 		method: http.MethodDelete, path: "/v1/roles/bindings?group=Owners&role=admin",
-		kind: "role", about: "Owners on every product",
+		kind: "role", about: "Owners over this deployment",
+	},
+	{
+		// The other thing held over the deployment. It goes down the same
+		// route and is recorded the same way, which is the point of there
+		// being one route.
+		id: "bind-group", what: "a group bound to auditing", method: http.MethodPost,
+		path: "/v1/roles/bindings", body: `{"group":"Auditors","role":"audit"}`,
+		kind: "role", about: "Auditors over this deployment",
+	},
+	{
+		id: "unbind-group", what: "a group unbound from auditing",
+		method: http.MethodDelete, path: "/v1/roles/bindings?group=Auditors&role=audit",
+		kind: "role", about: "Auditors over this deployment",
 	},
 	{
 		// The one act that hands out a new way into the deployment, and the
@@ -624,5 +637,58 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 			return
 		}
 		t.Error("the triage floor is not among the settings offered")
+	})
+}
+
+// TestTheAuditPermissionReadsTheDeploymentAndNoProduct pins both halves of
+// what it grants.
+//
+// The record proving nobody moved the goalposts was readable only by the
+// people who can move them: an auditor could read every decision and not the
+// deadline policy those decisions were measured against, who held which role
+// when they were made, or whether any of it changed.
+func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+
+		// The deployment's own records, which is the whole of the grant.
+		for _, path := range []string{
+			"/v1/administration/changes", "/v1/settings", "/v1/people",
+			"/v1/people/admin", "/v1/roles/bindings", "/v1/roles/mode",
+		} {
+			if got := asPerson(t, r, "auditor", http.MethodGet, path, ""); got.Code != http.StatusOK {
+				t.Errorf("an auditor reading %s answered %d: %s",
+					path, got.Code, got.Body.String())
+			}
+		}
+
+		// And no product. An auditor scoped to one product stays scoped to
+		// it; this one holds no role at all, so every one of these is what
+		// somebody holding nothing sees.
+		for _, path := range []string{
+			"/v1/products/mine/findings", "/v1/products/mine/builds",
+		} {
+			got := asPerson(t, r, "auditor", http.MethodGet, path, "")
+			if got.Code != http.StatusForbidden && got.Code != http.StatusNotFound {
+				t.Errorf("an auditor reading %s answered %d, want a refusal: %s",
+					path, got.Code, got.Body.String())
+			}
+		}
+
+		// Every write over those same records stays with the administrator.
+		for _, act := range []struct {
+			method, path, body string
+		}{
+			{http.MethodPut, "/v1/settings/triage.floor", `{"value":"high"}`},
+			{http.MethodPost, "/v1/people", `{"identity":"someone-else"}`},
+			{http.MethodPost, "/v1/roles/bindings", `{"group":"Owners","role":"admin"}`},
+			{http.MethodPut, "/v1/roles/mode", `{"mode":"direct"}`},
+		} {
+			got := asPerson(t, r, "auditor", act.method, act.path, act.body)
+			if got.Code != http.StatusForbidden {
+				t.Errorf("an auditor sending %s %s answered %d, want 403: %s",
+					act.method, act.path, got.Code, got.Body.String())
+			}
+		}
 	})
 }

@@ -198,8 +198,8 @@ func registerSettings(api huma.API, in Ingest) {
 			"agreed to produces an estate that is permanently late and a signal everybody " +
 			"ignores.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[SettingBody], error) {
-		if err := administrating(ctx); err != nil {
+	}, deploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*listOutput[SettingBody], error) {
+		if err := readingTheDeployment(ctx); err != nil {
 			return nil, err
 		}
 		// From the accessor, which answers nothing where there is no

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
@@ -12,6 +13,7 @@ import { Because, labeled } from "../ui/Outcome";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
+import { coveringPeriod, stated } from "./reports/Window";
 
 // How much of the record one page holds. The server's own ceiling is five
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -326,12 +328,33 @@ export function Audit() {
 // judgments without being able to see who moved the ground under them is
 // reading half of it.
 function Administered() {
+  const [params] = useSearchParams();
+  // The period the screen is already reading, rather than a second one of its
+  // own. Who moved the ground under a set of judgments is the same question
+  // over the same stretch, and two date controls on one screen is two answers
+  // to it.
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
+  // How many rows are shown, rather than an offset: the newest first is the
+  // order, and asking for the next page of a list that only grows at the top
+  // is how a row is seen twice or not at all.
+  const [showing, setShowing] = useState(50);
   const changes = useQuery({
-    queryKey: ["administered"],
+    queryKey: ["administered", from, to, showing],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/administration/changes", { params: { query: { limit: 50 } } })),
-    // An administrator's screen; anybody else is refused and the section is
-    // simply absent for them.
+      unwrap(
+        await api.GET("/v1/administration/changes", {
+          params: {
+            query: {
+              limit: showing,
+              ...(from ? { from } : {}),
+              ...(to ? { to } : {}),
+            },
+          },
+        }),
+      ),
+    // An administrator's or an auditor's screen; anybody else is refused and
+    // the section is simply absent for them.
     retry: false,
   });
   const rows = changes.data?.items ?? [];
@@ -347,13 +370,26 @@ function Administered() {
       </div>
     );
   }
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && showing === 50) return null;
 
   return (
-    <div style={{ marginTop: 24 }}>
-      <h3>Change history</h3>
+    <div style={{ marginTop: 24 }} id="changes">
+      <div className="screen-head">
+        <h3>Change history</h3>
+        <span style={{ marginLeft: "auto" }} className="noprint">
+          {/* The record an access review is written from, as a file. It was
+              capped at fifty rows on a screen and could not leave it. */}
+          <a className="btn quiet" href={changesAt(params, "csv")}>
+            CSV
+          </a>{" "}
+          <a className="btn quiet" href={changesAt(params, "json")}>
+            JSON
+          </a>
+        </span>
+      </div>
       <p className="hint">
         Settings, roles, support dates, credentials, accounts and teams, with what each held before.
+        {stated({ from, to }) ? ` Over ${coveringPeriod({ from, to }, 0)}.` : ""}
       </p>
       <Wide>
         <table>
@@ -384,11 +420,32 @@ function Administered() {
       {(changes.data?.total ?? 0) > rows.length && (
         <p className="hint noprint">
           Showing the newest {rows.length.toLocaleString()} of{" "}
-          {(changes.data?.total ?? 0).toLocaleString()}.
+          {(changes.data?.total ?? 0).toLocaleString()}.{" "}
+          <button
+            type="button"
+            className="btn quiet"
+            disabled={changes.isFetching}
+            onClick={() => setShowing((shown) => shown + 100)}
+          >
+            Show more
+          </button>
         </p>
       )}
     </div>
   );
+}
+
+// Where the change history comes from as a file, built the way the record's
+// own link is: the screen's period straight from the address, so the file and
+// the section it was taken from cannot disagree about the stretch.
+function changesAt(params: URLSearchParams, format: string): string {
+  const asked = new URLSearchParams();
+  for (const name of ["from", "to"]) {
+    const value = params.get(name);
+    if (value) asked.set(name, value);
+  }
+  const query = asked.toString();
+  return `/v1/administration/changes.${format}${query ? `?${query}` : ""}`;
 }
 
 function Judgment({ row }: { row: Judged }) {

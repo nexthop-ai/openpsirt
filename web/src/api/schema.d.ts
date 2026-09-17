@@ -19,9 +19,37 @@ export interface paths {
          *
          *     Newest first, and paged: it only grows.
          *
-         *     **Requires:** administrator
+         *     Takes a period, because the question an audit asks is what changed in the stretch the certificate covers. Asked for none, it answers about everything it holds.
+         *
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-administrative-changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/administration/changes.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export administrative changes
+         * @description Every administrative change the same filters would show, as a file, rather than one page of them.
+         *
+         *     **One row per change**, with who made it, what it was about, and what it held before and after. An absent value is not an empty one: `unset` says nobody had set it, and `cleared` that the change removed it.
+         *
+         *     Takes the kind and the period the list takes. Asked for no period it writes everything this deployment holds.
+         *
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
+         */
+        get: operations["export-administrative-changes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1321,7 +1349,7 @@ export interface paths {
          *
          *     Nobody appears here by having authenticated. Access is granted in advance, so this list is what an administrator has decided rather than who has turned up.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-people"];
         put?: never;
@@ -1379,7 +1407,7 @@ export interface paths {
          *
          *     `held` and `told` are the first page of each; `held_total` and `told_total` say how many there are.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["read-person"];
         put?: never;
@@ -3741,7 +3769,7 @@ export interface paths {
          *
          *     In group-bound mode a mapping is the advance authorization: somebody arriving for the first time in a mapped group is admitted, and somebody in none is refused.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-bindings"];
         put?: never;
@@ -3783,7 +3811,7 @@ export interface paths {
          *
          *     One mode for the whole deployment, never both. A hybrid would need a precedence rule for somebody holding one role from a team and another directly, which is how a stale assignment outlives somebody's removal from the team it was shadowing.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["get-role-mode"];
         /**
@@ -4021,7 +4049,7 @@ export interface paths {
          *
          *     The shipped numbers are a starting point rather than a recommendation. What a deployment can hold to is a question about that deployment, and a deadline nobody agreed to produces an estate that is permanently late and a signal everybody ignores.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-settings"];
         put?: never;
@@ -4389,6 +4417,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Whether they administer this deployment */
             admin?: boolean;
+            /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
+            audits?: boolean;
             /** @description When they left. Absent means they are active */
             deactivated_at?: string;
             display_name?: string;
@@ -4694,7 +4724,7 @@ export interface components {
              * @description What membership of this group grants
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin" | "audit";
         };
         BlockingBody: {
             component: string;
@@ -6481,7 +6511,9 @@ export interface components {
              * @example https://example.com/schemas/List-administrative-changesResponse.json
              */
             readonly $schema?: string;
+            from?: string;
             items: components["schemas"]["ChangeBody"][] | null;
+            to?: string;
             /** Format: int64 */
             total: number;
         };
@@ -7427,6 +7459,8 @@ export interface components {
         PersonBody: {
             /** @description Whether they administer this deployment */
             admin?: boolean;
+            /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
+            audits?: boolean;
             /** @description What to show instead of the identity */
             display_name?: string;
             /** @description Where they are reached outside the application */
@@ -7916,6 +7950,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Whether they administer this deployment. Omit it to leave it as it is */
             admin?: boolean;
+            /** @description Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is */
+            audits?: boolean;
             /** @description What to show instead of the identity */
             display_name?: string;
             /** @description Where to reach them outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was */
@@ -9100,6 +9136,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Administers this deployment */
             admin: boolean;
+            /** @description May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them */
+            audits?: boolean;
             /**
              * Format: int64
              * @description How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
@@ -9186,6 +9224,12 @@ export interface operations {
             query?: {
                 /** @description Keep only changes of one kind */
                 kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
                 limit?: number;
                 offset?: number;
             };
@@ -9203,6 +9247,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["List-administrative-changesResponse"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-administrative-changes": {
+        parameters: {
+            query?: {
+                /** @description Keep only changes of one kind */
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

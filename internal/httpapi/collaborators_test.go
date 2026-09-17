@@ -246,7 +246,7 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 
 		// Somebody whose display name is not their identity, which is the
 		// shape the recording route itself documents.
-		person, err := r.rights.Ensure(ctx, "ana", "Ana Ruiz", nil)
+		person, err := r.rights.Ensure(ctx, "ana", "Ana Ruiz", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -28,7 +28,7 @@ type BindingBody struct {
 	// ProductDisplayName is what to show beside it, for the reason HeldBody
 	// carries one: unbind resolves the field above.
 	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
-	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin" doc:"What membership of this group grants"`
+	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"What membership of this group grants"`
 }
 
 func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *setting.Store) {
@@ -41,8 +41,8 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			"rule for somebody holding one role from a team and another directly, which is how a " +
 			"stale assignment outlives somebody's removal from the team it was shadowing.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ModeBody }, error) {
-		if _, _, err := administerable(ctx, a, a.handle()); err != nil {
+	}, deploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ModeBody }, error) {
+		if _, _, err := readable(ctx, a, a.handle()); err != nil {
 			return nil, err
 		}
 		store := settings(a.handle())
@@ -135,8 +135,8 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			"In group-bound mode a mapping is the advance authorization: somebody arriving for " +
 			"the first time in a mapped group is admitted, and somebody in none is refused.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[BindingBody], error) {
-		rights, _, err := administerable(ctx, a, a.handle())
+	}, deploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*listOutput[BindingBody], error) {
+		rights, _, err := readable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -160,12 +160,18 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			})
 		}
 
-		administering, err := rights.AdminGroups(ctx)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot list which groups administer", err)
-		}
-		for _, group := range administering {
-			out.Body.Items = append(out.Body.Items, BindingBody{Group: group, Role: adminRole})
+		// Listed after the per-product bindings, each under the word a
+		// request names it by.
+		for _, over := range access.OverTheDeployment() {
+			groups, err := rights.GroupsOver(ctx, over)
+			if err != nil {
+				return nil, wentWrong(a.Logger,
+					"cannot list what groups hold over this deployment", err)
+			}
+			for _, group := range groups {
+				out.Body.Items = append(out.Body.Items,
+					BindingBody{Group: group, Role: string(over)})
+			}
 		}
 		return out, nil
 	})
@@ -191,16 +197,18 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 				return err
 			}
 
-			if in.Body.Role == adminRole {
+			if over, deployment := overTheDeployment(in.Body.Role); deployment {
 				if in.Body.Product != "" {
 					return huma.Error422UnprocessableEntity(
-						"administration is not held against a product, so a group bound to it names none")
+						"that is held over the deployment rather than against a product, " +
+							"so a group bound to it names none")
 				}
-				if err := rights.BindAdmin(ctx, in.Body.Group); err != nil {
-					return wentWrong(a.Logger, "cannot bind a group to administration", err)
+				if err := rights.BindOver(ctx, in.Body.Group, over); err != nil {
+					return wentWrong(a.Logger,
+						"cannot bind a group to something held over this deployment", err)
 				}
-				if err := noted(ctx, tx, trail.Role, in.Body.Group+" on every product",
-					nil, trail.Said(adminRole, true)); err != nil {
+				if err := noted(ctx, tx, trail.Role, in.Body.Group+" over this deployment",
+					nil, trail.Said(string(over), true)); err != nil {
 					return notRecorded(a.Logger, err)
 				}
 				return nil
@@ -249,13 +257,20 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 				return err
 			}
 
-			if in.Role == adminRole {
-				// Refused where it would leave nobody able to administer, for
-				// the same reason the mode change is — and decided inside the
-				// write, so a refusal rolls the delete back rather than being
-				// undone by a second statement that could itself fail.
-				switch err := rights.UnbindAdminIfOthersRemain(ctx, in.Group,
-					roleModeIn(settings)); {
+			if over, deployment := overTheDeployment(in.Role); deployment {
+				// Administration is refused where it would leave nobody able
+				// to administer, for the same reason the mode change is — and
+				// decided inside the write, so a refusal rolls the delete back
+				// rather than being undone by a second statement that could
+				// itself fail. Nothing else held over the deployment can lock
+				// anybody out, so nothing else is counted.
+				unbind := func() error { return rights.UnbindOver(ctx, in.Group, over) }
+				if over == access.Administers {
+					unbind = func() error {
+						return rights.UnbindAdminIfOthersRemain(ctx, in.Group, roleModeIn(settings))
+					}
+				}
+				switch err := unbind(); {
 				case errors.Is(err, access.ErrLastAdministrator):
 					return huma.Error409Conflict(
 						"that was the last thing granting administration: bind another group " +
@@ -266,10 +281,11 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 					// delete did nothing.
 					return noSuchGrant()
 				case err != nil:
-					return wentWrong(a.Logger, "cannot unbind a group from administration", err)
+					return wentWrong(a.Logger,
+						"cannot unbind a group from what it holds over this deployment", err)
 				}
-				if err := noted(ctx, tx, trail.Role, in.Group+" on every product",
-					trail.Said(adminRole, true), nil); err != nil {
+				if err := noted(ctx, tx, trail.Role, in.Group+" over this deployment",
+					trail.Said(string(over), true), nil); err != nil {
 					return notRecorded(a.Logger, err)
 				}
 				return nil
@@ -301,9 +317,17 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 	})
 }
 
-// adminRole is how administration is named in a binding. It is not a role held
-// against a product, so it is not one of the roles.
-const adminRole = "admin"
+// overTheDeployment reads a binding's role as something held over the
+// deployment, or says it is not one.
+//
+// Two words in the role field name nothing held against a product:
+// administering this deployment, and auditing what it is set to. They are in
+// that field because a binding maps a group to one thing somebody holds, and
+// splitting them out would make a caller decide which of two shapes to send.
+func overTheDeployment(role string) (access.Over, bool) {
+	over := access.Over(role)
+	return over, over.Valid()
+}
 
 // roleModeIn reads where roles actually come from, against whichever handle it
 // is given — which is the transaction deciding, rather than this.

@@ -37,7 +37,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // a quarter" rather than "until 3 March".
 func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil)
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -88,7 +88,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 // rule that lives only in a request schema is one the next caller walks past.
 func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil)
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -157,7 +157,7 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 // in this process calls, so the rule is asked here rather than in a schema.
 func TestAFilterMayNotPrepareAClaimTheDecisionStoreWouldRefuse(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil)
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -214,7 +214,7 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 	// writing many, and it fills the same table — and the panel that lists
 	// them read every row it found on every open.
 	each(t, func(t *testing.T, f *fixture) {
-		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil)
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

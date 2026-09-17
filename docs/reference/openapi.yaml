@@ -13,6 +13,9 @@ components:
         admin:
           description: Whether they administer this deployment
           type: boolean
+        audits:
+          description: Whether they may read this deployment's own records. It grants no product's findings or decisions
+          type: boolean
         deactivated_at:
           description: When they left. Absent means they are active
           type: string
@@ -542,6 +545,7 @@ components:
             - public-triage
             - private-triage
             - admin
+            - audit
           type: string
       required:
         - group
@@ -3735,12 +3739,16 @@ components:
           format: uri
           readOnly: true
           type: string
+        from:
+          type: string
         items:
           items:
             $ref: "#/components/schemas/ChangeBody"
           type:
             - array
             - "null"
+        to:
+          type: string
         total:
           format: int64
           type: integer
@@ -5498,6 +5506,9 @@ components:
         admin:
           description: Whether they administer this deployment
           type: boolean
+        audits:
+          description: Whether they may read this deployment's own records. It grants no product's findings or decisions
+          type: boolean
         display_name:
           description: What to show instead of the identity
           type: string
@@ -6278,6 +6289,9 @@ components:
           type: string
         admin:
           description: Whether they administer this deployment. Omit it to leave it as it is
+          type: boolean
+        audits:
+          description: "Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"
           type: boolean
         display_name:
           description: What to show instead of the identity
@@ -8360,6 +8374,9 @@ components:
         admin:
           description: Administers this deployment
           type: boolean
+        audits:
+          description: May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them
+          type: boolean
         bulk_cap:
           description: How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
           format: int64
@@ -8475,7 +8492,9 @@ paths:
 
         Newest first, and paged: it only grows.
 
-        **Requires:** administrator
+        Takes a period, because the question an audit asks is what changed in the stretch the certificate covers. Asked for none, it answers about everything it holds.
+
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-administrative-changes
       parameters:
         - description: Keep only changes of one kind
@@ -8496,6 +8515,30 @@ paths:
               - case
               - alias
             type: string
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+            format: int64
+            maximum: 3650
+            minimum: 1
+            type: integer
         - explode: false
           in: query
           name: limit
@@ -8529,7 +8572,83 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
+  /v1/administration/changes.{format}:
+    get:
+      description: |-
+        Every administrative change the same filters would show, as a file, rather than one page of them.
+
+        **One row per change**, with who made it, what it was about, and what it held before and after. An absent value is not an empty one: `unset` says nobody had set it, and `cleared` that the change removed it.
+
+        Takes the kind and the period the list takes. Asked for no period it writes everything this deployment holds.
+
+        **Requires:** administrator, or the audit permission over this deployment's own records
+      operationId: export-administrative-changes
+      parameters:
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Keep only changes of one kind
+          explode: false
+          in: query
+          name: kind
+          schema:
+            description: Keep only changes of one kind
+            enum:
+              - setting
+              - role
+              - routing
+              - support
+              - release
+              - credential
+              - account
+              - team
+              - case
+              - alias
+            type: string
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+            format: int64
+            maximum: 3650
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export administrative changes
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: records
   /v1/advisories:
     get:
       description: |-
@@ -11925,7 +12044,7 @@ paths:
 
         Nobody appears here by having authenticated. Access is granted in advance, so this list is what an administrator has decided rather than who has turned up.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-people
       responses:
         "200":
@@ -11944,7 +12063,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
     post:
       description: |-
         Records somebody so that they may sign in, and optionally what they hold. Recording the same person again confirms them and adds any roles named.
@@ -12013,7 +12132,7 @@ paths:
 
         `held` and `told` are the first page of each; `held_total` and `told_total` say how many there are.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: read-person
       parameters:
         - in: path
@@ -12050,7 +12169,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
   /v1/people/{identity}/assignments:
     get:
       description: |-
@@ -19078,7 +19197,7 @@ paths:
 
         In group-bound mode a mapping is the advance authorization: somebody arriving for the first time in a mapped group is admitted, and somebody in none is refused.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-bindings
       responses:
         "200":
@@ -19097,7 +19216,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
     post:
       description: |-
         Maps one identity-provider group to one role, so that everybody in that group holds it from their next sign-in.
@@ -19139,7 +19258,7 @@ paths:
 
         One mode for the whole deployment, never both. A hybrid would need a precedence rule for somebody holding one role from a team and another directly, which is how a stale assignment outlives somebody's removal from the team it was shadowing.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: get-role-mode
       responses:
         "200":
@@ -19158,7 +19277,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
     put:
       description: |-
         Turning group binding on sets assignments aside rather than deleting them, and turning it off restores them — so trying it is not a one-way door. Refused if it would leave nobody able to administer this deployment.
@@ -19600,7 +19719,7 @@ paths:
 
         The shipped numbers are a starting point rather than a recommendation. What a deployment can hold to is a question about that deployment, and a deadline nobody agreed to produces an estate that is permanently late and a signal everybody ignores.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-settings
       responses:
         "200":
@@ -19619,7 +19738,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
   /v1/settings/{name}:
     put:
       description: |-

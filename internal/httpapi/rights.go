@@ -23,6 +23,16 @@ const (
 	perProduct = "product"
 	// deploymentWide is administrator, which is not held per product.
 	deploymentWide = "deployment"
+	// deploymentRecords is reading what the deployment is set to, who holds
+	// what, and what has been changed administratively. Either of the two
+	// things held over the deployment satisfies it.
+	//
+	// Its own word rather than deploymentWide with a note, because the
+	// difference is what may be done rather than what may be reached: every
+	// write over these records asks for the first, and these reads ask for
+	// either. Written as a note, an access review reading the published
+	// document would have counted them as administrator-only.
+	deploymentRecords = "records"
 	// anySubject is any credential this deployment recognizes, a pipeline's
 	// key included. It still answers only what that subject may see.
 	//
@@ -84,6 +94,8 @@ func (r requires) said() string {
 		what = strings.Join(r.AnyOf, " or ")
 	case r.Scope == deploymentWide:
 		what = "administrator"
+	case r.Scope == deploymentRecords:
+		what = "administrator, or the audit permission over this deployment's own records"
 	case r.Scope == ownSubject:
 		what = "your own credential"
 	case r.Scope == anyPerson:
@@ -185,6 +197,11 @@ func enforceDeclarations(api huma.API) {
 		switch asks.Scope {
 		case deploymentWide:
 			if !subject.Admin {
+				refuse(http.StatusForbidden)
+				return
+			}
+		case deploymentRecords:
+			if !subject.ReadsTheDeployment() {
 				refuse(http.StatusForbidden)
 				return
 			}

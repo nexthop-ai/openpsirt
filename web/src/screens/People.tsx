@@ -103,6 +103,16 @@ export function People({ who: me }: { who: Who }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
   });
 
+  // The other thing held over the deployment rather than against a product,
+  // and the one an auditor is given: the records, and none of the products.
+  const audit = useMutation({
+    mutationFn: async (who: { identity: string; audits: boolean }) =>
+      unwrap(
+        await api.POST("/v1/people", { body: { identity: who.identity, audits: who.audits } }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+  });
+
   const endSessions = useMutation({
     mutationFn: async (who: { identity: string }) =>
       unwrap(await api.DELETE("/v1/people/{identity}/sessions", { params: { path: who } })),
@@ -175,6 +185,14 @@ export function People({ who: me }: { who: Who }) {
                         <>
                           {" "}
                           <span className="state agreed">administrator</span>
+                        </>
+                      )}
+                      {person.audits && (
+                        <>
+                          {" "}
+                          <span className="state" title="Reads this deployment's own records">
+                            auditor
+                          </span>
                         </>
                       )}
                     </td>
@@ -319,6 +337,32 @@ export function People({ who: me }: { who: Who }) {
                         </label>
                         {administer.error != null && (
                           <Failed error={administer.error} what="That could not be changed." />
+                        )}
+                        <label
+                          className="hint"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            margin: "2px 0 8px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(person.audits)}
+                            disabled={audit.isPending}
+                            onChange={(event) =>
+                              audit.mutate({
+                                identity: person.identity ?? "",
+                                audits: event.target.checked,
+                              })
+                            }
+                          />
+                          Reads the settings, who holds what, and the record of administrative
+                          changes. Changes none of them, and reaches no product.
+                        </label>
+                        {audit.error != null && (
+                          <Failed error={audit.error} what="That could not be changed." />
                         )}
                         <Access
                           holds={person.holds ?? []}

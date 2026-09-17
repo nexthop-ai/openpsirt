@@ -86,7 +86,7 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 	// cannot be a way in behind the groups' back.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", nil)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,7 +119,7 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 func TestAGroupCanCarryAdministration(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := f.store.BindAdmin(ctx, "platform-leads"); err != nil {
+		if err := f.store.BindOver(ctx, "platform-leads", access.Administers); err != nil {
 			t.Fatal(err)
 		}
 		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "a-lead"}, []string{"platform-leads"})
@@ -196,7 +196,7 @@ func TestSwitchingToGroupBoundSetsAssignmentsAsideRatherThanDeletingThem(t *test
 	// how the team actually divides work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", nil)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +233,7 @@ func TestSwitchingBackToDirectClearsWhatGroupsDerived(t *testing.T) {
 		if err := f.store.Bind(ctx, "platform", f.products["sonic"], access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.BindAdmin(ctx, "leads"); err != nil {
+		if err := f.store.BindOver(ctx, "leads", access.Administers); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform", "leads"}); err != nil {
@@ -274,7 +274,7 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 			t.Error("group-bound mode with no admin group and nobody named looked survivable")
 		}
 
-		if err := f.store.BindAdmin(ctx, "leads"); err != nil {
+		if err := f.store.BindOver(ctx, "leads", access.Administers); err != nil {
 			t.Fatal(err)
 		}
 		if can, err = f.store.CanAdminister(ctx, access.GroupBound); err != nil || !can {
@@ -289,7 +289,7 @@ func TestADeploymentIsNotAllowedToLockItselfOut(t *testing.T) {
 			err, access.ErrLastAdministrator) {
 			t.Errorf("unbinding the last administrators' group answered %v, want a refusal", err)
 		}
-		groups, err := f.store.AdminGroups(ctx)
+		groups, err := f.store.GroupsOver(ctx, access.Administers)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -387,7 +387,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// Promoted here, not by a group.
-		person, err := f.store.Ensure(ctx, "bob", "Bob", access.Stated(true))
+		person, err := f.store.Ensure(ctx, "bob", "Bob", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -395,7 +395,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 		if err := f.store.Claim(ctx, person.ID, "bob"); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.BindAdmin(ctx, "platform-admins"); err != nil {
+		if err := f.store.BindOver(ctx, "platform-admins", access.Administers); err != nil {
 			t.Fatal(err)
 		}
 

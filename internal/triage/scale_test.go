@@ -69,7 +69,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 		// A real person row, because a claim names who made it and the schema
 		// holds it to that.
 		rights := access.NewStore(db.DB)
-		person, err := rights.Ensure(ctx, "triager", "A triager", nil)
+		person, err := rights.Ensure(ctx, "triager", "A triager", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

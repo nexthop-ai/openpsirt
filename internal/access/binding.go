@@ -63,12 +63,18 @@ type Binding struct {
 	CreatedAt time.Time `bun:"created_at,notnull"`
 }
 
-// AdminBinding is a provider group whose members administer this deployment.
+// AdminBinding is a provider group bound to something held over the
+// deployment: administering it, or auditing what it is set to.
+//
+// Apart from the table above because that one names a product and these name
+// none. A uniqueness rule over a column that may be absent behaves differently
+// on each of the four engines, which is what a single table would need.
 type AdminBinding struct {
 	bun.BaseModel `bun:"table:group_admin,alias:ga"`
 
 	ID        int64     `bun:"id,pk,autoincrement"`
 	GroupName string    `bun:"group_name,notnull"`
+	Grants    Over      `bun:"grants,notnull"`
 	CreatedAt time.Time `bun:"created_at,notnull"`
 }
 
@@ -139,19 +145,51 @@ func (s *Store) Bindings(ctx context.Context) ([]Binding, error) {
 	return bindings, nil
 }
 
-// BindAdmin makes a group's members administrators.
-func (s *Store) BindAdmin(ctx context.Context, group string) error {
+// BindOver gives a group's members something held over the deployment.
+func (s *Store) BindOver(ctx context.Context, group string, over Over) error {
 	group = strings.TrimSpace(group)
 	if group == "" {
 		return fmt.Errorf("a binding needs a group to bind")
 	}
-	binding := &AdminBinding{GroupName: group, CreatedAt: s.now().Truncate(time.Microsecond)}
+	if !over.Valid() {
+		return fmt.Errorf("%q is not something held over this deployment", over)
+	}
+	binding := &AdminBinding{
+		GroupName: group, Grants: over,
+		CreatedAt: s.now().Truncate(time.Microsecond),
+	}
 	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
-		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to administration", group),
+		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to %q", group, over),
 			func(ctx context.Context) (bool, error) {
 				return s.db.NewSelect().Model((*AdminBinding)(nil)).
-					Where("group_name = ?", group).Exists(ctx)
+					Where("group_name = ?", group).
+					Where("grants = ?", over).Exists(ctx)
 			})
+	}
+	return nil
+}
+
+// UnbindOver takes one back, for the things unbinding cannot lock anybody out
+// of.
+//
+// Administration is not one of them, and goes through the path below that
+// counts what would be left.
+func (s *Store) UnbindOver(ctx context.Context, group string, over Over) error {
+	group = strings.TrimSpace(group)
+	if over == Administers {
+		return fmt.Errorf("administration is unbound where what remains can be counted")
+	}
+	res, err := s.db.NewDelete().Model((*AdminBinding)(nil)).
+		Where("group_name = ?", group).Where("grants = ?", over).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("unbind %q from %q: %w", group, over, err)
+	}
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("unbind %q from %q: %w", group, over, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("%q is bound to %q here: %w", group, over, ErrNothingMatched)
 	}
 	return nil
 }
@@ -192,7 +230,8 @@ func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mod
 			return err
 		}
 		res, err := tx.NewDelete().Model((*AdminBinding)(nil)).
-			Where("group_name = ?", group).Exec(ctx)
+			Where("group_name = ?", group).
+			Where("grants = ?", Administers).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("unbind %q from administration: %w", group, err)
 		}
@@ -216,11 +255,13 @@ func (s *Store) UnbindAdminIfOthersRemain(ctx context.Context, group string, mod
 	})
 }
 
-// AdminGroups lists the groups whose members administer this deployment.
-func (s *Store) AdminGroups(ctx context.Context) ([]string, error) {
+// GroupsOver lists the groups whose members hold one thing over this
+// deployment.
+func (s *Store) GroupsOver(ctx context.Context, over Over) ([]string, error) {
 	var bindings []AdminBinding
-	if err := s.db.NewSelect().Model(&bindings).Order("group_name ASC").Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read the administrator bindings: %w", err)
+	if err := s.db.NewSelect().Model(&bindings).
+		Where("grants = ?", over).Order("group_name ASC").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what groups are bound to %q: %w", over, err)
 	}
 	names := make([]string, 0, len(bindings))
 	for _, binding := range bindings {
@@ -313,7 +354,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// they left behind is not.
 	person, err := s.match(ctx, who)
 	known := err == nil
-	if !known && len(roles) == 0 && !admin {
+	if !known && len(roles) == 0 && !admin.administers && !admin.audits {
 		return nil, ErrDenied
 	}
 
@@ -355,7 +396,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// group, so a group not mentioning them says nothing about it. Only
 	// what a group granted is taken back by a group, which is what
 	// admin_derived records.
-	effective := admin || person.IsBootstrap || (person.IsAdmin && !person.AdminDerived)
+	effective := admin.administers || person.IsBootstrap || (person.IsAdmin && !person.AdminDerived)
 	// **A group's grant is derived only where it is what made them an
 	// administrator.** Written as "whatever the groups say this time", the
 	// column destroyed the input the line above depends on next time:
@@ -363,10 +404,20 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// admin-bound group was rewritten as derived, and losing the group then
 	// took away administration the group never gave — irrecoverably, since a
 	// switch back to direct roles clears exactly the rows marked derived.
-	derived := person.AdminDerived || (admin && !person.IsAdmin)
+	derived := person.AdminDerived || (admin.administers && !person.IsAdmin)
 	if !effective {
 		// Nothing to have come from anywhere.
 		derived = false
+	}
+	// Auditing follows administration's rule exactly, for the same reasons:
+	// only what a group gave is taken back by a group, and the stamp is what
+	// bounds the flag for a credential that never signs in. It has no
+	// bootstrap arm — configuration names an administrator, which is the way
+	// back in, and nothing is locked out by holding no audit permission.
+	audits := admin.audits || (person.Audits && !person.AuditsDerived)
+	auditsDerived := person.AuditsDerived || (admin.audits && !person.Audits)
+	if !audits {
+		auditsDerived = false
 	}
 	// The stamp is written whenever a group is what says so, and not only when
 	// the answer changes: what it records is when a group last confirmed it,
@@ -379,16 +430,29 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		now := s.now().Truncate(time.Microsecond)
 		derivedAt = &now
 	}
-	if person.IsAdmin != effective || person.AdminDerived != derived || derived {
+	var auditsAt *time.Time
+	if auditsDerived {
+		now := s.now().Truncate(time.Microsecond)
+		auditsAt = &now
+	}
+	if person.IsAdmin != effective || person.AdminDerived != derived || derived ||
+		person.Audits != audits || person.AuditsDerived != auditsDerived || auditsDerived {
+
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
 			Set("is_admin = ?", effective).Set("admin_derived = ?", derived).
 			Set("admin_derived_at = ?", derivedAt).
+			Set("audits = ?", audits).Set("audits_derived = ?", auditsDerived).
+			Set("audits_derived_at = ?", auditsAt).
 			Where("id = ?", person.ID).Exec(ctx); err != nil {
-			return nil, fmt.Errorf("record what %q administers: %w", person.Identity, err)
+			return nil, fmt.Errorf("record what %q holds over this deployment: %w",
+				person.Identity, err)
 		}
 		person.IsAdmin = effective
 		person.AdminDerived = derived
 		person.AdminDerivedAt = derivedAt
+		person.Audits = audits
+		person.AuditsDerived = auditsDerived
+		person.AuditsDerivedAt = auditsAt
 	}
 
 	if err := s.replaceDerived(ctx, person.ID, roles); err != nil {
@@ -403,7 +467,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 // Groups nobody bound contribute nothing, and no groups at all contribute
 // nothing — never everything. That is the failure which would otherwise be
 // silent and total.
-func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role, bool, error) {
+func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role, held, error) {
 	named := make([]string, 0, len(groups))
 	for _, group := range groups {
 		if trimmed := strings.TrimSpace(group); trimmed != "" {
@@ -411,13 +475,13 @@ func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role
 		}
 	}
 	if len(named) == 0 {
-		return nil, false, nil
+		return nil, held{}, nil
 	}
 
 	var bindings []Binding
 	if err := s.db.NewSelect().Model(&bindings).
 		Where("group_name IN (?)", bun.List(named)).Scan(ctx); err != nil {
-		return nil, false, fmt.Errorf("read what these groups are bound to: %w", err)
+		return nil, held{}, fmt.Errorf("read what these groups are bound to: %w", err)
 	}
 	roles := map[int64][]Role{}
 	for _, binding := range bindings {
@@ -427,12 +491,30 @@ func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role
 		roles[binding.ProductID] = append(roles[binding.ProductID], binding.Role)
 	}
 
-	administers, err := s.db.NewSelect().Model((*AdminBinding)(nil)).
-		Where("group_name IN (?)", bun.List(named)).Count(ctx)
-	if err != nil {
-		return nil, false, fmt.Errorf("read whether these groups administer: %w", err)
+	var over []AdminBinding
+	if err := s.db.NewSelect().Model(&over).
+		Where("group_name IN (?)", bun.List(named)).Scan(ctx); err != nil {
+		return nil, held{}, fmt.Errorf("read what these groups hold over this deployment: %w", err)
 	}
-	return roles, administers > 0, nil
+	var deployment held
+	for _, binding := range over {
+		switch binding.Grants {
+		case Administers:
+			deployment.administers = true
+		case Audits:
+			deployment.audits = true
+		}
+	}
+	return roles, deployment, nil
+}
+
+// held is what a set of groups gives over the deployment itself.
+//
+// A pair rather than two returns, because every caller wants both and a second
+// bool beside the first is the argument order nobody reads twice.
+type held struct {
+	administers bool
+	audits      bool
 }
 
 // replaceDerived makes somebody's derived grants exactly what their groups say.
@@ -539,6 +621,20 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			Where("admin_derived = ?", true).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups administered: %w", err)
 		}
+		// Auditing goes the same way and by the same rule: what a group gave
+		// is cleared, what somebody here granted stands. There is no
+		// bootstrap arm because configuration names an administrator and not
+		// an auditor — nobody is locked out by holding none of this.
+		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
+			Set("audits = ?", false).
+			Where("audits_derived = ?", true).Exec(ctx); err != nil {
+			return fmt.Errorf("clear what groups audited: %w", err)
+		}
+		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
+			Set("audits_derived = ?", false).
+			Where("audits_derived = ?", true).Exec(ctx); err != nil {
+			return fmt.Errorf("clear what groups audited: %w", err)
+		}
 	default:
 		return fmt.Errorf("%q is not a way for roles to be assigned", mode)
 	}
@@ -576,7 +672,12 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 	}
 
 	if mode == GroupBound {
-		bound, err := db.NewSelect().Model((*AdminBinding)(nil)).Count(ctx)
+		// Groups bound to administration, not to anything else held over the
+		// deployment: an auditor cannot grant themselves administration, so a
+		// deployment whose only binding is an audit one is a deployment
+		// nobody can administer.
+		bound, err := db.NewSelect().Model((*AdminBinding)(nil)).
+			Where("grants = ?", Administers).Count(ctx)
 		if err != nil {
 			return false, fmt.Errorf("read which groups administer: %w", err)
 		}
@@ -657,7 +758,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) er
 		}
 
 		for _, identity := range named {
-			person, err := within.Ensure(ctx, identity, "", Stated(true))
+			person, err := within.Ensure(ctx, identity, "", Stated(true), nil)
 			if err != nil {
 				return err
 			}
