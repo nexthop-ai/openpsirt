@@ -11,9 +11,10 @@ OpenPSIRT takes in the inventory a build produced, scans it for known
 vulnerabilities, works out what changed release to release, and gives people
 somewhere to triage what it finds and follow it through to a fix.
 
-!!! note "Early development"
- There is no release yet. What is here describes the system as it is being
- built, and changes as it is.
+!!! note "Alpha"
+    Every version below 1.0 promises nothing about the API or the schema, and
+    an upgrade may mean recreating the database. What is here describes the
+    system as it is being built, and changes as it is.
 
 ## What it does
 

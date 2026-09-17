@@ -2,7 +2,8 @@
 
 The container image, the Helm chart, and what a deployment looks like.
 
-Satisfies REQ-01, REQ-02, REQ-04, and the probe behavior REQ-72 requires.
+Satisfies REQ-01, REQ-02, REQ-04, REQ-76, and the probe behavior REQ-72
+requires.
 
 ## Contents
 
@@ -416,10 +417,14 @@ platform and cross-compile from there (`FROM --platform=$BUILDPLATFORM`, with
 not done, so the manifest holds one architecture and the chart runs on
 `amd64` nodes.
 
-Compatibility is not promised yet. A tag is where that promise would start and
-it does not start until the schema is collapsed into one initial migration
-(REQ-72), so releases before then are prereleases: they exercise the whole
-publication path and undertake nothing about upgrading from one to the next.
+Compatibility begins at 1.0 (REQ-76). Below it the API and the schema are both
+alpha: a release exercises the whole publication path and undertakes nothing
+about upgrading from one to the next, and the schema is not collapsed into one
+initial migration until then (REQ-72). What says so is the major version rather
+than a suffix on the tag, which is why `0.1.0` is published as a release and
+moves the aliases — `latest` has to name something, and while every version is
+alpha the newest one is still what somebody asking for the current version
+should get.
 
 ## Limits
 

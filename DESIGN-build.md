@@ -320,8 +320,8 @@ once per package per engine, which was 475 s of server work in a run that spent
 43 s of processor time — and none of it tests anything the migration tests do
 not.
 
-What makes reuse safe is the name. Until the first release a schema change edits
-the migration that created the thing rather than adding one beside it, so the
+What makes reuse safe is the name. Below 1.0 a schema change edits the
+migration that created the thing rather than adding one beside it, so the
 applied version does not move and only the content of the migrations tells one
 schema from another. The name therefore carries a fingerprint of the migration
 sources: an edited migration names a different database rather than reusing a

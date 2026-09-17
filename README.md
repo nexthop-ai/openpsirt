@@ -9,9 +9,9 @@ OpenPSIRT takes in the inventory a build produced, scans it for known
 vulnerabilities, works out what changed release to release, and gives people a
 place to triage what it finds and track it through to a fix.
 
-> **Status: early development.** Not released, and nothing is compatible with
-> anything yet — a schema change edits the migration that created it, and a
-> development database is recreated rather than migrated.
+> **Status: alpha.** Every version below 1.0 promises nothing about the API or
+> the schema — a schema change edits the migration that created it, and a
+> database is recreated rather than migrated.
 > [What is built](#what-is-built) says how far each area has got.
 
 ## Contents

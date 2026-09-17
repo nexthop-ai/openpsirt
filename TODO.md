@@ -7,22 +7,21 @@ Nothing else may reference this file. Anything durable belongs in
 
 ## Contents
 
-- [Before the first release](#before-the-first-release)
+- [Before 1.0](#before-10)
 - [Deferred by the owner](#deferred-by-the-owner)
 - [Decided, not built](#decided-not-built)
 - [Known gaps](#known-gaps)
 - [Measured, recorded, not fixed](#measured-recorded-not-fixed)
 - [Not planned](#not-planned)
 
-## Before the first release
+## Before 1.0
 
 Mandatory, and wrong to do earlier.
 
 | | |
 |---|---|
-| Collapse the schema into one initial migration | Thirty-seven migrations describe the order things were thought of. They are kept until now because walking the chain catches an ordering mistake between two of them (REQ-72) |
-| Start keeping schema and API compatibility | Until this point a schema change edits the migration that created the thing, and a development database is recreated (REQ-61 and REQ-72) |
-| Promote a prerelease to a release | The publication path is built and exercised. What a plain `vX.Y.Z` adds is the compatibility promise, which cannot start while the two rows above are open — so tags before then carry a prerelease suffix (REQ-02) |
+| Collapse the schema into one initial migration | Thirty-seven migrations describe the order things were thought of. They are kept until then because walking the chain catches an ordering mistake between two of them (REQ-72) |
+| Start keeping schema and API compatibility | Until 1.0 a schema change edits the migration that created the thing, and a development database is recreated (REQ-61, REQ-72 and REQ-76) |
 
 ## Deferred by the owner
 
