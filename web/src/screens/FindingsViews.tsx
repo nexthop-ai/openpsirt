@@ -10,6 +10,7 @@ import { ROLLED } from "../ui/severities";
 
 import { Loading } from "../ui/Loading";
 import { useQuery } from "@tanstack/react-query";
+import { Decide } from "../ui/Decide";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -515,20 +516,29 @@ export function ByBump({
   );
 }
 
-// Opening a row is a look, not a commitment: what the issue actually says and
-// where it sits, without leaving a list of a thousand rows.
+// Opening a row is where the judgment is made, not only where it is read.
+//
+// What the issue says, where it sits, and the decision form — the same form
+// the finding screen carries, in the same place a reader already is. Nothing
+// about what a claim requires changes: only where it is typed. A triager
+// answering a page of findings used to make two journeys per row, and the
+// list was read again on each return.
 export function Peek({
   at,
   vulnerability,
   component,
   version,
   to: link,
+  onDecided,
 }: {
   at: { product: string; stream: string; variant: string };
   vulnerability: string;
   component: string;
   version: string;
   to: string;
+  // What the list does once something has been recorded here: read itself
+  // again, because the row's state has moved.
+  onDecided: () => void;
 }) {
   const detail = useQuery({
     queryKey: ["finding", at, vulnerability, component, version],
@@ -570,6 +580,19 @@ export function Peek({
           </li>
         ))}
       </ul>
+      {/* The same form the finding screen carries. What it requires and what
+          it writes are unchanged — a second person still agrees to it — and
+          the only difference is that the list is still on screen underneath.
+          Everything the form cannot show here is one link away. */}
+      <Decide
+        at={{ ...at, vulnerability, component, version }}
+        places={it?.places ?? []}
+        undisclosed={!!it?.undisclosed}
+        onDone={() => {
+          void detail.refetch();
+          onDecided();
+        }}
+      />
       <Link to={link} className="linkish">
         Open finding →
       </Link>

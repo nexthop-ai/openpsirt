@@ -1032,6 +1032,15 @@ tbody tr.row {
 tbody tr.row:hover td {
   background: var(--raised);
 }
+/* The row the keys are about. Drawn on the left edge rather than as a fill, so
+   that it is still legible on the row a pointer is also over and on one that
+   is open below. */
+tbody tr.row.at > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+tbody tr.row.at > td {
+  background: var(--accent-soft);
+}
 td.num,
 th.num {
   font-variant-numeric: tabular-nums;

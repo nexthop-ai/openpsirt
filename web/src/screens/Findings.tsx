@@ -6,10 +6,10 @@ import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
 import { FLOORS } from "../ui/severities";
 import { Filters, Narrowed, STATES, activeFilters, without, withoutAny } from "./FindingsFilters";
 import { Choices } from "../ui/Choices";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
@@ -19,6 +19,7 @@ import { Holder } from "../ui/Holder";
 import { Saved, here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
+import { meansFor, moved, typingIn } from "./keys";
 import { useWho } from "../app/session";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
@@ -41,6 +42,8 @@ import {
   withParam,
   withParams,
   hidden,
+  identityOf,
+  pathTo,
   type Row,
   type SortWord,
   usePaging,
@@ -73,6 +76,7 @@ export function Findings() {
   // the product as a column of its own.
   const COLUMNS = spanning ? 11 : 10;
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   // The branch and the variant come from the path on a build's own list and
   // from the picker's selection otherwise. Either may be "all": the list is
   // not one of the screens that needs a whole build.
@@ -123,6 +127,11 @@ export function Findings() {
   // somebody followed a link to read, to say what the chips say already.
   const [more, setMore] = useState(false);
   const [peeking, setPeeking] = useState<string | null>(null);
+  // Which row the keys are about. An index rather than a key, because "the
+  // next one" is a question about the page's order; it is put back to nothing
+  // whenever the question changes, since a cursor pointing at row nine of a
+  // list that has been re-read is pointing at a different finding.
+  const [cursor, setCursor] = useState(-1);
   // What is selected, by what a row *is* rather than by where it sits: the
   // list is read again after every decision and after every page, and an index
   // would select a different row each time. Selection is a prerequisite rather
@@ -388,6 +397,11 @@ export function Findings() {
   // holds the selection, which is where the rule that a changed question
   // clears it now lives.
   function ask(next: URLSearchParams) {
+    // The cursor and the open row go with it. Both point at a position in a
+    // page, and a changed question is a different page — row nine of the
+    // answer is a different finding from row nine of the last one.
+    setCursor(-1);
+    setPeeking(null);
     setParams(asking(next));
   }
 
@@ -433,6 +447,67 @@ export function Findings() {
     return seen;
   }, [rows]);
   const total = findings.data?.total ?? 0;
+
+  // Working the list from the keyboard.
+  //
+  // The list is where a triager spends the day, and it answered one global
+  // key. Move with j and k, open the row where it sits with Enter, close it
+  // with Escape, and go to the finding itself with o. What each key means, and
+  // when it means nothing, is in `keys.ts` so that the rule can be pinned
+  // without rendering a page.
+  //
+  // The rows are held in a ref so that the listener is bound once rather than
+  // re-bound on every page of results, which would also have made the cursor
+  // a dependency of itself.
+  const live = useRef({ rows, cursor, peeking, at: (row: Row) => pathTo(buildOf(row), row) });
+  useEffect(() => {
+    live.current = {
+      rows,
+      cursor,
+      peeking,
+      at: (row: Row) => pathTo(buildOf(row), row, carrying, prepared?.name),
+    };
+  });
+  useEffect(() => {
+    function key(event: KeyboardEvent) {
+      const { rows, cursor, peeking, at: addressOf } = live.current;
+      const means = meansFor(event, typingIn(document.activeElement));
+      if (means === null) return;
+      if (means === "close") {
+        if (peeking === null && cursor < 0) return;
+        event.preventDefault();
+        setPeeking(null);
+        setCursor(-1);
+        return;
+      }
+      if (means === "next" || means === "previous") {
+        event.preventDefault();
+        const to = moved(cursor, means === "next" ? 1 : -1, rows.length);
+        setCursor(to);
+        // The row brought into view, because a cursor below the fold is a
+        // cursor nobody can see moving.
+        requestAnimationFrame(() =>
+          document
+            .querySelector(`#findingRows tr[data-i="${to}"]`)
+            ?.scrollIntoView({ block: "nearest" }),
+        );
+        return;
+      }
+      const row = rows[cursor];
+      if (!row) return;
+      event.preventDefault();
+      if (means === "openFull") {
+        navigate(addressOf(row));
+        return;
+      }
+      const at = identityOf(row);
+      setPeeking(peeking === at ? null : at);
+    }
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+    // Bound once. Everything it reads that changes is read off the ref above,
+    // which the effect before this one keeps in step.
+  }, [navigate]);
 
   const controls = (
     <>
@@ -883,6 +958,10 @@ export function Findings() {
         ) : (
           <FindingsTable
             rows={rows}
+            cursor={cursor}
+            onDecided={() => {
+              void queries.invalidateQueries({ queryKey: ["findings"] });
+            }}
             shownKeys={shownKeys}
             picked={picked}
             pick={pick}
@@ -904,6 +983,12 @@ export function Findings() {
       </div>
 
       <div className="filters" style={{ margin: "10px 0 0" }}>
+        {/* Said where somebody is already looking at the foot of a page,
+            rather than behind a key that opens a list of keys. */}
+        <span className="hint" style={{ marginRight: "auto" }}>
+          <kbd>j</kbd> <kbd>k</kbd> to move · <kbd>Enter</kbd> to open in place · <kbd>o</kbd> to
+          open the finding
+        </span>
         <span className="hint">
           Showing {rows.length.toLocaleString()} of {total.toLocaleString()}
           {(line.hidden ?? 0) > 0 && !below && (

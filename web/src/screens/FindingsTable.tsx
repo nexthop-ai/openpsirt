@@ -88,6 +88,8 @@ export function FindingsTable({
   hide,
   peeking,
   setPeeking,
+  cursor,
+  onDecided,
 }: {
   rows: Row[];
   // The selection's key for each row on this page, in the same order.
@@ -114,6 +116,13 @@ export function FindingsTable({
   hide: (component: string) => void;
   peeking: string | null;
   setPeeking: (key: string | null) => void;
+  // What to do once a row has been decided where it sits: the list is read
+  // again, because the state the row draws has moved.
+  onDecided: () => void;
+  // Which row the keys are about, by its position on the page. Drawn rather
+  // than only acted on: a cursor nobody can see is a key that appears to do
+  // nothing.
+  cursor: number;
 }) {
   const navigate = useNavigate();
   return (
@@ -159,7 +168,12 @@ export function FindingsTable({
               const pill = decidedAs(row.state, row.sent_back);
               return (
                 <Fragment key={key}>
-                  <tr className="row" data-i={i} onClick={() => navigate(at)}>
+                  <tr
+                    className={i === cursor ? "row at" : "row"}
+                    data-i={i}
+                    aria-current={i === cursor ? "true" : undefined}
+                    onClick={() => navigate(at)}
+                  >
                     {/* The two controls that belong to the row rather than
                               to what is in it. Side by side in one narrow cell:
                               stacked they read as two unrelated things, and the
@@ -448,6 +462,7 @@ export function FindingsTable({
                           component={row.component ?? ""}
                           version={row.version ?? ""}
                           to={at}
+                          onDecided={onDecided}
                         />
                       </td>
                     </tr>
