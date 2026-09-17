@@ -139,6 +139,22 @@ type listOutput[T any] struct {
 	Body listBody[T]
 }
 
+// overPeriod is a listing that covers a stretch of time and says which.
+//
+// Its own shape rather than two more fields on every listing: most lists here
+// are about now, and a from and a to on those would be two empty strings a
+// reader has to work out the meaning of.
+type overPeriod[T any] struct {
+	Body struct {
+		Items []T `json:"items"`
+		Total int `json:"total,omitempty"`
+		// The period these cover, said back, so a figure is never read apart
+		// from the window it was worked out over.
+		From string `json:"from,omitempty" doc:"The first day of the period. Absent where it runs from the beginning"`
+		To   string `json:"to" doc:"The day it ends, which is not itself in it"`
+	}
+}
+
 type listBody[T any] struct {
 	Items []T `json:"items"`
 	// Total is how many there are in all, where a listing is capped and the

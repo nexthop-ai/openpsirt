@@ -82,17 +82,20 @@ type Document struct {
 
 // Meta is the document's own description.
 type Meta struct {
-	// Category is what kind of document this is. It follows what the document
-	// can actually support rather than what would sound better: the VEX
+	// Category is what kind of document this is, and it follows what the
+	// document can actually support rather than what would sound better. The
+	// security-advisory profile's own tests are what decides it; the VEX
 	// profile is the one that carries "not affected, and here is why", and
-	// those justifications are not assembled here yet.
-	Category    string   `json:"category"`
-	CSAFVersion string   `json:"csaf_version"`
-	Title       string   `json:"title"`
-	Publisher   Issuer   `json:"publisher"`
-	Tracking    Tracking `json:"tracking"`
-	Notes       []Note   `json:"notes,omitempty"`
-	Language    string   `json:"lang,omitempty"`
+	// those justifications are not assembled here.
+	Category     string        `json:"category"`
+	CSAFVersion  string        `json:"csaf_version"`
+	Title        string        `json:"title"`
+	Publisher    Issuer        `json:"publisher"`
+	Tracking     Tracking      `json:"tracking"`
+	Notes        []Note        `json:"notes,omitempty"`
+	References   []Reference   `json:"references,omitempty"`
+	Distribution *Distribution `json:"distribution,omitempty"`
+	Language     string        `json:"lang,omitempty"`
 }
 
 // Issuer is the publisher as the document carries it.
@@ -175,6 +178,12 @@ type Vulnerability struct {
 	Notes []Note   `json:"notes,omitempty"`
 	// Status is which releases the flaw is in and which it is out of.
 	Status Status `json:"product_status"`
+	// What is held about the flaw beyond which releases carry it: what it
+	// scored, what a holder of an affected release can do, and whoever asked
+	// to be credited for telling us.
+	Scores          []Score          `json:"scores,omitempty"`
+	Remediations    []Remediation    `json:"remediations,omitempty"`
+	Acknowledgments []Acknowledgment `json:"acknowledgments,omitempty"`
 	// DiscoveryDate is when this deployment first recorded it, which is what
 	// it knows. When somebody outside found it is not something it holds.
 	DiscoveryDate string `json:"discovery_date,omitempty"`
@@ -263,6 +272,14 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	pointers, err := s.referencesTo(ctx, issue)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	credited, err := s.creditedFor(ctx, named.ID, issue.ID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	now := s.now().UTC()
 	shown := named.DisplayName
@@ -276,12 +293,10 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 
 	doc := &Document{}
 	doc.Document = Meta{
-		// A security advisory rather than the VEX profile, because what this
-		// carries is which releases are affected and which are fixed. The VEX
-		// profile's point is the not-affected justification, and claiming that
-		// category while carrying none of them would describe the document as
-		// something it is not.
-		Category:    "csaf_security_advisory",
+		// Filled in once the document is assembled, from what it turned out
+		// to carry. Claiming the security-advisory profile while failing its
+		// tests describes the document as something it is not, and a reader's
+		// tooling drops it on exactly that.
 		CSAFVersion: "2.0",
 		Title:       fmt.Sprintf("%s: %s", shown, summaryOf(issue, identifier)),
 		Language:    "en-US",
@@ -313,10 +328,20 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 	if text := summaryOf(issue, identifier); text != "" {
 		doc.Document.Notes = []Note{{Category: "description", Title: "Summary", Text: text}}
 	}
+	doc.Document.References = pointers
+	doc.Document.Distribution = distributionFor(doc.Document.Tracking.Status)
 
 	vulnerability := Vulnerability{
-		Title: summaryOf(issue, identifier),
-		IDs:   []Issued{{SystemName: who.Name, Text: identifier}},
+		Title:           summaryOf(issue, identifier),
+		IDs:             []Issued{{SystemName: who.Name, Text: identifier}},
+		Acknowledgments: credited,
+	}
+	// The same sentence the document carries, on the entry a reader of one
+	// vulnerability stops at. The profile asks for both, and two readers is
+	// what it is asking about: somebody scanning the document and somebody
+	// whose tooling walked to this entry.
+	if text := summaryOf(issue, identifier); text != "" {
+		vulnerability.Notes = []Note{{Category: "description", Title: "Summary", Text: text}}
 	}
 	// A CVE assigned later is another name for the same issue, and the
 	// issue is then filed under it. Where that has happened the document
@@ -363,6 +388,16 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 				vulnerability.Status.Fixed, release.ProductID(product))
 		}
 	}
+	// Every release the document names, which is what a rating is stated for:
+	// the score is the flaw's, and the flaw is the same flaw in each of them.
+	rated := make([]string, 0, len(releases))
+	for _, release := range releases {
+		rated = append(rated, release.ProductID(product))
+	}
+	vulnerability.Scores = scoresFor(issue, rated)
+	vulnerability.Remediations = remediationsFor(
+		vulnerability.Status.Fixed, vulnerability.Status.KnownAffected)
+
 	doc.ProductTree = ProductTree{Branches: []Branch{{
 		Category: "vendor", Name: who.Name,
 		Branches: []Branch{{
@@ -370,6 +405,7 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 		}},
 	}}}
 	doc.Vulnerabilities = []Vulnerability{vulnerability}
+	doc.Document.Category = profileOf(doc)
 	return doc, named, issue, nil
 }
 

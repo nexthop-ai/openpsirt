@@ -28,6 +28,17 @@ export type Report = {
   needs?: (at: Scoped) => string | null;
 };
 
+// withProduct carries the selection into an address that reads its narrowing
+// from the address rather than from the picker.
+//
+// The record is the one screen that does: it is read as a document and sent as
+// a link, so what it answers has to be in the address it was sent as.
+function withProduct(at: string, scope: Scoped): string {
+  if (!scope.product) return at;
+  const joined = at.includes("?") ? "&" : "?";
+  return `${at}${joined}product=${encodeURIComponent(scope.product)}`;
+}
+
 export const CATALOG: Report[] = [
   {
     slug: "program-overview",
@@ -52,6 +63,12 @@ export const CATALOG: Report[] = [
     name: "Rubber-stamp",
     answers:
       "How much a second pair of eyes actually did: what stands on one person, who agrees with whom, what was agreed in bulk, and what covers more now than when somebody agreed to it.",
+  },
+  {
+    slug: "where-the-effort-went",
+    name: "Where the effort went",
+    answers:
+      "What the judgments in a period were about, most argued first: which component, how many arguments, how far they reached, and what came out of them. Every other report counts the backlog; this one says what the quarter went into.",
   },
   {
     slug: "deadline-compliance",
@@ -114,13 +131,31 @@ export const CATALOG: Report[] = [
     name: "The exception report",
     answers:
       "Dismissals no second person has a standing agreement on. It should come back empty — every dismissal requires one, so a row here is a control that did not hold.",
-    to: () => "/audit?alone=true&outcome=not-applicable&outcome=wont-fix&outcome=already-fixed",
+    // The product the catalog is being read for, carried into the record. The
+    // record reads its narrowing from the address alone, so an entry that
+    // dropped it opened every product the reader can see from a page scoped
+    // to one — a different population under the same name.
+    to: (at) =>
+      withProduct(
+        "/audit?alone=true&outcome=not-applicable&outcome=wont-fix&outcome=already-fixed",
+        at,
+      ),
   },
   {
     name: "Administrative changes",
     answers:
       "Who moved the ground under the judgments: roles, support dates, thresholds. In the record, for administrators.",
-    to: () => "/audit",
+    to: (at) => withProduct("/audit", at),
+  },
+  {
+    // The sign-off sheet. The comparison screen already answers it, so the
+    // catalog carries it with the selection made rather than a second page
+    // being built over the same query.
+    name: "Shipping with known issues",
+    answers:
+      "What a build still carries, with what stands about each: agreed and why, waiting on a second person, or nobody has said anything. The last of those is the release coordinator's blocker list.",
+    to: (at) => `/products/${encodeURIComponent(at.product ?? "")}/comparison`,
+    needs: (at) => (at.product ? null : "Pick a product to compare two of its builds."),
   },
   {
     name: "Release comparison",

@@ -47,6 +47,8 @@ export interface paths {
          *
          *     Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody who may not read it, and a count is as much a disclosure as a row.
          *
+         *     Asked for neither a period nor a window, this is the last 365 days. An auditor asking what went out in a financial year names the two dates instead.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-published-advisories"];
@@ -98,6 +100,8 @@ export interface paths {
          *     `bulk` is agreements given as one act over many claims, `pairs` is who agrees with whom and what share of everything ran between them, `lapsed` is agreements standing from somebody who no longer holds the right to give one, and `grew` is what somebody agreed to against what the same claim reaches now — a claim reaches by matching, so a build appearing afterwards is covered with nobody acting.
          *
          *     Everything is dated by when the claim was proposed, not by when it was agreed to, and narrowed by what you may see.
+         *
+         *     Asked for neither a period nor a window, this is the last 90 days.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -284,6 +288,8 @@ export interface paths {
          * @description The audit list as a file: every judgment the same filters would show, not one page of them.
          *
          *     **One row per judgment**, with who proposed it, who has a standing agreement on it, and whether a second person does. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
+         *
+         *     **`agreements` is the whole of the record**, with dates: who agreed, when, whether the agreement was carried from an earlier claim, and when it was taken back. `approved by` stays who agrees *now*, because those are different questions and a column mixing them is the one answer an auditor must not be given.
          *
          *     **Read with your own visibility, as it streams.** Nothing about a report is exempt from the rules the screens follow — a file showing more than the screen that summarizes it would be a way around them.
          *
@@ -677,6 +683,10 @@ export interface paths {
          *
          *     **A product is required** — a place identity carries no product, so this cannot be asked across the deployment.
          *
+         *     **A period, or the whole of it.** `from` and `to` bound what closed in them, which is the number a report on a quarter or a financial year is about; `days` is the rolling window, and only one of the two may be sent. Asked for neither, this is the lifetime figure.
+         *
+         *     **What is open is always now.** Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable and is not reconstructed.
+         *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-compliance-rate"];
@@ -766,6 +776,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/deferrals/repeated.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export repeated deferrals
+         * @description The same list as a file: places deferred more than once, most-deferred first, with how long they have been put off for in total.
+         *
+         *     What the screen shows is a shape rather than a page — one item deferred three times is a judgment and forty of them is a policy nobody wrote down — and the file is what that goes into a review as.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-repeated-deferrals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/disclosing": {
         parameters: {
             query?: never;
@@ -846,6 +880,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/effort": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report where triage effort went
+         * @description What the judgments in a period were about, most argued first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
+         *
+         *     **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image. Both numbers come back.
+         *
+         *     Dated by when a judgment was proposed. Asked for neither a period nor a window, this is the last 90 days.
+         *
+         *     Takes the same period and scope the other reports do, and is narrowed by what you may see.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-effort"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/findings": {
         parameters: {
             query?: never;
@@ -919,11 +981,41 @@ export interface paths {
          *
          *     **Narrowed the way every other read is**, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
          *
+         *     **Nothing affected is an answer**, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
+         *
          *     Answers by any name the issue goes by.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-issue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/issues/{vulnerability}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Render everything known about one issue
+         * @description What the issue is, every build of yours that carries it, what was decided about each and the reasoning behind it, as markdown — the form a customer inquiry is answered from.
+         *
+         *     **It is an internal document and says so.** The reasoning is this deployment's own argument; what goes to a customer is the advisory or the VEX document, both of which are assembled elsewhere and say less on purpose.
+         *
+         *     **Narrowed by what you may see**, like every other read: two people asking get different documents rather than one of them getting an error.
+         *
+         *     Nothing of yours affected is an answer, and the document says that rather than refusing — which is what the inquiry is usually asking.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-issue-document"];
         put?: never;
         post?: never;
         delete?: never;
@@ -999,11 +1091,15 @@ export interface paths {
          *
          *     **Per severity**, because a critical waiting a week and a low waiting a week are not the same fact.
          *
+         *     **A period or a rolling window.** `from` and `to` name the stretch a manager or an auditor is reporting on; `days` is the rolling window, and the two are ways of saying the same thing so only one may be sent.
+         *
          *     **Bounded, and it says so.** The two waits are worked out from at most the most recent few thousand claims in the window; `sampled` says how many and `capped` says whether the ceiling was reached. A figure quoted from part of a window without saying so is the one thing a number like this must not be.
          *
          *     **Send-backs are counted for the deployment rather than per person**: the record holds that a claim was sent back and not by whom, and the reason travels as a comment.
          *
          *     Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
+         *
+         *     Asked for neither a period nor a window, this is the last 90 days.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -1862,6 +1958,30 @@ export interface paths {
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-fix-bundles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/fix-bundles.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export findings by upgrade
+         * @description The same list as a file: one row per upstream bump, with what it closes and the builds that hold it.
+         *
+         *     Takes the same selection and the same filters as the screen, from the same struct. The builds a bump is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-fix-bundles"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3132,6 +3252,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the upgrades one build is waiting on
+         * @description The same list as a file: one row per bump this build is waiting on, where it stands, and what it would still close here.
+         *
+         *     The packages one bump moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-pending-upgrades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/readiness": {
         parameters: {
             query?: never;
@@ -3148,6 +3292,8 @@ export interface paths {
          *     Both sides come from scans already collected, so this asks nothing new of a build pipeline. Where there is nothing to compare against, `shipped` is absent and `why` says what is missing rather than reporting zeroes, because a release that shipped clean and a release nobody scanned are not the same answer.
          *
          *     Counted as issues at components at or above the deployment's line, which `floor` names.
+         *
+         *     **`blocking` is what the count is made of**: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3455,6 +3601,8 @@ export interface paths {
          *
          *     `inherited` means the date came from the product rather than from the release itself. `open` counts issues at components, not one per place — the same unit every release-level count here uses.
          *
+         *     **`within` asks what is about to go**, in days ahead. Those come back under `ending`, soonest first and never mixed into what has already gone: the day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, so a warning and an exposure are two lists rather than one. `ended_days` is negative on those, which is how many days are left.
+         *
          *     Narrowed by what you may see, and ordered by what is open.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -3481,6 +3629,8 @@ export interface paths {
          *
          *     `open` counts issues at components rather than one per place, the same unit every release-level count here uses. `inherited` means the date came from the product rather than from the release itself.
          *
+         *     `within` writes out what is about to go as well, marked `ending` in the state column, with `ended_days` negative for how many days are left.
+         *
          *     The day the file was taken is stated in it, because how long ago a release ended is only readable against a date.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
@@ -3503,11 +3653,15 @@ export interface paths {
         };
         /**
          * Report how fast findings are being fixed
-         * @description Fix velocity, average time to remediate by severity, and what is aging, over a window and narrowed by the scope picker.
+         * @description Fix velocity, average time to remediate by severity, and what is aging, over a period and narrowed by the scope picker.
+         *
+         *     **A period or a rolling window.** `from` and `to` name a stretch — a quarter, a financial year — and `days` is the rolling window ending now. They are two ways of saying when, so only one may be sent. What is **aging** is a statement about now whatever period was asked for: how long something has been open is answered by the clock.
          *
          *     **A closure only counts as a fix if the issue actually went away.** A bump that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
          *
          *     **Counted in issues, not in places.** One kernel flaw across sixty modules is one thing that was fixed; an average weighted by how far a component fans out measures the dependency graph rather than anybody's work.
+         *
+         *     Asked for neither a period nor a window, this is the last 30 days.
          *
          *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -4269,6 +4423,10 @@ export interface components {
              */
             acknowledged: number;
         };
+        Acknowledgment: {
+            names?: string[] | null;
+            summary?: string;
+        };
         "Add-outboundRequest": {
             /**
              * Format: uri
@@ -4538,6 +4696,23 @@ export interface components {
              */
             role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin";
         };
+        BlockingBody: {
+            component: string;
+            due?: string;
+            exploited?: boolean;
+            /**
+             * Format: int64
+             * @description How many places of the build it sits at
+             */
+            places: number;
+            severity?: string;
+            /**
+             * @description How far it has been decided. Anything agreed is not in this list
+             * @enum {string}
+             */
+            state?: "undecided" | "waiting" | "lapsed";
+            vulnerability: string;
+        };
         Branch: {
             branches?: components["schemas"]["Branch"][] | null;
             category: string;
@@ -4661,6 +4836,13 @@ export interface components {
             to: string;
             /** @description What the bump is of: the source package where one is recorded, and the component's own name otherwise */
             upstream: string;
+        };
+        CVSSv3: {
+            /** Format: double */
+            baseScore: number;
+            baseSeverity: string;
+            vectorString: string;
+            version: string;
         };
         CanBody: {
             /** @description Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
@@ -4799,11 +4981,28 @@ export interface components {
              */
             closed_by_run?: number;
             component: string;
+            /** @description The soonest deadline among the places still open, as a date */
+            due?: string;
             /** @description The version the place held before the fix. Only on a fixed entry the version moved for */
             from_version?: string;
+            /**
+             * @description The recognized reason it does not apply, on a dismissal
+             * @enum {string}
+             */
+            justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @description The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither */
             moved_to?: string;
+            /**
+             * @description What was decided, where every standing decision over its places says the same thing
+             * @enum {string}
+             */
+            outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             severity?: string;
+            /**
+             * @description How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
+             * @enum {string}
+             */
+            state?: "undecided" | "waiting" | "agreed" | "lapsed";
             vulnerability: string;
         };
         ClaimApprovalBody: {
@@ -5403,6 +5602,9 @@ export interface components {
             version?: string;
             vulnerability: string;
         };
+        Distribution: {
+            tlp?: components["schemas"]["TLP"];
+        };
         Document: {
             /**
              * Format: uri
@@ -5943,6 +6145,8 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["DisposedBody"][] | null;
+            /** @description What the register was measured with. Absent where nothing has been uploaded to the build */
+            measured?: components["schemas"]["MeasuredBody"];
             /** Format: int64 */
             total: number;
         };
@@ -6605,17 +6809,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyRateBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyRateBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["RateBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyReleaseBody: {
             /**
              * Format: uri
@@ -6759,17 +6952,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyWentBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyWentBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["WentBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         MatchBody: {
             /** @description This is another version in the same build, not another build */
             here?: boolean;
@@ -6784,12 +6966,37 @@ export interface components {
             version?: string;
         };
         MeasuredBody: {
+            /** @description When the build it describes was built */
+            built_at?: string;
             /** @description The vulnerability database it read */
             database_version?: string;
+            /**
+             * Format: int64
+             * @description The inventory that was read, as the receipt names it
+             */
+            document?: number;
+            /** @description Where to fetch the inventory that was read. Absent where its contents were let go */
+            document_at?: string;
+            /** @description The hash of the inventory as it arrived */
+            document_hash?: string;
+            /** @description Whether the inventory itself is still here */
+            document_held?: boolean;
             /** @description When that run finished */
             ran_at?: string;
             /** @description We ran the scanner, rather than the build sending what its own found */
             ran_here?: boolean;
+            /**
+             * Format: int64
+             * @description The scanner run these came from
+             */
+            run?: number;
+            /**
+             * Format: int64
+             * @description The upload the build's contents came from, as the receipt names it
+             */
+            scan?: number;
+            /** @description The hash of what was uploaded */
+            scan_hash?: string;
             /** @description Which scanner produced the findings */
             scanner: string;
             scanner_version?: string;
@@ -6841,9 +7048,11 @@ export interface components {
         Meta: {
             category: string;
             csaf_version: string;
+            distribution?: components["schemas"]["Distribution"];
             lang?: string;
             notes?: components["schemas"]["Note"][] | null;
             publisher: components["schemas"]["Issuer"];
+            references?: components["schemas"]["Reference"][] | null;
             title: string;
             tracking: components["schemas"]["Tracking"];
         };
@@ -7037,6 +7246,51 @@ export interface components {
              * @description Issues whose description does not carry the term the set was narrowed by
              */
             unmatched: number;
+        };
+        OverPeriodRateBodyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OverPeriodRateBodyBody.json
+             */
+            readonly $schema?: string;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
+            items: components["schemas"]["RateBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
+            /** Format: int64 */
+            total?: number;
+        };
+        OverPeriodSpentBodyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OverPeriodSpentBodyBody.json
+             */
+            readonly $schema?: string;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
+            items: components["schemas"]["SpentBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
+            /** Format: int64 */
+            total?: number;
+        };
+        OverPeriodWentBodyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OverPeriodWentBodyBody.json
+             */
+            readonly $schema?: string;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
+            items: components["schemas"]["WentBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
+            /** Format: int64 */
+            total?: number;
         };
         OverviewOutputBody: {
             /**
@@ -7445,6 +7699,11 @@ export interface components {
             met: number;
             /**
              * Format: int64
+             * @description Still open at all, whatever their deadline. The denominator the deferred and overdue counts are read against
+             */
+            open: number;
+            /**
+             * Format: int64
              * @description Still open, past the deadline, with no deferral standing — plainly late
              */
             overdue: number;
@@ -7474,6 +7733,13 @@ export interface components {
              * @example https://example.com/schemas/ReadinessBody.json
              */
             readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description How many pieces of work nobody has agreed to ship with
+             */
+            blockers: number;
+            /** @description What nobody has agreed to ship with, worst first. Bounded; total says how many there are */
+            blocking: components["schemas"]["BlockingBody"][] | null;
             /** @description The least severity counted, or empty where everything is */
             floor?: string;
             now: components["schemas"]["BuildCountsBody"];
@@ -7668,6 +7934,11 @@ export interface components {
             /** @description Why the file is being removed. Recorded and shown wherever the text referred to it */
             reason: string;
         };
+        Reference: {
+            category?: string;
+            summary: string;
+            url: string;
+        };
         ReferenceBody: {
             /**
              * @description What it appears to be. A patch is the change itself
@@ -7705,6 +7976,11 @@ export interface components {
             open: number;
             stream: string;
         };
+        Remediation: {
+            category: string;
+            details: string;
+            product_ids?: string[] | null;
+        };
         RemediationOutputBody: {
             /**
              * Format: uri
@@ -7712,18 +7988,15 @@ export interface components {
              * @example https://example.com/schemas/RemediationOutputBody.json
              */
             readonly $schema?: string;
-            /** @description What is open now, by how long it has been */
+            /** @description What is open now, by how long it has been. About now whatever period was asked for */
             aging: components["schemas"]["BucketBody"][] | null;
-            /**
-             * Format: int64
-             * @description The window these cover
-             */
-            days: number;
             /**
              * Format: int64
              * @description Distinct issues that actually went away in the window
              */
             fixed: number;
+            /** @description The first day of the period. Absent where it runs from the beginning */
+            from?: string;
             /**
              * Format: int64
              * @description Distinct issues that appeared in it
@@ -7733,6 +8006,8 @@ export interface components {
             time_to_fix?: {
                 [key: string]: number;
             };
+            /** @description The day it ends, which is not itself in it */
+            to: string;
         };
         RepeatBody: {
             /** @description The furthest any of them reached */
@@ -7815,9 +8090,11 @@ export interface components {
             closed: number;
         };
         RetiredBody: {
+            /** @description The date has passed. False is a release that is about to go out of support */
+            ended: boolean;
             /**
              * Format: int64
-             * @description How many days ago support ended
+             * @description How many days ago support ended. Negative where the date has not arrived, which is how many days are left
              */
             ended_days: number;
             /** @description The date support ended, as YYYY-MM-DD */
@@ -7844,6 +8121,13 @@ export interface components {
              * @example https://example.com/schemas/RetiredOutputBody.json
              */
             readonly $schema?: string;
+            /** @description Releases whose date has not arrived yet, soonest first. Empty unless within was asked for */
+            ending: components["schemas"]["RetiredBody"][] | null;
+            /**
+             * Format: int64
+             * @description Issues open across those, which is what leaves every overdue count on the day they cross
+             */
+            ending_open: number;
             items: components["schemas"]["RetiredBody"][] | null;
             /**
              * Format: int64
@@ -7855,6 +8139,11 @@ export interface components {
              * @description How many releases are out of support
              */
             total: number;
+            /**
+             * Format: int64
+             * @description How many days ahead this looked
+             */
+            within: number;
         };
         "Revise-claimRequest": {
             /**
@@ -8020,6 +8309,10 @@ export interface components {
             /** @description The findings list's query string, without a leading ? */
             query: string;
         };
+        Score: {
+            cvss_v3?: components["schemas"]["CVSSv3"];
+            products: string[] | null;
+        };
         "Score-vectorResponse": {
             /**
              * Format: uri
@@ -8053,14 +8346,13 @@ export interface components {
             bulk: components["schemas"]["BulkApprovalBody"][] | null;
             /** @description A section reached the limit, so this is the worst of it rather than all of it */
             capped?: boolean;
-            /**
-             * Format: int64
-             * @description How far back this looked
-             */
-            days: number;
+            /** @description The first day of the period, by when a claim was proposed. Absent where it runs from the beginning */
+            from?: string;
             grew: components["schemas"]["GrownBody"][] | null;
             lapsed: components["schemas"]["LapsedApprovalBody"][] | null;
             pairs: components["schemas"]["PairingBody"][] | null;
+            /** @description The day it ends, which is not itself in it */
+            to: string;
         };
         SelectionBody: {
             /** @description The text the candidate list was narrowed by. Absent where it was not narrowed, which means every issue at the component was on the page */
@@ -8265,6 +8557,41 @@ export interface components {
             /** @description The build has already argued this place away */
             suppressed?: boolean;
         };
+        SpentBody: {
+            /**
+             * Format: int64
+             * @description Arguments made about it in the period
+             */
+            claims: number;
+            /** @description What the judgments were about, by name. Empty where nothing in any build carries the place any more */
+            component: string;
+            /**
+             * Format: int64
+             * @description Places those reached
+             */
+            decisions: number;
+            /**
+             * Format: int64
+             * @description Claims that put it off
+             */
+            deferred: number;
+            /**
+             * Format: int64
+             * @description Claims that argued it away
+             */
+            dismissed: number;
+            /**
+             * Format: int64
+             * @description How many different people argued about it
+             */
+            people: number;
+            product: string;
+            /**
+             * Format: int64
+             * @description Claims that promised work: an upgrade or a backport
+             */
+            promised: number;
+        };
         "Split-claimRequest": {
             /**
              * Format: uri
@@ -8451,6 +8778,10 @@ export interface components {
             parent?: string;
             /** @description For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in */
             released_on?: string;
+        };
+        TLP: {
+            label: string;
+            url?: string;
         };
         TeamBody: {
             display_name?: string;
@@ -8682,11 +9013,14 @@ export interface components {
             status: string;
         };
         Vulnerability: {
+            acknowledgments?: components["schemas"]["Acknowledgment"][] | null;
             cve?: string;
             discovery_date?: string;
             ids?: components["schemas"]["Issued"][] | null;
             notes?: components["schemas"]["Note"][] | null;
             product_status: components["schemas"]["Status"];
+            remediations?: components["schemas"]["Remediation"][] | null;
+            scores?: components["schemas"]["Score"][] | null;
             title?: string;
         };
         WaitingBody: {
@@ -8886,7 +9220,11 @@ export interface operations {
             query?: {
                 /** @description Limit to one product, by name */
                 product?: string;
-                /** @description How far back to look, by when the advisory went out */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
             };
             header?: never;
@@ -8901,7 +9239,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyWentBody"];
+                    "application/json": components["schemas"]["OverPeriodWentBodyBody"];
                 };
             };
             /** @description Error */
@@ -8951,7 +9289,11 @@ export interface operations {
             query?: {
                 /** @description Limit to one product, by name */
                 product?: string;
-                /** @description How far back to look, by when a claim was proposed */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
                 /** @description How many rows each section carries at most. capped says a section reached it */
                 limit?: number;
@@ -9198,6 +9540,10 @@ export interface operations {
                 issue?: string;
                 /** @description Only judgments about this component, by name */
                 component?: string;
+                /** @description Only judgments about places this branch or tag holds. Needs exactly one product and a variant */
+                stream?: string;
+                /** @description Which build of that stream. Needs exactly one product and a stream */
+                variant?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -9250,6 +9596,10 @@ export interface operations {
                 issue?: string;
                 /** @description Only judgments about this component, by name */
                 component?: string;
+                /** @description Only judgments about places this branch or tag holds. Needs exactly one product and a variant */
+                stream?: string;
+                /** @description Which build of that stream. Needs exactly one product and a stream */
+                variant?: string;
             };
             header?: never;
             path: {
@@ -9779,6 +10129,12 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
             };
             header?: never;
             path?: never;
@@ -9792,7 +10148,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyRateBody"];
+                    "application/json": components["schemas"]["OverPeriodRateBodyBody"];
                 };
             };
             /** @description Error */
@@ -9916,6 +10272,40 @@ export interface operations {
             };
         };
     };
+    "export-repeated-deferrals": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description How many deferrals make something worth listing. One is an ordinary judgment */
+                at_least?: number;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-approaching-disclosure": {
         parameters: {
             query?: {
@@ -10007,6 +10397,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-effort": {
+        parameters: {
+            query?: {
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
+                /** @description Limit to judgments made in one product, by name */
+                product?: string;
+                /** @description Limit to judgments this team's members proposed, by team name */
+                team?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverPeriodSpentBodyBody"];
+                };
             };
             /** @description Error */
             default: {
@@ -10257,6 +10688,36 @@ export interface operations {
             };
         };
     };
+    "get-issue-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-keys": {
         parameters: {
             query?: never;
@@ -10351,8 +10812,16 @@ export interface operations {
     "get-measures": {
         parameters: {
             query?: {
-                /** @description How far back to measure */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
+                /** @description Limit to judgments made in one product, by name */
+                product?: string;
+                /** @description Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name */
+                team?: string;
             };
             header?: never;
             path?: never;
@@ -11888,6 +12357,57 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["List-fix-bundlesResponse"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-fix-bundles": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag */
+                stream?: string;
+                /** @description Limit to one variant */
+                variant?: string;
+                /** @description Keep only issues rated this badly or worse */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only bumps closing something known to be exploited */
+                exploited?: boolean;
+                /** @description Keep only bumps moving a component of this name */
+                component?: string;
+                /** @description Keep only rows whose component or issue name contains this */
+                q?: string;
+                /** @description Keep only components of one package kind */
+                ecosystem?: string;
+                /** @description Keep only groups this far decided */
+                state?: "undecided" | "waiting" | "agreed" | "lapsed";
+                /** @description Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                sort?: "urgency" | "severity" | "issues" | "places" | "builds" | "deadline";
+                /** @description Order the other way — fewest, least urgent, nearest deadline first */
+                asc?: boolean;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -13766,6 +14286,38 @@ export interface operations {
             };
         };
     };
+    "export-pending-upgrades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-readiness": {
         parameters: {
             query?: never;
@@ -13802,6 +14354,16 @@ export interface operations {
     "get-disposition-register": {
         parameters: {
             query?: {
+                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep rows whose standing judgment is one of these. Repeatable */
+                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep one component, by name */
+                component?: string;
+                /** @description Keep one vulnerability, under the name it is filed here */
+                issue?: string;
+                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
+                standing?: "open" | "closed";
                 limit?: number;
                 offset?: number;
             };
@@ -13837,7 +14399,18 @@ export interface operations {
     };
     "export-disposition-register": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep rows whose standing judgment is one of these. Repeatable */
+                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep one component, by name */
+                component?: string;
+                /** @description Keep one vulnerability, under the name it is filed here */
+                issue?: string;
+                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
+                standing?: "open" | "closed";
+            };
             header?: never;
             path: {
                 product: string;
@@ -14235,6 +14808,8 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone */
+                within?: number;
             };
             header?: never;
             path?: never;
@@ -14271,6 +14846,8 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description Also write out releases whose date falls inside this many days ahead, marked as not yet ended */
+                within?: number;
             };
             header?: never;
             path: {
@@ -14307,7 +14884,11 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How far back to measure */
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
             };
             header?: never;

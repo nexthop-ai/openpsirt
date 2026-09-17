@@ -698,6 +698,26 @@ type MeasuredBody struct {
 	// found. Counts are only comparable between builds measured the same way,
 	// so a report mixing the two without saying would be a rumor.
 	RanHere bool `json:"ran_here,omitempty" doc:"We ran the scanner, rather than the build sending what its own found"`
+	// The rest of the chain, for a report read against what shipped: the
+	// upload, the inventory inside it, and where to fetch that inventory. An
+	// auditor follows shipped artifact, inventory, run, scanner and database,
+	// disposition — and a report naming only the run is the last two links of
+	// five.
+	//
+	// Absent where the caller is describing a run alone, which is what a
+	// finding and a receipt do.
+	Run          int64  `json:"run,omitempty" doc:"The scanner run these came from"`
+	Scan         int64  `json:"scan,omitempty" doc:"The upload the build's contents came from, as the receipt names it"`
+	ScanHash     string `json:"scan_hash,omitempty" doc:"The hash of what was uploaded"`
+	BuiltAt      string `json:"built_at,omitempty" doc:"When the build it describes was built"`
+	Document     int64  `json:"document,omitempty" doc:"The inventory that was read, as the receipt names it"`
+	DocumentHash string `json:"document_hash,omitempty" doc:"The hash of the inventory as it arrived"`
+	// DocumentHeld distinguishes an inventory whose bytes were let go from one
+	// nothing knows about: a tagged release keeps its documents and a branch
+	// build does not, and a hash nobody can fetch the bytes for is a claim
+	// rather than evidence.
+	DocumentHeld *bool  `json:"document_held,omitempty" doc:"Whether the inventory itself is still here"`
+	DocumentAt   string `json:"document_at,omitempty" doc:"Where to fetch the inventory that was read. Absent where its contents were let go"`
 }
 
 // ReceiptsOutput is a page of what has been filed against a build.
@@ -1082,7 +1102,8 @@ func registerCoverageExport(api huma.API, in Ingest) {
 			return nil, refused(in.Logger, err, "what has been scanned could not be read")
 		}
 		out := Exporting{
-			About: [2]string{"quiet after days", strconv.Itoa(int(quietAfter.Hours() / 24))},
+			What:  "scanning",
+			About: []Stated{{"quiet after days", strconv.Itoa(int(quietAfter.Hours() / 24))}},
 			Header: []string{
 				"product", "stream", "kind", "variant",
 				"last_received_at", "last_refused_at", "refused_because",

@@ -44,12 +44,14 @@ func registerPublished(api huma.API, in Ingest) {
 			"`ordinal` above one is a revision of an advisory already out, which is the entry " +
 			"a period is usually read for.\n\n" +
 			"Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody " +
-			"who may not read it, and a count is as much a disclosure as a row.",
+			"who may not read it, and a count is as much a disclosure as a row.\n\n" +
+			"Asked for neither a period nor a window, this is the last 365 days. An auditor " +
+			"asking what went out in a financial year names the two dates instead.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
-		Days    int    `query:"days" default:"365" minimum:"1" maximum:"3650" doc:"How far back to look, by when the advisory went out"`
-	}) (*listOutput[WentBody], error) {
+		Period
+	}) (*overPeriod[WentBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -65,13 +67,17 @@ func registerPublished(api huma.API, in Ingest) {
 			}
 			products = []int64{named.ID}
 		}
-		since := time.Now().UTC().AddDate(0, 0, -input.Days)
+		since, until, err := input.window(365, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
 
-		gone, err := advisory.NewStore(in.DB.DB).Published(ctx, subject, products, since)
+		gone, err := advisory.NewStore(in.DB.DB).Published(ctx, subject, products, since, until)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what has been published could not be read", err)
 		}
-		out := &listOutput[WentBody]{}
+		out := &overPeriod[WentBody]{}
+		out.Body.From, out.Body.To = stating(since, until)
 		out.Body.Items = make([]WentBody, 0, len(gone))
 		for _, row := range gone {
 			out.Body.Items = append(out.Body.Items, WentBody{

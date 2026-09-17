@@ -3,6 +3,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -80,13 +81,13 @@ type Disposed struct {
 // auditor is asking about, and a register of only what is still open answers a
 // different question.
 func (s *Store) Register(ctx context.Context, subject access.Subject, targetID int64,
-	limit, offset int) ([]Disposed, int, error) {
+	only Registering, limit, offset int) ([]Disposed, int, error) {
 
-	rows, err := s.RegisterPage(ctx, subject, targetID, limit, offset)
+	rows, err := s.RegisterPage(ctx, subject, targetID, only, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.registerSize(ctx, subject, targetID)
+	total, err := s.registerSize(ctx, subject, targetID, only)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -98,13 +99,16 @@ func (s *Store) Register(ctx context.Context, subject access.Subject, targetID i
 // Its own statement because it is its own cost: a scan of every finding in
 // the build, which is a quarter of a million rows on a real image.
 func (s *Store) registerSize(ctx context.Context, subject access.Subject,
-	targetID int64) (int, error) {
+	targetID int64, only Registering) (int, error) {
 
-	_, narrow, err := s.registerNarrowing(ctx, subject, targetID)
+	productID, narrow, err := s.registerNarrowing(ctx, subject, targetID)
 	if err != nil {
 		return 0, err
 	}
-	total, err := narrow(s.db.NewSelect()).ColumnExpr("f.id").Count(ctx)
+	// Counted over the same statement the page reads, narrowing included:
+	// counted over the build instead, a filtered page said how many rows the
+	// build holds and every later offset was a page of a different list.
+	total, err := only.narrow(s.registerJoins(productID, narrow)).ColumnExpr("f.id").Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what this build holds: %w", err)
 	}
@@ -151,7 +155,7 @@ func (s *Store) MayReadRegister(ctx context.Context, subject access.Subject, tar
 // there altogether" a thousand times to fill in a number the file has no
 // column for. The screen still asks, once, through Register.
 func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, targetID int64,
-	limit, offset int) ([]Disposed, error) {
+	only Registering, limit, offset int) ([]Disposed, error) {
 
 	productID, narrow, err := s.registerNarrowing(ctx, subject, targetID)
 	if err != nil {
@@ -160,7 +164,7 @@ func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, target
 	limit = database.AWholeBuild.Of(limit)
 
 	var rows []registerRow
-	err = s.registerQuery(productID, narrow).
+	err = only.narrow(s.registerQuery(productID, narrow)).
 		Limit(limit).Offset(offset).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -190,13 +194,13 @@ func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, target
 //
 // The screen still pages, because a screen is a page.
 func (s *Store) RegisterEach(ctx context.Context, subject access.Subject, targetID int64,
-	each func(Disposed) error) error {
+	only Registering, each func(Disposed) error) error {
 
 	productID, narrow, err := s.registerNarrowing(ctx, subject, targetID)
 	if err != nil {
 		return err
 	}
-	rows, err := s.registerQuery(productID, narrow).Rows(ctx)
+	rows, err := only.narrow(s.registerQuery(productID, narrow)).Rows(ctx)
 	if err != nil {
 		return fmt.Errorf("read what was decided about this build: %w", err)
 	}
@@ -245,13 +249,97 @@ type registerRow struct {
 	ClosedNote    string     `bun:"closed_note"`
 }
 
-// registerQuery is the register, unbounded. What a caller adds is how much of
-// it they want.
+// Registering narrows the register.
 //
-// The standing decision at each place, and the agreement it holds. Left joins
-// throughout, because a place nobody has decided about is the row this exists
-// to show — an inner join answers the question the audit list already answers.
-func (s *Store) registerQuery(productID int64,
+// **An auditor's questions, and nothing that would make it a second findings
+// list.** What a register is asked is "show me what nobody decided", "show me
+// the dismissals", "show me this component" — each of them a way of reading
+// the same complete answer rather than a different question. What is left out
+// is deliberate: a triage line, because the register applies none.
+type Registering struct {
+	// States keeps rows standing in any of these, by the four words the row
+	// itself carries.
+	States []string
+	// Outcomes keeps rows whose standing judgment is one of these.
+	Outcomes []string
+	// Component and Issue keep one of each, by name.
+	Component string
+	Issue     string
+	// Open and Closed keep one side of the build's history. Both false is
+	// everything, which is what a register is.
+	Open   bool
+	Closed bool
+}
+
+// narrow applies it to the register's statement.
+//
+// Over the decision's own columns rather than over the word the row carries:
+// the word is worked out as the row is read, and the two are the same rule
+// spelled for a reader and for the engine.
+func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
+	if len(r.States) > 0 {
+		var said []string
+		for _, word := range r.States {
+			if expr, known := registerState(word); known {
+				said = append(said, expr)
+			}
+		}
+		if len(said) == 0 {
+			// A word none of the four recognizes keeps nothing, rather than
+			// keeping everything: a filter that silently widens is how a
+			// register reads as complete about rows it left out.
+			return q.Where("1 = 0")
+		}
+		q = q.Where("(" + strings.Join(said, " OR ") + ")")
+	}
+	if len(r.Outcomes) > 0 {
+		// Asked of a judgment that is on the record, so a superseded claim's
+		// outcome does not answer for a place nothing stands at.
+		q = q.Where("("+onTheRecord+"COALESCE(cl.outcome, '') ELSE '' END) IN (?)",
+			bun.List(r.Outcomes))
+	}
+	if r.Component != "" {
+		q = q.Where("c.name = ?", r.Component)
+	}
+	if r.Issue != "" {
+		q = q.Where("v.identifier = ?", r.Issue)
+	}
+	// Both sides asked for is both sides, which is the whole register.
+	if r.Open && !r.Closed {
+		q = q.Where("f.closed_at IS NULL")
+	}
+	if r.Closed && !r.Open {
+		q = q.Where("f.closed_at IS NOT NULL")
+	}
+	return q
+}
+
+// registerState is the predicate behind one of the four words a register row
+// carries, spelled beside the column they are read from so the filter and the
+// word cannot come to mean different things.
+func registerState(word string) (string, bool) {
+	live := "de.live_key IS NOT NULL"
+	lapsed := "de.state = 'lapsed'"
+	switch word {
+	case "undecided":
+		return "NOT (" + live + " OR " + lapsed + ") OR de.id IS NULL", true
+	case "agreed":
+		return "(" + live + " AND de.state = 'approved')", true
+	case "lapsed":
+		return "(" + lapsed + ")", true
+	case "waiting":
+		return "(" + live + " AND de.state NOT IN ('approved', 'lapsed'))", true
+	}
+	return "", false
+}
+
+// registerJoins is what both the page and the count read from: the build's
+// findings with everything a row or a filter is asked about joined in.
+//
+// One spelling, because the count is a statement of its own and a narrowing
+// applied to one and not the other is a page of one list with the total of
+// another.
+func (s *Store) registerJoins(productID int64,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery) *bun.SelectQuery {
 
 	return narrow(s.db.NewSelect()).
@@ -261,16 +349,30 @@ func (s *Store) registerQuery(productID int64,
 		// What pulls the component in. Left, because a build holds some
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		// Liveness is asked of the columns rather than of the join, for the
+		// reason the column list gives.
+		Join(`LEFT JOIN "decision" AS "de" ON de.product_id = ?
+			AND de.vulnerability_id = f.vulnerability_id
+			AND de.place_identity = f.place_identity`, productID).
+		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id`)
+}
+
+// registerQuery is the register, unbounded. What a caller adds is how much of
+// it they want.
+//
+// The standing decision at each place, and the agreement it holds. Left joins
+// throughout, because a place nobody has decided about is the row this exists
+// to show — an inner join answers the question the audit list already answers.
+func (s *Store) registerQuery(productID int64,
+	narrow func(*bun.SelectQuery) *bun.SelectQuery) *bun.SelectQuery {
+
+	return s.registerJoins(productID, narrow).
 		// Liveness is asked of the columns rather than of the join. In the
 		// join it hid a lapsed decision entirely, so a place whose judgment
 		// stopped applying reported as never decided and the register lost who
 		// proposed and who approved it — which is what a compliance reader
 		// comes here for. The findings list says "lapsed" about the same
 		// place, so the two surfaces disagreed.
-		Join(`LEFT JOIN "decision" AS "de" ON de.product_id = ?
-			AND de.vulnerability_id = f.vulnerability_id
-			AND de.place_identity = f.place_identity`, productID).
-		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`LEFT JOIN "person" AS "pp" ON pp.id = de.proposed_by`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).

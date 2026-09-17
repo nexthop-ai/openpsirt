@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -59,6 +60,11 @@ func registerIssue(api huma.API, in Ingest) {
 			"**Narrowed the way every other read is**, per product and per visibility. A page " +
 			"that spans products is exactly where filtering afterwards gets forgotten, and " +
 			"the count is the leak even when no row is shown.\n\n" +
+			"**Nothing affected is an answer**, not a 404: `total` is zero and `items` is " +
+			"empty, which is what a customer inquiry is asking for. An identifier nobody " +
+			"here has seen answers the same way as one that sits only in products you " +
+			"cannot read — told apart, the pair would say which issues this deployment " +
+			"holds, one guess at a time.\n\n" +
 			"Answers by any name the issue goes by.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
@@ -72,28 +78,47 @@ func registerIssue(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
+		out := &IssueOutput{}
+		out.Body.Vulnerability = input.Vulnerability
+		out.Body.Items = []SightingBody{}
+
 		issues := finding.NewVulnerabilities(in.DB.DB)
 		id, err := issues.ByName(ctx, input.Vulnerability)
 		if err != nil {
-			return nil, noSuchIssue()
+			// A read that could not be made is not an answer about what this
+			// reader is affected by. The sentinel is what tells the two
+			// apart, which is what it is for.
+			if !errors.Is(err, finding.ErrNoSuchIssue) {
+				return nil, wentWrong(in.Logger, "what issue this is could not be read", err)
+			}
+			// **Not affected is an answer, and it is the one a customer
+			// inquiry asks for.** This refused with a 404, so the question
+			// "are you affected by this" could be answered "yes, here" and
+			// never "no" — and the case somebody is under time pressure to
+			// answer is the second one.
+			//
+			// An identifier nobody here has ever seen answers the same way as
+			// one that affects only products this reader cannot see. Told
+			// apart, the pair says which issues the deployment holds, one
+			// guess at a time, about products somebody may not read — and an
+			// issue is here because some scan somewhere reported it.
+			return out, nil
 		}
 		store := finding.NewStore(in.DB.DB)
 		rows, total, err := store.Everywhere(ctx, subject, id, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "where this issue sits could not be read", err)
 		}
-		// Nothing they may see is the same answer as no such issue,
-		// deliberately: an issue that exists somewhere they hold nothing is
-		// not something this should confirm.
 		if total == 0 {
-			return nil, noSuchIssue()
+			// Nothing about the issue itself, for the reason above: what is
+			// said about it is said to somebody who can see it somewhere.
+			return out, nil
 		}
 		known, err := issues.Describe(ctx, id)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what this issue is could not be read", err)
 		}
 
-		out := &IssueOutput{}
 		out.Body.Vulnerability = known.Identifier
 		out.Body.Aliases = known.Aliases
 		out.Body.Severity = known.Severity

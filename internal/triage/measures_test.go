@@ -58,7 +58,7 @@ func TestAWaitIsMeasuredFromTheFindingTheDecisionIsAbout(t *testing.T) {
 		nowhere.ConsumerUpstream = ""
 		f.claims(t, nowhere)
 
-		measured, err := f.store.Measure(ctx, f.reviewer, time.Time{}, time.Time{})
+		measured, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{}, time.Time{}, time.Time{})
 		if err != nil {
 			t.Fatal(err)
 		}

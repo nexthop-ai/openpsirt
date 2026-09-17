@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
@@ -11,6 +12,7 @@ import { Paged } from "../../ui/Paged";
 import { Severity } from "../../ui/Severity";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { STATES, type Stands, said } from "../../ui/states";
 import { Wide } from "../../ui/Wide";
 
 // How much of the register one page holds. The server's own ceiling is five
@@ -46,7 +48,19 @@ export function Register() {
   // query key, so carrying page nine onto a build with two pages asks for rows
   // that are not there — and the empty answer draws as "nothing is known about
   // this build yet", with the footer inside the rows branch and so no way back.
-  const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}`;
+  const [params, setParams] = useSearchParams();
+  // What the register was narrowed to. In the address, so a narrowed register
+  // is something somebody sends rather than describes, and so the file beside
+  // it carries the same narrowing.
+  const states = params
+    .getAll("state")
+    .filter((word): word is Stands => (STATES as readonly string[]).includes(word));
+  const standing = params.get("standing") === "open";
+  const narrowed = {
+    ...(states.length > 0 ? { state: states } : {}),
+    ...(standing ? { standing: "open" as const } : {}),
+  };
+  const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}\u0000${params.toString()}`;
   const [shown, setShown] = useState(showing);
   if (shown !== showing) {
     setShown(showing);
@@ -55,14 +69,23 @@ export function Register() {
 
   const register = useQuery({
     enabled: whole,
-    queryKey: ["register", where, offset],
+    queryKey: ["register", where, narrowed, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/register", {
-          params: { path: where, query: { limit: PAGE, offset } },
+          params: {
+            path: where,
+            query: { limit: PAGE, offset, ...narrowed },
+          },
         }),
       ),
   });
+
+  // The narrowing as an address, for the two file links. Written from the same
+  // values the query above reads, so the file is the list on screen.
+  const asked = new URLSearchParams();
+  for (const word of states) asked.append("state", word);
+  if (standing) asked.set("standing", "open");
 
   const rows = register.data?.items ?? [];
   const total = register.data?.total ?? 0;
@@ -86,14 +109,57 @@ export function Register() {
         <Failed error={register.error} what="The register could not be read." />
       ) : (
         <section className="panel">
+          {/* An auditor's questions, asked of the whole answer rather than
+              of a narrower one: "what has nobody decided", "what is still
+              open". The register applies no triage line whatever is picked
+              here, which is what it is for. */}
+          <div className="controls">
+            <div className="seg" role="group" aria-label="What stands">
+              {STATES.map((word) => (
+                <button
+                  key={word}
+                  type="button"
+                  aria-pressed={states.includes(word)}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    const kept = states.includes(word)
+                      ? states.filter((each) => each !== word)
+                      : [...states, word];
+                    next.delete("state");
+                    for (const each of kept) next.append("state", each);
+                    setParams(next);
+                  }}
+                >
+                  {said(word)}
+                </button>
+              ))}
+            </div>
+            <label>
+              <input
+                type="checkbox"
+                checked={standing}
+                onChange={(e) => {
+                  const next = new URLSearchParams(params);
+                  if (e.target.checked) next.set("standing", "open");
+                  else next.delete("standing");
+                  setParams(next);
+                }}
+              />{" "}
+              Still open
+            </label>
+          </div>
+
           <h3>
             {total.toLocaleString()} {total === 1 ? "row" : "rows"}
+            {(states.length > 0 || standing) && <span className="hint"> narrowed</span>}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
             One row per issue and place, unfolded. Everything the build carries, decided or not and
             open or closed: <b>no triage line is applied</b>. The whole of it as a file —{" "}
-            <a href={fileAt(where, "csv")}>CSV</a> · <a href={fileAt(where, "json")}>JSON</a>.
+            <a href={fileAt(where, "csv", asked)}>CSV</a> ·{" "}
+            <a href={fileAt(where, "json", asked)}>JSON</a>, narrowed the same way.
           </p>
+          <MeasuredWith measured={register.data?.measured} />
           {rows.length === 0 ? (
             <Empty
               title={total > 0 ? "Nothing on this page." : "Nothing is known about this build yet."}
@@ -241,6 +307,58 @@ export function Register() {
   );
 }
 
+// What the register was measured with.
+//
+// An auditor reads shipped artifact, inventory, run, scanner and database,
+// disposition. The rows are the last link, and without this the page states
+// them with nothing behind them — while the inventory that was read is one
+// click away and was reachable from nothing.
+function MeasuredWith({
+  measured,
+}: {
+  measured?: {
+    scan?: number;
+    built_at?: string;
+    scanner?: string;
+    scanner_version?: string;
+    database_version?: string;
+    ran_at?: string;
+    document_hash?: string;
+    document_held?: boolean;
+    document_at?: string;
+  } | null;
+}) {
+  if (!measured) return null;
+  const scanner = [measured.scanner, measured.scanner_version].filter(Boolean).join(" ");
+  const built = on(measured.built_at);
+  const ran = on(measured.ran_at);
+  return (
+    <p className="hint" style={{ marginTop: 0 }}>
+      Measured from upload <span className="id">{measured.scan}</span>
+      {built && ` built ${built}`}
+      {scanner && `, scanned by ${scanner}`}
+      {measured.database_version && ` against data of ${measured.database_version}`}
+      {ran && ` on ${ran}`}.{" "}
+      {measured.document_at ? (
+        <a href={measured.document_at}>The inventory it read</a>
+      ) : (
+        // A branch build's contents are let go once read, so the hash is still
+        // the record of what arrived and there is nothing to fetch. Said,
+        // rather than left looking like an omission.
+        <span>The inventory it read is no longer held</span>
+      )}
+      {measured.document_hash && (
+        <>
+          {" · "}
+          <span className="id" title={measured.document_hash}>
+            {measured.document_hash.slice(0, 12)}
+          </span>
+        </>
+      )}
+    </p>
+  );
+}
+
 // What stands at one place, in the words the sheet uses.
 //
 // Four states, and a state this does not know shown as it arrived. A register
@@ -263,10 +381,16 @@ function RegisterState({ state }: { state?: string }) {
 
 // Where the file comes from. A link somebody follows rather than a request
 // this page makes, so the browser fetches it with the session it already has.
-function fileAt(at: { product: string; stream: string; variant: string }, format: string): string {
+function fileAt(
+  at: { product: string; stream: string; variant: string },
+  format: string,
+  asked: URLSearchParams,
+): string {
+  const query = asked.toString();
   return (
     `/v1/products/${encodeURIComponent(at.product)}` +
     `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}/register.${format}`
+    `/variants/${encodeURIComponent(at.variant)}/register.${format}` +
+    (query ? `?${query}` : "")
   );
 }

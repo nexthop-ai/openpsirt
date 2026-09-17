@@ -11,7 +11,16 @@ import { Empty } from "../../ui/Empty";
 import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords, daysAsked, windowStart } from "./Window";
+import {
+  PeriodPicker,
+  WindowPicker,
+  asked,
+  coveringPeriod,
+  daysAsked,
+  periodAsked,
+  stated,
+  windowStart,
+} from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // How long the figures cover. Thirty days is the window the remediation
@@ -68,11 +77,20 @@ export function Overview() {
   const scope = scopeQuery(at);
   const [params] = useSearchParams();
   const days = daysAsked(params, 30);
+  const period = periodAsked(params);
+  // What every figure on this sheet covers, and what the lists it links to
+  // have to be narrowed by. One value, because a heading saying one stretch
+  // over a list showing another is the failure this sheet is easiest to ship.
+  const when = asked(period, days);
+  // A period naming only its end still runs from the beginning, so there is
+  // no date to narrow a list by — and a list narrowed by an empty one opens
+  // over all time beside a figure that counts one window.
+  const began = stated(period) ? period.from : windowStart(days);
 
   const pace = useQuery({
-    queryKey: ["remediation", scope, days],
+    queryKey: ["remediation", scope, when],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/remediation", { params: { query: { days, ...scope } } })),
+      unwrap(await api.GET("/v1/remediation", { params: { query: { ...when, ...scope } } })),
   });
   // What has been argued away, which is what an auditor asks for first.
   //
@@ -87,7 +105,7 @@ export function Overview() {
   // record is the one that takes an outcome repeated and names the place each
   // judgment sits at.
   const argued = useQuery({
-    queryKey: ["dismissals", at.product ?? "", days],
+    queryKey: ["dismissals", at.product ?? "", when],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/audit", {
@@ -99,7 +117,8 @@ export function Overview() {
               // header saying ninety days over a list that ignores it. Dated
               // by when the judgment was argued, which is what the record
               // dates by.
-              from: windowStart(days),
+              ...(began ? { from: began } : {}),
+              ...(period.to ? { to: period.to } : {}),
               limit: NEWEST,
               ...(at.product ? { product: [at.product] } : {}),
             },
@@ -108,8 +127,13 @@ export function Overview() {
       ),
   });
   const measures = useQuery({
-    queryKey: ["measures", days],
-    queryFn: async () => unwrap(await api.GET("/v1/measures", { params: { query: { days } } })),
+    queryKey: ["measures", when, at.product ?? ""],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/measures", {
+          params: { query: { ...when, ...(at.product ? { product: at.product } : {}) } },
+        }),
+      ),
   });
   const repeated = useQuery({
     queryKey: ["repeated", at.product ?? ""],
@@ -126,9 +150,10 @@ export function Overview() {
       settled={pace.isSuccess && measures.isSuccess && repeated.isSuccess && argued.isSuccess}
       name="Program overview"
       answers="how the work is going, rather than what it is."
-      asked={coveringWords(days)}
+      asked={coveringPeriod(period, days)}
     >
       <WindowPicker offered={WINDOWS} days={days} />
+      <PeriodPicker period={period} />
 
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Keeping pace</h3>
@@ -143,14 +168,20 @@ export function Overview() {
                   the window, which is a different population from this list's
                   own — asking for it changes what the list is about rather
                   than narrowing it, and the list says so when it is asked. */}
-              <Link className="kpi" to={`${findingsPath(at)}?closed_after=${windowStart(days)}`}>
+              <Link
+                className="kpi"
+                to={`${findingsPath(at)}${began ? `?closed_after=${began}` : ""}`}
+              >
                 <span className="l">Fixed</span>
                 <span className="n">{(pace.data?.fixed ?? 0).toLocaleString()}</span>
                 <span className="d">
                   distinct issues that went away · a version carrying the issue forward is not a fix
                 </span>
               </Link>
-              <Link className="kpi" to={`${findingsPath(at)}?opened_after=${windowStart(days)}`}>
+              <Link
+                className="kpi"
+                to={`${findingsPath(at)}${began ? `?opened_after=${began}` : ""}`}
+              >
                 <span className="l">Appeared</span>
                 <span className="n">{(pace.data?.opened ?? 0).toLocaleString()}</span>
                 <span className="d">distinct issues, same window and unit as fixed</span>
@@ -378,7 +409,11 @@ export function Overview() {
         <h3>Repeated deferrals</h3>
         <p className="hint">
           One item deferred three times is a judgment; forty is an undocumented policy. This
-          product, not this build — and over the whole record, not the window above.
+          product, not this build — and over the whole record, not the window above.{" "}
+          {/* The one list on this sheet rather than a figure, so it is the one
+              thing here that exports. A review argues over the rows. */}
+          <a href={repeatsFile(at.product ?? "", "csv")}>CSV</a> ·{" "}
+          <a href={repeatsFile(at.product ?? "", "json")}>JSON</a>
         </p>
         {repeated.isPending ? (
           <Loading />
@@ -513,4 +548,12 @@ export function Overview() {
       </section>
     </Sheet>
   );
+}
+
+// Where what keeps being put off comes from as a file. A link somebody
+// follows rather than a request this page makes, narrowed the way the panel
+// above it is.
+function repeatsFile(product: string, format: string): string {
+  const asked = product ? `?product=${encodeURIComponent(product)}` : "";
+  return `/v1/deferrals/repeated.${format}${asked}`;
 }

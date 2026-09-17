@@ -33,6 +33,10 @@ type Rate struct {
 	// deferral standing — plainly late, which is the number the rate is
 	// usually being asked about.
 	Overdue int
+	// Open is what Deferred and Overdue are a share of. Without it the two
+	// were numerators with no denominator, so "eleven overdue" could not be
+	// read as a proportion of anything — which is what a rate is.
+	Open int
 }
 
 // Compliance is what proportion of the work met its deadline, by severity.
@@ -40,8 +44,15 @@ type Rate struct {
 // **Arithmetic rather than storage.** A closed row keeps the deadline it
 // carried, and only *open* rows lose one at end-of-life or below the line — so
 // everything this needs is already there, and nothing is precomputed.
+// **The period bounds what closed in it; what is open is always now.** A rate
+// asked for last year says how much of the work finished then met its date.
+// The open half is a statement about the present whatever period was asked
+// for, because reconstructing what stood open on a date gone by is the
+// reconstruction the register refuses — deadlines are recomputed when the
+// policy moves and dropped below the line and past end of life, so a deadline
+// "as of" a past date is not recoverable.
 func (s *Store) Compliance(ctx context.Context, subject access.Subject,
-	scope Scope) ([]Rate, error) {
+	scope Scope, since, until time.Time) ([]Rate, error) {
 
 	// A product is required, for the reason every list here requires one: a
 	// place identity carries no product, so a decision correlated without one
@@ -61,6 +72,18 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		Met      int    `bun:"met"`
 		Deferred int    `bun:"deferred"`
 		Overdue  int    `bun:"overdue"`
+		Open     int    `bun:"still_open"`
+	}
+	// The period, as the two halves of a condition on when a row closed. An
+	// unbounded side is left out rather than bound to a moment that stands
+	// for forever, so a rate asked for nothing in particular is the rate over
+	// everything held.
+	within, bounds := "", []any{}
+	if !since.IsZero() {
+		within, bounds = ` AND f.closed_at >= ?`, append(bounds, since)
+	}
+	if !until.IsZero() {
+		within, bounds = within+` AND f.closed_at < ?`, append(bounds, until)
 	}
 	// A standing deferral at the place, asked as a correlated existence test
 	// rather than a join, so a place with two of them counts once.
@@ -91,9 +114,9 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		Join(rating.Here, productID).
 		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr("SUM(CASE WHEN f.closed_at IS NOT NULL AND f.due_at IS NOT NULL "+
-			`THEN 1 ELSE 0 END) AS "judged"`).
+			within+` THEN 1 ELSE 0 END) AS "judged"`, bounds...).
 		ColumnExpr("SUM(CASE WHEN f.closed_at IS NOT NULL AND f.due_at IS NOT NULL "+
-			`AND f.closed_at > f.due_at THEN 1 ELSE 0 END) AS "late"`).
+			within+` AND f.closed_at > f.due_at THEN 1 ELSE 0 END) AS "late"`, bounds...).
 		ColumnExpr(`SUM(CASE WHEN f.closed_at IS NULL THEN 1 ELSE 0 END) AS "still_open"`).
 		ColumnExpr("SUM(CASE WHEN f.closed_at IS NULL AND "+deferred+
 			` THEN 1 ELSE 0 END) AS "covered"`, covers...).
@@ -120,6 +143,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		ColumnExpr("SUM(CASE WHEN grouped.still_open > 0 "+
 			`AND grouped.covered = grouped.still_open THEN 1 ELSE 0 END) AS "deferred"`).
 		ColumnExpr(`SUM(CASE WHEN grouped.past_due > 0 THEN 1 ELSE 0 END) AS "overdue"`).
+		ColumnExpr(`SUM(CASE WHEN grouped.still_open > 0 THEN 1 ELSE 0 END) AS "still_open"`).
 		GroupExpr("grouped.band").
 		Scan(ctx, &rows)
 	if err != nil {
@@ -134,6 +158,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		by[row.Severity] = Rate{
 			Severity: row.Severity, Closed: row.Closed, Met: row.Met,
 			Late: row.Closed - row.Met, Deferred: row.Deferred, Overdue: row.Overdue,
+			Open: row.Open,
 		}
 	}
 	out := make([]Rate, 0, len(ranked))

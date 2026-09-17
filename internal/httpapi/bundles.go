@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -42,6 +44,36 @@ type BundleBody struct {
 	In []BuildName `json:"in" doc:"The builds that hold this bump"`
 }
 
+// BundleQuery is what narrows the fix-bundle list.
+//
+// One struct for the screen and the file, because they are one question. An
+// export declaring its own parameters drifts from the list it came from, and
+// nothing rejects an undeclared parameter — so the filters a caller sent
+// arrive and are dropped before the handler runs, with no error and no clue.
+type BundleQuery struct {
+	Stream    string     `query:"stream" doc:"Limit to one branch or tag"`
+	Variant   string     `query:"variant" doc:"Limit to one variant"`
+	Severity  string     `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse"`
+	Exploited bool       `query:"exploited" doc:"Keep only bumps closing something known to be exploited"`
+	Component string     `query:"component" doc:"Keep only bumps moving a component of this name"`
+	Search    string     `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
+	Ecosystem string     `query:"ecosystem" doc:"Keep only components of one package kind"`
+	State     string     `query:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided"`
+	Sort      bundleSort `query:"sort" doc:"Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for"`
+	Ascending bool       `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
+}
+
+// narrow is what the store reads by, from what was asked for.
+func (q BundleQuery) narrow(floor finding.Floor) finding.Filter {
+	return finding.Filter{
+		MinSeverity: q.Severity, Exploited: q.Exploited,
+		Components: []string{q.Component}, Search: q.Search,
+		Ecosystems: []string{q.Ecosystem}, States: []string{q.State},
+		BundleSort: finding.BundleSortKey(q.Sort), Ascending: q.Ascending,
+		Floor: floor,
+	}
+}
+
 func registerBundles(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-fix-bundles", Method: http.MethodGet,
@@ -66,19 +98,10 @@ func registerBundles(api huma.API, in Ingest) {
 			"`sort=issues` answers what to do this afternoon.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product   string     `path:"product"`
-		Stream    string     `query:"stream" doc:"Limit to one branch or tag"`
-		Variant   string     `query:"variant" doc:"Limit to one variant"`
-		Severity  string     `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse"`
-		Exploited bool       `query:"exploited" doc:"Keep only bumps closing something known to be exploited"`
-		Component string     `query:"component" doc:"Keep only bumps moving a component of this name"`
-		Search    string     `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
-		Ecosystem string     `query:"ecosystem" doc:"Keep only components of one package kind"`
-		State     string     `query:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided"`
-		Sort      bundleSort `query:"sort" doc:"Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for"`
-		Ascending bool       `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
-		Limit     int        `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset    int        `query:"offset" minimum:"0"`
+		Product string `path:"product"`
+		BundleQuery
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0"`
 	}) (*struct {
 		Body struct {
 			Items []BundleBody `json:"items"`
@@ -92,13 +115,7 @@ func registerBundles(api huma.API, in Ingest) {
 			return nil, err
 		}
 		bundles, total, err := finding.NewStore(in.DB.DB).Bundles(ctx, subject, scope,
-			input.Limit, input.Offset, finding.Filter{
-				MinSeverity: input.Severity, Exploited: input.Exploited,
-				Components: []string{input.Component}, Search: input.Search,
-				Ecosystems: []string{input.Ecosystem}, States: []string{input.State},
-				BundleSort: finding.BundleSortKey(input.Sort), Ascending: input.Ascending,
-				Floor: floor,
-			})
+			input.Limit, input.Offset, input.narrow(floor))
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
@@ -110,26 +127,100 @@ func registerBundles(api huma.API, in Ingest) {
 			}
 		}{}
 		out.Body.Total = total
-		out.Body.Items = make([]BundleBody, 0, len(bundles))
 		oneBuild := scope.StreamID != nil && scope.VariantID != nil
-		for _, bundle := range bundles {
-			body := BundleBody{
-				Upstream: bundle.Upstream, From: bundle.From, To: bundle.To,
-				Components: bundle.Components,
-				Issues:     bundle.Issues, Places: bundle.Places,
-				Severity: bundle.Severity, Exploited: bundle.Exploited,
-				In: make([]BuildName, 0, len(bundle.In)),
-			}
-			for _, at := range bundle.In {
-				body.In = append(body.In, BuildName{Stream: at.Stream, Variant: at.Variant})
-			}
-			if !oneBuild {
-				body.Builds = bundle.Builds
-			}
-			out.Body.Items = append(out.Body.Items, body)
-		}
+		out.Body.Items = bundleBodies(bundles, oneBuild)
 		return out, nil
 	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "export-fix-bundles", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/fix-bundles.{format}",
+		Summary: "Export findings by upgrade",
+		Description: "The same list as a file: one row per upstream bump, with what it closes " +
+			"and the builds that hold it.\n\n" +
+			"Takes the same selection and the same filters as the screen, from the same " +
+			"struct. The builds a bump is held in are one cell, separated by spaces, because " +
+			"a spreadsheet has no second dimension.",
+		Tags: []string{"Findings"},
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		Format  string `path:"format" enum:"csv,json"`
+		BundleQuery
+	}) (*huma.StreamResponse, error) {
+		subject, scope, floor, err := scopedFloor(ctx, in, ScopeQuery{
+			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+		}, "the triage line could not be read")
+		if err != nil {
+			return nil, err
+		}
+		store := finding.NewStore(in.DB.DB)
+		narrowed := input.narrow(floor)
+		oneBuild := scope.StreamID != nil && scope.VariantID != nil
+		line := "everything"
+		if floor.Hides() {
+			line = floor.Word
+		}
+		out := Exporting{
+			What:  "findings by upgrade",
+			About: []Stated{{"triaged at or above", line}},
+			Header: []string{
+				"upstream", "from", "to", "components", "issues", "places",
+				"builds", "severity", "exploited", "in",
+			},
+			// Paged through the store the screen reads, so the file is the
+			// list rather than a second query that will come to disagree
+			// with it.
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				bundles, _, err := store.Bundles(ctx, subject, scope, limit, offset, narrowed)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(bundles))
+				for _, body := range bundleBodies(bundles, oneBuild) {
+					builds := make([]string, 0, len(body.In))
+					for _, at := range body.In {
+						builds = append(builds, at.Stream+"/"+at.Variant)
+					}
+					rows = append(rows, []string{
+						body.Upstream, body.From, body.To,
+						strings.Join(body.Components, " "),
+						strconv.Itoa(body.Issues), strconv.Itoa(body.Places),
+						strconv.Itoa(body.Builds), body.Severity,
+						strconv.FormatBool(body.Exploited),
+						strings.Join(builds, " "),
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			writeExport(writer, input.Format, "fix-bundles-"+downloadName(input.Product), out)
+		}}, nil
+	})
+}
+
+// bundleBodies is the list as it is written, for the screen and for the file.
+func bundleBodies(bundles []finding.Bundle, oneBuild bool) []BundleBody {
+	out := make([]BundleBody, 0, len(bundles))
+	for _, bundle := range bundles {
+		body := BundleBody{
+			Upstream: bundle.Upstream, From: bundle.From, To: bundle.To,
+			Components: bundle.Components,
+			Issues:     bundle.Issues, Places: bundle.Places,
+			Severity: bundle.Severity, Exploited: bundle.Exploited,
+			In: make([]BuildName, 0, len(bundle.In)),
+		}
+		for _, at := range bundle.In {
+			body.In = append(body.In, BuildName{Stream: at.Stream, Variant: at.Variant})
+		}
+		// Absent where the selection is one build, because then it is the
+		// same number on every row.
+		if !oneBuild {
+			body.Builds = bundle.Builds
+		}
+		out = append(out, body)
+	}
+	return out
 }
 
 // BuildName is a release and variant, as the catalog names them.
@@ -214,24 +305,108 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 			return nil, refusedFinding(in, err)
 		}
 		out := &listOutput[PlannedBody]{}
-		out.Body.Items = make([]PlannedBody, 0, len(planned))
-		for _, one := range planned {
-			row := PlannedBody{
-				Fold: one.Fold, Upstream: one.Upstream, From: one.From, To: one.To,
-				Components: one.Components,
-				Issues:     one.Issues, Places: one.Places,
-				DeclaredAt: one.DeclaredAt.Format(time.DateOnly),
-				HeldBy:     one.HeldBy, State: string(one.State),
-				ClaimID: one.ClaimID,
-			}
-			if row.Components == nil {
-				row.Components = []string{}
-			}
-			if one.By != nil {
-				row.By = one.By.Format(time.DateOnly)
-			}
-			out.Body.Items = append(out.Body.Items, row)
-		}
+		out.Body.Items = plannedBodies(planned)
 		return out, nil
 	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "export-pending-upgrades", Method: http.MethodGet,
+		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
+			"/pending-upgrades.{format}",
+		Summary: "Export the upgrades one build is waiting on",
+		Description: "The same list as a file: one row per bump this build is waiting on, " +
+			"where it stands, and what it would still close here.\n\n" +
+			"The packages one bump moves are a single cell, separated by spaces, because a " +
+			"spreadsheet has no second dimension.",
+		Tags: []string{"Remediation"},
+	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		Stream  string `path:"stream"`
+		Variant string `path:"variant"`
+		Format  string `path:"format" enum:"csv,json"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
+		located, err := locatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		if err != nil {
+			return nil, err
+		}
+		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
+		if err != nil {
+			return nil, err
+		}
+		// Read whole before a byte is written, like the screen reads it: this
+		// is one build's plan rather than a paged list, and a refusal has to
+		// land before the status is gone.
+		planned, err := finding.NewStore(in.DB.DB).PendingUpgrades(ctx, subject, target.ID)
+		if err != nil {
+			return nil, refusedFinding(in, err)
+		}
+		rows := plannedBodies(planned)
+		out := Exporting{
+			What: "upgrades this build is waiting on",
+			About: []Stated{
+				{"build", input.Product + " " + input.Stream + " (" + input.Variant + ")"},
+			},
+			Header: []string{
+				"upstream", "from", "to", "components", "issues", "places",
+				"declared_at", "by", "held_by", "state", "claim",
+			},
+			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
+				if offset >= len(rows) {
+					return nil, nil
+				}
+				page := rows[offset:]
+				if len(page) > limit {
+					page = page[:limit]
+				}
+				written := make([][]string, 0, len(page))
+				for _, row := range page {
+					claim := ""
+					if row.ClaimID != 0 {
+						claim = strconv.FormatInt(row.ClaimID, 10)
+					}
+					written = append(written, []string{
+						row.Upstream, row.From, row.To,
+						strings.Join(row.Components, " "),
+						strconv.Itoa(row.Issues), strconv.Itoa(row.Places),
+						row.DeclaredAt, row.By, row.HeldBy, row.State, claim,
+					})
+				}
+				return written, nil
+			},
+		}
+		name := "pending-upgrades-" + downloadName(input.Product+"-"+input.Stream+"-"+input.Variant)
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			writeExport(writer, input.Format, name, out)
+		}}, nil
+	})
+}
+
+// plannedBodies is the plan as it is written, for the screen and for the file.
+func plannedBodies(planned []finding.Planned) []PlannedBody {
+	out := make([]PlannedBody, 0, len(planned))
+	for _, one := range planned {
+		row := PlannedBody{
+			Fold: one.Fold, Upstream: one.Upstream, From: one.From, To: one.To,
+			Components: one.Components,
+			Issues:     one.Issues, Places: one.Places,
+			DeclaredAt: one.DeclaredAt.Format(time.DateOnly),
+			HeldBy:     one.HeldBy, State: string(one.State),
+			ClaimID: one.ClaimID,
+		}
+		if row.Components == nil {
+			row.Components = []string{}
+		}
+		if one.By != nil {
+			row.By = one.By.Format(time.DateOnly)
+		}
+		out = append(out, row)
+	}
+	return out
 }

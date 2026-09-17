@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { findingsPath, scopeQuery, useScope } from "../../app/scope";
@@ -23,14 +23,27 @@ import { Wide } from "../../ui/Wide";
 export function Support() {
   const at = useScope();
   const scope = scopeQuery(at);
+  const [params, setParams] = useSearchParams();
+  // How far ahead to warn. Nothing by default, because this report is about
+  // what has already gone and a second population appearing unasked would
+  // change what the figures at the top of it count.
+  const within = aheadAsked(params);
   const ended = useQuery({
-    queryKey: ["out-of-support", scope],
+    queryKey: ["out-of-support", scope, within],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/releases/out-of-support", { params: { query: scope } })),
+      unwrap(
+        await api.GET("/v1/releases/out-of-support", {
+          params: { query: { ...scope, ...(within > 0 ? { within } : {}) } },
+        }),
+      ),
   });
 
   const rows = ended.data?.items ?? [];
-  const asked = new URLSearchParams(scope).toString();
+  const ending = ended.data?.ending ?? [];
+  const asked = new URLSearchParams({
+    ...scope,
+    ...(within > 0 ? { within: String(within) } : {}),
+  }).toString();
 
   return (
     <Sheet
@@ -38,6 +51,26 @@ export function Support() {
       name="Releases out of support"
       answers="what is still shipped and no longer maintained."
     >
+      <div className="controls">
+        <div className="seg" role="group" aria-label="Warn ahead">
+          {AHEAD.map((n) => (
+            <button
+              key={n}
+              type="button"
+              aria-pressed={within === n}
+              onClick={() => {
+                const next = new URLSearchParams(params);
+                if (n === 0) next.delete("within");
+                else next.set("within", String(n));
+                setParams(next);
+              }}
+            >
+              {n === 0 ? "what has gone" : `and the next ${n} days`}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {ended.isPending ? (
         <Loading />
       ) : ended.isError ? (
@@ -115,8 +148,87 @@ export function Support() {
           )}
         </section>
       )}
+
+      {/* Kept apart from the pile above rather than sorted into it. The day a
+          release crosses, the deadline comes off every open finding on it and
+          that work leaves every overdue count at once — so one of these is a
+          date somebody can still act before and the other is exposure nobody
+          can work on, and a single list makes the warning the tail of the
+          bad news. */}
+      {ending.length > 0 && (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <h3>
+            {ending.length.toLocaleString()} about to go, with{" "}
+            {(ended.data?.ending_open ?? 0).toLocaleString()} open
+          </h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            On the day each one crosses, what is open on it loses its deadline and leaves every
+            overdue count. That is the last moment anything can be planned for it.
+          </p>
+          <Wide>
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Release</th>
+                  <th>Support ends</th>
+                  <th className="num">Left</th>
+                  <th className="num">Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ending.map((row) => (
+                  <tr key={`${row.product} ${row.stream}`} className="row">
+                    <td>{row.product}</td>
+                    <td>
+                      {row.stream} <span className="hint">{row.kind}</span>
+                    </td>
+                    <td>
+                      {row.ended_on}{" "}
+                      {row.inherited && <span className="hint">the product&rsquo;s date</span>}
+                    </td>
+                    <td className="num">
+                      {Math.abs(row.ended_days).toLocaleString()}{" "}
+                      {Math.abs(row.ended_days) === 1 ? "day" : "days"}
+                    </td>
+                    <td className="num">
+                      {/* Still in support, so this one links as the list's own
+                          default would read it rather than past end of life. */}
+                      <Link
+                        to={endingAt(row.product, row.stream, row.kind)}
+                        className={row.open > 0 ? "state open" : undefined}
+                      >
+                        {row.open.toLocaleString()}
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Wide>
+        </section>
+      )}
     </Sheet>
   );
+}
+
+// How far ahead the sheet offers to warn. Nothing, a month, a quarter: the
+// horizons a release plan is written in.
+const AHEAD = [0, 30, 90] as const;
+
+// The longest warning the sheet will ask for. The value goes to the server,
+// which refuses one it cannot answer for, and an edited address is the
+// ordinary way a wrong one arrives.
+const FURTHEST = 3650;
+
+// aheadAsked is how far ahead the address asks to look, checked rather than
+// trusted.
+function aheadAsked(params: URLSearchParams): number {
+  const asked = params.get("within");
+  if (asked === null) return 0;
+  const days = Number(asked);
+  if (!Number.isFinite(days) || days < 1 || days > FURTHEST) return 0;
+  return Math.floor(days);
 }
 
 // Where the file comes from. A link somebody follows rather than a request
@@ -131,6 +243,15 @@ function fileAt(format: string, asked: string): string {
 // default: it keeps to branches in support unless told otherwise, and every
 // release here is out of support, so the default answers nothing. The kind is
 // the release's own, because a branch can be past end-of-life too.
+// What is open on a release that has not gone yet. The same list, without the
+// past-end-of-life filter: this one is still in support, which is what makes
+// it something somebody can still act on.
+function endingAt(product: string, stream: string, kind: string): string {
+  const asked = new URLSearchParams({ stream });
+  asked.set("on", kind === "tag" ? "tag" : "branch");
+  return `${findingsPath({ product })}?${asked.toString()}`;
+}
+
 function openAt(product: string, stream: string, kind: string): string {
   const asked = new URLSearchParams({ stream });
   asked.set("on", kind === "tag" ? "tag" : "branch");

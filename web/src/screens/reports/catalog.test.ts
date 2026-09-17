@@ -104,3 +104,28 @@ describe("every address a report leads to", () => {
     }
   });
 });
+
+describe("what a catalog row carries with it", () => {
+  // The record reads its narrowing from the address rather than from the
+  // picker, so an entry that drops the selection opens every product the
+  // reader can see from a page scoped to one — a different population under
+  // the same name.
+  it("carries the product into the record", () => {
+    const exception = CATALOG.find((report) => report.name === "The exception report")!;
+    const wide = leadsTo(exception, {}).to!;
+    expect(wide).toContain("alone=true");
+    expect(wide).not.toContain("product=");
+
+    const narrowed = leadsTo(exception, { product: "sonic" }).to!;
+    expect(narrowed).toContain("product=sonic");
+    // And the filters the entry exists for are still on it.
+    expect(narrowed).toContain("alone=true");
+    expect(narrowed).toContain("outcome=not-applicable");
+  });
+
+  it("carries it into an address that has no query of its own yet", () => {
+    const changes = CATALOG.find((report) => report.name === "Administrative changes")!;
+    expect(leadsTo(changes, { product: "sonic" }).to).toBe("/audit?product=sonic");
+    expect(leadsTo(changes, {}).to).toBe("/audit");
+  });
+});

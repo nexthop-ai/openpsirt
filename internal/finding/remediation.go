@@ -87,8 +87,12 @@ func resolved(q *bun.SelectQuery) *bun.SelectQuery {
 }
 
 // Remediation reports how fast issues are being closed and what is aging.
+// The period bounds what closed and what opened in it. What is *aging* is a
+// statement about now whatever period was asked for: how long something has
+// been open is answered by the clock, and reconstructing it as of a date gone
+// by is the reconstruction the register refuses for the same reason.
 func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope Scope,
-	window time.Duration) (*Remediation, error) {
+	since, until time.Time) (*Remediation, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second. A person holding
@@ -100,11 +104,14 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	if !all && len(products) == 0 {
 		return nil, nil
 	}
-	if window <= 0 {
-		window = 30 * 24 * time.Hour
-	}
 	now := s.now().UTC()
-	since := now.Add(-window)
+	if until.IsZero() {
+		until = now
+	}
+	// An absent start is the beginning, which is what a zero side of a period
+	// means and what the reports beside this one already do. Substituted with
+	// a default here, a caller asking for an end alone got a window it never
+	// asked for under a response saying the period ran from the beginning.
 
 	out := &Remediation{TimeToFix: map[string]time.Duration{}}
 
@@ -127,7 +134,12 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MAX(f.closed_at) AS "closed_at"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		Where("f.closed_at IS NOT NULL").
-		Where("f.closed_at >= ?", since).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			if !since.IsZero() {
+				q = q.Where("f.closed_at >= ?", since)
+			}
+			return q.Where("f.closed_at < ?", until)
+		}).
 		GroupExpr("band, f.vulnerability_id")
 	closed = resolved(scope.Narrow(onlyReadable(closed, subject, products, all)))
 
@@ -156,7 +168,12 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("f.vulnerability_id").
-		Where("f.opened_at >= ?", since).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			if !since.IsZero() {
+				q = q.Where("f.opened_at >= ?", since)
+			}
+			return q.Where("f.opened_at < ?", until)
+		}).
 		GroupExpr("f.vulnerability_id")
 	count, err := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, scope.Narrow(onlyReadable(opened, subject, products, all))).Count(ctx)

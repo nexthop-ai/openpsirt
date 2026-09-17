@@ -100,6 +100,19 @@ type Worked struct {
 	Withdrawn int
 }
 
+// from bounds the start of a period where one was asked for, and leaves it
+// unbounded where none was.
+//
+// A zero start is the beginning, which is what a period's zero side means.
+// Written once because four statements here take it and a default substituted
+// in one of them is a figure over a window nobody asked for.
+func from(q *bun.SelectQuery, column string, since time.Time) *bun.SelectQuery {
+	if since.IsZero() {
+		return q
+	}
+	return q.Where(column+" >= ?", since)
+}
+
 // measuredAtMost is how many observations one figure is worked out from.
 //
 // The most recent ones in the window rather than a sample across it, because
@@ -108,16 +121,54 @@ type Worked struct {
 // of a window is never quoted as if it were the whole.
 const measuredAtMost = 5000
 
+// Measuring narrows the figures to part of the deployment.
+//
+// **Without it there were no per-team figures at all**, so a manager asking
+// how their own people are doing read the deployment's numbers and a large
+// deployment's answer was the same for everybody.
+type Measuring struct {
+	// Products keeps judgments made in these products.
+	Products []int64
+	// People keeps judgments these people **proposed** — a team, resolved to
+	// its members by whoever asked.
+	//
+	// By the proposer for both waits, including the wait for a second person:
+	// a claim belongs to whoever argued it, which is the rule the record of
+	// judgments already dates by. Narrowed by the approver instead, a team's
+	// "time to agree" would be about claims its people agreed to for somebody
+	// else.
+	People []int64
+}
+
+// narrow applies it to a query over the decision, aliased de, keyed on
+// whoever proposed.
+func (m Measuring) narrow(q *bun.SelectQuery) *bun.SelectQuery {
+	return m.by(q, "de.proposed_by")
+}
+
+// by is the same, for a count keyed on somebody else — an agreement is the
+// approver's work, and a team's throughput is what each of its people did
+// rather than what was done to the claims they wrote.
+func (m Measuring) by(q *bun.SelectQuery, person string) *bun.SelectQuery {
+	if len(m.Products) > 0 {
+		q = q.Where("de.product_id IN (?)", bun.List(m.Products))
+	}
+	if len(m.People) > 0 {
+		q = q.Where(person+" IN (?)", bun.List(m.People))
+	}
+	return q
+}
+
 // Measure works out the figures about how triage is going in a window.
-func (s *Store) Measure(ctx context.Context, subject access.Subject,
+func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measuring,
 	since, until time.Time) (Measures, error) {
 
 	if until.IsZero() {
 		until = s.now().UTC()
 	}
-	if since.IsZero() {
-		since = until.AddDate(0, 0, -90)
-	}
+	// An absent start is the beginning, which is what a zero side of a period
+	// means. Substituted with a default, a caller asking for an end alone got
+	// a window it never asked for under a response saying otherwise.
 	out := Measures{Since: since, Until: until}
 
 	// The two spans, read as their endpoints. One query rather than two,
@@ -163,12 +214,14 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`de.proposed_at AS "proposed_at"`).
 		ColumnExpr(`MIN(da.approved_at) AS "approved_at"`).
-		Where("de.proposed_at >= ?", since).
 		Where("de.proposed_at < ?", until).
 		GroupExpr("de.id, de.proposed_at, " + rating.EffectiveExpr).
 		OrderExpr("de.proposed_at DESC").
 		Limit(measuredAtMost + 1)
-	q = readableBy(q, subject, "de")
+	if !since.IsZero() {
+		q = q.Where("de.proposed_at >= ?", since)
+	}
+	q = only.narrow(readableBy(q, subject, "de"))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return Measures{}, fmt.Errorf("read how long triage is taking: %w", err)
 	}
@@ -198,7 +251,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 	out.ToDecide = spreads(toDecide)
 	out.ToAgree = spreads(toAgree)
 
-	worked, err := s.throughput(ctx, subject, since, until)
+	worked, err := s.throughput(ctx, subject, only, since, until)
 	if err != nil {
 		return Measures{}, err
 	}
@@ -210,9 +263,11 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 	back := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 		ColumnExpr(`COUNT(*) AS "number"`).
 		Where("de.sent_back_at IS NOT NULL").
-		Where("de.sent_back_at >= ?", since).
 		Where("de.sent_back_at < ?", until)
-	if err := readableBy(back, subject, "de").Scan(ctx, &out.SentBack); err != nil {
+	if !since.IsZero() {
+		back = back.Where("de.sent_back_at >= ?", since)
+	}
+	if err := only.narrow(readableBy(back, subject, "de")).Scan(ctx, &out.SentBack); err != nil {
 		return Measures{}, fmt.Errorf("read how much came back: %w", err)
 	}
 	return out, nil
@@ -220,11 +275,12 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject,
 
 // throughput is what each person got through in the window.
 //
-// Four counts from three tables, keyed on the person rather than joined into
-// one statement: a claim proposed, an agreement given, a claim sent back and a
-// claim withdrawn are four different rows in three places, and one query
-// counting all four would multiply them together.
-func (s *Store) throughput(ctx context.Context, subject access.Subject,
+// Three counts from two tables, keyed on the person rather than joined into
+// one statement: a claim proposed, one withdrawn and an agreement given are
+// different rows in different places, and one query counting them together
+// would multiply them. How much came back is counted for the deployment
+// rather than per person, so it is read beside these rather than among them.
+func (s *Store) throughput(ctx context.Context, subject access.Subject, only Measuring,
 	since, until time.Time) ([]Worked, error) {
 
 	by := map[int64]*Worked{}
@@ -258,10 +314,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 			ColumnExpr(`de.proposed_by AS "person"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
-			Where("de.proposed_at >= ?", since).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")
-		return readableBy(q, subject, "de")
+		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Proposed }); err != nil {
 		return nil, err
 	}
@@ -270,10 +325,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 			ColumnExpr(`de.proposed_by AS "person"`).
 			ColumnExpr(`COUNT(*) AS "number"`).
 			Where("de.state = ?", Withdrawn).
-			Where("de.proposed_at >= ?", since).
 			Where("de.proposed_at < ?", until).
 			GroupExpr("de.proposed_by")
-		return readableBy(q, subject, "de")
+		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Withdrawn }); err != nil {
 		return nil, err
 	}
@@ -288,10 +342,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject,
 			ColumnExpr(`da.approved_by AS "person"`).
 			ColumnExpr(`COUNT(DISTINCT da.id) AS "number"`).
 			Where("da.withdrawn_at IS NULL").
-			Where("da.approved_at >= ?", since).
 			Where("da.approved_at < ?", until).
 			GroupExpr("da.approved_by")
-		return readableBy(q, subject, "de")
+		return only.by(readableBy(from(q, "da.approved_at", since), subject, "de"), "da.approved_by")
 	}, func(w *Worked) *int { return &w.Approved }); err != nil {
 		return nil, err
 	}

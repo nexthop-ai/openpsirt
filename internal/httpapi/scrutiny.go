@@ -71,7 +71,10 @@ type scrutinyOutput struct {
 		// each figure above can be read against the whole rather than on its
 		// own.
 		Agreed int `json:"agreed" doc:"Decisions a standing agreement covers in this period"`
-		Days   int `json:"days" doc:"How far back this looked"`
+		// The period these cover, said back, so a figure is never read apart
+		// from the window it was worked out over.
+		From string `json:"from,omitempty" doc:"The first day of the period, by when a claim was proposed. Absent where it runs from the beginning"`
+		To   string `json:"to" doc:"The day it ends, which is not itself in it"`
 		// Capped says a section reached the ceiling, so what is here is the
 		// worst of it rather than all of it. Said rather than implied: a
 		// report about a control that reads as complete while it is clipped
@@ -104,12 +107,13 @@ func registerScrutiny(api huma.API, in Ingest) {
 			"what somebody agreed to against what the same claim reaches now — a claim reaches " +
 			"by matching, so a build appearing afterwards is covered with nobody acting.\n\n" +
 			"Everything is dated by when the claim was proposed, not by when it was agreed to, " +
-			"and narrowed by what you may see.",
+			"and narrowed by what you may see.\n\n" +
+			"Asked for neither a period nor a window, this is the last 90 days.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
-		Days    int    `query:"days" default:"90" minimum:"1" maximum:"3650" doc:"How far back to look, by when a claim was proposed"`
-		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500" doc:"How many rows each section carries at most. capped says a section reached it"`
+		Period
+		Limit int `query:"limit" default:"100" minimum:"1" maximum:"500" doc:"How many rows each section carries at most. capped says a section reached it"`
 	}) (*scrutinyOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -129,15 +133,18 @@ func registerScrutiny(api huma.API, in Ingest) {
 			}
 			products = []int64{named.ID}
 		}
-		since := time.Now().UTC().AddDate(0, 0, -input.Days)
-
-		got, err := triage.NewStore(in.DB.DB).Scrutinize(ctx, subject, products, since, input.Limit)
+		since, until, err := input.window(90, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+		got, err := triage.NewStore(in.DB.DB).Scrutinize(ctx, subject, products,
+			since, until, input.Limit)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "how approvals are going could not be read", err)
 		}
 
 		out := &scrutinyOutput{}
-		out.Body.Days = input.Days
+		out.Body.From, out.Body.To = stating(since, until)
 		out.Body.Capped = got.Capped
 		out.Body.Alone = make([]UnagreedBody, 0, len(got.Alone))
 		for _, row := range got.Alone {

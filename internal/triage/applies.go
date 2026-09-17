@@ -253,6 +253,15 @@ type Filter struct {
 	// Issue and Component name what the judgment was about.
 	Issue     string
 	Component string
+	// TargetID keeps judgments about places one build holds.
+	//
+	// **A decision names no build, deliberately** — it is keyed on the
+	// product, the issue and the place, so that it carries across the
+	// releases that share the code. What a release sign-off asks is the other
+	// question: which of these judgments is about something this build
+	// actually ships. Reached through the findings at the place, the way the
+	// component filter beside it is.
+	TargetID int64
 }
 
 // List returns decisions matching a filter, newest first, with how many there
@@ -290,7 +299,11 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 				`WHERE fc.id = de.claim_id AND fc.deferred_until IS NOT NULL `+
 				`AND fc.deferred_until <= ?))`, LapsedState, s.now())
 		}
-		return q
+		// What the judgment was about, through the one spelling the record's
+		// own page uses. Stated in the filter and applied by only one of the
+		// two readers, a caller that set any of the three got the whole
+		// unnarrowed list back with no complaint.
+		return aboutTheSamePlaces(q, subject, f)
 	}
 
 	total, err := narrow(s.db.NewSelect().Model((*Decision)(nil))).Count(ctx)

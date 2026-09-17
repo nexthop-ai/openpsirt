@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -40,6 +41,35 @@ type Changed struct {
 	// given nowhere to look. Zero where a person closed it, which is the other
 	// way a finding closes.
 	ClosedRun int64 `bun:"closed_run"`
+	// What a reader of a release note acts on, beyond the identifier and the
+	// word: the number, whether somebody is known to be exploiting it, and
+	// where it is written up.
+	//
+	// **Not the description.** One upgrade closes hundreds of issues and the
+	// note lists them under it, so a sentence apiece is a document nobody
+	// reads to the end — and the description is behind the link, which is
+	// what the link is for.
+	ScoreCenti int    `bun:"score_centi"`
+	Exploited  bool   `bun:"exploited"`
+	Advisory   string `bun:"advisory"`
+	// What stands about it in the later build, on a still-present entry and
+	// nowhere else. **This is the sign-off half**: shipping with a known
+	// issue is a decision somebody made, and a list of what is still there
+	// with no way to tell an approved not-applicable from something nobody
+	// has looked at is not a list anybody can sign.
+	//
+	// The outcome and its reason are stated only where every standing
+	// decision over the row's places says the same thing, which is the rule
+	// the VEX document already publishes under: a row decided one way at one
+	// place and another way at a second is not one claim, and stating either
+	// over both would be a claim nobody made.
+	State         string
+	Outcome       string
+	Justification string
+	// Due is the soonest deadline among the places still open, which is the
+	// date a coordinator is reading against. Absent where none of them
+	// carries one.
+	Due *time.Time
 }
 
 // Comparison is what changed between two builds.
@@ -112,9 +142,16 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).
 			ColumnExpr(`MIN(COALESCE(f.arrived_from, '')) AS "arrived_from"`).
+			// Properties of the issue rather than of the place, so they are
+			// grouped on rather than aggregated: every row of a group carries
+			// the same three.
+			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+			ColumnExpr(`v.exploited AS "exploited"`).
+			ColumnExpr(`COALESCE(v.advisory, '') AS "advisory"`).
 			Where("f.target_id = ?", targetID).
 			Where("f.visibility IN (?)", bun.List(visible)).
-			GroupExpr("v.identifier, c.name, " + rating.EffectiveExpr + ", f.closed_because")
+			GroupExpr("v.identifier, c.name, " + rating.EffectiveExpr +
+				", f.closed_because, v.score_centi, v.exploited, v.advisory")
 		return q.Where("f.closed_at IS NULL")
 	}
 
@@ -172,6 +209,24 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// decides what counts as a fix. The screen used to make that judgment a
 	// second time, in a column heading, and it disagreed with this one.
 	comparison.Fixed, comparison.Closed = partition(comparison.Fixed)
+
+	// What stands over what is still there. Read only for the still-present
+	// entries, because that is the list somebody signs a release off against
+	// — what was fixed needs no justification and what is newly present has
+	// not been looked at yet.
+	if len(comparison.Still) > 0 {
+		stands, err := s.whatStands(ctx, toProduct, toTarget, visible)
+		if err != nil {
+			return nil, err
+		}
+		for i := range comparison.Still {
+			held := stands[key(comparison.Still[i])]
+			comparison.Still[i].State = held.State
+			comparison.Still[i].Outcome = held.Outcome
+			comparison.Still[i].Justification = held.Justification
+			comparison.Still[i].Due = held.Due
+		}
+	}
 
 	had := map[string]bool{}
 	for _, c := range was {
@@ -400,4 +455,141 @@ type Gone struct {
 // can stop agreeing.
 func pairKey(vulnerability, component string) string {
 	return vulnerability + "\x00" + component
+}
+
+// Stands is what a build has decided about one issue at one component.
+type Stands struct {
+	State         string
+	Outcome       string
+	Justification string
+	Due           *time.Time
+}
+
+// whatStands reads how far the later build has decided each of the things it
+// still has, and what it decided.
+//
+// **Two statements over groups rather than one over places.** A real build
+// holds a quarter of a million places and a few hundred groups, and what is
+// wanted is one answer per group — so the counts are aggregated in the
+// database and the outcomes are folded here, which is also where the rule
+// about disagreement lives.
+//
+// Read for the whole build rather than for the entries asked about: the
+// comparison's still-present list is most of what the build holds, and a
+// statement narrowed by a list of hundreds of pairs is a longer statement
+// that reads the same rows.
+func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
+	visible []access.Visibility) (map[string]Stands, error) {
+
+	var counted []struct {
+		Vulnerability string     `bun:"vulnerability"`
+		Component     string     `bun:"component"`
+		Places        int        `bun:"places"`
+		Waiting       int        `bun:"waiting_here"`
+		Approved      int        `bun:"approved_here"`
+		Lapsed        int        `bun:"lapsed_here"`
+		Due           *time.Time `bun:"due_at"`
+	}
+	q := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`COUNT(*) AS "places"`).
+		// The soonest of them, which is the date a coordinator reads against.
+		ColumnExpr(`MIN(f.due_at) AS "due_at"`)
+	// Counted the way the findings list counts them, through the one spelling
+	// of each state, so a row here and the same row on the list cannot say
+	// different things about how far it has been decided.
+	q = decisionCounts(q, "?", []any{productID}, claimWaiting, claimApproved, claimLapsed).
+		Where("f.target_id = ?", targetID).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("v.identifier, c.name")
+	if err := q.Scan(ctx, &counted); err != nil {
+		return nil, fmt.Errorf("read how far this build has decided what it still has: %w", err)
+	}
+
+	out := make(map[string]Stands, len(counted))
+	for _, row := range counted {
+		out[pairKey(row.Vulnerability, row.Component)] = Stands{
+			State: stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
+			Due:   row.Due,
+		}
+	}
+
+	// And what was decided, where something stands. One row per claim, so a
+	// group answered by two claims comes back as two — which is what says the
+	// row has no single judgment behind it.
+	//
+	// **Grouped on the claim rather than on its words.** MySQL and MariaDB
+	// compare only the first `max_sort_length` bytes of a long text for
+	// GROUP BY, and a justification is bounded at sixty-four kilobytes — so
+	// two claims whose reasoning differs only past the first kilobyte counted
+	// as one there and as two on PostgreSQL. A claim identifier compares the
+	// same everywhere.
+	var said []struct {
+		Vulnerability string `bun:"vulnerability"`
+		Component     string `bun:"component"`
+		Claim         int64  `bun:"claim"`
+		Outcome       string `bun:"outcome"`
+		Justification string `bun:"justification"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		// The decision at this place, in this product, at the versions the
+		// place holds now — the same match the counts above are made with.
+		Join(`JOIN "decision" AS "de" ON de.vulnerability_id = f.vulnerability_id
+			AND de.place_identity = f.place_identity AND de.product_id = ?
+			AND de.state = ? AND de.live_key IS NOT NULL AND `+KeyMatches, productID, "approved").
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`cl.id AS "claim"`).
+		ColumnExpr(`cl.outcome AS "outcome"`).
+		// One value per group, because the group is one claim: which bytes an
+		// engine compares to take the minimum cannot change the answer.
+		ColumnExpr(`COALESCE(MIN(cl.justification), '') AS "justification"`).
+		Where("f.target_id = ?", targetID).
+		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
+		GroupExpr("v.identifier, c.name, cl.id, cl.outcome").
+		Scan(ctx, &said)
+	if err != nil {
+		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)
+	}
+	// **Only where they agree, and agreement is about the outcome.** A
+	// component argued away at one place and deferred at another is two
+	// claims, and stating either over the row would be a claim nobody made —
+	// the rule the VEX document publishes under. Two claims reaching the same
+	// outcome in different words are not that: they agree, and what the row
+	// cannot state is which wording, so it states the outcome and no reason.
+	outcomes := map[string]map[string]bool{}
+	claims := map[string]int{}
+	for _, row := range said {
+		at := pairKey(row.Vulnerability, row.Component)
+		if outcomes[at] == nil {
+			outcomes[at] = map[string]bool{}
+		}
+		outcomes[at][row.Outcome] = true
+		claims[at]++
+	}
+	for _, row := range said {
+		at := pairKey(row.Vulnerability, row.Component)
+		if len(outcomes[at]) != 1 {
+			continue
+		}
+		held := out[at]
+		held.Outcome = row.Outcome
+		if claims[at] == 1 {
+			held.Justification = row.Justification
+		}
+		out[at] = held
+	}
+	return out, nil
 }

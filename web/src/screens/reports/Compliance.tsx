@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { findingsPath, scopeQuery, useScope } from "../../app/scope";
@@ -8,6 +8,7 @@ import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Severity } from "../../ui/Severity";
 import { Sheet } from "./Sheet";
+import { PeriodPicker, asked, coveringPeriod, periodAsked, stated } from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // Whether work met the dates policy set for it.
@@ -26,11 +27,18 @@ export function Compliance() {
   const at = useScope();
   const scope = scopeQuery(at);
   const product = at.product ?? "";
+  const [params] = useSearchParams();
+  // No window by default, which is the lifetime figure this has always
+  // answered. A period is what a quarterly review or a financial year asks
+  // for, and it bounds what closed in it — what is open is always now.
+  const period = periodAsked(params);
+  const when = asked(period, 0);
 
   const rates = useQuery({
     enabled: product !== "",
-    queryKey: ["compliance", scope],
-    queryFn: async () => unwrap(await api.GET("/v1/compliance", { params: { query: scope } })),
+    queryKey: ["compliance", scope, when],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/compliance", { params: { query: { ...when, ...scope } } })),
   });
 
   const rows = rates.data?.items ?? [];
@@ -50,7 +58,9 @@ export function Compliance() {
       settled={rates.isSuccess}
       name="Deadline compliance"
       answers="whether work met the dates policy set for it."
+      asked={stated(period) ? coveringPeriod(period, 0) : undefined}
     >
+      {product !== "" && <PeriodPicker period={period} />}
       {product === "" ? (
         <section className="panel">
           <Empty

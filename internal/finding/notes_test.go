@@ -273,3 +273,55 @@ func TestTwoMovesOfOneComponentStayApart(t *testing.T) {
 		t.Errorf("three moves of one component made %d entries:\n%s", n, notes)
 	}
 }
+
+func TestABulletCarriesWhatDecidesWhenTheUpgradeIsTaken(t *testing.T) {
+	// A name and a word are not enough to act on. The number, whether
+	// somebody is known to be exploiting it, and where it is written up are
+	// all held and none of them reached the document a customer reads.
+	notes := finding.Notes(about("2.4.0"), &finding.Comparison{
+		Fixed: []finding.Changed{
+			{
+				Vulnerability: "CVE-2026-1", Component: "linux-image", Severity: "critical",
+				Because: finding.Upgraded, FromVersion: "6.12.41-1", MovedTo: "6.12.85-1",
+				ScoreCenti: 980, Exploited: true,
+				Advisory: "https://nvd.nist.gov/vuln/detail/CVE-2026-1",
+			},
+			{
+				Vulnerability: "CVE-2026-2", Component: "linux-image", Severity: "low",
+				Because: finding.Upgraded, FromVersion: "6.12.41-1", MovedTo: "6.12.85-1",
+				// An address a reader's machine would act on, from a feed.
+				// The same rule an address stored beside a claim goes
+				// through, and this one leaves the building.
+				Advisory: "ms-msdt:calc",
+			},
+			{
+				Vulnerability: "CVE-2026-3", Component: "linux-image", Severity: "low",
+				Because: finding.Upgraded, FromVersion: "6.12.41-1", MovedTo: "6.12.85-1",
+				// A scheme nothing refuses, carrying a newline. Inside angle
+				// brackets the address ends at the first space, so the rest
+				// of it is not a link — it is markdown, in a document going
+				// to a customer.
+				Advisory: "https://example.test/x\n\n## Fixed upstream\n- nothing",
+			},
+		},
+	})
+	if !strings.Contains(notes, "CVE-2026-1 (critical, 9.8, known exploited)") {
+		t.Errorf("the bullet does not carry what decides when to take it:\n%s", notes)
+	}
+	if !strings.Contains(notes, "<https://nvd.nist.gov/vuln/detail/CVE-2026-1>") {
+		t.Errorf("the bullet does not link the write-up:\n%s", notes)
+	}
+	if strings.Contains(notes, "ms-msdt") {
+		t.Errorf("a scheme a machine acts on reached a published document:\n%s", notes)
+	}
+	// An issue nobody scored says the word and no number, rather than a zero
+	// that reads as harmless.
+	if !strings.Contains(notes, "CVE-2026-2 (low)") {
+		t.Errorf("an unscored issue does not read as unscored:\n%s", notes)
+	}
+	// And an address that would close the autolink is left out rather than
+	// printed: what follows it is whole markdown lines a feed chose.
+	if strings.Contains(notes, "Fixed upstream") {
+		t.Errorf("a feed wrote lines into a published note:\n%s", notes)
+	}
+}

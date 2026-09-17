@@ -37,7 +37,7 @@ type Went struct {
 // so the row is shown only where the reader may see the finding it was written
 // about, and a count is as much a disclosure as a row.
 func (s *Store) Published(ctx context.Context, subject access.Subject,
-	productIDs []int64, since time.Time) ([]Went, error) {
+	productIDs []int64, since, until time.Time) ([]Went, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second. A person holding
@@ -69,8 +69,13 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	if len(productIDs) > 0 {
 		q = q.Where("ai.product_id IN (?)", bun.List(productIDs))
 	}
+	// Either side, or neither: an unbounded side is the beginning or now,
+	// which is what a period's zero side means everywhere else here.
 	if !since.IsZero() {
 		q = q.Where("ai.issued_at >= ?", since)
+	}
+	if !until.IsZero() {
+		q = q.Where("ai.issued_at < ?", until)
 	}
 
 	// The flaw it was written about has to be one this reader may see. Asked

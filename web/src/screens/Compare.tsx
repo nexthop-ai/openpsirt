@@ -7,6 +7,8 @@ import type { Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Outcome } from "../ui/Outcome";
+import { drawn, said } from "../ui/states";
 import { Severity } from "../ui/Severity";
 import { Across } from "../ui/Charts";
 
@@ -364,11 +366,17 @@ function Columns({
         note="Superseded means the version moved and took the issue with it. Unexplained means the component is unchanged and the scanner stopped reporting it, which is a fault to look into."
       />
       <Column kind="newly" title="Introduced" rows={newly} />
+      {/* What is shipping anyway, and why. The list of what is still there
+          is what a release is signed off against, and without what stands
+          about each row an approved not-applicable and something nobody has
+          looked at read identically — which are opposite answers to the
+          question being asked. */}
       <Column
         kind="still"
         title="Unchanged"
         rows={still}
-        note="A version it arrived from means the bump did not reach the fix."
+        signOff
+        note="A version it arrived from means the bump did not reach the fix. What stands about each is beside it: shipping with a known issue is a decision somebody made."
       />
     </div>
   );
@@ -380,25 +388,44 @@ function Column({
   rows,
   note,
   runsAt,
+  signOff,
 }: {
   kind: string;
   title: string;
   rows: Changed[];
   note?: string;
   runsAt?: string;
+  // signOff draws what stands about each row, and offers the one narrowing a
+  // release coordinator actually works from: what nobody has decided.
+  signOff?: boolean;
 }) {
   const [all, setAll] = useState(false);
-  const shown = all ? rows : rows.slice(0, SHOWN);
+  const [blockers, setBlockers] = useState(false);
+  const kept = blockers ? rows.filter((row) => row.state !== "agreed") : rows;
+  const shown = all ? kept : kept.slice(0, SHOWN);
 
   return (
     <div className={`col ${kind}`}>
       <header>
         <h4>{title}</h4>
-        <span className="n">{rows.length.toLocaleString()}</span>
+        <span className="n">{kept.length.toLocaleString()}</span>
       </header>
-      {rows.length === 0 ? (
+      {signOff && rows.length > 0 && (
+        <label className="hint">
+          <input
+            type="checkbox"
+            checked={blockers}
+            onChange={(e) => {
+              setBlockers(e.target.checked);
+              setAll(false);
+            }}
+          />{" "}
+          Only what nobody has agreed to
+        </label>
+      )}
+      {kept.length === 0 ? (
         <p className="hint" style={{ margin: 0 }}>
-          Nothing.
+          {blockers ? "Everything here has been agreed to." : "Nothing."}
         </p>
       ) : (
         <ul>
@@ -430,14 +457,29 @@ function Column({
                   </>
                 )}
               </span>
+              {/* What stands about it: the outcome where every place of it
+                  was answered the same way, the state otherwise, and the
+                  date it is due. The row nobody has said anything about is
+                  the one a coordinator is looking for. */}
+              {signOff && (
+                <span className="why">
+                  {row.outcome ? (
+                    <Outcome outcome={row.outcome} />
+                  ) : (
+                    <span className={`state ${drawn(row.state)}`}>{said(row.state)}</span>
+                  )}
+                  {row.justification && <span className="hint"> {row.justification}</span>}
+                  {row.due && <span className="hint"> · due {row.due}</span>}
+                </span>
+              )}
             </li>
           ))}
         </ul>
       )}
-      {rows.length > SHOWN && (
+      {kept.length > SHOWN && (
         <p className="more">
           <button type="button" className="linkish" onClick={() => setAll(!all)}>
-            {all ? "Show fewer" : `Show all ${rows.length.toLocaleString()}`}
+            {all ? "Show fewer" : `Show all ${kept.length.toLocaleString()}`}
           </button>
         </p>
       )}

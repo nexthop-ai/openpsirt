@@ -77,6 +77,12 @@ type Auditing struct {
 	Approver  string    `query:"approved_by" doc:"Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match"`
 	Issue     string    `query:"issue" doc:"Only judgments about this vulnerability, under the name it is filed here"`
 	Component string    `query:"component" doc:"Only judgments about this component, by name"`
+	// A build, for the question a release sign-off asks. A decision names no
+	// build — it is keyed on the product, the issue and the place, so that it
+	// carries across releases sharing the code — so this asks which judgments
+	// are about something one build actually ships.
+	Stream  string `query:"stream" doc:"Only judgments about places this branch or tag holds. Needs exactly one product and a variant"`
+	Variant string `query:"variant" doc:"Which build of that stream. Needs exactly one product and a stream"`
 }
 
 // narrow turns what was asked for into what the store reads by, resolving the
@@ -115,6 +121,29 @@ func (a Auditing) narrow(ctx context.Context, in Ingest,
 			return filter, since, until, err
 		}
 		filter.ProductIDs = append(filter.ProductIDs, named.ID)
+	}
+	// A build is a product, a stream and a variant together. Named without
+	// the other two it would narrow to a stream of some other product that
+	// happens to share the name, which is a report about somebody else's
+	// releases under this one's heading.
+	if (a.Stream != "") != (a.Variant != "") {
+		return filter, since, until, huma.Error422UnprocessableEntity(
+			"a build is a stream and a variant together: name both, or neither")
+	}
+	if a.Stream != "" {
+		if len(filter.ProductIDs) != 1 {
+			return filter, since, until, huma.Error422UnprocessableEntity(
+				"name exactly one product with a build: a stream belongs to one")
+		}
+		located, err := locatedVisibly(ctx, in, subject, a.Product[0], a.Stream, a.Variant)
+		if err != nil {
+			return filter, since, until, err
+		}
+		target, err := targetRow(ctx, in, located.StreamID, located.VariantID)
+		if err != nil {
+			return filter, since, until, err
+		}
+		filter.TargetID = target.ID
 	}
 	from, err := aDate(a.From)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -228,5 +229,126 @@ func TestTheRateCountsTheSameThingTheListDoes(t *testing.T) {
 			return
 		}
 		t.Fatal("no band called \"high\"")
+	})
+}
+
+// TestARateCanBeAskedForAPeriod is the number a manager and an auditor ask for.
+//
+// A rolling window ending today cannot express "last financial year", and the
+// rate took no period control at all — so the one report whose whole subject is
+// dates could only be read as a lifetime total.
+func TestARateCanBeAskedForAPeriod(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		ctx := t.Context()
+
+		// The high one closed inside its deadline, a year ago. The low one is
+		// still open, which is what the open half of the rate is about.
+		closed := time.Now().UTC().AddDate(0, 0, -400)
+		if _, err := r.db.DB.NewUpdate().Table("finding").
+			Set("closed_at = ?", closed).
+			Set("due_at = ?", closed.AddDate(0, 0, 7)).
+			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" `+
+				`WHERE identifier = ?)`, "CVE-2026-9999").
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		rate := func(t *testing.T, query, band string) (closed, met, open int) {
+			t.Helper()
+			var out struct {
+				Items []struct {
+					Severity string `json:"severity"`
+					Closed   int    `json:"closed"`
+					Met      int    `json:"met"`
+					Open     int    `json:"open"`
+				} `json:"items"`
+			}
+			read(t, r, "triager", "/v1/compliance?product=mine"+query, &out)
+			for _, each := range out.Items {
+				if each.Severity == band {
+					return each.Closed, each.Met, each.Open
+				}
+			}
+			t.Fatalf("no band called %q", band)
+			return 0, 0, 0
+		}
+
+		// Everything held, which is what this answered before and still
+		// answers when nothing is asked for.
+		if got, met, _ := rate(t, "", "high"); got != 1 || met != 1 {
+			t.Errorf("over everything held the rate closed %d and met %d", got, met)
+		}
+
+		// A period the closure falls in, and one it does not. The second is
+		// the whole point: a quarter in which nothing was finished has to read
+		// as nothing finished rather than as the lifetime figure.
+		within := fmt.Sprintf("&from=%s&to=%s",
+			closed.AddDate(0, 0, -7).Format(time.DateOnly),
+			closed.AddDate(0, 0, 7).Format(time.DateOnly))
+		if got, met, _ := rate(t, within, "high"); got != 1 || met != 1 {
+			t.Errorf("in the period it closed in the rate closed %d and met %d", got, met)
+		}
+		after := "&from=" + time.Now().UTC().AddDate(0, 0, -30).Format(time.DateOnly)
+		if got, _, _ := rate(t, after, "high"); got != 0 {
+			t.Errorf("in a period after the closure the rate still closed %d", got)
+		}
+		// And one that ends before it, which is the other bound: a financial
+		// year is both.
+		before := "&to=" + closed.AddDate(0, 0, -7).Format(time.DateOnly)
+		if got, _, _ := rate(t, before, "high"); got != 0 {
+			t.Errorf("in a period ending before the closure the rate closed %d", got)
+		}
+
+		// And the open half is a statement about now whatever period was
+		// asked for, because what stood open on a date gone by is not
+		// recoverable — deadlines move as the policy moves.
+		if _, _, open := rate(t, after, "low"); open != 1 {
+			t.Errorf("a period narrowed what is open now to %d", open)
+		}
+
+		// The denominator the deferred and overdue counts are read against.
+		// Without it they were numerators with nothing to be a share of.
+		if _, _, open := rate(t, "", "low"); open != 1 {
+			t.Errorf("the rate says %d are open at all", open)
+		}
+	})
+}
+
+func TestTwoWaysOfSayingWhenAreRefusedTogether(t *testing.T) {
+	// A caller who sent both meant one of them, and a report that silently
+	// answered about the other is a figure quoted for the wrong period —
+	// which is the failure a period control exists to fix.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		for _, at := range []string{
+			"/v1/compliance?product=mine&days=30&from=2026-01-01",
+			"/v1/remediation?days=30&to=2026-01-01",
+			"/v1/measures?days=30&from=2026-01-01",
+			"/v1/approvals/scrutiny?days=30&from=2026-01-01",
+			"/v1/effort?days=30&from=2026-01-01",
+		} {
+			got := asPerson(t, r, "private-triage", http.MethodGet, at, "")
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("%s answered %d to both ways of saying when", at, got.Code)
+			}
+		}
+		// And a period that ends before it starts holds nothing, which is
+		// indistinguishable from a quarter in which nothing happened.
+		backwards := asPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/compliance?product=mine&from=2026-06-01&to=2026-01-01", "")
+		if backwards.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a period ending before it starts answered %d", backwards.Code)
+		}
+		// And one naming the same day twice holds no days, because the end is
+		// not itself in it — a different mistake, said differently.
+		empty := asPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/compliance?product=mine&from=2026-01-01&to=2026-01-01", "")
+		if empty.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a period holding no days answered %d", empty.Code)
+		}
+		if !strings.Contains(empty.Body.String(), "no days") {
+			t.Errorf("an empty period is refused as a backwards one: %s", empty.Body.String())
+		}
 	})
 }

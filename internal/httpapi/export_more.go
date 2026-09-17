@@ -76,6 +76,8 @@ func registerDueExport(api huma.API, in Ingest) {
 		rights := access.NewStore(in.DB.DB)
 		now := time.Now().UTC()
 		out := Exporting{
+			What:  "what is running out of time",
+			About: []Stated{{"looking ahead days", strconv.Itoa(input.Days)}},
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
 				"product", "stream", "variant", "places", "held by", "due", "days left",
@@ -188,9 +190,20 @@ func registerComparisonExport(api huma.API, in Ingest) {
 			return nil, refusedFinding(in, err)
 		}
 		out := Exporting{
+			What: "comparison of two builds",
+			// Which two builds, because a file headed "comparison" and
+			// naming neither of them is a document nobody can check against
+			// anything, and whether the undisclosed ones are in it: a file
+			// that leaves them out reads as complete about what remains.
+			About: []Stated{
+				{"earlier build", input.From + " (" + input.FromVariant + ")"},
+				{"later build", input.To + " (" + input.ToVariant + ")"},
+				{"includes undisclosed", strconv.FormatBool(input.IncludePrivate)},
+			},
 			Header: []string{
 				"change", "issue", "component", "severity", "because",
 				"from version", "moved to", "arrived from", "closed by run",
+				"state", "outcome", "justification", "due",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				if offset > 0 {
@@ -201,24 +214,35 @@ func registerComparisonExport(api huma.API, in Ingest) {
 				for _, group := range []struct {
 					what string
 					of   []finding.Changed
+					// stands says the rows carry what the build decided about
+					// them, which is true of what is still there and of
+					// nothing else: what was fixed needs no justification and
+					// what is newly present has not been looked at yet.
+					stands bool
 				}{
-					{"fixed", comparison.Fixed},
+					{what: "fixed", of: comparison.Fixed},
 					// Apart from the fixes, by the same split the screen and
 					// the release note read: a superseded bump and a closure
 					// nothing explains are not work anybody did.
-					{"closed, not fixed", comparison.Closed},
-					{"newly present", comparison.Newly},
-					{"still present", comparison.Still},
+					{what: "closed, not fixed", of: comparison.Closed},
+					{what: "newly present", of: comparison.Newly},
+					{what: "still present", of: comparison.Still, stands: true},
 				} {
-					for _, row := range group.of {
+					// Read through the same function the screen reads, so the
+					// file cannot come to answer less than the screen it was
+					// taken from — which is what it did: an approved
+					// not-applicable and a row nobody had looked at were the
+					// same nine columns.
+					for _, body := range changed(group.of, true, group.stands) {
 						closedRun := ""
-						if row.ClosedRun != 0 {
-							closedRun = strconv.FormatInt(row.ClosedRun, 10)
+						if body.ClosedRun != 0 {
+							closedRun = strconv.FormatInt(body.ClosedRun, 10)
 						}
 						rows = append(rows, []string{
-							group.what, row.Vulnerability, row.Component, row.Severity,
-							string(row.Because), row.FromVersion, row.MovedTo, row.ArrivedFrom,
-							closedRun,
+							group.what, body.Vulnerability, body.Component, body.Severity,
+							body.Because, body.FromVersion, body.MovedTo, body.ArrivedFrom,
+							closedRun, body.State, string(body.Outcome),
+							string(body.Justification), body.Due,
 						})
 					}
 				}
@@ -229,6 +253,15 @@ func registerComparisonExport(api huma.API, in Ingest) {
 			writeExport(writer, input.Format, "comparison-"+downloadName(input.Product), out)
 		}}, nil
 	})
+}
+
+// asDay is a bound on a period as a file states it, and nothing where the
+// period has no bound on that side.
+func asDay(at time.Time) string {
+	if at.IsZero() {
+		return ""
+	}
+	return at.UTC().Format(time.DateOnly)
 }
 
 // registerAuditExport writes out the record of judgments.
@@ -242,6 +275,11 @@ func registerAuditExport(api huma.API, in Ingest) {
 			"it, and whether a second person does. Approvals are joined with `;` in the CSV " +
 			"because a spreadsheet has one cell per column and an auditor reads them as a " +
 			"list; the JSON keeps them as one field of the same shape.\n\n" +
+			"**`agreements` is the whole of the record**, with dates: who agreed, when, " +
+			"whether the agreement was carried from an earlier claim, and when it was taken " +
+			"back. `approved by` stays who agrees *now*, because those are different " +
+			"questions and a column mixing them is the one answer an auditor must not be " +
+			"given.\n\n" +
 			"**Read with your own visibility, as it streams.** Nothing about a report is " +
 			"exempt from the rules the screens follow — a file showing more than the screen " +
 			"that summarizes it would be a way around them.\n\n" +
@@ -260,11 +298,13 @@ func registerAuditExport(api huma.API, in Ingest) {
 			return nil, err
 		}
 		out := Exporting{
+			What:  "the record of judgments",
+			About: []Stated{{"from", asDay(since)}, {"to", asDay(until)}},
 			Header: []string{
 				"id", "proposed", "product", "issue", "component", "version", "consumer",
 				"outcome", "justification", "deferred until", "fixed version",
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
-				"reasoning",
+				"agreements", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				judged, _, err := store.Audit(ctx, subject, filter, since, until, limit, offset)
@@ -284,6 +324,22 @@ func registerAuditExport(api huma.API, in Ingest) {
 							agreed = append(agreed, one.By)
 						}
 					}
+					// And the whole of the record beside it, dates and all.
+					// The column above is who agrees now, which is what an
+					// auditor reads first; what somebody agreed to and then
+					// stopped agreeing to is what an audit is looking for,
+					// and the file carried neither it nor any date at all.
+					every := make([]string, 0, len(body.Approvals))
+					for _, one := range body.Approvals {
+						said := one.By + " " + one.At
+						if one.Carried {
+							said += " carried"
+						}
+						if one.WithdrawnAt != "" {
+							said += " withdrawn " + one.WithdrawnAt
+						}
+						every = append(every, said)
+					}
 					rows = append(rows, []string{
 						strconv.FormatInt(body.ID, 10), body.ProposedAt, body.Product,
 						body.Issue, body.Component, body.Version, body.Consumer,
@@ -292,7 +348,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 						strconv.FormatBool(body.Standing),
 						body.ProposedBy, strings.Join(agreed, "; "),
 						strconv.FormatBool(body.TwoPeople), body.EndedAt,
-						body.Reasoning,
+						strings.Join(every, "; "), body.Reasoning,
 					})
 				}
 				return rows, nil
@@ -337,6 +393,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 			return nil, err
 		}
 		out := Exporting{
+			What: "the review queue",
 			Header: []string{
 				"claim", "proposed", "proposed by", "age days", "outcome", "issue",
 				"product", "component", "decisions", "issues", "places", "builds",
@@ -429,7 +486,8 @@ func registerComponentExport(api huma.API, in Ingest) {
 			line = floor.Word
 		}
 		out := Exporting{
-			About:  [2]string{"triaged at or above", line},
+			What:   "findings by component",
+			About:  []Stated{{"triaged at or above", line}},
 			Header: []string{"component", "version", "upstream", "ecosystem", "issues", "places", "exploited"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				groups, _, err := store.ComponentGroups(ctx, subject, scope, limit, offset, narrowed)

@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { findingsPath, scopeQuery, useScope } from "../app/scope";
 import type { Scoped } from "../app/scope";
 import { unwrap } from "../api/queries";
+import { Severity } from "../ui/Severity";
 import { Failed } from "../ui/Failed";
 import { Pace, Mix, Ring, Releases } from "../ui/Charts";
 import { paceReading, mixReading } from "../ui/trend";
@@ -207,6 +208,7 @@ function Readiness({ at }: { at: Scoped }) {
   const now = ready.data?.now;
   const shipped = ready.data?.shipped;
   const floor = ready.data?.floor;
+  const blocking = ready.data?.blocking ?? [];
 
   return (
     <div className="panel">
@@ -253,8 +255,38 @@ function Readiness({ at }: { at: Scoped }) {
       ) : (
         <p className="reading">{ready.data?.why || "Nothing to compare against yet."}</p>
       )}
+      {/* What the count is made of. A number read at the moment there is no
+          time to go and assemble the list is a number nobody can act on, and
+          this is the screen a release conversation happens in. Anything
+          agreed to is absent: agreeing is the decision to ship with it. */}
+      {blocking.length > 0 && (
+        <>
+          <p className="reading" style={{ marginBottom: 4 }}>
+            <b>{(ready.data?.blockers ?? 0).toLocaleString()} nobody has agreed to ship with</b>
+            {(ready.data?.blockers ?? 0) > blocking.length && (
+              <span className="hint"> · the worst {blocking.length} shown</span>
+            )}
+          </p>
+          <ul className="plain">
+            {blocking.map((row) => (
+              <li key={`${row.vulnerability} ${row.component}`}>
+                <Severity word={row.severity} /> <span className="id">{row.vulnerability}</span>{" "}
+                <span className="id hint">{row.component}</span>
+                {row.state && <span className="hint"> · {row.state}</span>}
+                {row.due && <span className="hint"> · due {row.due}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {at.product && (
         <footer>
+          <Link
+            to={`${findingsPath({ product: at.product, stream: at.stream, variant: at.variant })}?state=undecided&state=waiting&state=lapsed`}
+            className="linkish"
+          >
+            Work what is blocking →
+          </Link>
           <Link to={`/products/${encodeURIComponent(at.product)}/comparison`} className="linkish">
             Release comparison →
           </Link>

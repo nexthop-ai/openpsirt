@@ -76,6 +76,16 @@ export function Upgrades() {
         )}
       </div>
 
+      {rows.length > 0 && (
+        <p className="hint">
+          {/* A link somebody follows rather than a request this page makes, so
+              the browser fetches it with the session it already has. */}
+          The whole of it as a file — <a href={fileAt(product, stream, variant, "csv")}>CSV</a> ·{" "}
+          <a href={fileAt(product, stream, variant, "json")}>JSON</a>, with the build it is about
+          and the day it was taken stated in it.
+        </p>
+      )}
+
       {rows.length === 0 ? (
         <Empty
           title="Nothing is planned for this build."
@@ -153,5 +163,14 @@ export function Upgrades() {
         </Wide>
       )}
     </>
+  );
+}
+
+// Where the file comes from.
+function fileAt(product: string, stream: string, variant: string, format: string): string {
+  return (
+    `/v1/products/${encodeURIComponent(product)}` +
+    `/streams/${encodeURIComponent(stream)}` +
+    `/variants/${encodeURIComponent(variant)}/pending-upgrades.${format}`
   );
 }

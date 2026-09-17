@@ -74,6 +74,18 @@ components:
       required:
         - acknowledged
       type: object
+    Acknowledgment:
+      additionalProperties: false
+      properties:
+        names:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        summary:
+          type: string
+      type: object
     Add-outboundRequest:
       additionalProperties: false
       properties:
@@ -535,6 +547,35 @@ components:
         - group
         - role
       type: object
+    BlockingBody:
+      additionalProperties: false
+      properties:
+        component:
+          type: string
+        due:
+          type: string
+        exploited:
+          type: boolean
+        places:
+          description: How many places of the build it sits at
+          format: int64
+          type: integer
+        severity:
+          type: string
+        state:
+          description: How far it has been decided. Anything agreed is not in this list
+          enum:
+            - undecided
+            - waiting
+            - lapsed
+          type: string
+        vulnerability:
+          type: string
+      required:
+        - vulnerability
+        - component
+        - places
+      type: object
     Branch:
       additionalProperties: false
       properties:
@@ -749,6 +790,24 @@ components:
         - issues
         - places
         - in
+      type: object
+    CVSSv3:
+      additionalProperties: false
+      properties:
+        baseScore:
+          format: double
+          type: number
+        baseSeverity:
+          type: string
+        vectorString:
+          type: string
+        version:
+          type: string
+      required:
+        - version
+        - vectorString
+        - baseScore
+        - baseSeverity
       type: object
     CanBody:
       additionalProperties: false
@@ -996,13 +1055,44 @@ components:
           type: integer
         component:
           type: string
+        due:
+          description: The soonest deadline among the places still open, as a date
+          type: string
         from_version:
           description: The version the place held before the fix. Only on a fixed entry the version moved for
+          type: string
+        justification:
+          description: The recognized reason it does not apply, on a dismissal
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+            - vulnerable_code_not_in_execute_path
+            - vulnerable_code_cannot_be_controlled_by_adversary
+            - inline_mitigations_already_exist
           type: string
         moved_to:
           description: The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither
           type: string
+        outcome:
+          description: What was decided, where every standing decision over its places says the same thing
+          enum:
+            - affected
+            - not-applicable
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
+          type: string
         severity:
+          type: string
+        state:
+          description: How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
+          enum:
+            - undecided
+            - waiting
+            - agreed
+            - lapsed
           type: string
         vulnerability:
           type: string
@@ -2025,6 +2115,12 @@ components:
         - state
         - opened
       type: object
+    Distribution:
+      additionalProperties: false
+      properties:
+        tlp:
+          $ref: "#/components/schemas/TLP"
+      type: object
     Document:
       additionalProperties: false
       properties:
@@ -2972,6 +3068,9 @@ components:
           type:
             - array
             - "null"
+        measured:
+          $ref: "#/components/schemas/MeasuredBody"
+          description: What the register was measured with. Absent where nothing has been uploaded to the build
         total:
           format: int64
           type: integer
@@ -4299,28 +4398,6 @@ components:
       required:
         - items
       type: object
-    ListBodyRateBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyRateBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/RateBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
     ListBodyReleaseBody:
       additionalProperties: false
       properties:
@@ -4607,28 +4684,6 @@ components:
       required:
         - items
       type: object
-    ListBodyWentBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyWentBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/WentBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
     MatchBody:
       additionalProperties: false
       properties:
@@ -4654,15 +4709,42 @@ components:
     MeasuredBody:
       additionalProperties: false
       properties:
+        built_at:
+          description: When the build it describes was built
+          type: string
         database_version:
           description: The vulnerability database it read
           type: string
+        document:
+          description: The inventory that was read, as the receipt names it
+          format: int64
+          type: integer
+        document_at:
+          description: Where to fetch the inventory that was read. Absent where its contents were let go
+          type: string
+        document_hash:
+          description: The hash of the inventory as it arrived
+          type: string
+        document_held:
+          description: Whether the inventory itself is still here
+          type: boolean
         ran_at:
           description: When that run finished
           type: string
         ran_here:
           description: We ran the scanner, rather than the build sending what its own found
           type: boolean
+        run:
+          description: The scanner run these came from
+          format: int64
+          type: integer
+        scan:
+          description: The upload the build's contents came from, as the receipt names it
+          format: int64
+          type: integer
+        scan_hash:
+          description: The hash of what was uploaded
+          type: string
         scanner:
           description: Which scanner produced the findings
           type: string
@@ -4764,6 +4846,8 @@ components:
           type: string
         csaf_version:
           type: string
+        distribution:
+          $ref: "#/components/schemas/Distribution"
         lang:
           type: string
         notes:
@@ -4774,6 +4858,12 @@ components:
             - "null"
         publisher:
           $ref: "#/components/schemas/Issuer"
+        references:
+          items:
+            $ref: "#/components/schemas/Reference"
+          type:
+            - array
+            - "null"
         title:
           type: string
         tracking:
@@ -5106,6 +5196,93 @@ components:
         - fixable
         - unmatched
         - rows
+      type: object
+    OverPeriodRateBodyBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OverPeriodRateBodyBody.json
+          format: uri
+          readOnly: true
+          type: string
+        from:
+          description: The first day of the period. Absent where it runs from the beginning
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/RateBody"
+          type:
+            - array
+            - "null"
+        to:
+          description: The day it ends, which is not itself in it
+          type: string
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - to
+      type: object
+    OverPeriodSpentBodyBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OverPeriodSpentBodyBody.json
+          format: uri
+          readOnly: true
+          type: string
+        from:
+          description: The first day of the period. Absent where it runs from the beginning
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SpentBody"
+          type:
+            - array
+            - "null"
+        to:
+          description: The day it ends, which is not itself in it
+          type: string
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - to
+      type: object
+    OverPeriodWentBodyBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OverPeriodWentBodyBody.json
+          format: uri
+          readOnly: true
+          type: string
+        from:
+          description: The first day of the period. Absent where it runs from the beginning
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/WentBody"
+          type:
+            - array
+            - "null"
+        to:
+          description: The day it ends, which is not itself in it
+          type: string
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - to
       type: object
     OverviewOutputBody:
       additionalProperties: false
@@ -5747,6 +5924,10 @@ components:
           description: How many of those closed by it. Closed exactly at the deadline met it, because something still open at that instant is not yet overdue
           format: int64
           type: integer
+        open:
+          description: Still open at all, whatever their deadline. The denominator the deferred and overdue counts are read against
+          format: int64
+          type: integer
         overdue:
           description: Still open, past the deadline, with no deferral standing — plainly late
           format: int64
@@ -5760,6 +5941,7 @@ components:
         - late
         - deferred
         - overdue
+        - open
       type: object
     ReachBody:
       additionalProperties: false
@@ -5804,6 +5986,17 @@ components:
           format: uri
           readOnly: true
           type: string
+        blockers:
+          description: How many pieces of work nobody has agreed to ship with
+          format: int64
+          type: integer
+        blocking:
+          description: What nobody has agreed to ship with, worst first. Bounded; total says how many there are
+          items:
+            $ref: "#/components/schemas/BlockingBody"
+          type:
+            - array
+            - "null"
         floor:
           description: The least severity counted, or empty where everything is
           type: string
@@ -5816,6 +6009,8 @@ components:
           type: string
       required:
         - now
+        - blocking
+        - blockers
       type: object
     Reaffirm-claimRequest:
       additionalProperties: false
@@ -6122,6 +6317,19 @@ components:
       required:
         - reason
       type: object
+    Reference:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        summary:
+          type: string
+        url:
+          type: string
+      required:
+        - summary
+        - url
+      type: object
     ReferenceBody:
       additionalProperties: false
       properties:
@@ -6188,6 +6396,23 @@ components:
         - cut
         - open
       type: object
+    Remediation:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        details:
+          type: string
+        product_ids:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - category
+        - details
+      type: object
     RemediationOutputBody:
       additionalProperties: false
       properties:
@@ -6199,20 +6424,19 @@ components:
           readOnly: true
           type: string
         aging:
-          description: What is open now, by how long it has been
+          description: What is open now, by how long it has been. About now whatever period was asked for
           items:
             $ref: "#/components/schemas/BucketBody"
           type:
             - array
             - "null"
-        days:
-          description: The window these cover
-          format: int64
-          type: integer
         fixed:
           description: Distinct issues that actually went away in the window
           format: int64
           type: integer
+        from:
+          description: The first day of the period. Absent where it runs from the beginning
+          type: string
         opened:
           description: Distinct issues that appeared in it
           format: int64
@@ -6223,11 +6447,14 @@ components:
             type: number
           description: Average hours an issue closed in the window was open for, by severity. A severity nothing closed at is absent rather than zero
           type: object
+        to:
+          description: The day it ends, which is not itself in it
+          type: string
       required:
         - fixed
         - opened
         - aging
-        - days
+        - to
       type: object
     RepeatBody:
       additionalProperties: false
@@ -6359,8 +6586,11 @@ components:
     RetiredBody:
       additionalProperties: false
       properties:
+        ended:
+          description: The date has passed. False is a release that is about to go out of support
+          type: boolean
         ended_days:
-          description: How many days ago support ended
+          description: How many days ago support ended. Negative where the date has not arrived, which is how many days are left
           format: int64
           type: integer
         ended_on:
@@ -6390,6 +6620,7 @@ components:
         - ended_on
         - ended_days
         - open
+        - ended
       type: object
     RetiredOutputBody:
       additionalProperties: false
@@ -6401,6 +6632,17 @@ components:
           format: uri
           readOnly: true
           type: string
+        ending:
+          description: Releases whose date has not arrived yet, soonest first. Empty unless within was asked for
+          items:
+            $ref: "#/components/schemas/RetiredBody"
+          type:
+            - array
+            - "null"
+        ending_open:
+          description: Issues open across those, which is what leaves every overdue count on the day they cross
+          format: int64
+          type: integer
         items:
           items:
             $ref: "#/components/schemas/RetiredBody"
@@ -6415,10 +6657,17 @@ components:
           description: How many releases are out of support
           format: int64
           type: integer
+        within:
+          description: How many days ahead this looked
+          format: int64
+          type: integer
       required:
         - items
         - total
         - open
+        - ending
+        - ending_open
+        - within
       type: object
     Revise-claimRequest:
       additionalProperties: false
@@ -6680,6 +6929,20 @@ components:
         - name
         - query
       type: object
+    Score:
+      additionalProperties: false
+      properties:
+        cvss_v3:
+          $ref: "#/components/schemas/CVSSv3"
+        products:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - products
+      type: object
     Score-vectorResponse:
       additionalProperties: false
       properties:
@@ -6739,10 +7002,9 @@ components:
         capped:
           description: A section reached the limit, so this is the worst of it rather than all of it
           type: boolean
-        days:
-          description: How far back this looked
-          format: int64
-          type: integer
+        from:
+          description: The first day of the period, by when a claim was proposed. Absent where it runs from the beginning
+          type: string
         grew:
           items:
             $ref: "#/components/schemas/GrownBody"
@@ -6761,6 +7023,9 @@ components:
           type:
             - array
             - "null"
+        to:
+          description: The day it ends, which is not itself in it
+          type: string
       required:
         - alone
         - bulk
@@ -6768,7 +7033,7 @@ components:
         - lapsed
         - grew
         - agreed
-        - days
+        - to
       type: object
     SelectionBody:
       additionalProperties: false
@@ -7121,6 +7386,48 @@ components:
         - place
         - component
       type: object
+    SpentBody:
+      additionalProperties: false
+      properties:
+        claims:
+          description: Arguments made about it in the period
+          format: int64
+          type: integer
+        component:
+          description: What the judgments were about, by name. Empty where nothing in any build carries the place any more
+          type: string
+        decisions:
+          description: Places those reached
+          format: int64
+          type: integer
+        deferred:
+          description: Claims that put it off
+          format: int64
+          type: integer
+        dismissed:
+          description: Claims that argued it away
+          format: int64
+          type: integer
+        people:
+          description: How many different people argued about it
+          format: int64
+          type: integer
+        product:
+          type: string
+        promised:
+          description: "Claims that promised work: an upgrade or a backport"
+          format: int64
+          type: integer
+      required:
+        - product
+        - component
+        - claims
+        - decisions
+        - people
+        - promised
+        - dismissed
+        - deferred
+      type: object
     Split-claimRequest:
       additionalProperties: false
       properties:
@@ -7468,6 +7775,16 @@ components:
       required:
         - name
         - kind
+      type: object
+    TLP:
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+      required:
+        - label
       type: object
     TeamBody:
       additionalProperties: false
@@ -7878,6 +8195,12 @@ components:
     Vulnerability:
       additionalProperties: false
       properties:
+        acknowledgments:
+          items:
+            $ref: "#/components/schemas/Acknowledgment"
+          type:
+            - array
+            - "null"
         cve:
           type: string
         discovery_date:
@@ -7896,6 +8219,18 @@ components:
             - "null"
         product_status:
           $ref: "#/components/schemas/Status"
+        remediations:
+          items:
+            $ref: "#/components/schemas/Remediation"
+          type:
+            - array
+            - "null"
+        scores:
+          items:
+            $ref: "#/components/schemas/Score"
+          type:
+            - array
+            - "null"
         title:
           type: string
       required:
@@ -8206,6 +8541,8 @@ paths:
 
         Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody who may not read it, and a count is as much a disclosure as a row.
 
+        Asked for neither a period nor a window, this is the last 365 days. An auditor asking what went out in a financial year names the two dates instead.
+
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-published-advisories
       parameters:
@@ -8216,13 +8553,26 @@ paths:
           schema:
             description: Limit to one product, by name
             type: string
-        - description: How far back to look, by when the advisory went out
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
           explode: false
           in: query
           name: days
           schema:
-            default: 365
-            description: How far back to look, by when the advisory went out
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
             format: int64
             maximum: 3650
             minimum: 1
@@ -8232,7 +8582,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyWentBody"
+                $ref: "#/components/schemas/OverPeriodWentBodyBody"
           description: OK
         default:
           content:
@@ -8296,6 +8646,8 @@ paths:
 
         Everything is dated by when the claim was proposed, not by when it was agreed to, and narrowed by what you may see.
 
+        Asked for neither a period nor a window, this is the last 90 days.
+
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-approval-scrutiny
       parameters:
@@ -8306,13 +8658,26 @@ paths:
           schema:
             description: Limit to one product, by name
             type: string
-        - description: How far back to look, by when a claim was proposed
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
           explode: false
           in: query
           name: days
           schema:
-            default: 90
-            description: How far back to look, by when a claim was proposed
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
             format: int64
             maximum: 3650
             minimum: 1
@@ -8704,6 +9069,20 @@ paths:
           schema:
             description: Only judgments about this component, by name
             type: string
+        - description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+            type: string
+        - description: Which build of that stream. Needs exactly one product and a stream
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Which build of that stream. Needs exactly one product and a stream
+            type: string
         - explode: false
           in: query
           name: limit
@@ -8745,6 +9124,8 @@ paths:
         The audit list as a file: every judgment the same filters would show, not one page of them.
 
         **One row per judgment**, with who proposed it, who has a standing agreement on it, and whether a second person does. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
+
+        **`agreements` is the whole of the record**, with dates: who agreed, when, whether the agreement was carried from an earlier claim, and when it was taken back. `approved by` stays who agrees *now*, because those are different questions and a column mixing them is the one answer an auditor must not be given.
 
         **Read with your own visibility, as it streams.** Nothing about a report is exempt from the rules the screens follow — a file showing more than the screen that summarizes it would be a way around them.
 
@@ -8847,6 +9228,20 @@ paths:
           name: component
           schema:
             description: Only judgments about this component, by name
+            type: string
+        - description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
+            type: string
+        - description: Which build of that stream. Needs exactly one product and a stream
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Which build of that stream. Needs exactly one product and a stream
             type: string
         - in: path
           name: format
@@ -9504,6 +9899,10 @@ paths:
 
         **A product is required** — a place identity carries no product, so this cannot be asked across the deployment.
 
+        **A period, or the whole of it.** `from` and `to` bound what closed in them, which is the number a report on a quarter or a financial year is about; `days` is the rolling window, and only one of the two may be sent. Asked for neither, this is the lifetime figure.
+
+        **What is open is always now.** Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable and is not reconstructed.
+
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-compliance-rate
       parameters:
@@ -9528,12 +9927,36 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+            format: int64
+            maximum: 3650
+            minimum: 1
+            type: integer
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyRateBody"
+                $ref: "#/components/schemas/OverPeriodRateBodyBody"
           description: OK
         default:
           content:
@@ -9746,6 +10169,57 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/deferrals/repeated.{format}:
+    get:
+      description: |-
+        The same list as a file: places deferred more than once, most-deferred first, with how long they have been put off for in total.
+
+        What the screen shows is a shape rather than a page — one item deferred three times is a judgment and forty of them is a policy nobody wrote down — and the file is what that goes into a review as.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-repeated-deferrals
+      parameters:
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Limit to one product, by name. Empty means every product you can see
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see
+            type: string
+        - description: How many deferrals make something worth listing. One is an ordinary judgment
+          explode: false
+          in: query
+          name: at_least
+          schema:
+            default: 2
+            description: How many deferrals make something worth listing. One is an ordinary judgment
+            format: int64
+            maximum: 50
+            minimum: 2
+            type: integer
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export repeated deferrals
+      tags:
+        - Reports
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/disclosing:
     get:
       description: |-
@@ -9917,6 +10391,86 @@ paths:
         any_of:
           - private-triage
         note: Not the person who asked for it.
+  /v1/effort:
+    get:
+      description: |-
+        What the judgments in a period were about, most argued first: which component in which product, how many arguments were made, how many places they reached, how many people made them, and what came out of them.
+
+        **Counted in claims, not in the rows they wrote.** A claim is one person's act; counting its rows measures how far a component fans out through an image. Both numbers come back.
+
+        Dated by when a judgment was proposed. Asked for neither a period nor a window, this is the last 90 days.
+
+        Takes the same period and scope the other reports do, and is narrowed by what you may see.
+
+        **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: get-effort
+      parameters:
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+            format: int64
+            maximum: 3650
+            minimum: 1
+            type: integer
+        - description: Limit to judgments made in one product, by name
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to judgments made in one product, by name
+            type: string
+        - description: Limit to judgments this team's members proposed, by team name
+          explode: false
+          in: query
+          name: team
+          schema:
+            description: Limit to judgments this team's members proposed, by team name
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverPeriodSpentBodyBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Report where triage effort went
+      tags:
+        - Reports
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
   /v1/findings:
     get:
       description: |-
@@ -10790,6 +11344,8 @@ paths:
 
         **Narrowed the way every other read is**, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
 
+        **Nothing affected is an answer**, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
+
         Answers by any name the issue goes by.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -10825,6 +11381,42 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: List findings for one issue across every product
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/issues/{vulnerability}/document:
+    get:
+      description: |-
+        What the issue is, every build of yours that carries it, what was decided about each and the reasoning behind it, as markdown — the form a customer inquiry is answered from.
+
+        **It is an internal document and says so.** The reasoning is this deployment's own argument; what goes to a customer is the advisory or the VEX document, both of which are assembled elsewhere and say less on purpose.
+
+        **Narrowed by what you may see**, like every other read: two people asking get different documents rather than one of them getting an error.
+
+        Nothing of yours affected is an answer, and the document says that rather than refusing — which is what the inquiry is usually asking.
+
+        **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: get-issue-document
+      parameters:
+        - description: The issue, by any name it is known under
+          in: path
+          name: vulnerability
+          required: true
+          schema:
+            description: The issue, by any name it is known under
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Render everything known about one issue
       tags:
         - Findings
       x-openpsirt-requires:
@@ -10923,26 +11515,57 @@ paths:
 
         **Per severity**, because a critical waiting a week and a low waiting a week are not the same fact.
 
+        **A period or a rolling window.** `from` and `to` name the stretch a manager or an auditor is reporting on; `days` is the rolling window, and the two are ways of saying the same thing so only one may be sent.
+
         **Bounded, and it says so.** The two waits are worked out from at most the most recent few thousand claims in the window; `sampled` says how many and `capped` says whether the ceiling was reached. A figure quoted from part of a window without saying so is the one thing a number like this must not be.
 
         **Send-backs are counted for the deployment rather than per person**: the record holds that a claim was sent back and not by whom, and the reason travels as a comment.
 
         Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
 
+        Asked for neither a period nor a window, this is the last 90 days.
+
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-measures
       parameters:
-        - description: How far back to measure
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
           explode: false
           in: query
           name: days
           schema:
-            default: 90
-            description: How far back to measure
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
             format: int64
-            maximum: 366
+            maximum: 3650
             minimum: 1
             type: integer
+        - description: Limit to judgments made in one product, by name
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to judgments made in one product, by name
+            type: string
+        - description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name
+          explode: false
+          in: query
+          name: team
+          schema:
+            description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name
+            type: string
       responses:
         "200":
           content:
@@ -14281,6 +14904,132 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/fix-bundles.{format}:
+    get:
+      description: |-
+        The same list as a file: one row per upstream bump, with what it closes and the builds that hold it.
+
+        Takes the same selection and the same filters as the screen, from the same struct. The builds a bump is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-fix-bundles
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Limit to one branch or tag
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Limit to one branch or tag
+            type: string
+        - description: Limit to one variant
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant
+            type: string
+        - description: Keep only issues rated this badly or worse
+          explode: false
+          in: query
+          name: severity
+          schema:
+            description: Keep only issues rated this badly or worse
+            enum:
+              - low
+              - medium
+              - high
+              - critical
+            type: string
+        - description: Keep only bumps closing something known to be exploited
+          explode: false
+          in: query
+          name: exploited
+          schema:
+            description: Keep only bumps closing something known to be exploited
+            type: boolean
+        - description: Keep only bumps moving a component of this name
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep only bumps moving a component of this name
+            type: string
+        - description: Keep only rows whose component or issue name contains this
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Keep only rows whose component or issue name contains this
+            maxLength: 200
+            type: string
+        - description: Keep only components of one package kind
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: Keep only components of one package kind
+            type: string
+        - description: Keep only groups this far decided
+          explode: false
+          in: query
+          name: state
+          schema:
+            description: Keep only groups this far decided
+            enum:
+              - undecided
+              - waiting
+              - agreed
+              - lapsed
+            type: string
+        - description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+          explode: false
+          in: query
+          name: sort
+          schema:
+            description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+            enum:
+              - urgency
+              - severity
+              - issues
+              - places
+              - builds
+              - deadline
+            type: string
+        - description: Order the other way — fewest, least urgent, nearest deadline first
+          explode: false
+          in: query
+          name: asc
+          schema:
+            description: Order the other way — fewest, least urgent, nearest deadline first
+            type: boolean
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export findings by upgrade
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/products/{product}/holders:
     get:
       description: |-
@@ -17100,6 +17849,54 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades.{format}:
+    get:
+      description: |-
+        The same list as a file: one row per bump this build is waiting on, where it stands, and what it would still close here.
+
+        The packages one bump moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-pending-upgrades
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the upgrades one build is waiting on
+      tags:
+        - Remediation
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/products/{product}/streams/{stream}/variants/{variant}/readiness:
     get:
       description: |-
@@ -17110,6 +17907,8 @@ paths:
         Both sides come from scans already collected, so this asks nothing new of a build pipeline. Where there is nothing to compare against, `shipped` is absent and `why` says what is missing rather than reporting zeroes, because a release that shipped clean and a release nobody scanned are not the same answer.
 
         Counted as issues at components at or above the deployment's line, which `floor` names.
+
+        **`blocking` is what the count is made of**: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-readiness
@@ -17174,6 +17973,65 @@ paths:
           name: variant
           required: true
           schema:
+            type: string
+        - description: Keep rows standing in any of these. Repeatable; any of them matches
+          explode: true
+          in: query
+          name: state
+          schema:
+            description: Keep rows standing in any of these. Repeatable; any of them matches
+            items:
+              enum:
+                - undecided
+                - waiting
+                - agreed
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep rows whose standing judgment is one of these. Repeatable
+          explode: true
+          in: query
+          name: outcome
+          schema:
+            description: Keep rows whose standing judgment is one of these. Repeatable
+            items:
+              enum:
+                - affected
+                - not-applicable
+                - deferred
+                - wont-fix
+                - already-fixed
+                - upgrade-needed
+                - patch-needed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep one component, by name
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep one component, by name
+            type: string
+        - description: Keep one vulnerability, under the name it is filed here
+          explode: false
+          in: query
+          name: issue
+          schema:
+            description: Keep one vulnerability, under the name it is filed here
+            type: string
+        - description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+          explode: false
+          in: query
+          name: standing
+          schema:
+            description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+            enum:
+              - open
+              - closed
             type: string
         - explode: false
           in: query
@@ -17240,6 +18098,65 @@ paths:
             enum:
               - csv
               - json
+            type: string
+        - description: Keep rows standing in any of these. Repeatable; any of them matches
+          explode: true
+          in: query
+          name: state
+          schema:
+            description: Keep rows standing in any of these. Repeatable; any of them matches
+            items:
+              enum:
+                - undecided
+                - waiting
+                - agreed
+                - lapsed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep rows whose standing judgment is one of these. Repeatable
+          explode: true
+          in: query
+          name: outcome
+          schema:
+            description: Keep rows whose standing judgment is one of these. Repeatable
+            items:
+              enum:
+                - affected
+                - not-applicable
+                - deferred
+                - wont-fix
+                - already-fixed
+                - upgrade-needed
+                - patch-needed
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Keep one component, by name
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep one component, by name
+            type: string
+        - description: Keep one vulnerability, under the name it is filed here
+          explode: false
+          in: query
+          name: issue
+          schema:
+            description: Keep one vulnerability, under the name it is filed here
+            type: string
+        - description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+          explode: false
+          in: query
+          name: standing
+          schema:
+            description: Keep one side of the build's history. Neither is the whole register, which is what it is for
+            enum:
+              - open
+              - closed
             type: string
       responses:
         "200":
@@ -17797,6 +18714,8 @@ paths:
 
         `inherited` means the date came from the product rather than from the release itself. `open` counts issues at components, not one per place — the same unit every release-level count here uses.
 
+        **`within` asks what is about to go**, in days ahead. Those come back under `ending`, soonest first and never mixed into what has already gone: the day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, so a warning and an exposure are two lists rather than one. `ended_days` is negative on those, which is how many days are left.
+
         Narrowed by what you may see, and ordered by what is open.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -17823,6 +18742,16 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
+        - description: Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone
+          explode: false
+          in: query
+          name: within
+          schema:
+            description: Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone
+            format: int64
+            maximum: 3650
+            minimum: 0
+            type: integer
       responses:
         "200":
           content:
@@ -17848,6 +18777,8 @@ paths:
         The same answer as a file: every release you can see whose end-of-life date has passed, how long ago that was, and how many issues are still open against it.
 
         `open` counts issues at components rather than one per place, the same unit every release-level count here uses. `inherited` means the date came from the product rather than from the release itself.
+
+        `within` writes out what is about to go as well, marked `ending` in the state column, with `ended_days` negative for how many days are left.
 
         The day the file was taken is stated in it, because how long ago a release ended is only readable against a date.
 
@@ -17883,6 +18814,16 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
+        - description: Also write out releases whose date falls inside this many days ahead, marked as not yet ended
+          explode: false
+          in: query
+          name: within
+          schema:
+            description: Also write out releases whose date falls inside this many days ahead, marked as not yet ended
+            format: int64
+            maximum: 3650
+            minimum: 0
+            type: integer
       responses:
         "200":
           description: OK
@@ -17901,11 +18842,15 @@ paths:
   /v1/remediation:
     get:
       description: |-
-        Fix velocity, average time to remediate by severity, and what is aging, over a window and narrowed by the scope picker.
+        Fix velocity, average time to remediate by severity, and what is aging, over a period and narrowed by the scope picker.
+
+        **A period or a rolling window.** `from` and `to` name a stretch — a quarter, a financial year — and `days` is the rolling window ending now. They are two ways of saying when, so only one may be sent. What is **aging** is a statement about now whatever period was asked for: how long something has been open is answered by the clock.
 
         **A closure only counts as a fix if the issue actually went away.** A bump that carried the issue into the next version, and a finding a scanner silently stopped reporting, are not fixes — counting them measures churn and reports it as progress, so the figure moves in the right direction while nothing improves.
 
         **Counted in issues, not in places.** One kernel flaw across sixty modules is one thing that was fixed; an average weighted by how far a component fans out measures the dependency graph rather than anybody's work.
+
+        Asked for neither a period nor a window, this is the last 30 days.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-remediation
@@ -17931,15 +18876,28 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: How far back to measure
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
           explode: false
           in: query
           name: days
           schema:
-            default: 30
-            description: How far back to measure
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
             format: int64
-            maximum: 366
+            maximum: 3650
             minimum: 1
             type: integer
       responses:

@@ -1,9 +1,11 @@
 package advisory_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -388,4 +390,286 @@ func TestTheDocumentsVersionIsTheLastNumberItsHistoryStates(t *testing.T) {
 		}
 		matches(t, "after two")
 	})
+}
+
+// pointsAt records what a report says about the issue: where it is written up,
+// and everywhere else it points.
+//
+// Through the interning path a scan takes rather than by writing the rows,
+// because what the document carries has to be what arrives that way.
+func (f *fixture) pointsAt(t *testing.T, identifier, advisory string,
+	references ...finding.Reference) {
+
+	t.Helper()
+	if _, err := finding.NewVulnerabilities(f.db.DB).Intern(t.Context(),
+		[]finding.Named{{
+			Identifier: identifier, Advisory: advisory, References: references,
+		}}); err != nil {
+		t.Fatalf("recording where the issue is written up: %v", err)
+	}
+}
+
+func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
+	// The score, the credit, the places to go and what to do about it are all
+	// held, and the document carried none of them: a reader got which
+	// releases are affected and nothing they could act on.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
+			TargetIDs: []int64{f.master}, Component: carrier.Name,
+			Summary: "The management socket answers before anyone authenticated.",
+			Vector:  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+			Told:    finding.Told{ReportedBy: "A. Reporter", Credit: "anonymous"},
+		})
+		if err != nil {
+			t.Fatalf("recording a flaw: %v", err)
+		}
+		f.alsoIn(t, identifier, f.tagged)
+		f.pointsAt(t, identifier, "https://example.test/advisories/1",
+			finding.Reference{URL: "https://example.test/commit/abc", Kind: finding.Patch},
+			// The same address twice, which is what two reports pointing at
+			// one page is, and one a browser must not be handed.
+			finding.Reference{URL: "https://example.test/commit/abc", Kind: finding.Report},
+			finding.Reference{URL: "ms-msdt:calc", Kind: finding.Report})
+
+		doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		one := doc.Vulnerabilities[0]
+
+		// The score, worked out from the vector rather than read beside it,
+		// stated for every release the document names.
+		if len(one.Scores) != 1 || one.Scores[0].CVSSv3 == nil {
+			t.Fatalf("the document states %d scores", len(one.Scores))
+		}
+		score := one.Scores[0].CVSSv3
+		if score.Version != "3.1" || score.BaseScore != 9.8 || score.BaseSeverity != "CRITICAL" {
+			t.Errorf("the score reads %+v", score)
+		}
+		if len(one.Scores[0].Products) != 2 {
+			t.Errorf("the score is stated for %v", one.Scores[0].Products)
+		}
+
+		// Credited the way they asked to be, and never by the name they
+		// reported under: "anonymous" is a real answer to the question the
+		// credit field asks, and it is the one the document has to carry.
+		if len(one.Acknowledgments) != 1 ||
+			!slices.Equal(one.Acknowledgments[0].Names, []string{"anonymous"}) {
+			t.Errorf("the acknowledgments read %+v", one.Acknowledgments)
+		}
+
+		// Somewhere to go, each address once, and nothing a browser acts on
+		// as an installed program.
+		var addresses []string
+		for _, reference := range doc.Document.References {
+			addresses = append(addresses, reference.URL)
+			if reference.Category != "external" {
+				t.Errorf("a reference claims category %q", reference.Category)
+			}
+		}
+		want := []string{"https://example.test/advisories/1", "https://example.test/commit/abc"}
+		if !slices.Equal(addresses, want) {
+			t.Errorf("the document points at %v, want %v", addresses, want)
+		}
+
+		// Nothing has been disclosed, so the document is a draft and says so
+		// in the field that decides whether a reader may pass it on.
+		if doc.Document.Distribution == nil || doc.Document.Distribution.TLP == nil ||
+			doc.Document.Distribution.TLP.Label != "RED" {
+			t.Errorf("a draft is distributed as %+v", doc.Document.Distribution)
+		}
+
+		// Nothing is fixed anywhere, so there is nothing to upgrade to and
+		// the document says that rather than naming a release.
+		if len(one.Remediations) != 1 || one.Remediations[0].Category != "none_available" {
+			t.Fatalf("the remediations read %+v", one.Remediations)
+		}
+
+		// And once a release no longer carries it, that release is what to
+		// update to.
+		issueID, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.finds.Resolve(ctx, f.who, f.tagged, issueID,
+			"Shipped in the tag, which carries the patch."); err != nil {
+			t.Fatalf("closing it in the tagged release: %v", err)
+		}
+		doc, err = f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Stated for the release that still carries it, which is who a
+		// remediation is for: the one that is already fixed has nothing to do,
+		// and naming it leaves the customer who has to act reading an advisory
+		// with no remediation in it.
+		fix := doc.Vulnerabilities[0].Remediations
+		if len(fix) != 1 || fix[0].Category != "vendor_fix" ||
+			!slices.Equal(fix[0].ProductIDs, []string{"sonic:master:broadcom"}) {
+			t.Errorf("the remediations read %+v", fix)
+		}
+	})
+}
+
+func TestTheDocumentDeclaresOnlyAProfileItSatisfies(t *testing.T) {
+	// The document declared the security-advisory profile unconditionally and
+	// failed two of its mandatory tests, which is a document a customer's
+	// tooling drops — the one use a generated advisory has.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+
+		// A flaw of our own that nobody outside has written up: no references
+		// anywhere, and the security-advisory profile asks for none. Gated on
+		// the informational advisory's list instead, this declared the base
+		// profile and a customer's tooling filtering for security advisories
+		// skipped it.
+		doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		if len(doc.Document.References) != 0 {
+			t.Fatalf("the fixture holds references, so this checks nothing: %+v",
+				doc.Document.References)
+		}
+		if doc.Document.Category != "csaf_security_advisory" {
+			t.Errorf("a flaw nobody has written up declares %q", doc.Document.Category)
+		}
+		required(t, doc)
+
+		// And a document that carries nothing to make a statement about is
+		// not one: the profile is the product tree and the vulnerabilities.
+		bare := *doc
+		bare.Vulnerabilities = nil
+		if got := advisory.Categorized(&bare); got != "csaf_base" {
+			t.Errorf("a document with no vulnerabilities declares %q", got)
+		}
+
+		f.pointsAt(t, identifier, "https://example.test/advisories/1")
+		doc, err = f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if doc.Document.Category != "csaf_security_advisory" {
+			t.Errorf("a document meeting the profile declares %q", doc.Document.Category)
+		}
+		required(t, doc)
+	})
+}
+
+// required fails on any element the profile the document declares demands.
+//
+// Walked over the document as it is serialized rather than over the structs,
+// because what a validator reads is the JSON — a field the profile names and
+// the encoder omits is exactly the failure this exists to catch, and from the
+// Go side it looks present.
+func required(t *testing.T, doc *advisory.Document) {
+	t.Helper()
+	body, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tree any
+	if err := json.Unmarshal(body, &tree); err != nil {
+		t.Fatal(err)
+	}
+
+	// Every element the generic profile requires, and the five the
+	// security-advisory profile adds. A document declaring the base profile
+	// is held to the first group alone.
+	generic := []string{
+		"/document/category", "/document/csaf_version", "/document/title",
+		"/document/publisher/category", "/document/publisher/name",
+		"/document/publisher/namespace",
+		"/document/tracking/id", "/document/tracking/status",
+		"/document/tracking/version", "/document/tracking/initial_release_date",
+		"/document/tracking/current_release_date", "/document/tracking/revision_history",
+	}
+	// CSAF 2.0 § 4.4: the base profile plus these. Notes and references on
+	// the document are § 4.3's requirement — the informational advisory,
+	// which carries no vulnerabilities at all.
+	profile := []string{
+		"/product_tree", "/vulnerabilities", "/vulnerabilities/0/notes",
+		"/vulnerabilities/0/product_status",
+	}
+	wanted := generic
+	if doc.Document.Category == "csaf_security_advisory" {
+		wanted = append(slices.Clone(generic), profile...)
+	}
+
+	examined := 0
+	for _, pointer := range wanted {
+		examined++
+		value, found := at(tree, pointer)
+		if !found {
+			t.Errorf("the document declares %q and carries no %s",
+				doc.Document.Category, pointer)
+			continue
+		}
+		switch held := value.(type) {
+		case string:
+			if strings.TrimSpace(held) == "" {
+				t.Errorf("%s is empty", pointer)
+			}
+		case []any:
+			if len(held) == 0 {
+				t.Errorf("%s is empty", pointer)
+			}
+		case map[string]any:
+			if len(held) == 0 {
+				t.Errorf("%s is empty", pointer)
+			}
+		}
+	}
+	// A list that went empty would report nothing rather than failing, which
+	// is how a check that examines nothing passes.
+	if examined == 0 {
+		t.Fatal("no elements were checked, so this checked nothing")
+	}
+
+	// The notes are the one element with a condition beyond being present:
+	// the categories a reader of a note can act on.
+	for _, pointer := range []string{"/vulnerabilities/0/notes"} {
+		if doc.Document.Category != "csaf_security_advisory" {
+			continue
+		}
+		notes, found := at(tree, pointer)
+		if !found {
+			continue
+		}
+		var usable bool
+		for _, note := range notes.([]any) {
+			switch note.(map[string]any)["category"] {
+			case "description", "details", "general", "summary":
+				usable = true
+			}
+		}
+		if !usable {
+			t.Errorf("%s carries no note a reader can act on", pointer)
+		}
+	}
+}
+
+// at resolves a JSON pointer against a decoded document.
+func at(tree any, pointer string) (any, bool) {
+	for _, step := range strings.Split(strings.TrimPrefix(pointer, "/"), "/") {
+		switch held := tree.(type) {
+		case map[string]any:
+			value, found := held[step]
+			if !found {
+				return nil, false
+			}
+			tree = value
+		case []any:
+			index, err := strconv.Atoi(step)
+			if err != nil || index >= len(held) {
+				return nil, false
+			}
+			tree = held[index]
+		default:
+			return nil, false
+		}
+	}
+	return tree, true
 }

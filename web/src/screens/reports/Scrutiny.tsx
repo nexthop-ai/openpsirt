@@ -9,7 +9,16 @@ import { Loading } from "../../ui/Loading";
 import { Outcome } from "../../ui/Outcome";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
-import { WindowPicker, coveringWords, daysAsked, windowStart } from "./Window";
+import {
+  PeriodPicker,
+  WindowPicker,
+  asked as askedFor,
+  coveringPeriod,
+  daysAsked,
+  periodAsked,
+  stated,
+  windowStart,
+} from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // How long back to look. Ninety days is a quarter, which is the period an
@@ -39,14 +48,16 @@ export function Scrutiny() {
   const at = useScope();
   const [params] = useSearchParams();
   const days = daysAsked(params, 90);
+  const period = periodAsked(params);
+  const when = askedFor(period, days);
   const product = at.product ?? "";
 
   const got = useQuery({
-    queryKey: ["scrutiny", product, days],
+    queryKey: ["scrutiny", product, when],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/approvals/scrutiny", {
-          params: { query: { days, limit: SECTION, ...(product ? { product } : {}) } },
+          params: { query: { ...when, limit: SECTION, ...(product ? { product } : {}) } },
         }),
       ),
   });
@@ -56,7 +67,13 @@ export function Scrutiny() {
   // population from the sheet's window and product — so the number and the
   // list it opens disagreed.
   const overTheSame = (outcome: string) => {
-    const asked = new URLSearchParams({ outcome, alone: "true", from: windowStart(days) });
+    const asked = new URLSearchParams({ outcome, alone: "true" });
+    // The same stretch the figure was computed over, whichever way it was
+    // asked for: a link carrying the rolling window while the sheet is
+    // reading a period opens a list the number was never about.
+    const began = stated(period) ? period.from : windowStart(days);
+    if (began) asked.set("from", began);
+    if (period.to) asked.set("to", period.to);
     if (product) asked.set("product", product);
     return `/audit?${asked.toString()}`;
   };
@@ -70,9 +87,10 @@ export function Scrutiny() {
       settled={got.isSuccess}
       name="Rubber-stamp"
       answers="how much a second pair of eyes actually did."
-      asked={coveringWords(days)}
+      asked={coveringPeriod(period, days)}
     >
       <WindowPicker offered={WINDOWS} days={days} />
+      <PeriodPicker period={period} />
 
       {got.isPending ? (
         <Loading />

@@ -813,6 +813,39 @@ button.vchip {
   opacity: var(--dim);
   cursor: not-allowed;
 }
+/* A sheet's own controls: the window, the period, whose work. A row rather
+   than a column, because they are one question asked three ways and stacked
+   they read as three unrelated ones — and a date input left to itself fills
+   whatever it is inside, which on a report sheet is the whole page. */
+.controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.controls input[type="date"],
+.controls select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--pill);
+  background: var(--surface);
+  color: var(--ink);
+}
+/* The one control that takes a width of its own: a date is a fixed shape and
+   the browser draws its own picker inside it. */
+.controls input[type="date"] {
+  width: 10.5rem;
+}
+
 .seg {
   display: inline-flex;
   border: 1px solid var(--line-strong);
