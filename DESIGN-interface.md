@@ -160,9 +160,9 @@ to upload, what is waiting on you, and who you are.
 
 | Rail group | Holds |
 |---|---|
-| **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
+| **Across products** | Home, the review queue, what nobody holds, the assignments, the catalog and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build. The catalog is here because it is what this deployment carries, and because Manage ships folded |
 | **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many |
-| **Manage** | The catalog, the users and the settings. Branches, tags and variants have entries of their own, scoped to the picked product |
+| **Manage** | The users, the teams, the standing assignment rules, the settings and the deployment itself. Branches, tags and variants have entries of their own, scoped to the picked product |
 
 A build-only entry declines rather than opening on a scope that means nothing.
 With a product, branch or variant unpicked, the tree and inventories entries are
@@ -189,9 +189,12 @@ the screen; scrolling with the page leaves the menu a thousand pixels above
 somebody reading the foot of a findings list, which is where they are when they
 want it.
 
-A group heading folds what is under it, and "Manage" starts folded. Declaring a
-product or granting a role is occasional rather than something done while
-working, and with it away the rail asks for under seven hundred. The heading
+A group heading folds what is under it, and "Manage" starts folded. Granting a
+role or changing a setting is occasional rather than something done while
+working, and with it away the rail asks for under seven hundred. **Nothing a
+first visit needs is under it** — the catalog was, which made the one screen
+saying what this deployment carries invisible to somebody who had just
+arrived. The heading
 stays a heading to look at — a caret is the only thing marking it as a control,
 because three headings drawn as buttons read as three more places to go. What is
 folded is kept in the browser, per person.

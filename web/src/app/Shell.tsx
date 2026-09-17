@@ -202,6 +202,13 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               quiet
             />
             <Rail to="/work" icon="people" label="Assignments" />
+            {/* The catalog of what this deployment carries. Across products
+              because that is what it is, and here rather than under Manage
+              because Manage ships folded — which left the one screen that
+              says what exists invisible on a first visit, when there is
+              nothing else to go on. Declaring a product happens there too;
+              reading what is there is the commoner reason to open it. */}
+            <Rail to="/products" end icon="box" label="Products" />
             {/* The record of what was judged. Across products because that is how
               it is asked for — an auditor asks about a period, not a build. */}
             <Rail to="/audit" icon="ledger" label="The record" />
@@ -263,7 +270,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         <Group name="manage" label="Manage" shut={shut} onToggle={toggleGroup} />
         {!shut.has("manage") && (
           <>
-            <Rail to="/products" end icon="box" label="Products" />
             <Rail
               to={`/products/${encodeURIComponent(product ?? "")}/streams`}
               end

@@ -7,8 +7,13 @@
 // above somebody reading the foot of a findings list.
 //
 // So it folds instead. "Manage" is shut to begin with: it is where somebody
-// goes occasionally to declare a product or grant a role, rather than while
+// goes occasionally to grant a role or change a setting, rather than while
 // working, and with it away the rail fits a laptop with room to spare.
+//
+// Nothing a first visit needs is under it. The catalog was, which made the one
+// screen that says what this deployment carries invisible to somebody who had
+// just arrived and had nothing else to go on; it is an across-products screen
+// and sits with the others.
 //
 // Kept in the browser, per person, the same rule as the look and saved
 // filters: it changes what one person sees and nothing anybody else is shown.
