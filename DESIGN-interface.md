@@ -1374,6 +1374,7 @@ said so.
 
 | Rule | |
 |---|---|
+| **The band a row is drawn in and the word it says are two answers** | They differ for exactly the two words a scanner reports below low. Both rank inside the low band everywhere that sorts and filters, so that is the color; what the row says is what was rated. Folded together, "rated negligible" read as "Unrated" — which tells a reader nobody has looked at a finding somebody looked at and dismissed |
 | Known-exploited is its own badge, not a replacement for the severity word | Replacing it answers one question by destroying another: an exploited medium is still a medium, and the reader needs both facts to see why it sits above an unexploited high |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |
 | Where this product has rated something itself, that is what orders its list, and both ratings are shown | Being able to say a published rating is wrong is pointless if everything that sorts and filters then ignores us. The world's stays beside it, because a rating of ours standing where the world's goes reads as the world's. The list that spans products reads each row against its own product's rating, because a rating belongs to one (REQ-29) |
