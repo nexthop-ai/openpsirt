@@ -586,6 +586,9 @@ components:
             - waiting
             - lapsed
           type: string
+        version:
+          description: The version this sits at, which is what tells two rows of one component apart
+          type: string
         vulnerability:
           type: string
       required:
@@ -5927,7 +5930,7 @@ components:
           minLength: 1
           type: string
         open:
-          description: Issues open against it, counted at components rather than at every place they sit
+          description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
         tags:
@@ -7876,7 +7879,7 @@ components:
           minLength: 1
           type: string
         open:
-          description: Issues open against it, counted at components rather than at every place they sit
+          description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
         parent:
@@ -8264,7 +8267,7 @@ components:
           minLength: 1
           type: string
         open:
-          description: Issues open against it here, counted at components rather than at every place they sit
+          description: Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
       required:
@@ -12684,6 +12687,14 @@ paths:
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-products
+      parameters:
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:
@@ -16652,6 +16663,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:
@@ -16813,6 +16831,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:
@@ -18208,7 +18233,7 @@ paths:
 
         Counted as issues at components at or above the deployment's line, which `floor` names.
 
-        **`blocking` is what the count is made of**: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
+        **`blocking` is the worst few of what the count is made of**: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
 
         **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-readiness
@@ -18885,6 +18910,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+          explode: false
+          in: query
+          name: counts
+          schema:
+            description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
+            type: boolean
       responses:
         "200":
           content:
