@@ -172,10 +172,3 @@ function TheQueue() {
     </>
   );
 }
-
-// Where this deployment sends what it has to say.
-//
-// One signed request rather than an adapter each: Slack, Teams, a tracker
-// driven by automation and paging all take an HTTP request with a JSON body.
-// The secret is never returned by anything, so changing one means recording
-// the destination again.

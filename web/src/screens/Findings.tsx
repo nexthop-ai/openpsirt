@@ -689,7 +689,16 @@ export function Findings() {
         // was asked of one product is the same question asked of all of them,
         // and dropping the narrowing somebody did not touch would be a second
         // surprise on top of the one this chip exists to end.
-        widen={(to) => navigate(widened(findingsPath(to), asked))}
+        widen={(to) => {
+          // What ask() clears, cleared here too. This navigates rather than
+          // asking, and removing a chip usually stays on the same route
+          // element — so without these the keyboard cursor and the open peek
+          // row survive into a different answer, where row nine is a
+          // different finding.
+          setCursor(-1);
+          setPeeking(null);
+          navigate(widened(findingsPath(to), asked));
+        }}
         // Through the same function every other change goes through, so the
         // invariant above holds by construction rather than by a property of
         // the chips: today every chip either drops its key or puts the wider

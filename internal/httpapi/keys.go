@@ -97,9 +97,11 @@ func registerKeys(api huma.API, a Administering) {
 			}
 			scope := access.Scope{ProductID: product.ID}
 
-			// Each lookup says which of the three names it could not find.
-			// All three reported the product, so somebody who mistyped a
-			// branch was sent to check the one field they had right.
+			// Each lookup names the field whose read failed, so a fault
+			// reading the branch is not reported as a fault reading the
+			// product. A name that is simply not declared never reaches this
+			// string: undeclared answers those from the error, which already
+			// carries the name and what it was.
 			if in.Body.Stream != "" {
 				stream, err := names.StreamByName(ctx, product.ID, in.Body.Stream)
 				if err != nil {

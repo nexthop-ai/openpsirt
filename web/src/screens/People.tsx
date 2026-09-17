@@ -591,7 +591,13 @@ export function People({ who: me }: { who: Who }) {
         )}
       </div>
 
-      <Credentials me={me} />
+      {/* Administrators only, and the panel as a whole. Both of its reads are
+          administrator-only, so an auditor — whom the rail admits here — got a
+          403 for each and the only empty branch below drew "Nothing is issued."
+          against a deployment holding twelve keys. A silent wrong answer, to
+          the one reader whose job is reviewing them. The same shape the
+          webhooks panel is gated for. */}
+      {me.admin && <Credentials me={me} />}
 
       <Declare
         title="Add user"
@@ -856,11 +862,11 @@ function Credentials({ me }: { me: Who }) {
         Shown once. Only a hash is stored.
       </p>
 
-      {/* Disabled rather than hidden, like the rest of this screen: an auditor
-          reads it and cannot act, and a control that vanishes teaches nobody
-          that it exists. Only a signed-in administrator may mint one — a
-          credential cannot create another — so the refusal belongs here rather
-          than after the form has been filled in. */}
+      {/* Only a signed-in administrator may mint one — a credential cannot
+          create another — so the refusal belongs here rather than after the
+          form has been filled in. The belt rather than the braces while the
+          panel itself is gated: it is what keeps this honest if the reads
+          behind it are ever widened to the auditor whose job this is. */}
       <button
         type="button"
         className="btn"
@@ -890,7 +896,18 @@ function Credentials({ me }: { me: Who }) {
         />
         <label className="field">
           <span>Product</span>
-          <select value={keyProduct} onChange={(event) => setKeyProduct(event.target.value)}>
+          {/* Choosing a product clears the two below it, the way the scope
+              panel does: a branch belongs to one product, so a branch picked
+              against the last one survives into a key naming a build the new
+              product never declared. */}
+          <select
+            value={keyProduct}
+            onChange={(event) => {
+              setKeyProduct(event.target.value);
+              setKeyStream("");
+              setKeyVariant("");
+            }}
+          >
             <option value="">Choose a product</option>
             {(products.data?.items ?? []).map((each) => (
               <option key={each.name} value={each.name ?? ""}>

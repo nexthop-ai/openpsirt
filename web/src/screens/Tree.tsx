@@ -19,7 +19,7 @@ import { useReseed } from "../ui/reseed";
 // What is beneath a node, worst first, as one bar whose widths are the counts.
 //
 // The same control the component screen draws, for the same reason: a bar that
-// is mostly one colour says where the weight is before a number is read. This
+// is mostly one color says where the weight is before a number is read. This
 // was a chip per band at a fixed width, which said only which bands were
 // present — and down a page of rows at six different depths that is five
 // numbers a reader cannot compare, which is the one thing they are for.

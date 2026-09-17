@@ -70,11 +70,14 @@ func TestWhatAReleaseWasBuiltAsSaysHowMuchIsOpenInEach(t *testing.T) {
 }
 
 // Counting what is open is the expensive half of a catalog read, so it is
-// asked for rather than always done. What it must never do is come back as a
-// zero: the screens that draw this column render a missing number as "0", and
-// a variant holding twenty-five reported as clean is the failure the count
-// above exists to catch, arriving by a different route.
-func TestACatalogListNobodyAskedToCountReportsNoCountRatherThanZero(t *testing.T) {
+// asked for rather than always done. Both directions are pinned on every path
+// that takes the parameter.
+//
+// Unasked, it must never come back as a zero: the screens that draw this
+// column render a missing number as "0", and a variant holding twenty-five
+// reported as clean is the failure the count above exists to catch, arriving
+// by a different route. Asked, it must still be the number.
+func TestACatalogListCountsWhatWasAskedForAndNothingOtherwise(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 
@@ -99,6 +102,28 @@ func TestACatalogListNobodyAskedToCountReportsNoCountRatherThanZero(t *testing.T
 					t.Errorf("%s: %q reports open=%d where nobody asked for a count",
 						path, one.Name, *one.Open)
 				}
+			}
+
+			// And the other direction on the same path. Pinned per path
+			// rather than once: each of these counts through a scope of its
+			// own, so a handler that stopped counting would leave the screen
+			// drawing this column at zero with the suite still green.
+			var counted struct {
+				Items []struct {
+					Name string `json:"name"`
+					Open *int   `json:"open"`
+				} `json:"items"`
+			}
+			read(t, r, "triager", path+"?counts=true", &counted)
+			total := 0
+			for _, one := range counted.Items {
+				if one.Open == nil {
+					t.Fatalf("%s: %q reports no count where one was asked for", path, one.Name)
+				}
+				total += *one.Open
+			}
+			if total == 0 {
+				t.Errorf("%s: a fixture with findings in it counts nothing open", path)
 			}
 		}
 	})

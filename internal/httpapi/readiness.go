@@ -73,11 +73,11 @@ type BlockingBody struct {
 //
 // A release conversation reads the top of this and the number beside it; the
 // findings list is where the whole of it is worked, and the panel links to it.
-// Five rather than twenty: against a blocker count in the thousands, twenty is
-// an arbitrary page of the list rather than what the count is made of, and it
-// made the panel three times the height of everything beside it on the screen
-// the comparison is named after. What the rule asks for — a number somebody can
-// act on without going and assembling it — is satisfied by the worst few.
+// The worst few: against a blocker count in the thousands, a longer list is an
+// arbitrary page of the findings list rather than what the count is made of,
+// and it costs the panel the comparison it is named after — which is what the
+// rest of the panel draws. What is asked for here is a number somebody can act
+// on without going and assembling it, and the worst few are that.
 const blocking = 5
 
 func registerReadiness(api huma.API, in Ingest) {
@@ -98,7 +98,7 @@ func registerReadiness(api huma.API, in Ingest) {
 			"that shipped clean and a release nobody scanned are not the same answer.\n\n" +
 			"Counted as issues at components at or above the deployment's line, which `floor` " +
 			"names.\n\n" +
-			"**`blocking` is what the count is made of**: the work nobody has agreed to ship " +
+			"**`blocking` is the worst few of what the count is made of**: the work nobody has agreed to ship " +
 			"with, worst first, read through the findings list's own reader with the same " +
 			"line — so the list it opens is the list it counts. Anything agreed is absent, " +
 			"because agreeing is the decision to ship with it. `blockers` says how many " +

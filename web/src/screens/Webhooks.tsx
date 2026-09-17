@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
@@ -10,11 +10,13 @@ import { Wide } from "../ui/Wide";
 
 // Where this deployment posts what it has to say, and whether it is arriving.
 //
-// **Webhooks, not "where things are sent".** One transport: a signed HTTP POST
-// carrying a timestamp and an HMAC over it and the body. The kind says which
-// notifications go to a destination, never how they travel, and mail is a path
-// of its own — so the conventional word is accurate as well as shorter
-// (REQ-60).
+// **Webhooks, not "where things are sent".** One signed request rather than an
+// adapter each: Slack, Teams, a tracker driven by automation and paging all
+// take an HTTP POST with a JSON body, carrying a timestamp and an HMAC over it
+// and the body. The kind says which notifications go to a destination, never
+// how they travel, and mail is a path of its own — so the conventional word is
+// accurate as well as shorter (REQ-60). The signing secret is returned by
+// nothing, so changing one means recording the destination again.
 //
 // **Two panels, because they answer to two readers.** Configuring one is
 // administration and belongs beside the other things a deployment is set to.
@@ -24,19 +26,22 @@ import { Wide } from "../ui/Wide";
 // exists to make visible.
 //
 // **Only the address is a credential.** For two of the services this names, the
-// path authenticates, which is why the summary below carries every column but
+// path authenticates, which is why the summary below draws every column but
 // that one and why a failure is recorded with the address replaced by its host.
 // The configuration panel shows it and is administrator-only for that reason.
+//
+// The address is on the wire either way: one read serves both panels and
+// `OutboundBody` carries `url` unconditionally, so what keeps it from a reader
+// who should not have it is the endpoint's own administrator gate, not the
+// column this file declines to draw. Widening the delivery panel to the
+// operator the system screen is described as being for means giving it a body
+// that carries the host in place of the address — not deleting a `<td>`.
 
-// One row as both panels read it.
-type Destination = {
-  name?: string;
-  kind?: string;
-  url?: string;
-  sent?: number;
-  failing?: number;
-  because?: string;
-};
+// One row as both panels read it, from the document the server publishes
+// rather than restated here: a hand-copied shape compiles perfectly while
+// missing whatever the server grew since, which is the bug the readiness rows
+// in this same change were carrying.
+type Destination = Body<"OutboundBody">;
 
 function useDestinations() {
   return useQuery({
@@ -210,9 +215,11 @@ export function Webhooks() {
 // delivery" drawn empty is not, and this one is empty when nothing is
 // configured.
 //
-// No address column. Everything here is safe for anybody who may read this
-// screen: a failure is stored with the address replaced by its host, so the
-// reason says which destination without saying what authenticates to it.
+// No address column, and the reason is safe to show: a failure is stored with
+// the address replaced by its host, so it says which destination without
+// saying what authenticates to it. What is not drawn is still in the response,
+// so this panel is administrator-only because its endpoint is — see the head
+// of this file.
 export function WebhookDelivery() {
   const sent = useDestinations();
   const rows = sent.data?.items ?? [];

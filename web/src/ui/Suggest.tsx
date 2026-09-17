@@ -108,7 +108,16 @@ export function Suggest({
           ) : options.length === 0 ? (
             // Said rather than left blank. "Nothing here is called that" is
             // the answer somebody needs before they send it and are refused.
-            <li className="hint">Nothing here is called that.</li>
+            //
+            // Two answers, because an empty box is not a search that found
+            // nothing. A control opening on focus offers the whole list, so
+            // where the deployment holds none it was reporting a search
+            // nobody had made.
+            <li className="hint">
+              {value.trim() === ""
+                ? "There are none of these yet."
+                : "Nothing here is called that."}
+            </li>
           ) : (
             options.map((name, i) => (
               <li key={name}>

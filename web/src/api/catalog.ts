@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import { unwrap } from "./queries";
 
@@ -37,20 +37,17 @@ export function useCatalog(
   const products = useQuery({
     queryKey: ["products"],
     enabled: open,
-    placeholderData: keepPreviousData,
     queryFn: async () => unwrap(await api.GET("/v1/products", {})),
   });
   const streams = useQuery({
     queryKey: ["streams", product],
     enabled: open && !!product,
-    placeholderData: keepPreviousData,
     queryFn: async () =>
       unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
   });
   const variants = useQuery({
     queryKey: ["variants", product],
     enabled: open && !!product,
-    placeholderData: keepPreviousData,
     queryFn: async () =>
       unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
   });
@@ -61,11 +58,13 @@ export function useCatalog(
 // product is built as — and a different route. Only the scope picker asks it,
 // once a branch or tag is chosen.
 //
-// **The list it replaces stays on screen while this is read.** Picking a branch
-// switches the variant column from the product's list to this one, and the two
-// are different cache entries — so the column emptied and refilled on every
-// branch chosen, which reads as the picker losing what it had rather than as
-// it answering a narrower question. They are usually the same names.
+// **Nothing here holds a previous key's rows on screen.** Three of these four
+// are keyed on something the picker changes, so keeping the last answer would
+// draw one product's branches under another product's name — and a variant
+// picked from it reaches the server as a build that product has no such branch
+// for, which is the selection this panel is not allowed to send. The variant
+// column has a stand-in for the gap it leaves, and it is the product's own
+// list, which is a superset of any one release's.
 export function useReleaseVariants(
   open: boolean,
   product: string,
@@ -74,7 +73,6 @@ export function useReleaseVariants(
   return useQuery({
     queryKey: ["variants", product, stream],
     enabled: open && !!product && !!stream,
-    placeholderData: keepPreviousData,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/streams/{stream}/variants", {
