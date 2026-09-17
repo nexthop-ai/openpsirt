@@ -26,6 +26,9 @@ import { useWho } from "../app/session";
 // is 153 pages of one product's findings, which is not a list anybody
 // assembles a day's work out of.
 import {
+  BY_DEFAULT,
+  LEAST_FIRST,
+  ORDERS,
   PAGE,
   PAGES,
   SORTS,
@@ -38,6 +41,7 @@ import {
   withParams,
   hidden,
   type Row,
+  type SortWord,
   usePaging,
 } from "./list";
 
@@ -149,9 +153,16 @@ export function Findings() {
   // is offered again.
   const [declined, setDeclined] = useState<string | null>(null);
   const [typed, setTyped] = useState(searching);
+  // The direction an order opens at, which is not the same for all of them:
+  // "sort by severity" means the worst first and "sort by due" means the
+  // soonest, and both were opening most-first.
+  function firstAsk(key: SortWord): Record<string, string> {
+    return { sort: key === BY_DEFAULT ? "" : key, asc: LEAST_FIRST.includes(key) ? "yes" : "" };
+  }
+
   // A column header that orders by itself. Clicking the one already sorted
-  // turns it around; clicking another sorts by that, most-first, because that
-  // is what somebody means by "sort by severity".
+  // turns it around; clicking another opens it the way round that column
+  // means.
   function sortable(label: keyof typeof SORTS) {
     const key = SORTS[label];
     const on = sort === key;
@@ -161,13 +172,11 @@ export function Findings() {
         className="linkish"
         title={`Order by ${label.toLowerCase()}`}
         onClick={() => {
-          const next = new URLSearchParams(params);
-          if (on && !ascending) next.set("asc", "yes");
-          else {
-            next.set("sort", key);
-            next.delete("asc");
+          if (on) {
+            ask(withParam(asked, "asc", ascending ? "" : "yes"));
+            return;
           }
-          ask(next);
+          setEach(firstAsk(key));
         }}
       >
         {label}
@@ -452,6 +461,25 @@ export function Findings() {
             }}
           />
         )}
+        {/* Which order the list is in, said rather than inferred. Four of the
+            six sit under a column header, so the two that do not — the tool's
+            own ranking and how long something has been open — could not be
+            asked for at all, and the ranking could not be got back to once a
+            header had been clicked. */}
+        <span className="floor">
+          <span style={{ color: "var(--faint)" }}>Order</span>
+          <select
+            aria-label="Order the list"
+            value={sort || BY_DEFAULT}
+            onChange={(event) => setEach(firstAsk(event.target.value as SortWord))}
+          >
+            {Object.entries(ORDERS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </span>
         <span className="floor">
           <span style={{ color: "var(--faint)" }}>Min severity</span>
           <span className="seg">

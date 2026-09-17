@@ -35,15 +35,44 @@ export type SortWord = NonNullable<
 
 // The orders this list offers as column headers, by the column they sit under.
 //
-// Four of the six. `urgency` is the order the list is in when nothing else is
-// asked for and needs no header of its own, and `age` has no column to sit
-// under — which the typing makes visible rather than answers.
+// Four of the six. The other two are in the order control above the list:
+// `urgency` has no column because it is composed from four signals, and `age`
+// has none because the table is already wider than a laptop.
 export const SORTS = {
   Severity: "severity",
   EPSS: "epss",
   Covers: "places",
   Due: "deadline",
 } satisfies Record<string, SortWord>;
+
+// Every order, by the word a reader picks it by.
+//
+// All six, checked against the server's own enum: an order the server gains
+// and this list does not offer is a compile error here rather than a word
+// nobody can reach. The list is ordered by urgency when nothing is asked —
+// the tool's own ranking, and what REQ-32 exists for — and that was the one
+// order with no name on screen and no way back to it once a column header had
+// been clicked.
+export const ORDERS = {
+  urgency: "Urgency",
+  severity: "Severity",
+  epss: "EPSS",
+  places: "Covers",
+  deadline: "Due",
+  age: "Age",
+} satisfies Record<SortWord, string>;
+
+// The order the list is in when the address asks for none.
+export const BY_DEFAULT: SortWord = "urgency";
+
+// Which orders mean "least first" on the first ask.
+//
+// Most of them are "most first": the worst severity, the highest likelihood,
+// the widest reach. Two are not, and both were opening at the end nobody
+// wanted — Due sorted the furthest-away deadline first, which is the answer to
+// a question nobody asks, and Age is a question about what has sat here
+// longest.
+export const LEAST_FIRST: readonly SortWord[] = ["deadline", "age"];
 
 // Work nobody holds and nobody has decided, as filters on this list.
 //

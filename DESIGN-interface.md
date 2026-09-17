@@ -448,7 +448,10 @@ first is what has not been answered yet.
 
 Sorting is by a column the server names, never by one a caller does (REQ-66).
 Four headers order the list — severity, EPSS, locations and the deadline — and
-clicking the one already sorted turns it around. What reaches the statement is
+clicking the one already sorted turns it around. **An order control above the
+list carries all six**, including the two with no column: the ranking the list
+is in when nothing is asked, and how long something has been open. What reaches
+the statement is
 an expression the server stores against each of its own keys: a placeholder
 cannot bind a column name, so this is the one query parameter that has to become
 SQL text. A word that is not one of the keys is not a sort, and the list comes
@@ -457,6 +460,8 @@ back in its own order rather than refusing.
 | Rule | |
 |---|---|
 | A finding with no deadline sorts last whichever direction is asked for | "No deadline" is neither early nor late |
+| The order in force is named on screen, and every order can be asked for | Four of the six sit under a column header, so the other two could be reached by typing an address and by nothing else — one of them being urgency, which is the order the list opens in and what REQ-32 is for. Sorting by a column and then wanting the ranking back was a dead end |
+| An order opens the way round that order means | The worst severity, the highest likelihood and the widest reach are all "most first"; a deadline and an age are not. Due opened at the furthest-away date, which is the answer to a question nobody asks |
 | The tie-break is always the same pair of identifiers | Two rows equal on the sorted column do not swap between pages and drop one while repeating another |
 | A page size of fifty, a hundred or two hundred, kept in the address | Fifty is 153 pages of one product's findings |
 | A row is selected by what it is, not by where it sits | The list is read again after every decision and on every page, so an index would select a different row each time. That also makes a selection survive paging, which is what "a filtered set" means when the filter matches more than a page |
