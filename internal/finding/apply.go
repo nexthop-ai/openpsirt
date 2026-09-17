@@ -50,7 +50,7 @@ type at struct {
 func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Reported) (Applied, error) {
 	var applied Applied
 
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		// Taken first, before anything is read, exactly as applying a graph
 		// does. Two runs against one target can be in flight at once — the
 		// queue hands different jobs to different workers by design — and
@@ -929,7 +929,7 @@ func sameDate(a, b *time.Time) bool {
 //
 // Read from the variant, because that is where it is recorded: what a product
 // is built as is what decides whether anybody outside runs it.
-func shippedToCustomers(ctx context.Context, tx bun.Tx, targetID int64) (bool, error) {
+func shippedToCustomers(ctx context.Context, tx bun.IDB, targetID int64) (bool, error) {
 	var shipped bool
 	err := tx.NewSelect().
 		TableExpr(`"target" AS "t"`).

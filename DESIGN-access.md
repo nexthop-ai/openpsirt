@@ -15,7 +15,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [Assignment](#assignment)
 - [What a sign-in leaves behind](#what-a-sign-in-leaves-behind)
 - [Departure](#departure)
-- [No statistics role](#no-statistics-role)
+- [Statistics and the audit permission](#statistics-and-the-audit-permission)
 - [Somebody who has left](#somebody-who-has-left)
 - [Teams](#teams)
 - [Routing rules](#routing-rules)
@@ -238,10 +238,12 @@ Two triggers happen on their own: withdrawing somebody's last role on a product
 hands back what they were dealing with *there*, and only there; and deactivating
 an account hands back everything it held, everywhere.
 
-## No statistics role
+## Statistics and the audit permission
 
-Not built, and not planned. Asked for as "counts and trends without reading the
-findings behind them".
+A numbers-only role over products is not built and not planned. Reading the
+deployment's own records **is** built, as a permission beside administration.
+
+### Numbers-only is not a role
 
 `public-read` on the products somebody should see already is that role. Every
 report endpoint runs as the subject asking and answers only what that subject
@@ -254,8 +256,50 @@ numbers for two products and nothing else.
 | What it would protect | A product's name, which REQ-42 already treats as a secret — a product somebody holds nothing on is invisible rather than merely unreadable |
 | Why that is not enough | The protection is already there, and the mode would be a second way of expressing it that can disagree with the first |
 
-The `reporting` role was retired for the same reason (REQ-42), and a read-only
-auditor is granted with what already exists.
+The `reporting` role was retired for the same reason (REQ-42).
+
+### The administrative half
+
+That held for findings, decisions and reports, and never for the administrative
+half. An auditor could read every decision and not the deadline policy those
+decisions were measured against, who held which role when they were made, or
+whether any of it changed — three of the four things an audit checks. The only
+grant that opened those was the administrator flag, which is not read-only: the
+record proving nobody moved the goalposts was readable by exactly the population
+able to move them.
+
+### What the audit permission grants
+
+| | |
+|---|---|
+| The settings, who holds what, the role bindings, and the administrative change log | These are records about the deployment rather than about anything scanned |
+| No product's findings or decisions | It is orthogonal to product visibility. An auditor holding disclosed reading on one product sees that product and the whole deployment's governance, and does not gain a second product's contents |
+| Read, never write | Every write over the same records asks for administration. An administrator is not asked to hold this as well: they can grant themselves anything, so requiring it would be a checkbox rather than a control |
+| The records are shown whole | Not narrowed by which products the holder reaches |
+
+**Holding it means knowing which products exist.** The change log names them —
+a role granted on one, a release whose support date moved — and the list of
+people names each person's products. That is a property of the grant rather
+than a leak, because granting it is a deliberate administrative act, and it is
+written down here so that granting it is an informed one. The alternative is an
+audit record with holes in it that nothing marks, which is worse than no record.
+
+**What somebody was told is narrowed, and this is not a way to see more.** The
+rows come back as the asker could have read them on their own account, which is
+the rule the administrator flag already follows — so an auditor who reaches no
+product is answered with nothing.
+
+### Where it lives
+
+Its own column beside administration, not a role.
+
+| Rule | Reason |
+|---|---|
+| Not a role | A role is held against a product and this is held against none. Spread over every product it would grant nothing in a deployment with no products declared, and would appear in every product's grant list while reaching none of them |
+| Bound to a group the way administration is | Roles come from one place at a time, so in group-bound mode a capability with no binding path is one nobody can ever hold. The binding table says which of the two things over the deployment it grants |
+| Derived and stamped like administration | Only what a group gave is taken back by a group, and the stamp is what bounds the flag for a credential that never signs in. Without it somebody a group made an auditor, who minted a year-long token and then left, would go on auditing through it |
+| No bootstrap arm | Configuration names an administrator, which is the documented way back into a deployment nobody can administer. Nobody is locked out by holding no audit permission |
+| Unbinding it counts nothing | Administration is refused where it would leave nobody able to administer. Nothing else held over the deployment can lock anybody out |
 
 ## Somebody who has left
 
@@ -929,11 +973,15 @@ record, because it is the same question one layer up.
 |---|---|
 | Both values are kept, and absent is not empty | "Who raised the floor to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
 | Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
-| A failure to record is not a failure of the change | The change has already happened; an error would invite a retry that makes it twice |
-| Recorded as soon as the change has happened, before anything that follows it | Deactivating somebody also ends their sessions and hands their work back, and either can fail with the deactivation already written. Recorded afterwards it was lost for good, because the second attempt finds nothing to move and stops earlier still |
+| The record is written in the transaction that makes the change | Both are one act. Written afterwards, a change could succeed while the record of it silently failed, and a trail that is sometimes missing a line answers an auditor's question wrongly rather than not at all |
+| A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
+| What follows the change is outside it | Deactivating somebody also ends their sessions and hands their work back. The sessions end inside, because they are what deactivation means; the work is handed back afterwards, bounded by how much they held rather than by the request |
 | A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
 | A revocation that matched nothing leaves no row | The writes that take access away bound only the error from the statement and never read how many rows it matched, so withdrawing a role somebody does not hold answered as though it had been withdrawn. The caller then recorded the act and asked whether the person still held anything on that product: for a role they never had the answer was no, and everything they were dealing with there went back to the unassigned list. A grant, an estate grant, a group binding, a group's administration and a team membership all take access away, and all of them read what they matched |
 | Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
+| **What a change is about is composed from the names it resolved to** | A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
+| The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
+| **It is read over a period, and leaves as a file** | An access review asks what changed in the stretch a certificate covers. Capped at fifty rows, undated and unexportable, that question was answered a page at a time on a screen and could not leave it. Asked for no period it answers about everything it holds |
 
 ### Which writes leave a row
 

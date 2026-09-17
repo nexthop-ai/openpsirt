@@ -262,7 +262,7 @@ func (f *runFixture) decided(t *testing.T) int64 {
 	}
 	var people []access.Subject
 	for _, who := range []string{"proposer", "approver"} {
-		person, err := rights.Ensure(ctx, who, "", nil)
+		person, err := rights.Ensure(ctx, who, "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

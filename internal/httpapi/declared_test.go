@@ -60,7 +60,7 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 		// worse than no sweep: the numbers it checks are the only evidence
 		// it is still looking at the API, and a class emptying is invisible
 		// in one total.
-		var onProduct, deployment, notAGate, narrowed, noValue int
+		var onProduct, deployment, records, notAGate, narrowed, noValue int
 		for path, item := range r.api.OpenAPI().Paths {
 			for method, op := range operations(item) {
 				want, ok := op.Extensions[requiresExtensionName]
@@ -99,6 +99,12 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 					// administer the deployment. A subject who reaches
 					// nothing would be refused before the gate was consulted.
 					who = "reader"
+				case needs.Scope == "records":
+					// The deployment's own records. Either thing held over the
+					// deployment opens these and a role on a product opens
+					// none of them, so the stranger is the same one.
+					records++
+					who = "reader"
 				default:
 					notAGate++
 					continue
@@ -130,10 +136,18 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 			t.Errorf("only %d operations are gated on administering the deployment: "+
 				"this sweep is not walking them", deployment)
 		}
-		t.Logf("swept %d on a product, %d deployment-wide "+
+		// Its own floor, because a class folded into another is a class that
+		// can quietly empty: every one of these was administrator-only until
+		// the audit permission existed, and reading them as that class again
+		// is the way the difference stops being checked.
+		if records < 5 {
+			t.Errorf("only %d operations are gated on reading the deployment's own "+
+				"records: this sweep is not walking them", records)
+		}
+		t.Logf("swept %d on a product, %d deployment-wide, %d over its own records "+
 			"(%d ask only for a credential, %d are narrowed rather than gated, "+
 			"%d have no value here)",
-			onProduct, deployment, notAGate, narrowed, noValue)
+			onProduct, deployment, records, notAGate, narrowed, noValue)
 	})
 }
 

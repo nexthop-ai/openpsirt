@@ -21,6 +21,9 @@ export type Who = {
   identity: string;
   name: string;
   admin: boolean;
+  // Whether they may read this deployment's own records and write none of
+  // them. A separate answer from admin: one of them changes things.
+  audits?: boolean;
   kind: "person" | "key";
   reach: Can[];
   // What they asked to be sent, and whether anything can be: a screen offering

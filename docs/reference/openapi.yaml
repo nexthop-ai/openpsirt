@@ -13,6 +13,9 @@ components:
         admin:
           description: Whether they administer this deployment
           type: boolean
+        audits:
+          description: Whether they may read this deployment's own records. It grants no product's findings or decisions
+          type: boolean
         deactivated_at:
           description: When they left. Absent means they are active
           type: string
@@ -542,6 +545,7 @@ components:
             - public-triage
             - private-triage
             - admin
+            - audit
           type: string
       required:
         - group
@@ -3605,6 +3609,9 @@ components:
           format: uri
           readOnly: true
           type: string
+        created_at:
+          description: When it was issued. A pipeline key does not expire, so this is the only thing that dates it
+          type: string
         last_used_at:
           description: When it last sent something
           type: string
@@ -3735,12 +3742,16 @@ components:
           format: uri
           readOnly: true
           type: string
+        from:
+          type: string
         items:
           items:
             $ref: "#/components/schemas/ChangeBody"
           type:
             - array
             - "null"
+        to:
+          type: string
         total:
           format: int64
           type: integer
@@ -3890,6 +3901,59 @@ components:
         - total
         - findings
         - cap
+      type: object
+    List-set-aside-workResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/List-set-aside-workResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SetAsideBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+        waiting:
+          items:
+            $ref: "#/components/schemas/QueuedBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+        - total
+        - waiting
+      type: object
+    List-team-assignedResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/List-team-assignedResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/UnassignedBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
       type: object
     List-unassignedResponse:
       additionalProperties: false
@@ -4499,28 +4563,6 @@ components:
         items:
           items:
             $ref: "#/components/schemas/SavedBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
-    ListBodySetAsideBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodySetAsideBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/SetAsideBody"
           type:
             - array
             - "null"
@@ -5498,6 +5540,12 @@ components:
         admin:
           description: Whether they administer this deployment
           type: boolean
+        audits:
+          description: Whether they may read this deployment's own records. It grants no product's findings or decisions
+          type: boolean
+        deactivated_at:
+          description: When they left. Absent means they may still sign in
+          type: string
         display_name:
           description: What to show instead of the identity
           type: string
@@ -5759,16 +5807,30 @@ components:
           description: Findings that appeared during this step
           format: int64
           type: integer
+        opened_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: What appeared, split by severity
+          type: object
         resolved:
           description: Findings that went away during this step
           format: int64
           type: integer
+        resolved_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: What went away, split by the severity it held while it was open
+          type: object
       required:
         - at
         - open
         - opened
         - resolved
         - by_severity
+        - opened_by_severity
+        - resolved_by_severity
       type: object
     PreparedBody:
       additionalProperties: false
@@ -5904,6 +5966,25 @@ components:
       required:
         - items
         - total
+      type: object
+    QueuedBody:
+      additionalProperties: false
+      properties:
+        kind:
+          description: Which worker the work is for
+          type: string
+        limit:
+          description: How much of this kind may wait before more is refused
+          format: int64
+          type: integer
+        waiting:
+          description: How much is waiting, including work held by a worker that has stopped reporting
+          format: int64
+          type: integer
+      required:
+        - kind
+        - waiting
+        - limit
       type: object
     RateBody:
       additionalProperties: false
@@ -6278,6 +6359,9 @@ components:
           type: string
         admin:
           description: Whether they administer this deployment. Omit it to leave it as it is
+          type: boolean
+        audits:
+          description: "Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"
           type: boolean
         display_name:
           description: What to show instead of the identity
@@ -7194,7 +7278,7 @@ components:
           description: Which worker the job was for
           type: string
         last_error:
-          description: Why it stopped, where anything reported one
+          description: Why it stopped, where anything reported one. Worker output, which may quote what the job was about
           type: string
         reference:
           description: What the work was about
@@ -7841,6 +7925,9 @@ components:
           format: uri
           readOnly: true
           type: string
+        created_at:
+          description: When it was minted
+          type: string
         expires_at:
           description: When it stops working
           type: string
@@ -8360,6 +8447,9 @@ components:
         admin:
           description: Administers this deployment
           type: boolean
+        audits:
+          description: May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them
+          type: boolean
         bulk_cap:
           description: How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
           format: int64
@@ -8475,7 +8565,9 @@ paths:
 
         Newest first, and paged: it only grows.
 
-        **Requires:** administrator
+        Takes a period, because the question an audit asks is what changed in the stretch the certificate covers. Asked for none, it answers about everything it holds.
+
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-administrative-changes
       parameters:
         - description: Keep only changes of one kind
@@ -8496,6 +8588,30 @@ paths:
               - case
               - alias
             type: string
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+            format: int64
+            maximum: 3650
+            minimum: 1
+            type: integer
         - explode: false
           in: query
           name: limit
@@ -8529,7 +8645,83 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
+  /v1/administration/changes.{format}:
+    get:
+      description: |-
+        Every administrative change the same filters would show, as a file, rather than one page of them.
+
+        **One row per change**, with who made it, what it was about, and what it held before and after. An absent value is not an empty one: `unset` says nobody had set it, and `cleared` that the change removed it.
+
+        Takes the kind and the period the list takes. Asked for no period it writes everything this deployment holds.
+
+        **Requires:** administrator, or the audit permission over this deployment's own records
+      operationId: export-administrative-changes
+      parameters:
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Keep only changes of one kind
+          explode: false
+          in: query
+          name: kind
+          schema:
+            description: Keep only changes of one kind
+            enum:
+              - setting
+              - role
+              - routing
+              - support
+              - release
+              - credential
+              - account
+              - team
+              - case
+              - alias
+            type: string
+        - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
+            type: string
+        - description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning
+            type: string
+        - description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: A rolling window of this many days ending now. An alternative to a period, not an addition to one
+            format: int64
+            maximum: 3650
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export administrative changes
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: records
   /v1/advisories:
     get:
       description: |-
@@ -11925,8 +12117,32 @@ paths:
 
         Nobody appears here by having authenticated. Access is granted in advance, so this list is what an administrator has decided rather than who has turned up.
 
-        **Requires:** administrator
+        **`product` and `role` narrow it to who holds what.** "Who approves on this product" is the question an access review asks, and reading it off a list of everybody is reading the grid sideways. A grant that is not in force does not match: what somebody holds is a statement about now.
+
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-people
+      parameters:
+        - description: Keep only people holding something on this product, by the name that addresses it
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Keep only people holding something on this product, by the name that addresses it
+            type: string
+        - description: Keep only people holding this role
+          explode: false
+          in: query
+          name: role
+          schema:
+            description: Keep only people holding this role
+            enum:
+              - approver
+              - assigner
+              - public-read
+              - private-read
+              - public-triage
+              - private-triage
+            type: string
       responses:
         "200":
           content:
@@ -11944,7 +12160,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
     post:
       description: |-
         Records somebody so that they may sign in, and optionally what they hold. Recording the same person again confirms them and adds any roles named.
@@ -12013,7 +12229,7 @@ paths:
 
         `held` and `told` are the first page of each; `held_total` and `told_total` say how many there are.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: read-person
       parameters:
         - in: path
@@ -12050,7 +12266,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
   /v1/people/{identity}/assignments:
     get:
       description: |-
@@ -19074,11 +19290,11 @@ paths:
         scope: deployment
     get:
       description: |-
-        Lists every group-to-role mapping, and the groups that administer.
+        Lists every group-to-role mapping, and the groups that administer or audit.
 
         In group-bound mode a mapping is the advance authorization: somebody arriving for the first time in a mapped group is admitted, and somebody in none is refused.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-bindings
       responses:
         "200":
@@ -19097,12 +19313,12 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
     post:
       description: |-
         Maps one identity-provider group to one role, so that everybody in that group holds it from their next sign-in.
 
-        Every role but administration names the product it applies to. Administration is bound without one, because it is global rather than held against a product.
+        Every role names the product it applies to. Administration and the audit permission are bound without one, because they are held over the deployment rather than against a product.
 
         **The group is matched exactly, including its capitals.** It is an identity the provider hands over rather than a name anybody here types, so it is stored as given and compared as given — `Security` and `security` are two bindings, and a binding whose capitals do not match what the provider sends grants nothing. The refusal somebody then meets says only that they are not authorized, so check the spelling against the provider rather than against what looks right.
 
@@ -19139,7 +19355,7 @@ paths:
 
         One mode for the whole deployment, never both. A hybrid would need a precedence rule for somebody holding one role from a team and another directly, which is how a stale assignment outlives somebody's removal from the team it was shadowing.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: get-role-mode
       responses:
         "200":
@@ -19158,7 +19374,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
     put:
       description: |-
         Turning group binding on sets assignments aside rather than deleting them, and turning it off restores them — so trying it is not a one-way door. Refused if it would leave nobody able to administer this deployment.
@@ -19600,7 +19816,7 @@ paths:
 
         The shipped numbers are a starting point rather than a recommendation. What a deployment can hold to is a question about that deployment, and a deadline nobody agreed to produces an estate that is permanently late and a signal everybody ignores.
 
-        **Requires:** administrator
+        **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-settings
       responses:
         "200":
@@ -19619,7 +19835,7 @@ paths:
       tags:
         - Administration
       x-openpsirt-requires:
-        scope: deployment
+        scope: records
   /v1/settings/{name}:
     put:
       description: |-
@@ -19771,6 +19987,81 @@ paths:
         - Administration
       x-openpsirt-requires:
         scope: deployment
+  /v1/teams/{team}/assignments:
+    get:
+      description: |-
+        The open findings routed to a team, most urgent first, in the same units as everywhere else: **one item per issue in a component in a product**.
+
+        Work goes to a team by standing rule and by an assignment naming one, so a team holds work the way a person does — and the totals list says so. This is the list behind that number.
+
+        A team nobody declared answers with an empty list rather than a 404, which is also what a team whose work is not yours to see answers. The two are deliberately the same, for the reason a person's is: refusing would answer "does this team exist" for any credential at all.
+
+        **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see. A team nobody declared answers as one whose work you cannot see.
+      operationId: list-team-assigned
+      parameters:
+        - description: The team's name
+          in: path
+          name: team
+          required: true
+          schema:
+            description: The team's name
+            type: string
+        - description: Limit to one product, by name. Empty means every product you can see
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see
+            type: string
+        - description: Limit to one branch or tag. Only meaningful with a product
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Limit to one branch or tag. Only meaningful with a product
+            type: string
+        - description: Limit to one variant. Only meaningful with a product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Only meaningful with a product, and independent of the branch
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/List-team-assignedResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what one team is dealing with
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see. A team nobody declared answers as one whose work you cannot see.
   /v1/teams/{team}/members/{identity}:
     delete:
       description: |-
@@ -20019,6 +20310,99 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/trend.{format}:
+    get:
+      description: |-
+        One row per step, with what arrived, what was answered and what stood open at the end of it — each split by severity.
+
+        **The two flows are what the backlog is read for.** Ten arriving and ten answered is a team keeping pace where both are low, and a team losing ground where what arrives is critical and what leaves is not.
+
+        Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
+
+        **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-trend
+      parameters:
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+        - description: Limit to one product, by name. Empty means every product you can see
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see
+            type: string
+        - description: Limit to one branch or tag. Only meaningful with a product
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Limit to one branch or tag. Only meaningful with a product
+            type: string
+        - description: Limit to one variant. Only meaningful with a product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Only meaningful with a product, and independent of the branch
+            type: string
+        - explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 12
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - description: Keep only what is open against components of this name, whatever version
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep only what is open against components of this name, whatever version
+            type: string
+        - description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build
+            type: string
+        - description: Which one, where the build holds that name at several versions
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: Which one, where the build holds that name at several versions
+            type: string
+        - description: Which one, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: Which one, for the few names a build holds at one version as two components
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export new, resolved and open over time
+      tags:
+        - Reports
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/trend/releases:
     get:
       description: |-
@@ -20185,6 +20569,8 @@ paths:
 
         At most 200 are returned. `total` is how many are set aside in all, so a clipped page can be told from a complete one.
 
+        `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
+
         **Requires:** administrator
       operationId: list-set-aside-work
       responses:
@@ -20192,7 +20578,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodySetAsideBody"
+                $ref: "#/components/schemas/List-set-aside-workResponse"
           description: OK
         default:
           content:

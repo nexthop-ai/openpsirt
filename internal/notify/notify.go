@@ -232,12 +232,13 @@ type Notification struct {
 
 // Store records and reads notifications.
 type Store struct {
-	db  *bun.DB
+	db  bun.IDB
 	now func() time.Time
 }
 
-// NewStore returns a store over db.
-func NewStore(db *bun.DB) *Store {
+// NewStore returns a store over db, which is the transaction an
+// administrative act is being made in or this deployment's pooled handle.
+func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
@@ -345,7 +346,7 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 		wanted[h.About] = h
 	}
 
-	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		opened, cleared = 0, 0
 
 		var open []Notification
@@ -592,17 +593,18 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // somebody was told, and a line they have already acknowledged is still a line
 // they were sent.
 //
-// **For an administrator alone**, and refused for anybody else. Every other
-// read of this table is somebody reading their own; this one is a person page
-// asking after a leak, which is the one reason to read a list addressed to
-// somebody else. Enforced here rather than at the handler, because that is
-// where the rest of this table's rules live (REQ-42 and REQ-43).
+// **For either thing held over the deployment**, and refused for anybody else.
+// Every other read of this table is somebody reading their own; this one is a
+// person page asking after a leak, which is the one reason to read a list
+// addressed to somebody else. Enforced here rather than at the handler,
+// because that is where the rest of this table's rules live (REQ-42 and
+// REQ-43).
 //
-// **Narrowed by what the reader may see, and the flag is not a way to see
-// more.** The administrator flag decides who may ask this question; the rows
-// that come back are the ones the asker could read on their own account, so an
-// administrator holding nothing on a product reads the public half of a feed
-// and not the embargoed half.
+// **Narrowed by what the reader may see, and neither grant is a way to see
+// more.** Holding one decides who may ask this question; the rows that come
+// back are the ones the asker could read on their own account, so somebody
+// holding nothing on a product reads the public half of a feed and not the
+// embargoed half — and an auditor, who holds no product, reads nothing.
 //
 // The defense for answering it whole was that an administrator could grant
 // themselves the product and read it anyway. They can, and that grant lands in
@@ -612,7 +614,11 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int64,
 	limit, offset int) ([]Notification, int, error) {
 
-	if !subject.Admin || subject.Kind != access.Person {
+	// Either thing held over the deployment, and neither is a way to see
+	// more: the rows are narrowed below by what the asker could read on their
+	// own account. Somebody who reaches no product is answered with nothing,
+	// which is the same answer an administrator holding no product gets.
+	if !subject.ReadsTheDeployment() {
 		return nil, 0, access.Denied("read what somebody else was told")
 	}
 	limit = database.AList.Of(limit)

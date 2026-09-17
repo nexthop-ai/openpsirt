@@ -5,14 +5,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import type { Who } from "../app/session";
 import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
 
 // What this deployment has decided for everybody in it, grouped the way the
 // mockup groups them. Every setting the server exposes renders; a setting no
 // group names lands under "Other", so nothing offered is hidden.
-export function Settings() {
+export function Settings({ who }: { who: Who }) {
   const queries = useQueryClient();
+  // The audit permission reads this screen and writes none of it. A control
+  // somebody can press that the server will refuse is worse than one that is
+  // not there, because pressing it looks like it worked.
+  const canSet = Boolean(who.admin);
   const settings = useQuery({
     queryKey: ["settings"],
     queryFn: async () => unwrap(await api.GET("/v1/settings", {})),
@@ -61,6 +66,7 @@ export function Settings() {
     <Field
       key={each.name}
       setting={each}
+      canSet={canSet}
       onSet={(value) => set.mutate({ name: each.name ?? "", value })}
     />
   );
@@ -220,6 +226,7 @@ function label(name?: string): string {
 
 function Field({
   setting,
+  canSet,
   onSet,
 }: {
   setting: {
@@ -230,6 +237,7 @@ function Field({
     kind: "duration" | "count" | "size" | "word" | "switch";
     words?: string[] | null;
   };
+  canSet: boolean;
   onSet: (value: string) => void;
 }) {
   const [value, setValue] = useState(setting.value ?? "");
@@ -290,19 +298,32 @@ function Field({
         ? writeBytes(typed, size)
         : ""
       : value;
-  const changed = asked !== "" && asked !== (setting.value ?? "");
+  // Changed, and worth offering to save. A reader who cannot write still sees
+  // what is set — the value is the answer they came for — and is offered no
+  // control that would be refused.
+  const changed = canSet && asked !== "" && asked !== (setting.value ?? "");
 
   return (
     <div className="field" style={{ margin: 0, maxWidth: takes || sizes ? 320 : 240 }}>
-      {/* The sentence sits on the label rather than on the control. A
-          password manager classifies a field by the words it can reach
-          through it, and what a setting means is prose about sign-ins,
-          accounts and dates — which is how three of these came to be offered
-          a saved login despite saying they were not credentials. */}
-      <label htmlFor={setting.name} title={setting.means}>
+      <label htmlFor={setting.name}>
         {label(setting.name)}
         {setting.default && <span className="hint"> · default</span>}
       </label>
+      {/* What the setting does, in words, under the name of it. It sat on the
+          label's hover, which is where clarification goes — and what a
+          setting does is not clarification, it is the whole of what the
+          control is. Three of these rewrite what the tool reports without
+          anything being scanned, and a reader had to hover to find out which.
+
+          Not on the control itself: a password manager classifies a field by
+          the words it can reach through it, and this is prose about sign-ins,
+          accounts and dates — which is how three of them came to be offered a
+          saved login despite saying they were not credentials. */}
+      {setting.means && (
+        <span className="hint" style={{ margin: "0 0 4px" }}>
+          {setting.means}
+        </span>
+      )}
       <div style={{ display: "flex", gap: 6 }}>
         {words ? (
           <select
@@ -382,7 +403,7 @@ function Field({
             onChange={(event) => setValue(event.target.value)}
           />
         )}
-        {changed && (
+        {changed && canSet && (
           <button type="button" className="btn" onClick={() => onSet(asked)}>
             Save
           </button>

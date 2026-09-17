@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -26,6 +27,9 @@ type AboutPersonBody struct {
 	Identity    string `json:"identity"`
 	DisplayName string `json:"display_name,omitempty"`
 	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
+	// Audits is the read-only half of what is held over the deployment: its
+	// own records, and no product's findings or decisions.
+	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
 	// DeactivatedAt is when they stopped being somebody who may sign in.
 	// Absent is the ordinary state. Never a deletion: they are still named
 	// by every judgment they proposed and every one they agreed to.
@@ -95,11 +99,11 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 			"`held` and `told` are the first page of each; `held_total` and `told_total` " +
 			"say how many there are.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, input *struct {
+	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
 		Identity string `path:"identity" maxLength:"191"`
 		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many of each list to return"`
 	}) (*struct{ Body AboutPersonBody }, error) {
-		store, _, err := administerable(ctx, a)
+		store, _, err := readable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -115,6 +119,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 
 		body := AboutPersonBody{
 			Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+			Audits:        person.Audits,
 			DeactivatedAt: orAbsent(person.DeactivatedAt),
 		}
 
@@ -152,14 +157,23 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 			})
 		}
 
-		record, err := triage.NewStore(in.DB.DB).RecordOf(ctx, subject, person.ID)
-		if err != nil {
-			return nil, refused(a.Logger, err, "cannot read their part in the record")
-		}
-		body.Record = PersonRecordBody{
-			Proposed: record.Proposed, Approved: record.Approved, Withdrawn: record.Withdrawn,
-			LastProposedAt: orAbsent(record.LastProposedAt),
-			LastApprovedAt: orAbsent(record.LastApprovedAt),
+		// What they did to the triage record, which is counted over every
+		// product without narrowing — a concentration signal computed over
+		// the products the reader happens to hold is not the signal. So it is
+		// an administrator's, and the page leaves the block out for an auditor
+		// rather than refusing: the grant that reads this deployment's records
+		// is declared to reach no product's decisions, and this is a count
+		// over all of them.
+		if subject.Admin {
+			record, err := triage.NewStore(in.DB.DB).RecordOf(ctx, subject, person.ID)
+			if err != nil {
+				return nil, refused(a.Logger, err, "cannot read their part in the record")
+			}
+			body.Record = PersonRecordBody{
+				Proposed: record.Proposed, Approved: record.Approved, Withdrawn: record.Withdrawn,
+				LastProposedAt: orAbsent(record.LastProposedAt),
+				LastApprovedAt: orAbsent(record.LastApprovedAt),
+			}
 		}
 
 		told, toldTotal, err := notify.NewStore(in.DB.DB).ToldTo(ctx, subject, person.ID, input.Limit, 0)
@@ -243,24 +257,6 @@ func registerDeactivation(api huma.API, a Administering) {
 			Since    string `json:"since" doc:"When they left"`
 		}
 	}, error) {
-		rights, subject, person, err := aboutPerson(ctx, a, input.Identity)
-		if err != nil {
-			return nil, err
-		}
-		// Refused before anything is written. An administrator locking
-		// themselves out is a deployment nobody can administer, and the
-		// documented way back in is the bootstrap account — which is this one
-		// often enough that the mistake is worth refusing rather than
-		// recording.
-		if person.ID == subject.ID {
-			return nil, huma.Error409Conflict(
-				"deactivating yourself would leave nobody able to undo it")
-		}
-
-		moved, err := rights.Deactivate(ctx, person.ID)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot record that they left", err)
-		}
 		out := &struct {
 			Body struct {
 				Released int64  `json:"released" doc:"Findings handed back because they are gone"`
@@ -268,35 +264,65 @@ func registerDeactivation(api huma.API, a Administering) {
 				Since    string `json:"since" doc:"When they left"`
 			}
 		}{}
-		out.Body.Already = !moved
-		if !moved {
-			// Read back rather than echoed: the date is when they left, and a
-			// second call must report that moment rather than this one.
-			again, err := rights.ByIdentity(ctx, input.Identity)
-			if err == nil && again.DeactivatedAt != nil {
-				out.Body.Since = again.DeactivatedAt.Format(time.RFC3339)
+		var subject access.Subject
+		var person *access.Account
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			rights, asking, who, err := aboutPerson(ctx, a, tx, input.Identity)
+			if err != nil {
+				return err
 			}
-			return out, nil
+			subject, person = asking, who
+			// Refused before anything is written. An administrator locking
+			// themselves out is a deployment nobody can administer, and the
+			// documented way back in is the bootstrap account — which is this
+			// one often enough that the mistake is worth refusing rather than
+			// recording.
+			if person.ID == subject.ID {
+				return huma.Error409Conflict(
+					"deactivating yourself would leave nobody able to undo it")
+			}
+
+			moved, err := rights.Deactivate(ctx, person.ID)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot record that they left", err)
+			}
+			out.Body.Already = !moved
+			out.Body.Since, out.Body.Released = "", 0
+			if !moved {
+				// Read back rather than echoed: the date is when they left,
+				// and a second call must report that moment rather than this
+				// one. A second call finds nothing to move and writes no
+				// second row.
+				again, err := rights.ByIdentity(ctx, input.Identity)
+				if err == nil && again.DeactivatedAt != nil {
+					out.Body.Since = again.DeactivatedAt.Format(time.RFC3339)
+				}
+				return nil
+			}
+			out.Body.Since = time.Now().UTC().Format(time.RFC3339)
+
+			if err := noted(ctx, tx, trail.Account, person.Identity,
+				trail.Said("active", true), trail.Said("deactivated", true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+
+			// Ended rather than left to expire. Roles are re-read at sign-in,
+			// so withdrawing one takes effect then; this is what makes leaving
+			// immediate instead.
+			if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
+				return wentWrong(a.Logger, "cannot end their sessions", err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		out.Body.Since = time.Now().UTC().Format(time.RFC3339)
-
-		// Recorded as soon as it has happened, rather than after the two
-		// things that follow it. Both of those can fail and answer 500, and
-		// the deactivation has already been written by then — leaving a
-		// person who cannot sign in and nothing saying who stopped them.
-		// A second call finds nothing to move and writes no second row.
-		noteAdminChange(ctx, a, trail.Account, person.Identity,
-			trail.Said("active", true), trail.Said("deactivated", true))
-
-		// Ended rather than left to expire. Roles are re-read at sign-in, so
-		// withdrawing one takes effect then; this is what makes leaving
-		// immediate instead.
-		if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
-			return nil, wentWrong(a.Logger, "cannot end their sessions", err)
+		if out.Body.Already {
+			return out, nil
 		}
 		// Handed back for the reason losing a last role hands work back: work
 		// held by somebody who is gone is work nobody is doing, and it does
-		// not look like it.
+		// not look like it. Outside the act, like the release a withdrawal
+		// does, because it is bounded by how much they were holding.
 		if a.Findings != nil {
 			if findings := a.Findings(); findings != nil {
 				released, err := findings.Release(ctx, subject, person.PartyID)
@@ -322,17 +348,25 @@ func registerDeactivation(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Identity string `path:"identity" maxLength:"191"`
 	}) (*struct{}, error) {
-		rights, _, person, err := aboutPerson(ctx, a, input.Identity)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			rights, _, person, err := aboutPerson(ctx, a, tx, input.Identity)
+			if err != nil {
+				return err
+			}
+			moved, err := rights.Reactivate(ctx, person.ID)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot record that they are back", err)
+			}
+			if !moved {
+				return nil
+			}
+			if err := noted(ctx, tx, trail.Account, person.Identity,
+				trail.Said("deactivated", true), trail.Said("active", true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
-		}
-		moved, err := rights.Reactivate(ctx, person.ID)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot record that they are back", err)
-		}
-		if moved {
-			noteAdminChange(ctx, a, trail.Account, person.Identity,
-				trail.Said("deactivated", true), trail.Said("active", true))
 		}
 		return &struct{}{}, nil
 	})
@@ -345,10 +379,12 @@ func registerDeactivation(api huma.API, a Administering) {
 // refusing after makes the refusal informative — a name nobody holds and a name
 // somebody holds come back differently, which turns a lookup into a directory
 // (REQ-42).
-func aboutPerson(ctx context.Context, a Administering, identity string) (
+// db is the handle it builds the store over: the transaction the act is being
+// made in, or handle() where the route only reads.
+func aboutPerson(ctx context.Context, a Administering, db bun.IDB, identity string) (
 	*access.Store, access.Subject, *access.Account, error) {
 
-	rights, _, err := administerable(ctx, a)
+	rights, _, err := administerable(ctx, a, db)
 	if err != nil {
 		return nil, access.Subject{}, nil, err
 	}

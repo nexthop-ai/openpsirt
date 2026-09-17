@@ -234,7 +234,7 @@ func (f *fixture) granted(t *testing.T, identity string, productID int64,
 	t.Helper()
 	ctx := t.Context()
 	rights := access.NewStore(f.db.DB)
-	person, err := rights.Ensure(ctx, identity, "", nil)
+	person, err := rights.Ensure(ctx, identity, "", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func TestSomebodyBroughtOntoACaseReachesItsNotes(t *testing.T) {
 		ctx := t.Context()
 		f.sits(t, access.Private)
 		rights := access.NewStore(f.db.DB)
-		person, err := rights.Ensure(ctx, "collaborator", "Collaborator", nil)
+		person, err := rights.Ensure(ctx, "collaborator", "Collaborator", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

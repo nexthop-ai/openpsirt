@@ -372,3 +372,64 @@ func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) 
 		_ = place
 	})
 }
+
+// TestATeamsQueueCanBeOpened pins the list behind a team's own number.
+//
+// Auto-assignment and an assignment naming a team both put work into a team's
+// queue, and the totals list said the team was holding it. Nothing could open
+// it: the drill-down resolved an identity, so a team's name matched nobody and
+// the screen answered "they are not holding anything" over work it had just
+// counted. Worse than an absent view, because it answered.
+func TestATeamsQueueCanBeOpened(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		if made := asPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"platform","display_name":"Platform","members":["triager"]}`); made.Code >= 300 {
+			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
+		}
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+		if got := asPerson(t, r, "assigner", http.MethodPut, at,
+			`{"team":"platform"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("routing work to a team answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The totals list says the team holds it.
+		var holdings struct {
+			Items []struct {
+				Person string `json:"person"`
+				Team   bool   `json:"team"`
+				Open   int    `json:"open"`
+			} `json:"items"`
+		}
+		read(t, r, "triager", "/v1/assignments", &holdings)
+		if len(holdings.Items) != 1 || !holdings.Items[0].Team || holdings.Items[0].Open == 0 {
+			t.Fatalf("who is holding what reads as %+v", holdings.Items)
+		}
+
+		// And the list behind that number holds the same work.
+		var queue struct {
+			Items []struct {
+				Vulnerability string `json:"vulnerability"`
+				Component     string `json:"component"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+		read(t, r, "triager", "/v1/teams/platform/assignments", &queue)
+		if queue.Total != holdings.Items[0].Open {
+			t.Errorf("the team's queue holds %d and the total beside it says %d",
+				queue.Total, holdings.Items[0].Open)
+		}
+		if len(queue.Items) != 1 || queue.Items[0].Component != "libnl-3-200" {
+			t.Fatalf("the team's queue reads as %+v", queue.Items)
+		}
+
+		// A name nothing matches holds nothing rather than being refused:
+		// refusing would answer "is there a team called this" for any
+		// credential at all.
+		read(t, r, "triager", "/v1/teams/no-such-team/assignments", &queue)
+		if queue.Total != 0 {
+			t.Errorf("a team nobody declared holds %d pieces of work", queue.Total)
+		}
+	})
+}

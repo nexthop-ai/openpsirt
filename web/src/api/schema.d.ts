@@ -19,9 +19,37 @@ export interface paths {
          *
          *     Newest first, and paged: it only grows.
          *
-         *     **Requires:** administrator
+         *     Takes a period, because the question an audit asks is what changed in the stretch the certificate covers. Asked for none, it answers about everything it holds.
+         *
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-administrative-changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/administration/changes.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export administrative changes
+         * @description Every administrative change the same filters would show, as a file, rather than one page of them.
+         *
+         *     **One row per change**, with who made it, what it was about, and what it held before and after. An absent value is not an empty one: `unset` says nobody had set it, and `cleared` that the change removed it.
+         *
+         *     Takes the kind and the period the list takes. Asked for no period it writes everything this deployment holds.
+         *
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
+         */
+        get: operations["export-administrative-changes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1321,7 +1349,9 @@ export interface paths {
          *
          *     Nobody appears here by having authenticated. Access is granted in advance, so this list is what an administrator has decided rather than who has turned up.
          *
-         *     **Requires:** administrator
+         *     **`product` and `role` narrow it to who holds what.** "Who approves on this product" is the question an access review asks, and reading it off a list of everybody is reading the grid sideways. A grant that is not in force does not match: what somebody holds is a statement about now.
+         *
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-people"];
         put?: never;
@@ -1379,7 +1409,7 @@ export interface paths {
          *
          *     `held` and `told` are the first page of each; `held_total` and `told_total` say how many there are.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["read-person"];
         put?: never;
@@ -3737,11 +3767,11 @@ export interface paths {
         };
         /**
          * List group-to-role bindings
-         * @description Lists every group-to-role mapping, and the groups that administer.
+         * @description Lists every group-to-role mapping, and the groups that administer or audit.
          *
          *     In group-bound mode a mapping is the advance authorization: somebody arriving for the first time in a mapped group is admitted, and somebody in none is refused.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-bindings"];
         put?: never;
@@ -3749,7 +3779,7 @@ export interface paths {
          * Bind an identity-provider group to a role
          * @description Maps one identity-provider group to one role, so that everybody in that group holds it from their next sign-in.
          *
-         *     Every role but administration names the product it applies to. Administration is bound without one, because it is global rather than held against a product.
+         *     Every role names the product it applies to. Administration and the audit permission are bound without one, because they are held over the deployment rather than against a product.
          *
          *     **The group is matched exactly, including its capitals.** It is an identity the provider hands over rather than a name anybody here types, so it is stored as given and compared as given — `Security` and `security` are two bindings, and a binding whose capitals do not match what the provider sends grants nothing. The refusal somebody then meets says only that they are not authorized, so check the spelling against the provider rather than against what looks right.
          *
@@ -3783,7 +3813,7 @@ export interface paths {
          *
          *     One mode for the whole deployment, never both. A hybrid would need a precedence rule for somebody holding one role from a team and another directly, which is how a stale assignment outlives somebody's removal from the team it was shadowing.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["get-role-mode"];
         /**
@@ -4021,7 +4051,7 @@ export interface paths {
          *
          *     The shipped numbers are a starting point rather than a recommendation. What a deployment can hold to is a question about that deployment, and a deadline nobody agreed to produces an estate that is permanently late and a signal everybody ignores.
          *
-         *     **Requires:** administrator
+         *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-settings"];
         put?: never;
@@ -4131,6 +4161,32 @@ export interface paths {
          *     **Requires:** administrator
          */
         delete: operations["retire-team"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/teams/{team}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what one team is dealing with
+         * @description The open findings routed to a team, most urgent first, in the same units as everywhere else: **one item per issue in a component in a product**.
+         *
+         *     Work goes to a team by standing rule and by an assignment naming one, so a team holds work the way a person does — and the totals list says so. This is the list behind that number.
+         *
+         *     A team nobody declared answers with an empty list rather than a 404, which is also what a team whose work is not yours to see answers. The two are deliberately the same, for the reason a person's is: refusing would answer "does this team exist" for any credential at all.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see. A team nobody declared answers as one whose work you cannot see.
+         */
+        get: operations["list-team-assigned"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4252,6 +4308,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trend.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export new, resolved and open over time
+         * @description One row per step, with what arrived, what was answered and what stood open at the end of it — each split by severity.
+         *
+         *     **The two flows are what the backlog is read for.** Ten arriving and ten answered is a team keeping pace where both are low, and a team losing ground where what arrives is critical and what leaves is not.
+         *
+         *     Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-trend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trend/releases": {
         parameters: {
             query?: never;
@@ -4341,6 +4423,8 @@ export interface paths {
          *
          *     At most 200 are returned. `total` is how many are set aside in all, so a clipped page can be told from a complete one.
          *
+         *     `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
+         *
          *     **Requires:** administrator
          */
         get: operations["list-set-aside-work"];
@@ -4389,6 +4473,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Whether they administer this deployment */
             admin?: boolean;
+            /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
+            audits?: boolean;
             /** @description When they left. Absent means they are active */
             deactivated_at?: string;
             display_name?: string;
@@ -4694,7 +4780,7 @@ export interface components {
              * @description What membership of this group grants
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin" | "audit";
         };
         BlockingBody: {
             component: string;
@@ -6416,6 +6502,8 @@ export interface components {
              * @example https://example.com/schemas/KeyBody.json
              */
             readonly $schema?: string;
+            /** @description When it was issued. A pipeline key does not expire, so this is the only thing that dates it */
+            created_at?: string;
             /** @description When it last sent something */
             last_used_at?: string;
             /** @description What this credential is for */
@@ -6481,7 +6569,9 @@ export interface components {
              * @example https://example.com/schemas/List-administrative-changesResponse.json
              */
             readonly $schema?: string;
+            from?: string;
             items: components["schemas"]["ChangeBody"][] | null;
+            to?: string;
             /** Format: int64 */
             total: number;
         };
@@ -6553,6 +6643,29 @@ export interface components {
             /** Format: int64 */
             findings: number;
             items: components["schemas"]["AtComponentBody"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        "List-set-aside-workResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-set-aside-workResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SetAsideBody"][] | null;
+            /** Format: int64 */
+            total: number;
+            waiting: components["schemas"]["QueuedBody"][] | null;
+        };
+        "List-team-assignedResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-team-assignedResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["UnassignedBody"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -6861,17 +6974,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["SavedBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodySetAsideBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodySetAsideBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["SetAsideBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -7427,6 +7529,10 @@ export interface components {
         PersonBody: {
             /** @description Whether they administer this deployment */
             admin?: boolean;
+            /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
+            audits?: boolean;
+            /** @description When they left. Absent means they may still sign in */
+            deactivated_at?: string;
             /** @description What to show instead of the identity */
             display_name?: string;
             /** @description Where they are reached outside the application */
@@ -7590,11 +7696,19 @@ export interface components {
              * @description Findings that appeared during this step
              */
             opened: number;
+            /** @description What appeared, split by severity */
+            opened_by_severity: {
+                [key: string]: number;
+            };
             /**
              * Format: int64
              * @description Findings that went away during this step
              */
             resolved: number;
+            /** @description What went away, split by the severity it held while it was open */
+            resolved_by_severity: {
+                [key: string]: number;
+            };
         };
         PreparedBody: {
             /**
@@ -7675,6 +7789,20 @@ export interface components {
             items: components["schemas"]["WaitingBody"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        QueuedBody: {
+            /** @description Which worker the work is for */
+            kind: string;
+            /**
+             * Format: int64
+             * @description How much of this kind may wait before more is refused
+             */
+            limit: number;
+            /**
+             * Format: int64
+             * @description How much is waiting, including work held by a worker that has stopped reporting
+             */
+            waiting: number;
         };
         RateBody: {
             /**
@@ -7916,6 +8044,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Whether they administer this deployment. Omit it to leave it as it is */
             admin?: boolean;
+            /** @description Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is */
+            audits?: boolean;
             /** @description What to show instead of the identity */
             display_name?: string;
             /** @description Where to reach them outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was */
@@ -8457,7 +8587,7 @@ export interface components {
             id: number;
             /** @description Which worker the job was for */
             kind: string;
-            /** @description Why it stopped, where anything reported one */
+            /** @description Why it stopped, where anything reported one. Worker output, which may quote what the job was about */
             last_error?: string;
             /** @description What the work was about */
             reference: string;
@@ -8810,6 +8940,8 @@ export interface components {
              * @example https://example.com/schemas/TokenBody.json
              */
             readonly $schema?: string;
+            /** @description When it was minted */
+            created_at?: string;
             /** @description When it stops working */
             expires_at?: string;
             /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none */
@@ -9100,6 +9232,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Administers this deployment */
             admin: boolean;
+            /** @description May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them */
+            audits?: boolean;
             /**
              * Format: int64
              * @description How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
@@ -9186,6 +9320,12 @@ export interface operations {
             query?: {
                 /** @description Keep only changes of one kind */
                 kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
                 limit?: number;
                 offset?: number;
             };
@@ -9203,6 +9343,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["List-administrative-changesResponse"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-administrative-changes": {
+        parameters: {
+            query?: {
+                /** @description Keep only changes of one kind */
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -11133,7 +11311,12 @@ export interface operations {
     };
     "list-people": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Keep only people holding something on this product, by the name that addresses it */
+                product?: string;
+                /** @description Keep only people holding this role */
+                role?: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -15599,6 +15782,47 @@ export interface operations {
             };
         };
     };
+    "list-team-assigned": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                stream?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The team's name */
+                team: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-team-assignedResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "add-to-team": {
         parameters: {
             query?: never;
@@ -15795,6 +16019,51 @@ export interface operations {
             };
         };
     };
+    "export-trend": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                stream?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                weeks?: number;
+                /** @description Keep only what is open against components of this name, whatever version */
+                component?: string;
+                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build */
+                beneath?: string;
+                /** @description Which one, where the build holds that name at several versions */
+                beneath_version?: string;
+                /** @description Which one, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-release-trend": {
         parameters: {
             query?: {
@@ -15915,7 +16184,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodySetAsideBody"];
+                    "application/json": components["schemas"]["List-set-aside-workResponse"];
                 };
             };
             /** @description Error */

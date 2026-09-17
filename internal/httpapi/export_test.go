@@ -795,7 +795,26 @@ func TestEveryExportSaysWhatItIsAndWhenItWasTaken(t *testing.T) {
 			if query != "" {
 				query = "?" + strings.TrimPrefix(query, "&")
 			}
-			got := asPerson(t, r, "private-triage", http.MethodGet, at+query, "")
+			// Asked as somebody the operation's own declaration says may
+			// ask. A file over the deployment's own records is not a file
+			// about findings, and driving every export as one persona would
+			// make the walk skip whichever kind that persona cannot reach —
+			// which is the export this test exists to catch.
+			// Asked as the narrowest persona the declaration admits.
+			// Administration is a superset of reading the deployment's own
+			// records, so asking as an administrator leaves a file that
+			// narrowed back to administration green — which is the change
+			// this walk exists to catch.
+			who := "private-triage"
+			if asks, stated := item.Get.Extensions["x-openpsirt-requires"]; stated {
+				switch declaredScope(t, asks) {
+				case "deployment":
+					who = "admin"
+				case "records":
+					who = "auditor"
+				}
+			}
+			got := asPerson(t, r, who, http.MethodGet, at+query, "")
 			if got.Code != http.StatusOK {
 				t.Errorf("GET %s%s answered %d: %s", at, query, got.Code, got.Body.String())
 				continue

@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -40,6 +41,7 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	}
 	body := &PersonBody{
 		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 		Email: person.Email, EmailSource: string(person.EmailSource),
 	}
 	for _, door := range doors {
@@ -69,25 +71,30 @@ func described(ctx context.Context, a Administering, store *access.Store,
 
 // Administering is what the endpoints for people and credentials need.
 type Administering struct {
-	Access  func() *access.Store
-	Catalog func() *catalog.Store
+	// DB is what an administrative act and the record of it are written in
+	// one transaction on. Nil where this process has no database, and then
+	// every route here refuses rather than changing anything.
+	DB *database.DB
+	// Access and Catalog are built over whatever handle the caller is
+	// writing on: the transaction, where the act is being made, and the
+	// pooled handle where it is only being read.
+	Access  func(bun.IDB) *access.Store
+	Catalog func(bun.IDB) *catalog.Store
 	Logger  *slog.Logger
-	// Mode says where roles come from, read per request because an
-	// administrator can change it without a restart.
-	Mode func(context.Context) access.Mode
 	// Findings is what withdrawing somebody's last role on a product
 	// needs: their work there goes back to the unassigned list rather than
 	// staying where nobody can reach it. Nil where this process has no
 	// database, and then nothing is released.
+	//
+	// Over the pooled handle rather than the act's transaction: handing work
+	// back is a consequence of the withdrawal rather than part of it, and it
+	// is bounded by how much that person was holding rather than by the
+	// request.
 	Findings func() *finding.Store
-	// Trail is where an administrative change is recorded. Nil where this
-	// process has no database, and then nothing is recorded — which is the
-	// same state as having no database to change anything in.
-	Trail func() *trail.Store
 	// Settings is where the window an unredeemed authorization stays
 	// redeemable for is read. Nil where this process has no database, and
 	// then the built-in window applies.
-	Settings func() *setting.Store
+	Settings func(bun.IDB) *setting.Store
 	// Groups says whether anything configured here can hand over group
 	// membership: a provider with a source of groups, or a trusted proxy that
 	// reports them.
@@ -98,11 +105,35 @@ type Administering struct {
 	Groups func() bool
 }
 
+// handle is what a route that only reads builds its stores over.
+//
+// Named rather than written as a.DB at each site: a nil *database.DB handed to
+// an interface parameter is an interface that is not nil, so every check below
+// it reads as a database that is there and every store built over it panics on
+// first use.
+func (a Administering) handle() bun.IDB {
+	if a.DB == nil {
+		return nil
+	}
+	return a.DB.DB
+}
+
 // PersonBody is somebody who has been granted access.
 type PersonBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"What to call them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"What to show instead of the identity"`
 	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
+	// Audits is the read-only half: this deployment's own records, and no
+	// product's findings or decisions.
+	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
+	// DeactivatedAt is when they stopped being somebody who may sign in.
+	// Absent is the ordinary state, and it is never a deletion: they are
+	// still named by every judgment they proposed.
+	//
+	// On the list as well as on the person, because "who still has access"
+	// is a question about the list — and a list that answers it only one row
+	// at a time is one nobody asks it of.
+	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"When they left. Absent means they may still sign in"`
 	// How somebody signs in is SignsInBy below, which carries the username
 	// and whether the provider's own identifier has been pinned to it. Two
 	// fields here said the same thing, were documented as though a request
@@ -167,6 +198,9 @@ type RecordBody struct {
 	// A plain bool decodes an absent field as false, so granting a role — a
 	// request that says nothing about administration — withdrew it.
 	Admin *bool `json:"admin,omitempty" doc:"Whether they administer this deployment. Omit it to leave it as it is"`
+	// Audits is the same shape for the other thing held over the deployment:
+	// reading its own records and writing none of them.
+	Audits *bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"`
 	// Email is where to reach them outside the application. Optional:
 	// without one somebody is told nothing outside it and keeps the area
 	// inside it. A provider that verifies an address fills in one nobody
@@ -243,7 +277,15 @@ type KeyBody struct {
 	Stream  string `json:"stream,omitempty" doc:"Optionally, the one release it may send for"`
 	Variant string `json:"variant,omitempty" doc:"Optionally, the one variant it may send for"`
 	// Secret is returned when the credential is created, and never again.
-	Secret     string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
+	Secret string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
+	// CreatedAt is when it was issued. A credential's age is half of what
+	// somebody reviewing them is looking at — the other half is when it was
+	// last used, and "never used and two years old" reads very differently
+	// from "never used and made this morning".
+	//
+	// A pipeline key does not expire, which is why the date it was made is
+	// the only thing that bounds it.
+	CreatedAt  string `json:"created_at,omitempty" doc:"When it was issued. A pipeline key does not expire, so this is the only thing that dates it"`
 	LastUsedAt string `json:"last_used_at,omitempty" doc:"When it last sent something"`
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
 }
@@ -262,12 +304,33 @@ func registerAdministration(api huma.API, a Administering) {
 		Description: "Lists everybody who may sign in, with the roles each of them holds and " +
 			"the products those apply to.\n\n" +
 			"Nobody appears here by having authenticated. Access is granted in advance, so this " +
-			"list is what an administrator has decided rather than who has turned up.",
+			"list is what an administrator has decided rather than who has turned up.\n\n" +
+			"**`product` and `role` narrow it to who holds what.** \"Who approves on this " +
+			"product\" is the question an access review asks, and reading it off a list of " +
+			"everybody is reading the grid sideways. A grant that is not in force does not " +
+			"match: what somebody holds is a statement about now.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[PersonBody], error) {
-		store, _, err := administerable(ctx, a)
+	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
+		Product string `query:"product" doc:"Keep only people holding something on this product, by the name that addresses it"`
+		Role    string `query:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"Keep only people holding this role"`
+	}) (*listOutput[PersonBody], error) {
+		store, names, err := readable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
+		}
+		// Resolved before the list is read, so a product nobody declared is
+		// said rather than answered with an empty list — which reads as
+		// "nobody holds anything there" and is a different fact.
+		var onProduct int64
+		if input.Product != "" {
+			product, err := names.ProductByName(ctx, input.Product)
+			if err != nil {
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
+			}
+			onProduct = product.ID
+		}
+		if input.Role != "" && !access.Role(input.Role).Valid() {
+			return nil, huma.Error422UnprocessableEntity("that is not a role")
 		}
 		people, held, err := store.People(ctx)
 		if err != nil {
@@ -290,6 +353,13 @@ func registerAdministration(api huma.API, a Administering) {
 		for _, person := range people {
 			body := PersonBody{
 				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
+				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
+				// Where they are reached, and which of the two sources said
+				// so. On the list as well as on the one-person read: the
+				// screen that records an address is the list, and a column
+				// that drew "none" over an address somebody had just typed
+				// reads as the write having been refused.
+				Email: person.Email, EmailSource: string(person.EmailSource),
 			}
 			doors, err := store.Identities(ctx, person.ID)
 			if err != nil {
@@ -314,6 +384,9 @@ func registerAdministration(api huma.API, a Administering) {
 				})
 			}
 			body.SeesNothing = seesNothing(body.Holds)
+			if !holding(body.Holds, onProduct, named, input.Role) {
+				continue
+			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		return out, nil
@@ -330,23 +403,9 @@ func registerAdministration(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Body RecordBody
 	}) (*declaredOutput[PersonBody], error) {
-		store, _, err := mintable(ctx, a)
+		store, _, err := mintable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
-		}
-
-		// Nobody recorded under that name, and a read that failed, are
-		// different answers. Told apart by the sentinel rather than by "any
-		// error at all": read as "this person is new", a dropped connection
-		// took administration away from somebody who had it, recorded nothing
-		// saying so, and answered 201.
-		before, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
-		switch {
-		case lookupErr == nil:
-		case errors.Is(lookupErr, access.ErrNoSuchPerson):
-			before = nil
-		default:
-			return nil, wentWrong(a.Logger, "that person could not be looked up", lookupErr)
 		}
 
 		// Recording somebody records the way they sign in, because access
@@ -360,28 +419,6 @@ func registerAdministration(api huma.API, a Administering) {
 		// knows that — computed here from a read taken before the write, two
 		// requests at once would have the second write back the value it saw
 		// before the first.
-		// An authorization is matched by name until somebody redeems it, so
-		// it carries the window in force when it was written.
-		window := access.DefaultClaimWindow
-		if a.Settings != nil {
-			if settings := a.Settings(); settings != nil {
-				window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
-				if err != nil {
-					return nil, wentWrong(a.Logger, "cannot read how long an authorization stays redeemable", err)
-				}
-			}
-		}
-
-		// Where roles come from, read before the transaction opens and carried
-		// into it. The closure below holds the connection it writes through,
-		// and SQLite lends one, so a read taken through the root handle from
-		// inside it waits for a connection the transaction cannot release
-		// until the read returns.
-		deriving := access.Direct
-		if a.Mode != nil {
-			deriving = a.Mode(ctx)
-		}
-
 		// Recording somebody, how they may be reached and what they hold is
 		// one act. Written as a statement each, a product name nobody has
 		// declared answered 422 with the person recorded and the roles named
@@ -389,19 +426,63 @@ func registerAdministration(api huma.API, a Administering) {
 		// sending the request again granted the earlier ones twice, and a
 		// request they gave up on left access nobody asked for.
 		var person *access.Account
-		var granted []func()
-		// The request's own context, so that a trail row written after the
-		// commit still knows who asked: the closure below runs under the
-		// transaction's.
-		asking := ctx
+		var recorded bool
 		if err := store.Within(ctx, func(ctx context.Context, store *access.Store,
 			db bun.IDB) error {
 
-			granted = granted[:0]
 			names := catalog.NewStore(db)
-			var err error
+
+			// Where roles come from, and how long an authorization stays
+			// redeemable, read inside the act that decides from them (REQ-71).
+			//
+			// Read before it opened, a mode switch landing between the two let
+			// an assignment be written into a deployment where nothing derives
+			// one — and nothing re-derives an assignment, so the grant would
+			// outlive every group change without a group ever having been
+			// behind it.
+			//
+			// Through the transaction's own handle, which is what the comment
+			// that stood here had wrong: the stall it described came from
+			// reading through the *root* handle while the closure held
+			// SQLite's one connection, not from reading inside the
+			// transaction at all. Unbinding a group already reads the mode
+			// exactly this way.
+			deriving, err := roleModeIn(a.Settings)(ctx, db)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot read where roles come from", err)
+			}
+			window := access.DefaultClaimWindow
+			if a.Settings != nil {
+				if settings := a.Settings(db); settings != nil {
+					window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
+					if err != nil {
+						return wentWrong(a.Logger,
+							"cannot read how long an authorization stays redeemable", err)
+					}
+				}
+			}
+
+			// Nobody recorded under that name, and a read that failed, are
+			// different answers. Told apart by the sentinel rather than by
+			// "any error at all": read as "this person is new", a dropped
+			// connection took administration away from somebody who had it,
+			// recorded nothing saying so, and answered 201.
+			//
+			// Read here rather than before the transaction, because what the
+			// record at the foot of it says depends on the answer and a retry
+			// re-runs against a database that has moved (REQ-71).
+			before, lookupErr := store.ByIdentity(ctx, in.Body.Identity)
+			switch {
+			case lookupErr == nil:
+			case errors.Is(lookupErr, access.ErrNoSuchPerson):
+				before = nil
+			default:
+				return wentWrong(a.Logger, "that person could not be looked up", lookupErr)
+			}
+			recorded = before == nil
+
 			if person, err = store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName,
-				in.Body.Admin); err != nil {
+				in.Body.Admin, in.Body.Audits); err != nil {
 				return huma.Error400BadRequest(err.Error())
 			}
 			if err := store.ClaimingWithin(window).Claim(ctx, person.ID, in.Body.Identity); err != nil {
@@ -438,7 +519,10 @@ func registerAdministration(api huma.API, a Administering) {
 					if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
 						return huma.Error400BadRequest(err.Error())
 					}
-					granted = append(granted, noting(asking, a, in.Body.Identity+" on every product", hold.Role))
+					if err := noted(ctx, db, trail.Role, in.Body.Identity+" on every product",
+						nil, trail.Said(hold.Role, true)); err != nil {
+						return notRecorded(a.Logger, err)
+					}
 					continue
 				}
 				if hold.Product == "" {
@@ -452,30 +536,33 @@ func registerAdministration(api huma.API, a Administering) {
 				if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
 					return huma.Error400BadRequest(err.Error())
 				}
-				granted = append(granted, noting(asking, a, in.Body.Identity+" on "+hold.Product, hold.Role))
+				if err := noted(ctx, db, trail.Role, in.Body.Identity+" on "+hold.Product,
+					nil, trail.Said(hold.Role, true)); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+			}
+
+			if before == nil {
+				if err := noted(ctx, db, trail.Account, in.Body.Identity, nil,
+					trail.Said("recorded", true)); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+			}
+			// The two things held over the deployment, each recorded where it
+			// moved and with what it moved from (REQ-22).
+			for _, held := range moved(before, in.Body) {
+				if held.asked == nil || held.was == *held.asked {
+					continue
+				}
+				if err := noted(ctx, db, trail.Account, in.Body.Identity,
+					trail.Said(held.what, held.was),
+					trail.Said(held.what, *held.asked)); err != nil {
+					return notRecorded(a.Logger, err)
+				}
 			}
 			return nil
 		}); err != nil {
 			return nil, err
-		}
-
-		// The trail rows follow the commit. Written inside it they would
-		// describe grants a later refusal rolled back.
-		if before == nil {
-			noteAdminChange(ctx, a, trail.Account, in.Body.Identity, nil,
-				trail.Said("recorded", true))
-		} else if in.Body.Admin != nil && before.IsAdmin != *in.Body.Admin {
-			// Administration is global and is the widest thing anybody here
-			// holds, so a change to it is recorded with what it changed from
-			// (REQ-22). Only where it actually moved: recording somebody again
-			// to add a role would otherwise write a line saying nothing
-			// changed.
-			noteAdminChange(ctx, a, trail.Account, in.Body.Identity,
-				trail.Said("administrator", before.IsAdmin),
-				trail.Said("administrator", *in.Body.Admin))
-		}
-		for _, note := range granted {
-			note()
 		}
 
 		// Read back rather than echoed. What is in force and where a role came
@@ -487,7 +574,7 @@ func registerAdministration(api huma.API, a Administering) {
 		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot read back the person just recorded", err)
 		}
-		return answer(before == nil, *body), nil
+		return answer(recorded, *body), nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -517,50 +604,61 @@ func registerAdministration(api huma.API, a Administering) {
 		if err != nil {
 			return nil, err
 		}
-		store, names, err := administerable(ctx, a)
-		if err != nil {
+		var person *access.Account
+		var productID int64
+		var remaining bool
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, names, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
+				return noSuchPerson()
+			}
+			product, err := names.ProductByName(ctx, in.Product)
+			if err != nil {
+				return undeclared(a.Logger, err, "that product could not be looked up")
+			}
+			productID = product.ID
+			// The role is checked before anything is written, because a word
+			// that is not a role withdraws nothing and would otherwise be
+			// recorded as a withdrawal of it.
+			role := access.Role(in.Role)
+			if !role.Valid() {
+				return huma.Error422UnprocessableEntity("that is not a role")
+			}
+			// Mapped before the trail row and before the work is handed back.
+			// A withdrawal that matched nothing did neither of those things,
+			// and doing them anyway wrote a record of an act that never
+			// happened and unassigned everything the person was dealing with
+			// there.
+			switch err := store.Withdraw(ctx, person.ID, product.ID, role); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return noSuchGrant()
+			case err != nil:
+				return wentWrong(a.Logger, "cannot withdraw the role", err)
+			}
+			if err := noted(ctx, tx, trail.Role, in.Identity+" on "+in.Product,
+				trail.Said(in.Role, true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			// Asked inside, so what it sees is what the withdrawal left rather
+			// than what another administrator leaves behind afterwards. Their
+			// last role here going is what turns their assigned work into work
+			// nobody can reach.
+			if remaining, err = store.HoldsAnythingIn(ctx, person.ID, product.ID); err != nil {
+				return wentWrong(a.Logger, "cannot read what they still hold", err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		person, err := store.ByIdentity(ctx, in.Identity)
-		if err != nil {
-			return nil, noSuchPerson()
-		}
-		product, err := names.ProductByName(ctx, in.Product)
-		if err != nil {
-			return nil, undeclared(a.Logger, err, "that product could not be looked up")
-		}
-		// The role is checked before anything is written, because a word that
-		// is not a role withdraws nothing and would otherwise be recorded as a
-		// withdrawal of it.
-		role := access.Role(in.Role)
-		if !role.Valid() {
-			return nil, huma.Error422UnprocessableEntity("that is not a role")
-		}
-		// Mapped before the trail row and before the work is handed back. A
-		// withdrawal that matched nothing did neither of those things, and
-		// doing them anyway wrote a record of an act that never happened and
-		// unassigned everything the person was dealing with there.
-		switch err := store.Withdraw(ctx, person.ID, product.ID, role); {
-		case errors.Is(err, access.ErrNothingMatched):
-			return nil, noSuchGrant()
-		case err != nil:
-			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)
-		}
-		noteAdminChange(ctx, a, trail.Role, in.Identity+" on "+in.Product,
-			trail.Said(in.Role, true), nil)
 
 		out := &struct {
 			Body struct {
 				Released int64 `json:"released" doc:"Findings handed back because that was their last role here"`
 			}
 		}{}
-		// Asked after the withdrawal, so what it sees is what the withdrawal
-		// left. Their last role here going is what turns their assigned work
-		// into work nobody can reach.
-		remaining, err := store.HoldsAnythingIn(ctx, person.ID, product.ID)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot read what they still hold", err)
-		}
 		if remaining || a.Findings == nil {
 			return out, nil
 		}
@@ -568,7 +666,7 @@ func registerAdministration(api huma.API, a Administering) {
 		if findings == nil {
 			return out, nil
 		}
-		released, err := findings.ReleaseIn(ctx, subject, person.PartyID, product.ID)
+		released, err := findings.ReleaseIn(ctx, subject, person.PartyID, productID)
 		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot hand back what they were dealing with", err)
 		}
@@ -592,19 +690,27 @@ func registerAdministration(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
-		store, _, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			person, err := store.ByIdentity(ctx, in.Identity)
+			if err != nil {
+				return noSuchPerson()
+			}
+			if err := store.UnbindIdentifier(ctx, person.ID); err != nil {
+				return wentWrong(a.Logger, "cannot unbind how they sign in", err)
+			}
+			if err := noted(ctx, tx, trail.Account, in.Identity,
+				trail.Said("identifier bound", true),
+				trail.Said("identifier bound", false)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		person, err := store.ByIdentity(ctx, in.Identity)
-		if err != nil {
-			return nil, noSuchPerson()
-		}
-		if err := store.UnbindIdentifier(ctx, person.ID); err != nil {
-			return nil, wentWrong(a.Logger, "cannot unbind how they sign in", err)
-		}
-		noteAdminChange(ctx, a, trail.Account, in.Identity,
-			trail.Said("identifier bound", true), trail.Said("identifier bound", false))
 		return &struct{}{}, nil
 	})
 
@@ -633,53 +739,75 @@ func registerAdministration(api huma.API, a Administering) {
 		if err != nil {
 			return nil, err
 		}
-		store, _, err := administerable(ctx, a)
-		if err != nil {
+		var person *access.Account
+		var unreachable []int64
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
+				return noSuchPerson()
+			}
+			role := access.Role(in.Role)
+			if !role.Valid() {
+				return huma.Error422UnprocessableEntity("that is not a role")
+			}
+			switch err := store.WithdrawEstateRole(ctx, person.ID, role); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return noSuchGrant()
+			case err != nil:
+				return wentWrong(a.Logger, "cannot withdraw the role", err)
+			}
+			if err := noted(ctx, tx, trail.Role, in.Identity+" on every product",
+				trail.Said(in.Role, true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+
+			// The same reason the per-product withdrawal releases work: their
+			// last role in a product going is what turns their assigned
+			// findings into work nobody can reach — assigned, so out of the
+			// shared queue, and assigned to somebody who can no longer open
+			// it. An estate role is the last role in every product at once, so
+			// this asks for each.
+			//
+			// Which products those are is read here, in the view the
+			// withdrawal left. Handing the work back is done afterwards: it is
+			// bounded by how much they were holding rather than by the
+			// request, and it is a consequence of the withdrawal rather than
+			// part of it.
+			covered, err := store.ProductsCovered(ctx)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot read what the grant covered", err)
+			}
+			unreachable = unreachable[:0]
+			for _, productID := range covered {
+				remaining, err := store.HoldsAnythingIn(ctx, person.ID, productID)
+				if err != nil {
+					return wentWrong(a.Logger, "cannot read what they still hold", err)
+				}
+				if !remaining {
+					unreachable = append(unreachable, productID)
+				}
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		person, err := store.ByIdentity(ctx, in.Identity)
-		if err != nil {
-			return nil, noSuchPerson()
-		}
-		role := access.Role(in.Role)
-		if !role.Valid() {
-			return nil, huma.Error422UnprocessableEntity("that is not a role")
-		}
-		switch err := store.WithdrawEstateRole(ctx, person.ID, role); {
-		case errors.Is(err, access.ErrNothingMatched):
-			return nil, noSuchGrant()
-		case err != nil:
-			return nil, wentWrong(a.Logger, "cannot withdraw the role", err)
-		}
-		noteAdminChange(ctx, a, trail.Role, in.Identity+" on every product",
-			trail.Said(in.Role, true), nil)
 
 		out := &struct {
 			Body struct {
 				Released int64 `json:"released" doc:"Findings handed back because that was their last role there"`
 			}
 		}{}
-		// The same reason the per-product withdrawal releases work: their last
-		// role in a product going is what turns their assigned findings into
-		// work nobody can reach — assigned, so out of the shared queue, and
-		// assigned to somebody who can no longer open it. An estate role is
-		// the last role in every product at once, so this asks for each.
-		covered, err := store.ProductsCovered(ctx)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot read what the grant covered", err)
+		if a.Findings == nil {
+			return out, nil
 		}
-		for _, productID := range covered {
-			remaining, err := store.HoldsAnythingIn(ctx, person.ID, productID)
-			if err != nil {
-				return nil, wentWrong(a.Logger, "cannot read what they still hold", err)
-			}
-			if remaining || a.Findings == nil {
-				continue
-			}
-			findings := a.Findings()
-			if findings == nil {
-				continue
-			}
+		findings := a.Findings()
+		if findings == nil {
+			return out, nil
+		}
+		for _, productID := range unreachable {
 			released, err := findings.ReleaseIn(ctx, subject, person.PartyID, productID)
 			if err != nil {
 				return nil, wentWrong(a.Logger, "cannot hand back what they were dealing with", err)
@@ -690,27 +818,16 @@ func registerAdministration(api huma.API, a Administering) {
 	})
 }
 
-// noting holds a trail row back until the transaction that earned it commits.
-//
-// A grant recorded inside the transaction would describe access a later
-// refusal rolled back, and the trail is append-only: a line saying somebody was
-// granted something nobody granted cannot be taken out again.
-func noting(ctx context.Context, a Administering, name, role string) func() {
-	return func() {
-		noteAdminChange(ctx, a, trail.Role, name, nil, trail.Said(role, true))
-	}
-}
-
 // timeFormat is how a moment is reported.
 const timeFormat = "2006-01-02T15:04:05Z"
 
 // mintable is administerable for the two acts that create a credential: a
 // credential cannot create another.
-func mintable(ctx context.Context, a Administering) (*access.Store, *catalog.Store, error) {
+func mintable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
 	if err := mintingCredentials(ctx); err != nil {
 		return nil, nil, err
 	}
-	return administerable(ctx, a)
+	return administerable(ctx, a, db)
 }
 
 // administerable refuses anybody who is not an administrator, and hands back
@@ -719,14 +836,94 @@ func mintable(ctx context.Context, a Administering) (*access.Store, *catalog.Sto
 // Managing who may do what is the one thing that must never be reachable by a
 // role granted on a product: somebody who may triage a product must not be
 // able to grant themselves more of it.
-func administerable(ctx context.Context, a Administering) (*access.Store, *catalog.Store, error) {
+// db is the handle it builds those over: the transaction an act is being made
+// in, or handle() where the route only reads.
+func administerable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
 	if err := administrating(ctx); err != nil {
 		return nil, nil, err
 	}
-	if a.Access == nil || a.Catalog == nil {
+	return stores(a, db)
+}
+
+// readable is administerable for the routes that only read the deployment's
+// own records: who holds what, what it is set to, and what has been changed.
+//
+// The audit permission reaches those and nothing else. Every write below stays
+// with administerable above, which is the whole difference between the two.
+func readable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
+	if err := readingTheDeployment(ctx); err != nil {
+		return nil, nil, err
+	}
+	return stores(a, db)
+}
+
+// held is one thing somebody holds over the deployment: what it is called in
+// the record, what it was, and what the request asks it to become.
+type held struct {
+	what  string
+	was   bool
+	asked *bool
+}
+
+// moved is the two of those, for a person who was already recorded.
+//
+// **Both, rather than whichever matched first.** Written as arms of one switch
+// beside "this person is new", a request granting both recorded one of them —
+// and the audit permission, which is the one grant that opens the change log,
+// was the arm that never ran at all, so the permission to read the record was
+// the change the record did not hold.
+//
+// Nothing for somebody who has just been recorded: their creation is the row,
+// and a second line saying a brand-new account went from holding nothing is a
+// line about no change.
+func moved(before *access.Account, asked RecordBody) []held {
+	if before == nil {
+		return nil
+	}
+	return []held{
+		{"administrator", before.IsAdmin, asked.Admin},
+		{"auditor", before.Audits, asked.Audits},
+	}
+}
+
+// holding reports whether what somebody holds matches the narrowing asked for.
+//
+// Applied to the bodies rather than in the query, because what is being
+// narrowed is what the list already says: a role held across every product
+// matches a named one, and a grant out of force matches nothing. Both of those
+// are decided above, and asking the database again would be a second rule that
+// can disagree with the first.
+func holding(holds []HeldBody, productID int64, named map[int64]named, role string) bool {
+	if productID == 0 && role == "" {
+		return true
+	}
+	address := named[productID].Address
+	for _, held := range holds {
+		// Not in force is not held. What somebody holds is a statement about
+		// now, and a review asking who approves here must not be handed
+		// somebody whose grant a change of mode set aside.
+		if !held.Effective {
+			continue
+		}
+		if role != "" && held.Role != role {
+			continue
+		}
+		// A role held across every product is held on this one, including
+		// products declared after the grant was made.
+		if productID != 0 && !held.Everywhere && held.Product != address {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// stores builds the pair over db, or says this process has no database.
+func stores(a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
+	if a.Access == nil || a.Catalog == nil || db == nil {
 		return nil, nil, noDatabase(a.Logger)
 	}
-	store, names := a.Access(), a.Catalog()
+	store, names := a.Access(db), a.Catalog(db)
 	if store == nil || names == nil {
 		return nil, nil, noDatabase(a.Logger)
 	}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -23,7 +24,7 @@ func registerKeys(api huma.API, a Administering) {
 			"whether it still works. The secrets are not here and cannot be: what is stored is a digest.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[KeyBody], error) {
-		store, names, err := administerable(ctx, a)
+		store, names, err := administerable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
 		}
@@ -35,7 +36,10 @@ func registerKeys(api huma.API, a Administering) {
 		out := &listOutput[KeyBody]{}
 		out.Body.Items = make([]KeyBody, 0, len(keys))
 		for _, key := range keys {
-			body := KeyBody{Name: key.Name, Withdrawn: key.RevokedAt != nil}
+			body := KeyBody{
+				Name: key.Name, Withdrawn: key.RevokedAt != nil,
+				CreatedAt: key.CreatedAt.UTC().Format(timeFormat),
+			}
 			// The address, because create-key resolves this field through
 			// ProductByName — and the Stream and Variant fields beside it
 			// already answer the address. A listing that cannot be used to
@@ -80,43 +84,53 @@ func registerKeys(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Body KeyBody
 	}) (*declaredOutput[KeyBody], error) {
-		store, names, err := mintable(ctx, a)
-		if err != nil {
+		var name, secret string
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, names, err := mintable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+
+			product, err := names.ProductByName(ctx, in.Body.Product)
+			if err != nil {
+				return undeclared(a.Logger, err, "that product could not be looked up")
+			}
+			scope := access.Scope{ProductID: product.ID}
+
+			if in.Body.Stream != "" {
+				stream, err := names.StreamByName(ctx, product.ID, in.Body.Stream)
+				if err != nil {
+					return undeclared(a.Logger, err, "that product could not be looked up")
+				}
+				scope.StreamID = &stream.ID
+			}
+			if in.Body.Variant != "" {
+				variant, err := names.VariantByName(ctx, product.ID, in.Body.Variant)
+				if err != nil {
+					return undeclared(a.Logger, err, "that product could not be looked up")
+				}
+				scope.VariantID = &variant.ID
+			}
+
+			key, minted, err := store.NewKey(ctx, in.Body.Name, scope)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot issue a credential", err)
+			}
+			name, secret = key.Name, minted
+			// What it may send, never the secret or its digest: the trail is
+			// read by whoever may administer, and a credential store that
+			// hands back what it holds is what storing a digest exists to
+			// avoid.
+			if err := noted(ctx, tx, trail.Credential, key.Name,
+				nil, trail.Said(keyScope(in.Body), true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-
-		product, err := names.ProductByName(ctx, in.Body.Product)
-		if err != nil {
-			return nil, undeclared(a.Logger, err, "that product could not be looked up")
-		}
-		scope := access.Scope{ProductID: product.ID}
-
-		if in.Body.Stream != "" {
-			stream, err := names.StreamByName(ctx, product.ID, in.Body.Stream)
-			if err != nil {
-				return nil, undeclared(a.Logger, err, "that product could not be looked up")
-			}
-			scope.StreamID = &stream.ID
-		}
-		if in.Body.Variant != "" {
-			variant, err := names.VariantByName(ctx, product.ID, in.Body.Variant)
-			if err != nil {
-				return nil, undeclared(a.Logger, err, "that product could not be looked up")
-			}
-			scope.VariantID = &variant.ID
-		}
-
-		key, secret, err := store.NewKey(ctx, in.Body.Name, scope)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot issue a credential", err)
-		}
-		// What it may send, never the secret or its digest: the trail is read
-		// by whoever may administer, and a credential store that hands back
-		// what it holds is what storing a digest exists to avoid.
-		noteAdminChange(ctx, a, trail.Credential, key.Name,
-			nil, trail.Said(keyScope(in.Body), true))
 		return answer(true, KeyBody{
-			Name: key.Name, Product: in.Body.Product, Stream: in.Body.Stream,
+			Name: name, Product: in.Body.Product, Stream: in.Body.Stream,
 			Variant: in.Body.Variant, Secret: secret,
 		}), nil
 	})
@@ -130,26 +144,33 @@ func registerKeys(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Name string `path:"name"`
 	}) (*struct{}, error) {
-		store, _, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			keys, err := store.Keys(ctx)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot read the credentials", err)
+			}
+			for _, key := range keys {
+				if key.Name != in.Name || key.RevokedAt != nil {
+					continue
+				}
+				if err := store.Revoke(ctx, key.ID); err != nil {
+					return wentWrong(a.Logger, "cannot withdraw the credential", err)
+				}
+				if err := noted(ctx, tx, trail.Credential, in.Name,
+					trail.Said("in force", true), nil); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+				return nil
+			}
+			return noSuchKey()
+		}); err != nil {
 			return nil, err
 		}
-		keys, err := store.Keys(ctx)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot read the credentials", err)
-		}
-		for _, key := range keys {
-			if key.Name != in.Name || key.RevokedAt != nil {
-				continue
-			}
-			if err := store.Revoke(ctx, key.ID); err != nil {
-				return nil, wentWrong(a.Logger, "cannot withdraw the credential", err)
-			}
-			noteAdminChange(ctx, a, trail.Credential, in.Name,
-				trail.Said("in force", true), nil)
-			return nil, nil
-		}
-		return nil, noSuchKey()
+		return nil, nil
 	})
 }
 

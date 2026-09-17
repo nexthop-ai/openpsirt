@@ -51,6 +51,8 @@ end rather than left to be found by clicking.
 - [A person, whole](#a-person-whole)
 - [A release, gathered](#a-release-gathered)
 - [Reports, settings, inheritance](#reports-settings-inheritance)
+- [The System screen](#the-system-screen)
+- [The administration screens](#the-administration-screens)
 - [Showing the ordering signals](#showing-the-ordering-signals)
 - [Units, dates and copy](#units-dates-and-copy)
 - [What a screen says](#what-a-screen-says)
@@ -242,17 +244,29 @@ waiting for review, what is being worked on, what stopped applying, then the
 trends, and the operational state at the foot. The trends answer a question
 asked occasionally, and they are also the slowest part of the page.
 
-Four figures lead, and they follow the scope: open at or above the floor, known
-exploited, pending the reader's approval, and overdue. Open is the trend's
-latest point at every scope, which counts distinct issues — the findings list
-counts one row per issue and component, and a tile switching between the two as
-the picker moved would quote two figures for one word.
+**The reader's own work leads, then the shape of the estate.** Assigned to
+them, and claims of theirs an approver sent back; then open at or above the
+floor, known exploited, pending their approval, and overdue. Home answered "how
+much is there" and never "what do I do next" — the largest number on the screen
+was the whole estate's open count, which is the least actionable thing on it,
+and the one panel that could have carried somebody's own work is deliberately
+everybody else's.
+
+Open is the trend's latest point at every scope, which counts distinct issues —
+the findings list counts one row per issue and component, and a tile switching
+between the two as the picker moved would quote two figures for one word.
+
+**What became of a claim is derived rather than stored**, so there is no count
+to ask the server for: a page is read and what is on it is counted, and the
+tile says so where the page was cut. That is the treatment the deadline tiles
+beside it already get.
 
 | Panel | |
 |---|---|
 | **Release readiness** | The picked branch against the last release cut from it, band by band, with the move shown as a direction rather than a signed number: fewer is better here, so the color follows the meaning and not the arithmetic. Drawn only where the question has an answer — it needs a whole build, because a count across products is not a release, and a branch, because a tag is one frozen point |
 | **Quiet builds** | A build that stops being scanned reports no new findings and fails nothing, so it looks healthier than one still being scanned. Named one at a time rather than counted, because a number is read past and a name is acted on. On the front page and on the scans screen |
 | **Overdue and due soon** | Overdue is a report about something that has already happened; due-soon is the week somebody can still finish. Both come from one read of the deadline list. The overdue tile pointed at the assignments screen, which answers what is *mine*, so the number and the screen it opened disagreed for everybody but the person holding all of it |
+| **In progress** | How much each person and team holds, with the reader's own row first. The panel is about the shape of the work rather than about one person, and it stays that way — but reading your own row off a list of colleagues, where it may fall below the three this shows, is why somebody who works here went elsewhere to find out |
 
 Every figure opens the list it counts, narrowed the way the figure was counted —
 the aging buckets, the fixed and appeared counts, both deadline tiles. A number
@@ -875,6 +889,8 @@ with an avatar.
 | Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The unassigned list spans every product somebody can see, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
+| **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
+| A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 
 A screen for the standing rules (REQ-34), per product, shown as a numbered list
 because the order *is* the precedence: the first rule that matches places the
@@ -1036,6 +1052,32 @@ the part of a decision that matters most.
 | **A draft key names everything the text is about** | The build and the version included. A build ships one name at more than one version often enough that leaving the version out shares a draft between two of them, and they are different code at a different number of places |
 | **Signing out also clears what the tab remembers** | The scope somebody picked and the last judgment they recorded. Sign-out is a same-tab navigation, so the session store survives it by construction: the next person was handed the previous person's product in the scope bar — a name they may hold no grant on — and their last outcome in the decision form. The look and the rail stay, because a preference surviving a sign-out is what a preference is |
 | Where a draft lives, and under whose name, is decided in one place | A control spelled at each of six call sites is a control that is missing at the seventh |
+| **A draft keeps the answer as well as the prose** | The outcome, the justification, the date, the fixed version. A draft that kept three paragraphs and lost what they argued for came back as text somebody had to read to find out what they had meant — and the prose is about the answer |
+| It is restored into the form it was typed in, and is not a default | The rule that the decision form opens on nothing chosen is about what somebody has *not* answered. This is their own answer to this exact finding, keyed on every part of it, and an explicit "start from this" beats it |
+
+### Where somebody was
+
+A browser restores the scroll position on a real navigation and this
+application never makes one.
+
+| Rule | |
+|---|---|
+| **A list opened by pressing back opens where it was being read** | Going into a finding and coming back rebuilt the list at the top: eighteen rows above where somebody had been, on the screen whose whole use is working down a list one row at a time. The address and the filters survived because they are in the address; the place in the list is the one thing that cannot be re-derived from it |
+| A list opened fresh opens at the top | Which is what a fresh list is. The two are told apart by how the arrival happened, and restoring on both would drop somebody into the middle of a list they have not read |
+| Restored after the rows are drawn | Scrolling a page that is a few hundred pixels tall clamps to the bottom, so the restore lands somewhere arbitrary and reads as a fault in the list |
+| Written as somebody scrolls, not as they leave | A route change unmounts the screen, and an unmount is too late to read a position the browser has already moved |
+| A handful of pages, and anything that is not a position is the top | The store is the browser's and a person may edit it, and the value goes straight into a scroll call. An unbounded map in storage grows for as long as the tab is open |
+| Cleared with everything else the session holds | The next person on this browser does not land in the middle of somebody else's page |
+
+### Where an answer appears
+
+**A confirmation belongs where the button that produced it was pressed.** The
+decision form's submit sits at the foot of a long form and the confirmation is
+drawn at the head of the screen, so somebody pressing it was left looking at
+the form they had just sent, with the answer a page and a half above them and
+nothing saying anything had happened. The page is brought to it, smoothly, so
+that the movement is something they watch rather than a jump they have to
+re-find themselves after.
 
 ## Reachable from a keyboard
 
@@ -1249,6 +1291,37 @@ since a person only ever sees products they hold a role on.
 | A setting nobody has set is composed like one that is set | Nothing to read is not a value the composer refuses. The embargo periods arrive with no value at all, and they fell to the plain box kept for a duration this cannot say — which is the one control that cannot ask whether a typed 90 means hours, days or weeks. An empty composer opens on days, because a period nobody has set here is an embargo and an embargo is said in days |
 | What a new line inherits is on the inventories screen | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already and how many cover nothing here, and offers the rest as a list to tick. Only two of the four groups are questions, and the screen says which |
 | What was recorded here is a filter | A flaw somebody entered is the only kind a person may close by hand (REQ-19), and the screen that records one is where "is this already filed" gets asked. Offered on the list and linked from the recording screen, with the line off, because the question is what exists rather than what is worth an afternoon |
+| **A setting says what it does in words, under its name** | It said so on the label's hover, which is where clarification goes — and what a setting does is not clarification, it is the whole of what the control is. Three of them rewrite what the tool reports without anything being scanned. Not on the control itself: a password manager classifies a field by the words it can reach through it |
+
+## The System screen
+
+What this deployment is doing, rather than what it has found.
+
+| Rule | |
+|---|---|
+| Three things on one screen: what is queued, what the queue gave up on, and where things are sent | They are one question — is this deployment working — and each of them fails the same way. A queue that has given up looks exactly like a quiet one, and a destination refusing every request for a week looks exactly like one nothing has been sent to |
+| What is waiting is said per kind, against the bound | The bound is per kind, so one producer's own backlog hides behind everybody else's empty queues. What an operator does about a full queue needs both numbers |
+| Work held by a worker that stopped reporting counts as waiting | It is work waiting for whoever takes it next. Counted as running, a queue in the middle of a reclaim cycle reads as empty |
+| A set-aside job is shown in the queue's own words | What it points at may have been deleted since, and a list that fails to render because one row points at nothing is worse than one that says what the row says |
+| An operator's screen, not an auditor's | What a worker reported quotes what its job was about, so a failed parse can carry a component name out of an SBOM the reader holds nothing on — and a destination's address is a credential. Neither is one of the deployment's own records, which is what that grant reads |
+| A destination's address is not a link | It is somewhere this deployment posts to rather than somewhere a person goes, and for two of the services it names the path is the credential |
+| What a full queue needs is both numbers | An operator adds workers or raises the bound, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the bound is a state rather than a proportion |
+| A resolved issue is counted at the severity it held while it was open | The step it left in no longer has one, and counting it as unrated would make every answered critical disappear from the answered column |
+| The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
+
+## The administration screens
+
+Who may sign in, what they hold, and the credentials that carry it.
+
+| Rule | |
+|---|---|
+| **Every field that ages is shown**, not only the ones that identify | A credential review asks how old something is, when it stops working and when it was last used. The table showed the last of those alone, so "never used and two years old" and "never used and made this morning" drew identically |
+| A pipeline key says it never expires | It has no expiry, and a blank column reads as one nobody has set. A credential that never runs out is the one nobody revokes |
+| **Who has left is on the list** | The date was on each person's own screen, so "who still has access" was a question somebody answered by opening every row |
+| The list narrows to who holds what | "Who approves on this product" is what an access review asks. A grant out of force does not match, because what somebody holds is a statement about now |
+| A person's name and their address are recorded here | Both are on the record and neither could be typed: the whole mail path could never reach anybody created through the interface, and what the person was told when they went looking was that an administrator has to record one |
+| An address stated empty clears it; an address left out is left alone | Coming off mail is not coming off the tool, and a screen that cannot tell the two apart makes one of them unreachable |
+| The two things held over the deployment are checkboxes beside the grid, not roles in it | A role is held against a product and neither of these is. What each grants is written beside it, because one of them is a reader who changes nothing and that is not what "administrator" reads as |
 
 ## Showing the ordering signals
 

@@ -1,5 +1,6 @@
 import { type ReactElement } from "react";
 import { Navigate, useParams } from "react-router-dom";
+import { Backlog } from "./Backlog";
 import { Compliance } from "./Compliance";
 import { Coverage } from "./Coverage";
 import { Effort } from "./Effort";
@@ -25,6 +26,7 @@ export const PAGES: Record<string, ReactElement> = {
   "disposition-register": <Register />,
   "advisories-issued": <Published />,
   "where-the-effort-went": <Effort />,
+  "backlog-over-time": <Backlog />,
 };
 
 export function Report() {

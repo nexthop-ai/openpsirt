@@ -92,8 +92,8 @@ number stays the sum of what the reader may see.
 ## The period a report covers
 
 Every report over a stretch of time takes one: deadline compliance,
-remediation, triage latency, approval coverage, where the effort went, and
-what advisories went out. Two
+remediation, triage latency, approval coverage, where the effort went, what
+advisories went out, and what has been changed administratively. Two
 dates, or a rolling window of days, in one shape so that a screen linking from
 one report to another carries the same two parameters.
 
@@ -107,6 +107,9 @@ one report to another carries the same two parameters.
 | A default window belongs to the report, and each says which in its own words | They differ — thirty days, ninety, or the whole of it — and one shared parameter cannot carry three answers |
 | **What is open is always now** | Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable — the same reason the register states current state with no `as_of`. A period bounds what closed in it |
 | The rate asked for no period is the lifetime figure | It is what that report has always answered, and a default window would quietly change what the number means for everybody reading it |
+| The change log takes no default window | A record read with one answers about the last stretch while looking like it answers about everything, which is the reading an audit must not be given |
+| **A trend is stepped, so its window is a count of steps rather than a period** | It is the one report whose answer is a series: a step is a week, and what is asked for is how many of them. Two dates cannot say "in steps of a week" and a number of days cannot say where a step ends, so the shape above does not fit and is not pretended to |
+| The longest window offered is two years | Measured rather than assumed, because the walk that fills the buckets is per row per step: over 8,407 open findings on two builds, twelve weeks answers in 1.28 s and a hundred and four in 1.40 s — nine per cent for nearly nine times the steps, because the cost is the query rather than the walk. The file over the same window is 1.43 s |
 
 ## Trends
 
@@ -530,7 +533,7 @@ holds the files that are reachable nowhere else.
 
 ### Pages of the catalog's own
 
-Seven, in the order the catalog lists them. Deadline compliance and the
+Eight, in the order the catalog lists them. Deadline compliance and the
 disposition register have sections above.
 
 | Page | What it answers |
@@ -538,6 +541,7 @@ disposition register have sections above.
 | Program overview | What is being fixed against what is appearing, what is aging and whether anybody has looked at it, how long a claim waits to be decided and then agreed to, what keeps being put off, and what has been argued away. Its window is seven, thirty or ninety days or a period between two dates, and the printed header names which |
 | Scan coverage | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. The front page names the three quietest and the inventories screen answers for one product; this answers for the estate |
 | Releases out of support | The releases whose date has passed, and — asked for — the ones about to, how long ago or how long there is left, and how many issues are still open against each, ordered by what is open. Past end-of-life the deadline is removed from every open finding, so none of that pile is overdue, none is due soon, and none of it reaches a figure built on either. That is correct — no work will land there — and it is what makes asking the only way to see it. A date inherited from the product says so: a release following a date and one that stated the same date are different, and only the first moves when the product changes its mind |
+| Backlog over time | Whether the backlog is growing, and what kind of thing is making it grow: what arrived, what was answered and what stood open at the end of each step, each split by severity. Only the open count was split, and ten arriving against ten answered is a team keeping pace where both are low and a team losing ground where what arrives is critical and what leaves is not — which a line of totals draws as flat. A resolved issue is counted at the severity it held while it was open, because the step it left in no longer has one |
 | Rubber-stamp | How much a second pair of eyes actually did. Its sections are below |
 | Where the effort went | What the judgments in a period were about, most argued first, with what came out of them. It has a section of its own above |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
@@ -620,9 +624,9 @@ Any list that can be read can be exported, as CSV or JSON. What exports: the
 findings list, the cross-product findings list, the record of judgments, the
 review queue, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, the fix bundles, the
-upgrades one build is waiting on, what keeps being put off, and the disposition
-register — which is the one an auditor asks for first, and which the count left
-out.
+upgrades one build is waiting on, what keeps being put off, the backlog over
+time, what has been changed administratively, and the disposition register —
+which is the one an auditor asks for first, and which the count left out.
 
 The subject travels through the stream. An export is the easiest place to
 build the list first and narrow it afterwards, so it is the same query with the

@@ -230,7 +230,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// belongs with the change that decides, field by field, which of the
 		// two each should carry.
 		rights := access.NewStore(db.DB)
-		administrator, err := rights.Ensure(ctx, "admin", "", access.Stated(true))
+		administrator, err := rights.Ensure(ctx, "admin", "", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -242,7 +242,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// reading by administering — and the point of the pair is that
 		// the grant is visible in the same record as everybody else's
 		// rather than implied by the flag.
-		adminReader, err := rights.Ensure(ctx, "admin-reader", "", access.Stated(true))
+		adminReader, err := rights.Ensure(ctx, "admin-reader", "", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -250,6 +250,17 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 			t.Fatal(err)
 		}
 		if err := rights.GrantRole(ctx, adminReader.ID, mine.ID, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		// Somebody holding the audit permission and no role at all: the
+		// whole of what it is for is a reader of the deployment's own records
+		// who reaches no product, so the identity that tests it holds nothing
+		// else.
+		auditor, err := rights.Ensure(ctx, "auditor", "", nil, access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.Claim(ctx, auditor.ID, "auditor"); err != nil {
 			t.Fatal(err)
 		}
 		// One entry per identity, and more than one role where the
@@ -279,7 +290,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 			// that holds it bare.
 			"assigner-only": {access.Assigner},
 		} {
-			person, err := rights.Ensure(ctx, who, "", nil)
+			person, err := rights.Ensure(ctx, who, "", nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -300,7 +311,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// approver is actually granted in a deployment. The approver above
 		// holds the capability alone, and reaches nothing — that is the rule
 		// being pinned, not an oversight.
-		reviewer, err := rights.Ensure(ctx, "reviewer", "", nil)
+		reviewer, err := rights.Ensure(ctx, "reviewer", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -318,7 +329,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// deliberately: the hazard is that "every product" is read as "no
 		// narrowing at all", which would hand this identity the undisclosed
 		// findings in both products (REQ-42 and REQ-43).
-		estate, err := rights.Ensure(ctx, "estate-reader", "", nil)
+		estate, err := rights.Ensure(ctx, "estate-reader", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -333,7 +344,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// the role everywhere" and "may act on this issue here" can be told
 		// apart: an issue a product does not carry is not one anybody rates
 		// through it, however widely they are trusted.
-		estateTriage, err := rights.Ensure(ctx, "wide-triager", "", nil)
+		estateTriage, err := rights.Ensure(ctx, "wide-triager", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -348,7 +359,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		// one. Not "nothing": a subject granted nothing anywhere is refused at
 		// the door, so a case grant is untestable through them — and a case is
 		// exactly what somebody outside a product is brought into.
-		outsider, err := rights.Ensure(ctx, "outsider", "", nil)
+		outsider, err := rights.Ensure(ctx, "outsider", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -360,7 +371,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		}
 
 		// Somebody who exists and was granted nothing at all.
-		ungranted, err := rights.Ensure(ctx, "nothing", "", nil)
+		ungranted, err := rights.Ensure(ctx, "nothing", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1019,7 +1030,7 @@ func TestRolesCannotBeBoundToGroupsNothingCanReport(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		// Something has to administer in the new mode, or the check beside
 		// this one refuses first and this would prove nothing.
-		if err := r.rights.BindAdmin(t.Context(), "admins"); err != nil {
+		if err := r.rights.BindOver(t.Context(), "admins", access.Administers); err != nil {
 			t.Fatal(err)
 		}
 		for _, c := range []struct {

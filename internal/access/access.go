@@ -81,6 +81,43 @@ func (r Role) Valid() bool {
 	return false
 }
 
+// Over is something held over the deployment rather than over a product.
+//
+// Two things are, and a role is not one of them: a role names the product it
+// applies to, and these name none because what they reach is the deployment's
+// own records. Somebody holding one of these and no role reaches no product at
+// all.
+type Over string
+
+const (
+	// Administers is changing what the deployment is set to and who may reach
+	// it. Every write path over the deployment's own records asks for it.
+	Administers Over = "admin"
+	// Audits is reading those records: the settings, who holds what, and the
+	// administrative change log. It grants no product's findings or decisions,
+	// so an auditor who reads one product goes on reading one product.
+	//
+	// The records are read whole rather than narrowed by which products the
+	// holder reaches, so holding it means knowing which products exist, what
+	// their releases are called and how work routes in them. That is a
+	// property of the grant rather than a leak: granting it is a deliberate
+	// administrative act.
+	Audits Over = "audit"
+)
+
+// OverTheDeployment is what may be granted over it.
+func OverTheDeployment() []Over { return []Over{Administers, Audits} }
+
+// Valid reports whether o is one this deployment recognizes.
+func (o Over) Valid() bool {
+	for _, known := range OverTheDeployment() {
+		if o == known {
+			return true
+		}
+	}
+	return false
+}
+
 // Visibility says whether something has been disclosed.
 //
 // It is about disclosure, not about who may read: every request is
@@ -145,9 +182,13 @@ type Subject struct {
 	ID int64
 	// Identity is what to call them in a record of what was done.
 	Identity string
-	// Admin is global and belongs to a person. It is the one role not granted
-	// against a product.
+	// Admin is global and belongs to a person. It is one of the two things
+	// held over the deployment rather than against a product.
 	Admin bool
+	// Audits is the other: reading the deployment's own records and writing
+	// none of them. An administrator reads them too, so a check asks for
+	// either — but somebody holding this alone can change nothing.
+	Audits bool
 	// grants is what this person may do, per product.
 	grants map[int64][]Role
 	// scope is what a pipeline's key allows. Absent for a person.
@@ -289,6 +330,28 @@ func NewPerson(id int64, identity string, admin bool, grants map[int64][]Role,
 func (s Subject) OnCases(cases map[int64][]int64) Subject {
 	s.cases = cases
 	return s
+}
+
+// Auditing returns this subject holding the deployment's own records.
+//
+// Chained rather than another argument to NewPerson, for the reason OnCases is:
+// every caller of that constructor is a test or a background pass that holds
+// none of this, and a parameter they all pass false for is one that gets passed
+// the wrong thing eventually.
+func (s Subject) Auditing() Subject {
+	s.Audits = true
+	return s
+}
+
+// ReadsTheDeployment reports whether this subject may read the deployment's own
+// records: what it is set to, who holds what, and what has been changed.
+//
+// Either of the two things held over the deployment satisfies it. An
+// administrator is not asked to hold the audit permission as well — they can
+// grant themselves anything, so requiring it would be a checkbox rather than a
+// control.
+func (s Subject) ReadsTheDeployment() bool {
+	return s.Kind == Person && (s.Admin || s.Audits)
 }
 
 // NewPipeline returns the subject for a build authenticating with a key.

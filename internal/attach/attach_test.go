@@ -115,7 +115,7 @@ func (f *fixture) anIssue(t *testing.T, name string, visibility access.Visibilit
 func (f *fixture) who(t *testing.T, roles ...access.Role) access.Subject {
 	t.Helper()
 	person, err := access.NewStore(f.db.DB).Ensure(t.Context(),
-		"them"+string(roles[0])+"@example.com", "Them", nil)
+		"them"+string(roles[0])+"@example.com", "Them", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func (f *fixture) who(t *testing.T, roles ...access.Role) access.Subject {
 func (f *fixture) admin(t *testing.T) access.Subject {
 	t.Helper()
 	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "boss@example.com", "Boss",
-		access.Stated(true))
+		access.Stated(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 
 		// A collaborator brought onto this issue may still attach: evidence
 		// is usually why they were brought in.
-		person, err := access.NewStore(f.db.DB).Ensure(ctx, "guest@example.com", "Guest", nil)
+		person, err := access.NewStore(f.db.DB).Ensure(ctx, "guest@example.com", "Guest", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

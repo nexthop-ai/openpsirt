@@ -285,7 +285,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7))); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil)
+		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "them@example.com", "Them", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -640,6 +640,7 @@ func (f *fixture) recorded(t *testing.T, id int64, identity string) {
 		Model(&map[string]interface{}{
 			"id": id, "party_id": party.ID, "identity": identity, "display_name": identity,
 			"is_admin": false, "is_bootstrap": false, "admin_derived": false,
+			"audits": false, "audits_derived": false,
 			"email_source": "", "digest": false, "digest_unassigned": false,
 			"created_at": time.Now().UTC().Truncate(time.Microsecond),
 		}).

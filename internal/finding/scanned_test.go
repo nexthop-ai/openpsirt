@@ -364,7 +364,7 @@ func (f *fixture) interned(t *testing.T, name string) int64 {
 // need two — agreeing to somebody else's request, most of all.
 func (f *fixture) someoneElse(t *testing.T, roles ...access.Role) access.Subject {
 	t.Helper()
-	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "other@example.com", "Other", nil)
+	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "other@example.com", "Other", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

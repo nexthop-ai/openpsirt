@@ -2,22 +2,41 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// noteChange records an administrative act against whoever made it.
+// changing runs one administrative act and the record of it in one
+// transaction.
 //
-// **A failure to record is not a failure of the change.** The change has
-// already happened, and answering with an error would invite a retry that
-// makes it twice. It is logged instead, which is the same choice the
-// assignment notification makes for the same reason.
+// **A failure to record fails the act.** Both are one change: a setting moved
+// with nobody recorded as having moved it is exactly the state REQ-22 says the
+// record exists to prevent, and it used to be reachable by a write that
+// succeeded beside a record that did not. Answering with an error invites a
+// retry, which is what the retry is for — nothing was committed.
+//
+// The act is written against the transaction rather than against the handle,
+// so everything it decides from is read inside it (REQ-71).
+func changing(ctx context.Context, db *database.DB, logger *slog.Logger,
+	do func(ctx context.Context, tx bun.Tx) error) error {
+
+	if db == nil {
+		return noDatabase(logger)
+	}
+	return database.InTransaction(ctx, db.DB, do)
+}
+
+// noted records an administrative act against whoever made it, in the
+// transaction that made it.
 //
 // Called from the request rather than from the store underneath. The stores
 // take no subject — a setting write knows the name and the value and nothing
@@ -25,48 +44,42 @@ import (
 // this would make those signatures about auditing rather than about the thing
 // being written. The cost is that a new administrative route can forget, so a
 // test walks the routes and asserts each leaves a row.
-func noteChange(ctx context.Context, in Ingest, kind trail.Kind, name string, was, became *string) {
-	if in.DB == nil {
-		return
-	}
-	noted(ctx, trail.NewStore(in.DB.DB), in.Logger, kind, name, was, became)
-}
-
-// noteAdminChange is the same for the administrative routes, which carry their
-// dependencies as functions rather than a database.
-func noteAdminChange(ctx context.Context, a Administering, kind trail.Kind, name string,
-	was, became *string) {
-
-	if a.Trail == nil {
-		return
-	}
-	noted(ctx, a.Trail(), a.Logger, kind, name, was, became)
-}
-
-func noted(ctx context.Context, store *trail.Store, logger *slog.Logger, kind trail.Kind,
-	name string, was, became *string) {
-
-	if store == nil {
-		return
-	}
+func noted(ctx context.Context, tx bun.IDB, kind trail.Kind, name string, was, became *string) error {
 	by, err := reading(ctx)
 	if err != nil {
-		return
+		return err
 	}
-	if err := store.Record(ctx, by, kind, name, was, became); err != nil && logger != nil {
-		logger.Error("could not record an administrative change",
-			"error", err, "kind", kind, "about", name)
-	}
+	return trail.NewStore(tx).Record(ctx, by, kind, name, was, became)
 }
 
-// noteDeclared is the same for the catalog routes.
-func noteDeclared(ctx context.Context, d Declaring, kind trail.Kind, name string,
-	was, became *string) {
-
-	if d.Trail == nil {
-		return
+// recording answers a store write that is part of an act.
+//
+// **A lost race goes back untouched.** A store handed somebody else's
+// transaction cannot go again itself — the failed statement has already
+// aborted it on one engine — so it says it lost, and the helper that opened
+// the transaction takes the whole act again. Reported as a fault instead, the
+// sentinel is destroyed: wentWrong builds a fresh refusal that wraps nothing,
+// so the retry helper never sees it and the loser of an ordinary race is
+// handed a 500 where the path this replaces went round and won.
+//
+// One spelling rather than an arm at each site, because the way this stops
+// working again is a third write that forgets it.
+func recording(logger *slog.Logger, what string, err error) error {
+	if err == nil {
+		return nil
 	}
-	noted(ctx, d.Trail(), d.Logger, kind, name, was, became)
+	if errors.Is(err, database.ErrGoAgain) {
+		return err
+	}
+	return wentWrong(logger, what, err)
+}
+
+// notRecorded refuses an act whose record could not be written.
+//
+// The act is rolled back with it, so the sentence says that: a caller told
+// only that recording failed would be left wondering which of the two stood.
+func notRecorded(logger *slog.Logger, err error) error {
+	return wentWrong(logger, "that change could not be recorded, so it was not made", err)
 }
 
 // onDay spells a date for the trail, where absent means there is none.
@@ -109,16 +122,25 @@ func registerTrail(api huma.API, in Ingest) {
 			"things listed here silently rewrite what the tool reports: the deadline windows " +
 			"recompute every open finding's deadline, the triage floor takes the deadline off " +
 			"everything below it, and an end-of-life date takes it off everything past it.\n\n" +
-			"Newest first, and paged: it only grows.",
+			"Newest first, and paged: it only grows.\n\n" +
+			"Takes a period, because the question an audit asks is what changed in the " +
+			"stretch the certificate covers. Asked for none, it answers about everything " +
+			"it holds.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, input *struct {
-		Kind   string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"Keep only changes of one kind"`
-		Limit  int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int    `query:"offset" minimum:"0"`
+	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
+		Kind string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"Keep only changes of one kind"`
+		Period
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0"`
 	}) (*struct {
 		Body struct {
 			Items []ChangeBody `json:"items"`
 			Total int          `json:"total"`
+			// From and To say the period back, so a page of rows is never
+			// read without the stretch it covers. Empty where that side is
+			// unbounded.
+			From string `json:"from,omitempty"`
+			To   string `json:"to,omitempty"`
 		}
 	}, error) {
 		subject, err := requester(ctx)
@@ -128,12 +150,20 @@ func registerTrail(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
+		// No default window. A trail read with one would answer about the
+		// last stretch while looking like it answered about everything, which
+		// is the reading an audit must not be given.
+		since, until, err := input.window(0, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
 		store := access.NewStore(in.DB.DB)
 		// Refused by the store rather than here. A row names who was brought
 		// into which case, undisclosed ones among them, so who may read it is
 		// a question about the query (REQ-42 and REQ-43).
 		changes, total, err := trail.NewStore(in.DB.DB).Changes(ctx, subject,
-			trail.Kind(input.Kind), input.Limit, input.Offset)
+			trail.Kind(input.Kind), trail.Over{Since: since, Until: until},
+			input.Limit, input.Offset)
 		if err != nil {
 			return nil, refused(in.Logger, err, "what has been changed could not be read")
 		}
@@ -151,9 +181,12 @@ func registerTrail(api huma.API, in Ingest) {
 			Body struct {
 				Items []ChangeBody `json:"items"`
 				Total int          `json:"total"`
+				From  string       `json:"from,omitempty"`
+				To    string       `json:"to,omitempty"`
 			}
 		}{}
 		out.Body.Total = total
+		out.Body.From, out.Body.To = stating(since, until)
 		out.Body.Items = make([]ChangeBody, 0, len(changes))
 		for _, change := range changes {
 			body := ChangeBody{

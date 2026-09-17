@@ -121,7 +121,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 	}
 
 	var recorded *Assessment
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		// Inside the transaction, because a retry re-runs this closure
 		// against a database that has moved and an authorization
 		// answered against the old one describes a world that is gone.
@@ -223,7 +223,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 		return nil, access.Denied("agree to a rating")
 	}
 	var agreed *Assessment
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		claim := new(Assessment)
 		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
 			// A claim nobody may be told about and a claim that was never
@@ -282,7 +282,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
 		return access.Denied("take a rating back")
 	}
-	return database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		claim := new(Assessment)
 		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
 			return ErrNoSuchAssessment
@@ -327,7 +327,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 // clearing a rating deletes it rather than writing an empty word — a row
 // holding nothing would read as a rating of nothing in every expression that
 // coalesces onto the published one.
-func liveRating(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
+func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	severity string) error {
 
 	if severity == "" {
@@ -404,7 +404,7 @@ func rank(word string) int {
 // Written for one product, because the rating it was worked out from is one
 // product's. The same issue in another product keeps the order its own rating
 // gives it.
-func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
+func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	assessed string) error {
 
 	var issue struct {
@@ -486,7 +486,7 @@ func rerank(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64,
 //
 // Takes the handle because the caller writes inside its own transaction: the
 // scan that raised the signal and the re-ranking it forces are one act.
-func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Time) error {
+func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Time) error {
 	if len(issues) == 0 {
 		return nil
 	}
@@ -589,7 +589,7 @@ func Reranked(ctx context.Context, tx bun.Tx, issues []int64, learnedAt time.Tim
 // Written per group rather than per finding: a deadline is a run's start plus
 // a fixed number of days, so every finding of one issue opened by one run,
 // rated the same way, in this product, lands on the same instant.
-func redue(ctx context.Context, tx bun.Tx, productID, vulnerabilityID int64) error {
+func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) error {
 	windows, err := LoadWindows(ctx, tx)
 	if err != nil {
 		return err

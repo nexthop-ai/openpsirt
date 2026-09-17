@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 // TestUnbindingTheLastAdministratorsGroupIsRefusedAndChangesNothing drives the
@@ -20,7 +22,7 @@ import (
 // using should still be tidyable.
 func TestUnbindingTheLastAdministratorsGroupIsRefusedAndChangesNothing(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
-		if err := r.rights.BindAdmin(t.Context(), "leads"); err != nil {
+		if err := r.rights.BindOver(t.Context(), "leads", access.Administers); err != nil {
 			t.Fatal(err)
 		}
 		// A provider with a source of groups, or the switch below is refused

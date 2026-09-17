@@ -31,11 +31,29 @@ type SetAsideBody struct {
 	// the thing may have been deleted since, and a list of set-aside work
 	// that fails to render because one row points at nothing is worse than
 	// one that says what the row says.
-	Kind      string    `json:"kind" doc:"Which worker the job was for"`
-	Reference string    `json:"reference" doc:"What the work was about"`
-	Attempts  int       `json:"attempts" doc:"How many times it was tried"`
-	LastError string    `json:"last_error,omitempty" doc:"Why it stopped, where anything reported one"`
+	Kind      string `json:"kind" doc:"Which worker the job was for"`
+	Reference string `json:"reference" doc:"What the work was about"`
+	Attempts  int    `json:"attempts" doc:"How many times it was tried"`
+	// LastError is what a worker reported, which is not one of this
+	// deployment's own records: a failed parse quotes the cause it was given,
+	// and that can carry a component name or a package address out of an
+	// SBOM. It is why this route asks for administration rather than for the
+	// grant that reads the records — that grant is declared, three times over,
+	// to reach no product's findings.
+	LastError string    `json:"last_error,omitempty" doc:"Why it stopped, where anything reported one. Worker output, which may quote what the job was about"`
 	StoppedAt time.Time `json:"stopped_at" doc:"When it was set aside"`
+}
+
+// QueuedBody is how much of one kind of work is waiting, against the bound
+// that refuses more of it.
+//
+// Per kind, because the bound is per kind: counted across the queue, a
+// runaway producer's own backlog is what hides behind everybody else's empty
+// queues, and the one number an operator has says the deployment is idle.
+type QueuedBody struct {
+	Kind    string `json:"kind" doc:"Which worker the work is for"`
+	Waiting int    `json:"waiting" doc:"How much is waiting, including work held by a worker that has stopped reporting"`
+	Limit   int    `json:"limit" doc:"How much of this kind may wait before more is refused"`
 }
 
 func registerWork(api huma.API, in Ingest) {
@@ -47,21 +65,50 @@ func registerWork(api huma.API, in Ingest) {
 			"been tried as many times as it is allowed to be, whether it reported a failure " +
 			"or its worker stopped answering.\n\n" +
 			"At most 200 are returned. `total` is how many are set aside in all, so a clipped " +
-			"page can be told from a complete one.",
+			"page can be told from a complete one.\n\n" +
+			"`waiting` is what has not stopped: how much of each kind is queued, against the " +
+			"bound that refuses more of it. A queue filling up and a queue that has given up " +
+			"are different faults and only one of them leaves rows here.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[SetAsideBody], error) {
+	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct {
+		Body struct {
+			Items   []SetAsideBody `json:"items"`
+			Total   int            `json:"total"`
+			Waiting []QueuedBody   `json:"waiting"`
+		}
+	}, error) {
+		type answer = struct {
+			Body struct {
+				Items   []SetAsideBody `json:"items"`
+				Total   int            `json:"total"`
+				Waiting []QueuedBody   `json:"waiting"`
+			}
+		}
 		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
 		if in.Queue == nil {
-			return &listOutput[SetAsideBody]{}, nil
+			return &answer{}, nil
 		}
 		jobs, total, err := in.Queue.SetAside(ctx, 0)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "work that was set aside could not be read", err)
 		}
-		out := &listOutput[SetAsideBody]{}
+		out := &answer{}
 		out.Body.Total = total
+		limit, err := in.Queue.Backlog(ctx)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "the bound on the queue could not be read", err)
+		}
+		out.Body.Waiting = make([]QueuedBody, 0, len(queue.Kinds()))
+		for _, kind := range queue.Kinds() {
+			depth, err := in.Queue.Depth(ctx, kind)
+			if err != nil {
+				return nil, wentWrong(in.Logger, "the queue could not be measured", err)
+			}
+			out.Body.Waiting = append(out.Body.Waiting,
+				QueuedBody{Kind: kind, Waiting: depth, Limit: limit})
+		}
 		out.Body.Items = make([]SetAsideBody, 0, len(jobs))
 		for _, job := range jobs {
 			body := SetAsideBody{

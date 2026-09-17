@@ -71,7 +71,7 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 	}
 	createdAt := s.now().UTC().Truncate(time.Microsecond)
 	var rule *Routing
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		// Built inside, because an insert writes the generated identifier back
 		// into the model and the ordinal below is read from the database. A
 		// retry of a rolled-back attempt would re-insert a model carrying both
@@ -594,7 +594,7 @@ func (s *Store) reaching() int {
 // For the test alone, which has to show the refusal without building a fixture
 // of two thousand components: what is being checked is that the cap refuses,
 // and a slow fixture says the same thing.
-func NewStoreReaching(db *bun.DB, reach int) *Store {
+func NewStoreReaching(db bun.IDB, reach int) *Store {
 	s := NewStore(db)
 	s.reach = reach
 	return s

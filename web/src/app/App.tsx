@@ -47,6 +47,7 @@ const Inventories = lazy(() =>
   import("../screens/Inventories").then((m) => ({ default: m.Inventories })),
 );
 const Settings = lazy(() => import("../screens/Settings").then((m) => ({ default: m.Settings })));
+const System = lazy(() => import("../screens/System").then((m) => ({ default: m.System })));
 const Audit = lazy(() => import("../screens/Audit").then((m) => ({ default: m.Audit })));
 const Reports = lazy(() =>
   import("../screens/reports/Catalog").then((m) => ({ default: m.Catalog })),
@@ -100,6 +101,7 @@ export const ROUTES = {
   disclosing: "/disclosing",
   autoAssignment: "/auto-assignment",
   settings: "/settings",
+  system: "/system",
 } as const;
 
 export function App() {
@@ -213,7 +215,8 @@ export function App() {
               <Route path={ROUTES.record} element={<Record />} />
               <Route path={ROUTES.disclosing} element={<Disclosing />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
-              <Route path={ROUTES.settings} element={<Settings />} />
+              <Route path={ROUTES.settings} element={<Settings who={who.data} />} />
+              <Route path={ROUTES.system} element={<System />} />
               {/* A path the page does not know either. Sending somebody home is
             better than a dead end — and the replace is what stops the back
             button returning to an address that only redirects again.

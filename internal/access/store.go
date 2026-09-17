@@ -39,6 +39,15 @@ type Account struct {
 	// that derives it. It is what bounds the flag for a credential that never
 	// signs in. Null where a person granted it.
 	AdminDerivedAt *time.Time `bun:"admin_derived_at"`
+	// Audits is the other thing held over the deployment rather than over a
+	// product: reading what it is set to, who holds what, and what has been
+	// changed administratively. It grants no product's findings or decisions.
+	//
+	// The two columns beside it are administration's two, and carry the same
+	// bound for the same reason.
+	Audits          bool       `bun:"audits,notnull"`
+	AuditsDerived   bool       `bun:"audits_derived,notnull"`
+	AuditsDerivedAt *time.Time `bun:"audits_derived_at"`
 	// Email is where to reach this person outside the application, and
 	// EmailDerived says a sign-in provider supplied it rather than
 	// somebody here. The pair works like the two above: a provider may
@@ -258,7 +267,11 @@ func (s *Store) Within(ctx context.Context,
 // dropped connection read the same way — it answered "nobody is recorded as
 // this", so administration was withdrawn from somebody who had it and no row
 // said anybody had done it.
-func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin *bool) (*Account, error) {
+// audits is the same shape as admin and says the same three things about the
+// other capability held over the deployment.
+func (s *Store) Ensure(ctx context.Context, identity, displayName string,
+	admin, audits *bool) (*Account, error) {
+
 	// Folded, so that what is recorded here and what a sign-in matches are the
 	// same string. An identity is a username, and a username is a name people
 	// type.
@@ -269,19 +282,24 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin 
 
 	existing, err := s.ByIdentity(ctx, identity)
 	if err == nil {
-		if admin == nil {
-			return existing, nil
-		}
 		// Conditional on what is stored, so the value being replaced is read
 		// by the statement that replaces it. The affected-row count then says
 		// whether it moved, which is what the trail records.
-		if existing.IsAdmin != *admin {
+		if admin != nil && existing.IsAdmin != *admin {
 			if _, err := s.db.NewUpdate().Model((*Account)(nil)).
 				Set("is_admin = ?", *admin).Where("id = ?", existing.ID).
 				Where("is_admin = ?", existing.IsAdmin).Exec(ctx); err != nil {
 				return nil, fmt.Errorf("record that %q is an administrator: %w", identity, err)
 			}
 			existing.IsAdmin = *admin
+		}
+		if audits != nil && existing.Audits != *audits {
+			if _, err := s.db.NewUpdate().Model((*Account)(nil)).
+				Set("audits = ?", *audits).Where("id = ?", existing.ID).
+				Where("audits = ?", existing.Audits).Exec(ctx); err != nil {
+				return nil, fmt.Errorf("record that %q audits this deployment: %w", identity, err)
+			}
+			existing.Audits = *audits
 		}
 		return existing, nil
 	}
@@ -295,6 +313,7 @@ func (s *Store) Ensure(ctx context.Context, identity, displayName string, admin 
 	person := &Account{
 		Identity: identity, DisplayName: displayName,
 		IsAdmin: admin != nil && *admin,
+		Audits:  audits != nil && *audits,
 		// Said rather than left to the zero value. "Nobody has said" and
 		// "somebody said none" are different states — read as the same, the
 		// next sign-in puts back the address an administrator had just
@@ -324,16 +343,12 @@ func (s *Store) record(ctx context.Context, person *Account) error {
 		_, err := db.NewInsert().Model(person).Exec(ctx)
 		return err
 	}
-	db, ok := database.Handle(s.db)
-	if !ok {
-		return write(ctx, s.db)
-	}
 	// Through the one helper, so the whole of it is retried: a cluster
 	// certifies at COMMIT, and a write whose statements all succeeded can
-	// still be rolled back under it.
-	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		return write(ctx, tx)
-	})
+	// still be rolled back under it. A caller already inside a transaction —
+	// an administrator recording somebody, which is trailed in the same
+	// transaction — joins that one instead.
+	return database.Within(ctx, s.db, write)
 }
 
 // EmailSource says who last decided somebody's address.
@@ -544,7 +559,19 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 			administers = false
 		}
 	}
-	if !administers && len(grants) == 0 && len(cases) == 0 {
+	// Auditing is bounded exactly as administration is, and for the same
+	// reason: a group is what says so, and a credential that never signs in
+	// never asks a group again.
+	audits := person.Audits
+	if boundDerived && person.AuditsDerived {
+		if person.AuditsDerivedAt == nil || s.stale(ctx, Derived, *person.AuditsDerivedAt) {
+			audits = false
+		}
+	}
+	// Somebody holding the audit permission alone holds access: they reach no
+	// product and read the deployment's own records, which is the whole of
+	// what it is for.
+	if !administers && !audits && len(grants) == 0 && len(cases) == 0 {
 		return Subject{}, ErrDenied
 	}
 
@@ -574,8 +601,12 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	for _, team := range teams {
 		on = append(on, team.PartyID)
 	}
-	return NewPerson(person.ID, person.Identity, administers, grants,
-		person.PartyID, on...).OnCases(cases), nil
+	subject := NewPerson(person.ID, person.Identity, administers, grants,
+		person.PartyID, on...).OnCases(cases)
+	if audits {
+		subject = subject.Auditing()
+	}
+	return subject, nil
 }
 
 // alreadyThere turns a refused insert into success where the state the caller

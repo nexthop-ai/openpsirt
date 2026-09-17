@@ -42,7 +42,7 @@ func (f *fixture) privateTriager(t *testing.T, identity, display string) access.
 	t.Helper()
 	ctx := t.Context()
 	rights := access.NewStore(f.db.DB)
-	who, err := rights.Ensure(ctx, identity, display, nil)
+	who, err := rights.Ensure(ctx, identity, display, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -103,7 +103,7 @@ inputs.
 |---|---|---|
 | REQ-20 | Change over time is a primary query, not an audit log read backwards | "What is new since the last release" is the question the tool exists to answer |
 | REQ-21 | Findings open and close themselves as scans change, every closure records why, and a disappearance nobody can explain is flagged at any volume | Nobody closes 441,108 findings by hand, and a silent disappearance is either a producer bug or a scanner regression |
-| REQ-22 | Triage history is append-only, administrative changes record who and what changed from what, and what a scan observed is never merged with what a person declared | The record is what an auditor reads. Observed state is rewritten nightly; declared state is somebody's word |
+| REQ-22 | Triage history is append-only: the application writes records and never edits or removes them, and the record is written in the same transaction as the act it describes. The database is trusted; nothing defends against somebody editing rows directly. Administrative changes record who and what changed from what, and what a scan observed is never merged with what a person declared | The record is what an auditor reads. Observed state is rewritten nightly; declared state is somebody's word |
 
 ### 3.6 Triage
 

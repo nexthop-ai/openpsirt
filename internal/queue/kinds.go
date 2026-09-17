@@ -21,3 +21,11 @@ const (
 	// open.
 	Route = "routing.sweep"
 )
+
+// Kinds is every kind of work this deployment queues.
+//
+// For the one reader that asks about all of them rather than about its own: an
+// operator looking at what is waiting. The cap is per kind, so a single number
+// across the queue would hide the kind that is actually backed up behind the
+// two that are not.
+func Kinds() []string { return []string{Parse, Scan, Route} }

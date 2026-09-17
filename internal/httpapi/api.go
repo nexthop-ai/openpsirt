@@ -27,7 +27,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -373,16 +372,11 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerElsewhere(api, in)
 	registerReachAcross(api, in)
 	registerBindings(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Groups: in.groupsReachable, Trail: in.trail,
-	}, func() *setting.Store {
-		if in.DB == nil {
-			return nil
-		}
-		return setting.NewStore(in.DB.DB)
-	})
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
+		Groups: in.groupsReachable,
+	}, in.settings)
 	registerCatalog(api, Declaring{
-		Store: in.catalog, Logger: logger,
+		DB: in.DB, Store: in.catalog, Logger: logger,
 		Findings: func() *finding.Store {
 			if in.DB == nil {
 				return nil
@@ -396,27 +390,19 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 			return ingest.NewStore(in.DB.DB)
 		},
 		RewriteDeadlines: deadlinesRewritten(in),
-		Trail:            in.trail,
 	})
 	registerAdministration(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 		Findings: func() *finding.Store {
 			if in.DB == nil {
 				return nil
 			}
 			return finding.NewStore(in.DB.DB)
 		},
-		Trail: in.trail,
-		Settings: func() *setting.Store {
-			if in.DB == nil {
-				return nil
-			}
-			return setting.NewStore(in.DB.DB)
-		},
+		Settings: in.settings,
 	})
 	registerTeams(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
 	// Who is on one undisclosed case. It takes both: the grant is managed
 	// by whoever reads the case rather than by an administrator, and it
@@ -435,23 +421,19 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	// Where a claim's work is happening, stored and never sent to.
 	registerClaimLink(api, in)
 	registerCollaborators(api, in, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
 	// One person, whole: what they hold, what they used to hold, their part
 	// in the record, and what they were told.
 	registerPerson(api, in, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
 	// Where this deployment sends what it has to say.
 	registerOutbound(api, in, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
 	registerRevocation(api, Administering{
-		Access: in.rights, Catalog: in.catalog, Logger: logger, Mode: in.Mode,
-		Trail: in.trail,
+		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
 
 	// Last, so it claims only what nothing above it did.
@@ -467,12 +449,39 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 // message — which for a connection failure is the address and the user it
 // tried. Whoever operates this deployment needs that; whoever is asking does
 // not.
+//
+// **The cause travels with the refusal and is not part of it.** An act is a
+// transaction now, and the helper that opened it asks whether what came back
+// is worth going again — a deadlock on one engine, a lost race on another.
+// Answered with a refusal built fresh, that question is asked of an error
+// wrapping nothing, so a mid-transaction deadlock was reported to an
+// administrator instead of taken again.
 func wentWrong(logger *slog.Logger, what string, err error) error {
 	if logger != nil {
 		logger.Error(what, "error", err)
 	}
-	return huma.Error500InternalServerError(what)
+	return carried{said: huma.Error500InternalServerError(what), cause: err}
 }
+
+// carried is a refusal that remembers what caused it.
+//
+// The refusal is what a caller is told and is the whole of what they are told:
+// the framework resolves a returned error to the first status error it finds,
+// which is the refusal inside this, so nothing a driver wrote reaches a
+// response. What the cause is for is the retry helper, which reads the
+// driver's own types through the wrapping.
+type carried struct {
+	said  error
+	cause error
+}
+
+// Error is the refusal alone. It is what a log line and a text comparison see,
+// and the cause is logged beside it where it is wrapped.
+func (c carried) Error() string { return c.said.Error() }
+
+// Unwrap gives both, so that a walk for the status error and a walk for the
+// driver's type each find what they are looking for.
+func (c carried) Unwrap() []error { return []error{c.said, c.cause} }
 
 // asked is the answer when a store refused what the caller asked for.
 //

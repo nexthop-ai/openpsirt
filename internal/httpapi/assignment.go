@@ -488,6 +488,88 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 	})
 
 	huma.Register(api, requiring(huma.Operation{
+		OperationID: "list-team-assigned", Method: http.MethodGet,
+		Path:    "/v1/teams/{team}/assignments",
+		Summary: "List what one team is dealing with",
+		Description: "The open findings routed to a team, most urgent first, in the same units " +
+			"as everywhere else: **one item per issue in a component in a product**.\n\n" +
+			"Work goes to a team by standing rule and by an assignment naming one, so a team " +
+			"holds work the way a person does — and the totals list says so. This is the list " +
+			"behind that number.\n\n" +
+			"A team nobody declared answers with an empty list rather than a 404, which is also " +
+			"what a team whose work is not yours to see answers. The two are deliberately the " +
+			"same, for the reason a person's is: refusing would answer \"does this team exist\" " +
+			"for any credential at all.",
+		Tags: []string{"Findings"},
+	}, anyPerson, "Answers only what you may see. A team nobody declared answers as one whose "+
+		"work you cannot see."), func(ctx context.Context, input *struct {
+		Team string `path:"team" doc:"The team's name"`
+		ScopeQuery
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int `query:"offset" minimum:"0"`
+	}) (*struct {
+		Body struct {
+			Items []UnassignedBody `json:"items"`
+			Total int              `json:"total"`
+		}
+	}, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Narrowed by what they hold rather than by what they read, for the
+		// reason the person's list is: a capability held without a read role
+		// reaches no product and is given content by what has been assigned.
+		scope, sees, err := scopedByHolding(ctx, in, subject, input.ScopeQuery)
+		if err != nil {
+			return nil, err
+		}
+		// A name nothing matches holds nothing, rather than being refused.
+		// Refusing would answer "is there a team called this" for any
+		// credential, which is a directory of how the organization divides its
+		// work for the price of one request — and the read below is narrowed
+		// by what the caller may see anyway.
+		//
+		// **A read that could not be made is not that answer.** Told apart by
+		// the sentinel rather than by "any error at all": read as "no such
+		// team", a database nobody can reach answers that this team is holding
+		// nothing — which is the exact false statement this route was written
+		// to stop a screen making.
+		holders := []int64{nobody}
+		switch team, err := access.NewStore(in.DB.DB).TeamByName(ctx, input.Team); {
+		case err == nil:
+			holders = []int64{team.PartyID}
+		case !errors.Is(err, access.ErrNoSuchTeam):
+			return nil, wentWrong(in.Logger, "that team could not be looked up", err)
+		}
+		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, subject, holders,
+			scope, input.Limit, input.Offset)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "what the team is dealing with could not be read", err)
+		}
+		if len(rows) == 0 && input.Product != "" && !sees {
+			return nil, noSuchProduct()
+		}
+		out := &struct {
+			Body struct {
+				Items []UnassignedBody `json:"items"`
+				Total int              `json:"total"`
+			}
+		}{}
+		out.Body.Items = make([]UnassignedBody, 0, len(rows))
+		for _, row := range rows {
+			out.Body.Items = append(out.Body.Items, UnassignedBody{
+				Vulnerability: row.Vulnerability, Severity: row.Severity, Exploited: row.Exploited,
+				Component: row.Component, Version: row.Version,
+				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
+				Places: row.Places, Builds: row.Builds,
+			})
+		}
+		out.Body.Total = total
+		return out, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-holdings", Method: http.MethodGet, Path: "/v1/assignments",
 		Summary: "List assignment totals",
 		Description: "Returns everyone holding open work you can see, with how much.\n\n" +

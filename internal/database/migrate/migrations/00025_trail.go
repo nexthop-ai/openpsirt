@@ -3,8 +3,11 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"strconv"
 
 	"github.com/pressly/goose/v3"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 func init() {
@@ -45,8 +48,20 @@ func upTrail(ctx context.Context, tx *sql.Tx) error {
 			"by"       ` + t.ref + ` NOT NULL,
 			-- What kind of thing moved, and which one of them. The kind is
 			-- what a reader filters by; the name is what they search for.
+			--
+			-- Wider than a name, because what is written here is composed of
+			-- them: a collaborator is a product, an issue and a person, each
+			-- of them a name's width, with separators between. At a name's
+			-- own width the longest of those overflowed the column, which
+			-- takes the act down with it on the three engines that refuse a
+			-- value too long for what it is going into.
 			"kind"     ` + t.kind + ` NOT NULL,
-			"about"    ` + t.name + ` NOT NULL,
+			-- Wider than a name because what is written here is composed
+			-- of them, and derived from a name's own width so that moving
+			-- one moves this with it. The recorder bounds what it writes
+			-- to the same number, which is what keeps a composed name from
+			-- ever reaching a column too small for it.
+			"about"    VARCHAR(` + strconv.Itoa(database.ComposedWidth) + `) NOT NULL,
 			-- What it held and what it holds. Null before means nobody had
 			-- set it; null after means it was cleared.
 			"was"      ` + t.text + ` NULL,

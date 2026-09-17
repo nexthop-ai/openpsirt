@@ -1121,7 +1121,7 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, who := range []string{"triager", "reviewer"} {
-			person, err := r.rights.Ensure(ctx, who, "", nil)
+			person, err := r.rights.Ensure(ctx, who, "", nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1306,7 +1306,7 @@ func TestAClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		person, err := r.rights.Ensure(ctx, "private-triage", "", nil)
+		person, err := r.rights.Ensure(ctx, "private-triage", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

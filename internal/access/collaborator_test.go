@@ -15,11 +15,11 @@ func TestBringingSomebodyIntoACaseTwiceLeavesOneGrant(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		product := f.products["sonic"]
-		person, err := f.store.Ensure(ctx, "ana", "", nil)
+		person, err := f.store.Ensure(ctx, "ana", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		granter, err := f.store.Ensure(ctx, "bo", "", nil)
+		granter, err := f.store.Ensure(ctx, "bo", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

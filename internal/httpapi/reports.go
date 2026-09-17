@@ -23,6 +23,12 @@ type PointBody struct {
 	Opened     int            `json:"opened" doc:"Findings that appeared during this step"`
 	Resolved   int            `json:"resolved" doc:"Findings that went away during this step"`
 	BySeverity map[string]int `json:"by_severity"`
+	// The two flows, split the same way. What arrived and what was answered
+	// is the question a backlog is read for: ten in and ten out is a team
+	// keeping pace where both are low, and a team losing ground where what
+	// arrives is critical and what leaves is not.
+	OpenedBySeverity   map[string]int `json:"opened_by_severity" doc:"What appeared, split by severity"`
+	ResolvedBySeverity map[string]int `json:"resolved_by_severity" doc:"What went away, split by the severity it held while it was open"`
 }
 
 // ComparisonBody is what changed between two builds.
@@ -118,6 +124,7 @@ func registerReports(api huma.API, in Ingest) {
 			out.Body.Items = append(out.Body.Items, PointBody{
 				At: p.At.Format(time.DateOnly), Open: p.Open,
 				Opened: p.Opened, Resolved: p.Resolved, BySeverity: p.BySeverity,
+				OpenedBySeverity: p.OpenedBySeverity, ResolvedBySeverity: p.ResolvedBySeverity,
 			})
 		}
 		return out, nil

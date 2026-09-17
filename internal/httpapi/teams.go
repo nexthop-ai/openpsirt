@@ -51,7 +51,7 @@ func registerTeams(api huma.API, a Administering) {
 			if a.Access == nil {
 				return nil, noDatabase(a.Logger)
 			}
-			store := a.Access()
+			store := a.Access(a.handle())
 			if store == nil {
 				return nil, noDatabase(a.Logger)
 			}
@@ -100,25 +100,36 @@ func registerTeams(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Body TeamRecordBody
 	}) (*declaredOutput[TeamBody], error) {
-		store, _, err := administerable(ctx, a)
-		if err != nil {
-			return nil, err
-		}
 		by, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		_, before := store.TeamByName(ctx, in.Body.Name)
 		// Declaring a team and putting people on it is one act. Written as a
 		// declaration and then a statement per member, a name nobody holds
 		// left the team standing with whoever came before it on it, and the
 		// caller a 404 saying nothing had happened.
 		var team *access.Team
-		if err := store.Within(ctx, func(ctx context.Context, store *access.Store, _ bun.IDB) error {
-			var err error
+		var body TeamBody
+		var declared bool
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			// Read inside, because whether this declared the team is what the
+			// record at the foot of it says and what the status answers.
+			_, missing := store.TeamByName(ctx, in.Body.Name)
+			declared = missing != nil
+
 			if team, err = store.DeclareTeam(ctx, in.Body.Name, in.Body.DisplayName); err != nil {
 				return asked(a.Logger, err)
+			}
+			if declared {
+				if err := noted(ctx, tx, trail.Team, team.Name,
+					nil, trail.Said("declared", true)); err != nil {
+					return notRecorded(a.Logger, err)
+				}
 			}
 			for _, identity := range in.Body.Members {
 				person, err := store.ByIdentity(ctx, identity)
@@ -128,28 +139,23 @@ func registerTeams(api huma.API, a Administering) {
 				if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
 					return wentWrong(a.Logger, "cannot put somebody on a team", err)
 				}
+				// Recorded here as well as on the route that adds one later.
+				// Somebody put on a team at the moment it is declared is on it
+				// the same way, and a trail that has one and not the other is
+				// a trail somebody has to know the history of to read.
+				if err := noted(ctx, tx, trail.Team, team.Name+" · "+identity,
+					nil, trail.Said("a member", true)); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+			}
+			if body, err = teamBody(ctx, store, *team); err != nil {
+				return wentWrong(a.Logger, "cannot read who is on a team", err)
 			}
 			return nil
 		}); err != nil {
 			return nil, err
 		}
-		for _, identity := range in.Body.Members {
-			// Recorded here as well as on the route that adds one later.
-			// Somebody put on a team at the moment it is declared is on it the
-			// same way, and a trail that has one and not the other is a trail
-			// somebody has to know the history of to read.
-			noteAdminChange(ctx, a, trail.Team, team.Name+" · "+identity,
-				nil, trail.Said("a member", true))
-		}
-
-		body, err := teamBody(ctx, store, *team)
-		if err != nil {
-			return nil, wentWrong(a.Logger, "cannot read who is on a team", err)
-		}
-		if before != nil {
-			noteAdminChange(ctx, a, trail.Team, team.Name, nil, trail.Said("declared", true))
-		}
-		return answer(before != nil, body), nil
+		return answer(declared, body), nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -162,21 +168,28 @@ func registerTeams(api huma.API, a Administering) {
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Team string `path:"team"`
 	}) (*struct{}, error) {
-		store, _, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			team, err := store.TeamByName(ctx, in.Team)
+			if err != nil {
+				return noSuchTeamNamed(in.Team)
+			}
+			if err := store.RetireTeam(ctx, team.ID); err != nil {
+				if errors.Is(err, access.ErrNoSuchTeam) {
+					return noSuchTeamNamed(in.Team)
+				}
+				return wentWrong(a.Logger, "cannot retire that team", err)
+			}
+			if err := noted(ctx, tx, trail.Team, team.Name, trail.Said("in use", true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		team, err := store.TeamByName(ctx, in.Team)
-		if err != nil {
-			return nil, noSuchTeamNamed(in.Team)
-		}
-		if err := store.RetireTeam(ctx, team.ID); err != nil {
-			if errors.Is(err, access.ErrNoSuchTeam) {
-				return nil, noSuchTeamNamed(in.Team)
-			}
-			return nil, wentWrong(a.Logger, "cannot retire that team", err)
-		}
-		noteAdminChange(ctx, a, trail.Team, team.Name, trail.Said("in use", true), nil)
 		return &struct{}{}, nil
 	})
 
@@ -193,27 +206,34 @@ func registerTeams(api huma.API, a Administering) {
 		Team     string `path:"team"`
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
-		store, _, err := administerable(ctx, a)
-		if err != nil {
-			return nil, err
-		}
 		by, err := reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		team, err := store.TeamByName(ctx, in.Team)
-		if err != nil {
-			return nil, noSuchTeamNamed(in.Team)
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			team, err := store.TeamByName(ctx, in.Team)
+			if err != nil {
+				return noSuchTeamNamed(in.Team)
+			}
+			person, err := store.ByIdentity(ctx, in.Identity)
+			if err != nil {
+				return noSuchPerson()
+			}
+			if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
+				return wentWrong(a.Logger, "cannot put somebody on a team", err)
+			}
+			if err := noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
+				nil, trail.Said("a member", true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		person, err := store.ByIdentity(ctx, in.Identity)
-		if err != nil {
-			return nil, noSuchPerson()
-		}
-		if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
-			return nil, wentWrong(a.Logger, "cannot put somebody on a team", err)
-		}
-		noteAdminChange(ctx, a, trail.Team, team.Name+" · "+in.Identity,
-			nil, trail.Said("a member", true))
 		return &struct{}{}, nil
 	})
 
@@ -228,29 +248,37 @@ func registerTeams(api huma.API, a Administering) {
 		Team     string `path:"team"`
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
-		store, _, err := administerable(ctx, a)
-		if err != nil {
+		if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, _, err := administerable(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			team, err := store.TeamByName(ctx, in.Team)
+			if err != nil {
+				return noSuchTeamNamed(in.Team)
+			}
+			person, err := store.ByIdentity(ctx, in.Identity)
+			if err != nil {
+				return noSuchPerson()
+			}
+			// Mapped before the trail row, as every other withdrawal is: a
+			// removal that matched nothing is not a removal, and recording it
+			// as one says somebody stopped receiving work they were never
+			// sent.
+			switch err := store.RemoveFromTeam(ctx, team.ID, person.ID); {
+			case errors.Is(err, access.ErrNothingMatched):
+				return huma.Error404NotFound("they are not on that team")
+			case err != nil:
+				return wentWrong(a.Logger, "cannot take somebody off a team", err)
+			}
+			if err := noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
+				trail.Said("a member", true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
-		team, err := store.TeamByName(ctx, in.Team)
-		if err != nil {
-			return nil, noSuchTeamNamed(in.Team)
-		}
-		person, err := store.ByIdentity(ctx, in.Identity)
-		if err != nil {
-			return nil, noSuchPerson()
-		}
-		// Mapped before the trail row, as every other withdrawal is: a
-		// removal that matched nothing is not a removal, and recording it as
-		// one says somebody stopped receiving work they were never sent.
-		switch err := store.RemoveFromTeam(ctx, team.ID, person.ID); {
-		case errors.Is(err, access.ErrNothingMatched):
-			return nil, huma.Error404NotFound("they are not on that team")
-		case err != nil:
-			return nil, wentWrong(a.Logger, "cannot take somebody off a team", err)
-		}
-		noteAdminChange(ctx, a, trail.Team, team.Name+" · "+in.Identity,
-			trail.Said("a member", true), nil)
 		return &struct{}{}, nil
 	})
 }

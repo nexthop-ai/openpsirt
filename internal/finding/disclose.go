@@ -238,7 +238,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject,
 	until = until.UTC().Truncate(time.Microsecond)
 
 	var out *Extension
-	err := database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		// Where it ends now, read inside the transaction: a retry
 		// re-runs this against a database another extension may have
 		// moved.
@@ -308,7 +308,7 @@ func (s *Store) AgreeToExtension(ctx context.Context, subject access.Subject, id
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 
-	return database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		asked := new(Extension)
 		if err := tx.NewSelect().Model(asked).Where("id = ?", id).Scan(ctx); err != nil {
 			// An extension somebody may not reach and one that is

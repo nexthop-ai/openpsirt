@@ -73,6 +73,12 @@ export function Finding() {
   // somebody: reusing an earlier reasoning fills it in and then has to show
   // them what it filled in.
   const form = useRef<HTMLDivElement>(null);
+  // Where the confirmation is drawn. It sits at the head of the screen, above
+  // everything the finding says, and the button that produces it is at the
+  // foot of the decision form — so somebody pressing submit was left looking
+  // at the form they had just sent, with the answer a page and a half above
+  // them and nothing saying anything had happened.
+  const confirmation = useRef<HTMLDivElement>(null);
   // Which finding the screen is on. A params-only change does not remount it,
   // so anything below that belongs to one finding has to say which.
   const oneFinding = `${vulnerability}|${component}|${version}`;
@@ -482,7 +488,7 @@ export function Finding() {
       )}
 
       {recorded && (
-        <div className="alert info" style={{ marginBottom: 14 }}>
+        <div className="alert info" style={{ marginBottom: 14 }} ref={confirmation}>
           <strong>Submitted</strong>
           <span>
             Recorded against {recorded.recorded} {recorded.recorded === 1 ? "place" : "places"} here
@@ -993,6 +999,16 @@ export function Finding() {
                     setRecorded(r);
                     startFrom(null);
                     setExtending(null);
+                    // Brought to where somebody is looking. Smooth, like the
+                    // form's own scroll, so the page moving is something they
+                    // watch happen rather than a jump they have to re-find
+                    // themselves after.
+                    requestAnimationFrame(() =>
+                      confirmation.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      }),
+                    );
                   }}
                   extending={extending}
                   prefill={opening}

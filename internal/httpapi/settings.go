@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -197,15 +198,15 @@ func registerSettings(api huma.API, in Ingest) {
 			"agreed to produces an estate that is permanently late and a signal everybody " +
 			"ignores.",
 		Tags: []string{"Administration"},
-	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[SettingBody], error) {
-		if err := administrating(ctx); err != nil {
+	}, deploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*listOutput[SettingBody], error) {
+		if err := readingTheDeployment(ctx); err != nil {
 			return nil, err
 		}
 		// From the accessor, which answers nothing where there is no
 		// database. Built from `in.DB.DB` directly this panicked into the
 		// recovery middleware and answered 500, where the route already has
 		// words for a process that has no database.
-		settings := in.settings()
+		settings := in.settings(in.handle())
 		if settings == nil {
 			return nil, noDatabase(in.logger())
 		}
@@ -301,16 +302,23 @@ func registerSettings(api huma.API, in Ingest) {
 		// the value at some earlier moment — two administrators moving the
 		// same setting at once both read the original, and the second wrote a
 		// prior value into an append-only trail that nothing ever held.
-		settings := in.settings()
-		if settings == nil {
-			return nil, noDatabase(in.logger())
+		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+			settings := in.settings(tx)
+			if settings == nil {
+				return noDatabase(in.logger())
+			}
+			before, had, err := settings.Change(ctx, input.Name, input.Body.Value)
+			if err != nil {
+				return recording(in.Logger, "that setting could not be recorded", err)
+			}
+			if err := noted(ctx, tx, trail.Setting, input.Name,
+				trail.Said(before, had), trail.Said(input.Body.Value, true)); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		before, had, err := settings.Change(ctx, input.Name, input.Body.Value)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "that setting could not be recorded", err)
-		}
-		noteChange(ctx, in, trail.Setting, input.Name,
-			trail.Said(before, had), trail.Said(input.Body.Value, true))
 
 		// A deadline is stored on the finding when it is first seen,
 		// so changing how long something may stay open makes every

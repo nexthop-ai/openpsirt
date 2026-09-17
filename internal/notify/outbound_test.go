@@ -55,7 +55,7 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +238,7 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		dbtest.Reset(t, db)
 
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -278,7 +278,7 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		dbtest.Reset(t, db)
 
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,7 +335,7 @@ func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		dbtest.Reset(t, db)
 
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -397,11 +397,11 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 		dbtest.Reset(t, db)
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		other, err := rights.Ensure(ctx, "bo@example.com", "Bo", nil)
+		other, err := rights.Ensure(ctx, "bo@example.com", "Bo", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -457,7 +457,7 @@ func TestADestinationTakingOneKindReachesPastABacklogOfAnother(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		dbtest.Reset(t, db)
 
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -522,7 +522,7 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
 		defer server.Close()
 
-		first, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true))
+		first, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -543,7 +543,7 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 			who := first
 			if i > 0 {
 				who, err = rights.Ensure(ctx,
-					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true))
+					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true), nil)
 				if err != nil {
 					t.Fatal(err)
 				}

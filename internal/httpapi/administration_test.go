@@ -308,3 +308,103 @@ func TestWithdrawingSomethingNobodyHoldsRecordsNothingAndReleasesNothing(t *test
 		}
 	})
 }
+
+// TestTheUserListNarrowsToWhoHoldsWhat pins the question an access review
+// asks.
+//
+// "Who approves on this product" was answerable only by reading the grid
+// sideways off a list of everybody, and a deployment with two hundred people
+// in it is one where that is not answered at all.
+func TestTheUserListNarrowsToWhoHoldsWhat(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		held := func(query string) []string {
+			t.Helper()
+			var out struct {
+				Items []struct {
+					Identity string `json:"identity"`
+				} `json:"items"`
+			}
+			read(t, r, "admin", "/v1/people"+query, &out)
+			names := make([]string, 0, len(out.Items))
+			for _, item := range out.Items {
+				names = append(names, item.Identity)
+			}
+			return names
+		}
+
+		everybody := held("")
+		approvers := held("?product=mine&role=approver")
+		if len(approvers) == 0 {
+			t.Fatal("nobody approves on the product, so this narrowing was not exercised")
+		}
+		if len(approvers) >= len(everybody) {
+			t.Errorf("narrowing to approvers on one product kept %d of %d people",
+				len(approvers), len(everybody))
+		}
+		for _, who := range approvers {
+			if who == "triager" || who == "reader" {
+				t.Errorf("%q holds no approval here and is in the narrowed list", who)
+			}
+		}
+
+		// A role nobody holds on a product answers empty rather than
+		// everybody: a narrowing that silently does nothing is the one that
+		// makes a review report the wrong population.
+		if narrowed := held("?product=mine&role=assigner"); len(narrowed) >= len(everybody) {
+			t.Errorf("narrowing to assigners kept %d of %d people", len(narrowed), len(everybody))
+		}
+
+		// And a product nobody declared is said, rather than answered with an
+		// empty list — which reads as "nobody holds anything there".
+		if got := asPerson(t, r, "admin", http.MethodGet,
+			"/v1/people?product=no-such-product", ""); got.Code != http.StatusNotFound {
+			t.Errorf("narrowing to a product nobody declared answered %d, want 404", got.Code)
+		}
+		if got := asPerson(t, r, "admin", http.MethodGet,
+			"/v1/people?role=nonsense", ""); got.Code < 400 {
+			t.Errorf("narrowing to a word that is not a role answered %d", got.Code)
+		}
+	})
+}
+
+// TestTheUserListSaysWhereSomebodyIsReached pins the column against the write
+// that fills it.
+//
+// The address and the display name are recorded from this screen, and the list
+// is the screen — so a column drawing "none" over an address somebody had just
+// typed reads as the write having been refused.
+func TestTheUserListSaysWhereSomebodyIsReached(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"ada","display_name":"Ada","email":"ada@example.test"}`); got.Code >= 300 {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Items []struct {
+				Identity    string `json:"identity"`
+				DisplayName string `json:"display_name"`
+				Email       string `json:"email"`
+				EmailSource string `json:"email_source"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/people", &out)
+		for _, person := range out.Items {
+			if person.Identity != "ada" {
+				continue
+			}
+			if person.Email != "ada@example.test" {
+				t.Errorf("the list says ada is reached at %q", person.Email)
+			}
+			if person.DisplayName != "Ada" {
+				t.Errorf("the list calls ada %q", person.DisplayName)
+			}
+			// Which of the two said so, because a provider's may be replaced
+			// by a later sign-in and one recorded here never is.
+			if person.EmailSource != "recorded" {
+				t.Errorf("the list says ada's address came from %q", person.EmailSource)
+			}
+			return
+		}
+		t.Error("ada is not in the list of people")
+	})
+}

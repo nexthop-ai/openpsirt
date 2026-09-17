@@ -46,8 +46,16 @@ export function Work() {
       ),
   });
   // Whose work is being looked at on the second tab. Empty is the roll-up of
-  // everybody; a name is that person's list.
+  // everybody; a name is that holder's list.
+  //
+  // **Which kind of holder, because a team is not a person.** Work goes to a
+  // team by standing rule and by an assignment naming one, and the totals list
+  // says a team holds it — but the person's route resolves an identity, so a
+  // team's name matched nobody and the screen answered "they are not holding
+  // anything" over work it had just counted.
   const person = params.get("person") ?? "";
+  const team = params.get("team") ?? "";
+  const holder = team || person;
   const mine = useQuery({
     queryKey: ["assigned", "me", scope, offset],
     queryFn: async () =>
@@ -67,6 +75,17 @@ export function Work() {
         }),
       ),
   });
+  const theTeams = useQuery({
+    enabled: team !== "",
+    queryKey: ["team-assigned", team, scope, offset],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/teams/{team}/assignments", {
+          params: { path: { team }, query: { limit: PAGE, offset, ...scope } },
+        }),
+      ),
+  });
+  const held = team ? theTeams : theirs;
 
   function go(next: string) {
     const now = new URLSearchParams(params);
@@ -133,7 +152,7 @@ export function Work() {
           empty="Nothing is assigned to you."
           detail="Work you take on from a finding, or that somebody hands you, appears here."
         />
-      ) : person ? (
+      ) : holder ? (
         <>
           <div className="filters" style={{ marginBottom: 10 }}>
             <button
@@ -142,22 +161,23 @@ export function Work() {
               onClick={() => {
                 const now = new URLSearchParams(params);
                 now.delete("person");
+                now.delete("team");
                 setParams(now);
               }}
             >
               ← Everybody
             </button>
             <span className="hint">
-              What <b>{person}</b> is dealing with
+              What <b>{holder}</b> is dealing with{team && " · team queue"}
             </span>
           </div>
           <Held
-            rows={theirs.data?.items ?? []}
-            total={theirs.data?.total ?? 0}
-            query={theirs}
+            rows={held.data?.items ?? []}
+            total={held.data?.total ?? 0}
+            query={held}
             offset={offset}
             onGo={goTo}
-            empty="They are not holding anything."
+            empty={team ? "The team is not holding anything." : "They are not holding anything."}
             detail="Either it has been decided, or somebody handed it back."
           />
         </>
@@ -165,9 +185,11 @@ export function Work() {
         <ByPerson
           rows={others}
           query={holdings}
-          onPick={(identity) => {
+          onPick={(name, isTeam) => {
             const now = new URLSearchParams(params);
-            now.set("person", identity);
+            now.delete("person");
+            now.delete("team");
+            now.set(isTeam ? "team" : "person", name);
             setParams(now);
           }}
         />
@@ -185,7 +207,7 @@ function ByPerson({
 }: {
   rows: { person?: string; team?: boolean; open?: number; places?: number; overdue?: number }[];
   query: Query;
-  onPick: (identity: string) => void;
+  onPick: (name: string, team: boolean) => void;
 }) {
   const queries = useQueryClient();
   const release = useMutation({
@@ -238,7 +260,7 @@ function ByPerson({
                   <button
                     type="button"
                     className="linkish"
-                    onClick={() => onPick(row.person ?? "")}
+                    onClick={() => onPick(row.person ?? "", Boolean(row.team))}
                     title="See what they are dealing with"
                   >
                     <span className="who2">

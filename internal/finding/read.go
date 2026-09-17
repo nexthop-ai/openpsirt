@@ -70,7 +70,7 @@ func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
 // The published rating only. What a product says instead belongs to the
 // product, so it is read alongside by whoever knows which product is being
 // asked about and put on the copy the row shows (RatedIn).
-func issuesNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]Vulnerability, error) {
+func issuesNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]Vulnerability, error) {
 	held := map[int64]Vulnerability{}
 	if len(ids) == 0 {
 		return held, nil
@@ -92,7 +92,7 @@ func issuesNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]Vulner
 
 // componentsNamed reads what these components are, including the upstream they
 // were cut from where one is known.
-func componentsNamed(ctx context.Context, db *bun.DB, ids []int64) (map[int64]graph.Component, error) {
+func componentsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]graph.Component, error) {
 	held := map[int64]graph.Component{}
 	if len(ids) == 0 {
 		return held, nil
