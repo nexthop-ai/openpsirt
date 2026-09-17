@@ -366,3 +366,45 @@ func TestTheUserListNarrowsToWhoHoldsWhat(t *testing.T) {
 		}
 	})
 }
+
+// TestTheUserListSaysWhereSomebodyIsReached pins the column against the write
+// that fills it.
+//
+// The address and the display name are recorded from this screen, and the list
+// is the screen — so a column drawing "none" over an address somebody had just
+// typed reads as the write having been refused.
+func TestTheUserListSaysWhereSomebodyIsReached(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"ada","display_name":"Ada","email":"ada@example.test"}`); got.Code >= 300 {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		var out struct {
+			Items []struct {
+				Identity    string `json:"identity"`
+				DisplayName string `json:"display_name"`
+				Email       string `json:"email"`
+				EmailSource string `json:"email_source"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/people", &out)
+		for _, person := range out.Items {
+			if person.Identity != "ada" {
+				continue
+			}
+			if person.Email != "ada@example.test" {
+				t.Errorf("the list says ada is reached at %q", person.Email)
+			}
+			if person.DisplayName != "Ada" {
+				t.Errorf("the list calls ada %q", person.DisplayName)
+			}
+			// Which of the two said so, because a provider's may be replaced
+			// by a later sign-in and one recorded here never is.
+			if person.EmailSource != "recorded" {
+				t.Errorf("the list says ada's address came from %q", person.EmailSource)
+			}
+			return
+		}
+		t.Error("ada is not in the list of people")
+	})
+}

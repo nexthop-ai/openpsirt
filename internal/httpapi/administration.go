@@ -357,6 +357,12 @@ func registerAdministration(api huma.API, a Administering) {
 			body := PersonBody{
 				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
 				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
+				// Where they are reached, and which of the two sources said
+				// so. On the list as well as on the one-person read: the
+				// screen that records an address is the list, and a column
+				// that drew "none" over an address somebody had just typed
+				// reads as the write having been refused.
+				Email: person.Email, EmailSource: string(person.EmailSource),
 			}
 			doors, err := store.Identities(ctx, person.ID)
 			if err != nil {
