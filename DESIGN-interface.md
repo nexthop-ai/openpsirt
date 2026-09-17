@@ -51,6 +51,7 @@ end rather than left to be found by clicking.
 - [A person, whole](#a-person-whole)
 - [A release, gathered](#a-release-gathered)
 - [Reports, settings, inheritance](#reports-settings-inheritance)
+- [The administration screens](#the-administration-screens)
 - [Showing the ordering signals](#showing-the-ordering-signals)
 - [Units, dates and copy](#units-dates-and-copy)
 - [What a screen says](#what-a-screen-says)
@@ -1249,6 +1250,21 @@ since a person only ever sees products they hold a role on.
 | A setting nobody has set is composed like one that is set | Nothing to read is not a value the composer refuses. The embargo periods arrive with no value at all, and they fell to the plain box kept for a duration this cannot say — which is the one control that cannot ask whether a typed 90 means hours, days or weeks. An empty composer opens on days, because a period nobody has set here is an embargo and an embargo is said in days |
 | What a new line inherits is on the inventories screen | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already and how many cover nothing here, and offers the rest as a list to tick. Only two of the four groups are questions, and the screen says which |
 | What was recorded here is a filter | A flaw somebody entered is the only kind a person may close by hand (REQ-19), and the screen that records one is where "is this already filed" gets asked. Offered on the list and linked from the recording screen, with the line off, because the question is what exists rather than what is worth an afternoon |
+| **A setting says what it does in words, under its name** | It said so on the label's hover, which is where clarification goes — and what a setting does is not clarification, it is the whole of what the control is. Three of them rewrite what the tool reports without anything being scanned. Not on the control itself: a password manager classifies a field by the words it can reach through it |
+
+## The administration screens
+
+Who may sign in, what they hold, and the credentials that carry it.
+
+| Rule | |
+|---|---|
+| **Every field that ages is shown**, not only the ones that identify | A credential review asks how old something is, when it stops working and when it was last used. The table showed the last of those alone, so "never used and two years old" and "never used and made this morning" drew identically |
+| A pipeline key says it never expires | It has no expiry, and a blank column reads as one nobody has set. A credential that never runs out is the one nobody revokes |
+| **Who has left is on the list** | The date was on each person's own screen, so "who still has access" was a question somebody answered by opening every row |
+| The list narrows to who holds what | "Who approves on this product" is what an access review asks. A grant out of force does not match, because what somebody holds is a statement about now |
+| A person's name and their address are recorded here | Both are on the record and neither could be typed: the whole mail path could never reach anybody created through the interface, and what the person was told when they went looking was that an administrator has to record one |
+| An address stated empty clears it; an address left out is left alone | Coming off mail is not coming off the tool, and a screen that cannot tell the two apart makes one of them unreachable |
+| The two things held over the deployment are checkboxes beside the grid, not roles in it | A role is held against a product and neither of these is. What each grants is written beside it, because one of them is a reader who changes nothing and that is not what "administrator" reads as |
 
 ## Showing the ordering signals
 

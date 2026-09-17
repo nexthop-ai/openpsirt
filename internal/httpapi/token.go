@@ -31,8 +31,11 @@ type TokenBody struct {
 	// there is no way to ask for one that never expires.
 	Lifetime string `json:"lifetime,omitempty" doc:"How long it lasts, such as \"720h\". There is a configured maximum"`
 	// Secret is returned at creation and never again.
-	Secret     string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
-	Owner      string `json:"owner,omitempty" doc:"Whose it is. Shown to an administrator listing everybody's"`
+	Secret string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
+	Owner  string `json:"owner,omitempty" doc:"Whose it is. Shown to an administrator listing everybody's"`
+	// CreatedAt is when it was minted, beside when it stops working. Both
+	// age, and a review of what is outstanding asks about each.
+	CreatedAt  string `json:"created_at,omitempty" doc:"When it was minted"`
 	ExpiresAt  string `json:"expires_at,omitempty" doc:"When it stops working"`
 	LastUsedAt string `json:"last_used_at,omitempty" doc:"When it was last used"`
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
@@ -254,6 +257,7 @@ func tokenList(ctx context.Context, names *catalog.Store, tokens []access.Token,
 	for _, token := range tokens {
 		body := TokenBody{
 			Name: token.Name, ExpiresAt: stamp(token.ExpiresAt),
+			CreatedAt: stamp(token.CreatedAt),
 			Withdrawn: token.RevokedAt != nil, Owner: owners[token.PersonID],
 		}
 		if token.LastUsedAt != nil {

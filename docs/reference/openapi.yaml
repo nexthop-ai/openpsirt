@@ -3609,6 +3609,9 @@ components:
           format: uri
           readOnly: true
           type: string
+        created_at:
+          description: When it was issued. A pipeline key does not expire, so this is the only thing that dates it
+          type: string
         last_used_at:
           description: When it last sent something
           type: string
@@ -5509,6 +5512,9 @@ components:
         audits:
           description: Whether they may read this deployment's own records. It grants no product's findings or decisions
           type: boolean
+        deactivated_at:
+          description: When they left. Absent means they may still sign in
+          type: string
         display_name:
           description: What to show instead of the identity
           type: string
@@ -7854,6 +7860,9 @@ components:
             - https://example.com/schemas/TokenBody.json
           format: uri
           readOnly: true
+          type: string
+        created_at:
+          description: When it was minted
           type: string
         expires_at:
           description: When it stops working
@@ -12044,8 +12053,32 @@ paths:
 
         Nobody appears here by having authenticated. Access is granted in advance, so this list is what an administrator has decided rather than who has turned up.
 
+        **`product` and `role` narrow it to who holds what.** "Who approves on this product" is the question an access review asks, and reading it off a list of everybody is reading the grid sideways. A grant that is not in force does not match: what somebody holds is a statement about now.
+
         **Requires:** administrator, or the audit permission over this deployment's own records
       operationId: list-people
+      parameters:
+        - description: Keep only people holding something on this product, by the name that addresses it
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Keep only people holding something on this product, by the name that addresses it
+            type: string
+        - description: Keep only people holding this role
+          explode: false
+          in: query
+          name: role
+          schema:
+            description: Keep only people holding this role
+            enum:
+              - approver
+              - assigner
+              - public-read
+              - private-read
+              - public-triage
+              - private-triage
+            type: string
       responses:
         "200":
           content:

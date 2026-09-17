@@ -294,15 +294,25 @@ function Field({
 
   return (
     <div className="field" style={{ margin: 0, maxWidth: takes || sizes ? 320 : 240 }}>
-      {/* The sentence sits on the label rather than on the control. A
-          password manager classifies a field by the words it can reach
-          through it, and what a setting means is prose about sign-ins,
-          accounts and dates — which is how three of these came to be offered
-          a saved login despite saying they were not credentials. */}
-      <label htmlFor={setting.name} title={setting.means}>
+      <label htmlFor={setting.name}>
         {label(setting.name)}
         {setting.default && <span className="hint"> · default</span>}
       </label>
+      {/* What the setting does, in words, under the name of it. It sat on the
+          label's hover, which is where clarification goes — and what a
+          setting does is not clarification, it is the whole of what the
+          control is. Three of these rewrite what the tool reports without
+          anything being scanned, and a reader had to hover to find out which.
+
+          Not on the control itself: a password manager classifies a field by
+          the words it can reach through it, and this is prose about sign-ins,
+          accounts and dates — which is how three of them came to be offered a
+          saved login despite saying they were not credentials. */}
+      {setting.means && (
+        <span className="hint" style={{ margin: "0 0 4px" }}>
+          {setting.means}
+        </span>
+      )}
       <div style={{ display: "flex", gap: 6 }}>
         {words ? (
           <select

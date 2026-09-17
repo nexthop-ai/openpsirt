@@ -10,6 +10,7 @@ import { Failed } from "../ui/Failed";
 import { called, ROLES, type Role } from "../ui/roles";
 import { Access } from "./Access";
 import { Wide } from "../ui/Wide";
+import { on } from "../ui/when";
 import type { Who } from "../app/session";
 
 // Users and roles: who can see what, and who can decide about it.
@@ -25,10 +26,37 @@ export function People({ who: me }: { who: Who }) {
   // two of them stacked is a screen nobody can read a row out of.
   const [openFor, setOpenFor] = useState("");
   const [identity, setIdentity] = useState("");
+  // What to show instead of the identity, and where to reach them outside the
+  // application. Both are on the record and neither could be typed here: the
+  // whole mail path could never deliver to anybody recorded through this
+  // screen, and "an administrator has to record one" is what the person was
+  // told when they went looking.
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+
+  // Who holds what, narrowed. "Who approves on this product" is what an
+  // access review asks, and reading it off a list of everybody is reading the
+  // grid sideways — so the narrowing is a control rather than a scan.
+  const [onProduct, setOnProduct] = useState("");
+  const [withRole, setWithRole] = useState("");
 
   const people = useQuery({
-    queryKey: ["people"],
-    queryFn: async () => unwrap(await api.GET("/v1/people", {})),
+    queryKey: ["people", onProduct, withRole],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/people", {
+          params: {
+            query: {
+              ...(onProduct ? { product: onProduct } : {}),
+              ...(withRole ? { role: withRole as Role } : {}),
+            },
+          },
+        }),
+      ),
+  });
+  const products = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
   });
   const mode = useQuery({
     queryKey: ["role-mode"],
@@ -40,13 +68,38 @@ export function People({ who: me }: { who: Who }) {
   });
 
   const record = useMutation({
-    mutationFn: async (body: { identity: string }) =>
+    mutationFn: async (body: { identity: string; display_name?: string; email?: string }) =>
       unwrap(await api.POST("/v1/people", { body })),
     onSuccess: () => {
       setIdentity("");
+      setDisplayName("");
+      setEmail("");
       setAdding(false);
       void queries.invalidateQueries({ queryKey: ["people"] });
     },
+  });
+
+  // What to show instead of the identity, for somebody already recorded. An
+  // identity is what a provider hands over and a name is what people read, so
+  // a deployment where every row is an address is one nobody scans.
+  const rename = useMutation({
+    mutationFn: async (who: { identity: string; name: string }) =>
+      unwrap(
+        await api.POST("/v1/people", {
+          body: { identity: who.identity, display_name: who.name },
+        }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+  });
+
+  // Where to reach somebody already recorded. Sent on its own so that an
+  // address cleared here is cleared rather than left alone: the endpoint
+  // distinguishes an empty address from an absent field, and the difference is
+  // coming off mail without coming off the tool.
+  const reach = useMutation({
+    mutationFn: async (who: { identity: string; email: string }) =>
+      unwrap(await api.POST("/v1/people", { body: { identity: who.identity, email: who.email } })),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
   });
 
   const grant = useMutation({
@@ -144,6 +197,43 @@ export function People({ who: me }: { who: Who }) {
         {me.admin && <AddButton label="Add user" onClick={() => setAdding(true)} />}
       </div>
 
+      <div className="controls noprint">
+        <label>
+          On{" "}
+          <select value={onProduct} onChange={(event) => setOnProduct(event.target.value)}>
+            <option value="">any product</option>
+            {(products.data?.items ?? []).map((product) => (
+              <option key={product.name} value={product.name ?? ""}>
+                {product.display_name || product.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Holding{" "}
+          <select value={withRole} onChange={(event) => setWithRole(event.target.value)}>
+            <option value="">any role</option>
+            {ROLES.map((each) => (
+              <option key={each.role} value={each.role}>
+                {called(each.role)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {(onProduct !== "" || withRole !== "") && (
+          <button
+            type="button"
+            className="btn quiet"
+            onClick={() => {
+              setOnProduct("");
+              setWithRole("");
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       {grant.error != null && <Failed error={grant.error} what="That role could not be granted." />}
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That role could not be withdrawn." />
@@ -151,9 +241,19 @@ export function People({ who: me }: { who: Who }) {
       {endSessions.error != null && (
         <Failed error={endSessions.error} what="Their sessions could not be ended." />
       )}
+      {reach.error != null && (
+        <Failed error={reach.error} what="Where to reach them could not be recorded." />
+      )}
 
       {rows.length === 0 ? (
-        <Empty title="Nobody is recorded yet." detail="Add somebody to give them a way in." />
+        onProduct !== "" || withRole !== "" ? (
+          <Empty
+            title="Nobody holds that."
+            detail="Nobody in force holds this role here. A grant a change of mode set aside is not one somebody holds."
+          />
+        ) : (
+          <Empty title="Nobody is recorded yet." detail="Add somebody to give them a way in." />
+        )
       ) : (
         <Wide>
           <table>
@@ -161,6 +261,7 @@ export function People({ who: me }: { who: Who }) {
               <tr>
                 <th>User</th>
                 <th>Identity</th>
+                <th>Email</th>
                 <th>Roles</th>
                 <th style={{ width: 150 }}>Access</th>
                 <th />
@@ -195,6 +296,17 @@ export function People({ who: me }: { who: Who }) {
                           </span>
                         </>
                       )}
+                      {/* Who still has access is a question about the list.
+                          The date was on the person's own screen alone, so
+                          answering it meant opening every row. */}
+                      {person.deactivated_at && (
+                        <>
+                          {" "}
+                          <span className="state closed" title={person.deactivated_at}>
+                            left {on(person.deactivated_at)}
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td>
                       {(person.signs_in_by ?? []).length === 0 ? (
@@ -206,6 +318,15 @@ export function People({ who: me }: { who: Who }) {
                           </div>
                         ))
                       )}
+                    </td>
+                    <td>
+                      <Reachable
+                        person={person}
+                        busy={reach.isPending}
+                        onSet={(address) =>
+                          reach.mutate({ identity: person.identity ?? "", email: address })
+                        }
+                      />
                     </td>
                     <td>
                       {(person.holds ?? []).length === 0 ? (
@@ -311,7 +432,20 @@ export function People({ who: me }: { who: Who }) {
                   </tr>
                   {openFor === person.identity && (
                     <tr>
-                      <td colSpan={5}>
+                      <td colSpan={6}>
+                        <p className="hint" style={{ margin: "2px 0 8px" }}>
+                          Name{" "}
+                          <Named
+                            person={person}
+                            busy={rename.isPending}
+                            onSet={(name) =>
+                              rename.mutate({ identity: person.identity ?? "", name })
+                            }
+                          />
+                        </p>
+                        {rename.error != null && (
+                          <Failed error={rename.error} what="That name could not be recorded." />
+                        )}
                         <label
                           className="hint"
                           style={{
@@ -460,7 +594,13 @@ export function People({ who: me }: { who: Who }) {
         title="Add user"
         open={adding}
         onClose={() => setAdding(false)}
-        onSubmit={() => record.mutate({ identity: identity.trim() })}
+        onSubmit={() =>
+          record.mutate({
+            identity: identity.trim(),
+            ...(displayName.trim() ? { display_name: displayName.trim() } : {}),
+            ...(email.trim() ? { email: email.trim() } : {}),
+          })
+        }
         error={record.error}
         busy={identity.trim() === "" || record.isPending}
         ok="Add user"
@@ -472,6 +612,20 @@ export function People({ who: me }: { who: Who }) {
           onChange={setIdentity}
           placeholder="ashwin@example.com"
           hint="Exactly as your provider gives it. Capitals matter."
+        />
+        <Field
+          label="Name"
+          value={displayName}
+          onChange={setDisplayName}
+          placeholder="Ashwin Rao"
+          hint="Shown instead of the identity. Optional."
+        />
+        <Field
+          label="Email"
+          value={email}
+          onChange={setEmail}
+          placeholder="ashwin@example.com"
+          hint="Where they are reached outside the application. Without one they get the notifications inside it and no mail. A provider that verifies an address fills this in where nobody has."
         />
       </Declare>
     </>
@@ -574,6 +728,8 @@ function Credentials() {
                 <th>Name</th>
                 <th>Kind</th>
                 <th>Scope</th>
+                <th>Made</th>
+                <th>Expires</th>
                 <th>Last used</th>
                 <th />
               </tr>
@@ -596,6 +752,14 @@ function Credentials() {
                       · {key.stream ? key.stream : "any branch"},{" "}
                       {key.variant ? key.variant : "any variant"}
                     </span>
+                  </td>
+                  <td className="hint">{on(key.created_at) || "—"}</td>
+                  {/* A pipeline key has no expiry to show. Saying so is the
+                      point: a credential that never runs out is one nobody
+                      revokes, and those are found when somebody leaves and
+                      nobody knows what breaks if it is turned off. */}
+                  <td className="hint" title="A pipeline key does not expire">
+                    never
                   </td>
                   <td className="hint">{key.last_used_at || "never"}</td>
                   <td>
@@ -632,6 +796,8 @@ function Credentials() {
                       </span>
                     )}
                   </td>
+                  <td className="hint">{on(token.created_at) || "—"}</td>
+                  <td className="hint">{on(token.expires_at) || "—"}</td>
                   <td className="hint">{token.last_used_at || "never"}</td>
                   <td>
                     {token.withdrawn ? (
@@ -728,5 +894,145 @@ function Credentials() {
         />
       </Declare>
     </div>
+  );
+}
+
+// What to show instead of somebody's identity, and the control that records
+// it. Cleared by saving it empty, which is what leaves the identity showing.
+function Named({
+  person,
+  busy,
+  onSet,
+}: {
+  person: { display_name?: string };
+  busy: boolean;
+  onSet: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(person.display_name ?? "");
+
+  if (!editing) {
+    return (
+      <>
+        {person.display_name ? (
+          person.display_name
+        ) : (
+          <span style={{ color: "var(--faint)" }} title="The identity is shown instead">
+            none
+          </span>
+        )}{" "}
+        <button
+          type="button"
+          className="linkish noprint"
+          onClick={() => {
+            setDraft(person.display_name ?? "");
+            setEditing(true);
+          }}
+        >
+          {person.display_name ? "Change" : "Add"}
+        </button>
+      </>
+    );
+  }
+  return (
+    <span className="controls">
+      <input
+        type="text"
+        value={draft}
+        placeholder="Ashwin Rao"
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <button
+        type="button"
+        className="btn"
+        disabled={busy}
+        onClick={() => {
+          onSet(draft.trim());
+          setEditing(false);
+        }}
+      >
+        Save
+      </button>
+      <button type="button" className="btn quiet" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+    </span>
+  );
+}
+
+// Where somebody is reached outside the application, and the control that
+// records it.
+//
+// An address is optional and the two states either side of it are different
+// acts: nobody having said, and somebody having cleared it. The source is
+// shown because a provider's may be replaced by a later sign-in and one
+// recorded here never is — which is the difference between an address that
+// holds and one that drifts back.
+function Reachable({
+  person,
+  busy,
+  onSet,
+}: {
+  person: { email?: string; email_source?: string };
+  busy: boolean;
+  onSet: (email: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(person.email ?? "");
+
+  if (!editing) {
+    return (
+      <>
+        {person.email ? (
+          <span className="id">{person.email}</span>
+        ) : (
+          <span style={{ color: "var(--faint)" }} title="They get no mail from this deployment">
+            none
+          </span>
+        )}
+        {person.email_source === "provider" && (
+          <>
+            {" "}
+            <span className="hint" title="A later sign-in may replace it">
+              from the provider
+            </span>
+          </>
+        )}{" "}
+        <button
+          type="button"
+          className="linkish noprint"
+          onClick={() => {
+            setDraft(person.email ?? "");
+            setEditing(true);
+          }}
+        >
+          {person.email ? "Change" : "Add"}
+        </button>
+      </>
+    );
+  }
+  return (
+    <span className="controls">
+      <input
+        type="email"
+        value={draft}
+        placeholder="ashwin@example.com"
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <button
+        type="button"
+        className="btn"
+        disabled={busy}
+        onClick={() => {
+          onSet(draft.trim());
+          setEditing(false);
+        }}
+      >
+        Save
+      </button>
+      <button type="button" className="btn quiet" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+    </span>
   );
 }

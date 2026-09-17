@@ -36,7 +36,10 @@ func registerKeys(api huma.API, a Administering) {
 		out := &listOutput[KeyBody]{}
 		out.Body.Items = make([]KeyBody, 0, len(keys))
 		for _, key := range keys {
-			body := KeyBody{Name: key.Name, Withdrawn: key.RevokedAt != nil}
+			body := KeyBody{
+				Name: key.Name, Withdrawn: key.RevokedAt != nil,
+				CreatedAt: key.CreatedAt.UTC().Format(timeFormat),
+			}
 			// The address, because create-key resolves this field through
 			// ProductByName — and the Stream and Variant fields beside it
 			// already answer the address. A listing that cannot be used to

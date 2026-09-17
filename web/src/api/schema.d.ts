@@ -1349,6 +1349,8 @@ export interface paths {
          *
          *     Nobody appears here by having authenticated. Access is granted in advance, so this list is what an administrator has decided rather than who has turned up.
          *
+         *     **`product` and `role` narrow it to who holds what.** "Who approves on this product" is the question an access review asks, and reading it off a list of everybody is reading the grid sideways. A grant that is not in force does not match: what somebody holds is a statement about now.
+         *
          *     **Requires:** administrator, or the audit permission over this deployment's own records
          */
         get: operations["list-people"];
@@ -6446,6 +6448,8 @@ export interface components {
              * @example https://example.com/schemas/KeyBody.json
              */
             readonly $schema?: string;
+            /** @description When it was issued. A pipeline key does not expire, so this is the only thing that dates it */
+            created_at?: string;
             /** @description When it last sent something */
             last_used_at?: string;
             /** @description What this credential is for */
@@ -7461,6 +7465,8 @@ export interface components {
             admin?: boolean;
             /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
             audits?: boolean;
+            /** @description When they left. Absent means they may still sign in */
+            deactivated_at?: string;
             /** @description What to show instead of the identity */
             display_name?: string;
             /** @description Where they are reached outside the application */
@@ -8846,6 +8852,8 @@ export interface components {
              * @example https://example.com/schemas/TokenBody.json
              */
             readonly $schema?: string;
+            /** @description When it was minted */
+            created_at?: string;
             /** @description When it stops working */
             expires_at?: string;
             /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none */
@@ -11215,7 +11223,12 @@ export interface operations {
     };
     "list-people": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Keep only people holding something on this product, by the name that addresses it */
+                product?: string;
+                /** @description Keep only people holding this role */
+                role?: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage";
+            };
             header?: never;
             path?: never;
             cookie?: never;

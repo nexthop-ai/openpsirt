@@ -41,8 +41,8 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	}
 	body := &PersonBody{
 		Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
-		Audits: person.Audits,
-		Email:  person.Email, EmailSource: string(person.EmailSource),
+		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
+		Email: person.Email, EmailSource: string(person.EmailSource),
 	}
 	for _, door := range doors {
 		body.SignsInBy = append(body.SignsInBy, SignInBody{
@@ -129,6 +129,14 @@ type PersonBody struct {
 	// Audits is the read-only half: this deployment's own records, and no
 	// product's findings or decisions.
 	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
+	// DeactivatedAt is when they stopped being somebody who may sign in.
+	// Absent is the ordinary state, and it is never a deletion: they are
+	// still named by every judgment they proposed.
+	//
+	// On the list as well as on the person, because "who still has access"
+	// is a question about the list — and a list that answers it only one row
+	// at a time is one nobody asks it of.
+	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"When they left. Absent means they may still sign in"`
 	// How somebody signs in is SignsInBy below, which carries the username
 	// and whether the provider's own identifier has been pinned to it. Two
 	// fields here said the same thing, were documented as though a request
@@ -272,7 +280,15 @@ type KeyBody struct {
 	Stream  string `json:"stream,omitempty" doc:"Optionally, the one release it may send for"`
 	Variant string `json:"variant,omitempty" doc:"Optionally, the one variant it may send for"`
 	// Secret is returned when the credential is created, and never again.
-	Secret     string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
+	Secret string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
+	// CreatedAt is when it was issued. A credential's age is half of what
+	// somebody reviewing them is looking at — the other half is when it was
+	// last used, and "never used and two years old" reads very differently
+	// from "never used and made this morning".
+	//
+	// A pipeline key does not expire, which is why the date it was made is
+	// the only thing that bounds it.
+	CreatedAt  string `json:"created_at,omitempty" doc:"When it was issued. A pipeline key does not expire, so this is the only thing that dates it"`
 	LastUsedAt string `json:"last_used_at,omitempty" doc:"When it last sent something"`
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
 }
@@ -291,12 +307,33 @@ func registerAdministration(api huma.API, a Administering) {
 		Description: "Lists everybody who may sign in, with the roles each of them holds and " +
 			"the products those apply to.\n\n" +
 			"Nobody appears here by having authenticated. Access is granted in advance, so this " +
-			"list is what an administrator has decided rather than who has turned up.",
+			"list is what an administrator has decided rather than who has turned up.\n\n" +
+			"**`product` and `role` narrow it to who holds what.** \"Who approves on this " +
+			"product\" is the question an access review asks, and reading it off a list of " +
+			"everybody is reading the grid sideways. A grant that is not in force does not " +
+			"match: what somebody holds is a statement about now.",
 		Tags: []string{"Administration"},
-	}, deploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*listOutput[PersonBody], error) {
-		store, _, err := readable(ctx, a, a.handle())
+	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
+		Product string `query:"product" doc:"Keep only people holding something on this product, by the name that addresses it"`
+		Role    string `query:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"Keep only people holding this role"`
+	}) (*listOutput[PersonBody], error) {
+		store, names, err := readable(ctx, a, a.handle())
 		if err != nil {
 			return nil, err
+		}
+		// Resolved before the list is read, so a product nobody declared is
+		// said rather than answered with an empty list — which reads as
+		// "nobody holds anything there" and is a different fact.
+		var onProduct int64
+		if input.Product != "" {
+			product, err := names.ProductByName(ctx, input.Product)
+			if err != nil {
+				return nil, undeclared(a.Logger, err, "that product could not be looked up")
+			}
+			onProduct = product.ID
+		}
+		if input.Role != "" && !access.Role(input.Role).Valid() {
+			return nil, huma.Error422UnprocessableEntity("that is not a role")
 		}
 		people, held, err := store.People(ctx)
 		if err != nil {
@@ -319,7 +356,7 @@ func registerAdministration(api huma.API, a Administering) {
 		for _, person := range people {
 			body := PersonBody{
 				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
-				Audits: person.Audits,
+				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
 			}
 			doors, err := store.Identities(ctx, person.ID)
 			if err != nil {
@@ -344,6 +381,9 @@ func registerAdministration(api huma.API, a Administering) {
 				})
 			}
 			body.SeesNothing = seesNothing(body.Holds)
+			if !holding(body.Holds, onProduct, named, input.Role) {
+				continue
+			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		return out, nil
@@ -810,6 +850,38 @@ func readable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, 
 		return nil, nil, err
 	}
 	return stores(a, db)
+}
+
+// holding reports whether what somebody holds matches the narrowing asked for.
+//
+// Applied to the bodies rather than in the query, because what is being
+// narrowed is what the list already says: a role held across every product
+// matches a named one, and a grant out of force matches nothing. Both of those
+// are decided above, and asking the database again would be a second rule that
+// can disagree with the first.
+func holding(holds []HeldBody, productID int64, named map[int64]named, role string) bool {
+	if productID == 0 && role == "" {
+		return true
+	}
+	address := named[productID].Address
+	for _, held := range holds {
+		// Not in force is not held. What somebody holds is a statement about
+		// now, and a review asking who approves here must not be handed
+		// somebody whose grant a change of mode set aside.
+		if !held.Effective {
+			continue
+		}
+		if role != "" && held.Role != role {
+			continue
+		}
+		// A role held across every product is held on this one, including
+		// products declared after the grant was made.
+		if productID != 0 && !held.Everywhere && held.Product != address {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // stores builds the pair over db, or says this process has no database.
