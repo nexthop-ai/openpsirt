@@ -62,6 +62,17 @@ export const ORDERS = {
   age: "Age",
 } satisfies Record<SortWord, string>;
 
+// A date this many days back, as the address carries one.
+//
+// Written as the date rather than as "yesterday": every filter lives in the
+// address so that a list is a link somebody can send, and a relative word
+// would mean something different whenever it was opened.
+export function daysBack(days: number, from = new Date()): string {
+  const then = new Date(from);
+  then.setUTCDate(then.getUTCDate() - days);
+  return then.toISOString().slice(0, 10);
+}
+
 // The order the list is in when the address asks for none.
 export const BY_DEFAULT: SortWord = "urgency";
 

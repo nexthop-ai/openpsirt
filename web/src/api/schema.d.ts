@@ -845,6 +845,8 @@ export interface paths {
          *
          *     Every row is undisclosed by definition, so this list is a disclosure in its own right: a product you may not read undisclosed work in contributes nothing to it, not even a count.
          *
+         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length — the screen opened on thirty days against a ninety-day policy and drew nothing while five embargoes were running.
+         *
          *     **Requires:** private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read undisclosed work in contributes nothing, not even a count.
          */
         get: operations["list-approaching-disclosure"];
@@ -10504,7 +10506,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How many days ahead to look */
+                /** @description How many days ahead to look. Left off, this deployment's own embargo length */
                 within?: number;
                 limit?: number;
                 /** @description Where in the list to start */

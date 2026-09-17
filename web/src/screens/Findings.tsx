@@ -28,6 +28,7 @@ import { useWho } from "../app/session";
 import {
   BY_DEFAULT,
   LEAST_FIRST,
+  daysBack,
   ORDERS,
   PAGE,
   PAGES,
@@ -505,6 +506,19 @@ export function Findings() {
             onChange={(chosen) => setMany("state", chosen)}
           />
         </span>
+        {/* What came in overnight, which is the first question of a working
+            day and was a hand-typed date behind a disclosure. The date rather
+            than the word, so a list somebody sends means the same thing when
+            it is opened. */}
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={!!asked.get("opened_after")}
+          title="Findings first seen in the last day"
+          onClick={() => set("opened_after", asked.get("opened_after") ? "" : daysBack(1))}
+        >
+          New today
+        </button>
         {/* Behind a control rather than always on screen: the chips above are
             what somebody uses constantly. What is on is said on the control,
             so a narrowed list never looks like an unnarrowed one. */}

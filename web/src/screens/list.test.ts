@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LEAST_FIRST,
+  daysBack,
   ORDERS,
   SORTS,
   asAsked,
@@ -281,5 +282,19 @@ describe("every order the list offers", () => {
     for (const word of ["severity", "epss", "places", "urgency"] as const) {
       expect(LEAST_FIRST).not.toContain(word);
     }
+  });
+});
+
+describe("a date the address carries", () => {
+  it("is the date rather than the word", () => {
+    // A relative word in an address means something different whenever the
+    // link is opened, and every filter here lives in the address so that a
+    // list can be sent to somebody.
+    expect(daysBack(1, new Date("2026-03-01T09:30:00Z"))).toBe("2026-02-28");
+    expect(daysBack(7, new Date("2026-01-03T00:00:00Z"))).toBe("2025-12-27");
+  });
+
+  it("crosses a leap day like any other", () => {
+    expect(daysBack(1, new Date("2028-03-01T12:00:00Z"))).toBe("2028-02-29");
   });
 });

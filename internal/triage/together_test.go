@@ -1,6 +1,9 @@
 package triage_test
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -59,6 +62,46 @@ func TestABulkClaimRecordsTheRatingInForceAsItsBaseline(t *testing.T) {
 		if written.SeverityAtApproval() != want {
 			t.Errorf("the baseline reads as %d, want %d — the rating in force here, "+
 				"not the published score", written.SeverityAtApproval(), want)
+		}
+	})
+}
+
+func TestABulkClaimNamesTheDecisionThatBlockedIt(t *testing.T) {
+	// One live claim per combination of code holds here as it does anywhere,
+	// so a selection covering something already decided is refused whole. What
+	// it used to say was "something in this selection is already decided",
+	// which tells somebody holding five hundred rows nothing they can act on —
+	// while the single-finding path named the decision to go and revise. One
+	// spelling, and it names which.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		in := f.build(t, f.product, "2026.03")
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		f.finds(t, in, libfoo, "place-of-libfoo", access.Public)
+
+		at := triage.TogetherAt{
+			TargetID: in.target, ComponentID: libfoo, VulnerabilityIDs: []int64{f.issue},
+		}
+		claim := triage.Proposal{
+			Outcome: triage.NotApplicable, Justification: triage.CodeNotInExecutePath,
+			Reasoning: "The parser is never reached: we only call the encoder.",
+			By:        f.proposer, NeedsApproval: true,
+		}
+		_, recorded, err := f.store.Together(ctx, f.triager, at, claim, triage.DefaultTogetherCap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(recorded) != 1 {
+			t.Fatalf("%d decisions recorded, want the one place", len(recorded))
+		}
+
+		// The same selection again, which now collides with what it wrote.
+		_, _, err = f.store.Together(ctx, f.triager, at, claim, triage.DefaultTogetherCap)
+		if !errors.Is(err, triage.ErrAlreadyDecided) {
+			t.Fatalf("a second claim was recorded over the first: %v", err)
+		}
+		if !strings.Contains(err.Error(), fmt.Sprint(recorded[0])) {
+			t.Errorf("the refusal does not name the decision that stands: %v", err)
 		}
 	})
 }
