@@ -769,6 +769,7 @@ written, and only then is anything sent.
 
 | Rule | |
 |---|---|
+| **A build is one entry, however many places reach it** | A judgment is about a group of places, and a build the claim already reaches is one thing to be told about. Answered per place, a kernel flaw at sixty places listed the same other build sixty times, once per consumer that pulls the package in — so what the sheet led with was a count of this build's own graph rather than of builds the judgment travels to. A build at *another* version is one entry per version, because each version is a separate judgment |
 | The decision here is recorded first, then each build applied, one at a time | With the places narrowed where any were excluded. A refusal on one is reported for that one and does not decide the rest |
 | The reach is answered whole rather than sampled | Where a judgment lands beyond this build is a question per place, and asking per place is a request each — so it asked about the first eight. That was a cost control that had become a rule about what a decision covers: what is offered is what gets written, so a build reachable only from the ninth place was never offered and nothing said so |
 | The review step is skipped where there is nothing to review | It ran even when the reach it exists to confirm is zero, and at around 150 decisions a day that is some 300 keystrokes spent confirming nothing |

@@ -12,10 +12,14 @@ import { Review, type Other, type Plan } from "./Review";
 import { useWho } from "../app/session";
 import { DECIDE_KEPT, keepAnswer, restoreAnswer } from "../app/drafts";
 
-// One judgment about this finding: the decision form the finding screen
-// carries. Outcome, the justification where it does not apply, a date where it
-// is deferred, the reasoning, which places it covers, and — on submit — a
-// guided review of where it applies beyond this build.
+// One judgment about this finding. Outcome, the justification where it does
+// not apply, a date where it is deferred, the reasoning, which places it
+// covers, and — on submit — a guided review of where it applies beyond this
+// build.
+//
+// The finding screen carries it and so does a row opened in the findings list,
+// which is the same form in both: what a claim requires and what it writes do
+// not change with where it is typed.
 
 export type At = {
   product: string;
