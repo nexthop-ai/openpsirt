@@ -81,9 +81,6 @@ type Administering struct {
 	Access  func(bun.IDB) *access.Store
 	Catalog func(bun.IDB) *catalog.Store
 	Logger  *slog.Logger
-	// Mode says where roles come from, read per request because an
-	// administrator can change it without a restart.
-	Mode func(context.Context) access.Mode
 	// Findings is what withdrawing somebody's last role on a product
 	// needs: their work there goes back to the unassigned list rather than
 	// staying where nobody can reach it. Nil where this process has no
@@ -422,28 +419,6 @@ func registerAdministration(api huma.API, a Administering) {
 		// knows that — computed here from a read taken before the write, two
 		// requests at once would have the second write back the value it saw
 		// before the first.
-		// An authorization is matched by name until somebody redeems it, so
-		// it carries the window in force when it was written.
-		window := access.DefaultClaimWindow
-		if a.Settings != nil {
-			if settings := a.Settings(a.handle()); settings != nil {
-				window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
-				if err != nil {
-					return nil, wentWrong(a.Logger, "cannot read how long an authorization stays redeemable", err)
-				}
-			}
-		}
-
-		// Where roles come from, read before the transaction opens and carried
-		// into it. The closure below holds the connection it writes through,
-		// and SQLite lends one, so a read taken through the root handle from
-		// inside it waits for a connection the transaction cannot release
-		// until the read returns.
-		deriving := access.Direct
-		if a.Mode != nil {
-			deriving = a.Mode(ctx)
-		}
-
 		// Recording somebody, how they may be reached and what they hold is
 		// one act. Written as a statement each, a product name nobody has
 		// declared answered 422 with the person recorded and the roles named
@@ -456,6 +431,36 @@ func registerAdministration(api huma.API, a Administering) {
 			db bun.IDB) error {
 
 			names := catalog.NewStore(db)
+
+			// Where roles come from, and how long an authorization stays
+			// redeemable, read inside the act that decides from them (REQ-71).
+			//
+			// Read before it opened, a mode switch landing between the two let
+			// an assignment be written into a deployment where nothing derives
+			// one — and nothing re-derives an assignment, so the grant would
+			// outlive every group change without a group ever having been
+			// behind it.
+			//
+			// Through the transaction's own handle, which is what the comment
+			// that stood here had wrong: the stall it described came from
+			// reading through the *root* handle while the closure held
+			// SQLite's one connection, not from reading inside the
+			// transaction at all. Unbinding a group already reads the mode
+			// exactly this way.
+			deriving, err := roleModeIn(a.Settings)(ctx, db)
+			if err != nil {
+				return wentWrong(a.Logger, "cannot read where roles come from", err)
+			}
+			window := access.DefaultClaimWindow
+			if a.Settings != nil {
+				if settings := a.Settings(db); settings != nil {
+					window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
+					if err != nil {
+						return wentWrong(a.Logger,
+							"cannot read how long an authorization stays redeemable", err)
+					}
+				}
+			}
 
 			// Nobody recorded under that name, and a read that failed, are
 			// different answers. Told apart by the sentinel rather than by
@@ -476,7 +481,6 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			recorded = before == nil
 
-			var err error
 			if person, err = store.Ensure(ctx, in.Body.Identity, in.Body.DisplayName,
 				in.Body.Admin, in.Body.Audits); err != nil {
 				return huma.Error400BadRequest(err.Error())
@@ -538,21 +542,21 @@ func registerAdministration(api huma.API, a Administering) {
 				}
 			}
 
-			switch {
-			case before == nil:
+			if before == nil {
 				if err := noted(ctx, db, trail.Account, in.Body.Identity, nil,
 					trail.Said("recorded", true)); err != nil {
 					return notRecorded(a.Logger, err)
 				}
-			case in.Body.Admin != nil && before.IsAdmin != *in.Body.Admin:
-				// Administration is global and is the widest thing anybody
-				// here holds, so a change to it is recorded with what it
-				// changed from (REQ-22). Only where it actually moved:
-				// recording somebody again to add a role would otherwise write
-				// a line saying nothing changed.
+			}
+			// The two things held over the deployment, each recorded where it
+			// moved and with what it moved from (REQ-22).
+			for _, held := range moved(before, in.Body) {
+				if held.asked == nil || held.was == *held.asked {
+					continue
+				}
 				if err := noted(ctx, db, trail.Account, in.Body.Identity,
-					trail.Said("administrator", before.IsAdmin),
-					trail.Said("administrator", *in.Body.Admin)); err != nil {
+					trail.Said(held.what, held.was),
+					trail.Said(held.what, *held.asked)); err != nil {
 					return notRecorded(a.Logger, err)
 				}
 			}
@@ -814,11 +818,6 @@ func registerAdministration(api huma.API, a Administering) {
 	})
 }
 
-// noting holds a trail row back until the transaction that earned it commits.
-//
-// A grant recorded inside the transaction would describe access a later
-// refusal rolled back, and the trail is append-only: a line saying somebody was
-// granted something nobody granted cannot be taken out again.
 // timeFormat is how a moment is reported.
 const timeFormat = "2006-01-02T15:04:05Z"
 
@@ -856,6 +855,35 @@ func readable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, 
 		return nil, nil, err
 	}
 	return stores(a, db)
+}
+
+// held is one thing somebody holds over the deployment: what it is called in
+// the record, what it was, and what the request asks it to become.
+type held struct {
+	what  string
+	was   bool
+	asked *bool
+}
+
+// moved is the two of those, for a person who was already recorded.
+//
+// **Both, rather than whichever matched first.** Written as arms of one switch
+// beside "this person is new", a request granting both recorded one of them —
+// and the audit permission, which is the one grant that opens the change log,
+// was the arm that never ran at all, so the permission to read the record was
+// the change the record did not hold.
+//
+// Nothing for somebody who has just been recorded: their creation is the row,
+// and a second line saying a brand-new account went from holding nothing is a
+// line about no change.
+func moved(before *access.Account, asked RecordBody) []held {
+	if before == nil {
+		return nil
+	}
+	return []held{
+		{"administrator", before.IsAdmin, asked.Admin},
+		{"auditor", before.Audits, asked.Audits},
+	}
 }
 
 // holding reports whether what somebody holds matches the narrowing asked for.

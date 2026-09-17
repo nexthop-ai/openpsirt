@@ -157,14 +157,23 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 			})
 		}
 
-		record, err := triage.NewStore(in.DB.DB).RecordOf(ctx, subject, person.ID)
-		if err != nil {
-			return nil, refused(a.Logger, err, "cannot read their part in the record")
-		}
-		body.Record = PersonRecordBody{
-			Proposed: record.Proposed, Approved: record.Approved, Withdrawn: record.Withdrawn,
-			LastProposedAt: orAbsent(record.LastProposedAt),
-			LastApprovedAt: orAbsent(record.LastApprovedAt),
+		// What they did to the triage record, which is counted over every
+		// product without narrowing — a concentration signal computed over
+		// the products the reader happens to hold is not the signal. So it is
+		// an administrator's, and the page leaves the block out for an auditor
+		// rather than refusing: the grant that reads this deployment's records
+		// is declared to reach no product's decisions, and this is a count
+		// over all of them.
+		if subject.Admin {
+			record, err := triage.NewStore(in.DB.DB).RecordOf(ctx, subject, person.ID)
+			if err != nil {
+				return nil, refused(a.Logger, err, "cannot read their part in the record")
+			}
+			body.Record = PersonRecordBody{
+				Proposed: record.Proposed, Approved: record.Approved, Withdrawn: record.Withdrawn,
+				LastProposedAt: orAbsent(record.LastProposedAt),
+				LastApprovedAt: orAbsent(record.LastApprovedAt),
+			}
 		}
 
 		told, toldTotal, err := notify.NewStore(in.DB.DB).ToldTo(ctx, subject, person.ID, input.Limit, 0)

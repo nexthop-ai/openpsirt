@@ -9,6 +9,8 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -95,6 +97,11 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			if !subject.Reads(access.Private, product) {
 				return nil, noSuchFinding()
 			}
+			named, issued, err := namedCase(ctx, in, product, issue)
+			if err != nil {
+				return nil, err
+			}
+			about := named + " · " + issued
 			var person *access.Account
 			if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				rights := access.NewStore(tx)
@@ -105,9 +112,12 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				if err := rights.AddToCase(ctx, product, issue, person.ID, subject.ID); err != nil {
 					return wentWrong(in.Logger, "they could not be brought in", err)
 				}
-				return noted(ctx, tx, trail.Case,
-					input.Product+" · "+input.Vulnerability+" · "+person.Identity,
-					nil, trail.Said("a collaborator", true))
+				if err := noted(ctx, tx, trail.Case,
+					about+" · "+person.Identity,
+					nil, trail.Said("a collaborator", true)); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+				return nil
 			}); err != nil {
 				return nil, err
 			}
@@ -155,6 +165,11 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			if !subject.Reads(access.Private, product) {
 				return nil, noSuchFinding()
 			}
+			named, issued, err := namedCase(ctx, in, product, issue)
+			if err != nil {
+				return nil, err
+			}
+			about := named + " · " + issued
 			if err := changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				rights := access.NewStore(tx)
 				person, err := rights.ByIdentity(ctx, input.Identity)
@@ -164,9 +179,12 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 				if err := rights.RemoveFromCase(ctx, product, issue, person.ID, subject.ID); err != nil {
 					return wentWrong(in.Logger, "they could not be taken off", err)
 				}
-				return noted(ctx, tx, trail.Case,
-					input.Product+" · "+input.Vulnerability+" · "+person.Identity,
-					trail.Said("a collaborator", true), nil)
+				if err := noted(ctx, tx, trail.Case,
+					about+" · "+person.Identity,
+					trail.Said("a collaborator", true), nil); err != nil {
+					return notRecorded(a.Logger, err)
+				}
+				return nil
 			}); err != nil {
 				return nil, err
 			}
@@ -239,6 +257,27 @@ func caseAt(ctx context.Context, in Ingest, product, vulnerability string) (
 	access.Subject, *access.Store, int64, int64, error) {
 
 	return caseAtHolding(ctx, in, product, vulnerability, false)
+}
+
+// namedCase is what a case is about, as the record writes it: the names the two
+// identifiers resolve to rather than the ones the caller typed.
+//
+// **What is typed is not bounded and what is stored is.** A path segment
+// carries no length on any route here, and an issue is looked up through a
+// normalization that keeps the first 191 runes — so a seven-hundred-character
+// name whose head is a real identifier resolves, and composing the record from
+// it writes seven hundred characters into a column sized for three names. The
+// row it resolved to is the thing the record is about anyway.
+func namedCase(ctx context.Context, in Ingest, productID, issueID int64) (string, string, error) {
+	product, err := catalog.NewStore(in.DB.DB).ProductByID(ctx, productID)
+	if err != nil {
+		return "", "", wentWrong(in.Logger, "that product could not be looked up", err)
+	}
+	issues, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, []int64{issueID})
+	if err != nil {
+		return "", "", wentWrong(in.Logger, "that issue could not be looked up", err)
+	}
+	return product.Name, issues[issueID], nil
 }
 
 // caseAtTriaging is the same, for the routes that ask for the right to argue

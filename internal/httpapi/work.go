@@ -31,10 +31,16 @@ type SetAsideBody struct {
 	// the thing may have been deleted since, and a list of set-aside work
 	// that fails to render because one row points at nothing is worse than
 	// one that says what the row says.
-	Kind      string    `json:"kind" doc:"Which worker the job was for"`
-	Reference string    `json:"reference" doc:"What the work was about"`
-	Attempts  int       `json:"attempts" doc:"How many times it was tried"`
-	LastError string    `json:"last_error,omitempty" doc:"Why it stopped, where anything reported one"`
+	Kind      string `json:"kind" doc:"Which worker the job was for"`
+	Reference string `json:"reference" doc:"What the work was about"`
+	Attempts  int    `json:"attempts" doc:"How many times it was tried"`
+	// LastError is what a worker reported, which is not one of this
+	// deployment's own records: a failed parse quotes the cause it was given,
+	// and that can carry a component name or a package address out of an
+	// SBOM. It is why this route asks for administration rather than for the
+	// grant that reads the records — that grant is declared, three times over,
+	// to reach no product's findings.
+	LastError string    `json:"last_error,omitempty" doc:"Why it stopped, where anything reported one. Worker output, which may quote what the job was about"`
 	StoppedAt time.Time `json:"stopped_at" doc:"When it was set aside"`
 }
 
@@ -64,7 +70,7 @@ func registerWork(api huma.API, in Ingest) {
 			"bound that refuses more of it. A queue filling up and a queue that has given up " +
 			"are different faults and only one of them leaves rows here.",
 		Tags: []string{"Administration"},
-	}, deploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*struct {
+	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct {
 		Body struct {
 			Items   []SetAsideBody `json:"items"`
 			Total   int            `json:"total"`
@@ -78,7 +84,7 @@ func registerWork(api huma.API, in Ingest) {
 				Waiting []QueuedBody   `json:"waiting"`
 			}
 		}
-		if err := readingTheDeployment(ctx); err != nil {
+		if err := administrating(ctx); err != nil {
 			return nil, err
 		}
 		if in.Queue == nil {

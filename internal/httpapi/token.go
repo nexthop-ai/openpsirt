@@ -205,8 +205,11 @@ func registerTokens(api huma.API, in Ingest) {
 			if err := rights.RevokeToken(ctx, token.ID); err != nil {
 				return wentWrong(in.Logger, "cannot revoke a token", err)
 			}
-			return noted(ctx, tx, trail.Credential, subject.Identity+" · "+token.Name,
-				trail.Said("in force", true), nil)
+			if err := noted(ctx, tx, trail.Credential, subject.Identity+" · "+token.Name,
+				trail.Said("in force", true), nil); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}

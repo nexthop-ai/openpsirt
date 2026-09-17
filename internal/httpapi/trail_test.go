@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,9 +70,9 @@ type trailedAct struct {
 // The identifiers are what tie this to the server rather than to a list: the
 // walk below fails on a registered write that is in neither this table nor
 // outsideTheTrail, so a new administrative route is classified rather than
-// forgotten. That is the whole point of it — the table this replaced was
-// twelve hand-written acts, and nine routes that recorded nothing sat outside
-// it with the suite green.
+// forgotten. That is the whole point of it. A list of acts somebody maintains
+// by hand is a list that goes short, and the routes it goes short by are the
+// ones recording nothing with the suite green.
 var administrativeActs = []trailedAct{
 	{
 		id: "set-setting", what: "a setting", method: http.MethodPut,
@@ -474,12 +475,11 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 			}
 			// Counted before and after, not read off the top.
 			//
-			// Reading only the newest row let an act pass with its own write
-			// deleted wherever the act above it had left a row saying the same
+			// Reading only the newest row lets an act pass with its own write
+			// deleted wherever the act above it left a row saying the same
 			// three things — which is true of unbinding a group, of
 			// withdrawing one's own token, and of taking somebody off a team
-			// twice. Three of the nine writes this exists to hold were held
-			// by the row before them.
+			// twice.
 			var before changed
 			read(t, r, "admin", "/v1/administration/changes?limit=1", &before)
 
@@ -653,7 +653,8 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 
 		// The deployment's own records, which is the whole of the grant.
 		for _, path := range []string{
-			"/v1/administration/changes", "/v1/settings", "/v1/people",
+			"/v1/administration/changes", "/v1/administration/changes.csv",
+			"/v1/settings", "/v1/people",
 			"/v1/people/admin", "/v1/roles/bindings", "/v1/roles/mode",
 		} {
 			if got := asPerson(t, r, "auditor", http.MethodGet, path, ""); got.Code != http.StatusOK {
@@ -662,11 +663,13 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 			}
 		}
 
-		// And no product. An auditor scoped to one product stays scoped to
-		// it; this one holds no role at all, so every one of these is what
-		// somebody holding nothing sees.
+		// And no product, and nothing that is not one of those records. What a
+		// worker reported quotes what its job was about, and a destination's
+		// address is the credential for two of the services it names — so
+		// neither is read by the grant that reads the records.
 		for _, path := range []string{
 			"/v1/products/mine/findings", "/v1/products/mine/builds",
+			"/v1/work/set-aside", "/v1/outbound",
 		} {
 			got := asPerson(t, r, "auditor", http.MethodGet, path, "")
 			if got.Code != http.StatusForbidden && got.Code != http.StatusNotFound {
@@ -689,6 +692,161 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 				t.Errorf("an auditor sending %s %s answered %d, want 403: %s",
 					act.method, act.path, got.Code, got.Body.String())
 			}
+		}
+	})
+}
+
+// TestBothThingsHeldOverTheDeploymentAreRecorded pins the record against the
+// two grants it is read by.
+//
+// Written as arms of one switch, a request granting both recorded one of them,
+// and the audit permission's arm never ran at all — so the one grant that
+// opens the change log was the change that log did not hold. The table above
+// classifies by operation, and both of these are a *field* on a route already
+// listed as trailed, which is why neither had coverage.
+func TestBothThingsHeldOverTheDeploymentAreRecorded(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"ada"}`); got.Code >= 300 {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		// Both at once, against somebody who already exists, which is the
+		// request that recorded one of the two.
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"ada","admin":true,"audits":true}`); got.Code >= 300 {
+			t.Fatalf("granting both answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var trail changed
+		read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
+		for _, want := range []struct{ was, became string }{
+			{"", "administrator"},
+			{"", "auditor"},
+		} {
+			found := false
+			for _, row := range trail.Items {
+				if row.About == "ada" && row.Became == want.became && row.Unset == (want.was == "") {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("nothing records ada becoming %s: %+v", want.became, trail.Items)
+			}
+		}
+
+		// And taking one back is recorded with what it was, which is the half
+		// an access review reads.
+		if got := asPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"ada","audits":false}`); got.Code >= 300 {
+			t.Fatalf("withdrawing it answered %d: %s", got.Code, got.Body.String())
+		}
+		read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
+		withdrawn := false
+		for _, row := range trail.Items {
+			if row.About == "ada" && row.Was == "auditor" && row.Cleared {
+				withdrawn = true
+			}
+		}
+		if !withdrawn {
+			t.Errorf("nothing records ada ceasing to audit: %+v", trail.Items)
+		}
+	})
+}
+
+// TestNoActHandsItsRecordsFailureToTheCaller walks every trailed route with
+// the trail table taken away.
+//
+// Ten of the forty sites returned the recorder's error straight out of the
+// closure, so a failed trail write handed the caller the driver's own message
+// — the statement text, and for a connection failure the address and the user
+// it tried. That is what `wentWrong` exists to stop, and the way it comes back
+// is a new trailed route written in the shape those ten had.
+func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedWithEvidence(t)
+		seen := &seeded{issue: r.embargoed(t)}
+
+		hide := func(from, to string) {
+			t.Helper()
+			if _, err := r.db.ExecContext(ctx,
+				`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
+				t.Fatalf("cannot rename %q to %q: %v", from, to, err)
+			}
+		}
+
+		examined := 0
+		for _, act := range administrativeActs {
+			who := act.who
+			if who == "" {
+				who = "admin"
+			}
+			hide("admin_change", "admin_change_hidden")
+			var got *httptest.ResponseRecorder
+			if act.drive != nil {
+				got = act.drive(t, r, seen)
+			} else {
+				got = asPerson(t, r, who, act.method, seen.fill(act.path), seen.fill(act.body))
+			}
+			hide("admin_change_hidden", "admin_change")
+			examined++
+
+			// Whatever the act would otherwise have answered, what it must
+			// not answer is anything a driver wrote. Checked by what a
+			// failure reads like rather than by the status: some of these
+			// refuse before they reach the recorder at all, which is fine.
+			body := got.Body.String()
+			for _, leaked := range []string{
+				"admin_change", "SQL", "no such table", "syntax", "sqlite", "pq:", "Error 1",
+			} {
+				if strings.Contains(body, leaked) {
+					t.Errorf("%s (%s) answered %d with the database's own words: %s",
+						act.what, act.id, got.Code, body)
+					break
+				}
+			}
+		}
+		if examined == 0 {
+			t.Fatal("no administrative act was driven, so this checked nothing")
+		}
+		t.Logf("drove %d administrative acts with the trail table taken away", examined)
+	})
+}
+
+// TestACaseIsRecordedByTheNamesItResolvedTo pins what a record is composed
+// from.
+//
+// Widening the column does not cover what actually lands in it: a path segment
+// carries no length on any route here, and an issue is looked up through a
+// normalization that keeps only its first 191 runes — so what resolved and
+// what was typed are not the same string, and a record composed from what was
+// typed is unbounded. Now that the record is written inside the act, that is
+// the act refused rather than a row quietly missing.
+//
+// Shown with capitals, which is the small case of the same thing: the lookup
+// folds them and the stored name does not have them.
+func TestACaseIsRecordedByTheNamesItResolvedTo(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		issue := r.embargoed(t)
+		typed := strings.ToLower(issue)
+		if typed == issue {
+			t.Fatalf("the fixture's issue %q is already folded, so this shows nothing", issue)
+		}
+
+		at := "/v1/products/mine/issues/" + url.PathEscape(typed) + "/collaborators/reader"
+		if got := asPerson(t, r, "private-triage", http.MethodPut, at, ""); got.Code >= 300 {
+			t.Fatalf("bringing somebody in answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var trail changed
+		read(t, r, "admin", "/v1/administration/changes?kind=case&limit=50", &trail)
+		if len(trail.Items) == 0 {
+			t.Fatal("bringing somebody into a case recorded nothing")
+		}
+		newest := trail.Items[0]
+		if want := "mine · " + issue + " · reader"; newest.About != want {
+			t.Errorf("the record says %q, want %q — the names it resolved to", newest.About, want)
 		}
 	})
 }

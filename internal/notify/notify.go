@@ -593,17 +593,18 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // somebody was told, and a line they have already acknowledged is still a line
 // they were sent.
 //
-// **For an administrator alone**, and refused for anybody else. Every other
-// read of this table is somebody reading their own; this one is a person page
-// asking after a leak, which is the one reason to read a list addressed to
-// somebody else. Enforced here rather than at the handler, because that is
-// where the rest of this table's rules live (REQ-42 and REQ-43).
+// **For either thing held over the deployment**, and refused for anybody else.
+// Every other read of this table is somebody reading their own; this one is a
+// person page asking after a leak, which is the one reason to read a list
+// addressed to somebody else. Enforced here rather than at the handler,
+// because that is where the rest of this table's rules live (REQ-42 and
+// REQ-43).
 //
-// **Narrowed by what the reader may see, and the flag is not a way to see
-// more.** The administrator flag decides who may ask this question; the rows
-// that come back are the ones the asker could read on their own account, so an
-// administrator holding nothing on a product reads the public half of a feed
-// and not the embargoed half.
+// **Narrowed by what the reader may see, and neither grant is a way to see
+// more.** Holding one decides who may ask this question; the rows that come
+// back are the ones the asker could read on their own account, so somebody
+// holding nothing on a product reads the public half of a feed and not the
+// embargoed half — and an auditor, who holds no product, reads nothing.
 //
 // The defense for answering it whole was that an administrator could grant
 // themselves the product and read it anyway. They can, and that grant lands in

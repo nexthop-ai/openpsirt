@@ -183,7 +183,10 @@ func registerTeams(api huma.API, a Administering) {
 				}
 				return wentWrong(a.Logger, "cannot retire that team", err)
 			}
-			return noted(ctx, tx, trail.Team, team.Name, trail.Said("in use", true), nil)
+			if err := noted(ctx, tx, trail.Team, team.Name, trail.Said("in use", true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}
@@ -223,8 +226,11 @@ func registerTeams(api huma.API, a Administering) {
 			if err := store.AddToTeam(ctx, team.ID, person.ID, by.ID); err != nil {
 				return wentWrong(a.Logger, "cannot put somebody on a team", err)
 			}
-			return noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
-				nil, trail.Said("a member", true))
+			if err := noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
+				nil, trail.Said("a member", true)); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}
@@ -265,8 +271,11 @@ func registerTeams(api huma.API, a Administering) {
 			case err != nil:
 				return wentWrong(a.Logger, "cannot take somebody off a team", err)
 			}
-			return noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
-				trail.Said("a member", true), nil)
+			if err := noted(ctx, tx, trail.Team, team.Name+" · "+in.Identity,
+				trail.Said("a member", true), nil); err != nil {
+				return notRecorded(a.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}

@@ -3767,7 +3767,7 @@ export interface paths {
         };
         /**
          * List group-to-role bindings
-         * @description Lists every group-to-role mapping, and the groups that administer.
+         * @description Lists every group-to-role mapping, and the groups that administer or audit.
          *
          *     In group-bound mode a mapping is the advance authorization: somebody arriving for the first time in a mapped group is admitted, and somebody in none is refused.
          *
@@ -3779,7 +3779,7 @@ export interface paths {
          * Bind an identity-provider group to a role
          * @description Maps one identity-provider group to one role, so that everybody in that group holds it from their next sign-in.
          *
-         *     Every role but administration names the product it applies to. Administration is bound without one, because it is global rather than held against a product.
+         *     Every role names the product it applies to. Administration and the audit permission are bound without one, because they are held over the deployment rather than against a product.
          *
          *     **The group is matched exactly, including its capitals.** It is an identity the provider hands over rather than a name anybody here types, so it is stored as given and compared as given — `Security` and `security` are two bindings, and a binding whose capitals do not match what the provider sends grants nothing. The refusal somebody then meets says only that they are not authorized, so check the spelling against the provider rather than against what looks right.
          *
@@ -4425,7 +4425,7 @@ export interface paths {
          *
          *     `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
          *
-         *     **Requires:** administrator, or the audit permission over this deployment's own records
+         *     **Requires:** administrator
          */
         get: operations["list-set-aside-work"];
         put?: never;
@@ -8587,7 +8587,7 @@ export interface components {
             id: number;
             /** @description Which worker the job was for */
             kind: string;
-            /** @description Why it stopped, where anything reported one */
+            /** @description Why it stopped, where anything reported one. Worker output, which may quote what the job was about */
             last_error?: string;
             /** @description What the work was about */
             reference: string;

@@ -529,9 +529,18 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		// credential, which is a directory of how the organization divides its
 		// work for the price of one request — and the read below is narrowed
 		// by what the caller may see anyway.
+		//
+		// **A read that could not be made is not that answer.** Told apart by
+		// the sentinel rather than by "any error at all": read as "no such
+		// team", a database nobody can reach answers that this team is holding
+		// nothing — which is the exact false statement this route was written
+		// to stop a screen making.
 		holders := []int64{nobody}
-		if team, err := access.NewStore(in.DB.DB).TeamByName(ctx, input.Team); err == nil {
+		switch team, err := access.NewStore(in.DB.DB).TeamByName(ctx, input.Team); {
+		case err == nil:
 			holders = []int64{team.PartyID}
+		case !errors.Is(err, access.ErrNoSuchTeam):
+			return nil, wentWrong(in.Logger, "that team could not be looked up", err)
 		}
 		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, subject, holders,
 			scope, input.Limit, input.Offset)

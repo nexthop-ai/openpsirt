@@ -8,7 +8,6 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Wide } from "../ui/Wide";
 import { since } from "../ui/when";
-import type { Who } from "../app/session";
 
 // What the deployment itself is doing, rather than what it has found.
 //
@@ -18,11 +17,16 @@ import type { Who } from "../app/session";
 // this deployment sends what it has to say was configurable only by calling
 // the API by hand.
 //
+// An operator's screen rather than an auditor's, which is not where it
+// started: what a worker reported can quote what the job was about, and a
+// destination's address is the credential for two of the services it names.
+// Neither is one of the deployment's own records.
+//
 // They are one screen because they are one question — is this deployment
 // working — and because each of them fails silently. A queue that has given up
 // looks exactly like a quiet one, and a destination that has been refusing for
 // a week looks exactly like a destination nothing has been sent to.
-export function System({ who }: { who: Who }) {
+export function System() {
   return (
     <>
       <div className="screen-head">
@@ -30,7 +34,7 @@ export function System({ who }: { who: Who }) {
         <p>What this deployment is doing, and where it sends what it has to say</p>
       </div>
       <TheQueue />
-      <Destinations canChange={Boolean(who.admin)} />
+      <Destinations />
     </>
   );
 }
@@ -60,9 +64,8 @@ function TheQueue() {
       <section className="panel">
         <h3>Waiting</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Per kind, because the bound is per kind: counted across the queue, one producer&rsquo;s
-          own backlog hides behind everybody else&rsquo;s empty queues. Work held by a worker that
-          has stopped reporting counts as waiting, because that is what it is.
+          Per kind, against the bound that refuses more. Work held by a worker that has stopped
+          reporting counts as waiting.
         </p>
         {waiting.length === 0 ? (
           <Empty title="There is no queue here." detail="This process runs no background work." />
@@ -81,9 +84,6 @@ function TheQueue() {
                   <td className="id">{kind.kind}</td>
                   <td>
                     {(kind.waiting ?? 0).toLocaleString()}
-                    {/* Said where it matters rather than drawn as a bar: what
-                        an operator does about a full queue is add workers or
-                        raise the bound, and both need the two numbers. */}
                     {(kind.waiting ?? 0) >= (kind.limit ?? 0) && (
                       <>
                         {" "}
@@ -102,8 +102,8 @@ function TheQueue() {
       <section className="panel">
         <h3>Given up on</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Work tried as many times as it is allowed to be. Nothing will pick it up again until
-          somebody puts it back, and a queue that has given up looks exactly like a quiet one.
+          Tried as many times as it is allowed to be. Nothing picks it up again until somebody puts
+          it back.
         </p>
         {retry.error != null && (
           <Failed error={retry.error} what="That job could not be put back." />
@@ -176,7 +176,7 @@ function TheQueue() {
 // driven by automation and paging all take an HTTP request with a JSON body.
 // The secret is never returned by anything, so changing one means recording
 // the destination again.
-function Destinations({ canChange }: { canChange: boolean }) {
+function Destinations() {
   const queries = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -212,11 +212,10 @@ function Destinations({ canChange }: { canChange: boolean }) {
     <section className="panel">
       <div className="screen-head">
         <h3>Where things are sent</h3>
-        {canChange && <AddButton label="Add destination" onClick={() => setAdding(true)} />}
+        <AddButton label="Add destination" onClick={() => setAdding(true)} />
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
-        One signed request each, not an adapter each. Every request carries a timestamp and an HMAC
-        over it and the body, so a receiver can tell one of ours from one anybody could make.
+        Every request is signed: a timestamp, and an HMAC over it and the body.
       </p>
       {retire.error != null && (
         <Failed error={retire.error} what="That destination could not be retired." />
@@ -264,18 +263,14 @@ function Destinations({ canChange }: { canChange: boolean }) {
                     )}
                   </td>
                   <td>
-                    {canChange && (
-                      <button
-                        type="button"
-                        className="linkish"
-                        disabled={retire.isPending}
-                        onClick={() =>
-                          retire.mutate({ name: row.name ?? "", kind: row.kind ?? "" })
-                        }
-                      >
-                        Retire
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="linkish"
+                      disabled={retire.isPending}
+                      onClick={() => retire.mutate({ name: row.name ?? "", kind: row.kind ?? "" })}
+                    >
+                      Retire
+                    </button>
                   </td>
                 </tr>
               ))}

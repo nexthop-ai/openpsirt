@@ -115,7 +115,7 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			// moment.
 			before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
 			if err != nil {
-				return wentWrong(a.Logger, "cannot record where roles come from", err)
+				return recording(a.Logger, "cannot record where roles come from", err)
 			}
 			if err := noted(ctx, tx, trail.Setting, setting.RoleMode,
 				trail.Said(before, had), trail.Said(string(wanted), true)); err != nil {
@@ -131,7 +131,8 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-bindings", Method: http.MethodGet, Path: "/v1/roles/bindings",
 		Summary: "List group-to-role bindings",
-		Description: "Lists every group-to-role mapping, and the groups that administer.\n\n" +
+		Description: "Lists every group-to-role mapping, and the groups that administer or " +
+			"audit.\n\n" +
 			"In group-bound mode a mapping is the advance authorization: somebody arriving for " +
 			"the first time in a mapped group is admitted, and somebody in none is refused.",
 		Tags: []string{"Administration"},
@@ -181,8 +182,9 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 		Summary: "Bind an identity-provider group to a role",
 		Description: "Maps one identity-provider group to one role, so that everybody in that " +
 			"group holds it from their next sign-in.\n\n" +
-			"Every role but administration names the product it applies to. Administration is " +
-			"bound without one, because it is global rather than held against a product.\n\n" +
+			"Every role names the product it applies to. Administration and the audit " +
+			"permission are bound without one, because they are held over the deployment " +
+			"rather than against a product.\n\n" +
 			"**The group is matched exactly, including its capitals.** It is an identity the " +
 			"provider hands over rather than a name anybody here types, so it is stored as " +
 			"given and compared as given — `Security` and `security` are two bindings, and a " +

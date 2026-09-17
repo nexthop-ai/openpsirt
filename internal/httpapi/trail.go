@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -49,6 +50,28 @@ func noted(ctx context.Context, tx bun.IDB, kind trail.Kind, name string, was, b
 		return err
 	}
 	return trail.NewStore(tx).Record(ctx, by, kind, name, was, became)
+}
+
+// recording answers a store write that is part of an act.
+//
+// **A lost race goes back untouched.** A store handed somebody else's
+// transaction cannot go again itself — the failed statement has already
+// aborted it on one engine — so it says it lost, and the helper that opened
+// the transaction takes the whole act again. Reported as a fault instead, the
+// sentinel is destroyed: wentWrong builds a fresh refusal that wraps nothing,
+// so the retry helper never sees it and the loser of an ordinary race is
+// handed a 500 where the path this replaces went round and won.
+//
+// One spelling rather than an arm at each site, because the way this stops
+// working again is a third write that forgets it.
+func recording(logger *slog.Logger, what string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, database.ErrGoAgain) {
+		return err
+	}
+	return wentWrong(logger, what, err)
 }
 
 // notRecorded refuses an act whose record could not be written.

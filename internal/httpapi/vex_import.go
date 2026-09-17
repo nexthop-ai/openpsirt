@@ -206,8 +206,11 @@ func registerVexImport(api huma.API, in Ingest) {
 			if err != nil {
 				return asked(in.Logger, err)
 			}
-			return noted(ctx, tx, trail.Setting, "VEX statements from "+publisher,
-				nil, trail.Said(file.Filename, true))
+			if err := noted(ctx, tx, trail.Setting, "VEX statements from "+publisher,
+				nil, trail.Said(file.Filename, true)); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}

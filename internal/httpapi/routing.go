@@ -245,9 +245,12 @@ func registerRouting(api huma.API, in Ingest) {
 				if err := finding.NewStore(tx).RetireRule(ctx, subject, product, input.ID); err != nil {
 					return absent(in.Logger, err, "that rule could not be retired", noSuchRule)
 				}
-				return noted(ctx, tx, trail.Routing,
+				if err := noted(ctx, tx, trail.Routing,
 					input.Product+" · "+strconv.FormatInt(input.ID, 10),
-					trail.Said("in use", true), nil)
+					trail.Said("in use", true), nil); err != nil {
+					return notRecorded(in.Logger, err)
+				}
+				return nil
 			}); err != nil {
 				return nil, err
 			}

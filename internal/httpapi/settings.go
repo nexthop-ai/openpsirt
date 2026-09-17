@@ -309,10 +309,13 @@ func registerSettings(api huma.API, in Ingest) {
 			}
 			before, had, err := settings.Change(ctx, input.Name, input.Body.Value)
 			if err != nil {
-				return wentWrong(in.Logger, "that setting could not be recorded", err)
+				return recording(in.Logger, "that setting could not be recorded", err)
 			}
-			return noted(ctx, tx, trail.Setting, input.Name,
-				trail.Said(before, had), trail.Said(input.Body.Value, true))
+			if err := noted(ctx, tx, trail.Setting, input.Name,
+				trail.Said(before, had), trail.Said(input.Body.Value, true)); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}

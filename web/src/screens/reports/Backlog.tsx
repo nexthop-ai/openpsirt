@@ -119,26 +119,19 @@ export function Backlog() {
                 <i style={{ background: "var(--ok)" }} /> Resolved
               </span>
             </div>
-            <p className="hint">
-              Counted as issues rather than as places: one issue in a shared library reaches every
-              consumer of it, and counting rows measures how much the graph shares.
-            </p>
+            <p className="hint">Counted as issues, not as places.</p>
           </section>
 
           <section className="panel">
             <h3>What is open, by severity</h3>
             <Mix points={points} />
-            <p className="hint">
-              A total that barely moves while its critical share rises is getting worse, and one
-              line hides exactly that.
-            </p>
+            <p className="hint">The share matters as much as the total.</p>
           </section>
 
           <section className="panel">
             <h3>What arrived, and what was answered</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              Both flows split the same way. A week where what arrives is critical and what leaves
-              is not is a week the backlog got worse while its total held still.
+              Both flows, split the same way.
             </p>
             {flows.length === 0 ? (
               <Empty

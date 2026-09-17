@@ -1303,8 +1303,10 @@ What this deployment is doing, rather than what it has found.
 | What is waiting is said per kind, against the bound | The bound is per kind, so one producer's own backlog hides behind everybody else's empty queues. What an operator does about a full queue needs both numbers |
 | Work held by a worker that stopped reporting counts as waiting | It is work waiting for whoever takes it next. Counted as running, a queue in the middle of a reclaim cycle reads as empty |
 | A set-aside job is shown in the queue's own words | What it points at may have been deleted since, and a list that fails to render because one row points at nothing is worse than one that says what the row says |
-| The audit permission reaches it; changing anything on it does not | Reading what is queued and where things are sent changes none of it |
+| An operator's screen, not an auditor's | What a worker reported quotes what its job was about, so a failed parse can carry a component name out of an SBOM the reader holds nothing on — and a destination's address is a credential. Neither is one of the deployment's own records, which is what that grant reads |
 | A destination's address is not a link | It is somewhere this deployment posts to rather than somewhere a person goes, and for two of the services it names the path is the credential |
+| What a full queue needs is both numbers | An operator adds workers or raises the bound, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the bound is a state rather than a proportion |
+| A resolved issue is counted at the severity it held while it was open | The step it left in no longer has one, and counting it as unrated would make every answered critical disappear from the answered column |
 | The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
 
 ## The administration screens

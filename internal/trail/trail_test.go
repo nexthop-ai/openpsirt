@@ -2,9 +2,12 @@ package trail_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -192,6 +195,80 @@ func TestTheTrailRefusesAReaderWhoDoesNotAdminister(t *testing.T) {
 		if _, _, err := s.Changes(ctx, access.Everything("reporting on the tool"),
 			"", trail.Over{}, 100, 0); err != nil {
 			t.Errorf("the deployment could not read its own trail: %v", err)
+		}
+	})
+}
+
+// TestARecordCannotOverflowItsOwnColumn pins the backstop under every caller.
+//
+// What is written here is composed by whoever is recording — a collaborator is
+// a product, an issue and a person — and the column is sized for three names
+// and their separators. Every caller composes from stored values, so this
+// never fires; it is here because "every caller does the right thing" is not a
+// property anything checks, and the failure it would otherwise take is the act
+// refused on the three engines that will not hold an over-long value.
+func TestARecordCannotOverflowItsOwnColumn(t *testing.T) {
+	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+		ctx := t.Context()
+
+		// Past the column, and multi-byte, so a bound counting bytes would cut
+		// a rune in half and store something that is not text.
+		long := strings.Repeat("é", trail.NameLimit+200)
+		if err := s.Record(ctx, by, trail.Setting, long, nil, trail.Said("moved", true)); err != nil {
+			t.Fatalf("a long name was refused rather than bounded: %v", err)
+		}
+
+		changes, _, err := s.Changes(ctx, by, trail.Setting, trail.Over{}, 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(changes) == 0 {
+			t.Fatal("nothing was recorded")
+		}
+		kept := changes[0].Name
+		if n := utf8.RuneCountInString(kept); n > trail.NameLimit {
+			t.Errorf("the record kept %d runes, past the %d the column holds", n, trail.NameLimit)
+		}
+		if !utf8.ValidString(kept) {
+			t.Error("the record was cut mid-rune, so what is stored is not text")
+		}
+		if !strings.HasPrefix(long, kept) {
+			t.Error("what was kept is not the head of what was asked for")
+		}
+	})
+}
+
+// TestAMaximalCaseFitsTheColumn pins the width against the widest thing
+// recorded.
+//
+// Nothing held the number in place: written at a name's own width the column
+// took every row the fixtures happen to compose, because none of them is
+// anywhere near maximal. The overflow comes straight back the next time a
+// name's width moves or a composition gains a fourth part — and with the
+// record inside the act, what it takes down is the act.
+func TestAMaximalCaseFitsTheColumn(t *testing.T) {
+	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+		ctx := t.Context()
+
+		// A product, an issue and a person, each as wide as a name column
+		// holds, with the separators the recorder puts between them.
+		wide := strings.Repeat("W", database.NameWidth)
+		about := wide + " · " + wide + " · " + wide
+		if utf8.RuneCountInString(about) > trail.NameLimit {
+			t.Fatalf("the widest thing recorded is %d runes and the column holds %d",
+				utf8.RuneCountInString(about), trail.NameLimit)
+		}
+
+		if err := s.Record(ctx, by, trail.Case, about,
+			nil, trail.Said("a collaborator", true)); err != nil {
+			t.Fatalf("a maximal case could not be recorded: %v", err)
+		}
+		changes, _, err := s.Changes(ctx, by, trail.Case, trail.Over{}, 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(changes) == 0 || changes[0].Name != about {
+			t.Error("a maximal case did not come back as it was written")
 		}
 	})
 }

@@ -132,6 +132,19 @@ func registerWhoTold(api huma.API, in Ingest) {
 			return nil, err
 		}
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
+			// What the issue is filed under, read before the name is added.
+			//
+			// By the stored name rather than the one typed: a path segment
+			// carries no length, and the lookup keeps only the first 191
+			// runes of it, so what resolved and what was typed are not the
+			// same string. Before, because recording an alias refiles the
+			// issue under the more widely recognized of its names — read
+			// afterwards, a row would say an issue gained the name it had
+			// just been renamed to.
+			named, err := finding.NewVulnerabilities(tx).NamesByID(ctx, []int64{issue})
+			if err != nil {
+				return wentWrong(in.Logger, "that issue could not be looked up", err)
+			}
 			switch err := finding.NewVulnerabilities(tx).
 				AlsoKnownAs(ctx, subject, issue, input.Alias); {
 			case errors.Is(err, finding.ErrNameTaken):
@@ -144,8 +157,11 @@ func registerWhoTold(api huma.API, in Ingest) {
 			// on a scan of any product reporting that name resolves to this
 			// issue. The issue it was recorded against is named too, since
 			// that is where the right to record it was held.
-			return noted(ctx, tx, trail.Alias, input.Vulnerability,
-				nil, trail.Said(input.Alias, true))
+			if err := noted(ctx, tx, trail.Alias, named[issue],
+				nil, trail.Said(input.Alias, true)); err != nil {
+				return notRecorded(in.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}

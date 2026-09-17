@@ -71,7 +71,10 @@ way to put one back.
 
 | Rule | Reason |
 |---|---|
-| The list is set-aside work alone | Waiting and running work needs no attention, and a list of it invites acting on a state that moves underneath the reader. What is set aside has stopped moving by definition |
+| What is listed is set-aside work; what is waiting is counted | A list of waiting work invites acting on a state that moves underneath the reader, and what is set aside has stopped moving by definition. A *count* of what is waiting moves too and nothing acts on one — it says whether the queue is filling up, which is the other way this goes wrong and which nothing else answered |
+| What is waiting is counted per kind, against the bound | The bound is per kind, so counted across the queue one producer's own backlog hides behind everybody else's empty queues — and what an operator does about a full queue needs both numbers |
+| Work held by a worker that has stopped reporting counts as waiting | It is work waiting for whoever takes it next. Counted as running, a queue in the middle of a reclaim cycle reads as empty |
+| Reading any of it is administration | What a worker reported is not one of the deployment's own records: a failed parse quotes the cause it was given, and that can carry a component name or a package address out of an SBOM the reader holds nothing on |
 | Putting a job back starts its attempts again | Whoever does it has decided the cause is dealt with. A job returned with one attempt left is set aside again by the next transient failure |
 | The last error survives being put back | It is the evidence of the previous run, and the decision to try again is not a reason to destroy it |
 | Only set-aside work is put back | Returning a running job hands the same work to two workers, which on an ingest looks like real change rather than an error |

@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -78,6 +79,24 @@ type Change struct {
 	Became *string `bun:"became"`
 }
 
+// NameLimit is how much of what a change is about the column holds.
+//
+// **A store must not be able to overflow its own column.** What is written
+// here is composed by the caller from names — a collaborator is a product, an
+// issue and a person — and the column is sized for three of them with their
+// separators. Every caller composes from stored values, each of which is a
+// name's own width, so this never fires; it is here because "every caller
+// does the right thing" is not a property anything checks, and the failure it
+// would otherwise take is the act refused rather than the record shortened.
+//
+// Bounded by runes rather than bytes: the column counts characters, and
+// cutting a multi-byte name mid-rune would store something that is not text.
+//
+// The column's own width, taken from where the column is declared rather than
+// written out again: a bound and the column it protects that are two copies of
+// one number are two numbers eventually.
+const NameLimit = database.ComposedWidth
+
 // Store reads and writes the trail.
 type Store struct {
 	db  bun.IDB
@@ -107,7 +126,7 @@ func (s *Store) Record(ctx context.Context, by access.Subject, kind Kind, name s
 	}
 	change := &Change{
 		At: s.now().Truncate(time.Microsecond), By: by.ID,
-		Kind: kind, Name: name, Was: was, Became: became,
+		Kind: kind, Name: bound.HeadRunes(name, NameLimit), Was: was, Became: became,
 	}
 	if _, err := s.db.NewInsert().Model(change).Exec(ctx); err != nil {
 		return fmt.Errorf("record that %q changed: %w", name, err)

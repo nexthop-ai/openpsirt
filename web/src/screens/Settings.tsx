@@ -5,14 +5,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import type { Who } from "../app/session";
 import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
 
 // What this deployment has decided for everybody in it, grouped the way the
 // mockup groups them. Every setting the server exposes renders; a setting no
 // group names lands under "Other", so nothing offered is hidden.
-export function Settings() {
+export function Settings({ who }: { who: Who }) {
   const queries = useQueryClient();
+  // The audit permission reads this screen and writes none of it. A control
+  // somebody can press that the server will refuse is worse than one that is
+  // not there, because pressing it looks like it worked.
+  const canSet = Boolean(who.admin);
   const settings = useQuery({
     queryKey: ["settings"],
     queryFn: async () => unwrap(await api.GET("/v1/settings", {})),
@@ -61,6 +66,7 @@ export function Settings() {
     <Field
       key={each.name}
       setting={each}
+      canSet={canSet}
       onSet={(value) => set.mutate({ name: each.name ?? "", value })}
     />
   );
@@ -220,6 +226,7 @@ function label(name?: string): string {
 
 function Field({
   setting,
+  canSet,
   onSet,
 }: {
   setting: {
@@ -230,6 +237,7 @@ function Field({
     kind: "duration" | "count" | "size" | "word" | "switch";
     words?: string[] | null;
   };
+  canSet: boolean;
   onSet: (value: string) => void;
 }) {
   const [value, setValue] = useState(setting.value ?? "");
@@ -290,7 +298,10 @@ function Field({
         ? writeBytes(typed, size)
         : ""
       : value;
-  const changed = asked !== "" && asked !== (setting.value ?? "");
+  // Changed, and worth offering to save. A reader who cannot write still sees
+  // what is set — the value is the answer they came for — and is offered no
+  // control that would be refused.
+  const changed = canSet && asked !== "" && asked !== (setting.value ?? "");
 
   return (
     <div className="field" style={{ margin: 0, maxWidth: takes || sizes ? 320 : 240 }}>
@@ -392,7 +403,7 @@ function Field({
             onChange={(event) => setValue(event.target.value)}
           />
         )}
-        {changed && (
+        {changed && canSet && (
           <button type="button" className="btn" onClick={() => onSet(asked)}>
             Save
           </button>

@@ -38,11 +38,13 @@ type Record struct {
 // concentration signal computed over the products the reader happens to hold
 // is not the signal. Enforced here, where the rest of this store's rules are
 // (REQ-42).
+//
+// Which is why the audit permission does not reach it, though it reads the
+// page this sits on: that grant is declared to reach no product's decisions,
+// and a count taken over every product's decisions is taken over decisions.
+// The page leaves the block out rather than refusing.
 func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID int64) (Record, error) {
-	// Either thing held over the deployment. What comes back is how much
-	// somebody proposed and agreed to rather than what any of it said, which
-	// is one of the things an audit of who decided what is for.
-	if !subject.ReadsTheDeployment() {
+	if !subject.Admin || subject.Kind != access.Person {
 		return Record{}, access.Denied("read somebody else's part in the record")
 	}
 	var out Record

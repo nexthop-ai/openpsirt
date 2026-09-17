@@ -215,8 +215,8 @@ export function App() {
               <Route path={ROUTES.record} element={<Record />} />
               <Route path={ROUTES.disclosing} element={<Disclosing />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
-              <Route path={ROUTES.settings} element={<Settings />} />
-              <Route path={ROUTES.system} element={<System who={who.data} />} />
+              <Route path={ROUTES.settings} element={<Settings who={who.data} />} />
+              <Route path={ROUTES.system} element={<System />} />
               {/* A path the page does not know either. Sending somebody home is
             better than a dead end — and the replace is what stops the back
             button returning to an address that only redirects again.

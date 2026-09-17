@@ -274,17 +274,22 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               are the same question asked twice, and belonging to a team grants
               nothing. */}
             {who.admin && <Rail to="/teams" icon="teams" label="Teams" />}
-            {who.admin && <Rail to="/people" icon="roles" label="Users and roles" />}
+            {/* Who holds what, which the audit permission is largely for.
+              The screen already degrades for a reader who cannot grant. */}
+            {(who.admin || who.audits) && (
+              <Rail to="/people" icon="roles" label="Users and roles" />
+            )}
             {/* Assignment without a person doing it, by standing rule.
               Under Manage because it is something set up once rather than worked
               at, and called what it does: the act it automates is assignment. */}
             <Rail to="/auto-assignment" icon="route" label="Auto-assignment" />
-            {who.admin && <Rail to="/settings" icon="gear" label="Settings" />}
+            {(who.admin || who.audits) && <Rail to="/settings" icon="gear" label="Settings" />}
             {/* What the deployment itself is doing. Beside settings because
-              both are about the deployment rather than about what it found,
-              and open to an auditor as well: reading what is queued and where
-              things are sent changes none of it. */}
-            {(who.admin || who.audits) && <Rail to="/system" icon="gear" label="System" />}
+              both are about the deployment rather than about what it found —
+              and an operator's rather than an auditor's: what a worker
+              reported can quote what the job was about, and a destination's
+              address is a credential for two of the services it names. */}
+            {who.admin && <Rail to="/system" icon="gear" label="System" />}
           </>
         )}
       </nav>
