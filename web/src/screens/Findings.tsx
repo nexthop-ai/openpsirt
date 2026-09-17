@@ -19,6 +19,7 @@ import { Holder } from "../ui/Holder";
 import { Saved, here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
+import { useWho } from "../app/session";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
 // question of the server to offer the row before and the row after. Fifty rows
@@ -140,6 +141,7 @@ export function Findings() {
   // Beside the hooks it belongs with: this reads the session, so it cannot sit
   // after an early return.
   const { cap: bulkCap, over: overCap } = useBulkCap(picked.size);
+  const me = useWho();
   const [handing, setHanding] = useState("");
   // The list somebody has turned down a prepared claim for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
@@ -640,9 +642,9 @@ export function Findings() {
   // Handing a selection to somebody, which is the one thing a selection can do
   // until the bulk workflows that start from one are built. What a refusal
   // partway through leaves behind is the hook's rule rather than this one's.
-  async function handOver() {
-    const who = handing.slice(handing.indexOf(":") + 1);
-    const team = handing.startsWith("team:");
+  async function handOver(to?: string) {
+    const who = to ?? handing.slice(handing.indexOf(":") + 1);
+    const team = to === undefined && handing.startsWith("team:");
     await through((row: Row) => hand.mutateAsync({ row, who, team }));
     // Once, after the loop. On every write it put a list refetch between each
     // of them, so a long selection spent its time refetching.
@@ -700,15 +702,31 @@ export function Findings() {
             </span>
           )}
           <span className="spacer" />
+          {/* Taking unowned work needs no more right than reaching this list
+              does and no product chosen, so it is a button rather than a step
+              through a picker that may have nobody in it. */}
+          <button
+            type="button"
+            className="btn"
+            disabled={me.data?.identity == null || hand.isPending || overCap}
+            onClick={() => void handOver(me.data!.identity)}
+          >
+            {`Take ${picked.size}`}
+          </button>
           {/* One lookup rather than a list of people beside a list of teams:
               both are parties, and at a hundred people a select is a list
-              nobody can type toward. */}
+              nobody can type toward.
+
+              Who may hold work is a question about one product, and this list
+              answers for every product a reader can see when none is picked —
+              so the control says that instead of opening on nobody. */}
           <div style={{ minWidth: 230 }}>
             <Holder
               product={product}
               value={null}
-              placeholder="Assign to…"
+              placeholder={product ? "Assign to…" : "Pick a product to assign"}
               none="Nobody"
+              disabled={!product}
               onPick={(held) => setHanding(held ? `${held.kind}:${held.identity}` : "")}
             />
           </div>

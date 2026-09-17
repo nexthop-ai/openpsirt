@@ -45,6 +45,17 @@ export const SORTS = {
   Due: "deadline",
 } satisfies Record<string, SortWord>;
 
+// Work nobody holds and nobody has decided, as filters on this list.
+//
+// One spelling, because three places open it: the sidebar entry, the badge
+// beside that entry, and the route the old `/unassigned` address resolves
+// through. The screen that used to answer this went — it asked the server a
+// question with no decision predicate in it, so it counted differently from
+// its own heading, and it carried no deadline, no age, no filters and no sort
+// over a list that runs to thousands of rows.
+export const UNOWNED = "assigned=nobody&state=undecided";
+export const UNOWNED_LIST = `/findings?${UNOWNED}`;
+
 // What the by-issue list asks when the address has not said: the work a
 // promised upgrade already answers is out of view, because deciding it again
 // one finding at a time is the thing the promise was made instead of.

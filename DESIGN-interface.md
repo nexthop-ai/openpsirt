@@ -159,7 +159,7 @@ to upload, what is waiting on you, and who you are.
 
 | Rail group | Holds |
 |---|---|
-| **Across products** | Home, the review queue, what is unassigned, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
+| **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
 | **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many |
 | **Manage** | The catalog, the users and the settings. Branches, tags and variants have entries of their own, scoped to the picked product |
 
@@ -878,17 +878,30 @@ claim, its reasoning and its history with no way to answer it.
 ## Assignments and routing rules
 
 Assignments is two tabs: what is due soon and undecided, and who holds what.
-Unassigned work is its own screen with its own rail entry, and a row nobody
-holds says "unassigned" in muted text rather than drawing nobody as a person
-with an avatar.
+A row nobody holds says "unassigned" in muted text rather than drawing nobody
+as a person with an avatar.
+
+**Work nobody holds is the findings list under two filters**, not a screen of
+its own: nobody assigned, and nothing decided. The rail entry keeps its label,
+its icon and its place, and its address carries those two filters. The badge
+beside it is counted from that same address, through the list's own query, so
+the number and the list it opens cannot disagree — the list writes three
+narrowings of its own into any address it is given, and a total counted without
+them is a different question.
+
+| Why it is not its own screen | |
+|---|---|
+| The list already does the whole of it | Deadline, age, EPSS, every filter and every order, over thousands of rows. The screen had none of those and no way to narrow |
+| The screen and its own heading disagreed | It said "undecided" and asked a question with no decision predicate in it |
+| `/unassigned` still resolves | A bookmark and a link in an old digest land on the list rather than being swallowed by the catch-all |
 
 | Rule | |
 |---|---|
 | Every figure counts pieces of work, and says so | A person's row and the list behind their name are one measurement, so clicking through never turns one number into a different one. The findings those cover are a second, quieter column, and the screen states in words what each counts |
-| Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. On a finding it is the picker's first option, because taking work is the common case and should need no typing; the unassigned list carries a Take of its own on its batch bar |
+| Taking unowned work is one action | A triager may take what nobody owns without the assigner right, and the API always allowed it; there was no control that asked. On a finding it is the picker's first option, because taking work is the common case and should need no typing; the findings list carries a Take of its own on its batch bar |
 | Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
-| Offering work to somebody is a question about one product | The unassigned list spans every product somebody can see, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
+| Offering work to somebody is a question about one product | The findings list spans every product somebody can see when none is picked, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
 | **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
 | A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 

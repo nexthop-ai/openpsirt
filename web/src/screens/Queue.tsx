@@ -7,7 +7,7 @@ import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { usePaging } from "./list";
+import { UNOWNED_LIST, usePaging } from "./list";
 import { unwrap } from "../api/queries";
 import { claimOf, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
 import { Empty } from "../ui/Empty";
@@ -289,7 +289,7 @@ export function Queue() {
           <strong>Claim {wanted} is not waiting here.</strong>
           <span>
             It may have been decided, or it may sit on another page.{" "}
-            <Link to="/unassigned" className="linkish">
+            <Link to={UNOWNED_LIST} className="linkish">
               Unassigned →
             </Link>
           </span>

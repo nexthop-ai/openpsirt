@@ -18,8 +18,9 @@ import { pathTo, usePaging } from "./list";
 const PAGE = 50;
 
 // Assignments: what is running out of time undecided, and what each person
-// holds. Unassigned already has its own entry in the rail, so the third tab
-// links across rather than drawing the list twice.
+// holds. What nobody holds has its own entry in the rail, which opens the
+// findings list under that narrowing, so the third tab links across rather
+// than drawing a list twice.
 //
 // Work assigned to somebody who has gone is invisible twice over: not in the
 // shared queue because it is assigned, and not in anybody's list because they
@@ -232,7 +233,7 @@ function ByPerson({
     return (
       <Empty
         title="Nobody else is holding anything."
-        detail="What is waiting for nobody is on the unassigned screen; this one is about work somebody has taken on."
+        detail="What is waiting for nobody is the findings list under Unassigned; this one is about work somebody has taken on."
       />
     );
   }
