@@ -633,12 +633,6 @@ func advisoryLinks(advisories []struct {
 	return links
 }
 
-// rating picks the severity score to record, and the vector it assumes.
-//
-// The first that states both. A report carries several ratings from different
-// sources and they disagree; taking the first stated is at least a stable
-// answer, and the vector travels with the number so that what the number
-// assumed is readable rather than lost.
 // rated is a published severity with what it assumes and who published it.
 type rated struct {
 	score   float64
@@ -648,6 +642,13 @@ type rated struct {
 	kind    string
 }
 
+// rating picks the severity score to record, and the vector it assumes.
+//
+// The first that states both. A report carries several ratings from different
+// sources and they disagree; taking the first stated is at least a stable
+// answer, and the vector travels with the number so that what the number
+// assumed is readable rather than lost. Who published it travels with them for
+// the same reason: everything else a scan says carries its provenance.
 func rating(ratings []struct {
 	Version string `json:"version"`
 	Vector  string `json:"vector"`
