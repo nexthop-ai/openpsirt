@@ -35,6 +35,24 @@ import { fromAt, listQuery, pathTo, where, windowFor } from "./list";
 // timeline, the revision history, the comments, and the decisions made at this
 // place before, whose reasoning is offered back.
 
+// Who published the score and whether it is the primary rating, as a reader
+// can use it.
+//
+// A publisher that is a bare identifier is dropped. Half of what arrives here
+// is a CNA's own UUID — "b0ca135-0b70-47ef-9f44-1890c2a1c46c" — which answers
+// "who says 7.8" with a string nobody can look up, and putting it on screen
+// beside a real name like "nvd@nist.gov" says the two are the same kind of
+// answer. Whether it is primary or secondary survives either way, because that
+// is the part somebody weighing two scores acts on.
+const ANONYMOUS = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
+
+function scoredBy(source: string | undefined, kind: string | undefined): string {
+  const named = (source ?? "").trim();
+  return [ANONYMOUS.test(named) ? "" : named, (kind ?? "").trim().toLowerCase()]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 // What a step lands on, said in the hover rather than on the button: the
 // button says which direction, and which finding is what somebody checks
 // before taking it.
@@ -609,10 +627,8 @@ export function Finding() {
             <div className="score">
               <span className="n">{it.score ? it.score.toFixed(1) : "—"}</span>
               <span className="l">CVSS{it.score_version ? ` ${it.score_version}` : ""}</span>
-              {(it.score_source || it.score_kind) && (
-                <span className="l">
-                  {[it.score_source, it.score_kind?.toLowerCase()].filter(Boolean).join(" · ")}
-                </span>
+              {scoredBy(it.score_source, it.score_kind) && (
+                <span className="l">{scoredBy(it.score_source, it.score_kind)}</span>
               )}
             </div>
             {/* The estimate, what it means, and whether it is current.
@@ -627,7 +643,7 @@ export function Finding() {
               <span className="l">
                 EPSS
                 {typeof it.likelihood_percentile === "number" && it.likelihood_percentile > 0 && (
-                  <> · {(it.likelihood_percentile * 100).toFixed(0)}th pct</>
+                  <> · {(it.likelihood_percentile * 100).toFixed(0)}th percentile</>
                 )}
               </span>
               {it.likelihood_on && <span className="l">as of {it.likelihood_on}</span>}
