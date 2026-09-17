@@ -44,6 +44,16 @@ const findingsAt = (product: string, row: Build, component: string) =>
   `/variants/${encodeURIComponent(row.variant ?? "")}/findings` +
   `?component=${encodeURIComponent(component)}`;
 
+// One judgment about many issues at this component, which is the answer where
+// no version fixes them. The screen was built, works, and had no link to it
+// anywhere in the application: this page is where the question is asked, so
+// this is where the way to it belongs.
+const decideAt = (product: string, row: Build, component: string) =>
+  `/products/${encodeURIComponent(product)}` +
+  `/streams/${encodeURIComponent(row.stream ?? "")}` +
+  `/variants/${encodeURIComponent(row.variant ?? "")}` +
+  `/components/${encodeURIComponent(component)}/decide`;
+
 export function Component() {
   const { product = "", component = "" } = useParams();
   const [params, setParams] = useSearchParams();
@@ -697,8 +707,11 @@ function Upgrade({
           Nothing fixes the {here.issues} open here.
         </p>
         <p style={{ marginTop: 10 }}>
-          <Link className="btn" to={findingsAt(product, here, component)}>
+          <Link className="btn" to={decideAt(product, here, component)}>
             Decide them together
+          </Link>{" "}
+          <Link className="btn quiet" to={findingsAt(product, here, component)}>
+            Read them
           </Link>
         </p>
       </div>
@@ -733,6 +746,16 @@ function Upgrade({
           <span className="d">a judgment rather than an upgrade</span>
         </span>
       </div>
+      {/* The way to make that judgment, beside the number that says how much
+          of it there is. Scheduling an upgrade answers the other half of this
+          card and nothing on this page answered this one. */}
+      {noFix > 0 && (
+        <p style={{ marginTop: 6 }}>
+          <Link className="linkish" to={decideAt(product, here, component)}>
+            Decide those together →
+          </Link>
+        </p>
+      )}
 
       <div className="filters">
         <div className="field">
