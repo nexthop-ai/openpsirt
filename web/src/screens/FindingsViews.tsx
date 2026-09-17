@@ -329,7 +329,7 @@ export function ByComponent({
 // One row per upstream bump, with what moving it would close.
 //
 // The other end of the same query the pending-upgrades screen reads: a
-// coordinator reads a build and the bumps it is waiting on, and a triager
+// coordinator reads a build and the upgrades it is waiting on, and a triager
 // reads a bump and the issues it closes. Keyed on the fold, so packages built
 // from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
 //
@@ -394,7 +394,7 @@ export function ByBump({
 
   if (bundles.isPending) return <Loading />;
   if (bundles.isError) {
-    return <Failed error={bundles.error} what="What is open could not be read by bump." />;
+    return <Failed error={bundles.error} what="What is open could not be read by upgrade." />;
   }
   const rows = bundles.data?.items ?? [];
   const total = bundles.data?.total ?? 0;
@@ -417,14 +417,14 @@ export function ByBump({
         <a href={bundlesFile(at, narrowed, "json")}>JSON</a>.
       </p>
       <p className="hint" style={{ margin: "0 0 8px" }}>
-        Ordered by what each bump would close. <b>Listed rather than ordered</b> — comparing two
+        Ordered by what each upgrade would close. <b>Listed rather than ordered</b> — comparing two
         versions needs a per-ecosystem ordering this does not have, so one package appears once per
         version upstream released and there is no nearest and no latest.
         {cannot.length > 0 && (
           <>
             {" "}
             <span style={{ color: "var(--sev-medium)" }}>
-              A bump has no place, no deadline and no assignee, so {cannot.join(", ")}{" "}
+              An upgrade has no place, no deadline and no assignee, so {cannot.join(", ")}{" "}
               {cannot.length === 1 ? "is" : "are"} not applied here.
             </span>
           </>
@@ -435,7 +435,7 @@ export function ByBump({
         <table>
           <thead>
             <tr>
-              <th>Bump</th>
+              <th>Upgrade</th>
               <th>Moving to</th>
               <th>Packages</th>
               <th>Worst</th>
@@ -492,8 +492,8 @@ export function ByBump({
 
       <div className="filters" style={{ margin: "10px 0 0" }}>
         <span className="hint">
-          Showing {rows.length.toLocaleString()} of {total.toLocaleString()} bumps that would close
-          something
+          Showing {rows.length.toLocaleString()} of {total.toLocaleString()} upgrades that would
+          close something
         </span>
         <Pager offset={offset} total={total} onGo={onPage} size={size} />
       </div>

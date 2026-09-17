@@ -339,7 +339,7 @@ type Narrowing struct {
 	OpenFor      int         `query:"open_for" minimum:"1" doc:"Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier"`
 	DueWithin    int         `query:"due_within" minimum:"1" doc:"Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead"`
 	Overdue      bool        `query:"overdue" doc:"Keep only what is already past its deadline"`
-	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than a bump, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed bump shows up in"`
+	FixState     []string    `query:"fix_state,explode" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in"`
 	Weakness     []string    `query:"weakness,explode" maxItems:"200" maxLength:"32" doc:"Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers"`
 	SentBack     bool        `query:"sent_back" doc:"Keep only groups where a claim is with its author, sent back for more"`
 	Publisher    []string    `query:"vex_publisher,explode" maxItems:"200" maxLength:"191" doc:"Keep only what one of these VEX publishers has a standing statement about"`
@@ -686,7 +686,7 @@ type EvidenceBody struct {
 	// ArrivedFrom says somebody moved this version and the issue came with it.
 	// A different sentence aimed at a different person: whoever did the bump,
 	// rather than whoever triages.
-	ArrivedFrom string `json:"arrived_from,omitempty" doc:"The version this was bumped from, where the bump did not resolve it"`
+	ArrivedFrom string `json:"arrived_from,omitempty" doc:"The version this was upgraded from, where the upgrade did not resolve it"`
 
 	// Tags are the words people put on this, as they were typed.
 	Tags []string `json:"tags,omitempty" doc:"Words somebody put on this. Free text, no fixed vocabulary"`

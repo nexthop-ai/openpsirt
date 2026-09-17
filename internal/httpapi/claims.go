@@ -229,7 +229,7 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 			"typed justification.\n\n" +
 			"Only the person who made the original may do this. It normally needs no second " +
 			"approver, for the reason the single form does not: two people already agreed, and " +
-			"a version bump is a prompt to re-check rather than a new claim.\n\n" +
+			"a version upgrade is a prompt to re-check rather than a new claim.\n\n" +
 			"**One act, one approval.** Where any row would need approval again — the " +
 			"severity has risen since it was agreed to, or nothing was ever agreed to — the " +
 			"whole act does. An approver works at the unit the proposer acted at, and agreeing " +

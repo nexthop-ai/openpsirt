@@ -137,7 +137,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			"components/{component}` lists the claims that qualify.\n\n" +
 			"**`patch-needed` is the backport case**: a fix is being carried into this build " +
 			"and the version does not move, so it requires `committed_to`, the date the work " +
-			"lands. `upgrade-needed` is not recorded here — a bump answers a component and " +
+			"lands. `upgrade-needed` is not recorded here — an upgrade answers a component and " +
 			"everything open on it, so it is recorded from the component.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {

@@ -27,13 +27,13 @@ func (bundleSort) Schema(huma.Registry) *huma.Schema {
 
 // BundleBody is one upstream bump and everything it would close.
 type BundleBody struct {
-	Upstream string `json:"upstream" doc:"What the bump is of: the source package where one is recorded, and the component's own name otherwise"`
+	Upstream string `json:"upstream" doc:"What the upgrade is of: the source package where one is recorded, and the component's own name otherwise"`
 	From     string `json:"from" doc:"The version in hand"`
 	To       string `json:"to" doc:"The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped"`
 	// Components are the names this bundle moves, which is what makes a
 	// bundle keyed on a source package readable.
-	Components []string `json:"components" doc:"The packages this one bump moves. More than one where a source package builds several"`
-	Issues     int      `json:"issues" doc:"Distinct vulnerabilities the bump closes"`
+	Components []string `json:"components" doc:"The packages this one upgrade moves. More than one where a source package builds several"`
+	Issues     int      `json:"issues" doc:"Distinct vulnerabilities the upgrade closes"`
 	Places     int      `json:"places" doc:"How many findings those sit at"`
 	Builds     int      `json:"builds,omitempty" doc:"How many builds of the selection hold any of it. Absent where the selection is one build"`
 	Severity   string   `json:"severity,omitempty" doc:"The worst of what it closes"`
@@ -41,7 +41,7 @@ type BundleBody struct {
 	// In names the builds that hold it, which is what a declaration is
 	// offered against: a bump is declared for releases, and the ones worth
 	// offering are the ones that have it.
-	In []BuildName `json:"in" doc:"The builds that hold this bump"`
+	In []BuildName `json:"in" doc:"The builds that hold this upgrade"`
 }
 
 // BundleQuery is what narrows the fix-bundle list.
@@ -54,8 +54,8 @@ type BundleQuery struct {
 	Stream    string     `query:"stream" doc:"Limit to one branch or tag"`
 	Variant   string     `query:"variant" doc:"Limit to one variant"`
 	Severity  string     `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse"`
-	Exploited bool       `query:"exploited" doc:"Keep only bumps closing something known to be exploited"`
-	Component string     `query:"component" doc:"Keep only bumps moving a component of this name"`
+	Exploited bool       `query:"exploited" doc:"Keep only upgrades closing something known to be exploited"`
+	Component string     `query:"component" doc:"Keep only upgrades moving a component of this name"`
 	Search    string     `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
 	Ecosystem string     `query:"ecosystem" doc:"Keep only components of one package kind"`
 	State     string     `query:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided"`
@@ -79,11 +79,11 @@ func registerBundles(api huma.API, in Ingest) {
 		OperationID: "list-fix-bundles", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/fix-bundles",
 		Summary: "List findings by upgrade",
-		Description: "One row per upstream bump, with the issues it closes.\n\n" +
+		Description: "One row per upstream upgrade, with the issues it closes.\n\n" +
 
 			"Keyed on the **source package** where one is recorded and on the component's " +
 			"own name otherwise, so packages built from one source are one row — curl, " +
-			"libcurl4t64 and libcurl3t64 bump once.\n\n" +
+			"libcurl4t64 and libcurl3t64 are upgraded once.\n\n" +
 			"Only what has a fix: a bundle is a version to move to, so a finding upstream has " +
 			"released nothing for is not in one.\n\n" +
 			"Grouping is presentation: one act still writes one decision per component and " +
@@ -91,7 +91,7 @@ func registerBundles(api huma.API, in Ingest) {
 			"Takes the same selection as the findings list, and six of its filters: " +
 			"severity, exploited, component, search, ecosystem and state. Not the rest: a " +
 			"filter that answers about a place or a deadline has no row here to narrow.\n\n" +
-			"Ordered worst first, and `sort` takes any of: what the bump would close " +
+			"Ordered worst first, and `sort` takes any of: what the upgrade would close " +
 			"(`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is " +
 			"(`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). " +
 			"`asc` orders the other way. The default answers what should worry you; " +
@@ -136,10 +136,10 @@ func registerBundles(api huma.API, in Ingest) {
 		OperationID: "export-fix-bundles", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/fix-bundles.{format}",
 		Summary: "Export findings by upgrade",
-		Description: "The same list as a file: one row per upstream bump, with what it closes " +
+		Description: "The same list as a file: one row per upstream upgrade, with what it closes " +
 			"and the builds that hold it.\n\n" +
 			"Takes the same selection and the same filters as the screen, from the same " +
-			"struct. The builds a bump is held in are one cell, separated by spaces, because " +
+			"struct. The builds an upgrade is held in are one cell, separated by spaces, because " +
 			"a spreadsheet has no second dimension.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
@@ -231,19 +231,19 @@ type BuildName struct {
 
 // PlannedBody is one bump a release is waiting on.
 type PlannedBody struct {
-	Fold       string   `json:"fold" doc:"The bump's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"`
+	Fold       string   `json:"fold" doc:"The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"`
 	Upstream   string   `json:"upstream" doc:"What to call it: the source package"`
 	From       string   `json:"from"`
 	To         string   `json:"to" doc:"The version it moves to, as the commitment recorded it"`
 	Components []string `json:"components"`
-	Issues     int      `json:"issues" doc:"Distinct issues still open under this bump here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"`
+	Issues     int      `json:"issues" doc:"Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"`
 	Places     int      `json:"places" doc:"How many findings those issues sit at"`
 	DeclaredAt string   `json:"declared_at" doc:"When the commitment was made, which is what this release has been waiting since"`
 	// By, HeldBy and State are the promise, who is carrying it, and where
 	// it stands. The state is derived on every read from the scans and the
 	// date, and set by nobody.
 	By     string `json:"by,omitempty" doc:"The date the promise named, as a date. Absent where the commitment is intent rather than a promise"`
-	HeldBy string `json:"held_by,omitempty" doc:"The party carrying it, where one party holds all of what is still open under it. A bump split between two is nobody's"`
+	HeldBy string `json:"held_by,omitempty" doc:"The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
 	State  string `json:"state" enum:"planned,landed,lapsed" doc:"Where it stands. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
 	// ClaimID is the claim that argued for it, which is the way through to
 	// the reasoning, the approval and the conversation about the upgrade.
@@ -255,15 +255,15 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		OperationID: "get-pending-upgrades", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades",
 		Summary: "List the upgrades one build is waiting on",
-		Description: "Everything committed for this build, one row per bump — a source package " +
+		Description: "Everything committed for this build, one row per upgrade — a source package " +
 			"at the version it was built at, moving to another version — with what it would " +
 			"still close here.\n\n" +
 			"**What it covers is a match, not a list.** A finding is covered when its " +
 			"component folds to the same key in this build, so changing the version a release " +
 			"is moving to is one row, and an issue published tonight against the same package " +
 			"is covered by this morning's commitment with nobody acting.\n\n" +
-			"**The fix-bundle query read from the other end.** A triager reads a bump and the " +
-			"issues it closes; a coordinator reads a build and the bumps it is waiting on. One " +
+			"**The fix-bundle query read from the other end.** A triager reads an upgrade and the " +
+			"issues it closes; a coordinator reads a build and the upgrades it is waiting on. One " +
 			"query rather than two reports that will eventually disagree.\n\n" +
 			"**Nothing here is declared done.** A piece of work has landed when the build " +
 			"stops holding it, which the scans already say — a declared fix that is still " +
@@ -314,9 +314,9 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
 			"/pending-upgrades.{format}",
 		Summary: "Export the upgrades one build is waiting on",
-		Description: "The same list as a file: one row per bump this build is waiting on, " +
+		Description: "The same list as a file: one row per upgrade this build is waiting on, " +
 			"where it stands, and what it would still close here.\n\n" +
-			"The packages one bump moves are a single cell, separated by spaces, because a " +
+			"The packages one upgrade moves are a single cell, separated by spaces, because a " +
 			"spreadsheet has no second dimension.",
 		Tags: []string{"Remediation"},
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {

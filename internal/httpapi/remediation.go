@@ -68,7 +68,7 @@ func registerRemediation(api huma.API, in Ingest) {
 			"of saying when, so only one may be sent. What is **aging** is a statement about " +
 			"now whatever period was asked for: how long something has been open is answered " +
 			"by the clock.\n\n" +
-			"**A closure only counts as a fix if the issue actually went away.** A bump that " +
+			"**A closure only counts as a fix if the issue actually went away.** An upgrade that " +
 			"carried the issue into the next version, and a finding a scanner silently stopped " +
 			"reporting, are not fixes — counting them measures churn and reports it as " +
 			"progress, so the figure moves in the right direction while nothing improves.\n\n" +

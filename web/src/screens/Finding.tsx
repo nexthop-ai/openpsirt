@@ -531,7 +531,7 @@ export function Finding() {
         <div className="shortfall">
           <span className="icon">◭</span>
           <div>
-            <h4>Short bumps</h4>
+            <h4>Short upgrades</h4>
             <p>
               <span className="id">{it.component}</span> moved{" "}
               <b>
@@ -542,8 +542,8 @@ export function Finding() {
                   ; this issue is fixed in <b>{it.fixed_in}</b>
                 </>
               )}
-              , so the bump could not have resolved it. The old reasoning probably still stands, and
-              somebody's remediation did not land.
+              , so the upgrade could not have resolved it. The old reasoning probably still stands,
+              and somebody's remediation did not land.
             </p>
             <div className="ladder">
               <span className="v was">{it.arrived_from}</span>

@@ -158,22 +158,22 @@ applied, so the two cannot disagree.
 
 ## Pending upgrades
 
-The fix-bundle query inverted (REQ-35). A triager reads a bump and the issues it
-closes, in the findings list's by-bump view; a coordinator reads a build and the
-bumps it is waiting on, here. One query read from either end, and both ends are
-drawn.
+The fix-bundle query inverted (REQ-35). A triager reads an upgrade and the
+issues it closes, in the findings list's by-upgrade view; a coordinator reads a
+build and the upgrades it is waiting on, here. One query read from either end,
+and both ends are drawn.
 
-Both ends key their rows on the fold, so a bump reads the same from either
+Both ends key their rows on the fold, so an upgrade reads the same from either
 direction.
 
 The version in hand and the version being moved to are both stored with the
 commitment. They are read off the findings that are still open, and landing the
-bump closes them — so a plan deriving them went blank on a bump exactly as the
-bump succeeded.
+upgrade closes them — so a plan deriving them went blank on an upgrade exactly
+as the upgrade succeeded.
 
 What each row reports is what is still open under it, counted from the findings
-rather than from anything written down: the distinct issues the bump would close
-here, and how many places those sit at. Nothing is declared done by hand — a
+rather than from anything written down: the distinct issues the upgrade would
+close here, and how many places those sit at. Nothing is declared done by hand — a
 build is clear when it stops holding them.
 
 ## Asking upstream what is current

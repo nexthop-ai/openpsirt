@@ -527,7 +527,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			"applying when an upstream version changed.\n\n" +
 			"`standing` is absent when nothing has been decided, or when a claim is still waiting " +
 			"for approval: a claim nobody has agreed to suppresses nothing.\n\n" +
-			"Read `previously` before deciding again. A claim that lapsed on a version bump is " +
+			"Read `previously` before deciding again. A claim that lapsed on a version upgrade is " +
 			"usually still the right answer, and re-affirming it is a different request from " +
 			"making a new one.",
 		Tags: []string{"Triage"},
@@ -591,7 +591,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			"moved, at the versions this finding has now. `previous` is the decision being " +
 			"re-made, from `previously` in `GET .../decision`.\n\n" +
 			"Only the person who made the original may do this, and it normally needs no second " +
-			"approver: two people already agreed to the claim, and a version bump is a prompt to " +
+			"approver: two people already agreed to the claim, and a version upgrade is a prompt to " +
 			"re-check rather than a new claim.\n\n" +
 			"It does need approval again if the vulnerability's severity has risen since the " +
 			"original was agreed to, or if nothing was ever agreed to. What was agreed was " +

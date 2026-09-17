@@ -406,7 +406,7 @@ export function Findings() {
           {[
             ["issues", "By issue"],
             ...(spanning ? [] : [["components", "By component"] as const]),
-            ...(spanning ? [] : [["bumps", "By bump"] as const]),
+            ...(spanning ? [] : [["bumps", "By upgrade"] as const]),
           ].map(([value, label]) => (
             <button
               key={value}
