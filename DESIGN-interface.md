@@ -1209,7 +1209,8 @@ chosen (REQ-64).
 | It matches issue names as well as component names | Labeled "Find a component or an issue", it searched component names only, so the question a PSIRT is asked first when an advisory lands — where is this in what we ship — returned an empty list, which reads as "we do not ship it" |
 | Aliases are matched | An issue is one thing under several names, so the name a reporter used has to reach the row filed under the name a scanner used, or the answer depends on which feed arrived first |
 | Both halves are one box rather than two fields | Somebody typing a name does not classify it first, and an identifier is not mistakable for a package name in practice |
-| It stops at a product where the address it is on does | Asking "wherever we have it" across every product is a view of its own with a query behind it, which is better than a box that quietly answers about one product while looking like it answered about all of them |
+| It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. It used to return without navigating anywhere when no product was picked, so the box looked live and swallowed what was typed |
+| A term that resolves to an issue goes to the issue instead | Decided by asking rather than by the shape of the text: a second copy of the server's name resolution is wrong about every identifier a deployment mints for itself |
 
 ## A person's own page
 

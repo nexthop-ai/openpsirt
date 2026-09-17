@@ -472,8 +472,10 @@ function Rail({
 // **An issue name goes to the issue, wherever it sits**, and needs no
 // product picked: "a critical just landed in openssl — which of our products
 // ship an affected version" is the question, and it spans products by
-// construction. Anything else searches what a product ships, which still needs
-// one picked.
+// construction. Anything else searches what is shipped, at whatever the
+// picker has selected — and across every product a reader can see where it has
+// selected nothing, which is the same list at its widest address. Typing at
+// that scope used to do nothing at all, silently.
 //
 // Which of the two it is, is decided by asking: a term that resolves to an
 // issue goes to the issue page, and everything else falls through to the list.
@@ -506,9 +508,6 @@ function Search({ at }: { at: Scoped }) {
   return (
     <form
       className="topsearch"
-      title={
-        at.product ? undefined : "Search an issue by name, or pick a product to search components"
-      }
       onSubmit={(event) => {
         event.preventDefault();
         const term = typed.trim();
@@ -532,9 +531,10 @@ function Search({ at }: { at: Scoped }) {
               setUnread(true);
               return;
             }
-            // Not an issue anybody here carries, so it is a component search,
-            // and that is a question about one product's contents.
-            if (!at.product) return;
+            // Not an issue anybody here carries, so it is a component
+            // search. The list answers that across every product a reader can
+            // see as readily as within one, so with no product picked the
+            // term used to be dropped where the answer was a screen away.
             const path = findingsPath(at);
             navigate(`${path}${path.includes("?") ? "&" : "?"}q=${encodeURIComponent(term)}`);
           })
