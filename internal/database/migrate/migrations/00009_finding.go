@@ -148,6 +148,15 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- published, and a feed that shouts or whispers one should not
 			-- make two rows of it.
 			"cwe"              ` + t.name + ` NOT NULL,
+			-- Whether this is the one the data calls the root cause.
+			--
+			-- A published advisory states one weakness, and an issue is
+			-- commonly classified as several. Which one is stated cannot be
+			-- picked here: choosing the lowest number, or the first read, is
+			-- an answer with nothing behind it. The feeds say which is primary
+			-- and a person recording a flaw names theirs first, so the answer
+			-- is carried rather than invented.
+			"is_primary"       ` + t.boolean + ` NOT NULL,
 			CONSTRAINT "vulnerability_weakness_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "vulnerability_weakness_unique" UNIQUE ("vulnerability_id", "cwe")
 		)` + t.suffix,

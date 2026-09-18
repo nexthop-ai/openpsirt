@@ -565,3 +565,73 @@ func TestAnEstimateDatedAheadOfNowIsNotTakenAsItsDay(t *testing.T) {
 			result.Reported[0].Issue.Likelihood)
 	}
 }
+
+// twoWeaknesses is one match classified two ways, with the one the data calls
+// the root cause deliberately not the one any ordering would reach for: CWE-20
+// is the lower number and "CWE-119" is the earlier string, and CWE-20 is
+// primary. A reader that sorts picks the wrong one.
+const twoWeaknesses = `{
+ "descriptor": {"name": "grype", "version": "0.112.0",
+   "db": {"built": "2026-08-28T01:31:12Z", "schemaVersion": "6.0.2"}},
+ "matches": [{
+   "vulnerability": {"id": "CVE-2026-1234", "severity": "High", "dataSource": "",
+     "cwes": [
+       {"cwe": "CWE-119", "source": "nvd@nist.gov", "type": "Secondary"},
+       {"cwe": "CWE-20", "source": "nvd@nist.gov", "type": "Primary"}],
+     "fix": {"state": "unknown", "versions": []}},
+   "artifact": {"name": "libc6", "version": "2.41", "type": "deb",
+     "purl": "pkg:deb/debian/libc6@2.41"},
+   "matchDetails": [{"type": "exact-direct-match"}]
+ }]
+}`
+
+func TestTheWeaknessTheDataCallsTheRootCauseLeads(t *testing.T) {
+	// A published advisory states one weakness and a report commonly carries
+	// several, so something has to say which. The feeds say it, in the word
+	// beside each entry, and it was read and dropped — which left the answer
+	// to whichever happened to sort first.
+	result, err := scanner.ParseGrype(strings.NewReader(twoWeaknesses), scanner.Limits{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(result.Reported) != 1 {
+		t.Fatalf("read %d matches, want 1", len(result.Reported))
+	}
+	got := result.Reported[0].Issue.Weaknesses
+	want := []string{"CWE-20", "CWE-119"}
+	if !slices.Equal(got, want) {
+		t.Errorf("the weaknesses read %v, want %v — the root cause leads", got, want)
+	}
+}
+
+func TestWhereNothingIsCalledTheRootCauseTheOrderIsStillTheSameEveryRun(t *testing.T) {
+	// Two secondaries and no primary, which is ordinary. Nothing is promoted,
+	// and the order is the identifier order — so a re-scan of unchanged data
+	// still writes nothing.
+	neither := strings.ReplaceAll(twoWeaknesses, `"type": "Primary"`, `"type": "Secondary"`)
+	result, err := scanner.ParseGrype(strings.NewReader(neither), scanner.Limits{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	got := result.Reported[0].Issue.Weaknesses
+	want := []string{"CWE-119", "CWE-20"}
+	if !slices.Equal(got, want) {
+		t.Errorf("the weaknesses read %v, want %v", got, want)
+	}
+}
+
+func TestAReportNamingTwoRootCausesKeepsTheFirst(t *testing.T) {
+	// A report disagreeing with itself. One weakness is stated, so one of the
+	// two has to lose, and the first stands — an answer stated rather than
+	// left to whichever the loop happened to reach last.
+	both := strings.ReplaceAll(twoWeaknesses, `"type": "Secondary"`, `"type": "Primary"`)
+	result, err := scanner.ParseGrype(strings.NewReader(both), scanner.Limits{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	got := result.Reported[0].Issue.Weaknesses
+	want := []string{"CWE-119", "CWE-20"}
+	if !slices.Equal(got, want) {
+		t.Errorf("the weaknesses read %v, want %v — the first stated root cause stands", got, want)
+	}
+}

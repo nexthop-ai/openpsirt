@@ -8332,6 +8332,8 @@ components:
             - "null"
         cve:
           type: string
+        cwe:
+          $ref: "#/components/schemas/Weakness"
         discovery_date:
           type: string
         ids:
@@ -8446,6 +8448,17 @@ components:
         - version
         - body
         - replaced_at
+      type: object
+    Weakness:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
       type: object
     WentBody:
       additionalProperties: false

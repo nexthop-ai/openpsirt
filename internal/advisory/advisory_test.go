@@ -105,9 +105,17 @@ func (f *fixture) shippedAs(t *testing.T, target int64, declared string) {
 // recorded enters a flaw against one build and returns what it was filed as.
 func (f *fixture) recorded(t *testing.T, target int64) string {
 	t.Helper()
+	return f.recordedAs(t, target)
+}
+
+// recordedAs is the same, classified as these kinds of flaw, the root cause
+// first.
+func (f *fixture) recordedAs(t *testing.T, target int64, weaknesses ...string) string {
+	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
 		TargetIDs: []int64{target}, Component: carrier.Name, Severity: "high",
-		Summary: "The management socket answers before anyone authenticated.",
+		Summary:    "The management socket answers before anyone authenticated.",
+		Weaknesses: weaknesses,
 	})
 	if err != nil {
 		t.Fatalf("recording a flaw: %v", err)
@@ -761,4 +769,84 @@ func releaseLeaves(doc *advisory.Document) []advisory.Named {
 	}
 	walk(doc.ProductTree.Branches)
 	return out
+}
+
+func TestTheAdvisoryNamesTheFlawInTheCatalogsOwnWordsRatherThanTheScreens(t *testing.T) {
+	// The standard states a weakness as the identifier and the name the
+	// catalog gives it, and a consumer's validator compares the pair. The
+	// interface calls this one "Buffer overflow", which is right for somebody
+	// scanning a list and fails that comparison. Two lists rather than one
+	// used twice.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recordedAs(t, f.master, "CWE-119")
+
+		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := doc.Vulnerabilities[0].CWE
+		if got == nil {
+			t.Fatal("the document says nothing about what kind of flaw this is")
+		}
+		want := "Improper Restriction of Operations within the Bounds of a Memory Buffer"
+		if got.ID != "CWE-119" || got.Name != want {
+			t.Errorf("the document states %+v, want CWE-119 named %q", got, want)
+		}
+	})
+}
+
+func TestTheAdvisoryStatesTheRootCauseRatherThanWhicheverSortsFirst(t *testing.T) {
+	// The standard carries one weakness and an issue is commonly classified as
+	// several, so something has to say which. These two are chosen because
+	// every order that is not the recorded one picks the wrong one: CWE-20 is
+	// the lower number and "CWE-119" is the earlier string, and the root cause
+	// here is CWE-20 — so a document stating CWE-119 is a document that sorted
+	// rather than read.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recordedAs(t, f.master, "CWE-20", "CWE-119")
+
+		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := doc.Vulnerabilities[0].CWE
+		if got == nil {
+			t.Fatal("the document says nothing about what kind of flaw this is")
+		}
+		if got.ID != "CWE-20" {
+			t.Errorf("the document states %q, want the one recorded as the root cause", got.ID)
+		}
+	})
+}
+
+func TestAWeaknessTheCatalogDoesNotAssignIsLeftOutRatherThanNamed(t *testing.T) {
+	// A category, a view, or a number from a catalog newer than the one read.
+	// The name is the half that cannot be invented, so a flaw whose kind
+	// cannot be named says nothing about its kind — which is what every other
+	// field the record cannot fill does.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recordedAs(t, f.master, "CWE-999999")
+
+		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := doc.Vulnerabilities[0].CWE; got != nil {
+			t.Errorf("the document calls it %+v, and the catalog assigns no such weakness", got)
+		}
+	})
+}
+
+func TestAFlawNobodyClassifiedSaysNothingAboutItsKind(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+
+		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := doc.Vulnerabilities[0].CWE; got != nil {
+			t.Errorf("the document calls it %+v, and nobody classified it", got)
+		}
+	})
 }

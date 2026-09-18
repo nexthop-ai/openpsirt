@@ -444,22 +444,37 @@ func matchedRange(details []matchDetail) string {
 // — what they act on is that this is a use-after-free and so are eleven other
 // findings. Ordering it makes the stored value the same for the same report,
 // which is what keeps a re-scan from writing.
+//
+// **Except for the one the data calls the root cause, which leads.** A
+// published advisory states one weakness and a report commonly carries
+// several, so something has to say which — and taking whichever sorts first is
+// an answer with nothing behind it. The feeds say it, in the word beside each
+// entry, and it was read and dropped. The rest follow in identifier order, so
+// the stored value is still the same for the same report.
+//
+// Where nothing is called primary the identifier order stands, which is the
+// same answer as before. Where two are, the first stands: a report naming two
+// root causes disagrees with itself, and one weakness is what gets stated.
 func weaknesses(cwes []struct {
 	CWE  string `json:"cwe"`
 	Type string `json:"type"`
 }) []string {
 	seen := map[string]bool{}
-	var named []string
+	var named, root []string
 	for _, entry := range cwes {
 		name := strings.ToUpper(strings.TrimSpace(entry.CWE))
 		if name == "" || seen[name] {
 			continue
 		}
 		seen[name] = true
+		if len(root) == 0 && strings.EqualFold(strings.TrimSpace(entry.Type), "primary") {
+			root = append(root, name)
+			continue
+		}
 		named = append(named, name)
 	}
 	sort.Strings(named)
-	return named
+	return append(root, named...)
 }
 
 // databaseVersion says which vulnerability data a run matched against.

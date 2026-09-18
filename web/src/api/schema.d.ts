@@ -9180,6 +9180,7 @@ export interface components {
         Vulnerability: {
             acknowledgments?: components["schemas"]["Acknowledgment"][] | null;
             cve?: string;
+            cwe?: components["schemas"]["Weakness"];
             discovery_date?: string;
             ids?: components["schemas"]["Issued"][] | null;
             notes?: components["schemas"]["Note"][] | null;
@@ -9240,6 +9241,10 @@ export interface components {
              * @description Which version this was, counting from one
              */
             version: number;
+        };
+        Weakness: {
+            id: string;
+            name: string;
         };
         WentBody: {
             /** @description What the document hashed to when it went out. The published document belongs to whoever published it; this is what makes comparing it possible */

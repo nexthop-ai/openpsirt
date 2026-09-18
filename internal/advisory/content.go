@@ -6,8 +6,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // The parts of the document that carry what is held about the flaw rather than
@@ -264,6 +267,39 @@ func remediationsFor(fixed []Named, affected []string) []Remediation {
 		Details:    "No release fixing this is available.",
 		ProductIDs: affected,
 	}}
+}
+
+// weaknessOf is what kind of flaw this is, where the catalog knows the name.
+//
+// **The root cause, and only where it can be named.** The standard carries one
+// weakness per flaw and an issue is commonly classified as several, so the
+// stored order decides: a feed says which it calls primary and a person
+// recording a flaw names theirs first, and that one leads.
+//
+// The name comes from the catalog rather than from anything held here, because
+// a validator compares the pair against the catalog and nothing else would
+// match. An identifier it does not assign — a category, a view, a number a
+// newer catalog added — states nothing, which is the same answer this file
+// gives everywhere: a field the record cannot fill is left out.
+//
+// A failed read is not a classification. It reports nothing rather than
+// answering "this flaw has no kind", which is a statement about the issue that
+// a database that would not answer does not support.
+func weaknessOf(ctx context.Context, db bun.IDB, issueID int64) *Weakness {
+	var held []string
+	err := db.NewSelect().Model((*finding.Weakness)(nil)).
+		ColumnExpr("vw.cwe").
+		Where("vw.vulnerability_id = ?", issueID).
+		OrderExpr("vw.is_primary DESC, vw.cwe").
+		Limit(1).Scan(ctx, &held)
+	if err != nil || len(held) == 0 {
+		return nil
+	}
+	name, known := weakness.Name(held[0])
+	if !known {
+		return nil
+	}
+	return &Weakness{ID: held[0], Name: name}
 }
 
 // distributionFor is how far the document may travel.

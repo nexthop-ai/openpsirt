@@ -198,6 +198,8 @@ type Vulnerability struct {
 	Notes []Note   `json:"notes,omitempty"`
 	// Status is which releases the flaw is in and which it is out of.
 	Status Status `json:"product_status"`
+	// CWE is what kind of flaw this is, where the catalog knows the name.
+	CWE *Weakness `json:"cwe,omitempty"`
 	// What is held about the flaw beyond which releases carry it: what it
 	// scored, what a holder of an affected release can do, and whoever asked
 	// to be credited for telling us.
@@ -207,6 +209,19 @@ type Vulnerability struct {
 	// DiscoveryDate is when this deployment first recorded it, which is what
 	// it knows. When somebody outside found it is not something it holds.
 	DiscoveryDate string `json:"discovery_date,omitempty"`
+}
+
+// Weakness is the kind of flaw, as the standard carries it.
+//
+// **One, and both halves of it.** The standard states a weakness as the
+// identifier and the name the catalog gives it, and a consumer's validator
+// compares the pair — so an issue classified several ways states the one the
+// data calls the root cause, and one whose name the catalog does not know
+// states nothing. A name invented to fill the field is the single thing in the
+// document guaranteed to be caught.
+type Weakness struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // Issued is an identifier somebody else's system knows this by.
@@ -386,6 +401,7 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 	if !entered.OpenedAt.IsZero() {
 		vulnerability.DiscoveryDate = entered.OpenedAt.UTC().Format("2006-01-02")
 	}
+	vulnerability.CWE = weaknessOf(ctx, s.db, issue.ID)
 
 	// One branch per release, under the product, under the publisher. The
 	// tree names releases rather than components on purpose: an advisory

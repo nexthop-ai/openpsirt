@@ -125,7 +125,7 @@ being parsed and thrown away.
 | What counts as a fix | One list, named once. A closure not on it is churn or a correction, never progress — it was a positive list of four words spliced into SQL, a negative list of three in Go, and a third list of the same four as a switch returning prose, none of them checked by the compiler and all three disagreeing about any closure added later |
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
 | A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
-| Weakness classification | Kept where the data carries it, deduplicated and ordered. It groups findings by the shape of the mistake rather than the package it landed in |
+| Weakness classification | Kept where the data carries it, deduplicated and ordered, with the one the data calls the root cause first. It groups findings by the shape of the mistake rather than the package it landed in, and a published advisory states one of them — which is what the order says |
 
 ## Who supplied a component
 
@@ -402,7 +402,8 @@ A public intake form is out of scope. This is the inside half.
 | An unstated vector is not a score of zero | Zero says "harmless", a judgment nobody made during early triage |
 | A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. It is not given *no* deadline: the windows answer for a severity they do not recognize |
 | A person's severity is checked against the words rather than folded | A report's is folded, because a scanner that rated nothing is silent and silence is not a claim that something is mild. A person typing "urgent" is not silent; they are wrong, and folding would replace their judgment with one nobody made |
-| Weaknesses are recorded as given, against no catalog | Trimmed, upper-cased, de-duplicated. A list refusing an identifier it had not heard of would refuse next year's |
+| Weaknesses are recorded as given, against no catalog | Trimmed, upper-cased, de-duplicated. A list refusing an identifier it had not heard of would refuse next year's. Where a published document has to name one, the name is looked up then rather than checked now, and an identifier no catalog assigns is left out of that document rather than out of the record |
+| Which one is the root cause is carried rather than picked | A published advisory states one weakness and an issue is commonly classified as several. The feeds say which they call primary, and a person recording a flaw names theirs first — the same statement made by hand. Choosing the lowest number or the earliest string instead is an answer with nothing behind it, and the two disagree: `CWE-20` is the lower number and `CWE-119` the earlier string |
 
 ## Affected build sets
 

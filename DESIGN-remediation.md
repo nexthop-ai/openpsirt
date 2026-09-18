@@ -352,11 +352,18 @@ An address a report supplied goes through the rule an address stored beside a
 claim goes through, and a custom application scheme is dropped rather than
 published. It is leaving the deployment, into tooling that follows it.
 
-**The weakness classification is not carried.** It needs the name that goes
-with the identifier, and what is held is the identifier alone — a name invented
-to fill the field is the one thing a validator checks it against, and acquiring
-names means taking on a catalog somebody else publishes, with an owner and a
-refresh story.
+**The weakness is stated in the catalog's own words.** The standard carries a
+weakness as the identifier and the name assigned to it, and a consumer's
+validator compares the pair — so the name is read from the authority that
+assigns it, never from anything held here.
+
+| Rule | Reason |
+|---|---|
+| The names come from the published catalog, fetched and committed | A thousand names nobody can check by eye is a file that goes wrong quietly: one transcription error is a document refused at a customer, months later, over a weakness nobody was looking at. The same reason the reserved-word list is asked rather than typed |
+| Not the names the interface uses | A screen names a weakness in a few words somebody scans — "Buffer overflow" — and the catalog calls that one "Improper Restriction of Operations within the Bounds of a Memory Buffer". Both are right for their reader and only one passes a validator, so they are two lists rather than one used twice |
+| One weakness, the one the data calls the root cause | The standard carries one and an issue is commonly classified as several. Taking whichever sorts first is an answer with nothing behind it. A feed says which it calls primary and a person recording a flaw names theirs first, so the answer is carried from where it was stated |
+| An identifier the catalog does not assign states nothing | Categories and views carry identifiers of the same shape and are not what a vulnerability is classified as, and a newer catalog assigns numbers an older one predates. The name is the half that cannot be invented |
+| The catalog version is recorded and is not gated against what it publishes today | The engines the reserved-word list asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes, for a reason no change here caused |
 
 **Each release is named by what its own inventory called it.** The product
 identification helper carries the package identifier the build declared for the
