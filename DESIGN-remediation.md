@@ -373,6 +373,8 @@ customer — which is the reason the two-person approval on those claims exists.
 |---|---|
 | OpenVEX rather than the CSAF profile | It is the format this deployment already reads. One document shape to get right, and one deployment's output can be another's input |
 | Approved claims only | A proposal is one person's opinion and this document is the deployment's word to a customer |
+| The impact statement carries what stops the flaw, never the reasoning | The reasoning is the argument a triager put to a second person here, addressed to a reader who can see the record it argues against. Published it is this deployment's review of itself, machine-readable, in front of every customer running a scanner. The mitigation is the half somebody holding the build can act on |
+| Where no mitigation was named the field is absent | Only one recognized reason asks for a mitigation, so most statements carry none. The justification beside it is what the format asks for, and silence says less wrongly than the wrong text |
 | A deferral is absent rather than exported as anything | Publishing it as not-affected would assert we assessed something as harmless when we had only postponed it. Silence already reads as affected in this format |
 | Public findings only | Asking for the undisclosed ones is a preview for somebody who may read them, and refused for anybody who may not |
 | The statement is about the build, with the component underneath | A VEX statement is about a thing somebody has, and what they have is the image |
@@ -398,12 +400,12 @@ twice.
 
 **The earliest decision is picked first, and then read.** Each column had its own
 minimum over the group, and nothing tied them to one row: with two claims
-standing at a component — "component_not_present / we removed it in the patch"
-and "vulnerable_code_not_in_execute_path / the path is unreachable" — the
-machine-readable category came from one and the prose from the other, and the
-published statement said the component was not present with reasoning explaining
-that a code path is unreachable. That is a composite no record ever held, going
-to every customer running a scanner. The group answers with the earliest
+standing at a component — "component_not_present" and
+"inline_mitigations_already_exist / bound to the management VLAN" — the
+machine-readable category came from one and the impact statement from the other,
+and the published statement said the component was not present while describing
+the network control that protects it. That is a composite no record ever held,
+going to every customer running a scanner. The group answers with the earliest
 decision's identifier and its words are read by that identifier.
 
 ## Issuance records

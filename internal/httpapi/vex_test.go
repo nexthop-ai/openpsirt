@@ -84,10 +84,13 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 		if one.Justification != "vulnerable_code_not_present" {
 			t.Errorf("the justification reads as %q", one.Justification)
 		}
-		// And the reasoning, which is the part worth reading and the part a
-		// second person agreed to.
-		if !contains(one.ImpactStatement, "driver") {
-			t.Errorf("the statement carries no reasoning: %q", one.ImpactStatement)
+		// And nothing else. The reasoning beside this dismissal is addressed
+		// to the second person who checked it, and this document is read by
+		// every customer running a scanner — so where no mitigation was named
+		// the field is absent rather than filled with the review.
+		if one.ImpactStatement != "" {
+			t.Errorf("the statement publishes %q, and nothing named a mitigation",
+				one.ImpactStatement)
 		}
 		// The product is what somebody has, with the component underneath it.
 		if len(one.Products) != 1 || one.Products[0].ID != "mine:master:broadcom" {
@@ -479,6 +482,44 @@ func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarg
 		}
 		if !strings.Contains(err.Error(), "mine") || !strings.Contains(err.Error(), "master") {
 			t.Errorf("the refusal does not say which build: %s", err)
+		}
+	})
+}
+
+func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
+	// The two texts answer different readers. A mitigation says what stops
+	// the flaw, which is what somebody holding the build can act on. The
+	// reasoning is the argument a triager put to a second person here, and
+	// publishing it hands every customer this deployment's review of itself.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+
+		const stops = "The service is bound to the management VLAN only."
+		const argued = "Checked the build flags and the exposed sockets."
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image",
+			`{"outcome":"not-applicable","justification":"inline_mitigations_already_exist",`+
+				`"mitigation":"`+stops+`","reasoning":"`+argued+`"}`)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var doc struct {
+			Statements []struct {
+				ImpactStatement string `json:"impact_statement"`
+			} `json:"statements"`
+		}
+		read(t, r, "triager", at, &doc)
+		if len(doc.Statements) != 1 {
+			t.Fatalf("the document carries %d statements, want the one approved dismissal",
+				len(doc.Statements))
+		}
+		if got := doc.Statements[0].ImpactStatement; got != stops {
+			t.Errorf("the statement says %q, want what stops it", got)
+		}
+		if contains(doc.Statements[0].ImpactStatement, "build flags") {
+			t.Errorf("the reasoning reached the document: %q", doc.Statements[0].ImpactStatement)
 		}
 	})
 }
