@@ -139,7 +139,7 @@ type FindingBody struct {
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"Nothing here has been announced. Anything said about it outside this deployment discloses it"`
 	DiscloseAt  string `json:"disclose_at,omitempty" doc:"When the embargo ends, as a date. Reaching it discloses nothing by itself"`
 
-	NoDeadline string `json:"no_deadline,omitempty" enum:"below-the-line,out-of-support" doc:"Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate"`
+	NoDeadline string `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life. Every reason is deliberate, and where more than one holds the narrowest is stated"`
 	// Exploited is why something is at the top when it is. A position nobody
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
@@ -719,7 +719,7 @@ type EvidenceBody struct {
 	// is past end of life — so a consumer validating against the published
 	// document rejected the body, and a TypeScript one could not narrow on
 	// the value it actually receives. Two bodies for one value, disagreeing.
-	NoDeadline string        `json:"no_deadline,omitempty" enum:"below-the-line,out-of-support" doc:"Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate. Blank would read as missing data on the row somebody is deciding about"`
+	NoDeadline string        `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life. Every reason is deliberate, and where more than one holds the narrowest is stated. Blank would read as missing data on the row somebody is deciding about"`
 	FoundBy    *MeasuredBody `json:"found_by,omitempty" doc:"What produced this: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
 	// Recorded says a person entered this rather than a scanner reporting it,

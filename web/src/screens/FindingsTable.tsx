@@ -33,16 +33,21 @@ function openFor(opened: string | undefined): string | null {
 
 // What to say in the Due column, and how to color it.
 //
-// A blank cell would mean two deliberate things at once — below the line or
-// past end of life — on the one screen whose purpose is noticing what is
-// running out, so the reason is said.
+// A blank cell would mean any of several deliberate things at once, on the one
+// screen whose purpose is noticing what is running out, so the reason is said.
+const noDeadlineSays: Record<string, string> = {
+  "below-the-line": "below the line",
+  "nothing-to-take": "no fix to take",
+  "out-of-support": "out of support",
+};
+
 function dueSays(row: { due?: string; days_left?: number; no_deadline?: string }): {
   text: string;
   tone: "over" | "soon" | "fine" | "none";
 } {
   if (!row.due) {
     return {
-      text: row.no_deadline === "out-of-support" ? "out of support" : "below the line",
+      text: noDeadlineSays[row.no_deadline ?? ""] ?? "no deadline",
       tone: "none",
     };
   }

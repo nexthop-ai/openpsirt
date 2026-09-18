@@ -106,8 +106,8 @@ type Group struct {
 	// has been somebody's problem for a week.
 	OpenedAt time.Time
 	// DueAt is the earliest deadline across these places, and NoDeadline
-	// says why there is none where there is none. Exactly two reasons,
-	// both deliberate, and a blank cell would mean either.
+	// says why there is none where there is none. Every reason is
+	// deliberate, and a blank cell would mean any of them.
 	DueAt      *time.Time
 	NoDeadline NoDeadline
 	// Urgency is how far up the list this belongs, and Exploited says whether
@@ -492,19 +492,23 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 			group.Source = component.UpstreamName
 		}
 	}
-	// Why there is no deadline, said rather than left as a blank cell. The two
-	// reasons are exhaustive, so whatever the line does not account for is the
-	// other one: the line is a statement about the rating, which is on the
-	// row, and everything else without a deadline is in a release nothing is
-	// going to be fixed in.
+	// Why there is no deadline, said rather than left as a blank cell. The
+	// reasons are asked narrowest first and the last is what is left: the line
+	// is a statement about this issue's rating, upstream having nothing to
+	// take is one about this finding, and anything else without a deadline is
+	// in a release nothing is going to be fixed in.
 	//
 	// Which line that is belongs to the caller: per product it is the
 	// product's own, and across products it is the deployment's, because one
 	// word chosen for a page that spans them would answer for none of them.
 	if group.DueAt == nil {
-		group.NoDeadline = OutOfSupport
-		if !floor.Admits(group.Exploited, group.Severity) {
+		switch {
+		case !floor.Admits(group.Exploited, group.Severity):
 			group.NoDeadline = BelowTheLine
+		case !Closable(group.FixState):
+			group.NoDeadline = NothingToTake
+		default:
+			group.NoDeadline = OutOfSupport
 		}
 	}
 	return group
@@ -576,16 +580,25 @@ type groupHead struct {
 
 // NoDeadline is why a finding carries no deadline.
 //
-// There are exactly two reasons and both are deliberate — a deadline stored at
-// ingest works out a deadline at ingest for everything else — so an empty cell
-// would mean two intended things at once, on the one screen whose purpose is
-// noticing what is running out.
+// Every reason is deliberate — a deadline is worked out at ingest for
+// everything else — so an empty cell would mean several intended things at
+// once, on the one screen whose purpose is noticing what is running out.
+//
+// **Narrowest first, where more than one holds.** The most useful sentence is
+// the one about this finding rather than about its release, and a reader who
+// is told the release is retired learns nothing they could act on if the real
+// answer is that the rating puts it below the line.
 type NoDeadline string
 
 const (
 	// BelowTheLine is a finding its product does not consider worth
 	// triaging . Still recorded, still counted, and off the clock.
 	BelowTheLine NoDeadline = "below-the-line"
+	// NothingToTake is a finding upstream has released no fix for, or has
+	// declined to fix. There is no version that would close it, so a
+	// deadline on it is unmeetable by construction — the same statement
+	// the two either side of it make, from a third direction.
+	NothingToTake NoDeadline = "nothing-to-take"
 	// OutOfSupport is a finding in a release that is past its end of life
 	// . Nothing is going to be fixed there, so nothing is late.
 	OutOfSupport NoDeadline = "out-of-support"

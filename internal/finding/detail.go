@@ -609,19 +609,24 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		}
 	}
 	// Why there is none, where there is none — derived the way the list
-	// derives it, because the two reasons are exhaustive: the line is a
-	// statement about the rating, and everything else without a deadline
-	// is in a release nothing is going to be fixed in. Where both hold it
-	// says the line, being the narrower statement about this finding
-	// rather than about its release.
+	// derives it, narrowest first: the line is a statement about this
+	// issue's rating, upstream having nothing to take is one about this
+	// finding, and anything else without a deadline is in a release nothing
+	// is going to be fixed in. Where more than one holds it says the
+	// narrower, because a reader told the release is retired learns nothing
+	// they could act on if the rating is what actually put it off the clock.
 	if evidence.DueAt == nil {
 		line, err := FloorFor(ctx, s.db, productID)
 		if err != nil {
 			return nil, err
 		}
-		evidence.NoDeadline = OutOfSupport
-		if !line.Admits(evidence.Exploited, evidence.Severity) {
+		switch {
+		case !line.Admits(evidence.Exploited, evidence.Severity):
 			evidence.NoDeadline = BelowTheLine
+		case !Closable(FixState(evidence.FixState)):
+			evidence.NoDeadline = NothingToTake
+		default:
+			evidence.NoDeadline = OutOfSupport
 		}
 	}
 	if opened != nil {

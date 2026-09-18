@@ -118,9 +118,12 @@ func TestAnIssueBecomingExploitedIsClockedFromWhenThatWasLearned(t *testing.T) {
 	// from the scan that learned it.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
+		// Fixed upstream, which is stated rather than incidental: a deadline
+		// is only meetable where a version exists to take, so this test's
+		// subject needs a finding that carries one at all.
 		quiet := finding.Reported{
 			Issue:     finding.Named{Identifier: "CVE-2026-KEV", Severity: "high"},
-			Component: libnl, FixState: finding.NoFix,
+			Component: libnl, FixState: finding.FixedUpstream,
 		}
 		opening := f.run(t)
 		if _, err := f.store.Apply(t.Context(), f.target, opening, []finding.Reported{quiet}); err != nil {

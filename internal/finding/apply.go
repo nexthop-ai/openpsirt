@@ -189,6 +189,12 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		onTheClock := moves && !supported.Past(s.now().UTC())
 
 		wanted := map[key]Finding{}
+		// How long each of them has, where it is on the clock at all. Carried
+		// beside the finding rather than on it: a deadline is worked out from
+		// the finding's own opening, and one already open opened before this
+		// run — so the window has to reach the loop below, where that is
+		// known. Absent means nothing on this build carries a deadline.
+		windowFor := map[key]time.Duration{}
 		for _, r := range reported {
 			component, held := present.byIdentity[r.Component.Identity()]
 			if !held {
@@ -234,19 +240,20 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				entry := wanted[key{vulnerabilityID, at}]
 				entry.Urgency = int64(ranked.Rank())
 				entry.RankExploited, entry.RankShipped = ranked.Exploited, ranked.Shipped
-				// Counted from this run. For a new finding that is when it was
-				// first seen; for one already open the update below takes it
-				// only where the clock itself changed, so a deadline does not
-				// restart every night and never arrive.
+				// A finding that opens already exploited was learned about
+				// when it opened, and every later recount has to reach the
+				// same answer.
+				entry.ExploitedLearnedAt = learnedExploitation(entry, startedAt)
 				severity := rated.Severity()
 				if onTheClock && floor.Admits(rated.Exploited, severity) {
-					due := startedAt.Add(windows.For(rated.Exploited, severity))
-					entry.DueAt = &due
+					window := windows.For(rated.Exploited, severity)
+					windowFor[key{vulnerabilityID, at}] = window
+					// From this run, which for a new finding is when it was
+					// first seen. One already open is answered in the loop
+					// below, from its own opening.
+					entry.DueAt = Deadline(entry.FixState, startedAt,
+						entry.ExploitedLearnedAt, entry.FixedAt, window)
 				}
-				// A finding that opens already exploited was learned about
-				// when it opened, and the recount has to reach the same
-				// answer as the line above.
-				entry.ExploitedLearnedAt = learnedExploitation(entry, startedAt)
 				wanted[key{vulnerabilityID, at}] = entry
 			}
 		}
@@ -311,8 +318,25 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			// month's answer indefinitely. The same goes for how
 			// urgent it is: what is known about an issue changes
 			// under a finding that has not.
-			moved, reclocked := ranking(already, f)
-			if same(already, f) && !moved {
+			moved, exploitationMoved := ranking(already, f)
+			// From its own opening rather than from this run, and from what
+			// the row already knows about when exploitation was learned — a
+			// recount that re-learned it nightly would move the deadline
+			// forward every night and never arrive.
+			learned := already.ExploitedLearnedAt
+			if exploitationMoved {
+				learned = learnedExploitation(f, startedAt)
+			}
+			window, onClock := windowFor[k]
+			if onClock {
+				f.DueAt = Deadline(f.FixState, already.OpenedAt, learned, f.FixedAt, window)
+			}
+			// Asked of the answer rather than of what moved. A fix appearing
+			// upstream starts a clock that was not running, and one being
+			// withdrawn stops it — and a row written before this rule was
+			// what it is now carries an answer nothing else would correct.
+			clockMoved := !sameDate(already.DueAt, f.DueAt)
+			if same(already, f) && !moved && !clockMoved {
 				continue
 			}
 			update := tx.NewUpdate().Model((*Finding)(nil)).
@@ -331,21 +355,14 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					Set("urgency_exploited = ?", f.RankExploited).
 					Set("urgency_shipped = ?", f.RankShipped)
 			}
-			if reclocked {
+			if exploitationMoved {
 				// The moment, kept beside the deadline it produced. Every
 				// later recount counts from it, and nothing else on the row
 				// holds it — so without this the recount fell back to the
 				// opening and moved the deadline into the past.
-				update = update.Set("exploited_learned_at = ?", learnedExploitation(f, startedAt))
+				update = update.Set("exploited_learned_at = ?", learned)
 			}
-			if reclocked {
-				// From this run rather than from when the
-				// finding opened. Counted from the opening, an
-				// issue that became exploited after six months
-				// would land three days *before* it was known
-				// — a deadline nobody could have met, which is
-				// exactly the failure a deadline from urgency
-				// says to design against.
+			if clockMoved {
 				update = update.Set("due_at = ?", f.DueAt)
 			}
 			if _, err := update.Where("id = ?", already.ID).Exec(ctx); err != nil {
@@ -480,20 +497,24 @@ func learnedExploitation(f Finding, startedAt time.Time) *time.Time {
 }
 
 // ranking reports whether an open finding's place in the order has moved, and
-// whether its clock has changed with it.
+// whether exploitation is what moved it.
 //
 // The two are separate, and deliberately: **every** ranking signal moves the
-// order, and **only** exploitation moves the deadline. A score somebody
-// revised upward is worth reordering the list for and is not worth resetting a
-// clock over — likelihood and score are not in the deadline at all, and a
-// deadline recounted whenever a number was revised would never arrive, which
-// is the same failure as recounting it nightly.
-func ranking(held, found Finding) (moved, reclocked bool) {
+// order, and exploitation is the only one that starts a clock over. A score
+// somebody revised upward is worth reordering the list for and is not worth
+// resetting a deadline over — likelihood and score are not in the deadline at
+// all, and a deadline recounted whenever a number was revised would never
+// arrive, which is the same failure as recounting it nightly.
+//
+// It does not answer whether the deadline moved. That is asked of the deadline
+// itself, because a fix appearing upstream moves it and touches no ranking
+// signal at all.
+func ranking(held, found Finding) (moved, exploitationMoved bool) {
 	moved = held.Urgency != found.Urgency ||
 		held.RankExploited != found.RankExploited ||
 		held.RankShipped != found.RankShipped
-	reclocked = held.RankExploited != found.RankExploited
-	return moved, reclocked
+	exploitationMoved = held.RankExploited != found.RankExploited
+	return moved, exploitationMoved
 }
 
 // ratingsInForce reads what is on record about each interned issue.

@@ -117,10 +117,10 @@ func TestWhatTheDocumentSaysAFindingWithNoDeadlineCarries(t *testing.T) {
 		if len(declared) == 0 {
 			t.Fatal("no published body declares why a finding has no deadline")
 		}
-		// The two the store emits, and nothing else. Named here rather than
-		// read from internal/finding so that a word added there without being
+		// What the store emits, and nothing else. Named here rather than read
+		// from internal/finding so that a word added there without being
 		// published fails this rather than passing it.
-		want := []string{"below-the-line", "out-of-support"}
+		want := []string{"below-the-line", "nothing-to-take", "out-of-support"}
 		for body, said := range declared {
 			if !slices.Equal(said, want) {
 				t.Errorf("%s declares %v, and the store emits %v", body, said, want)
