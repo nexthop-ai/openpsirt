@@ -84,7 +84,7 @@ inputs.
 |---|---|---|
 | REQ-10 | The deployment runs the scan, on a schedule, for everything it tracks. The component list always comes from the build — we re-scan, we do not discover | A producer-run scanner measures each product by whatever version its own pipeline installed, so nothing is comparable. The build knows what it shipped |
 | REQ-11 | A build's own suppressions are applied and never re-decided | The build's judgment about the patches it carries is the one nobody here can improve on |
-| REQ-12 | The scanner, its vulnerability database and the exploitation feeds all work with no network | Air-gapped installs need the offline path to work, not merely to exist |
+| REQ-12 | The scanner, its vulnerability database and the exploitation feeds all work with no network | A scan has to be reproducible, and one that reaches out is a scan whose answer depends on what somebody else served that minute. It also keeps every content network out of the path a scan is available through, which is the half that fails at the worst moment. Air-gapped operation falls out of both and was never the goal |
 | REQ-13 | Every finding records what produced it — which scanner, which version, which database, and how the match was made | "Why is this here" is unanswerable afterwards otherwise, and a scanner upgrade changes results |
 | REQ-14 | Static analysis and fuzzing findings are intended scope. **Not built** | The finding model carries a kind from the start, so a second kind needs no rewrite |
 
@@ -222,9 +222,8 @@ inputs.
 |---|---|
 | Generating SBOMs | We ingest them |
 | A portal that vulnerability reporters submit to | A flaw somebody reports is recorded by hand, with who reported it and when (REQ-19) |
-| Being a CVE Numbering Authority | |
 | Deploying fixes | Remediation is tracked (REQ-35); nothing ships from here |
-| Customer-facing status pages | |
+| Customer-facing status pages | This application does not host and serve a public page — REQ-63 at a different altitude. It writes documents; somebody else's web server serves them. The blank this replaces hid a real ambiguity: a service-health page and a disclosure page are opposite answers, and only the first is out of scope as a kind of thing |
 | License and compliance analysis of SBOM contents | Adjacent, and likely to be asked for. Noted, not built |
 | Replacing an issue tracker | Hand-off is optional and configured (REQ-36) |
 | Multi-tenancy | One deployment serves one organization. Isolation by having no shared boundary is stronger than isolation by remembering a filter — and the filter would live where reports, aggregates and exports do |
@@ -240,10 +239,10 @@ Asked for, and deliberately not built.
 | **Hiding a finding from a count by anything but a decision** | A preference that changes a number makes "312 open criticals" depend on who is looking, and lets a metric improve by editing a filter. A filter narrows a list, rides in the URL, and reports what it hid (REQ-30) |
 | **Dismissing everything under a container in one action** | One sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards, and what is true of a container is rarely true of everything in it. Triage cost is answered at axes where the claim stays honest (REQ-26, REQ-27) |
 | **A pass/fail gate in the build pipeline** | An upload answers before the documents are parsed, and what a scan reports depends on what the vulnerability database knows that day rather than on what the commit changed — so the same commit passes today and fails tomorrow. That is the property that makes a gate get switched off. A build that introduced a known-exploited critical tells somebody instead (REQ-49) |
-| **SSVC as a vocabulary over the ranking** | Its usual form is for a deployer patching an estate or a coordinator triaging incoming reports. This tool is vendor-side, and its audience asks for CSAF, VEX, CVSS and exploitation data. Adopting a named framework is a standing commitment to track it as it revises |
+| **SSVC as a vocabulary over the ranking** | This tool's audience asks for CSAF, VEX, CVSS and exploitation data. Adopting a named framework is a standing commitment to track it as it revises |
 | **Detecting abandoned dependencies to explain a finding with no fix** | Measured on a real image: of 1,125 findings with no fix, 1,113 are distribution packages. The maintainer is Debian, which is not dead |
 | **"Contained another way" as an outcome of its own** | Already sayable as not-applicable with the standard justification for existing mitigations. VEX puts this distinction in the justification rather than the status |
-| **Storing when a vulnerability was disclosed** | Nothing we read supplies it. The scanner reports when a fix appeared, never when the issue did |
+| **Storing when a vulnerability was disclosed** | Nothing the scanner reports supplies it: it says when a fix appeared, never when the issue did. Other sources do carry it, so acquiring it means a second source consulted per issue — a capability rather than a field, and one to decide on as a capability |
 | **Versions inside the identity of a place** | The top-level version changes every build, so every decision would lapse nightly |
 | **Backport tracking through pull requests tagged with a target branch** | Assumes commit and pull-request linkage we do not have. The same picture is derived from scans (REQ-35) |
 | **A reverse proxy at the ingress as the only sign-in** | Works in Kubernetes, does not travel to self-hosted or local development |
