@@ -165,6 +165,26 @@ type Branch struct {
 type Named struct {
 	Name string `json:"name"`
 	ID   string `json:"product_id"`
+	// Helper is how a reader matches this release against something they
+	// already hold, where the build said what it is.
+	Helper *IdentificationHelper `json:"product_identification_helper,omitempty"`
+}
+
+// IdentificationHelper is what a release called itself, in a spelling a machine
+// can compare.
+//
+// **The identifier the build declared, never one minted here.** An identifier
+// only helps if it appears on both sides of the comparison, and one invented
+// here appears on one: a reader holding our image has whatever our build wrote
+// into its inventory, which is this exact string if they ingested that
+// document. A plausible identifier nothing outside this deployment has seen is
+// worse than none, because a reader matches on it and misses.
+//
+// It is read from the scan rather than from the component, because the root
+// component is stored by name alone: a package identifier carries the version,
+// and the root's version moves every build.
+type IdentificationHelper struct {
+	Purl string `json:"purl,omitempty"`
 }
 
 // Vulnerability is the flaw and what is true of it in each release.
@@ -381,6 +401,9 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 			Name: fmt.Sprintf("%s %s", shown, release.Name()),
 			ID:   release.ProductID(product),
 		}
+		if release.Identifier != "" {
+			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
+		}
 		versions = append(versions, Branch{
 			Category: "product_version", Name: release.Name(), Product: &leaf,
 		})
@@ -419,6 +442,9 @@ type Release struct {
 	// Holds says the issue is open there. False is a release that held it and
 	// no longer does, which is the one that was fixed.
 	Holds bool
+	// Identifier is what this build's own inventory called the thing it is
+	// about, and empty where that document named no component of its own.
+	Identifier string
 }
 
 // Name is how the release is written in the document.
@@ -510,6 +536,7 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 		Stream  string `bun:"stream"`
 		Variant string `bun:"variant"`
 		Open    int    `bun:"open"`
+		Root    string `bun:"root_identifier"`
 	}
 	// One statement rather than one per build: a product with thirty tags
 	// would otherwise be thirty round trips to write one document, and the
@@ -519,6 +546,10 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
+		// What this build's own inventory called itself, from the scan that
+		// inventory arrived on. Joined on the target's current scan, which is
+		// one row by key, so it cannot multiply the findings counted below.
+		Join(`LEFT JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`va.name AS "variant"`).
 		// Counted rather than filtered, so a release that held the flaw and no
@@ -526,6 +557,9 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 		// to, and dropping it would leave finished work indistinguishable
 		// from a release that never shipped the thing.
 		ColumnExpr(`COUNT(CASE WHEN f.closed_at IS NULL THEN 1 END) AS "open"`).
+		// One value per build, aggregated because the grouping is on the
+		// build's names rather than on its key.
+		ColumnExpr(`MIN(COALESCE(sc.root_identifier, '')) AS "root_identifier"`).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", issueID).
 		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
@@ -539,6 +573,7 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		releases = append(releases, Release{
 			Stream: row.Stream, Variant: row.Variant, Holds: row.Open > 0,
+			Identifier: row.Root,
 		})
 	}
 	// Ordered here rather than by the engine, so the document is byte-for-byte

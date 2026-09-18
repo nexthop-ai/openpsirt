@@ -68,8 +68,16 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	})
 }
 
-// shipped stores a graph against one build.
+// shipped stores a graph against one build, as an inventory naming its own
+// root does.
 func (f *fixture) shipped(t *testing.T, target int64) {
+	t.Helper()
+	f.shippedAs(t, target, root.Purl)
+}
+
+// shippedAs is the same, with what the document declared itself to be — empty
+// for a document that named no component of its own.
+func (f *fixture) shippedAs(t *testing.T, target int64, declared string) {
 	t.Helper()
 	ctx := t.Context()
 	f.seq++
@@ -86,6 +94,11 @@ func (f *fixture) shipped(t *testing.T, target int64) {
 		Dependencies: []graph.Dependency{{Parent: root, Child: carrier}},
 	}); err != nil {
 		t.Fatalf("apply graph: %v", err)
+	}
+	// What the document said it was about, which ingest records beside what
+	// the inventory was made of.
+	if err := f.scans.Made(ctx, scan.ID, 1, 1, declared); err != nil {
+		t.Fatalf("record what the document declared: %v", err)
 	}
 }
 
@@ -680,4 +693,72 @@ func at(tree any, pointer string) (any, bool) {
 		}
 	}
 	return tree, true
+}
+
+func TestTheProductTreeNamesEachReleaseByWhatItsOwnInventoryCalledIt(t *testing.T) {
+	// A reader matches an advisory against what they hold, and the identifier
+	// that lets them is the one their copy of the inventory carries — which is
+	// the one the build wrote. So the tree states that and never a spelling
+	// minted here, which would appear on one side of the comparison only.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+
+		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		leaves := releaseLeaves(doc)
+		if len(leaves) == 0 {
+			t.Fatal("the tree names no release")
+		}
+		for _, leaf := range leaves {
+			if leaf.Helper == nil {
+				t.Errorf("%q carries no identifier for a reader to match on", leaf.ID)
+				continue
+			}
+			if leaf.Helper.Purl != root.Purl {
+				t.Errorf("%q says it is %q, want what the build declared, %q",
+					leaf.ID, leaf.Helper.Purl, root.Purl)
+			}
+		}
+	})
+}
+
+func TestAReleaseWhoseInventoryNamedNoRootOffersNothingToMatchOn(t *testing.T) {
+	// A document that names no component of its own is ordinary, and the
+	// tracked unit stands in for the root. What stands in is ours rather than
+	// the producer's, so there is nothing a reader could match against and the
+	// field is absent — which is the failure the field exists to avoid.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shippedAs(t, f.master, "")
+		identifier := f.recorded(t, f.master)
+
+		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch := "sonic:" + fixtures.BranchName + ":broadcom"
+		for _, leaf := range releaseLeaves(doc) {
+			if leaf.ID == branch && leaf.Helper != nil {
+				t.Errorf("%q claims to be %+v, and its inventory named nothing",
+					leaf.ID, leaf.Helper)
+			}
+		}
+	})
+}
+
+// releaseLeaves is every release the product tree names.
+func releaseLeaves(doc *advisory.Document) []advisory.Named {
+	var out []advisory.Named
+	var walk func(branches []advisory.Branch)
+	walk = func(branches []advisory.Branch) {
+		for _, branch := range branches {
+			if branch.Product != nil {
+				out = append(out, *branch.Product)
+			}
+			walk(branch.Branches)
+		}
+	}
+	walk(doc.ProductTree.Branches)
+	return out
 }

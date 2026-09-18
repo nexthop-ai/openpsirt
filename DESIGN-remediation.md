@@ -352,12 +352,21 @@ An address a report supplied goes through the rule an address stored beside a
 claim goes through, and a custom application scheme is dropped rather than
 published. It is leaving the deployment, into tooling that follows it.
 
-**Two fields the standard defines are not carried.** The weakness
-classification needs the name that goes with the identifier, and what is held
-is the identifier alone — a name invented to fill the field is the one thing a
-validator checks it against. The product identification helper names a package,
-and this tree names releases rather than components, which is what an advisory
-aggregates to.
+**The weakness classification is not carried.** It needs the name that goes
+with the identifier, and what is held is the identifier alone — a name invented
+to fill the field is the one thing a validator checks it against, and acquiring
+names means taking on a catalog somebody else publishes, with an owner and a
+refresh story.
+
+**Each release is named by what its own inventory called it.** The product
+identification helper carries the package identifier the build declared for the
+component the document is about, where it declared one.
+
+| Rule | Reason |
+|---|---|
+| The identifier the build declared, never one minted here | An identifier only helps if it appears on both sides of the comparison. A reader holding the image has whatever the build wrote into its inventory, which is this exact string if they ingested that document. A plausible identifier nothing outside this deployment has seen is worse than none, because a reader matches on it and misses |
+| Read from the scan rather than from the root component | The root is stored by name alone, deliberately: a package identifier carries the version, the root's version moves every build, and the root's identity moving takes every edge hanging off it. What the document declared is a fact about that document, so it is kept beside the serial and what the inventory was made of |
+| Absent where the document named no component of its own | The tracked unit stands in for the root there, and what stands in is ours rather than the producer's. A release with a declared root carrying no package identifier is the same answer for the same reason |
 
 ## The VEX document
 
