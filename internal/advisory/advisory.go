@@ -372,20 +372,24 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 	// aggregates to a product and a version range, and a reader of one is
 	// asking "am I affected", which a dependency path does not answer .
 	versions := make([]Branch, 0, len(releases))
+	// The releases somebody can move to, by the name the tree gives them. The
+	// remediation says which, and a document that named them some other way
+	// would be answering with a name nothing else in it uses.
+	fixed := make([]Named, 0, len(releases))
 	for _, release := range releases {
+		leaf := Named{
+			Name: fmt.Sprintf("%s %s", shown, release.Name()),
+			ID:   release.ProductID(product),
+		}
 		versions = append(versions, Branch{
-			Category: "product_version", Name: release.Name(),
-			Product: &Named{
-				Name: fmt.Sprintf("%s %s", shown, release.Name()),
-				ID:   release.ProductID(product),
-			},
+			Category: "product_version", Name: release.Name(), Product: &leaf,
 		})
 		if release.Holds {
 			vulnerability.Status.KnownAffected = append(
-				vulnerability.Status.KnownAffected, release.ProductID(product))
+				vulnerability.Status.KnownAffected, leaf.ID)
 		} else {
-			vulnerability.Status.Fixed = append(
-				vulnerability.Status.Fixed, release.ProductID(product))
+			vulnerability.Status.Fixed = append(vulnerability.Status.Fixed, leaf.ID)
+			fixed = append(fixed, leaf)
 		}
 	}
 	// Every release the document names, which is what a rating is stated for:
@@ -395,8 +399,7 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 		rated = append(rated, release.ProductID(product))
 	}
 	vulnerability.Scores = scoresFor(issue, rated)
-	vulnerability.Remediations = remediationsFor(
-		vulnerability.Status.Fixed, vulnerability.Status.KnownAffected)
+	vulnerability.Remediations = remediationsFor(fixed, vulnerability.Status.KnownAffected)
 
 	doc.ProductTree = ProductTree{Branches: []Branch{{
 		Category: "vendor", Name: who.Name,

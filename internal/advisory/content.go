@@ -218,6 +218,17 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 
 // remediationsFor is what a reader can do, from what is true now.
 //
+// **It names the releases.** "Update to a release in which this flaw is fixed"
+// is the instruction with the answer left out, and the answer is three lines
+// away in the same function. A reader then has to find the fixed set in the
+// product status and match identifiers by hand — which is the work a document
+// exists to save.
+//
+// Not the earliest fixed release. Picking one means ordering release names,
+// which this does not do for the reason nothing else here does: an ordering
+// that answers confidently for a pair it cannot order is worse than none. All
+// of them, in the order the tree names them, and the reader picks.
+//
 // **Stated for the releases that carry the flaw**, which is who a remediation
 // is for: CSAF § 3.2.3.12.6 defines the product identifiers as what the item
 // applies to, and § 3.2.3.12.1 defines a vendor fix as one for the affected
@@ -230,16 +241,21 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 // inside this deployment; the same sentence in a published advisory is a
 // promise to a customer about a date, and whether to make one is the
 // publisher's.
-func remediationsFor(fixed, affected []string) []Remediation {
+func remediationsFor(fixed []Named, affected []string) []Remediation {
 	// Nothing to remediate where nothing carries it: a document about a flaw
 	// every release has left behind is a record rather than a warning.
 	if len(affected) == 0 {
 		return nil
 	}
 	if len(fixed) > 0 {
+		names := make([]string, 0, len(fixed))
+		for _, one := range fixed {
+			names = append(names, one.Name)
+		}
 		return []Remediation{{
-			Category:   "vendor_fix",
-			Details:    "Update to a release in which this flaw is fixed.",
+			Category: "vendor_fix",
+			Details: "Update to a release in which this flaw is fixed: " +
+				strings.Join(names, ", ") + ".",
 			ProductIDs: affected,
 		}}
 	}

@@ -509,6 +509,14 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 			!slices.Equal(fix[0].ProductIDs, []string{"sonic:master:broadcom"}) {
 			t.Errorf("the remediations read %+v", fix)
 		}
+		// And it says which release, by the name the product tree gives it.
+		// "Update to a release in which this flaw is fixed" is the instruction
+		// with the answer left out, and the answer is in the same document.
+		says := "Update to a release in which this flaw is fixed: " +
+			fixtures.ProductDisplayName + " " + fixtures.TagName + " (broadcom)."
+		if fix[0].Details != says {
+			t.Errorf("the remediation reads %q, want %q", fix[0].Details, says)
+		}
 	})
 }
 
