@@ -79,6 +79,11 @@ type Statement struct {
 	// Justification is the standard category, present only for
 	// not_affected. It is the same vocabulary a dismissal already records.
 	Justification string `json:"justification,omitempty"`
+	// ActionStatement is what a holder can do about a flaw that is not going
+	// to be fixed. The format requires one on an affected statement, which is
+	// why silence is not an option there and why only a claim carrying a
+	// mitigation is published as one.
+	ActionStatement string `json:"action_statement,omitempty"`
 	// ImpactStatement is what stops the flaw, where somebody named it.
 	//
 	// The mitigation rather than the reasoning. The reasoning is what a
@@ -234,8 +239,14 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// part of the join rather than a filter, as it was on the decision:
 		// what the counting below asks is whether *every* open place is
 		// dismissed, and a filter would drop the places that are not.
+		// A claim that will not be fixed joins only where it says what a
+		// holder can do instead. The format requires an action on an affected
+		// statement, so one without a mitigation has nothing to publish — and
+		// left out it falls through to silence, which already reads as
+		// affected and is the honest answer.
 		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			AND cl.outcome IN ('not-applicable', 'already-fixed')`).
+			AND (cl.outcome IN ('not-applicable', 'already-fixed')
+				OR (cl.outcome = 'wont-fix' AND COALESCE(cl.mitigation, '') <> ''))`).
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
@@ -366,11 +377,19 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 			Products: []Shipped{{
 				ID: shipped, Subcomponents: []Inside{{ID: about}},
 			}},
-			Status:          statusOf(row.Outcome),
-			ImpactStatement: row.Mitigation,
+			Status: statusOf(row.Outcome),
 		}
-		if statement.Status == "not_affected" {
+		// The same sentence goes in a different field depending on what is
+		// being said about it. On a claim that something does not apply it is
+		// why, beside the category a machine reads; on one that will not be
+		// fixed it is what to do instead, which is the field the format asks
+		// for and the reason such a claim is published at all.
+		switch statement.Status {
+		case "not_affected":
 			statement.Justification = row.Justification
+			statement.ImpactStatement = row.Mitigation
+		case "affected":
+			statement.ActionStatement = row.Mitigation
 		}
 		doc.Statements = append(doc.Statements, statement)
 	}
@@ -390,15 +409,25 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 
 // statusOf turns an outcome into what the format calls it.
 //
-// Only the two a VEX document per build names arrive here. A deferral never
+// Only the three a VEX document per build names arrive here. A deferral never
 // does: publishing it as not-affected would tell the world we assessed
 // something as harmless when we had only postponed it, and silence already
 // reads as affected.
+//
+// A claim that will not be fixed is affected rather than dismissed, which is
+// what it says: the flaw is there and is staying. It reaches a customer only
+// this way — it is a standing property of a shipped feature, so no scan closes
+// it and no advisory is issued about it, and under silence it would never be
+// said at all.
 func statusOf(outcome string) string {
-	if outcome == "already-fixed" {
+	switch outcome {
+	case "already-fixed":
 		return "fixed"
+	case "wont-fix":
+		return "affected"
+	default:
+		return "not_affected"
 	}
-	return "not_affected"
 }
 
 // namesOf is what each of these issues is also called, keyed by issue.

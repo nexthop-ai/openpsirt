@@ -523,3 +523,64 @@ func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
 		}
 	})
 }
+
+func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing.T) {
+	// A standing property of a shipped feature — a protocol that cannot change
+	// without breaking what it is compatible with. No scan closes it, no
+	// advisory is issued about it, and under silence it reaches a customer
+	// never. The format has a status for exactly this and a field for what to
+	// do instead, and the second is why the first is publishable at all.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+
+		const instead = "Use SSH, or reach it from the management VLAN only."
+		// One that says what to do, and one that says nothing.
+		told, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image",
+			`{"outcome":"wont-fix","mitigation":"`+instead+`",`+
+				`"reasoning":"The protocol is fixed by the compatibility promise."}`)
+		silent, _ := r.claimed(t, "triager", "CVE-2026-1000", "linux-image",
+			`{"outcome":"wont-fix","reasoning":"Nothing can be done about this one."}`)
+		for _, id := range []int64{told, silent} {
+			if got := asPerson(t, r, "reviewer", http.MethodPost,
+				fmt.Sprintf("/v1/claims/%d/approval", id), `{}`); got.Code != http.StatusOK {
+				t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+			}
+		}
+
+		var doc struct {
+			Statements []struct {
+				Vulnerability struct {
+					Name string `json:"name"`
+				} `json:"vulnerability"`
+				Status          string `json:"status"`
+				ActionStatement string `json:"action_statement"`
+				ImpactStatement string `json:"impact_statement"`
+				Justification   string `json:"justification"`
+			} `json:"statements"`
+		}
+		read(t, r, "triager", at, &doc)
+		if len(doc.Statements) != 1 {
+			t.Fatalf("the document carries %d statements, want only the one with an "+
+				"action: %+v", len(doc.Statements), doc.Statements)
+		}
+		one := doc.Statements[0]
+		if one.Vulnerability.Name != "CVE-2026-9999" {
+			t.Fatalf("the statement is about %q", one.Vulnerability.Name)
+		}
+		// Affected rather than dismissed, which is what the claim says: the
+		// flaw is there and it is staying.
+		if one.Status != "affected" {
+			t.Errorf("a flaw that will not be fixed reads as %q", one.Status)
+		}
+		if one.ActionStatement != instead {
+			t.Errorf("the statement offers %q, want what to do instead", one.ActionStatement)
+		}
+		// The fields that belong to the other status stay empty. An affected
+		// statement carrying a not-affected justification is a document saying
+		// both things at once.
+		if one.ImpactStatement != "" || one.Justification != "" {
+			t.Errorf("an affected statement also reads as not affected: %+v", one)
+		}
+	})
+}

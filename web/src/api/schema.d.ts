@@ -5539,7 +5539,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other */
+            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
             mitigation?: string;
             /** @description Whether a second person has to agree before it takes effect */
             needs_approval?: boolean;
@@ -6182,7 +6182,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other */
+            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "patch-needed";
@@ -6385,6 +6385,9 @@ export interface components {
             /** @description This is a team's queue rather than one person's work */
             team?: boolean;
         };
+        IdentificationHelper: {
+            purl?: string;
+        };
         Info: {
             /**
              * Format: uri
@@ -6506,7 +6509,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks */
+            /** @description What a holder can do about it, where somebody said. Nothing here notices a control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
@@ -7202,6 +7205,7 @@ export interface components {
         Named: {
             name: string;
             product_id: string;
+            product_identification_helper?: components["schemas"]["IdentificationHelper"];
         };
         NeighborBody: {
             /**
@@ -8852,6 +8856,7 @@ export interface components {
             state: "proposed" | "approved";
         };
         Statement: {
+            action_statement?: string;
             impact_statement?: string;
             justification?: string;
             products: components["schemas"]["Shipped"][] | null;

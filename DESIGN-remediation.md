@@ -370,8 +370,9 @@ component the document is about, where it declared one.
 
 ## The VEX document
 
-Assembled from approved `not-applicable` and `already-fixed` claims (REQ-39), for
-one product, stream and variant.
+Assembled from approved `not-applicable` and `already-fixed` claims (REQ-39),
+and from `wont-fix` claims that say what a holder can do instead, for one
+product, stream and variant.
 
 A customer running their own scanner against a shipped image asks "which of these
 are you not affected by" more often than they ask for an advisory. Generating it
@@ -385,6 +386,8 @@ customer — which is the reason the two-person approval on those claims exists.
 | The impact statement carries what stops the flaw, never the reasoning | The reasoning is the argument a triager put to a second person here, addressed to a reader who can see the record it argues against. Published it is this deployment's review of itself, machine-readable, in front of every customer running a scanner. The mitigation is the half somebody holding the build can act on |
 | Where no mitigation was named the field is absent | Only one recognized reason asks for a mitigation, so most statements carry none. The justification beside it is what the format asks for, and silence says less wrongly than the wrong text |
 | A deferral is absent rather than exported as anything | Publishing it as not-affected would assert we assessed something as harmless when we had only postponed it. Silence already reads as affected in this format |
+| A claim that will not be fixed is published as affected, and only where it names what to do instead | It is the truth about such a flaw: it is there and it is staying. Nothing else ever says so — no scan closes a standing property of a shipped feature and no advisory is issued about one — so under silence it reaches a customer never. The format requires an action on an affected statement, so a claim with nothing to offer has nothing to publish, and left out it falls through to the silence that already reads as affected |
+| The mitigation goes in a different field depending on the status | On a claim that something does not apply it is why, beside the category a machine reads. On one that will not be fixed it is what to do instead. An affected statement carrying a not-affected justification says both things at once |
 | Public findings only | Asking for the undisclosed ones is a preview for somebody who may read them, and refused for anybody who may not |
 | The statement is about the build, with the component underneath | A VEX statement is about a thing somebody has, and what they have is the image |
 | A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |

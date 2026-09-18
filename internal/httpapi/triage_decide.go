@@ -30,7 +30,7 @@ import (
 type FindingDecisionBody struct {
 	Outcome       outcomeOneAtATime `json:"outcome"`
 	Justification justification     `json:"justification,omitempty" doc:"Why it does not apply. Required when it does not"`
-	Mitigation    string            `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other"`
+	Mitigation    string            `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
 	DeferredUntil string            `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 	// CommittedTo is when a promised backport lands. An upgrade is not
 	// recorded here at all: it answers a component rather than one

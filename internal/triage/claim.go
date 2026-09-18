@@ -58,9 +58,14 @@ type Claim struct {
 	// claims something does not apply — where which reason it is *is* the
 	// claim.
 	Justification *string `bun:"justification"`
-	// Mitigation is what actually stops it, where the claim is that something
-	// already does. Required with that justification and meaningless with any
-	// other.
+	// Mitigation is what a holder can do about it.
+	//
+	// Required where the claim is that something already stops it, which is
+	// what that claim says. Allowed and optional where the claim is that this
+	// will not be fixed, because a standing property of a shipped feature
+	// often has a real answer — use the other protocol, reach it from the
+	// management network only — and the published document has a field for
+	// exactly that. Meaningless with any other outcome.
 	Mitigation *string `bun:"mitigation"`
 	// DeferredUntil is when somebody will look again, for the one outcome that
 	// expires on a date rather than on the code changing.
